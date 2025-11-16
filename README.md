@@ -5,5 +5,13 @@
 <h1 align="center">Plotnik</h1>
 
 <p align="center">
-  A query language for <a href="https://tree-sitter.github.io/">tree-sitter</a> AST
+  An advanced query language for <a href="https://tree-sitter.github.io/">tree-sitter</a> AST
 </p>
+
+## About
+
+Plotnik is an expressive query language for tree-sitter AST. It allows you to extract structured data from code by matching syntax trees against regex-like queries that support recursion. The type of extracted data is inferred from the query.
+
+## License
+
+This project is licensed under the [MIT license](LICENCE.md).
