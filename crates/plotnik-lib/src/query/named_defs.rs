@@ -1,0 +1,488 @@
+//! Name resolution: builds symbol table and checks references.
+//!
+//! Two-pass approach:
+//! 1. Collect all `Name = expr` definitions
+//! 2. Check that all `(UpperIdent)` references are defined
+
+use indexmap::{IndexMap, IndexSet};
+use rowan::TextRange;
+
+use crate::ast::{Diagnostic, ErrorStage};
+use crate::ast::{Expr, Ref, Root};
+
+#[derive(Debug, Clone)]
+pub struct SymbolTable {
+    defs: IndexMap<String, DefInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DefInfo {
+    pub name: String,
+    pub range: TextRange,
+    pub refs: IndexSet<String>,
+}
+
+#[derive(Debug)]
+pub struct ResolveResult {
+    pub symbols: SymbolTable,
+    pub errors: Vec<Diagnostic>,
+}
+
+impl SymbolTable {
+    pub fn get(&self, name: &str) -> Option<&DefInfo> {
+        self.defs.get(name)
+    }
+
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.defs.keys().map(|s| s.as_str())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DefInfo> {
+        self.defs.values()
+    }
+
+    pub fn len(&self) -> usize {
+        self.defs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.defs.is_empty()
+    }
+}
+
+pub fn resolve(root: &Root) -> ResolveResult {
+    let mut defs = IndexMap::new();
+    let mut errors = Vec::new();
+
+    // Pass 1: collect definitions
+    for def in root.defs() {
+        let Some(name_token) = def.name() else {
+            continue;
+        };
+
+        let name = name_token.text().to_string();
+        let range = name_token.text_range();
+
+        if defs.contains_key(&name) {
+            errors.push(
+                Diagnostic::error(range, format!("duplicate definition: `{}`", name))
+                    .with_stage(ErrorStage::Resolve),
+            );
+            continue;
+        }
+
+        let mut refs = IndexSet::new();
+        if let Some(body) = def.body() {
+            collect_refs(&body, &mut refs);
+        }
+        defs.insert(name.clone(), DefInfo { name, range, refs });
+    }
+
+    let symbols = SymbolTable { defs };
+
+    // Pass 2: check references
+    for def in root.defs() {
+        let Some(body) = def.body() else { continue };
+        collect_reference_errors(&body, &symbols, &mut errors);
+    }
+
+    // Parser wraps all top-level exprs in Def nodes, so this should be empty
+    assert!(
+        root.exprs().next().is_none(),
+        "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
+    );
+
+    ResolveResult { symbols, errors }
+}
+
+fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
+    match expr {
+        Expr::Ref(r) => {
+            let Some(name_token) = r.name() else { return };
+            refs.insert(name_token.text().to_string());
+        }
+        Expr::Tree(tree) => {
+            for child in tree.children() {
+                collect_refs(&child, refs);
+            }
+        }
+        Expr::Alt(alt) => {
+            for branch in alt.branches() {
+                let Some(body) = branch.body() else { continue };
+                collect_refs(&body, refs);
+            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
+        }
+        Expr::Seq(seq) => {
+            for child in seq.children() {
+                collect_refs(&child, refs);
+            }
+        }
+        Expr::Capture(cap) => {
+            let Some(inner) = cap.inner() else { return };
+            collect_refs(&inner, refs);
+        }
+        Expr::Quantifier(q) => {
+            let Some(inner) = q.inner() else { return };
+            collect_refs(&inner, refs);
+        }
+        Expr::Field(f) => {
+            let Some(value) = f.value() else { return };
+            collect_refs(&value, refs);
+        }
+        Expr::Str(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+    }
+}
+
+fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
+    match expr {
+        Expr::Ref(r) => {
+            check_ref_reference(r, symbols, errors);
+        }
+        Expr::Tree(tree) => {
+            for child in tree.children() {
+                collect_reference_errors(&child, symbols, errors);
+            }
+        }
+        Expr::Alt(alt) => {
+            for branch in alt.branches() {
+                let Some(body) = branch.body() else { continue };
+                collect_reference_errors(&body, symbols, errors);
+            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
+        }
+        Expr::Seq(seq) => {
+            for child in seq.children() {
+                collect_reference_errors(&child, symbols, errors);
+            }
+        }
+        Expr::Capture(cap) => {
+            let Some(inner) = cap.inner() else { return };
+            collect_reference_errors(&inner, symbols, errors);
+        }
+        Expr::Quantifier(q) => {
+            let Some(inner) = q.inner() else { return };
+            collect_reference_errors(&inner, symbols, errors);
+        }
+        Expr::Field(f) => {
+            let Some(value) = f.value() else { return };
+            collect_reference_errors(&value, symbols, errors);
+        }
+        Expr::Str(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+    }
+}
+
+fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
+    let Some(name_token) = r.name() else { return };
+    let name = name_token.text();
+
+    if symbols.get(name).is_some() {
+        return;
+    }
+
+    errors.push(
+        Diagnostic::error(
+            name_token.text_range(),
+            format!("undefined reference: `{}`", name),
+        )
+        .with_stage(ErrorStage::Resolve),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Query;
+    use indoc::indoc;
+
+    #[test]
+    fn single_definition() {
+        let input = "Expr = (expression)";
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @"Expr");
+    }
+
+    #[test]
+    fn multiple_definitions() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Stmt = (statement)
+        Decl = (declaration)
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        Stmt
+        Decl
+        ");
+    }
+
+    #[test]
+    fn valid_reference() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Call = (call_expression function: (Expr))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        Call
+          Expr
+        ");
+    }
+
+    #[test]
+    fn undefined_reference() {
+        let input = "Call = (call_expression function: (Undefined))";
+
+        let query = Query::new(input).unwrap();
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.dump_errors(), @r"
+        error: undefined reference: `Undefined`
+          |
+        1 | Call = (call_expression function: (Undefined))
+          |                                    ^^^^^^^^^ undefined reference: `Undefined`
+        ");
+    }
+
+    #[test]
+    fn self_reference() {
+        let input = "Expr = [(identifier) (call (Expr))]";
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+          Expr (cycle)
+        ");
+    }
+
+    #[test]
+    fn mutual_recursion() {
+        let input = indoc! {r#"
+        A = (foo (B))
+        B = (bar (A))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.dump_errors(), @r"
+        error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+          |
+        1 | A = (foo (B))
+          |           - `A` references `B` (completing cycle)
+        2 | B = (bar (A))
+          |           ^
+          |           |
+          |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+          |           `B` references `A`
+        ");
+    }
+
+    #[test]
+    fn duplicate_definition() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Expr = (other)
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.dump_errors(), @r"
+        error: duplicate definition: `Expr`
+          |
+        2 | Expr = (other)
+          | ^^^^ duplicate definition: `Expr`
+        ");
+    }
+
+    #[test]
+    fn reference_in_alternation() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Value = [(Expr) (literal)]
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        Value
+          Expr
+        ");
+    }
+
+    #[test]
+    fn reference_in_sequence() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Pair = {(Expr) (Expr)}
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        Pair
+          Expr
+        ");
+    }
+
+    #[test]
+    fn reference_in_quantifier() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        List = (Expr)*
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        List
+          Expr
+        ");
+    }
+
+    #[test]
+    fn reference_in_capture() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        Named = (Expr) @e
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+        Named
+          Expr
+        ");
+    }
+
+    #[test]
+    fn entry_point_reference() {
+        let input = indoc! {r#"
+        Expr = (expression)
+        (call function: (Expr))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @"Expr");
+    }
+
+    #[test]
+    fn entry_point_undefined_reference() {
+        let input = "(call function: (Unknown))";
+
+        let query = Query::new(input).unwrap();
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.dump_errors(), @r"
+        error: undefined reference: `Unknown`
+          |
+        1 | (call function: (Unknown))
+          |                  ^^^^^^^ undefined reference: `Unknown`
+        ");
+    }
+
+    #[test]
+    fn no_definitions() {
+        let input = "(identifier)";
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @"");
+    }
+
+    #[test]
+    fn nested_references() {
+        let input = indoc! {r#"
+        A = (a)
+        B = (b (A))
+        C = (c (B))
+        D = (d (C) (A))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
+        C
+          B
+            A
+        D
+          A
+          C
+            B
+              A
+        ");
+    }
+
+    #[test]
+    fn multiple_undefined() {
+        let input = "(foo (X) (Y) (Z))";
+
+        let query = Query::new(input).unwrap();
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.dump_errors(), @r"
+        error: undefined reference: `X`
+          |
+        1 | (foo (X) (Y) (Z))
+          |       ^ undefined reference: `X`
+        error: undefined reference: `Y`
+          |
+        1 | (foo (X) (Y) (Z))
+          |           ^ undefined reference: `Y`
+        error: undefined reference: `Z`
+          |
+        1 | (foo (X) (Y) (Z))
+          |               ^ undefined reference: `Z`
+        ");
+    }
+
+    #[test]
+    fn reference_inside_tree_child() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (b (A))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
+        ");
+    }
+
+    #[test]
+    fn reference_inside_capture() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (A)@x
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
+        ");
+    }
+}

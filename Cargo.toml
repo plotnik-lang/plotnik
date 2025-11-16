@@ -1,0 +1,5 @@
+[workspace]
+
+resolver = "2"
+
+members = ["crates/plotnik-cli", "crates/plotnik-lib", "crates/plotnik-langs"]
