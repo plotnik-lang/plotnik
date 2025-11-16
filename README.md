@@ -14,4 +14,6 @@ Plotnik is an expressive query language for tree-sitter AST. It allows you to ex
 
 ## License
 
-This project is licensed under the [MIT license](LICENCE.md).
+This project is licensed under the [MIT license].
+
+[MIT license]: LICENSE.md
