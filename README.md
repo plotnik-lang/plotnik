@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" height="256" alt="logo" src="https://github.com/user-attachments/assets/414c0c4f-9994-485d-b76f-bfa87dadf2db" />
+  <img width="256" height="256" alt="logo" src="https://github.com/user-attachments/assets/52e86387-ce5b-42bb-a79a-a379caf3272d" />
 </p>
 
 <h1 align="center">Plotnik</h1>
