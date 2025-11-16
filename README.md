@@ -1,6 +1,5 @@
 <p align="center">
-  <!-- <img width="484" height="190" alt="Plotnik project logo" src="https://github.com/user-attachments/assets/6e0dd450-9ef1-45ad-9c49-056a3fa04f56" /> -->
-  <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/4aa9f6f0-fea3-495b-a798-124b56f99665" />
+  <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/c73b2a47-0871-4fda-9fb9-6375320c4093" />
 </p>
 
 <h1 align="center">Plotnik</h1>
