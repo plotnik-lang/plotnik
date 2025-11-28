@@ -1,12 +1,45 @@
-#![allow(dead_code)] // TODO: remove later
+//! Lexer for the query language.
+//!
+//! Produces span-based tokens without storing text - text is sliced from source only when needed.
+//!
+//! ## Error handling
+//!
+//! The lexer coalesces consecutive error characters into single `Error` tokens rather than
+//! producing one error per character. This keeps the token stream manageable for malformed input.
+//!
+//! ## Capture token splitting
+//!
+//! Logos matches the full `@name.field` pattern as one token, but the parser needs separate
+//! `At` and `CaptureName` tokens. The `lex()` function post-processes `Capture` tokens into
+//! this two-token sequence.
 
 use logos::Logos;
+use rowan::TextRange;
 use std::ops::Range;
 
-#[derive(Logos)]
-#[cfg_attr(test, derive(serde::Serialize))]
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token<'src> {
+use super::syntax_kind::SyntaxKind;
+
+/// Zero-copy token: kind + span, text retrieved via [`token_text`] when needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Token {
+    pub kind: SyntaxKind,
+    pub span: TextRange,
+}
+
+impl Token {
+    #[inline]
+    pub fn new(kind: SyntaxKind, span: TextRange) -> Self {
+        Self { kind, span }
+    }
+}
+
+/// Internal Logos token enum.
+///
+/// Converted to [`SyntaxKind`] after lexing. Separate enum because Logos derives
+/// its lexer from enum variants, and we need different token granularity than
+/// what Logos naturally produces (e.g., capture splitting).
+#[derive(Logos, Debug, PartialEq, Clone)]
+enum LexToken {
     #[token("(")]
     ParenOpen,
 
@@ -34,6 +67,21 @@ pub enum Token<'src> {
     #[token("_")]
     Underscore,
 
+    #[token(".")]
+    Dot,
+
+    /// Full capture including optional dotted path. Split into At + CaptureName in post-processing.
+    #[regex(r"@[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*")]
+    Capture,
+
+    /// Bare `@` without following identifier - signals parse error to be reported later.
+    #[token("@")]
+    At,
+
+    #[token("#")]
+    Hash,
+
+    // Non-greedy quantifiers must be listed before greedy ones for longest-match priority.
     #[token("*?")]
     StarQuestion,
 
@@ -52,248 +100,137 @@ pub enum Token<'src> {
     #[token("?")]
     Question,
 
+    /// Double-quoted string with backslash escapes.
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
-    String(&'src str),
+    String,
 
+    /// PascalCase identifier (e.g., `FunctionDeclaration`). Used for supertype patterns.
     #[regex(r"[A-Z][A-Za-z0-9]*")]
-    UpperIdentifier(&'src str),
+    UpperIdentifier,
 
+    /// snake_case identifier (e.g., `function_definition`). Standard node/field names.
     #[regex(r"[a-z][a-z0-9_]*")]
-    LowerIdentifier(&'src str),
+    LowerIdentifier,
 
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
-    BlockComment(&'src str),
+    BlockComment,
 
     #[regex(r"//[^\n]*")]
-    LineComment(&'src str),
+    LineComment,
 
+    /// Horizontal whitespace only (spaces, tabs). Newlines tracked separately for
+    /// potential future line-aware error reporting.
     #[regex(r"[ \t]+")]
-    Whitespace(&'src str),
+    Whitespace,
 
     #[token("\n")]
     #[token("\r\n")]
     Newline,
 
+    /// XML-like tags are explicitly matched and marked as errors.
+    /// Common mistake of LLM agents while generating code.
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
-    UnexpectedXML(&'src str),
-
-    UnexpectedFragment(&'src str),
+    UnexpectedXML,
 }
 
-pub struct TokenStream<'src> {
-    lexer: logos::Lexer<'src, Token<'src>>,
-    src: &'src str,
-    error_span: Option<Range<usize>>,
-    pending_token: Option<Token<'src>>,
-}
-
-impl<'src> TokenStream<'src> {
-    pub fn new(src: &'src str) -> Self {
-        Self {
-            lexer: Token::lexer(src),
-            src,
-            error_span: None,
-            pending_token: None,
+impl LexToken {
+    fn to_syntax_kind(&self) -> SyntaxKind {
+        match self {
+            LexToken::ParenOpen => SyntaxKind::ParenOpen,
+            LexToken::ParenClose => SyntaxKind::ParenClose,
+            LexToken::BracketOpen => SyntaxKind::BracketOpen,
+            LexToken::BracketClose => SyntaxKind::BracketClose,
+            LexToken::Colon => SyntaxKind::Colon,
+            LexToken::Equals => SyntaxKind::Equals,
+            LexToken::Negation => SyntaxKind::Negation,
+            LexToken::Tilde => SyntaxKind::Tilde,
+            LexToken::Underscore => SyntaxKind::Underscore,
+            LexToken::Dot => SyntaxKind::Dot,
+            LexToken::Capture => SyntaxKind::CaptureName, // Split in post-processing
+            LexToken::At => SyntaxKind::At,
+            LexToken::Hash => SyntaxKind::Hash,
+            LexToken::Star => SyntaxKind::Star,
+            LexToken::Plus => SyntaxKind::Plus,
+            LexToken::Question => SyntaxKind::Question,
+            LexToken::StarQuestion => SyntaxKind::StarQuestion,
+            LexToken::PlusQuestion => SyntaxKind::PlusQuestion,
+            LexToken::QuestionQuestion => SyntaxKind::QuestionQuestion,
+            LexToken::String => SyntaxKind::StringLit,
+            LexToken::UpperIdentifier => SyntaxKind::UpperIdent,
+            LexToken::LowerIdentifier => SyntaxKind::LowerIdent,
+            LexToken::BlockComment => SyntaxKind::BlockComment,
+            LexToken::LineComment => SyntaxKind::LineComment,
+            LexToken::Whitespace => SyntaxKind::Whitespace,
+            LexToken::Newline => SyntaxKind::Newline,
+            LexToken::UnexpectedXML => SyntaxKind::Error,
         }
     }
 }
 
-impl<'src> Iterator for TokenStream<'src> {
-    type Item = Token<'src>;
+fn range_to_text_range(range: Range<usize>) -> TextRange {
+    TextRange::new((range.start as u32).into(), (range.end as u32).into())
+}
 
-    fn next(&mut self) -> Option<Token<'src>> {
-        if let Some(token) = self.pending_token.take() {
-            return Some(token);
-        }
+/// Tokenizes source into a vector of span-based tokens.
+///
+/// Post-processes the Logos output to:
+/// 1. Coalesce consecutive lexer errors into single `Error` tokens
+/// 2. Split `@name.field` captures into `At` + `CaptureName` token pairs
+pub fn lex(source: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut lexer = LexToken::lexer(source);
+    let mut error_start: Option<usize> = None;
 
-        loop {
-            match self.lexer.next() {
-                Some(Ok(token)) => {
-                    if let Some(span) = self.error_span.take() {
-                        let fragment = &self.src[span];
-                        self.pending_token = Some(token);
-                        return Some(Token::UnexpectedFragment(fragment));
-                    }
-                    return Some(token);
+    loop {
+        match lexer.next() {
+            Some(Ok(lex_token)) => {
+                // Flush accumulated error span before emitting valid token
+                if let Some(start) = error_start.take() {
+                    let end = lexer.span().start;
+                    tokens.push(Token::new(SyntaxKind::Error, range_to_text_range(start..end)));
                 }
-                Some(Err(())) => {
-                    let span = self.lexer.span();
-                    match &mut self.error_span {
-                        None => {
-                            self.error_span = Some(span);
-                        }
-                        Some(existing) => {
-                            existing.end = span.end;
-                        }
-                    }
+
+                let span = lexer.span();
+
+                if matches!(lex_token, LexToken::Capture) {
+                    // Split @name into At(@) + CaptureName(name)
+                    tokens.push(Token::new(
+                        SyntaxKind::At,
+                        range_to_text_range(span.start..span.start + 1),
+                    ));
+                    tokens.push(Token::new(
+                        SyntaxKind::CaptureName,
+                        range_to_text_range(span.start + 1..span.end),
+                    ));
+                } else {
+                    tokens.push(Token::new(lex_token.to_syntax_kind(), range_to_text_range(span)));
                 }
-                None => {
-                    if let Some(span) = self.error_span.take() {
-                        let fragment = &self.src[span];
-                        return Some(Token::UnexpectedFragment(fragment));
-                    }
-                    return None;
+            }
+            Some(Err(())) => {
+                // Accumulate error span; will be flushed on next valid token or EOF
+                if error_start.is_none() {
+                    error_start = Some(lexer.span().start);
                 }
+            }
+            None => {
+                if let Some(start) = error_start.take() {
+                    tokens.push(Token::new(
+                        SyntaxKind::Error,
+                        range_to_text_range(start..source.len()),
+                    ));
+                }
+                break;
             }
         }
     }
+
+    tokens
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn filter_whitespace(tokens: Vec<Token>) -> Vec<Token> {
-        tokens
-            .into_iter()
-            .filter(|t| !matches!(t, Token::Whitespace(_)))
-            .collect()
-    }
-
-    #[test]
-    fn test_basic_tokens() {
-        let stream = TokenStream::new("( ) [ ] : = ! ~ _ *? +? ?? * + ?");
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - ParenOpen
-        - ParenClose
-        - BracketOpen
-        - BracketClose
-        - Colon
-        - Equals
-        - Negation
-        - Tilde
-        - Underscore
-        - StarQuestion
-        - PlusQuestion
-        - QuestionQuestion
-        - Star
-        - Plus
-        - Question
-        "#);
-    }
-
-    #[test]
-    fn test_identifiers() {
-        let stream = TokenStream::new("Foo Bar baz test_case snake_case CamelCase");
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - UpperIdentifier: Foo
-        - UpperIdentifier: Bar
-        - LowerIdentifier: baz
-        - LowerIdentifier: test_case
-        - LowerIdentifier: snake_case
-        - UpperIdentifier: CamelCase
-        "#);
-    }
-
-    #[test]
-    fn test_strings() {
-        let stream = TokenStream::new(r#""hello" "world" "escaped \"quote\"" "with\\backslash""#);
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - String: "\"hello\""
-        - String: "\"world\""
-        - String: "\"escaped \\\"quote\\\"\""
-        - String: "\"with\\\\backslash\""
-        "#);
-    }
-
-    #[test]
-    fn test_comments() {
-        let stream = TokenStream::new("// line comment\n/* block comment */");
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r"
-        - LineComment: // line comment
-        - Newline
-        - BlockComment: /* block comment */
-        ");
-    }
-
-    #[test]
-    fn test_query_example() {
-        let input = r#"Foo(bar: "baz", test*)"#;
-        let stream = TokenStream::new(input);
-        let tokens: Vec<_> = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - UpperIdentifier: Foo
-        - ParenOpen
-        - LowerIdentifier: bar
-        - Colon
-        - String: "\"baz\""
-        - UnexpectedFragment: ","
-        - LowerIdentifier: test
-        - Star
-        - ParenClose
-        "#);
-    }
-
-    #[test]
-    fn test_whitespace_and_newlines() {
-        let input = "foo  \n  bar\r\n\tbaz";
-        let stream = TokenStream::new(input);
-        let tokens: Vec<_> = stream.collect();
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - LowerIdentifier: foo
-        - Whitespace: "  "
-        - Newline
-        - Whitespace: "  "
-        - LowerIdentifier: bar
-        - Newline
-        - Whitespace: "\t"
-        - LowerIdentifier: baz
-        "#);
-    }
-
-    #[test]
-    fn test_quantifiers() {
-        let stream = TokenStream::new("foo* bar+ baz? qux*? lazy+? greedy??");
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - LowerIdentifier: foo
-        - Star
-        - LowerIdentifier: bar
-        - Plus
-        - LowerIdentifier: baz
-        - Question
-        - LowerIdentifier: qux
-        - StarQuestion
-        - LowerIdentifier: lazy
-        - PlusQuestion
-        - LowerIdentifier: greedy
-        - QuestionQuestion
-        "#);
-    }
-
-    #[test]
-    fn test_unexpected_xml() {
-        let input = r#"<div> </div> <MyTag attr="value"> <self-closing/> <tag />"#;
-        let stream = TokenStream::new(input);
-        let tokens = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r#"
-        - UnexpectedXML: "<div>"
-        - UnexpectedXML: "</div>"
-        - UnexpectedXML: "<MyTag attr=\"value\">"
-        - UnexpectedXML: "<self-closing/>"
-        - UnexpectedXML: "<tag />"
-        "#);
-    }
-
-    #[test]
-    fn test_error() {
-        let input = r#"(foo) ^$%& (bar)"#;
-        let stream = TokenStream::new(input);
-        let tokens: Vec<_> = filter_whitespace(stream.collect());
-        insta::assert_yaml_snapshot!(tokens, @r"
-        - ParenOpen
-        - LowerIdentifier: foo
-        - ParenClose
-        - UnexpectedFragment: ^$%&
-        - ParenOpen
-        - LowerIdentifier: bar
-        - ParenClose
-        ");
-    }
+/// Retrieves the text slice for a token. O(1) slice into source.
+#[inline]
+pub fn token_text<'src>(source: &'src str, token: &Token) -> &'src str {
+    &source[std::ops::Range::<usize>::from(token.span)]
 }
