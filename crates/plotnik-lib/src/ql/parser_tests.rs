@@ -1,4 +1,4 @@
-use crate::ql::parser::parse;
+use crate::ql::parser::{parse, render_errors};
 use crate::ql::syntax_kind::SyntaxNode;
 
 /// Format tree without trivia tokens (default for most tests)
@@ -16,10 +16,9 @@ fn format_result(input: &str, include_trivia: bool) -> String {
     let mut out = String::new();
     format_tree_impl(&result.syntax(), 0, &mut out, include_trivia);
     if !result.errors().is_empty() {
-        out.push_str("errors:\n");
-        for err in result.errors() {
-            out.push_str(&format!("  - {}\n", err));
-        }
+        out.push_str("---\n");
+        out.push_str(&render_errors(input, result.errors()));
+        out.push('\n');
     }
     out
 }
@@ -625,8 +624,11 @@ fn error_missing_paren() {
       NamedNode
         ParenOpen "("
         LowerIdent "identifier"
-    errors:
-      - error at 11..11: expected ParenClose
+    ---
+    error: expected ParenClose
+      |
+    1 | (identifier
+      |            ^
     "#);
 }
 
@@ -644,8 +646,11 @@ fn error_unexpected_token() {
         ParenOpen "("
         LowerIdent "string"
         ParenClose ")"
-    errors:
-      - error at 13..16: expected pattern
+    ---
+    error: expected pattern
+      |
+    1 | (identifier) ^^^ (string)
+      |              ^^^
     "#);
 }
 
@@ -663,8 +668,11 @@ fn error_missing_bracket() {
           ParenOpen "("
           LowerIdent "string"
           ParenClose ")"
-    errors:
-      - error at 22..22: expected BracketClose
+    ---
+    error: expected BracketClose
+      |
+    1 | [(identifier) (string)
+      |                       ^
     "#);
 }
 
@@ -676,8 +684,11 @@ fn error_empty_parens() {
       NamedNode
         ParenOpen "("
         ParenClose ")"
-    errors:
-      - error at 1..2: empty node pattern - expected node type or children
+    ---
+    error: empty node pattern - expected node type or children
+      |
+    1 | ()
+      |  ^
     "#);
 }
 
@@ -707,10 +718,19 @@ fn error_recovery_continues_parsing() {
         ParenOpen "("
         LowerIdent "d"
         ParenClose ")"
-    errors:
-      - error at 8..9: expected capture name
-      - error at 9..10: expected capture name
-      - error at 11..12: expected capture name
+    ---
+    error: expected capture name
+      |
+    1 | (a (b) @@@ (c)) (d)
+      |         ^
+    error: expected capture name
+      |
+    1 | (a (b) @@@ (c)) (d)
+      |          ^
+    error: expected capture name
+      |
+    1 | (a (b) @@@ (c)) (d)
+      |            ^
     "#);
 }
 
@@ -724,8 +744,11 @@ fn error_missing_capture_name() {
         ParenClose ")"
       Capture
         At "@"
-    errors:
-      - error at 14..14: expected capture name
+    ---
+    error: expected capture name
+      |
+    1 | (identifier) @
+      |               ^
     "#);
 }
 
@@ -741,9 +764,15 @@ fn error_missing_field_value() {
           Colon ":"
           Error
             ParenClose ")"
-    errors:
-      - error at 11..12: expected pattern
-      - error at 12..12: expected ParenClose
+    ---
+    error: expected pattern
+      |
+    1 | (call name:)
+      |            ^
+    error: expected ParenClose
+      |
+    1 | (call name:)
+      |             ^
     "#);
 }
 

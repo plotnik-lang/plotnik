@@ -38,6 +38,7 @@
 
 #![allow(dead_code)]
 
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::lexer::{Token, lex, token_text};
@@ -100,6 +101,45 @@ impl Parse {
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
     }
+
+    /// Render errors as a human-readable string using annotate-snippets.
+    pub fn render_errors(&self, source: &str) -> String {
+        render_errors(source, &self.errors)
+    }
+}
+
+/// Render syntax errors using annotate-snippets for nice diagnostic output.
+pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
+    if errors.is_empty() {
+        return String::new();
+    }
+
+    let renderer = Renderer::plain();
+    let mut output = String::new();
+
+    for (i, err) in errors.iter().enumerate() {
+        let start: usize = err.range.start().into();
+        let end: usize = err.range.end().into();
+        // For zero-width spans, extend to at least 1 char for visibility
+        let end = if start == end {
+            (start + 1).min(source.len())
+        } else {
+            end
+        };
+
+        let report = &[Level::ERROR.primary_title(&err.message).element(
+            Snippet::source(source)
+                .line_start(1)
+                .annotation(AnnotationKind::Primary.span(start..end)),
+        )];
+
+        if i > 0 {
+            output.push('\n');
+        }
+        output.push_str(&renderer.render(report).to_string());
+    }
+
+    output
 }
 
 /// Stack depth limit. Tree-sitter queries can nest deeply via `(a (b (c ...)))`.
