@@ -13,7 +13,7 @@ fn error_missing_paren() {
         ParenOpen "("
         LowerIdent "identifier"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | (identifier
       |            ^
@@ -65,7 +65,7 @@ fn error_missing_bracket() {
           LowerIdent "string"
           ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | [(identifier) (string)
       |                       ^
@@ -180,7 +180,7 @@ fn error_missing_field_value() {
       |
     1 | (call name:)
       |            ^
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | (call name:)
       |             ^
@@ -234,7 +234,7 @@ fn error_nested_unclosed() {
             LowerIdent "c"
             ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | (a (b (c)
       |          ^
@@ -336,7 +336,7 @@ fn error_unclosed_alternation_nested() {
           ParenOpen "("
           LowerIdent "b"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | [(a) (b
       |        ^
@@ -422,7 +422,7 @@ fn error_field_missing_colon() {
       NamedNode
         ParenOpen "("
         LowerIdent "call"
-        Pattern
+        NamedNode
           LowerIdent "name"
         NamedNode
           ParenOpen "("
@@ -477,7 +477,7 @@ fn error_deeply_nested_unclosed() {
               ParenOpen "("
               LowerIdent "d"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | (a (b (c (d
       |            ^
@@ -573,7 +573,7 @@ fn error_multiline_recovery() {
         LowerIdent "a"
         Error
           UnexpectedFragment "^^^"
-        Pattern
+        NamedNode
           LowerIdent "b"
         ParenClose ")"
     ---

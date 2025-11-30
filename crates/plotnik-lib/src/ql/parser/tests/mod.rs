@@ -7,5 +7,7 @@ mod fields_test;
 mod helpers_test;
 mod quantifiers_test;
 mod sequences_test;
+mod special_nodes_test;
+mod supertypes_test;
 mod trivia_test;
 mod type_annotations_test;

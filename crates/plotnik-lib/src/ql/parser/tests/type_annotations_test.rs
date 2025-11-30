@@ -294,7 +294,7 @@ fn type_annotation_invalid_token_after() {
       |
     1 | (identifier) @name::(
       |                     ^
-    error: expected ')'
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | (identifier) @name::(
       |                      ^

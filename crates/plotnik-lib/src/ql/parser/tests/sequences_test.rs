@@ -240,7 +240,7 @@ fn sequence_missing_close_brace() {
           LowerIdent "b"
           ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
     1 | {(a) (b)
       |         ^

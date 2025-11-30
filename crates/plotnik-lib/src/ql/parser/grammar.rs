@@ -61,6 +61,10 @@ impl Parser<'_> {
             SyntaxKind::Dot => self.parse_anchor(),
             SyntaxKind::Negation => self.parse_negated_field(),
             SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => self.parse_node_or_field(),
+            SyntaxKind::KwError | SyntaxKind::KwMissing => {
+                // Bare ERROR/MISSING outside parens - treat as error
+                self.error_and_bump("ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)");
+            }
             _ => {
                 self.error_and_bump("unexpected token; expected a pattern");
             }
@@ -71,28 +75,63 @@ impl Parser<'_> {
         self.exit_recursion();
     }
 
-    /// Named node: `(type child1 child2 ...)` or `(_ child1 ...)` for any node.
+    /// Named node pattern: `(type ...)`, `(_ ...)`, `(ERROR)`, `(MISSING ...)`.
+    /// Also handles supertype/subtype: `(expression/binary_expression)`.
     fn parse_named_node(&mut self) {
         self.start_node(SyntaxKind::NamedNode);
         self.expect(SyntaxKind::ParenOpen);
 
-        if self.peek() == SyntaxKind::ParenClose {
-            self.error("empty node pattern - expected node type or children");
-            self.expect(SyntaxKind::ParenClose);
-            self.finish_node();
-            return;
-        }
-
-        // Optional type constraint: `(identifier ...)` or `(_ ...)` for wildcard
-        if matches!(
-            self.peek(),
-            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent | SyntaxKind::Underscore
-        ) {
-            self.bump();
+        match self.peek() {
+            SyntaxKind::ParenClose => {
+                self.error("empty node pattern - expected node type or children");
+            }
+            SyntaxKind::Underscore => {
+                self.bump();
+            }
+            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
+                self.bump();
+                // Optional subtype: `expression/binary_expression` or `expr/"()"`
+                if self.peek() == SyntaxKind::Slash {
+                    self.bump();
+                    match self.peek() {
+                        SyntaxKind::LowerIdent | SyntaxKind::StringLit => {
+                            self.bump();
+                        }
+                        _ => {
+                            self.error("expected subtype after '/' (e.g., expression/binary_expression)");
+                        }
+                    }
+                }
+            }
+            SyntaxKind::KwError => {
+                self.bump();
+                if self.peek() != SyntaxKind::ParenClose {
+                    self.error("(ERROR) takes no arguments");
+                    self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
+                }
+                self.expect(SyntaxKind::ParenClose);
+                self.finish_node();
+                return;
+            }
+            SyntaxKind::KwMissing => {
+                self.bump();
+                match self.peek() {
+                    SyntaxKind::LowerIdent | SyntaxKind::StringLit => {
+                        self.bump();
+                    }
+                    SyntaxKind::ParenClose => {}
+                    _ => {
+                        self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
+                    }
+                }
+                self.expect(SyntaxKind::ParenClose);
+                self.finish_node();
+                return;
+            }
+            _ => {}
         }
 
         self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
-
         self.expect(SyntaxKind::ParenClose);
         self.finish_node();
     }
@@ -104,9 +143,15 @@ impl Parser<'_> {
         until: SyntaxKind,
         recovery: crate::ql::syntax_kind::TokenSet,
     ) {
-        while !self.eof() {
+        loop {
             let kind = self.peek();
             if kind == until {
+                break;
+            }
+            if self.eof() {
+                self.error(
+                    "unexpected end of input inside node; expected a child pattern or closing delimiter",
+                );
                 break;
             }
             if PATTERN_FIRST.contains(kind) {
@@ -218,7 +263,7 @@ impl Parser<'_> {
         if self.peek_nth(1) == SyntaxKind::Colon {
             self.parse_field();
         } else {
-            self.start_node(SyntaxKind::Pattern);
+            self.start_node(SyntaxKind::NamedNode);
             self.bump();
             self.finish_node();
         }

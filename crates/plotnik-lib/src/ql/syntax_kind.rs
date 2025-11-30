@@ -150,8 +150,6 @@ pub enum SyntaxKind {
     // ========== NODE KINDS ==========
     /// Root node containing the entire query
     Root,
-    /// A pattern matching a node (e.g., `(identifier)`)
-    Pattern,
     /// Named node pattern: `(type children...)`
     NamedNode,
     /// Anonymous/literal node pattern: `"keyword"`
@@ -178,10 +176,6 @@ pub enum SyntaxKind {
     Anchor,
     /// Negated field assertion: `!field` asserts field is absent
     NegatedField,
-    /// Special node: `(ERROR)` or `(MISSING ...)` for error recovery nodes
-    SpecialNode,
-    /// Supertype path: `expression/binary_expression`
-    SupertypePath,
     /// Named expression definition: `Name = pattern`
     NamedDef,
 
@@ -243,7 +237,6 @@ impl SyntaxKind {
             UnexpectedFragment => "unexpected characters",
             Error => "error",
             Root => "query",
-            Pattern => "pattern",
             NamedNode => "node pattern",
             AnonNode => "anonymous node",
             Field => "field",
@@ -257,8 +250,6 @@ impl SyntaxKind {
             Wildcard => "wildcard",
             Anchor => "anchor",
             NegatedField => "negated field",
-            SpecialNode => "special node",
-            SupertypePath => "supertype path",
             NamedDef => "named definition",
             __LAST => "unknown",
         }
@@ -495,8 +486,6 @@ mod tests {
         // Verify new Phase 1 nodes are defined
         assert_eq!(Sequence.human_name(), "sequence");
         assert_eq!(TypeAnnotation.human_name(), "type annotation");
-        assert_eq!(SupertypePath.human_name(), "supertype path");
-        assert_eq!(SpecialNode.human_name(), "special node");
         assert_eq!(NamedDef.human_name(), "named definition");
         assert_eq!(AltBranch.human_name(), "alternation branch");
     }
