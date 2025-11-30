@@ -9,17 +9,18 @@ fn simple_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
+          BraceClose "}"
     "#);
 }
 
@@ -31,9 +32,10 @@ fn empty_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          BraceClose "}"
     "#);
 }
 
@@ -45,13 +47,14 @@ fn sequence_single_element() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          BraceClose "}"
     "#);
 }
 
@@ -63,25 +66,26 @@ fn sequence_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Capture
-          Quantifier
+      Def
+        Seq
+          BraceOpen "{"
+          Capture
+            Quantifier
+              Tree
+                ParenOpen "("
+                LowerIdent "comment"
+                ParenClose ")"
+              Star "*"
+            At "@"
+            LowerIdent "comments"
+          Capture
             Tree
               ParenOpen "("
-              LowerIdent "comment"
+              LowerIdent "function"
               ParenClose ")"
-            Star "*"
-          At "@"
-          LowerIdent "comments"
-        Capture
-          Tree
-            ParenOpen "("
-            LowerIdent "function"
-            ParenClose ")"
-          At "@"
-          LowerIdent "fn"
-        BraceClose "}"
+            At "@"
+            LowerIdent "fn"
+          BraceClose "}"
     "#);
 }
 
@@ -93,19 +97,20 @@ fn sequence_with_quantifier() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Quantifier
-        Seq
-          BraceOpen "{"
-          Tree
-            ParenOpen "("
-            LowerIdent "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            LowerIdent "b"
-            ParenClose ")"
-          BraceClose "}"
-        Plus "+"
+      Def
+        Quantifier
+          Seq
+            BraceOpen "{"
+            Tree
+              ParenOpen "("
+              LowerIdent "a"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+            BraceClose "}"
+          Plus "+"
     "#);
 }
 
@@ -117,23 +122,24 @@ fn nested_sequences() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
+      Def
         Seq
           BraceOpen "{"
-          Tree
-            ParenOpen "("
-            LowerIdent "a"
-            ParenClose ")"
+          Seq
+            BraceOpen "{"
+            Tree
+              ParenOpen "("
+              LowerIdent "a"
+              ParenClose ")"
+            BraceClose "}"
+          Seq
+            BraceOpen "{"
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+            BraceClose "}"
           BraceClose "}"
-        Seq
-          BraceOpen "{"
-          Tree
-            ParenOpen "("
-            LowerIdent "b"
-            ParenClose ")"
-          BraceClose "}"
-        BraceClose "}"
     "#);
 }
 
@@ -145,21 +151,22 @@ fn sequence_in_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "block"
-        Seq
-          BraceOpen "{"
-          Tree
-            ParenOpen "("
-            LowerIdent "statement"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            LowerIdent "statement"
-            ParenClose ")"
-          BraceClose "}"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "block"
+          Seq
+            BraceOpen "{"
+            Tree
+              ParenOpen "("
+              LowerIdent "statement"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              LowerIdent "statement"
+              ParenClose ")"
+            BraceClose "}"
+          ParenClose ")"
     "#);
 }
 
@@ -171,24 +178,25 @@ fn sequence_with_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Alt
-          BracketOpen "["
+      Def
+        Seq
+          BraceOpen "{"
+          Alt
+            BracketOpen "["
+            Tree
+              ParenOpen "("
+              LowerIdent "a"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+            BracketClose "]"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            LowerIdent "c"
             ParenClose ")"
-          Tree
-            ParenOpen "("
-            LowerIdent "b"
-            ParenClose ")"
-          BracketClose "]"
-        Tree
-          ParenOpen "("
-          LowerIdent "c"
-          ParenClose ")"
-        BraceClose "}"
+          BraceClose "}"
     "#);
 }
 
@@ -200,24 +208,25 @@ fn sequence_comma_separated_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Tree
-          ParenOpen "("
-          LowerIdent "number"
-          ParenClose ")"
-        Quantifier
-          Seq
-            BraceOpen "{"
-            Lit
-              StringLit "\",\""
-            Tree
-              ParenOpen "("
-              LowerIdent "number"
-              ParenClose ")"
-            BraceClose "}"
-          Star "*"
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            LowerIdent "number"
+            ParenClose ")"
+          Quantifier
+            Seq
+              BraceOpen "{"
+              Lit
+                StringLit "\",\""
+              Tree
+                ParenOpen "("
+                LowerIdent "number"
+                ParenClose ")"
+              BraceClose "}"
+            Star "*"
+          BraceClose "}"
     "#);
 }
 
@@ -229,20 +238,21 @@ fn sequence_with_anchor() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Anchor
-          Dot "."
-        Tree
-          ParenOpen "("
-          LowerIdent "first"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "second"
-          ParenClose ")"
-        Anchor
-          Dot "."
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "first"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "second"
+            ParenClose ")"
+          Anchor
+            Dot "."
+          BraceClose "}"
     "#);
 }

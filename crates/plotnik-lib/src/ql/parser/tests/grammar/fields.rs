@@ -9,17 +9,18 @@ fn field_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        Field
-          LowerIdent "function"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
+          Field
+            LowerIdent "function"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -33,24 +34,25 @@ fn multiple_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "assignment"
-        Field
-          LowerIdent "left"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        Field
-          LowerIdent "right"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "expression"
-            ParenClose ")"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "assignment"
+          Field
+            LowerIdent "left"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          Field
+            LowerIdent "right"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "expression"
+              ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -62,13 +64,14 @@ fn negated_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "function"
-        NegatedField
-          Negation "!"
-          LowerIdent "async"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "function"
+          NegatedField
+            Negation "!"
+            LowerIdent "async"
+          ParenClose ")"
     "#);
 }
 
@@ -82,20 +85,21 @@ fn negated_and_regular_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "function"
-        NegatedField
-          Negation "!"
-          LowerIdent "async"
-        Field
-          LowerIdent "name"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "function"
+          NegatedField
+            Negation "!"
+            LowerIdent "async"
+          Field
+            LowerIdent "name"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -110,28 +114,29 @@ fn mixed_children_and_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "if"
-        Field
-          LowerIdent "condition"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "expr"
-            ParenClose ")"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "then_block"
-          ParenClose ")"
-        Field
-          LowerIdent "else"
-          Colon ":"
+          LowerIdent "if"
+          Field
+            LowerIdent "condition"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "expr"
+              ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "else_block"
+            LowerIdent "then_block"
             ParenClose ")"
-        ParenClose ")"
+          Field
+            LowerIdent "else"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "else_block"
+              ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -144,19 +149,21 @@ fn multiple_patterns_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "function"
-          ParenClose ")"
-        At "@"
-        LowerIdent "func"
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "class"
-          ParenClose ")"
-        At "@"
-        LowerIdent "cls"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "function"
+            ParenClose ")"
+          At "@"
+          LowerIdent "func"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "class"
+            ParenClose ")"
+          At "@"
+          LowerIdent "cls"
     "#);
 }

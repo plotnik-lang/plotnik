@@ -18,10 +18,11 @@ fn simple_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
     "#);
 }
 
@@ -33,17 +34,18 @@ fn nested_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "function_definition"
-        Field
-          LowerIdent "name"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "function_definition"
+          Field
+            LowerIdent "name"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -58,22 +60,23 @@ fn deeply_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          LowerIdent "a"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            LowerIdent "b"
             Tree
               ParenOpen "("
-              LowerIdent "d"
+              LowerIdent "c"
+              Tree
+                ParenOpen "("
+                LowerIdent "d"
+                ParenClose ")"
               ParenClose ")"
             ParenClose ")"
           ParenClose ")"
-        ParenClose ")"
     "#);
 }
 
@@ -88,22 +91,23 @@ fn sibling_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "block"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "statement"
+          LowerIdent "block"
+          Tree
+            ParenOpen "("
+            LowerIdent "statement"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "statement"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "statement"
+            ParenClose ")"
           ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "statement"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "statement"
-          ParenClose ")"
-        ParenClose ")"
     "#);
 }
 
@@ -117,18 +121,21 @@ fn multiple_patterns() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Tree
-        ParenOpen "("
-        LowerIdent "string"
-        ParenClose ")"
-      Tree
-        ParenOpen "("
-        LowerIdent "number"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "string"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "number"
+          ParenClose ")"
     "#);
 }
 
@@ -144,10 +151,11 @@ fn wildcard() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        Underscore "_"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          Underscore "_"
+          ParenClose ")"
     "#);
 }
 
@@ -163,8 +171,9 @@ fn anonymous_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Lit
-        StringLit "\"if\""
+      Def
+        Lit
+          StringLit "\"if\""
     "#);
 }
 
@@ -176,8 +185,9 @@ fn anonymous_node_operator() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Lit
-        StringLit "\"+=\""
+      Def
+        Lit
+          StringLit "\"+=\""
     "#);
 }
 
@@ -193,12 +203,13 @@ fn supertype_basic() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expression"
-        Slash "/"
-        LowerIdent "binary_expression"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expression"
+          Slash "/"
+          LowerIdent "binary_expression"
+          ParenClose ")"
     "#);
 }
 
@@ -210,12 +221,13 @@ fn supertype_with_string_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expression"
-        Slash "/"
-        StringLit "\"()\""
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expression"
+          Slash "/"
+          StringLit "\"()\""
+          ParenClose ")"
     "#);
 }
 
@@ -227,15 +239,16 @@ fn supertype_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "expression"
-          Slash "/"
-          LowerIdent "binary_expression"
-          ParenClose ")"
-        At "@"
-        LowerIdent "expr"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "expression"
+            Slash "/"
+            LowerIdent "binary_expression"
+            ParenClose ")"
+          At "@"
+          LowerIdent "expr"
     "#);
 }
 
@@ -249,32 +262,33 @@ fn supertype_with_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expression"
-        Slash "/"
-        LowerIdent "binary_expression"
-        Field
-          LowerIdent "left"
-          Colon ":"
-          Capture
-            Tree
-              ParenOpen "("
-              Underscore "_"
-              ParenClose ")"
-            At "@"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expression"
+          Slash "/"
+          LowerIdent "binary_expression"
+          Field
             LowerIdent "left"
-        Field
-          LowerIdent "right"
-          Colon ":"
-          Capture
-            Tree
-              ParenOpen "("
-              Underscore "_"
-              ParenClose ")"
-            At "@"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "left"
+          Field
             LowerIdent "right"
-        ParenClose ")"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "right"
+          ParenClose ")"
     "#);
 }
 
@@ -287,18 +301,19 @@ fn supertype_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "statement"
-        Slash "/"
-        LowerIdent "expression_statement"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          LowerIdent "statement"
           Slash "/"
-          LowerIdent "call_expression"
+          LowerIdent "expression_statement"
+          Tree
+            ParenOpen "("
+            LowerIdent "expression"
+            Slash "/"
+            LowerIdent "call_expression"
+            ParenClose ")"
           ParenClose ")"
-        ParenClose ")"
     "#);
 }
 
@@ -310,21 +325,22 @@ fn supertype_in_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "expression"
-          Slash "/"
-          LowerIdent "identifier"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "expression"
-          Slash "/"
-          LowerIdent "number"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "expression"
+            Slash "/"
+            LowerIdent "identifier"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "expression"
+            Slash "/"
+            LowerIdent "number"
+            ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -336,9 +352,10 @@ fn no_supertype_plain_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
     "#);
 }

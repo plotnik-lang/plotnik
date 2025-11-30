@@ -9,9 +9,10 @@ fn missing_paren() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
     ---
     error: unclosed tree; expected ')'
       |
@@ -30,16 +31,17 @@ fn missing_bracket() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "string"
-          ParenClose ")"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "string"
+            ParenClose ")"
     ---
     error: unclosed alternation; expected ']'
       |
@@ -58,16 +60,17 @@ fn missing_brace() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
+      Def
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
     ---
     error: unclosed sequence; expected '}'
       |
@@ -86,16 +89,17 @@ fn nested_unclosed() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          LowerIdent "a"
           Tree
             ParenOpen "("
-            LowerIdent "c"
-            ParenClose ")"
+            LowerIdent "b"
+            Tree
+              ParenOpen "("
+              LowerIdent "c"
+              ParenClose ")"
     ---
     error: unclosed tree; expected ')'
       |
@@ -114,18 +118,19 @@ fn deeply_nested_unclosed() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          LowerIdent "a"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            LowerIdent "b"
             Tree
               ParenOpen "("
-              LowerIdent "d"
+              LowerIdent "c"
+              Tree
+                ParenOpen "("
+                LowerIdent "d"
     ---
     error: unclosed tree; expected ')'
       |
@@ -144,15 +149,16 @@ fn unclosed_alternation_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
     ---
     error: unclosed tree; expected ')'
       |
@@ -171,9 +177,10 @@ fn empty_parens() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          ParenClose ")"
     ---
     error: empty tree expression - expected node type or children
       |

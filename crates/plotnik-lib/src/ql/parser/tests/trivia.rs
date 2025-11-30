@@ -9,13 +9,14 @@ fn whitespace_preserved() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        At "@"
-        LowerIdent "name"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
+          LowerIdent "name"
       Whitespace "  "
       Newline "\n"
     "#);
@@ -32,10 +33,11 @@ fn comment_preserved() {
     Root
       LineComment "// comment"
       Newline "\n"
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
       Newline "\n"
     "#);
 }
@@ -50,16 +52,18 @@ fn multiline() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          ParenClose ")"
       Newline "\n"
       Newline "\n"
-      Tree
-        ParenOpen "("
-        LowerIdent "b"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "b"
+          ParenClose ")"
       Newline "\n"
     "#);
 }
@@ -73,22 +77,23 @@ fn comment_inside_pattern() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        Whitespace " "
-        LineComment "// inline"
-        Newline "\n"
-        Whitespace "    "
-        Field
-          LowerIdent "name"
-          Colon ":"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
           Whitespace " "
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        ParenClose ")"
+          LineComment "// inline"
+          Newline "\n"
+          Whitespace "    "
+          Field
+            LowerIdent "name"
+            Colon ":"
+            Whitespace " "
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          ParenClose ")"
       Newline "\n"
     "#);
 }
@@ -102,10 +107,11 @@ fn trivia_filtered_by_default() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
     "#);
 }
 
@@ -120,21 +126,22 @@ fn trivia_between_alternation_items() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Newline "\n"
-        Whitespace "    "
-        Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Newline "\n"
-        Whitespace "    "
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Newline "\n"
+          Whitespace "    "
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Newline "\n"
+          Whitespace "    "
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
+          BracketClose "]"
       Newline "\n"
       Newline "\n"
     "#);

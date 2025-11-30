@@ -9,10 +9,11 @@ fn error_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        KwError "ERROR"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          KwError "ERROR"
+          ParenClose ")"
     "#);
 }
 
@@ -24,13 +25,14 @@ fn error_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          KwError "ERROR"
-          ParenClose ")"
-        At "@"
-        LowerIdent "err"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            KwError "ERROR"
+            ParenClose ")"
+          At "@"
+          LowerIdent "err"
     "#);
 }
 
@@ -42,10 +44,11 @@ fn missing_node_bare() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        KwMissing "MISSING"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          KwMissing "MISSING"
+          ParenClose ")"
     "#);
 }
 
@@ -57,11 +60,12 @@ fn missing_node_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        KwMissing "MISSING"
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          KwMissing "MISSING"
+          LowerIdent "identifier"
+          ParenClose ")"
     "#);
 }
 
@@ -73,11 +77,12 @@ fn missing_node_with_string() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        KwMissing "MISSING"
-        StringLit "\";\""
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          KwMissing "MISSING"
+          StringLit "\";\""
+          ParenClose ")"
     "#);
 }
 
@@ -89,14 +94,15 @@ fn missing_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          KwMissing "MISSING"
-          StringLit "\";\""
-          ParenClose ")"
-        At "@"
-        LowerIdent "missing_semi"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            KwMissing "MISSING"
+            StringLit "\";\""
+            ParenClose ")"
+          At "@"
+          LowerIdent "missing_semi"
     "#);
 }
 
@@ -108,17 +114,18 @@ fn error_in_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          KwError "ERROR"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            KwError "ERROR"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -130,18 +137,19 @@ fn missing_in_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Tree
-          ParenOpen "("
-          KwMissing "MISSING"
-          StringLit "\";\""
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            KwMissing "MISSING"
+            StringLit "\";\""
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          BraceClose "}"
     "#);
 }
 
@@ -154,21 +162,22 @@ fn special_node_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "function_definition"
-        Field
-          LowerIdent "body"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "block"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "function_definition"
+          Field
+            LowerIdent "body"
+            Colon ":"
             Tree
               ParenOpen "("
-              KwError "ERROR"
+              LowerIdent "block"
+              Tree
+                ParenOpen "("
+                KwError "ERROR"
+                ParenClose ")"
               ParenClose ")"
-            ParenClose ")"
-        ParenClose ")"
+          ParenClose ")"
     "#);
 }
 
@@ -180,12 +189,13 @@ fn error_with_quantifier() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Quantifier
-        Tree
-          ParenOpen "("
-          KwError "ERROR"
-          ParenClose ")"
-        Star "*"
+      Def
+        Quantifier
+          Tree
+            ParenOpen "("
+            KwError "ERROR"
+            ParenClose ")"
+          Star "*"
     "#);
 }
 
@@ -197,12 +207,13 @@ fn missing_with_quantifier() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Quantifier
-        Tree
-          ParenOpen "("
-          KwMissing "MISSING"
-          LowerIdent "identifier"
-          ParenClose ")"
-        Question "?"
+      Def
+        Quantifier
+          Tree
+            ParenOpen "("
+            KwMissing "MISSING"
+            LowerIdent "identifier"
+            ParenClose ")"
+          Question "?"
     "#);
 }

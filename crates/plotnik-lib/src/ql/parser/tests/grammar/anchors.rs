@@ -9,16 +9,17 @@ fn anchor_first_child() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "block"
-        Anchor
-          Dot "."
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "first_statement"
+          LowerIdent "block"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "first_statement"
+            ParenClose ")"
           ParenClose ")"
-        ParenClose ")"
     "#);
 }
 
@@ -30,16 +31,17 @@ fn anchor_last_child() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "block"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "last_statement"
+          LowerIdent "block"
+          Tree
+            ParenOpen "("
+            LowerIdent "last_statement"
+            ParenClose ")"
+          Anchor
+            Dot "."
           ParenClose ")"
-        Anchor
-          Dot "."
-        ParenClose ")"
     "#);
 }
 
@@ -51,26 +53,27 @@ fn anchor_adjacency() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "dotted_name"
-        Capture
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-          At "@"
-          LowerIdent "a"
-        Anchor
-          Dot "."
-        Capture
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-          At "@"
-          LowerIdent "b"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "dotted_name"
+          Capture
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+            At "@"
+            LowerIdent "a"
+          Anchor
+            Dot "."
+          Capture
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+            At "@"
+            LowerIdent "b"
+          ParenClose ")"
     "#);
 }
 
@@ -82,18 +85,19 @@ fn anchor_both_ends() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "array"
-        Anchor
-          Dot "."
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "element"
+          LowerIdent "array"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "element"
+            ParenClose ")"
+          Anchor
+            Dot "."
           ParenClose ")"
-        Anchor
-          Dot "."
-        ParenClose ")"
     "#);
 }
 
@@ -105,30 +109,31 @@ fn anchor_multiple_adjacent() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "tuple"
-        Anchor
-          Dot "."
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          LowerIdent "tuple"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "c"
+            ParenClose ")"
+          Anchor
+            Dot "."
           ParenClose ")"
-        Anchor
-          Dot "."
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        Anchor
-          Dot "."
-        Tree
-          ParenOpen "("
-          LowerIdent "c"
-          ParenClose ")"
-        Anchor
-          Dot "."
-        ParenClose ")"
     "#);
 }
 
@@ -140,21 +145,22 @@ fn anchor_in_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Anchor
-          Dot "."
-        Tree
-          ParenOpen "("
-          LowerIdent "first"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "second"
-          ParenClose ")"
-        Anchor
-          Dot "."
-        BraceClose "}"
+      Def
+        Seq
+          BraceOpen "{"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            LowerIdent "first"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "second"
+            ParenClose ")"
+          Anchor
+            Dot "."
+          BraceClose "}"
     "#);
 }
 
@@ -166,18 +172,21 @@ fn capture_space_after_dot_is_anchor() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
+          LowerIdent "foo"
+      Def
+        Anchor
+          Dot "."
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          LowerIdent "other"
           ParenClose ")"
-        At "@"
-        LowerIdent "foo"
-      Anchor
-        Dot "."
-      Tree
-        ParenOpen "("
-        LowerIdent "other"
-        ParenClose ")"
     "#);
 }

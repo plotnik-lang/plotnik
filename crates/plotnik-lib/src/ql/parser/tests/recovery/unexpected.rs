@@ -9,16 +9,19 @@ fn unexpected_token() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Error
-        Garbage "^^^"
-      Tree
-        ParenOpen "("
-        LowerIdent "string"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Error
+          Garbage "^^^"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "string"
+          ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -35,16 +38,20 @@ fn multiple_consecutive_garbage() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        Garbage "^^^"
-      Error
-        Garbage "$$$"
-      Error
-        Garbage "%%%"
-      Tree
-        ParenOpen "("
-        LowerIdent "ok"
-        ParenClose ")"
+      Def
+        Error
+          Garbage "^^^"
+      Def
+        Error
+          Garbage "$$$"
+      Def
+        Error
+          Garbage "%%%"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "ok"
+          ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -69,12 +76,14 @@ fn garbage_at_start() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        Garbage "^^^"
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
-        ParenClose ")"
+      Def
+        Error
+          Garbage "^^^"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -91,10 +100,12 @@ fn only_garbage() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        Garbage "^^^"
-      Error
-        Garbage "$$$"
+      Def
+        Error
+          Garbage "^^^"
+      Def
+        Error
+          Garbage "$$$"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -115,19 +126,20 @@ fn garbage_inside_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Error
-          Garbage "^^^"
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Error
+            Garbage "^^^"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
+          BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
@@ -144,29 +156,34 @@ fn garbage_inside_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            Capture
+              Tree
+                ParenOpen "("
+                LowerIdent "b"
+                ParenClose ")"
+              At "@"
+          At "@"
+      Def
+        Error
+          At "@"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
-          Capture
-            Tree
-              ParenOpen "("
-              LowerIdent "b"
-              ParenClose ")"
-            At "@"
-        At "@"
-      Error
-        At "@"
-      Tree
-        ParenOpen "("
-        LowerIdent "c"
-        ParenClose ")"
-      Error
-        ParenClose ")"
-      Tree
-        ParenOpen "("
-        LowerIdent "d"
-        ParenClose ")"
+          LowerIdent "c"
+          ParenClose ")"
+      Def
+        Error
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "d"
+          ParenClose ")"
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
       |
@@ -191,14 +208,17 @@ fn xml_tag_garbage() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        XMLGarbage "<div>"
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Error
-        XMLGarbage "</div>"
+      Def
+        Error
+          XMLGarbage "<div>"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Error
+          XMLGarbage "</div>"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -219,12 +239,14 @@ fn xml_self_closing() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        XMLGarbage "<br/>"
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
-        ParenClose ")"
+      Def
+        Error
+          XMLGarbage "<br/>"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -241,23 +263,26 @@ fn predicate_unsupported() {
 
     insta::assert_snapshot!(snapshot(input), @r##"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
-        Capture
-          Tree
-            ParenOpen "("
-            Error
-              Predicate "#eq?"
-          At "@"
-          LowerIdent "x"
-        Lit
-          StringLit "\"foo\""
-        ParenClose ")"
-      Tree
-        LowerIdent "b"
-      Error
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          Capture
+            Tree
+              ParenOpen "("
+              Error
+                Predicate "#eq?"
+            At "@"
+            LowerIdent "x"
+          Lit
+            StringLit "\"foo\""
+          ParenClose ")"
+      Def
+        Tree
+          LowerIdent "b"
+      Def
+        Error
+          ParenClose ")"
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
@@ -282,18 +307,23 @@ fn predicate_match() {
 
     insta::assert_snapshot!(snapshot(input), @r##"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Error
-        Predicate "#match?"
-      Error
-        At "@"
-      Tree
-        LowerIdent "name"
-      Lit
-        StringLit "\"test\""
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Error
+          Predicate "#match?"
+      Def
+        Error
+          At "@"
+      Def
+        Tree
+          LowerIdent "name"
+      Def
+        Lit
+          StringLit "\"test\""
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
@@ -316,14 +346,15 @@ fn multiline_garbage_recovery() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "a"
-        Error
-          Garbage "^^^"
+      Def
         Tree
-          LowerIdent "b"
-        ParenClose ")"
+          ParenOpen "("
+          LowerIdent "a"
+          Error
+            Garbage "^^^"
+          Tree
+            LowerIdent "b"
+          ParenClose ")"
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
@@ -340,14 +371,16 @@ fn capture_with_invalid_char() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        At "@"
-      Error
-        Garbage "123"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
+      Def
+        Error
+          Garbage "123"
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
       |
@@ -364,15 +397,16 @@ fn field_value_is_garbage() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        Field
-          LowerIdent "name"
-          Colon ":"
-          Error
-            Garbage "%%%"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
+          Field
+            LowerIdent "name"
+            Colon ":"
+            Error
+              Garbage "%%%"
+          ParenClose ")"
     ---
     error: unexpected token; expected an expression
       |
@@ -389,15 +423,17 @@ fn alternation_recovery_to_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Alt
-          BracketOpen "["
-          Error
-            Garbage "^^^"
-        At "@"
-        LowerIdent "name"
-      Error
-        BracketClose "]"
+      Def
+        Capture
+          Alt
+            BracketOpen "["
+            Error
+              Garbage "^^^"
+          At "@"
+          LowerIdent "name"
+      Def
+        Error
+          BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
@@ -429,8 +465,9 @@ fn top_level_garbage_recovery() {
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-      Error
-        Garbage "^^^"
+      Def
+        Error
+          Garbage "^^^"
       Def
         UpperIdent "Expr2"
         Equals "="
@@ -465,8 +502,9 @@ fn multiple_definitions_with_garbage_between() {
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-      Error
-        Garbage "^^^"
+      Def
+        Error
+          Garbage "^^^"
       Def
         UpperIdent "B"
         Equals "="
@@ -474,8 +512,9 @@ fn multiple_definitions_with_garbage_between() {
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
-      Error
-        Garbage "$$$"
+      Def
+        Error
+          Garbage "$$$"
       Def
         UpperIdent "C"
         Equals "="

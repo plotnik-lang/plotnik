@@ -25,7 +25,10 @@ impl Parser<'_> {
             if self.peek() == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
             } else {
+                // Anonymous def: wrap expression in Def node (invalid, lacks assignment)
+                self.start_node(SyntaxKind::Def);
                 self.parse_expr_or_error();
+                self.finish_node();
             }
         }
 

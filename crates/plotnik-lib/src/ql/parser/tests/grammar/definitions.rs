@@ -171,17 +171,18 @@ fn named_def_then_pattern() {
             LowerIdent "number"
             ParenClose ")"
           BracketClose "]"
-      Tree
-        ParenOpen "("
-        LowerIdent "program"
-        Capture
-          Tree
-            ParenOpen "("
-            UpperIdent "Expr"
-            ParenClose ")"
-          At "@"
-          LowerIdent "value"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "program"
+          Capture
+            Tree
+              ParenOpen "("
+              UpperIdent "Expr"
+              ParenClose ")"
+            At "@"
+            LowerIdent "value"
+          ParenClose ")"
     "#);
 }
 
@@ -343,10 +344,11 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        UpperIdent "Expr"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          UpperIdent "Expr"
+          ParenClose ")"
     "#);
 }
 
@@ -358,8 +360,9 @@ fn bare_upper_ident_not_followed_by_equals_is_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        UpperIdent "Expr"
+      Def
+        Tree
+          UpperIdent "Expr"
     "#);
 }
 
@@ -371,11 +374,13 @@ fn named_def_missing_equals() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        UpperIdent "Expr"
-      Tree
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
+      Def
+        Tree
+          UpperIdent "Expr"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
     "#);
 }

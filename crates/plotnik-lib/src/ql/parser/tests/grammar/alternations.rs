@@ -13,47 +13,7 @@ fn alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "string"
-          ParenClose ")"
-        BracketClose "]"
-    "#);
-}
-
-#[test]
-fn alternation_with_anonymous() {
-    let input = indoc! {r#"
-    ["true" "false"]
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Alt
-        BracketOpen "["
-        Lit
-          StringLit "\"true\""
-        Lit
-          StringLit "\"false\""
-        BracketClose "]"
-    "#);
-}
-
-#[test]
-fn alternation_with_capture() {
-    let input = indoc! {r#"
-    [(identifier) (string)] @value
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Capture
+      Def
         Alt
           BracketOpen "["
           Tree
@@ -65,8 +25,51 @@ fn alternation_with_capture() {
             LowerIdent "string"
             ParenClose ")"
           BracketClose "]"
-        At "@"
-        LowerIdent "value"
+    "#);
+}
+
+#[test]
+fn alternation_with_anonymous() {
+    let input = indoc! {r#"
+    ["true" "false"]
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Def
+        Alt
+          BracketOpen "["
+          Lit
+            StringLit "\"true\""
+          Lit
+            StringLit "\"false\""
+          BracketClose "]"
+    "#);
+}
+
+#[test]
+fn alternation_with_capture() {
+    let input = indoc! {r#"
+    [(identifier) (string)] @value
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Def
+        Capture
+          Alt
+            BracketOpen "["
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              LowerIdent "string"
+              ParenClose ")"
+            BracketClose "]"
+          At "@"
+          LowerIdent "value"
     "#);
 }
 
@@ -79,21 +82,22 @@ fn alternation_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expr"
-        Alt
-          BracketOpen "["
-          Tree
-            ParenOpen "("
-            LowerIdent "binary"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            LowerIdent "unary"
-            ParenClose ")"
-          BracketClose "]"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expr"
+          Alt
+            BracketOpen "["
+            Tree
+              ParenOpen "("
+              LowerIdent "binary"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              LowerIdent "unary"
+              ParenClose ")"
+            BracketClose "]"
+          ParenClose ")"
     "#);
 }
 
@@ -106,24 +110,25 @@ fn alternation_in_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        Field
-          LowerIdent "arguments"
-          Colon ":"
-          Alt
-            BracketOpen "["
-            Tree
-              ParenOpen "("
-              LowerIdent "string"
-              ParenClose ")"
-            Tree
-              ParenOpen "("
-              LowerIdent "number"
-              ParenClose ")"
-            BracketClose "]"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
+          Field
+            LowerIdent "arguments"
+            Colon ":"
+            Alt
+              BracketOpen "["
+              Tree
+                ParenOpen "("
+                LowerIdent "string"
+                ParenClose ")"
+              Tree
+                ParenOpen "("
+                LowerIdent "number"
+                ParenClose ")"
+              BracketClose "]"
+          ParenClose ")"
     "#);
 }
 
@@ -135,21 +140,22 @@ fn unlabeled_alternation_three_items() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "number"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "string"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "number"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "string"
+            ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -161,17 +167,18 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Tree
-          ParenOpen "("
-          UpperIdent "Expr"
-          ParenClose ")"
-        Tree
-          ParenOpen "("
-          UpperIdent "Statement"
-          ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            UpperIdent "Expr"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            UpperIdent "Statement"
+            ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -190,23 +197,24 @@ fn tagged_alternation_simple() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Ident"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        Branch
-          UpperIdent "Num"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "number"
-            ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Ident"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+          Branch
+            UpperIdent "Num"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "number"
+              ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -218,30 +226,31 @@ fn tagged_alternation_single_line() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "A"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "a"
-            ParenClose ")"
-        Branch
-          UpperIdent "B"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "b"
-            ParenClose ")"
-        Branch
-          UpperIdent "C"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "c"
-            ParenClose ")"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "A"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "a"
+              ParenClose ")"
+          Branch
+            UpperIdent "B"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+          Branch
+            UpperIdent "C"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "c"
+              ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -256,46 +265,47 @@ fn tagged_alternation_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Alt
-          BracketOpen "["
-          Branch
-            UpperIdent "Assign"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              LowerIdent "assignment_expression"
-              Field
-                LowerIdent "left"
-                Colon ":"
-                Capture
-                  Tree
-                    ParenOpen "("
-                    LowerIdent "identifier"
-                    ParenClose ")"
-                  At "@"
+      Def
+        Capture
+          Alt
+            BracketOpen "["
+            Branch
+              UpperIdent "Assign"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                LowerIdent "assignment_expression"
+                Field
                   LowerIdent "left"
-              ParenClose ")"
-          Branch
-            UpperIdent "Call"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              LowerIdent "call_expression"
-              Field
-                LowerIdent "function"
-                Colon ":"
-                Capture
-                  Tree
-                    ParenOpen "("
-                    LowerIdent "identifier"
-                    ParenClose ")"
-                  At "@"
-                  LowerIdent "func"
-              ParenClose ")"
-          BracketClose "]"
-        At "@"
-        LowerIdent "stmt"
+                  Colon ":"
+                  Capture
+                    Tree
+                      ParenOpen "("
+                      LowerIdent "identifier"
+                      ParenClose ")"
+                    At "@"
+                    LowerIdent "left"
+                ParenClose ")"
+            Branch
+              UpperIdent "Call"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                LowerIdent "call_expression"
+                Field
+                  LowerIdent "function"
+                  Colon ":"
+                  Capture
+                    Tree
+                      ParenOpen "("
+                      LowerIdent "identifier"
+                      ParenClose ")"
+                    At "@"
+                    LowerIdent "func"
+                ParenClose ")"
+            BracketClose "]"
+          At "@"
+          LowerIdent "stmt"
     "#);
 }
 
@@ -310,42 +320,43 @@ fn tagged_alternation_with_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Alt
-          BracketOpen "["
-          Branch
-            UpperIdent "Base"
-            Colon ":"
-            Capture
+      Def
+        Capture
+          Alt
+            BracketOpen "["
+            Branch
+              UpperIdent "Base"
+              Colon ":"
+              Capture
+                Tree
+                  ParenOpen "("
+                  LowerIdent "identifier"
+                  ParenClose ")"
+                At "@"
+                LowerIdent "name"
+            Branch
+              UpperIdent "Access"
+              Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "identifier"
+                LowerIdent "member_expression"
+                Field
+                  LowerIdent "object"
+                  Colon ":"
+                  Capture
+                    Tree
+                      ParenOpen "("
+                      Underscore "_"
+                      ParenClose ")"
+                    At "@"
+                    LowerIdent "obj"
                 ParenClose ")"
-              At "@"
-              LowerIdent "name"
-          Branch
-            UpperIdent "Access"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              LowerIdent "member_expression"
-              Field
-                LowerIdent "object"
-                Colon ":"
-                Capture
-                  Tree
-                    ParenOpen "("
-                    Underscore "_"
-                    ParenClose ")"
-                  At "@"
-                  LowerIdent "obj"
-              ParenClose ")"
-          BracketClose "]"
-        At "@"
-        LowerIdent "chain"
-        Type
-          DoubleColon "::"
-          UpperIdent "MemberChain"
+            BracketClose "]"
+          At "@"
+          LowerIdent "chain"
+          Type
+            DoubleColon "::"
+            UpperIdent "MemberChain"
     "#);
 }
 
@@ -361,27 +372,28 @@ fn tagged_alternation_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expr"
-        Alt
-          BracketOpen "["
-          Branch
-            UpperIdent "Binary"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              LowerIdent "binary_expression"
-              ParenClose ")"
-          Branch
-            UpperIdent "Unary"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              LowerIdent "unary_expression"
-              ParenClose ")"
-          BracketClose "]"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expr"
+          Alt
+            BracketOpen "["
+            Branch
+              UpperIdent "Binary"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                LowerIdent "binary_expression"
+                ParenClose ")"
+            Branch
+              UpperIdent "Unary"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                LowerIdent "unary_expression"
+                ParenClose ")"
+            BracketClose "]"
+          ParenClose ")"
     "#);
 }
 
@@ -438,25 +450,26 @@ fn tagged_alternation_with_quantifier() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Single"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "statement"
-            ParenClose ")"
-        Branch
-          UpperIdent "Multiple"
-          Colon ":"
-          Quantifier
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Single"
+            Colon ":"
             Tree
               ParenOpen "("
               LowerIdent "statement"
               ParenClose ")"
-            Plus "+"
-        BracketClose "]"
+          Branch
+            UpperIdent "Multiple"
+            Colon ":"
+            Quantifier
+              Tree
+                ParenOpen "("
+                LowerIdent "statement"
+                ParenClose ")"
+              Plus "+"
+          BracketClose "]"
     "#);
 }
 
@@ -471,30 +484,31 @@ fn tagged_alternation_with_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Pair"
-          Colon ":"
-          Seq
-            BraceOpen "{"
-            Tree
-              ParenOpen "("
-              LowerIdent "key"
-              ParenClose ")"
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Pair"
+            Colon ":"
+            Seq
+              BraceOpen "{"
+              Tree
+                ParenOpen "("
+                LowerIdent "key"
+                ParenClose ")"
+              Tree
+                ParenOpen "("
+                LowerIdent "value"
+                ParenClose ")"
+              BraceClose "}"
+          Branch
+            UpperIdent "Single"
+            Colon ":"
             Tree
               ParenOpen "("
               LowerIdent "value"
               ParenClose ")"
-            BraceClose "}"
-        Branch
-          UpperIdent "Single"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "value"
-            ParenClose ")"
-        BracketClose "]"
+          BracketClose "]"
     "#);
 }
 
@@ -506,27 +520,28 @@ fn mixed_tagged_and_untagged() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Tagged"
-          Colon ":"
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Tagged"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "a"
+              ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            LowerIdent "b"
             ParenClose ")"
-        Tree
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        Branch
-          UpperIdent "Another"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "c"
-            ParenClose ")"
-        BracketClose "]"
+          Branch
+            UpperIdent "Another"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "c"
+              ParenClose ")"
+          BracketClose "]"
     "#);
 }
 
@@ -541,30 +556,31 @@ fn tagged_alternation_with_nested_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Literal"
-          Colon ":"
-          Alt
-            BracketOpen "["
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Literal"
+            Colon ":"
+            Alt
+              BracketOpen "["
+              Tree
+                ParenOpen "("
+                LowerIdent "number"
+                ParenClose ")"
+              Tree
+                ParenOpen "("
+                LowerIdent "string"
+                ParenClose ")"
+              BracketClose "]"
+          Branch
+            UpperIdent "Ident"
+            Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "number"
+              LowerIdent "identifier"
               ParenClose ")"
-            Tree
-              ParenOpen "("
-              LowerIdent "string"
-              ParenClose ")"
-            BracketClose "]"
-        Branch
-          UpperIdent "Ident"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        BracketClose "]"
+          BracketClose "]"
     "#);
 }
 

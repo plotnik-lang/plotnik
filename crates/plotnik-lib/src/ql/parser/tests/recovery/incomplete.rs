@@ -9,12 +9,13 @@ fn missing_capture_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        At "@"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
       |
@@ -31,14 +32,15 @@ fn missing_field_value() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        Field
-          LowerIdent "name"
-          Colon ":"
-          Error
-            ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
+          Field
+            LowerIdent "name"
+            Colon ":"
+            Error
+              ParenClose ")"
     ---
     error: unexpected token; expected an expression
       |
@@ -78,15 +80,16 @@ fn missing_type_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        At "@"
-        LowerIdent "name"
-        Type
-          DoubleColon "::"
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
+          LowerIdent "name"
+          Type
+            DoubleColon "::"
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
@@ -103,12 +106,13 @@ fn missing_negated_field_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "call"
-        NegatedField
-          Negation "!"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "call"
+          NegatedField
+            Negation "!"
+          ParenClose ")"
     ---
     error: expected field name after '!' (e.g., !value)
       |
@@ -125,11 +129,12 @@ fn missing_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        LowerIdent "expression"
-        Slash "/"
-        ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "expression"
+          Slash "/"
+          ParenClose ")"
     ---
     error: expected subtype after '/' (e.g., expression/binary_expression)
       |
@@ -146,12 +151,13 @@ fn tagged_branch_missing_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Label"
-          Colon ":"
-        BracketClose "]"
+      Def
+        Alt
+          BracketOpen "["
+          Branch
+            UpperIdent "Label"
+            Colon ":"
+          BracketClose "]"
     ---
     error: expected expression after branch label
       |
@@ -168,19 +174,23 @@ fn mixed_valid_invalid_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          At "@"
+          LowerIdent "ok"
+      Def
+        Error
+          At "@"
+      Def
+        Error
+          At "@"
+      Def
         Tree
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        At "@"
-        LowerIdent "ok"
-      Error
-        At "@"
-      Error
-        At "@"
-      Tree
-        LowerIdent "name"
+          LowerIdent "name"
     ---
     error: capture '@' must follow an expression to capture
       |
@@ -201,17 +211,19 @@ fn type_annotation_invalid_token_after() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          At "@"
+          LowerIdent "name"
+          Type
+            DoubleColon "::"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        At "@"
-        LowerIdent "name"
-        Type
-          DoubleColon "::"
-      Tree
-        ParenOpen "("
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
@@ -234,14 +246,15 @@ fn error_with_unexpected_content() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Tree
-        ParenOpen "("
-        KwError "ERROR"
+      Def
         Tree
           ParenOpen "("
-          LowerIdent "something"
+          KwError "ERROR"
+          Tree
+            ParenOpen "("
+            LowerIdent "something"
+            ParenClose ")"
           ParenClose ")"
-        ParenClose ")"
     ---
     error: (ERROR) takes no arguments
       |
@@ -258,8 +271,9 @@ fn bare_error_keyword() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        KwError "ERROR"
+      Def
+        Error
+          KwError "ERROR"
     ---
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
       |
@@ -276,8 +290,9 @@ fn bare_missing_keyword() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Error
-        KwMissing "MISSING"
+      Def
+        Error
+          KwMissing "MISSING"
     ---
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
       |
