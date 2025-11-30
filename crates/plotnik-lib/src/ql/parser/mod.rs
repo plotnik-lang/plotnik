@@ -40,7 +40,7 @@ mod core;
 mod error;
 mod grammar;
 
-pub use error::{render_errors, SyntaxError};
+pub use error::{SyntaxError, render_errors};
 
 use core::{Parse as ParseInner, Parser};
 

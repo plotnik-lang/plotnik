@@ -6,10 +6,10 @@
 use rowan::Checkpoint;
 
 use super::core::Parser;
-use crate::ql::syntax_kind::token_sets::{
-    ALTERNATION_RECOVERY, NAMED_NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS,
-};
 use crate::ql::syntax_kind::SyntaxKind;
+use crate::ql::syntax_kind::token_sets::{
+    ALTERNATION_RECOVERY, NAMED_NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEQUENCE_RECOVERY,
+};
 
 impl Parser<'_> {
     pub fn parse_root(&mut self) {
@@ -32,7 +32,7 @@ impl Parser<'_> {
             self.parse_pattern();
         } else {
             self.error_and_bump(
-                "unexpected token; expected a pattern like (node), [choice], \"literal\", @capture, or _",
+                "unexpected token; expected a pattern like (node), [choice], {sequence}, \"literal\", @capture, or _",
             );
         }
     }
@@ -54,6 +54,7 @@ impl Parser<'_> {
         match self.peek() {
             SyntaxKind::ParenOpen => self.parse_named_node(),
             SyntaxKind::BracketOpen => self.parse_alternation(),
+            SyntaxKind::BraceOpen => self.parse_sequence(),
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::StringLit => self.parse_anonymous_node(),
             SyntaxKind::At => self.parse_capture(),
@@ -98,7 +99,11 @@ impl Parser<'_> {
 
     /// Parse children until `until` token or recovery set hit.
     /// Recovery set lets parent handle mismatched delimiters gracefully.
-    fn parse_node_children(&mut self, until: SyntaxKind, recovery: crate::ql::syntax_kind::TokenSet) {
+    fn parse_node_children(
+        &mut self,
+        until: SyntaxKind,
+        recovery: crate::ql::syntax_kind::TokenSet,
+    ) {
         while !self.eof() {
             let kind = self.peek();
             if kind == until {
@@ -110,7 +115,7 @@ impl Parser<'_> {
                 break;
             } else {
                 self.error_and_bump(
-                    "unexpected token inside node; expected a child pattern or closing ')'",
+                    "unexpected token inside node; expected a child pattern or closing delimiter",
                 );
             }
         }
@@ -127,6 +132,17 @@ impl Parser<'_> {
         self.finish_node();
     }
 
+    /// Sibling sequence: `{pattern1 pattern2 ...}`
+    fn parse_sequence(&mut self) {
+        self.start_node(SyntaxKind::Sequence);
+        self.expect(SyntaxKind::BraceOpen);
+
+        self.parse_node_children(SyntaxKind::BraceClose, SEQUENCE_RECOVERY);
+
+        self.expect(SyntaxKind::BraceClose);
+        self.finish_node();
+    }
+
     fn parse_wildcard(&mut self) {
         self.start_node(SyntaxKind::Wildcard);
         self.expect(SyntaxKind::Underscore);
@@ -140,15 +156,41 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Capture binding: `@name` (snake_case identifier)
+    /// Capture binding: `@name` or `@name::Type`
     fn parse_capture(&mut self) {
         self.start_node(SyntaxKind::Capture);
         self.expect(SyntaxKind::At);
+
         if self.peek() == SyntaxKind::LowerIdent {
             self.bump();
         } else {
             self.error("expected capture name after '@' (e.g., @name, @my_var)");
+            self.finish_node();
+            return;
         }
+
+        // Check for type annotation: `::Type` or `::string`
+        if self.peek() == SyntaxKind::DoubleColon {
+            self.parse_type_annotation();
+        }
+
+        self.finish_node();
+    }
+
+    /// Type annotation: `::Type` (UpperIdent) or `::string` (LowerIdent primitive)
+    fn parse_type_annotation(&mut self) {
+        self.start_node(SyntaxKind::TypeAnnotation);
+        self.expect(SyntaxKind::DoubleColon);
+
+        match self.peek() {
+            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => {
+                self.bump();
+            }
+            _ => {
+                self.error("expected type name after '::' (e.g., ::MyType or ::string)");
+            }
+        }
+
         self.finish_node();
     }
 

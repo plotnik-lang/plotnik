@@ -1,9 +1,11 @@
-mod helpers_test;
+mod alternations_test;
 mod basic_nodes_test;
 mod captures_test;
-mod quantifiers_test;
-mod alternations_test;
-mod fields_test;
-mod errors_test;
-mod trivia_test;
 mod complex_test;
+mod errors_test;
+mod fields_test;
+mod helpers_test;
+mod quantifiers_test;
+mod sequences_test;
+mod trivia_test;
+mod type_annotations_test;

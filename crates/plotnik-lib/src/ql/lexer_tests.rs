@@ -1,5 +1,4 @@
 use crate::ql::lexer::{lex, token_text};
-use crate::ql::syntax_kind::SyntaxKind;
 
 /// Format tokens without trivia (default for most tests)
 fn snapshot(input: &str) -> String {
@@ -26,21 +25,9 @@ fn format_tokens(input: &str, include_trivia: bool) -> String {
     out
 }
 
-macro_rules! assert_lex {
-    ($input:expr, @$snapshot:literal) => {
-        insta::assert_snapshot!(snapshot($input), @$snapshot)
-    };
-}
-
-macro_rules! assert_lex_raw {
-    ($input:expr, @$snapshot:literal) => {
-        insta::assert_snapshot!(snapshot_raw($input), @$snapshot)
-    };
-}
-
 #[test]
 fn punctuation() {
-    assert_lex!("( ) [ ] { } : = ! ~ _ .", @r#"
+    insta::assert_snapshot!(snapshot("( ) [ ] { } : = ! ~ _ ."), @r#"
     ParenOpen "("
     ParenClose ")"
     BracketOpen "["
@@ -58,7 +45,7 @@ fn punctuation() {
 
 #[test]
 fn braces() {
-    assert_lex!("{ (a) (b) }", @r#"
+    insta::assert_snapshot!(snapshot("{ (a) (b) }"), @r#"
     BraceOpen "{"
     ParenOpen "("
     LowerIdent "a"
@@ -72,7 +59,7 @@ fn braces() {
 
 #[test]
 fn quantifiers_greedy() {
-    assert_lex!("* + ?", @r#"
+    insta::assert_snapshot!(snapshot("* + ?"), @r#"
     Star "*"
     Plus "+"
     Question "?"
@@ -81,7 +68,7 @@ fn quantifiers_greedy() {
 
 #[test]
 fn quantifiers_non_greedy() {
-    assert_lex!("*? +? ??", @r#"
+    insta::assert_snapshot!(snapshot("*? +? ??"), @r#"
     StarQuestion "*?"
     PlusQuestion "+?"
     QuestionQuestion "??"
@@ -90,7 +77,7 @@ fn quantifiers_non_greedy() {
 
 #[test]
 fn quantifiers_attached() {
-    assert_lex!("foo* bar+ baz? qux*? lazy+? greedy??", @r#"
+    insta::assert_snapshot!(snapshot("foo* bar+ baz? qux*? lazy+? greedy??"), @r#"
     LowerIdent "foo"
     Star "*"
     LowerIdent "bar"
@@ -108,7 +95,7 @@ fn quantifiers_attached() {
 
 #[test]
 fn identifiers_lower() {
-    assert_lex!("foo bar_baz test123", @r#"
+    insta::assert_snapshot!(snapshot("foo bar_baz test123"), @r#"
     LowerIdent "foo"
     LowerIdent "bar_baz"
     LowerIdent "test123"
@@ -117,7 +104,7 @@ fn identifiers_lower() {
 
 #[test]
 fn identifiers_upper() {
-    assert_lex!("Foo BarBaz Test123", @r#"
+    insta::assert_snapshot!(snapshot("Foo BarBaz Test123"), @r#"
     UpperIdent "Foo"
     UpperIdent "BarBaz"
     UpperIdent "Test123"
@@ -126,7 +113,7 @@ fn identifiers_upper() {
 
 #[test]
 fn identifiers_mixed() {
-    assert_lex!("Foo Bar baz test_case", @r#"
+    insta::assert_snapshot!(snapshot("Foo Bar baz test_case"), @r#"
     UpperIdent "Foo"
     UpperIdent "Bar"
     LowerIdent "baz"
@@ -136,7 +123,7 @@ fn identifiers_mixed() {
 
 #[test]
 fn strings_simple() {
-    assert_lex!(r#""hello" "world""#, @r#"
+    insta::assert_snapshot!(snapshot(r#""hello" "world""#), @r#"
     StringLit "\"hello\""
     StringLit "\"world\""
     "#);
@@ -144,7 +131,7 @@ fn strings_simple() {
 
 #[test]
 fn strings_with_escapes() {
-    assert_lex!(r#""hello\nworld" "tab\there""#, @r#"
+    insta::assert_snapshot!(snapshot(r#""hello\nworld" "tab\there""#), @r#"
     StringLit "\"hello\\nworld\""
     StringLit "\"tab\\there\""
     "#);
@@ -152,14 +139,12 @@ fn strings_with_escapes() {
 
 #[test]
 fn strings_empty() {
-    assert_lex!(r#""""#, @r#"
-    StringLit "\"\""
-    "#);
+    insta::assert_snapshot!(snapshot(r#""""#), @r#"StringLit "\"\"""#);
 }
 
 #[test]
 fn capture_simple() {
-    assert_lex!("@name", @r#"
+    insta::assert_snapshot!(snapshot("@name"), @r#"
     At "@"
     LowerIdent "name"
     "#);
@@ -167,7 +152,7 @@ fn capture_simple() {
 
 #[test]
 fn capture_with_underscores() {
-    assert_lex!("@my_capture_name", @r#"
+    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"
     At "@"
     LowerIdent "my_capture_name"
     "#);
@@ -175,7 +160,7 @@ fn capture_with_underscores() {
 
 #[test]
 fn capture_multiple() {
-    assert_lex!("@name @value @other", @r#"
+    insta::assert_snapshot!(snapshot("@name @value @other"), @r#"
     At "@"
     LowerIdent "name"
     At "@"
@@ -187,7 +172,7 @@ fn capture_multiple() {
 
 #[test]
 fn capture_bare_at() {
-    assert_lex!("@ foo", @r#"
+    insta::assert_snapshot!(snapshot("@ foo"), @r#"
     At "@"
     LowerIdent "foo"
     "#);
@@ -196,7 +181,7 @@ fn capture_bare_at() {
 #[test]
 fn capture_uppercase_not_valid() {
     // Uppercase after @ is not a valid capture - lexed as At + UpperIdent
-    assert_lex!("@Name", @r#"
+    insta::assert_snapshot!(snapshot("@Name"), @r#"
     At "@"
     UpperIdent "Name"
     "#);
@@ -204,21 +189,17 @@ fn capture_uppercase_not_valid() {
 
 #[test]
 fn comment_line() {
-    assert_lex_raw!("// line comment", @r#"
-    LineComment "// line comment"
-    "#);
+    insta::assert_snapshot!(snapshot_raw("// line comment"), @r#"LineComment "// line comment""#);
 }
 
 #[test]
 fn comment_block() {
-    assert_lex_raw!("/* block comment */", @r#"
-    BlockComment "/* block comment */"
-    "#);
+    insta::assert_snapshot!(snapshot_raw("/* block comment */"), @r#"BlockComment "/* block comment */""#);
 }
 
 #[test]
 fn comment_line_then_block() {
-    assert_lex_raw!("// line comment\n/* block comment */", @r#"
+    insta::assert_snapshot!(snapshot_raw("// line comment\n/* block comment */"), @r#"
     LineComment "// line comment"
     Newline "\n"
     BlockComment "/* block comment */"
@@ -227,7 +208,7 @@ fn comment_line_then_block() {
 
 #[test]
 fn comment_between_tokens() {
-    assert_lex!("foo /* comment */ bar", @r#"
+    insta::assert_snapshot!(snapshot("foo /* comment */ bar"), @r#"
     LowerIdent "foo"
     LowerIdent "bar"
     "#);
@@ -235,14 +216,12 @@ fn comment_between_tokens() {
 
 #[test]
 fn trivia_whitespace() {
-    assert_lex_raw!("  \t ", @r#"
-    Whitespace "  \t "
-    "#);
+    insta::assert_snapshot!(snapshot_raw("  \t "), @r#"Whitespace "  \t ""#);
 }
 
 #[test]
 fn trivia_newlines() {
-    assert_lex_raw!("\n\r\n", @r#"
+    insta::assert_snapshot!(snapshot_raw("\n\r\n"), @r#"
     Newline "\n"
     Newline "\r\n"
     "#);
@@ -250,7 +229,7 @@ fn trivia_newlines() {
 
 #[test]
 fn trivia_mixed() {
-    assert_lex_raw!("  \n\t ", @r#"
+    insta::assert_snapshot!(snapshot_raw("  \n\t "), @r#"
     Whitespace "  "
     Newline "\n"
     Whitespace "\t "
@@ -259,7 +238,7 @@ fn trivia_mixed() {
 
 #[test]
 fn trivia_between_tokens() {
-    assert_lex_raw!("foo  bar", @r#"
+    insta::assert_snapshot!(snapshot_raw("foo  bar"), @r#"
     LowerIdent "foo"
     Whitespace "  "
     LowerIdent "bar"
@@ -268,7 +247,7 @@ fn trivia_between_tokens() {
 
 #[test]
 fn trivia_filtered_by_default() {
-    assert_lex!("foo  bar", @r#"
+    insta::assert_snapshot!(snapshot("foo  bar"), @r#"
     LowerIdent "foo"
     LowerIdent "bar"
     "#);
@@ -276,7 +255,7 @@ fn trivia_filtered_by_default() {
 
 #[test]
 fn error_coalescing() {
-    assert_lex!("(foo) ^$%& (bar)", @r#"
+    insta::assert_snapshot!(snapshot("(foo) ^$%& (bar)"), @r#"
     ParenOpen "("
     LowerIdent "foo"
     ParenClose ")"
@@ -289,27 +268,27 @@ fn error_coalescing() {
 
 #[test]
 fn error_unexpected_xml_opening() {
-    assert_lex!("<div>", @r#"UnexpectedXML "<div>""#);
+    insta::assert_snapshot!(snapshot("<div>"), @r#"UnexpectedXML "<div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_closing() {
-    assert_lex!("</div>", @r#"UnexpectedXML "</div>""#);
+    insta::assert_snapshot!(snapshot("</div>"), @r#"UnexpectedXML "</div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_self_closing() {
-    assert_lex!("<br/>", @r#"UnexpectedXML "<br/>""#);
+    insta::assert_snapshot!(snapshot("<br/>"), @r#"UnexpectedXML "<br/>""#);
 }
 
 #[test]
 fn error_single_char() {
-    assert_lex!("^", @r#"UnexpectedFragment "^""#);
+    insta::assert_snapshot!(snapshot("^"), @r#"UnexpectedFragment "^""#);
 }
 
 #[test]
 fn error_at_end() {
-    assert_lex!("foo ^^^", @r#"
+    insta::assert_snapshot!(snapshot("foo ^^^"), @r#"
     LowerIdent "foo"
     UnexpectedFragment "^^^"
     "#);
@@ -317,7 +296,7 @@ fn error_at_end() {
 
 #[test]
 fn complex_pattern() {
-    assert_lex!("(function_definition name: (identifier) @name)", @r#"
+    insta::assert_snapshot!(snapshot("(function_definition name: (identifier) @name)"), @r#"
     ParenOpen "("
     LowerIdent "function_definition"
     LowerIdent "name"
@@ -333,7 +312,7 @@ fn complex_pattern() {
 
 #[test]
 fn alternation_pattern() {
-    assert_lex!("[\"public\" \"private\" \"protected\"]", @r#"
+    insta::assert_snapshot!(snapshot("[\"public\" \"private\" \"protected\"]"), @r#"
     BracketOpen "["
     StringLit "\"public\""
     StringLit "\"private\""
@@ -344,12 +323,12 @@ fn alternation_pattern() {
 
 #[test]
 fn empty_input() {
-    assert_lex!("", @"");
+    insta::assert_snapshot!(snapshot(""), @"");
 }
 
 #[test]
 fn double_colon() {
-    assert_lex!("@name::Type", @r#"
+    insta::assert_snapshot!(snapshot("@name::Type"), @r#"
     At "@"
     LowerIdent "name"
     DoubleColon "::"
@@ -360,7 +339,7 @@ fn double_colon() {
 #[test]
 fn double_colon_vs_single_colon() {
     // DoubleColon must take precedence over two Colons
-    assert_lex!(":: : ::", @r#"
+    insta::assert_snapshot!(snapshot(":: : ::"), @r#"
     DoubleColon "::"
     Colon ":"
     DoubleColon "::"
@@ -369,7 +348,7 @@ fn double_colon_vs_single_colon() {
 
 #[test]
 fn double_colon_string_type() {
-    assert_lex!("@name::string", @r#"
+    insta::assert_snapshot!(snapshot("@name::string"), @r#"
     At "@"
     LowerIdent "name"
     DoubleColon "::"
@@ -379,7 +358,7 @@ fn double_colon_string_type() {
 
 #[test]
 fn slash() {
-    assert_lex!("expression/binary_expression", @r#"
+    insta::assert_snapshot!(snapshot("expression/binary_expression"), @r#"
     LowerIdent "expression"
     Slash "/"
     LowerIdent "binary_expression"
@@ -389,7 +368,7 @@ fn slash() {
 #[test]
 fn slash_vs_comment() {
     // Slash must not conflict with line comments
-    assert_lex_raw!("a/b // comment", @r#"
+    insta::assert_snapshot!(snapshot_raw("a/b // comment"), @r#"
     LowerIdent "a"
     Slash "/"
     LowerIdent "b"
@@ -401,7 +380,7 @@ fn slash_vs_comment() {
 #[test]
 fn slash_vs_block_comment() {
     // Slash must not conflict with block comments
-    assert_lex_raw!("a/b /* comment */", @r#"
+    insta::assert_snapshot!(snapshot_raw("a/b /* comment */"), @r#"
     LowerIdent "a"
     Slash "/"
     LowerIdent "b"
@@ -412,7 +391,7 @@ fn slash_vs_block_comment() {
 
 #[test]
 fn keyword_error() {
-    assert_lex!("(ERROR)", @r#"
+    insta::assert_snapshot!(snapshot("(ERROR)"), @r#"
     ParenOpen "("
     KwError "ERROR"
     ParenClose ")"
@@ -421,7 +400,7 @@ fn keyword_error() {
 
 #[test]
 fn keyword_missing() {
-    assert_lex!("(MISSING identifier)", @r#"
+    insta::assert_snapshot!(snapshot("(MISSING identifier)"), @r#"
     ParenOpen "("
     KwMissing "MISSING"
     LowerIdent "identifier"
@@ -433,7 +412,7 @@ fn keyword_missing() {
 fn keyword_error_vs_upper_ident() {
     // ERROR keyword must take precedence over UpperIdent
     // But ERRORx should be UpperIdent
-    assert_lex!("ERROR ERRORx Errors", @r#"
+    insta::assert_snapshot!(snapshot("ERROR ERRORx Errors"), @r#"
     KwError "ERROR"
     UpperIdent "ERRORx"
     UpperIdent "Errors"
@@ -443,7 +422,7 @@ fn keyword_error_vs_upper_ident() {
 #[test]
 fn keyword_missing_vs_upper_ident() {
     // MISSING keyword must take precedence over UpperIdent
-    assert_lex!("MISSING MISSINGx Missing", @r#"
+    insta::assert_snapshot!(snapshot("MISSING MISSINGx Missing"), @r#"
     KwMissing "MISSING"
     UpperIdent "MISSINGx"
     UpperIdent "Missing"
@@ -452,7 +431,7 @@ fn keyword_missing_vs_upper_ident() {
 
 #[test]
 fn supertype_path_pattern() {
-    assert_lex!("(expression/binary_expression)", @r#"
+    insta::assert_snapshot!(snapshot("(expression/binary_expression)"), @r#"
     ParenOpen "("
     LowerIdent "expression"
     Slash "/"
@@ -463,7 +442,7 @@ fn supertype_path_pattern() {
 
 #[test]
 fn type_annotation_full() {
-    assert_lex!("(identifier) @name::string", @r#"
+    insta::assert_snapshot!(snapshot("(identifier) @name::string"), @r#"
     ParenOpen "("
     LowerIdent "identifier"
     ParenClose ")"
@@ -476,7 +455,7 @@ fn type_annotation_full() {
 
 #[test]
 fn sequence_pattern() {
-    assert_lex!("{ (a) (b) }*", @r#"
+    insta::assert_snapshot!(snapshot("{ (a) (b) }*"), @r#"
     BraceOpen "{"
     ParenOpen "("
     LowerIdent "a"
@@ -491,7 +470,7 @@ fn sequence_pattern() {
 
 #[test]
 fn named_def_tokens() {
-    assert_lex!("Expr = (identifier)", @r#"
+    insta::assert_snapshot!(snapshot("Expr = (identifier)"), @r#"
     UpperIdent "Expr"
     Equals "="
     ParenOpen "("
@@ -501,37 +480,55 @@ fn named_def_tokens() {
 }
 
 #[test]
-fn all_phase1_tokens_together() {
-    // Comprehensive test with all new tokens
-    let input = r#"
-        Def = { (expr/lit) (ERROR) (MISSING ";") } @val::Type
-    "#;
-    let tokens = lex(input);
-    let kinds: Vec<_> = tokens.iter()
-        .filter(|t| !t.kind.is_trivia())
-        .map(|t| t.kind)
-        .collect();
-    
-    assert_eq!(kinds, vec![
-        SyntaxKind::UpperIdent,   // Def
-        SyntaxKind::Equals,       // =
-        SyntaxKind::BraceOpen,    // {
-        SyntaxKind::ParenOpen,    // (
-        SyntaxKind::LowerIdent,   // expr
-        SyntaxKind::Slash,        // /
-        SyntaxKind::LowerIdent,   // lit
-        SyntaxKind::ParenClose,   // )
-        SyntaxKind::ParenOpen,    // (
-        SyntaxKind::KwError,      // ERROR
-        SyntaxKind::ParenClose,   // )
-        SyntaxKind::ParenOpen,    // (
-        SyntaxKind::KwMissing,    // MISSING
-        SyntaxKind::StringLit,    // ";"
-        SyntaxKind::ParenClose,   // )
-        SyntaxKind::BraceClose,   // }
-        SyntaxKind::At,           // @
-        SyntaxKind::LowerIdent,   // val
-        SyntaxKind::DoubleColon,  // ::
-        SyntaxKind::UpperIdent,   // Type
-    ]);
+fn special_node_error() {
+    insta::assert_snapshot!(snapshot("(ERROR)"), @r#"
+    ParenOpen "("
+    KwError "ERROR"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn special_node_missing() {
+    insta::assert_snapshot!(snapshot("(MISSING)"), @r#"
+    ParenOpen "("
+    KwMissing "MISSING"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn special_node_missing_with_arg() {
+    insta::assert_snapshot!(snapshot(r#"(MISSING ";")"#), @r#"
+    ParenOpen "("
+    KwMissing "MISSING"
+    StringLit "\";\""
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn type_annotation_upper() {
+    insta::assert_snapshot!(snapshot("@val::Type"), @r#"
+    At "@"
+    LowerIdent "val"
+    DoubleColon "::"
+    UpperIdent "Type"
+    "#);
+}
+
+#[test]
+fn named_def_with_sequence() {
+    insta::assert_snapshot!(snapshot("Def = { (a) (b) }"), @r#"
+    UpperIdent "Def"
+    Equals "="
+    BraceOpen "{"
+    ParenOpen "("
+    LowerIdent "a"
+    ParenClose ")"
+    ParenOpen "("
+    LowerIdent "b"
+    ParenClose ")"
+    BraceClose "}"
+    "#);
 }

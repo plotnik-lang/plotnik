@@ -13,7 +13,7 @@ fn error_missing_paren() {
         ParenOpen "("
         LowerIdent "identifier"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | (identifier
       |            ^
@@ -39,7 +39,7 @@ fn error_unexpected_token() {
         LowerIdent "string"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | (identifier) ^^^ (string)
       |              ^^^
@@ -65,7 +65,7 @@ fn error_missing_bracket() {
           LowerIdent "string"
           ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | [(identifier) (string)
       |                       ^
@@ -180,7 +180,7 @@ fn error_missing_field_value() {
       |
     1 | (call name:)
       |            ^
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | (call name:)
       |             ^
@@ -204,11 +204,11 @@ fn error_unexpected_xml_tag() {
       Error
         UnexpectedXML "</div>"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | <div>(identifier)</div>
       | ^^^^^
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | <div>(identifier)</div>
       |                  ^^^^^^
@@ -234,7 +234,7 @@ fn error_nested_unclosed() {
             LowerIdent "c"
             ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | (a (b (c)
       |          ^
@@ -260,15 +260,15 @@ fn error_multiple_consecutive() {
         LowerIdent "ok"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ $$$ %%% (ok)
       | ^^^
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ $$$ %%% (ok)
       |     ^^^
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ $$$ %%% (ok)
       |         ^^^
@@ -297,7 +297,7 @@ fn error_inside_alternation() {
           ParenClose ")"
         BracketClose "]"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | [(a) ^^^ (b)]
       |      ^^^
@@ -336,7 +336,7 @@ fn error_unclosed_alternation_nested() {
           ParenOpen "("
           LowerIdent "b"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | [(a) (b
       |        ^
@@ -358,7 +358,7 @@ fn error_at_start() {
         LowerIdent "a"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ (a)
       | ^^^
@@ -378,11 +378,11 @@ fn error_only_garbage() {
       Error
         UnexpectedFragment "$$$"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ $$$
       | ^^^
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | ^^^ $$$
       |     ^^^
@@ -477,7 +477,7 @@ fn error_deeply_nested_unclosed() {
               ParenOpen "("
               LowerIdent "d"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | (a (b (c (d
       |            ^
@@ -527,7 +527,7 @@ fn error_xml_self_closing() {
         LowerIdent "a"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], "literal", @capture, or _
+    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
     1 | <br/> (a)
       | ^^^^^
@@ -551,7 +551,7 @@ fn error_recovery_alternation_to_capture() {
           LowerIdent "name"
         BracketClose "]"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     1 | [^^^ @name]
       |  ^^^
@@ -577,7 +577,7 @@ fn error_multiline_recovery() {
           LowerIdent "b"
         ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing ')'
+    error: unexpected token inside node; expected a child pattern or closing delimiter
       |
     2 | ^^^
       | ^^^

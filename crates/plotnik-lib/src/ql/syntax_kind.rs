@@ -148,7 +148,6 @@ pub enum SyntaxKind {
     Error,
 
     // ========== NODE KINDS ==========
-
     /// Root node containing the entire query
     Root,
     /// A pattern matching a node (e.g., `(identifier)`)
@@ -416,12 +415,15 @@ pub mod token_sets {
     pub const FIELD_RECOVERY: TokenSet =
         TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
 
-    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);
+    pub const ROOT_RECOVERY: TokenSet =
+        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);
 
     /// Recovery set for named definitions (Name = ...)
-    pub const NAMED_DEF_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
+    pub const NAMED_DEF_RECOVERY: TokenSet =
+        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
 
-    pub const SEQUENCE_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
+    pub const SEQUENCE_RECOVERY: TokenSet =
+        TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
 }
 
 #[cfg(test)]
