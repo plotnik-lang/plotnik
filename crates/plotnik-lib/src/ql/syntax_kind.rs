@@ -165,23 +165,23 @@ pub enum SyntaxKind {
 
     /// Root node containing the entire query
     Root,
-    /// Node pattern: `(type children...)`, `(_)`, `(ERROR)`, `(MISSING ...)`
-    Node,
-    /// Literal/anonymous node pattern: `"keyword"`
+    /// Tree expression: `(type children...)`, `(_)`, `(ERROR)`, `(MISSING ...)`
+    Tree,
+    /// Literal/anonymous node: `"keyword"`
     Lit,
-    /// Field specification: `name: pattern`
+    /// Field specification: `name: expr`
     Field,
-    /// Capture binding: `@name` or `@name :: Type`
+    /// Capture wrapping an expression: `(expr) @name` or `(expr) @name :: Type`
     Capture,
     /// Type annotation: `::Type` after a capture
     Type,
-    /// Quantifier wrapping a pattern, e.g., `(expr)*` becomes `Quantifier { Node, Star }`
+    /// Quantifier wrapping an expression, e.g., `(expr)*` becomes `Quantifier { Tree, Star }`
     Quantifier,
-    /// Sibling sequence: `{pattern1 pattern2 ...}`
+    /// Sibling sequence: `{expr1 expr2 ...}`
     Seq,
     /// Choice between alternatives: `[a b c]`
     Alt,
-    /// Branch in a tagged alternation: `Label: pattern`
+    /// Branch in a tagged alternation: `Label: expr`
     Branch,
     /// Wildcard: `_` matches any node
     Wildcard,
@@ -189,7 +189,7 @@ pub enum SyntaxKind {
     Anchor,
     /// Negated field assertion: `!field` asserts field is absent
     NegatedField,
-    /// Named expression definition: `Name = pattern`
+    /// Named expression definition: `Name = expr`
     Def,
 
     // Must be last - used for bounds checking in `kind_from_raw`
@@ -329,8 +329,9 @@ impl std::fmt::Debug for TokenSet {
 pub mod token_sets {
     use super::*;
 
-    /// Tokens that can start a pattern (FIRST set of the pattern production).
-    pub const PATTERN_FIRST: TokenSet = TokenSet::new(&[
+    /// Tokens that can start an expression (FIRST set of the expression production).
+    /// Note: At (@) is not included because captures wrap expressions, they don't start them.
+    pub const EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
         BraceOpen,
@@ -339,7 +340,6 @@ pub mod token_sets {
         LowerIdent,
         StringLit,
         SingleQuoteLit,
-        At,
         Dot,
         Negation,
         KwError,
@@ -362,7 +362,7 @@ pub mod token_sets {
     /// Invalid separator tokens (comma, pipe) - for error recovery
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
-    pub const NODE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
+    pub const TREE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
 
     pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
 

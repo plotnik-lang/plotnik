@@ -11,11 +11,11 @@ fn simple_sequence() {
     Root
       Seq
         BraceOpen "{"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -47,7 +47,7 @@ fn sequence_single_element() {
     Root
       Seq
         BraceOpen "{"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -65,20 +65,20 @@ fn sequence_with_captures() {
     Root
       Seq
         BraceOpen "{"
-        Quantifier
-          Node
-            ParenOpen "("
-            LowerIdent "comment"
-            ParenClose ")"
-          Star "*"
         Capture
+          Quantifier
+            Tree
+              ParenOpen "("
+              LowerIdent "comment"
+              ParenClose ")"
+            Star "*"
           At "@"
           LowerIdent "comments"
-        Node
-          ParenOpen "("
-          LowerIdent "function"
-          ParenClose ")"
         Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "function"
+            ParenClose ")"
           At "@"
           LowerIdent "fn"
         BraceClose "}"
@@ -96,11 +96,11 @@ fn sequence_with_quantifier() {
       Quantifier
         Seq
           BraceOpen "{"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -121,14 +121,14 @@ fn nested_sequences() {
         BraceOpen "{"
         Seq
           BraceOpen "{"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
           BraceClose "}"
         Seq
           BraceOpen "{"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -145,16 +145,16 @@ fn sequence_in_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "block"
         Seq
           BraceOpen "{"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"
@@ -175,16 +175,16 @@ fn sequence_with_alternation() {
         BraceOpen "{"
         Alt
           BracketOpen "["
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
           BracketClose "]"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "c"
           ParenClose ")"
@@ -202,7 +202,7 @@ fn sequence_comma_separated_pattern() {
     Root
       Seq
         BraceOpen "{"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "number"
           ParenClose ")"
@@ -211,7 +211,7 @@ fn sequence_comma_separated_pattern() {
             BraceOpen "{"
             Lit
               StringLit "\",\""
-            Node
+            Tree
               ParenOpen "("
               LowerIdent "number"
               ParenClose ")"
@@ -233,11 +233,11 @@ fn sequence_with_anchor() {
         BraceOpen "{"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "first"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "second"
           ParenClose ")"

@@ -13,11 +13,11 @@ fn capture_dotted_error() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "foo"
         Dot "."
@@ -40,11 +40,11 @@ fn capture_dotted_multiple_parts() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "foo"
         Dot "."
@@ -69,11 +69,11 @@ fn capture_dotted_followed_by_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "node"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "node"
+          ParenClose ")"
         At "@"
         LowerIdent "foo"
         Dot "."
@@ -81,7 +81,7 @@ fn capture_dotted_followed_by_field() {
       Field
         LowerIdent "name"
         Colon ":"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "other"
           ParenClose ")"
@@ -103,15 +103,15 @@ fn capture_space_after_dot_breaks_chain() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "foo"
         Dot "."
-      Node
+      Tree
         LowerIdent "bar"
     ---
     error: capture names cannot contain dots
@@ -133,7 +133,7 @@ fn single_quote_string_suggests_double_quotes() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Lit
@@ -184,7 +184,7 @@ fn single_quote_with_escape() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Lit
@@ -210,14 +210,14 @@ fn comma_in_node_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -240,11 +240,11 @@ fn comma_in_alternation() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           LowerIdent "a"
-        Node
+        Tree
           LowerIdent "b"
-        Node
+        Tree
           LowerIdent "c"
         BracketClose "]"
     ---
@@ -271,11 +271,11 @@ fn pipe_in_alternation() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           LowerIdent "a"
-        Node
+        Tree
           LowerIdent "b"
-        Node
+        Tree
           LowerIdent "c"
         BracketClose "]"
     ---
@@ -302,11 +302,11 @@ fn comma_in_sequence() {
     Root
       Seq
         BraceOpen "{"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -331,11 +331,11 @@ fn single_colon_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
@@ -357,11 +357,11 @@ fn single_colon_type_annotation_no_space() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
@@ -383,19 +383,27 @@ fn single_colon_primitive_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Capture
+      Error
         At "@"
+      Field
         LowerIdent "val"
-        Type
+        Error
           Colon ":"
-          LowerIdent "string"
+      Tree
+        LowerIdent "string"
     ---
-    error: use '::' for type annotations, not ':'
+    error: capture '@' must follow an expression to capture
+      |
+    1 | @val : string
+      | ^
+    error: expected ':' to separate field name from its value
+      |
+    1 | @val : string
+      |     ^
+    error: unexpected token; expected an expression
       |
     1 | @val : string
       |      ^
-      help: use '::' for type annotations
-      suggestion: `::`
     "#);
 }
 
@@ -419,14 +427,14 @@ fn lowercase_branch_label() {
         Branch
           LowerIdent "left"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
         Branch
           LowerIdent "right"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -458,14 +466,14 @@ fn mixed_case_branch_labels() {
         Branch
           LowerIdent "foo"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
         Branch
           UpperIdent "Bar"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -490,13 +498,13 @@ fn field_equals_typo() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Field
           LowerIdent "name"
           Equals "="
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -517,13 +525,13 @@ fn field_equals_typo_no_space() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Field
           LowerIdent "name"
           Equals "="
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -548,20 +556,21 @@ fn multiple_suggestions_combined() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "node"
-        Field
-          LowerIdent "name"
-          Equals "="
-          Lit
-            SingleQuoteLit "'foo'"
-        Capture
-          At "@"
-          LowerIdent "val"
-          Type
-            Colon ":"
-            UpperIdent "Type"
+      Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "node"
+          Field
+            LowerIdent "name"
+            Equals "="
+            Lit
+              SingleQuoteLit "'foo'"
+        At "@"
+        LowerIdent "val"
+        Type
+          Colon ":"
+          UpperIdent "Type"
+      Error
         ParenClose ")"
     ---
     error: use ':' for field constraints, not '='
@@ -582,12 +591,20 @@ fn multiple_suggestions_combined() {
       |                   ^
       help: remove ','
       suggestion: ``
+    error: expected closing ')' for tree
+      |
+    1 | (node name = 'foo', @val : Type)
+      |                     ^
     error: use '::' for type annotations, not ':'
       |
     1 | (node name = 'foo', @val : Type)
       |                          ^
       help: use '::' for type annotations
       suggestion: `::`
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | (node name = 'foo', @val : Type)
+      |                                ^
     "#);
 }
 
@@ -601,7 +618,7 @@ fn double_quotes_no_error() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Lit
@@ -616,11 +633,11 @@ fn double_colon_no_error() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
@@ -635,13 +652,13 @@ fn field_colon_no_error() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Field
           LowerIdent "name"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -660,14 +677,14 @@ fn capitalized_branch_label_no_error() {
         Branch
           UpperIdent "Left"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
         Branch
           UpperIdent "Right"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -683,11 +700,11 @@ fn whitespace_separation_no_error() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           LowerIdent "a"
-        Node
+        Tree
           LowerIdent "b"
-        Node
+        Tree
           LowerIdent "c"
         BracketClose "]"
     "#);
@@ -705,13 +722,13 @@ fn field_with_upper_ident_parses() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "node"
         Field
           UpperIdent "FieldTypo"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "x"
             ParenClose ")"
@@ -727,11 +744,11 @@ fn capture_with_upper_ident_parses() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         UpperIdent "Name"
     "#);
@@ -745,7 +762,7 @@ fn negated_field_with_upper_ident_parses() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         NegatedField
@@ -763,11 +780,11 @@ fn capture_with_type_and_upper_ident() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         UpperIdent "Name"
         Type

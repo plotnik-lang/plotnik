@@ -13,11 +13,11 @@ fn capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
     "#);
@@ -31,19 +31,19 @@ fn capture_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         Field
           LowerIdent "function"
           Colon ":"
-          Node
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "func"
+          Capture
+            Tree
+              ParenOpen "("
+              LowerIdent "identifier"
+              ParenClose ")"
+            At "@"
+            LowerIdent "func"
         ParenClose ")"
     "#);
 }
@@ -58,31 +58,31 @@ fn multiple_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "binary"
-        Field
-          LowerIdent "left"
-          Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "left"
-        Field
-          LowerIdent "right"
-          Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "right"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "binary"
+          Field
+            LowerIdent "left"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "left"
+          Field
+            LowerIdent "right"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "right"
+          ParenClose ")"
         At "@"
         LowerIdent "expr"
     "#);
@@ -100,11 +100,11 @@ fn capture_with_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
@@ -121,11 +121,11 @@ fn capture_with_custom_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "function_declaration"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "function_declaration"
+          ParenClose ")"
         At "@"
         LowerIdent "fn"
         Type
@@ -142,11 +142,11 @@ fn capture_without_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
     "#);
@@ -162,37 +162,37 @@ fn multiple_captures_with_types() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "binary"
-        Field
-          LowerIdent "left"
-          Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "left"
-          Type
-            DoubleColon "::"
-            UpperIdent "Node"
-        Field
-          LowerIdent "right"
-          Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "right"
-          Type
-            DoubleColon "::"
-            LowerIdent "string"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "binary"
+          Field
+            LowerIdent "left"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "left"
+              Type
+                DoubleColon "::"
+                UpperIdent "Node"
+          Field
+            LowerIdent "right"
+            Colon ":"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "right"
+              Type
+                DoubleColon "::"
+                LowerIdent "string"
+          ParenClose ")"
         At "@"
         LowerIdent "expr"
         Type
@@ -209,18 +209,18 @@ fn sequence_capture_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Seq
-        BraceOpen "{"
-        Node
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        BraceClose "}"
       Capture
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            LowerIdent "a"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
+          BraceClose "}"
         At "@"
         LowerIdent "seq"
         Type
@@ -237,18 +237,18 @@ fn alternation_capture_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Node
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          LowerIdent "number"
-          ParenClose ")"
-        BracketClose "]"
       Capture
+        Alt
+          BracketOpen "["
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            LowerIdent "number"
+            ParenClose ")"
+          BracketClose "]"
         At "@"
         LowerIdent "value"
         Type
@@ -265,13 +265,13 @@ fn quantified_capture_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Quantifier
-        Node
-          ParenOpen "("
-          LowerIdent "statement"
-          ParenClose ")"
-        Plus "+"
       Capture
+        Quantifier
+          Tree
+            ParenOpen "("
+            LowerIdent "statement"
+            ParenClose ")"
+          Plus "+"
         At "@"
         LowerIdent "stmts"
         Type
@@ -291,43 +291,43 @@ fn nested_captures_with_types() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "function"
-        Field
-          LowerIdent "name"
-          Colon ":"
-          Node
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "name"
-          Type
-            DoubleColon "::"
-            LowerIdent "string"
-        Field
-          LowerIdent "body"
-          Colon ":"
-          Node
-            ParenOpen "("
-            LowerIdent "block"
-            Quantifier
-              Node
-                ParenOpen "("
-                LowerIdent "statement"
-                ParenClose ")"
-              Star "*"
+      Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "function"
+          Field
+            LowerIdent "name"
+            Colon ":"
             Capture
+              Tree
+                ParenOpen "("
+                LowerIdent "identifier"
+                ParenClose ")"
               At "@"
-              LowerIdent "body_stmts"
+              LowerIdent "name"
               Type
                 DoubleColon "::"
-                UpperIdent "Statement"
-            ParenClose ")"
-        ParenClose ")"
-      Capture
+                LowerIdent "string"
+          Field
+            LowerIdent "body"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              LowerIdent "block"
+              Capture
+                Quantifier
+                  Tree
+                    ParenOpen "("
+                    LowerIdent "statement"
+                    ParenClose ")"
+                  Star "*"
+                At "@"
+                LowerIdent "body_stmts"
+                Type
+                  DoubleColon "::"
+                  UpperIdent "Statement"
+              ParenClose ")"
+          ParenClose ")"
         At "@"
         LowerIdent "func"
         Type
@@ -344,11 +344,11 @@ fn capture_with_type_no_spaces() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type

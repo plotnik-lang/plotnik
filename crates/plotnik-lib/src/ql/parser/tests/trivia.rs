@@ -9,14 +9,14 @@ fn whitespace_preserved() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Whitespace "  "
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
+      Whitespace "  "
       Newline "\n"
     "#);
 }
@@ -32,7 +32,7 @@ fn comment_preserved() {
     Root
       LineComment "// comment"
       Newline "\n"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -50,13 +50,13 @@ fn multiline() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
       Newline "\n"
       Newline "\n"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "b"
         ParenClose ")"
@@ -73,7 +73,7 @@ fn comment_inside_pattern() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         Whitespace " "
@@ -84,7 +84,7 @@ fn comment_inside_pattern() {
           LowerIdent "name"
           Colon ":"
           Whitespace " "
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -102,7 +102,7 @@ fn trivia_filtered_by_default() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -124,13 +124,13 @@ fn trivia_between_alternation_items() {
         BracketOpen "["
         Newline "\n"
         Whitespace "    "
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
         Newline "\n"
         Whitespace "    "
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"

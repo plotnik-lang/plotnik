@@ -9,18 +9,18 @@ fn unexpected_token() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Error
         Garbage "^^^"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "string"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (identifier) ^^^ (string)
       |              ^^^
@@ -41,20 +41,20 @@ fn multiple_consecutive_garbage() {
         Garbage "$$$"
       Error
         Garbage "%%%"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "ok"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
       | ^^^
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
       |     ^^^
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
       |         ^^^
@@ -71,12 +71,12 @@ fn garbage_at_start() {
     Root
       Error
         Garbage "^^^"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ (a)
       | ^^^
@@ -96,11 +96,11 @@ fn only_garbage() {
       Error
         Garbage "$$$"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$
       | ^^^
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$
       |     ^^^
@@ -117,19 +117,19 @@ fn garbage_inside_alternation() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
         Error
           Garbage "^^^"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
         BracketClose "]"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) ^^^ (b)]
       |      ^^^
@@ -144,25 +144,26 @@ fn garbage_inside_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          Capture
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+            At "@"
+        At "@"
+      Error
+        At "@"
+      Tree
         ParenOpen "("
-        LowerIdent "a"
-        Node
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-        Capture
-          At "@"
-        Capture
-          At "@"
-        Capture
-          At "@"
-        Node
-          ParenOpen "("
-          LowerIdent "c"
-          ParenClose ")"
+        LowerIdent "c"
         ParenClose ")"
-      Node
+      Error
+        ParenClose ")"
+      Tree
         ParenOpen "("
         LowerIdent "d"
         ParenClose ")"
@@ -175,10 +176,10 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
-    error: expected capture name after '@' (e.g., @name, @my_var)
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (a (b) @@@ (c)) (d)
-      |            ^
+      |               ^
     "#);
 }
 
@@ -192,18 +193,18 @@ fn xml_tag_garbage() {
     Root
       Error
         XMLGarbage "<div>"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Error
         XMLGarbage "</div>"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
       | ^^^^^
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
       |                  ^^^^^^
@@ -220,12 +221,12 @@ fn xml_self_closing() {
     Root
       Error
         XMLGarbage "<br/>"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <br/> (a)
       | ^^^^^
@@ -240,27 +241,36 @@ fn predicate_unsupported() {
 
     insta::assert_snapshot!(snapshot(input), @r##"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
-        Node
-          ParenOpen "("
-          Error
-            Predicate "#eq?"
-          Capture
-            At "@"
-            LowerIdent "x"
-          Lit
-            StringLit "\"foo\""
-          ParenClose ")"
-        Node
-          LowerIdent "b"
+        Capture
+          Tree
+            ParenOpen "("
+            Error
+              Predicate "#eq?"
+          At "@"
+          LowerIdent "x"
+        Lit
+          StringLit "\"foo\""
+        ParenClose ")"
+      Tree
+        LowerIdent "b"
+      Error
         ParenClose ")"
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
+    error: expected closing ')' for tree
+      |
+    1 | (a (#eq? @x "foo") b)
+      |          ^
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | (a (#eq? @x "foo") b)
+      |                     ^
     "##);
 }
 
@@ -272,14 +282,15 @@ fn predicate_match() {
 
     insta::assert_snapshot!(snapshot(input), @r##"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Error
         Predicate "#match?"
-      Capture
+      Error
         At "@"
+      Tree
         LowerIdent "name"
       Lit
         StringLit "\"test\""
@@ -288,6 +299,10 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
+    error: capture '@' must follow an expression to capture
+      |
+    1 | (identifier) #match? @name "test"
+      |                      ^
     "##);
 }
 
@@ -301,16 +316,16 @@ fn multiline_garbage_recovery() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
         Error
           Garbage "^^^"
-        Node
+        Tree
           LowerIdent "b"
         ParenClose ")"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected token; expected a child expression or closing delimiter
       |
     2 | ^^^
       | ^^^
@@ -325,11 +340,11 @@ fn capture_with_invalid_char() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
       Error
         Garbage "123"
@@ -349,7 +364,7 @@ fn field_value_is_garbage() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         Field
@@ -359,7 +374,7 @@ fn field_value_is_garbage() {
             Garbage "%%%"
         ParenClose ")"
     ---
-    error: unexpected token; expected a pattern
+    error: unexpected token; expected an expression
       |
     1 | (call name: %%%)
       |             ^^^
@@ -374,19 +389,28 @@ fn alternation_recovery_to_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alt
-        BracketOpen "["
-        Error
-          Garbage "^^^"
-        Capture
-          At "@"
-          LowerIdent "name"
+      Capture
+        Alt
+          BracketOpen "["
+          Error
+            Garbage "^^^"
+        At "@"
+        LowerIdent "name"
+      Error
         BracketClose "]"
     ---
-    error: unexpected token inside node; expected a child pattern or closing delimiter
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
       |  ^^^
+    error: expected closing ']' for alternation
+      |
+    1 | [^^^ @name]
+      |      ^
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | [^^^ @name]
+      |           ^
     "#);
 }
 
@@ -401,7 +425,7 @@ fn top_level_garbage_recovery() {
       Def
         UpperIdent "Expr"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
@@ -410,12 +434,12 @@ fn top_level_garbage_recovery() {
       Def
         UpperIdent "Expr2"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr = (a) ^^^ Expr2 = (b)
       |            ^^^
@@ -437,7 +461,7 @@ fn multiple_definitions_with_garbage_between() {
       Def
         UpperIdent "A"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
@@ -446,7 +470,7 @@ fn multiple_definitions_with_garbage_between() {
       Def
         UpperIdent "B"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -455,16 +479,16 @@ fn multiple_definitions_with_garbage_between() {
       Def
         UpperIdent "C"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "c"
           ParenClose ")"
     ---
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     2 | ^^^
       | ^^^
-    error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     4 | $$$
       | ^^^

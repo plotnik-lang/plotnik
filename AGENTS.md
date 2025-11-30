@@ -19,19 +19,30 @@
 
 - Lexer: all token types including trivia, error coalescing
 - Parser structure: trivia handling, error recovery, checkpoints
-- Basic grammar: named nodes `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = pattern`, tagged alternations `[A: ... B: ...]`
+- Basic grammar: tree expressions `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = expr`, tagged alternations `[A: ... B: ...]`
 - Parser accepts UpperIdent in capture/field positions for resilience (validation catches casing errors)
 
 ## SyntaxKind naming convention
 
 Short, punchy names for CST node kinds:
-- `Node` - parenthesized patterns: `(type)`, `(_)`, `(ERROR)`, `(MISSING)`
+
+- `Tree` - parenthesized tree expressions: `(type)`, `(_)`, `(ERROR)`, `(MISSING)`
 - `Lit` - literal/anonymous nodes: `"keyword"`
-- `Def` - named definitions: `Name = pattern`
+- `Def` - named definitions: `Name = expr`
 - `Alt` - alternations: `[a b c]`
-- `Branch` - tagged alternation branch: `Label: pattern`
+- `Branch` - tagged alternation branch: `Label: expr`
 - `Seq` - sibling sequences: `{a b c}`
+- `Quantifier` - wraps an expression with `*`, `+`, or `?`
+- `Capture` - wraps an expression with `@name` and optional `::Type`
 - `Type` - type annotations: `::T`
+
+## Expression structure
+
+An expression (`Expr`) is one of: `Tree | Alt | Seq | Quantifier | Capture`
+
+- `Quantifier` wraps the expression it quantifies: `(x)*` → `Quantifier { Tree, Star }`
+- `Capture` wraps the expression it captures: `(x) @name` → `Capture { Tree, @name }`
+- Captures must follow an expression; standalone `@name` is invalid
 
 ## What's NOT yet implemented
 
@@ -47,7 +58,7 @@ Short, punchy names for CST node kinds:
 
 ## Grammar Constraints
 
-- Fields: `field: pattern` constraints are strict. The pattern must be a node, alternation, or quantifier. Sibling sequences `{...}` are not allowed as direct field values.
+- Fields: `field: expr` constraints are strict. The expression must be a tree, alternation, or quantifier. Sibling sequences `{...}` are not allowed as direct field values.
 - Alternations: In unlabeled alternations, captures with the same name must have the same type across all branches where they appear. A capture is required if present in all branches, optional otherwise. When branches mix bare nodes and structures, bare node captures are auto-promoted to single-field structures. Merged structures require explicit type annotation (`@x :: TypeName`) for codegen. Use tagged alternations (`[A: ... B: ...]`) for discriminated unions.
 - Anchors: The `.` anchor enforces strict adjacency. Without it, sibling matching allows gaps (scanning).
 - Naming: Capitalized names (`Expr`) are user-defined (expressions, labels). Lowercase names (`stmt`) are language-defined (tree-sitter nodes).

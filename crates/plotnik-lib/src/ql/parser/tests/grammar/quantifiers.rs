@@ -10,7 +10,7 @@ fn quantifier_star() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -27,7 +27,7 @@ fn quantifier_plus() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -44,7 +44,7 @@ fn quantifier_optional() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -60,13 +60,13 @@ fn quantifier_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Quantifier
-        Node
-          ParenOpen "("
-          LowerIdent "statement"
-          ParenClose ")"
-        Star "*"
       Capture
+        Quantifier
+          Tree
+            ParenOpen "("
+            LowerIdent "statement"
+            ParenClose ")"
+          Star "*"
         At "@"
         LowerIdent "statements"
     "#);
@@ -81,11 +81,11 @@ fn quantifier_inside_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "block"
         Quantifier
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"

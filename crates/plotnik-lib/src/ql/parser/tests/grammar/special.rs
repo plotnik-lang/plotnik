@@ -9,7 +9,7 @@ fn error_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         KwError "ERROR"
         ParenClose ")"
@@ -24,11 +24,11 @@ fn error_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        KwError "ERROR"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          KwError "ERROR"
+          ParenClose ")"
         At "@"
         LowerIdent "err"
     "#);
@@ -42,7 +42,7 @@ fn missing_node_bare() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         KwMissing "MISSING"
         ParenClose ")"
@@ -57,7 +57,7 @@ fn missing_node_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         KwMissing "MISSING"
         LowerIdent "identifier"
@@ -73,7 +73,7 @@ fn missing_node_with_string() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         KwMissing "MISSING"
         StringLit "\";\""
@@ -89,12 +89,12 @@ fn missing_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        KwMissing "MISSING"
-        StringLit "\";\""
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          KwMissing "MISSING"
+          StringLit "\";\""
+          ParenClose ")"
         At "@"
         LowerIdent "missing_semi"
     "#);
@@ -110,11 +110,11 @@ fn error_in_alternation() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           ParenOpen "("
           KwError "ERROR"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -132,12 +132,12 @@ fn missing_in_sequence() {
     Root
       Seq
         BraceOpen "{"
-        Node
+        Tree
           ParenOpen "("
           KwMissing "MISSING"
           StringLit "\";\""
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -154,16 +154,16 @@ fn special_node_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "function_definition"
         Field
           LowerIdent "body"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "block"
-            Node
+            Tree
               ParenOpen "("
               KwError "ERROR"
               ParenClose ")"
@@ -181,7 +181,7 @@ fn error_with_quantifier() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Node
+        Tree
           ParenOpen "("
           KwError "ERROR"
           ParenClose ")"
@@ -198,7 +198,7 @@ fn missing_with_quantifier() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Node
+        Tree
           ParenOpen "("
           KwMissing "MISSING"
           LowerIdent "identifier"

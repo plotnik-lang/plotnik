@@ -9,12 +9,12 @@ fn anchor_first_child() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "block"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "first_statement"
           ParenClose ")"
@@ -30,10 +30,10 @@ fn anchor_last_child() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "block"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "last_statement"
           ParenClose ")"
@@ -51,23 +51,23 @@ fn anchor_adjacency() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "dotted_name"
-        Node
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
         Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
           At "@"
           LowerIdent "a"
         Anchor
           Dot "."
-        Node
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
         Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
           At "@"
           LowerIdent "b"
         ParenClose ")"
@@ -82,12 +82,12 @@ fn anchor_both_ends() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "array"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "element"
           ParenClose ")"
@@ -105,24 +105,24 @@ fn anchor_multiple_adjacent() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "tuple"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "c"
           ParenClose ")"
@@ -144,11 +144,11 @@ fn anchor_in_sequence() {
         BraceOpen "{"
         Anchor
           Dot "."
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "first"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "second"
           ParenClose ")"
@@ -166,16 +166,16 @@ fn capture_space_after_dot_is_anchor() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "foo"
       Anchor
         Dot "."
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "other"
         ParenClose ")"

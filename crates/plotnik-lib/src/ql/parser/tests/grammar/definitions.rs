@@ -12,7 +12,7 @@ fn simple_named_def() {
       Def
         UpperIdent "Expr"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -32,15 +32,15 @@ fn named_def_with_alternation() {
         Equals "="
         Alt
           BracketOpen "["
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "number"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "string"
             ParenClose ")"
@@ -61,11 +61,11 @@ fn named_def_with_sequence() {
         Equals "="
         Seq
           BraceOpen "{"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "expression"
             ParenClose ")"
@@ -87,37 +87,37 @@ fn named_def_with_captures() {
       Def
         UpperIdent "BinaryOp"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "binary_expression"
           Field
             LowerIdent "left"
             Colon ":"
-            Node
-              ParenOpen "("
-              Underscore "_"
-              ParenClose ")"
-          Capture
-            At "@"
-            LowerIdent "left"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "left"
           Field
             LowerIdent "operator"
             Colon ":"
-            Wildcard
-              Underscore "_"
-          Capture
-            At "@"
-            LowerIdent "op"
+            Capture
+              Wildcard
+                Underscore "_"
+              At "@"
+              LowerIdent "op"
           Field
             LowerIdent "right"
             Colon ":"
-            Node
-              ParenOpen "("
-              Underscore "_"
-              ParenClose ")"
-          Capture
-            At "@"
-            LowerIdent "right"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "right"
           ParenClose ")"
     "#);
 }
@@ -134,14 +134,14 @@ fn multiple_named_defs() {
       Def
         UpperIdent "Expr"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "expression"
           ParenClose ")"
       Def
         UpperIdent "Stmt"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -162,23 +162,23 @@ fn named_def_then_pattern() {
         Equals "="
         Alt
           BracketOpen "["
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "number"
             ParenClose ")"
           BracketClose "]"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "program"
-        Node
-          ParenOpen "("
-          UpperIdent "Expr"
-          ParenClose ")"
         Capture
+          Tree
+            ParenOpen "("
+            UpperIdent "Expr"
+            ParenClose ")"
           At "@"
           LowerIdent "value"
         ParenClose ")"
@@ -199,11 +199,11 @@ fn named_def_referencing_another() {
         Equals "="
         Alt
           BracketOpen "["
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "number"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "string"
             ParenClose ")"
@@ -213,11 +213,11 @@ fn named_def_referencing_another() {
         Equals "="
         Alt
           BracketOpen "["
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          Node
+          Tree
             ParenOpen "("
             UpperIdent "Literal"
             ParenClose ")"
@@ -237,7 +237,7 @@ fn named_def_with_quantifier() {
         UpperIdent "Statements"
         Equals "="
         Quantifier
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"
@@ -258,7 +258,7 @@ fn named_def_complex_recursive() {
       Def
         UpperIdent "NestedCall"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "call_expression"
           Field
@@ -266,25 +266,25 @@ fn named_def_complex_recursive() {
             Colon ":"
             Alt
               BracketOpen "["
-              Node
-                ParenOpen "("
-                LowerIdent "identifier"
-                ParenClose ")"
               Capture
+                Tree
+                  ParenOpen "("
+                  LowerIdent "identifier"
+                  ParenClose ")"
                 At "@"
                 LowerIdent "name"
-              Node
-                ParenOpen "("
-                UpperIdent "NestedCall"
-                ParenClose ")"
               Capture
+                Tree
+                  ParenOpen "("
+                  UpperIdent "NestedCall"
+                  ParenClose ")"
                 At "@"
                 LowerIdent "inner"
               BracketClose "]"
           Field
             LowerIdent "arguments"
             Colon ":"
-            Node
+            Tree
               ParenOpen "("
               LowerIdent "arguments"
               ParenClose ")"
@@ -305,32 +305,32 @@ fn named_def_with_type_annotation() {
       Def
         UpperIdent "Func"
         Equals "="
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "function_declaration"
           Field
             LowerIdent "name"
             Colon ":"
-            Node
-              ParenOpen "("
-              LowerIdent "identifier"
-              ParenClose ")"
-          Capture
-            At "@"
-            LowerIdent "name"
-            Type
-              DoubleColon "::"
-              LowerIdent "string"
+            Capture
+              Tree
+                ParenOpen "("
+                LowerIdent "identifier"
+                ParenClose ")"
+              At "@"
+              LowerIdent "name"
+              Type
+                DoubleColon "::"
+                LowerIdent "string"
           Field
             LowerIdent "body"
             Colon ":"
-            Node
-              ParenOpen "("
-              Underscore "_"
-              ParenClose ")"
-          Capture
-            At "@"
-            LowerIdent "body"
+            Capture
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+              At "@"
+              LowerIdent "body"
           ParenClose ")"
     "#);
 }
@@ -343,7 +343,7 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         UpperIdent "Expr"
         ParenClose ")"
@@ -358,7 +358,7 @@ fn bare_upper_ident_not_followed_by_equals_is_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         UpperIdent "Expr"
     "#);
 }
@@ -371,9 +371,9 @@ fn named_def_missing_equals() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         UpperIdent "Expr"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"

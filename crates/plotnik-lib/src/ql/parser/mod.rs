@@ -22,18 +22,19 @@
 //! # Grammar (EBNF-ish)
 //!
 //! ```text
-//! root       = pattern*
-//! pattern    = named_node | alternation | wildcard | anon_node
-//!            | capture | anchor | negated_field | field | ident
-//! named_node = "(" [node_type] pattern* ")"
-//! alternation= "[" pattern* "]"
+//! root       = expr*
+//! expr       = tree | alternation | wildcard | anon_node
+//!            | anchor | negated_field | field | ident
+//! tree       = "(" [node_type] expr* ")"
+//! alternation= "[" expr* "]"
 //! wildcard   = "_"
 //! anon_node  = STRING
 //! capture    = "@" LOWER_IDENT
 //! anchor     = "."
 //! negated_field = "!" IDENT
-//! field      = IDENT ":" pattern
-//! quantifier = pattern ("*" | "+" | "?" | "*?" | "+?" | "??")
+//! field      = IDENT ":" expr
+//! quantifier = expr ("*" | "+" | "?" | "*?" | "+?" | "??")
+//! capture    = expr "@" IDENT ["::" TYPE]
 //! ```
 
 mod core;

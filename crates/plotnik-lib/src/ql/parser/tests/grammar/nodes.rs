@@ -18,7 +18,7 @@ fn simple_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -33,13 +33,13 @@ fn nested_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "function_definition"
         Field
           LowerIdent "name"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -58,16 +58,16 @@ fn deeply_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "a"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "b"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "c"
-            Node
+            Tree
               ParenOpen "("
               LowerIdent "d"
               ParenClose ")"
@@ -88,18 +88,18 @@ fn sibling_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "block"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -117,15 +117,15 @@ fn multiple_patterns() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "string"
         ParenClose ")"
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "number"
         ParenClose ")"
@@ -144,7 +144,7 @@ fn wildcard() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         Underscore "_"
         ParenClose ")"
@@ -193,7 +193,7 @@ fn supertype_basic() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -210,7 +210,7 @@ fn supertype_with_string_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -227,13 +227,13 @@ fn supertype_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "expression"
-        Slash "/"
-        LowerIdent "binary_expression"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "expression"
+          Slash "/"
+          LowerIdent "binary_expression"
+          ParenClose ")"
         At "@"
         LowerIdent "expr"
     "#);
@@ -249,7 +249,7 @@ fn supertype_with_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -257,23 +257,23 @@ fn supertype_with_children() {
         Field
           LowerIdent "left"
           Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "left"
+          Capture
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+            At "@"
+            LowerIdent "left"
         Field
           LowerIdent "right"
           Colon ":"
-          Node
-            ParenOpen "("
-            Underscore "_"
-            ParenClose ")"
-        Capture
-          At "@"
-          LowerIdent "right"
+          Capture
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+            At "@"
+            LowerIdent "right"
         ParenClose ")"
     "#);
 }
@@ -287,12 +287,12 @@ fn supertype_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "statement"
         Slash "/"
         LowerIdent "expression_statement"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
@@ -312,13 +312,13 @@ fn supertype_in_alternation() {
     Root
       Alt
         BracketOpen "["
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
           LowerIdent "identifier"
           ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
@@ -336,7 +336,7 @@ fn no_supertype_plain_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"

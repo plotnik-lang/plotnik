@@ -9,13 +9,13 @@ fn field_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         Field
           LowerIdent "function"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -33,20 +33,20 @@ fn multiple_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "assignment"
         Field
           LowerIdent "left"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
         Field
           LowerIdent "right"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "expression"
             ParenClose ")"
@@ -62,7 +62,7 @@ fn negated_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "function"
         NegatedField
@@ -82,7 +82,7 @@ fn negated_and_regular_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "function"
         NegatedField
@@ -91,7 +91,7 @@ fn negated_and_regular_fields() {
         Field
           LowerIdent "name"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -110,24 +110,24 @@ fn mixed_children_and_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "if"
         Field
           LowerIdent "condition"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "expr"
             ParenClose ")"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "then_block"
           ParenClose ")"
         Field
           LowerIdent "else"
           Colon ":"
-          Node
+          Tree
             ParenOpen "("
             LowerIdent "else_block"
             ParenClose ")"
@@ -144,18 +144,18 @@ fn multiple_patterns_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "function"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "function"
+          ParenClose ")"
         At "@"
         LowerIdent "func"
-      Node
-        ParenOpen "("
-        LowerIdent "class"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "class"
+          ParenClose ")"
         At "@"
         LowerIdent "cls"
     "#);

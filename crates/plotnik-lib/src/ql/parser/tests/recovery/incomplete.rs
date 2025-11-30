@@ -9,11 +9,11 @@ fn missing_capture_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
@@ -31,7 +31,7 @@ fn missing_field_value() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         Field
@@ -40,16 +40,16 @@ fn missing_field_value() {
           Error
             ParenClose ")"
     ---
-    error: unexpected token; expected a pattern
+    error: unexpected token; expected an expression
       |
     1 | (call name:)
       |            ^
-    error: unclosed node; expected ')'
+    error: unclosed tree; expected ')'
       |
     1 | (call name:)
       | -           ^
       | |
-      | node started here
+      | tree started here
     "#);
 }
 
@@ -63,7 +63,7 @@ fn named_def_eof_after_equals() {
         UpperIdent "Expr"
         Equals "="
     ---
-    error: expected pattern after '=' in named definition
+    error: expected expression after '=' in named definition
       |
     1 | Expr = 
       |        ^
@@ -78,11 +78,11 @@ fn missing_type_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
@@ -103,7 +103,7 @@ fn missing_negated_field_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "call"
         NegatedField
@@ -125,7 +125,7 @@ fn missing_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -153,7 +153,7 @@ fn tagged_branch_missing_pattern() {
           Colon ":"
         BracketClose "]"
     ---
-    error: expected node, alternation, sequence, or literal after branch label
+    error: expected expression after branch label
       |
     1 | [Label:]
       |        ^
@@ -168,20 +168,25 @@ fn mixed_valid_invalid_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "a"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "a"
+          ParenClose ")"
         At "@"
         LowerIdent "ok"
-      Capture
+      Error
         At "@"
-      Capture
+      Error
         At "@"
+      Tree
         LowerIdent "name"
     ---
-    error: expected capture name after '@' (e.g., @name, @my_var)
+    error: capture '@' must follow an expression to capture
+      |
+    1 | (a) @ok @ @name
+      |         ^
+    error: capture '@' must follow an expression to capture
       |
     1 | (a) @ok @ @name
       |           ^
@@ -196,28 +201,28 @@ fn type_annotation_invalid_token_after() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
       Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
         At "@"
         LowerIdent "name"
         Type
           DoubleColon "::"
-      Node
+      Tree
         ParenOpen "("
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name :: (
       |                       ^
-    error: unclosed node; expected ')'
+    error: unclosed tree; expected ')'
       |
     1 | (identifier) @name :: (
       |                       -^
       |                       |
-      |                       node started here
+      |                       tree started here
     "#);
 }
 
@@ -229,10 +234,10 @@ fn error_with_unexpected_content() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Node
+      Tree
         ParenOpen "("
         KwError "ERROR"
-        Node
+        Tree
           ParenOpen "("
           LowerIdent "something"
           ParenClose ")"
