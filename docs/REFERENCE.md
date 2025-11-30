@@ -26,8 +26,11 @@ By default, the last subquery becomes the entry point. Alternatively, an entry p
 
 - Capitalized names (`Expr`, `Statement`, `BinaryOp`) are user-defined: named expressions, alternation labels, type annotations
 - Lowercase names (`function_declaration`, `identifier`, `binary_expression`) are language-defined: node types from tree-sitter grammars
+- Capture names must be snake_case (e.g., `@name`, `@func_body`)
 
 This distinction is enforced by the parser.
+
+> **Difference from tree-sitter:** Tree-sitter allows arbitrary capture names including dots (e.g., `@function.name`). Plotnik restricts captures to snake*case identifiers (`[a-z]a-z0-9*]\*`) because they map directly to struct fields in generated code (Rust, TypeScript, Python). Use underscores instead: `@function_name`.
 
 ---
 
@@ -148,7 +151,7 @@ interface FunctionDeclaration {
 | `@name` anywhere in query | field `name` in current scope          |
 | `(pattern)? @x`           | optional field                         |
 | `(pattern)* @x`           | array field                            |
-| `{...} @x` or `[...] @x`  | nested object (new scope for captures)  |
+| `{...} @x` or `[...] @x`  | nested object (new scope for captures) |
 | `@x::string`              | string value instead of Node           |
 | `@x::TypeName`            | custom type name in codegen            |
 
@@ -445,7 +448,9 @@ When the same capture appears in all branches:
 Output type:
 
 ```typescript
-{ name: Node }  // required: present in all branches, same type
+{
+  name: Node;
+} // required: present in all branches, same type
 ```
 
 Mixed presence:
@@ -715,22 +720,22 @@ type Root = {
 
 ## Quick Reference
 
-| Feature              | Tree-sitter      | Plotnik           |
-| -------------------- | ---------------- | ----------------- |
-| Capture              | `@name`          | `@name`           |
-| Type annotation      |                  | `@x::T`           |
-| Text extraction      |                  | `@x::string`      |
-| Named node           | `(type)`         | `(type)`          |
-| Anonymous node       | `"text"`         | `"text"`          |
-| Any node             | `_`              | `_`               |
-| Any named node       | `(_)`            | `(_)`             |
-| Field constraint     | `field: pattern` | `field: pattern`  |
-| Negated field        | `!field`         | `!field`          |
-| Quantifiers          | `?` `*` `+`      | `?` `*` `+`       |
-| Non-greedy           |                  | `??` `*?` `+?`    |
-| Sequence             | `((a) (b))`      | `{(a) (b)}`       |
-| Alternation          | `[a b]`          | `[a b]`           |
-| Tagged alternation   |                  | `[A: (a) B: (b)]` |
-| Anchor               | `.`              | `.`               |
-| Named expression     |                  | `Name = pattern`  |
-| Use named expression |                  | `(Name)`          |
+| Feature              | Tree-sitter      | Plotnik                   |
+| -------------------- | ---------------- | ------------------------- |
+| Capture              | `@name`          | `@name` (snake_case only) |
+| Type annotation      |                  | `@x::T`                   |
+| Text extraction      |                  | `@x::string`              |
+| Named node           | `(type)`         | `(type)`                  |
+| Anonymous node       | `"text"`         | `"text"`                  |
+| Any node             | `_`              | `_`                       |
+| Any named node       | `(_)`            | `(_)`                     |
+| Field constraint     | `field: pattern` | `field: pattern`          |
+| Negated field        | `!field`         | `!field`                  |
+| Quantifiers          | `?` `*` `+`      | `?` `*` `+`               |
+| Non-greedy           |                  | `??` `*?` `+?`            |
+| Sequence             | `((a) (b))`      | `{(a) (b)}`               |
+| Alternation          | `[a b]`          | `[a b]`                   |
+| Tagged alternation   |                  | `[A: (a) B: (b)]`         |
+| Anchor               | `.`              | `.`                       |
+| Named expression     |                  | `Name = pattern`          |
+| Use named expression |                  | `(Name)`                  |

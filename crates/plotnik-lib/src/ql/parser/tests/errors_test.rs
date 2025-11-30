@@ -122,15 +122,15 @@ fn error_recovery_continues_parsing() {
         LowerIdent "d"
         ParenClose ")"
     ---
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (a (b) @@@ (c)) (d)
       |         ^
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (a (b) @@@ (c)) (d)
       |            ^
@@ -152,7 +152,7 @@ fn error_missing_capture_name() {
       Capture
         At "@"
     ---
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (identifier) @
       |               ^
@@ -449,7 +449,7 @@ fn error_capture_with_invalid_char() {
       Error
         UnexpectedFragment "123"
     ---
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (identifier) @123
       |               ^^^
@@ -498,14 +498,14 @@ fn error_mixed_valid_invalid_captures() {
         ParenClose ")"
       Capture
         At "@"
-        CaptureName "ok"
+        LowerIdent "ok"
       Capture
         At "@"
       Capture
         At "@"
-        CaptureName "name"
+        LowerIdent "name"
     ---
-    error: expected capture name after '@' (e.g., @name, @func.body)
+    error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (a) @ok @ @name
       |           ^
@@ -548,7 +548,7 @@ fn error_recovery_alternation_to_capture() {
           UnexpectedFragment "^^^"
         Capture
           At "@"
-          CaptureName "name"
+          LowerIdent "name"
         BracketClose "]"
     ---
     error: unexpected token inside node; expected a child pattern or closing ')'

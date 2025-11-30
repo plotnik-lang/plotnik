@@ -16,7 +16,7 @@ fn trivia_whitespace_preserved() {
       Whitespace "  "
       Capture
         At "@"
-        CaptureName "name"
+        LowerIdent "name"
       Newline "\n"
     "#);
 }

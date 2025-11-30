@@ -141,14 +141,14 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Capture binding: `@name` or `@name.field.subfield`
+    /// Capture binding: `@name` (snake_case identifier)
     fn parse_capture(&mut self) {
         self.start_node(SyntaxKind::Capture);
         self.expect(SyntaxKind::At);
-        if self.peek() == SyntaxKind::CaptureName {
+        if self.peek() == SyntaxKind::LowerIdent {
             self.bump();
         } else {
-            self.error("expected capture name after '@' (e.g., @name, @func.body)");
+            self.error("expected capture name after '@' (e.g., @name, @my_var)");
         }
         self.finish_node();
     }

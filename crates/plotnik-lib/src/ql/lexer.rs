@@ -6,12 +6,6 @@
 //!
 //! The lexer coalesces consecutive error characters into single `Error` tokens rather than
 //! producing one error per character. This keeps the token stream manageable for malformed input.
-//!
-//! ## Capture token splitting
-//!
-//! Logos matches the full `@name.field` pattern as one token, but the parser needs separate
-//! `At` and `CaptureName` tokens. The `lex()` function post-processes `Capture` tokens into
-//! this two-token sequence.
 
 use logos::Logos;
 use rowan::TextRange;
@@ -36,8 +30,7 @@ impl Token {
 /// Internal Logos token enum.
 ///
 /// Converted to [`SyntaxKind`] after lexing. Separate enum because Logos derives
-/// its lexer from enum variants, and we need different token granularity than
-/// what Logos naturally produces (e.g., capture splitting).
+/// its lexer from enum variants.
 #[derive(Logos, Debug, PartialEq, Clone)]
 enum LexToken {
     #[token("(")]
@@ -70,11 +63,6 @@ enum LexToken {
     #[token(".")]
     Dot,
 
-    /// Full capture including optional dotted path. Split into At + CaptureName in post-processing.
-    #[regex(r"@[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*")]
-    Capture,
-
-    /// Bare `@` without following identifier - signals parse error to be reported later.
     #[token("@")]
     At,
 
@@ -105,7 +93,7 @@ enum LexToken {
     #[regex(r"[A-Z][A-Za-z0-9]*")]
     UpperIdentifier,
 
-    /// snake_case identifier (e.g., `function_definition`). Standard node/field names.
+    /// snake_case identifier (e.g., `function_definition`). Standard node/field names and captures.
     #[regex(r"[a-z][a-z0-9_]*")]
     LowerIdentifier,
 
@@ -145,7 +133,6 @@ impl LexToken {
             LexToken::Tilde => SyntaxKind::Tilde,
             LexToken::Underscore => SyntaxKind::Underscore,
             LexToken::Dot => SyntaxKind::Dot,
-            LexToken::Capture => SyntaxKind::CaptureName, // Split in post-processing
             LexToken::At => SyntaxKind::At,
             LexToken::Star => SyntaxKind::Star,
             LexToken::Plus => SyntaxKind::Plus,
@@ -171,9 +158,7 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
 
 /// Tokenizes source into a vector of span-based tokens.
 ///
-/// Post-processes the Logos output to:
-/// 1. Coalesce consecutive lexer errors into single `Error` tokens
-/// 2. Split `@name.field` captures into `At` + `CaptureName` token pairs
+/// Post-processes the Logos output to coalesce consecutive lexer errors into single `Error` tokens.
 pub fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = LexToken::lexer(source);
@@ -189,20 +174,7 @@ pub fn lex(source: &str) -> Vec<Token> {
                 }
 
                 let span = lexer.span();
-
-                if matches!(lex_token, LexToken::Capture) {
-                    // Split @name into At(@) + CaptureName(name)
-                    tokens.push(Token::new(
-                        SyntaxKind::At,
-                        range_to_text_range(span.start..span.start + 1),
-                    ));
-                    tokens.push(Token::new(
-                        SyntaxKind::CaptureName,
-                        range_to_text_range(span.start + 1..span.end),
-                    ));
-                } else {
-                    tokens.push(Token::new(lex_token.to_syntax_kind(), range_to_text_range(span)));
-                }
+                tokens.push(Token::new(lex_token.to_syntax_kind(), range_to_text_range(span)));
             }
             Some(Err(())) => {
                 // Accumulate error span; will be flushed on next valid token or EOF

@@ -15,26 +15,7 @@ fn capture() {
         ParenClose ")"
       Capture
         At "@"
-        CaptureName "name"
-    "#);
-}
-
-#[test]
-fn capture_dotted() {
-    // Dotted captures like @var.name are lexed as a single CaptureName token
-    let input = indoc! {r#"
-    (identifier) @var.name
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      NamedNode
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Capture
-        At "@"
-        CaptureName "var.name"
+        LowerIdent "name"
     "#);
 }
 
@@ -58,7 +39,7 @@ fn capture_nested() {
             ParenClose ")"
         Capture
           At "@"
-          CaptureName "func"
+          LowerIdent "func"
         ParenClose ")"
     "#);
 }
@@ -85,7 +66,7 @@ fn multiple_captures() {
             ParenClose ")"
         Capture
           At "@"
-          CaptureName "left"
+          LowerIdent "left"
         Field
           LowerIdent "right"
           Colon ":"
@@ -95,10 +76,10 @@ fn multiple_captures() {
             ParenClose ")"
         Capture
           At "@"
-          CaptureName "right"
+          LowerIdent "right"
         ParenClose ")"
       Capture
         At "@"
-        CaptureName "expr"
+        LowerIdent "expr"
     "#);
 }

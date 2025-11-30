@@ -68,7 +68,7 @@ fn quantifier_with_capture() {
         Star "*"
       Capture
         At "@"
-        CaptureName "statements"
+        LowerIdent "statements"
     "#);
 }
 

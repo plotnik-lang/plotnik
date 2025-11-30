@@ -54,12 +54,10 @@ pub enum SyntaxKind {
     StringLit,
     /// PascalCase identifier (e.g., `Foo`, `Bar`)
     UpperIdent,
-    /// snake_case identifier (e.g., `identifier`, `function_definition`)
+    /// snake_case identifier (e.g., `identifier`, `function_definition`). Also used for capture names.
     LowerIdent,
     Dot,
     At,
-    /// Capture name after `@`, may include dots (e.g., in `@var.field` this is `var.field`)
-    CaptureName,
 
     // Trivia tokens
     Whitespace,
@@ -149,7 +147,6 @@ impl SyntaxKind {
             LowerIdent => "identifier",
             Dot => "'.' (anchor)",
             At => "'@'",
-            CaptureName => "capture name",
             Whitespace | Newline => "whitespace",
             LineComment | BlockComment => "comment",
             UnexpectedXML => "unexpected XML",

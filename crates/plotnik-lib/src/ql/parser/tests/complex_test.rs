@@ -24,7 +24,7 @@ fn complex_function_query() {
             ParenClose ")"
         Capture
           At "@"
-          CaptureName "name"
+          LowerIdent "name"
         Field
           LowerIdent "parameters"
           Colon ":"

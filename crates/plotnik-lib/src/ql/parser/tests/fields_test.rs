@@ -139,13 +139,13 @@ fn multiple_patterns_with_captures() {
         ParenClose ")"
       Capture
         At "@"
-        CaptureName "func"
+        LowerIdent "func"
       NamedNode
         ParenOpen "("
         LowerIdent "class"
         ParenClose ")"
       Capture
         At "@"
-        CaptureName "cls"
+        LowerIdent "cls"
     "#);
 }

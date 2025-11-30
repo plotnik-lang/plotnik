@@ -19,7 +19,7 @@
 
 - Lexer: all token types including trivia, error coalescing
 - Parser structure: trivia handling, error recovery, checkpoints
-- Basic grammar: named nodes `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`
+- Basic grammar: named nodes `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` (snake_case only) with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`
 
 ## What's NOT yet implemented
 
@@ -40,6 +40,7 @@
 - Alternations: In unlabeled alternations, captures with the same name must have the same type across all branches where they appear. A capture is required if present in all branches, optional otherwise. When branches mix bare nodes and structures, bare node captures are auto-promoted to single-field structures. Merged structures require explicit type annotation (`@x::TypeName`) for codegen. Use tagged alternations (`[A: ... B: ...]`) for discriminated unions.
 - Anchors: The `.` anchor enforces strict adjacency. Without it, sibling matching allows gaps (scanning).
 - Naming: Capitalized names (`Expr`) are user-defined (expressions, labels). Lowercase names (`stmt`) are language-defined (tree-sitter nodes).
+- Captures: Must use snake_case (`@name`, `@func_body`). Dots are not allowed in capture names. This ensures captures map directly to valid struct field names in generated code (Rust, TypeScript, Python).
 
 ## Data Model
 

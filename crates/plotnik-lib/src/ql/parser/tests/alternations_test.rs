@@ -62,7 +62,7 @@ fn alternation_with_capture() {
         BracketClose "]"
       Capture
         At "@"
-        CaptureName "value"
+        LowerIdent "value"
     "#);
 }
 

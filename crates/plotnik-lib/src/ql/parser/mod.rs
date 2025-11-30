@@ -29,7 +29,7 @@
 //! alternation= "[" pattern* "]"
 //! wildcard   = "_"
 //! anon_node  = STRING
-//! capture    = "@" CAPTURE_NAME
+//! capture    = "@" LOWER_IDENT
 //! anchor     = "."
 //! negated_field = "!" IDENT
 //! field      = IDENT ":" pattern

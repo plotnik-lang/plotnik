@@ -160,35 +160,27 @@ fn strings_empty() {
 fn capture_simple() {
     assert_lex!("@name", @r#"
     At "@"
-    CaptureName "name"
+    LowerIdent "name"
     "#);
 }
 
 #[test]
-fn capture_dotted() {
-    assert_lex!("@var.field", @r#"
+fn capture_with_underscores() {
+    assert_lex!("@my_capture_name", @r#"
     At "@"
-    CaptureName "var.field"
-    "#);
-}
-
-#[test]
-fn capture_deeply_dotted() {
-    assert_lex!("@a.b.c.d", @r#"
-    At "@"
-    CaptureName "a.b.c.d"
+    LowerIdent "my_capture_name"
     "#);
 }
 
 #[test]
 fn capture_multiple() {
-    assert_lex!("@name @var.field @a.b.c", @r#"
+    assert_lex!("@name @value @other", @r#"
     At "@"
-    CaptureName "name"
+    LowerIdent "name"
     At "@"
-    CaptureName "var.field"
+    LowerIdent "value"
     At "@"
-    CaptureName "a.b.c"
+    LowerIdent "other"
     "#);
 }
 
@@ -201,12 +193,11 @@ fn capture_bare_at() {
 }
 
 #[test]
-fn capture_dot_not_consumed() {
-    assert_lex!("@name . foo", @r#"
+fn capture_uppercase_not_valid() {
+    // Uppercase after @ is not a valid capture - lexed as At + UpperIdent
+    assert_lex!("@Name", @r#"
     At "@"
-    CaptureName "name"
-    Dot "."
-    LowerIdent "foo"
+    UpperIdent "Name"
     "#);
 }
 
@@ -350,7 +341,7 @@ fn complex_pattern() {
     LowerIdent "identifier"
     ParenClose ")"
     At "@"
-    CaptureName "name"
+    LowerIdent "name"
     ParenClose ")"
     "#);
 }
