@@ -73,10 +73,6 @@ impl<'src> Parser<'src> {
         }
     }
 
-    // =========================================================================
-    // Token access - raw position based, includes trivia
-    // =========================================================================
-
     /// Current token kind. Returns `Error` at EOF (acts as sentinel).
     pub(super) fn current(&self) -> SyntaxKind {
         self.nth(0)
@@ -145,13 +141,6 @@ impl<'src> Parser<'src> {
         SyntaxKind::Error
     }
 
-    // =========================================================================
-    // Trivia handling
-    //
-    // Strategy: buffer trivia, drain as leading trivia when starting nodes.
-    // This means `(  foo)` attaches spaces to `foo`, not to `(`.
-    // =========================================================================
-
     pub(super) fn skip_trivia_to_buffer(&mut self) {
         while self.pos < self.tokens.len() && self.tokens[self.pos].kind.is_trivia() {
             self.trivia_buffer.push(self.tokens[self.pos]);
@@ -170,10 +159,6 @@ impl<'src> Parser<'src> {
         self.skip_trivia_to_buffer();
         self.drain_trivia();
     }
-
-    // =========================================================================
-    // Tree construction
-    // =========================================================================
 
     /// Start node, attaching any buffered trivia first.
     pub(super) fn start_node(&mut self, kind: SyntaxKind) {
@@ -226,10 +211,6 @@ impl<'src> Parser<'src> {
         false
     }
 
-    // =========================================================================
-    // Error handling & recovery
-    // =========================================================================
-
     pub(super) fn error(&mut self, message: impl Into<String>) {
         let range = self.current_span();
         let pos = range.start();
@@ -277,10 +258,6 @@ impl<'src> Parser<'src> {
         }
         self.finish_node();
     }
-
-    // =========================================================================
-    // Recursion guard
-    // =========================================================================
 
     pub(super) fn enter_recursion(&mut self) -> bool {
         if self.depth >= MAX_DEPTH {

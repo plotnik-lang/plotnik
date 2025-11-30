@@ -33,9 +33,6 @@ use rowan::Language;
 #[derive(Logos, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum SyntaxKind {
-    // =========================
-    // Tokens (terminal symbols)
-    // =========================
     #[token("(")]
     ParenOpen = 0,
 
@@ -102,7 +99,6 @@ pub enum SyntaxKind {
     #[token("@")]
     At,
 
-    // Trivia tokens
     /// Horizontal whitespace (spaces, tabs)
     #[regex(r"[ \t]+")]
     Whitespace,
@@ -117,7 +113,6 @@ pub enum SyntaxKind {
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
-    // Error tokens
     /// XML-like tags explicitly matched as errors (common LLM mistake)
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
@@ -128,9 +123,6 @@ pub enum SyntaxKind {
     /// Generic error token
     Error,
 
-    // ================================
-    // Nodes (non-terminal symbols)
-    // ================================
     /// Root node containing the entire query
     Root,
     /// A pattern matching a node (e.g., `(identifier)`)
@@ -363,40 +355,15 @@ pub mod token_sets {
     /// Trivia tokens.
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
 
-    // =========================================================================
-    // RECOVERY sets
-    //
-    // When parsing fails inside a production, these sets determine when to
-    // stop consuming error tokens and return control to the parent parser.
-    // =========================================================================
+    pub const NAMED_NODE_RECOVERY: TokenSet =
+        TokenSet::new(&[ParenOpen, BracketOpen, At]);
 
-    /// Recovery inside named node `(...)`.
-    /// Includes tokens that could be siblings or parent constructs.
-    pub const NAMED_NODE_RECOVERY: TokenSet = TokenSet::new(&[
-        ParenOpen,   // sibling node
-        BracketOpen, // alternation
-        At,          // capture
-    ]);
+    pub const ALTERNATION_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
 
-    /// Recovery inside alternation `[...]`.
-    pub const ALTERNATION_RECOVERY: TokenSet = TokenSet::new(&[
-        ParenClose, // parent node
-        At,         // capture
-    ]);
+    pub const FIELD_RECOVERY: TokenSet =
+        TokenSet::new(&[ParenClose, BracketClose, At, Colon]);
 
-    /// Recovery inside field value `name: pattern`.
-    pub const FIELD_RECOVERY: TokenSet = TokenSet::new(&[
-        ParenClose,
-        BracketClose,
-        At,
-        Colon, // next field
-    ]);
-
-    /// Recovery at top level.
-    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[
-        ParenOpen,   // new pattern
-        BracketOpen, // new alternation
-    ]);
+    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen]);
 }
 
 #[cfg(test)]
