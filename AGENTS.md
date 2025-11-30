@@ -55,3 +55,4 @@
 - Check diagnostics after your changes
 - Follow established parser patterns (see rnix-parser, taplo for reference)
 - Keep tokens span-based, avoid storing text in intermediate structures
+- Don't write AI slop code comments, write only useful ones
