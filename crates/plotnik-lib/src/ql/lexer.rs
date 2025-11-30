@@ -78,9 +78,6 @@ enum LexToken {
     #[token("@")]
     At,
 
-    #[token("#")]
-    Hash,
-
     // Non-greedy quantifiers must be listed before greedy ones for longest-match priority.
     #[token("*?")]
     StarQuestion,
@@ -150,7 +147,6 @@ impl LexToken {
             LexToken::Dot => SyntaxKind::Dot,
             LexToken::Capture => SyntaxKind::CaptureName, // Split in post-processing
             LexToken::At => SyntaxKind::At,
-            LexToken::Hash => SyntaxKind::Hash,
             LexToken::Star => SyntaxKind::Star,
             LexToken::Plus => SyntaxKind::Plus,
             LexToken::Question => SyntaxKind::Question,

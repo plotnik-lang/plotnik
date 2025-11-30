@@ -60,7 +60,6 @@ pub enum SyntaxKind {
     At,
     /// Capture name after `@`, may include dots (e.g., in `@var.field` this is `var.field`)
     CaptureName,
-    Hash,
 
     // Trivia tokens
     Whitespace,
@@ -91,10 +90,6 @@ pub enum SyntaxKind {
     Field,
     /// Capture binding: `@name` or `@name.field`
     Capture,
-    /// Predicate call: `#match?`, `#eq?`, etc. (not yet implemented in parser)
-    Predicate,
-    /// Arguments to a predicate (not yet implemented)
-    PredicateArgs,
     /// Quantifier wrapping a pattern, e.g., `(expr)*` becomes `Quantifier { NamedNode, Star }`
     Quantifier,
     /// Grouping of patterns
@@ -155,7 +150,6 @@ impl SyntaxKind {
             Dot => "'.' (anchor)",
             At => "'@'",
             CaptureName => "capture name",
-            Hash => "'#'",
             Whitespace | Newline => "whitespace",
             LineComment | BlockComment => "comment",
             UnexpectedXML => "unexpected XML",
@@ -167,8 +161,6 @@ impl SyntaxKind {
             AnonNode => "anonymous node",
             Field => "field",
             Capture => "capture",
-            Predicate => "predicate",
-            PredicateArgs => "predicate arguments",
             Quantifier => "quantifier",
             Group => "group",
             Alternation => "alternation",
@@ -332,14 +324,12 @@ pub mod token_sets {
         ParenOpen,   // sibling node
         BracketOpen, // alternation
         At,          // capture
-        Hash,        // predicate
     ]);
 
     /// Recovery inside alternation `[...]`.
     pub const ALTERNATION_RECOVERY: TokenSet = TokenSet::new(&[
         ParenClose, // parent node
         At,         // capture
-        Hash,       // predicate
     ]);
 
     /// Recovery inside field value `name: pattern`.
@@ -347,7 +337,6 @@ pub mod token_sets {
         ParenClose,
         BracketClose,
         At,
-        Hash,
         Colon, // next field
     ]);
 
@@ -355,7 +344,6 @@ pub mod token_sets {
     pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[
         ParenOpen,   // new pattern
         BracketOpen, // new alternation
-        Hash,        // predicate
     ]);
 }
 

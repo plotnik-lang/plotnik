@@ -263,7 +263,7 @@ impl<'src> Parser<'src> {
 
     /// Skip tokens until we hit a recovery point. Wraps skipped tokens in Error node.
     /// If already at recovery token, just emits error without consuming.
-    #[allow(dead_code)] // Used by future grammar rules (predicates, named expressions)
+    #[allow(dead_code)] // Used by future grammar rules (named expressions)
     pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
         if self.at_set(recovery) || self.eof() {
             self.error(message);

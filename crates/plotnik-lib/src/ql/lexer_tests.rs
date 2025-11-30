@@ -43,7 +43,7 @@ macro_rules! assert_lex_raw {
 
 #[test]
 fn punctuation() {
-    assert_lex!("( ) [ ] : = ! ~ _ . #", @r##"
+    assert_lex!("( ) [ ] : = ! ~ _ .", @r#"
     ParenOpen "("
     ParenClose ")"
     BracketOpen "["
@@ -54,8 +54,7 @@ fn punctuation() {
     Tilde "~"
     Underscore "_"
     Dot "."
-    Hash "#"
-    "##);
+    "#);
 }
 
 #[test]
