@@ -141,9 +141,9 @@ pub enum SyntaxKind {
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
-    UnexpectedXML,
+    XMLGarbage,
     /// Consecutive unrecognized characters coalesced into one token
-    UnexpectedFragment,
+    Garbage,
     /// Generic error token
     Error,
 
@@ -196,7 +196,7 @@ impl SyntaxKind {
     /// Returns `true` if this is an error token.
     #[inline]
     pub fn is_error(self) -> bool {
-        matches!(self, Error | UnexpectedXML | UnexpectedFragment)
+        matches!(self, Error | XMLGarbage | Garbage)
     }
 
     /// Returns a human-readable name for use in error messages.
@@ -230,8 +230,8 @@ impl SyntaxKind {
             At => "'@'",
             Whitespace | Newline => "whitespace",
             LineComment | BlockComment => "comment",
-            UnexpectedXML => "unexpected XML",
-            UnexpectedFragment => "unexpected characters",
+            XMLGarbage => "unexpected XML",
+            Garbage => "unexpected characters",
             Error => "error",
             Root => "query",
             Node => "node pattern",

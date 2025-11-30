@@ -259,7 +259,7 @@ fn error_coalescing() {
     ParenOpen "("
     LowerIdent "foo"
     ParenClose ")"
-    UnexpectedFragment "^$%&"
+    Garbage "^$%&"
     ParenOpen "("
     LowerIdent "bar"
     ParenClose ")"
@@ -268,29 +268,29 @@ fn error_coalescing() {
 
 #[test]
 fn error_unexpected_xml_opening() {
-    insta::assert_snapshot!(snapshot("<div>"), @r#"UnexpectedXML "<div>""#);
+    insta::assert_snapshot!(snapshot("<div>"), @r#"XMLGarbage "<div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_closing() {
-    insta::assert_snapshot!(snapshot("</div>"), @r#"UnexpectedXML "</div>""#);
+    insta::assert_snapshot!(snapshot("</div>"), @r#"XMLGarbage "</div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_self_closing() {
-    insta::assert_snapshot!(snapshot("<br/>"), @r#"UnexpectedXML "<br/>""#);
+    insta::assert_snapshot!(snapshot("<br/>"), @r#"XMLGarbage "<br/>""#);
 }
 
 #[test]
 fn error_single_char() {
-    insta::assert_snapshot!(snapshot("^"), @r#"UnexpectedFragment "^""#);
+    insta::assert_snapshot!(snapshot("^"), @r#"Garbage "^""#);
 }
 
 #[test]
 fn error_at_end() {
     insta::assert_snapshot!(snapshot("foo ^^^"), @r#"
     LowerIdent "foo"
-    UnexpectedFragment "^^^"
+    Garbage "^^^"
     "#);
 }
 

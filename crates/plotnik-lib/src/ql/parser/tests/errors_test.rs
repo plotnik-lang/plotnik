@@ -34,7 +34,7 @@ fn error_unexpected_token() {
         LowerIdent "identifier"
         ParenClose ")"
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Node
         ParenOpen "("
         LowerIdent "string"
@@ -197,13 +197,13 @@ fn error_unexpected_xml_tag() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Error
-        UnexpectedXML "<div>"
+        XMLGarbage "<div>"
       Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Error
-        UnexpectedXML "</div>"
+        XMLGarbage "</div>"
     ---
     error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
@@ -251,11 +251,11 @@ fn error_multiple_consecutive() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Error
-        UnexpectedFragment "$$$"
+        Garbage "$$$"
       Error
-        UnexpectedFragment "%%%"
+        Garbage "%%%"
       Node
         ParenOpen "("
         LowerIdent "ok"
@@ -291,7 +291,7 @@ fn error_inside_alternation() {
           LowerIdent "a"
           ParenClose ")"
         Error
-          UnexpectedFragment "^^^"
+          Garbage "^^^"
         Node
           ParenOpen "("
           LowerIdent "b"
@@ -353,7 +353,7 @@ fn error_at_start() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Node
         ParenOpen "("
         LowerIdent "a"
@@ -375,9 +375,9 @@ fn error_only_garbage() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Error
-        UnexpectedFragment "$$$"
+        Garbage "$$$"
     ---
     error: unexpected token; expected a pattern like (node), [choice], {sequence}, "literal", @capture, or _
       |
@@ -448,7 +448,7 @@ fn error_capture_with_invalid_char() {
       Capture
         At "@"
       Error
-        UnexpectedFragment "123"
+        Garbage "123"
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
       |
@@ -522,7 +522,7 @@ fn error_xml_self_closing() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Error
-        UnexpectedXML "<br/>"
+        XMLGarbage "<br/>"
       Node
         ParenOpen "("
         LowerIdent "a"
@@ -546,7 +546,7 @@ fn error_recovery_alternation_to_capture() {
       Alt
         BracketOpen "["
         Error
-          UnexpectedFragment "^^^"
+          Garbage "^^^"
         Capture
           At "@"
           LowerIdent "name"
@@ -573,7 +573,7 @@ fn error_multiline_recovery() {
         ParenOpen "("
         LowerIdent "a"
         Error
-          UnexpectedFragment "^^^"
+          Garbage "^^^"
         Node
           LowerIdent "b"
         ParenClose ")"
@@ -600,7 +600,7 @@ fn error_field_value_is_error_token() {
           LowerIdent "name"
           Colon ":"
           Error
-            UnexpectedFragment "%%%"
+            Garbage "%%%"
         ParenClose ")"
     ---
     error: unexpected token; expected a pattern

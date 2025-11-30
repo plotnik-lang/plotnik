@@ -43,7 +43,7 @@ fn top_level_garbage_recovery() {
           LowerIdent "a"
           ParenClose ")"
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Def
         UpperIdent "Expr2"
         Equals "="
@@ -157,7 +157,7 @@ fn multiple_definitions_with_garbage_between() {
           LowerIdent "a"
           ParenClose ")"
       Error
-        UnexpectedFragment "^^^"
+        Garbage "^^^"
       Def
         UpperIdent "B"
         Equals "="
@@ -166,7 +166,7 @@ fn multiple_definitions_with_garbage_between() {
           LowerIdent "b"
           ParenClose ")"
       Error
-        UnexpectedFragment "$$$"
+        Garbage "$$$"
       Def
         UpperIdent "C"
         Equals "="

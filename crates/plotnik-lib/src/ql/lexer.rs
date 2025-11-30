@@ -4,7 +4,7 @@
 //!
 //! ## Error handling
 //!
-//! The lexer coalesces consecutive error characters into single `UnexpectedFragment` tokens rather
+//! The lexer coalesces consecutive error characters into single `Garbage` tokens rather
 //! than producing one error per character. This keeps the token stream manageable for malformed input.
 
 use logos::Logos;
@@ -33,7 +33,7 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
 
 /// Tokenizes source into a vector of span-based tokens.
 ///
-/// Post-processes the Logos output to coalesce consecutive lexer errors into single `UnexpectedFragment` tokens.
+/// Post-processes the Logos output to coalesce consecutive lexer errors into single `Garbage` tokens.
 pub fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = SyntaxKind::lexer(source);
@@ -45,7 +45,7 @@ pub fn lex(source: &str) -> Vec<Token> {
                 if let Some(start) = error_start.take() {
                     let end = lexer.span().start;
                     tokens.push(Token::new(
-                        SyntaxKind::UnexpectedFragment,
+                        SyntaxKind::Garbage,
                         range_to_text_range(start..end),
                     ));
                 }
@@ -61,7 +61,7 @@ pub fn lex(source: &str) -> Vec<Token> {
             None => {
                 if let Some(start) = error_start.take() {
                     tokens.push(Token::new(
-                        SyntaxKind::UnexpectedFragment,
+                        SyntaxKind::Garbage,
                         range_to_text_range(start..source.len()),
                     ));
                 }
