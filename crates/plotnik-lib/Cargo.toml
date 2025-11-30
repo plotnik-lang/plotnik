@@ -12,4 +12,4 @@ serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
 insta = { version = "=1.44.3", features = ["yaml"] }
-indoc = "2"
+indoc = "=2.0.7"
