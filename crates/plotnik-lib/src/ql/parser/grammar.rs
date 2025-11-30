@@ -3,9 +3,11 @@
 //! This module implements all `parse_*` methods as an extension of `Parser`.
 //! The grammar follows tree-sitter query syntax with extensions for named subqueries.
 
-use rowan::Checkpoint;
+use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
+use super::error::Fix;
+use crate::ql::lexer::token_text;
 use crate::ql::syntax_kind::SyntaxKind;
 use crate::ql::syntax_kind::token_sets::{
     ALT_RECOVERY, DEF_RECOVERY, NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEQ_RECOVERY,
@@ -275,8 +277,10 @@ impl Parser<'_> {
 
     /// Capture binding: `@name` or `@name::Type`
     /// Accepts UpperIdent for resilience; validation will catch casing errors.
+    /// Detects tree-sitter style dotted captures (`@foo.bar.baz`) and emits helpful errors.
     fn parse_capture(&mut self) {
         self.start_node(SyntaxKind::Capture);
+        let at_span = self.current_span();
         self.expect(SyntaxKind::At);
 
         match self.peek() {
@@ -290,11 +294,73 @@ impl Parser<'_> {
             }
         }
 
+        // Detect tree-sitter style dotted captures: @foo.bar.baz
+        // Only trigger when tokens are adjacent (no whitespace)
+        if self.check_and_consume_dotted_capture(at_span.start()) {
+            self.finish_node();
+            return;
+        }
+
         if self.peek() == SyntaxKind::DoubleColon {
             self.parse_type_annotation();
         }
 
         self.finish_node();
+    }
+
+    /// Check for adjacent dotted capture name (`@foo.bar.baz`) and consume it if present.
+    /// Returns true if a dotted capture was found (error already emitted).
+    fn check_and_consume_dotted_capture(&mut self, at_start: rowan::TextSize) -> bool {
+        // Check if current token (without skipping trivia) is an adjacent Dot
+        if self.current() != SyntaxKind::Dot || !self.is_adjacent_to_prev() {
+            return false;
+        }
+
+        // Collect the parts for building the fix suggestion
+        // The first part was already consumed, get it from the previous token
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(prev_span) = self.prev_span() {
+            let prev_text = token_text(self.source, &crate::ql::lexer::Token {
+                kind: SyntaxKind::LowerIdent,
+                span: prev_span,
+            });
+            parts.push(prev_text.to_string());
+        }
+
+        // Consume all adjacent .ident pairs
+        while self.current() == SyntaxKind::Dot && self.is_adjacent_to_prev() {
+            self.bump(); // consume dot
+
+            // Check if next token is an adjacent identifier
+            if (self.current() == SyntaxKind::LowerIdent || self.current() == SyntaxKind::UpperIdent)
+                && self.is_adjacent_to_prev()
+            {
+                let ident_text = token_text(self.source, &self.tokens[self.pos]);
+                parts.push(ident_text.to_string());
+                self.bump(); // consume ident
+            } else {
+                break;
+            }
+        }
+
+        // Build the error span from @ to the last consumed token
+        let end = self.prev_span().map_or(at_start, |s| s.end());
+        let error_range = TextRange::new(at_start, end);
+
+        // Build the suggested fix: replace dots with underscores
+        let suggested_name = parts.join("_");
+        let fix = Fix::new(
+            format!("@{}", suggested_name),
+            format!("captures become struct fields; use @{} instead", suggested_name),
+        );
+
+        self.error_with_fix(
+            error_range,
+            "capture names cannot contain dots",
+            fix,
+        );
+
+        true
     }
 
     /// Type annotation: `::Type` (UpperIdent) or `::string` (LowerIdent primitive)

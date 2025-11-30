@@ -271,4 +271,40 @@ impl<'src> Parser<'src> {
     pub(super) fn exit_recursion(&mut self) {
         self.depth = self.depth.saturating_sub(1);
     }
+
+    /// Check if current token is immediately adjacent to the previous token (no whitespace).
+    /// Returns false if at start or EOF.
+    pub(super) fn is_adjacent_to_prev(&self) -> bool {
+        if self.pos == 0 || self.pos >= self.tokens.len() {
+            return false;
+        }
+        let prev_end = self.tokens[self.pos - 1].span.end();
+        let curr_start = self.tokens[self.pos].span.start();
+        prev_end == curr_start
+    }
+
+    /// Get the span of the previous token (if any).
+    pub(super) fn prev_span(&self) -> Option<TextRange> {
+        if self.pos == 0 {
+            None
+        } else {
+            Some(self.tokens[self.pos - 1].span)
+        }
+    }
+
+    /// Record an error with an associated fix suggestion.
+    pub(super) fn error_with_fix(
+        &mut self,
+        range: TextRange,
+        message: impl Into<String>,
+        fix: super::error::Fix,
+    ) {
+        let pos = range.start();
+        if self.last_error_pos == Some(pos) {
+            return;
+        }
+        self.last_error_pos = Some(pos);
+        self.errors
+            .push(SyntaxError::with_fix(range, message, fix));
+    }
 }

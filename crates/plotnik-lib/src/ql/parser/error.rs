@@ -2,12 +2,42 @@
 
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use rowan::{TextRange, TextSize};
+use serde::{Serialize, Serializer};
 
-/// A syntax error with location and message.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A suggested fix for a syntax error.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Fix {
+    /// The text to replace the error span with.
+    pub replacement: String,
+    /// Human-readable description of what the fix does.
+    pub description: String,
+}
+
+impl Fix {
+    pub fn new(replacement: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            replacement: replacement.into(),
+            description: description.into(),
+        }
+    }
+}
+
+/// A syntax error with location, message, and optional fix.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SyntaxError {
+    #[serde(serialize_with = "serialize_text_range")]
     pub range: TextRange,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix: Option<Fix>,
+}
+
+fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok, S::Error> {
+    use serde::ser::SerializeStruct;
+    let mut state = s.serialize_struct("TextRange", 2)?;
+    state.serialize_field("start", &u32::from(range.start()))?;
+    state.serialize_field("end", &u32::from(range.end()))?;
+    state.end()
 }
 
 impl SyntaxError {
@@ -15,6 +45,15 @@ impl SyntaxError {
         Self {
             range,
             message: message.into(),
+            fix: None,
+        }
+    }
+
+    pub fn with_fix(range: TextRange, message: impl Into<String>, fix: Fix) -> Self {
+        Self {
+            range,
+            message: message.into(),
+            fix: Some(fix),
         }
     }
 
@@ -31,7 +70,11 @@ impl std::fmt::Display for SyntaxError {
             u32::from(self.range.start()),
             u32::from(self.range.end()),
             self.message
-        )
+        )?;
+        if let Some(fix) = &self.fix {
+            write!(f, " (fix: {})", fix.description)?;
+        }
+        Ok(())
     }
 }
 
@@ -66,6 +109,11 @@ pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
             output.push('\n');
         }
         output.push_str(&renderer.render(report).to_string());
+
+        if let Some(fix) = &err.fix {
+            output.push_str(&format!("\n  help: {}", fix.description));
+            output.push_str(&format!("\n  suggestion: `{}`", fix.replacement));
+        }
     }
 
     output

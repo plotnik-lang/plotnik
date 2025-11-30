@@ -1,4 +1,5 @@
 use super::helpers_test::*;
+use crate::ql::parser::parse;
 use indoc::indoc;
 
 #[test]
@@ -606,5 +607,49 @@ fn error_field_value_is_error_token() {
       |
     1 | (call name: %%%)
       |             ^^^
+    "#);
+}
+
+#[test]
+fn error_json_serialization() {
+    let input = "(identifier) @foo.bar";
+    let result = parse(input);
+    let errors = result.errors();
+
+    assert_eq!(errors.len(), 1);
+    let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+
+    insta::assert_snapshot!(json, @r#"
+    {
+      "range": {
+        "start": 13,
+        "end": 21
+      },
+      "message": "capture names cannot contain dots",
+      "fix": {
+        "replacement": "@foo_bar",
+        "description": "captures become struct fields; use @foo_bar instead"
+      }
+    }
+    "#);
+}
+
+#[test]
+fn error_json_serialization_no_fix() {
+    let input = "(identifier) @";
+    let result = parse(input);
+    let errors = result.errors();
+
+    assert_eq!(errors.len(), 1);
+    let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+
+    insta::assert_snapshot!(json, @r#"
+    {
+      "range": {
+        "start": 14,
+        "end": 14
+      },
+      "message": "expected capture name after '@' (e.g., @name, @my_var)"
+    }
     "#);
 }
