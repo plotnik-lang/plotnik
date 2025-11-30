@@ -22,6 +22,24 @@ impl Fix {
     }
 }
 
+/// Related location information for a syntax error.
+/// Used to point to where a construct started (e.g., unclosed delimiter).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RelatedInfo {
+    #[serde(serialize_with = "serialize_text_range")]
+    pub range: TextRange,
+    pub message: String,
+}
+
+impl RelatedInfo {
+    pub fn new(range: TextRange, message: impl Into<String>) -> Self {
+        Self {
+            range,
+            message: message.into(),
+        }
+    }
+}
+
 /// A syntax error with location, message, and optional fix.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SyntaxError {
@@ -30,6 +48,8 @@ pub struct SyntaxError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fix: Option<Fix>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub related: Option<RelatedInfo>,
 }
 
 fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok, S::Error> {
@@ -46,6 +66,7 @@ impl SyntaxError {
             range,
             message: message.into(),
             fix: None,
+            related: None,
         }
     }
 
@@ -54,6 +75,20 @@ impl SyntaxError {
             range,
             message: message.into(),
             fix: Some(fix),
+            related: None,
+        }
+    }
+
+    pub fn with_related(
+        range: TextRange,
+        message: impl Into<String>,
+        related: RelatedInfo,
+    ) -> Self {
+        Self {
+            range,
+            message: message.into(),
+            fix: None,
+            related: Some(related),
         }
     }
 
@@ -73,6 +108,15 @@ impl std::fmt::Display for SyntaxError {
         )?;
         if let Some(fix) = &self.fix {
             write!(f, " (fix: {})", fix.description)?;
+        }
+        if let Some(related) = &self.related {
+            write!(
+                f,
+                " (related: {} at {}..{})",
+                related.message,
+                u32::from(related.range.start()),
+                u32::from(related.range.end())
+            )?;
         }
         Ok(())
     }
@@ -99,11 +143,27 @@ pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
             end
         };
 
-        let report = &[Level::ERROR.primary_title(&err.message).element(
-            Snippet::source(source)
-                .line_start(1)
-                .annotation(AnnotationKind::Primary.span(start..end)),
-        )];
+        let mut snippet = Snippet::source(source)
+            .line_start(1)
+            .annotation(AnnotationKind::Primary.span(start..end));
+
+        // Add related span if present
+        if let Some(related) = &err.related {
+            let rel_start: usize = related.range.start().into();
+            let rel_end: usize = related.range.end().into();
+            let rel_end = if rel_start == rel_end {
+                (rel_start + 1).min(source.len())
+            } else {
+                rel_end
+            };
+            snippet = snippet.annotation(
+                AnnotationKind::Context
+                    .span(rel_start..rel_end)
+                    .label(&related.message),
+            );
+        }
+
+        let report = &[Level::ERROR.primary_title(&err.message).element(snippet)];
 
         if i > 0 {
             output.push('\n');

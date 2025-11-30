@@ -44,10 +44,12 @@ fn missing_field_value() {
       |
     1 | (call name:)
       |            ^
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | (call name:)
-      |             ^
+      | -           ^
+      | |
+      | node started here
     "#);
 }
 
@@ -210,10 +212,12 @@ fn type_annotation_invalid_token_after() {
       |
     1 | (identifier) @name :: (
       |                       ^
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | (identifier) @name :: (
-      |                        ^
+      |                       -^
+      |                       |
+      |                       node started here
     "#);
 }
 

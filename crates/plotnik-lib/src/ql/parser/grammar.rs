@@ -6,7 +6,7 @@
 use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
-use super::error::Fix;
+use super::error::{Fix, RelatedInfo};
 use crate::ql::lexer::token_text;
 use crate::ql::syntax_kind::SyntaxKind;
 use crate::ql::syntax_kind::token_sets::{
@@ -114,6 +114,7 @@ impl Parser<'_> {
     /// Also handles supertype/subtype: `(expression/binary_expression)`.
     fn parse_node(&mut self) {
         self.start_node(SyntaxKind::Node);
+        self.push_delimiter(SyntaxKind::ParenOpen);
         self.expect(SyntaxKind::ParenOpen, "opening '(' for node");
 
         match self.peek() {
@@ -145,6 +146,7 @@ impl Parser<'_> {
                     self.error("(ERROR) takes no arguments");
                     self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
                 }
+                self.pop_delimiter();
                 self.expect(SyntaxKind::ParenClose, "closing ')' for (ERROR) node");
                 self.finish_node();
                 return;
@@ -160,6 +162,7 @@ impl Parser<'_> {
                         self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
                     }
                 }
+                self.pop_delimiter();
                 self.expect(SyntaxKind::ParenClose, "closing ')' for (MISSING) node");
                 self.finish_node();
                 return;
@@ -168,6 +171,7 @@ impl Parser<'_> {
         }
 
         self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
+        self.pop_delimiter();
         self.expect(SyntaxKind::ParenClose, "closing ')' for node");
         self.finish_node();
     }
@@ -180,9 +184,18 @@ impl Parser<'_> {
                 break;
             }
             if self.eof() {
-                self.error(
-                    "unexpected end of input inside node; expected a child pattern or closing delimiter",
-                );
+                let (construct, delim) = match until {
+                    SyntaxKind::ParenClose => ("node", "')'"),
+                    SyntaxKind::BraceClose => ("sequence", "'}'"),
+                    _ => ("construct", "closing delimiter"),
+                };
+                let msg = format!("unclosed {construct}; expected {delim}");
+                if let Some(open) = self.delimiter_stack.last() {
+                    let related = RelatedInfo::new(open.span, format!("{construct} started here"));
+                    self.error_with_related(msg, related);
+                } else {
+                    self.error(msg);
+                }
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -208,10 +221,12 @@ impl Parser<'_> {
     /// Alternation/choice: `[pattern1 pattern2 ...]` or `[Label: pattern ...]`
     fn parse_alt(&mut self) {
         self.start_node(SyntaxKind::Alt);
+        self.push_delimiter(SyntaxKind::BracketOpen);
         self.expect(SyntaxKind::BracketOpen, "opening '[' for alternation");
 
         self.parse_alt_children();
 
+        self.pop_delimiter();
         self.expect(SyntaxKind::BracketClose, "closing ']' for alternation");
         self.finish_node();
     }
@@ -224,9 +239,13 @@ impl Parser<'_> {
                 break;
             }
             if self.eof() {
-                self.error(
-                    "unexpected end of input inside node; expected a child pattern or closing delimiter",
-                );
+                let msg = "unclosed alternation; expected ']'";
+                if let Some(open) = self.delimiter_stack.last() {
+                    let related = RelatedInfo::new(open.span, "alternation started here");
+                    self.error_with_related(msg, related);
+                } else {
+                    self.error(msg);
+                }
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -305,10 +324,12 @@ impl Parser<'_> {
     /// Sibling sequence: `{pattern1 pattern2 ...}`
     fn parse_seq(&mut self) {
         self.start_node(SyntaxKind::Seq);
+        self.push_delimiter(SyntaxKind::BraceOpen);
         self.expect(SyntaxKind::BraceOpen, "opening '{' for sequence");
 
         self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY);
 
+        self.pop_delimiter();
         self.expect(SyntaxKind::BraceClose, "closing '}' for sequence");
         self.finish_node();
     }

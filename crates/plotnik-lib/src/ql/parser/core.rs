@@ -10,7 +10,7 @@
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::MAX_DEPTH;
-use super::error::SyntaxError;
+use super::error::{RelatedInfo, SyntaxError};
 
 #[cfg(debug_assertions)]
 const DEFAULT_FUEL: u32 = 256;
@@ -32,6 +32,14 @@ pub struct Parse {
 /// The token stream is processed left-to-right. Trivia tokens (whitespace, comments)
 /// are buffered separately and flushed as leading trivia when starting a new node.
 /// This gives predictable trivia attachment without backtracking.
+/// Tracks an open delimiter for better error messages on unclosed constructs.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct OpenDelimiter {
+    #[allow(dead_code)] // useful for future mismatch detection (e.g., `(]`)
+    pub kind: SyntaxKind,
+    pub span: TextRange,
+}
+
 pub struct Parser<'src> {
     pub(super) source: &'src str,
     pub(super) tokens: Vec<Token>,
@@ -45,6 +53,8 @@ pub struct Parser<'src> {
     pub(super) depth: u32,
     /// Last error position - used to suppress cascading errors at same span
     pub(super) last_error_pos: Option<TextSize>,
+    /// Stack of open delimiters for "unclosed X started here" errors.
+    pub(super) delimiter_stack: Vec<OpenDelimiter>,
     #[cfg(debug_assertions)]
     pub(super) fuel: std::cell::Cell<u32>,
 }
@@ -60,6 +70,7 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             depth: 0,
             last_error_pos: None,
+            delimiter_stack: Vec::with_capacity(8),
             #[cfg(debug_assertions)]
             fuel: std::cell::Cell::new(DEFAULT_FUEL),
         }
@@ -268,6 +279,31 @@ impl<'src> Parser<'src> {
 
     pub(super) fn exit_recursion(&mut self) {
         self.depth = self.depth.saturating_sub(1);
+    }
+
+    /// Push an opening delimiter onto the stack for tracking unclosed constructs.
+    pub(super) fn push_delimiter(&mut self, kind: SyntaxKind) {
+        self.delimiter_stack.push(OpenDelimiter {
+            kind,
+            span: self.current_span(),
+        });
+    }
+
+    /// Pop the most recent opening delimiter from the stack.
+    pub(super) fn pop_delimiter(&mut self) -> Option<OpenDelimiter> {
+        self.delimiter_stack.pop()
+    }
+
+    /// Record an error with a related location (e.g., where an unclosed delimiter started).
+    pub(super) fn error_with_related(&mut self, message: impl Into<String>, related: RelatedInfo) {
+        let range = self.current_span();
+        let pos = range.start();
+        if self.last_error_pos == Some(pos) {
+            return;
+        }
+        self.last_error_pos = Some(pos);
+        self.errors
+            .push(SyntaxError::with_related(range, message, related));
     }
 
     /// Check if current token is immediately adjacent to the previous token (no whitespace).

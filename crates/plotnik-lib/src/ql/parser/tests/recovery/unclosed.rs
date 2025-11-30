@@ -13,10 +13,12 @@ fn missing_paren() {
         ParenOpen "("
         LowerIdent "identifier"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | (identifier
-      |            ^
+      | -          ^
+      | |
+      | node started here
     "#);
 }
 
@@ -39,10 +41,12 @@ fn missing_bracket() {
           LowerIdent "string"
           ParenClose ")"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
-      |                       ^
+      | -                     ^
+      | |
+      | alternation started here
     "#);
 }
 
@@ -65,10 +69,12 @@ fn missing_brace() {
           LowerIdent "b"
           ParenClose ")"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      |         ^
+      | -       ^
+      | |
+      | sequence started here
     "#);
 }
 
@@ -91,10 +97,12 @@ fn nested_unclosed() {
             LowerIdent "c"
             ParenClose ")"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | (a (b (c)
-      |          ^
+      |    -     ^
+      |    |
+      |    node started here
     "#);
 }
 
@@ -119,10 +127,12 @@ fn deeply_nested_unclosed() {
               ParenOpen "("
               LowerIdent "d"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | (a (b (c (d
-      |            ^
+      |          - ^
+      |          |
+      |          node started here
     "#);
 }
 
@@ -144,10 +154,12 @@ fn unclosed_alternation_nested() {
           ParenOpen "("
           LowerIdent "b"
     ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
+    error: unclosed node; expected ')'
       |
     1 | [(a) (b
-      |        ^
+      |      - ^
+      |      |
+      |      node started here
     "#);
 }
 
