@@ -42,7 +42,6 @@ pub fn lex(source: &str) -> Vec<Token> {
     loop {
         match lexer.next() {
             Some(Ok(kind)) => {
-                // Flush accumulated error span before emitting valid token
                 if let Some(start) = error_start.take() {
                     let end = lexer.span().start;
                     tokens.push(Token::new(
@@ -55,7 +54,6 @@ pub fn lex(source: &str) -> Vec<Token> {
                 tokens.push(Token::new(kind, range_to_text_range(span)));
             }
             Some(Err(())) => {
-                // Accumulate error span; will be flushed on next valid token or EOF
                 if error_start.is_none() {
                     error_start = Some(lexer.span().start);
                 }

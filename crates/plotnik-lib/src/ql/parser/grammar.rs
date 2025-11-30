@@ -49,7 +49,6 @@ impl Parser<'_> {
             return;
         }
 
-        // Checkpoint before the pattern for potential quantifier wrapping
         let checkpoint = self.checkpoint();
 
         match self.peek() {
