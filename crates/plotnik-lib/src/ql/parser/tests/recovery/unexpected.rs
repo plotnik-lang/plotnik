@@ -31,10 +31,6 @@ fn unexpected_token() {
       |
     1 | (identifier) ^^^ (string)
       | ^^^^^^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = ^^^`
-      |
-    1 | (identifier) ^^^ (string)
-      |              ^^^
     "#);
 }
 
@@ -49,11 +45,8 @@ fn multiple_consecutive_garbage() {
       Def
         Error
           Garbage "^^^"
-      Def
         Error
           Garbage "$$$"
-      Def
-        Error
           Garbage "%%%"
       Def
         Tree
@@ -65,26 +58,6 @@ fn multiple_consecutive_garbage() {
       |
     1 | ^^^ $$$ %%% (ok)
       | ^^^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | ^^^ $$$ %%% (ok)
-      |     ^^^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | ^^^ $$$ %%% (ok)
-      |         ^^^
-    error: unnamed definition must be last in file; add a name: `Name = ^^^`
-      |
-    1 | ^^^ $$$ %%% (ok)
-      | ^^^
-    error: unnamed definition must be last in file; add a name: `Name = $$$`
-      |
-    1 | ^^^ $$$ %%% (ok)
-      |     ^^^
-    error: unnamed definition must be last in file; add a name: `Name = %%%`
-      |
-    1 | ^^^ $$$ %%% (ok)
-      |         ^^^
     "#);
 }
 
@@ -109,10 +82,6 @@ fn garbage_at_start() {
       |
     1 | ^^^ (a)
       | ^^^
-    error: unnamed definition must be last in file; add a name: `Name = ^^^`
-      |
-    1 | ^^^ (a)
-      | ^^^
     "#);
 }
 
@@ -127,19 +96,10 @@ fn only_garbage() {
       Def
         Error
           Garbage "^^^"
-      Def
         Error
           Garbage "$$$"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | ^^^ $$$
-      | ^^^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | ^^^ $$$
-      |     ^^^
-    error: unnamed definition must be last in file; add a name: `Name = ^^^`
       |
     1 | ^^^ $$$
       | ^^^
@@ -229,18 +189,10 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       | ^^^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = @`
-      |
-    1 | (a (b) @@@ (c)) (d)
-      |          ^
     error: unnamed definition must be last in file; add a name: `Name = (c)`
       |
     1 | (a (b) @@@ (c)) (d)
       |            ^^^
-    error: unnamed definition must be last in file; add a name: `Name = )`
-      |
-    1 | (a (b) @@@ (c)) (d)
-      |               ^
     "#);
 }
 
@@ -263,6 +215,7 @@ fn xml_tag_garbage() {
       Def
         Error
           XMLGarbage "</div>"
+        Error
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
@@ -272,14 +225,6 @@ fn xml_tag_garbage() {
       |
     1 | <div>(identifier)</div>
       |                  ^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = <div>`
-      |
-    1 | <div>(identifier)</div>
-      | ^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = (identifier)`
-      |
-    1 | <div>(identifier)</div>
-      |      ^^^^^^^^^^^^
     "#);
 }
 
@@ -301,10 +246,6 @@ fn xml_self_closing() {
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | <br/> (a)
-      | ^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = <br/>`
       |
     1 | <br/> (a)
       | ^^^^^
@@ -339,6 +280,7 @@ fn predicate_unsupported() {
       Def
         Error
           ParenClose ")"
+        Error
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
@@ -356,10 +298,6 @@ fn predicate_unsupported() {
       |
     1 | (a (#eq? @x "foo") b)
       | ^^^^^^^^^^^^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = b`
-      |
-    1 | (a (#eq? @x "foo") b)
-      |                    ^
     "##);
 }
 
@@ -379,11 +317,8 @@ fn predicate_match() {
       Def
         Error
           Predicate "#match?"
-      Def
         Error
           At "@"
-      Def
-        Tree
           LowerIdent "name"
       Def
         Lit
@@ -393,26 +328,10 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
-    error: capture '@' must follow an expression to capture
-      |
-    1 | (identifier) #match? @name "test"
-      |                      ^
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier) #match? @name "test"
       | ^^^^^^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = #match?`
-      |
-    1 | (identifier) #match? @name "test"
-      |              ^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = @`
-      |
-    1 | (identifier) #match? @name "test"
-      |                      ^
-    error: unnamed definition must be last in file; add a name: `Name = name`
-      |
-    1 | (identifier) #match? @name "test"
-      |                       ^^^^
     "##);
 }
 
@@ -461,15 +380,12 @@ fn capture_with_invalid_char() {
       Def
         Error
           Garbage "123"
+        Error
     ---
     error: expected capture name after '@' (e.g., @name, @my_var)
       |
     1 | (identifier) @123
       |               ^^^
-    error: unnamed definition must be last in file; add a name: `Name = (identifier) @`
-      |
-    1 | (identifier) @123
-      | ^^^^^^^^^^^^^^
     "#);
 }
 
@@ -518,6 +434,7 @@ fn alternation_recovery_to_capture() {
       Def
         Error
           BracketClose "]"
+        Error
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
@@ -531,10 +448,6 @@ fn alternation_recovery_to_capture() {
       |
     1 | [^^^ @name]
       |           ^
-    error: unnamed definition must be last in file; add a name: `Name = [^^^ @name`
-      |
-    1 | [^^^ @name]
-      | ^^^^^^^^^^
     "#);
 }
 
@@ -618,10 +531,6 @@ fn multiple_definitions_with_garbage_between() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     4 | $$$
-      | ^^^
-    error: unnamed definition must be last in file; add a name: `Name = ^^^`
-      |
-    2 | ^^^
       | ^^^
     "#);
 }

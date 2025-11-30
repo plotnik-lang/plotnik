@@ -11,6 +11,7 @@ use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::MAX_DEPTH;
 use super::error::{RelatedInfo, SyntaxError};
+use crate::ql::syntax_kind::token_sets::ROOT_EXPR_FIRST;
 
 #[cfg(debug_assertions)]
 const DEFAULT_FUEL: u32 = 256;
@@ -266,6 +267,44 @@ impl<'src> Parser<'src> {
             self.bump();
         }
         self.finish_node();
+    }
+
+    /// Synchronize to a token that can start a new definition at root level.
+    /// Consumes tokens into an Error node until we see:
+    /// - `UpperIdent` followed by `=` (named definition)
+    /// - A token in EXPR_FIRST (potential anonymous definition)
+    /// - EOF
+    /// Returns true if any tokens were consumed.
+    pub(super) fn synchronize_to_def_start(&mut self) -> bool {
+        if self.eof() {
+            return false;
+        }
+
+        // Check if already at a sync point
+        if self.at_def_start() {
+            return false;
+        }
+
+        self.start_node(SyntaxKind::Error);
+        while !self.eof() && !self.at_def_start() {
+            self.bump();
+            self.skip_trivia_to_buffer();
+        }
+        self.finish_node();
+        true
+    }
+
+    /// Check if current position looks like the start of a definition.
+    /// Uses peek() to skip trivia before checking.
+    fn at_def_start(&mut self) -> bool {
+        let kind = self.peek();
+        // Named def: UpperIdent followed by =
+        if kind == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
+            return true;
+        }
+        // Anonymous def: tokens that can validly start a root-level expression
+        // (excludes LowerIdent, Dot, Negation which only make sense inside trees)
+        ROOT_EXPR_FIRST.contains(kind)
     }
 
     pub(super) fn enter_recursion(&mut self) -> bool {

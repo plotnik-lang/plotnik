@@ -31,12 +31,17 @@ impl Parser<'_> {
                 // Anonymous def: wrap expression in Def node
                 let start = self.current_span().start();
                 self.start_node(SyntaxKind::Def);
-                self.parse_expr_or_error();
+                let success = self.parse_expr_or_error();
+                if !success {
+                    // Synchronize: consume remaining garbage until next def boundary
+                    self.synchronize_to_def_start();
+                }
                 self.finish_node();
-                // Record span for later validation (only last unnamed def is allowed)
-                // Find last non-trivia token end (peek() may have buffered trailing trivia)
-                let end = self.last_non_trivia_end().unwrap_or(start);
-                unnamed_def_spans.push(TextRange::new(start, end));
+                // Only track successfully parsed defs for validation
+                if success {
+                    let end = self.last_non_trivia_end().unwrap_or(start);
+                    unnamed_def_spans.push(TextRange::new(start, end));
+                }
             }
         }
 
@@ -81,20 +86,26 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    fn parse_expr_or_error(&mut self) {
+    /// Parse an expression, or emit an error if current token can't start one.
+    /// Returns `true` if a valid expression was parsed, `false` on error.
+    fn parse_expr_or_error(&mut self) -> bool {
         let kind = self.peek();
         if EXPR_FIRST.contains(kind) {
             self.parse_expr();
+            true
         } else if kind == SyntaxKind::At {
             self.error_and_bump("capture '@' must follow an expression to capture");
+            false
         } else if kind == SyntaxKind::Predicate {
             self.error_and_bump(
                 "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
             );
+            false
         } else {
             self.error_and_bump(
                 "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _",
             );
+            false
         }
     }
 

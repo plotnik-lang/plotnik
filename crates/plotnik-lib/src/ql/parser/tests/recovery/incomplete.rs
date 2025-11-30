@@ -185,33 +185,14 @@ fn mixed_valid_invalid_captures() {
       Def
         Error
           At "@"
-      Def
         Error
           At "@"
-      Def
-        Tree
           LowerIdent "name"
     ---
     error: capture '@' must follow an expression to capture
       |
     1 | (a) @ok @ @name
       |         ^
-    error: capture '@' must follow an expression to capture
-      |
-    1 | (a) @ok @ @name
-      |           ^
-    error: unnamed definition must be last in file; add a name: `Name = (a) @ok`
-      |
-    1 | (a) @ok @ @name
-      | ^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = @`
-      |
-    1 | (a) @ok @ @name
-      |         ^
-    error: unnamed definition must be last in file; add a name: `Name = @`
-      |
-    1 | (a) @ok @ @name
-      |           ^
     "#);
 }
 

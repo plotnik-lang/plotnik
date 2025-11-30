@@ -409,35 +409,15 @@ fn single_colon_primitive_type() {
       Def
         Error
           At "@"
-      Def
-        Field
+        Error
           LowerIdent "val"
-          Error
-            Colon ":"
-      Def
-        Tree
+          Colon ":"
           LowerIdent "string"
     ---
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
       | ^
-    error: expected ':' to separate field name from its value
-      |
-    1 | @val : string
-      |     ^
-    error: unexpected token; expected an expression
-      |
-    1 | @val : string
-      |      ^
-    error: unnamed definition must be last in file; add a name: `Name = @`
-      |
-    1 | @val : string
-      | ^
-    error: unnamed definition must be last in file; add a name: `Name = val :`
-      |
-    1 | @val : string
-      |  ^^^^^
     "#);
 }
 
@@ -645,10 +625,6 @@ fn multiple_suggestions_combined() {
       |
     1 | (node name = 'foo', @val : Type)
       |                                ^
-    error: unnamed definition must be last in file; add a name: `Name = (node name = 'foo', @val : Type`
-      |
-    1 | (node name = 'foo', @val : Type)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     "#);
 }
 

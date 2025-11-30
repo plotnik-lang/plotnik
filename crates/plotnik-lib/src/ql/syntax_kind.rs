@@ -346,6 +346,21 @@ pub mod token_sets {
         KwMissing,
     ]);
 
+    /// Tokens that can start a valid expression at root level (anonymous definition).
+    /// Excludes LowerIdent (only valid as node type inside parens), Dot (anchor),
+    /// and Negation (negated field) which only make sense inside tree context.
+    pub const ROOT_EXPR_FIRST: TokenSet = TokenSet::new(&[
+        ParenOpen,
+        BracketOpen,
+        BraceOpen,
+        Underscore,
+        UpperIdent,
+        StringLit,
+        SingleQuoteLit,
+        KwError,
+        KwMissing,
+    ]);
+
     /// Quantifier tokens that can follow a pattern.
     pub const QUANTIFIERS: TokenSet = TokenSet::new(&[
         Star,
