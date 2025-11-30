@@ -501,10 +501,10 @@ Labels create a discriminated union:
 ] @stmt::Stmt
 ```
 
-Output type (default discriminant `kind`):
+Output type (discriminant is always `tag`):
 
 ```typescript
-type Stmt = { kind: "Assign"; left: Node } | { kind: "Call"; func: Node };
+type Stmt = { tag: "Assign"; left: Node } | { tag: "Call"; func: Node };
 ```
 
 In Rust, tagged alternations become enums:
@@ -514,27 +514,6 @@ enum Stmt {
     Assign { left: Node },
     Call { func: Node },
 }
-```
-
-### Custom Discriminant Field
-
-Add a string literal at the start of the alternation to change the discriminant from `kind`:
-
-```
-Expr: [ "type"
-  Ident: (identifier) @name
-  Num: (number) @value
-  Binary: (binary_expression left: (Expr) @left right: (Expr) @right)
-]
-```
-
-Output type:
-
-```typescript
-type Expr =
-  | { type: "Ident"; name: Node }
-  | { type: "Num"; value: Node }
-  | { type: "Binary"; left: Expr; right: Expr };
 ```
 
 ### Alternations with Type Annotations
@@ -673,7 +652,7 @@ type NestedCall = {
 Another example—matching arbitrarily nested member chains:
 
 ```
-MemberChain = [ "type"
+MemberChain = [
   Base: (identifier) @name
   Access: (member_expression
     object: (MemberChain) @object
@@ -685,8 +664,8 @@ Output type:
 
 ```typescript
 type MemberChain =
-  | { type: "Base"; name: Node }
-  | { type: "Access"; object: MemberChain; property: Node };
+  | { tag: "Base"; name: Node }
+  | { tag: "Access"; object: MemberChain; property: Node };
 ```
 
 ---
@@ -705,7 +684,7 @@ Statement = [
     (Expression)? @value)
 ]
 
-Expression = [ "type"
+Expression = [
   Ident: (identifier) @name::string
   Num: (number) @value::string
   Str: (string) @value::string
@@ -718,14 +697,14 @@ Output types:
 
 ```typescript
 type Statement =
-  | { kind: "Assign"; target: string; value: Expression }
-  | { kind: "Call"; func: string; args: Expression[] }
-  | { kind: "Return"; value?: Expression };
+  | { tag: "Assign"; target: string; value: Expression }
+  | { tag: "Call"; func: string; args: Expression[] }
+  | { tag: "Return"; value?: Expression };
 
 type Expression =
-  | { type: "Ident"; name: string }
-  | { type: "Num"; value: string }
-  | { type: "Str"; value: string };
+  | { tag: "Ident"; name: string }
+  | { tag: "Num"; value: string }
+  | { tag: "Str"; value: string };
 
 type Root = {
   statements: [Statement, ...Statement[]];
@@ -752,7 +731,6 @@ type Root = {
 | Sequence             | `((a) (b))`      | `{(a) (b)}`       |
 | Alternation          | `[a b]`          | `[a b]`           |
 | Tagged alternation   |                  | `[A: (a) B: (b)]` |
-| Custom discriminant  |                  | `[ "field" ...]`  |
 | Anchor               | `.`              | `.`               |
 | Named expression     |                  | `Name = pattern`  |
 | Use named expression |                  | `(Name)`          |
