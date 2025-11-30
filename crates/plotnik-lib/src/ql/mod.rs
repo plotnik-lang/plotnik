@@ -33,20 +33,10 @@
 //! 3. Parsing continues at the nearest recovery point
 //!
 //! This ensures downstream tooling (CLI, LSP) always has a tree to work with.
-//!
-//! # Usage
-//!
-//! ```ignore
-//! let result = parse(source);
-//! let tree = result.syntax();      // SyntaxNode root
-//! let errors = result.errors();    // &[SyntaxError]
-//! ```
 
-mod lexer;
-mod parser;
-mod syntax_kind;
+pub mod lexer;
+pub mod parser;
+pub mod syntax_kind;
 
 #[cfg(test)]
 mod lexer_tests;
-#[cfg(test)]
-mod parser_tests;

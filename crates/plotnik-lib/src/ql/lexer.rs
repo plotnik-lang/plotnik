@@ -164,7 +164,7 @@ impl LexToken {
             LexToken::LineComment => SyntaxKind::LineComment,
             LexToken::Whitespace => SyntaxKind::Whitespace,
             LexToken::Newline => SyntaxKind::Newline,
-            LexToken::UnexpectedXML => SyntaxKind::Error,
+            LexToken::UnexpectedXML => SyntaxKind::UnexpectedXML,
         }
     }
 }
@@ -189,7 +189,7 @@ pub fn lex(source: &str) -> Vec<Token> {
                 // Flush accumulated error span before emitting valid token
                 if let Some(start) = error_start.take() {
                     let end = lexer.span().start;
-                    tokens.push(Token::new(SyntaxKind::Error, range_to_text_range(start..end)));
+                    tokens.push(Token::new(SyntaxKind::UnexpectedFragment, range_to_text_range(start..end)));
                 }
 
                 let span = lexer.span();
@@ -217,7 +217,7 @@ pub fn lex(source: &str) -> Vec<Token> {
             None => {
                 if let Some(start) = error_start.take() {
                     tokens.push(Token::new(
-                        SyntaxKind::Error,
+                        SyntaxKind::UnexpectedFragment,
                         range_to_text_range(start..source.len()),
                     ));
                 }

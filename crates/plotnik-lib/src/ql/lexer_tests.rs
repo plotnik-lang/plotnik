@@ -301,7 +301,7 @@ fn error_coalescing() {
     ParenOpen "("
     LowerIdent "foo"
     ParenClose ")"
-    Error "^$%&"
+    UnexpectedFragment "^$%&"
     ParenOpen "("
     LowerIdent "bar"
     ParenClose ")"
@@ -310,37 +310,29 @@ fn error_coalescing() {
 
 #[test]
 fn error_unexpected_xml_opening() {
-    assert_lex!("<div>", @r#"
-    Error "<div>"
-    "#);
+    assert_lex!("<div>", @r#"UnexpectedXML "<div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_closing() {
-    assert_lex!("</div>", @r#"
-    Error "</div>"
-    "#);
+    assert_lex!("</div>", @r#"UnexpectedXML "</div>""#);
 }
 
 #[test]
 fn error_unexpected_xml_self_closing() {
-    assert_lex!("<br/>", @r#"
-    Error "<br/>"
-    "#);
+    assert_lex!("<br/>", @r#"UnexpectedXML "<br/>""#);
 }
 
 #[test]
 fn error_single_char() {
-    assert_lex!("^", @r#"
-    Error "^"
-    "#);
+    assert_lex!("^", @r#"UnexpectedFragment "^""#);
 }
 
 #[test]
 fn error_at_end() {
     assert_lex!("foo ^^^", @r#"
     LowerIdent "foo"
-    Error "^^^"
+    UnexpectedFragment "^^^"
     "#);
 }
 

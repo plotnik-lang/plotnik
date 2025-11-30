@@ -68,7 +68,12 @@ pub enum SyntaxKind {
     LineComment,
     BlockComment,
 
-    // Error token
+    // Error tokens
+    /// XML-like tags explicitly matched as errors (common LLM mistake)
+    UnexpectedXML,
+    /// Consecutive unrecognized characters coalesced into one token
+    UnexpectedFragment,
+    /// Generic error token
     Error,
 
     // ================================
@@ -123,7 +128,55 @@ impl SyntaxKind {
     /// Returns `true` if this is an error token.
     #[inline]
     pub fn is_error(self) -> bool {
-        self == Error
+        matches!(self, Error | UnexpectedXML | UnexpectedFragment)
+    }
+
+    /// Returns a human-readable name for use in error messages.
+    pub fn human_name(self) -> &'static str {
+        match self {
+            ParenOpen => "'('",
+            ParenClose => "')'",
+            BracketOpen => "'['",
+            BracketClose => "']'",
+            Colon => "':'",
+            Equals => "'='",
+            Negation => "'!'",
+            Tilde => "'~'",
+            Underscore => "'_' (wildcard)",
+            Star => "'*'",
+            Plus => "'+'",
+            Question => "'?'",
+            StarQuestion => "'*?' (non-greedy)",
+            PlusQuestion => "'+?' (non-greedy)",
+            QuestionQuestion => "'??' (non-greedy)",
+            StringLit => "string literal",
+            UpperIdent => "type name",
+            LowerIdent => "identifier",
+            Dot => "'.' (anchor)",
+            At => "'@'",
+            CaptureName => "capture name",
+            Hash => "'#'",
+            Whitespace | Newline => "whitespace",
+            LineComment | BlockComment => "comment",
+            UnexpectedXML => "unexpected XML",
+            UnexpectedFragment => "unexpected characters",
+            Error => "error",
+            Root => "query",
+            Pattern => "pattern",
+            NamedNode => "node pattern",
+            AnonNode => "anonymous node",
+            Field => "field",
+            Capture => "capture",
+            Predicate => "predicate",
+            PredicateArgs => "predicate arguments",
+            Quantifier => "quantifier",
+            Group => "group",
+            Alternation => "alternation",
+            Wildcard => "wildcard",
+            Anchor => "anchor",
+            NegatedField => "negated field",
+            __LAST => "unknown",
+        }
     }
 }
 
@@ -166,14 +219,6 @@ pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 ///
 /// Used throughout the parser for O(1) membership testing of FIRST/FOLLOW/RECOVERY sets.
 /// The limitation is 64 variants max, which is enforced by compile-time asserts in `new()`.
-///
-/// ## Construction
-///
-/// All constructors are `const fn`, so token sets can be defined as constants:
-///
-/// ```ignore
-/// const DELIMITERS: TokenSet = TokenSet::new(&[ParenOpen, ParenClose, BracketOpen, BracketClose]);
-/// ```
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TokenSet(u64);
 
