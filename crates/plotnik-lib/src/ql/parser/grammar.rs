@@ -560,9 +560,10 @@ impl Parser<'_> {
         } else if self.peek_nth(1) == SyntaxKind::Equals {
             self.parse_field_equals_typo();
         } else {
-            self.start_node(SyntaxKind::Tree);
-            self.bump();
-            self.finish_node();
+            // Bare identifiers are not valid expressions; trees require parentheses
+            self.error_and_bump(
+                "bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)",
+            );
         }
     }
 

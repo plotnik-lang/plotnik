@@ -121,7 +121,7 @@ fn capture_space_after_dot_breaks_chain() {
           LowerIdent "foo"
           Dot "."
       Def
-        Tree
+        Error
           LowerIdent "bar"
     ---
     error: capture names cannot contain dots
@@ -130,6 +130,10 @@ fn capture_space_after_dot_breaks_chain() {
       |              ^^^^^
       help: captures become struct fields; use @foo instead
       suggestion: `@foo`
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (identifier) @foo. bar
+      |                    ^^^
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
       |
     1 | (identifier) @foo. bar
@@ -252,7 +256,7 @@ fn comma_in_node_children() {
 
 #[test]
 fn comma_in_alternation() {
-    let input = "[a, b, c]";
+    let input = "[(a), (b), (c)]";
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
@@ -260,23 +264,29 @@ fn comma_in_alternation() {
         Alt
           BracketOpen "["
           Tree
+            ParenOpen "("
             LowerIdent "a"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "b"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "c"
+            ParenClose ")"
           BracketClose "]"
     ---
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
-    1 | [a, b, c]
-      |   ^
+    1 | [(a), (b), (c)]
+      |     ^
       help: remove separator
       suggestion: ``
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
-    1 | [a, b, c]
-      |      ^
+    1 | [(a), (b), (c)]
+      |          ^
       help: remove separator
       suggestion: ``
     "#);
@@ -284,7 +294,7 @@ fn comma_in_alternation() {
 
 #[test]
 fn pipe_in_alternation() {
-    let input = "[a | b | c]";
+    let input = "[(a) | (b) | (c)]";
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
@@ -292,23 +302,29 @@ fn pipe_in_alternation() {
         Alt
           BracketOpen "["
           Tree
+            ParenOpen "("
             LowerIdent "a"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "b"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "c"
+            ParenClose ")"
           BracketClose "]"
     ---
     error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
-    1 | [a | b | c]
-      |    ^
+    1 | [(a) | (b) | (c)]
+      |      ^
       help: remove separator
       suggestion: ``
     error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
-    1 | [a | b | c]
-      |        ^
+    1 | [(a) | (b) | (c)]
+      |            ^
       help: remove separator
       suggestion: ``
     "#);
@@ -589,7 +605,7 @@ fn multiple_suggestions_combined() {
             LowerIdent "val"
             Error
               Colon ":"
-          Tree
+          Error
             UpperIdent "Type"
           ParenClose ")"
     ---
@@ -623,6 +639,10 @@ fn multiple_suggestions_combined() {
       |
     1 | (node name = 'foo', @val : Type)
       |                          ^
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (node name = 'foo', @val : Type)
+      |                            ^^^^
     "#);
 }
 
@@ -716,7 +736,7 @@ fn capitalized_branch_label_no_error() {
 
 #[test]
 fn whitespace_separation_no_error() {
-    let input = "[a b c]";
+    let input = "[(a) (b) (c)]";
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
@@ -724,11 +744,17 @@ fn whitespace_separation_no_error() {
         Alt
           BracketOpen "["
           Tree
+            ParenOpen "("
             LowerIdent "a"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "b"
+            ParenClose ")"
           Tree
+            ParenOpen "("
             LowerIdent "c"
+            ParenClose ")"
           BracketClose "]"
     "#);
 }

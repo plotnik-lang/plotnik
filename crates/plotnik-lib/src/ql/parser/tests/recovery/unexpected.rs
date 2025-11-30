@@ -258,12 +258,12 @@ fn predicate_unsupported() {
               Predicate "#eq?"
             Error
               At "@"
-            Tree
+            Error
               LowerIdent "x"
             Lit
               StringLit "\"foo\""
             ParenClose ")"
-          Tree
+          Error
             LowerIdent "b"
           ParenClose ")"
     ---
@@ -275,6 +275,14 @@ fn predicate_unsupported() {
       |
     1 | (a (#eq? @x "foo") b)
       |          ^
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (a (#eq? @x "foo") b)
+      |           ^
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (a (#eq? @x "foo") b)
+      |                    ^
     "##);
 }
 
@@ -328,7 +336,7 @@ fn multiline_garbage_recovery() {
           LowerIdent "a"
           Error
             Garbage "^^^"
-          Tree
+          Error
             LowerIdent "b"
           ParenClose ")"
     ---
@@ -336,6 +344,10 @@ fn multiline_garbage_recovery() {
       |
     2 | ^^^
       | ^^^
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    3 | b)
+      | ^
     "#);
 }
 
@@ -407,7 +419,7 @@ fn alternation_recovery_to_capture() {
             Garbage "^^^"
           Error
             At "@"
-          Tree
+          Error
             LowerIdent "name"
           BracketClose "]"
     ---
@@ -419,6 +431,10 @@ fn alternation_recovery_to_capture() {
       |
     1 | [^^^ @name]
       |      ^
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | [^^^ @name]
+      |       ^^^^
     "#);
 }
 

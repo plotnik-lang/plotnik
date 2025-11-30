@@ -353,7 +353,7 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
 }
 
 #[test]
-fn bare_upper_ident_not_followed_by_equals_is_node() {
+fn bare_upper_ident_not_followed_by_equals_is_error() {
     let input = indoc! {r#"
     Expr
     "#};
@@ -361,8 +361,13 @@ fn bare_upper_ident_not_followed_by_equals_is_node() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Def
-        Tree
+        Error
           UpperIdent "Expr"
+    ---
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | Expr
+      | ^^^^
     "#);
 }
 
@@ -375,7 +380,7 @@ fn named_def_missing_equals() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Def
-        Tree
+        Error
           UpperIdent "Expr"
       Def
         Tree
@@ -383,6 +388,10 @@ fn named_def_missing_equals() {
           LowerIdent "identifier"
           ParenClose ")"
     ---
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | Expr (identifier)
+      | ^^^^
     error: unnamed definition must be last in file; add a name: `Name = Expr`
       |
     1 | Expr (identifier)
