@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,8 @@ fn error_node() {
     (ERROR)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -23,7 +24,8 @@ fn error_node_with_capture() {
     (ERROR) @err
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -42,7 +44,8 @@ fn missing_node_bare() {
     (MISSING)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -58,7 +61,8 @@ fn missing_node_with_type() {
     (MISSING identifier)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -75,7 +79,8 @@ fn missing_node_with_string() {
     (MISSING ";")
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -92,7 +97,8 @@ fn missing_node_with_capture() {
     (MISSING ";") @missing_semi
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -112,7 +118,8 @@ fn error_in_alternation() {
     [(ERROR) (identifier)]
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Alt
@@ -135,7 +142,8 @@ fn missing_in_sequence() {
     {(MISSING ";") (identifier)}
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Seq
@@ -160,7 +168,8 @@ fn special_node_nested() {
         body: (block (ERROR)))
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -187,7 +196,8 @@ fn error_with_quantifier() {
     (ERROR)*
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Quantifier
@@ -205,7 +215,8 @@ fn missing_with_quantifier() {
     (MISSING identifier)?
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Quantifier

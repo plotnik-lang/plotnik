@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,8 @@ fn quantifier_star() {
     (statement)*
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Quantifier
@@ -25,7 +26,8 @@ fn quantifier_plus() {
     (statement)+
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Quantifier
@@ -43,7 +45,8 @@ fn quantifier_optional() {
     (statement)?
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Quantifier
@@ -61,7 +64,8 @@ fn quantifier_with_capture() {
     (statement)* @statements
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -83,7 +87,9 @@ fn quantifier_inside_node() {
         (statement)*)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree

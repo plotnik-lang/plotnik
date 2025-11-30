@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,8 @@ fn anchor_first_child() {
     (block . (first_statement))
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -29,7 +30,8 @@ fn anchor_last_child() {
     (block (last_statement) .)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -51,7 +53,8 @@ fn anchor_adjacency() {
     (dotted_name (identifier) @a . (identifier) @b)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -83,7 +86,8 @@ fn anchor_both_ends() {
     (array . (element) .)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -107,7 +111,8 @@ fn anchor_multiple_adjacent() {
     (tuple . (a) . (b) . (c) .)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -143,7 +148,8 @@ fn anchor_in_sequence() {
     {. (first) (second) .}
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Seq
@@ -170,7 +176,8 @@ fn capture_space_after_dot_is_anchor() {
     (identifier) @foo . (other)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture

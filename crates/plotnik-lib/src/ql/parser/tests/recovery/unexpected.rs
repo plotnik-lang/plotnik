@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,9 @@ fn unexpected_token() {
     (identifier) ^^^ (string)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -40,7 +42,9 @@ fn multiple_consecutive_garbage() {
     ^^^ $$$ %%% (ok)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -67,7 +71,9 @@ fn garbage_at_start() {
     ^^^ (a)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -91,7 +97,9 @@ fn only_garbage() {
     ^^^ $$$
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -112,7 +120,9 @@ fn garbage_inside_alternation() {
     [(a) ^^^ (b)]
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Alt
@@ -142,7 +152,9 @@ fn garbage_inside_node() {
     (a (b) @@@ (c)) (d)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -190,7 +202,9 @@ fn xml_tag_garbage() {
     <div>(identifier)</div>
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -222,7 +236,9 @@ fn xml_self_closing() {
     <br/> (a)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -246,7 +262,9 @@ fn predicate_unsupported() {
     (a (#eq? @x "foo") b)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r##"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r##"
     Root
       Def
         Tree
@@ -292,7 +310,9 @@ fn predicate_match() {
     (identifier) #match? @name "test"
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r##"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r##"
     Root
       Def
         Tree
@@ -328,7 +348,9 @@ fn multiline_garbage_recovery() {
     b)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -357,7 +379,9 @@ fn capture_with_invalid_char() {
     (identifier) @123
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -384,7 +408,9 @@ fn field_value_is_garbage() {
     (call name: %%%)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -410,7 +436,9 @@ fn alternation_recovery_to_capture() {
     [^^^ @name]
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Alt
@@ -444,7 +472,9 @@ fn top_level_garbage_recovery() {
     Expr = (a) ^^^ Expr2 = (b)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Expr"
@@ -481,7 +511,9 @@ fn multiple_definitions_with_garbage_between() {
     C = (c)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "A"

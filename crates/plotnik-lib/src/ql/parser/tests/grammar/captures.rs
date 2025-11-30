@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 // ============================================================================
@@ -11,7 +11,8 @@ fn capture() {
     (identifier) @name
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -30,7 +31,8 @@ fn capture_nested() {
     (call function: (identifier) @func)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -58,7 +60,8 @@ fn multiple_captures() {
         right: (_) @right) @expr
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -101,7 +104,8 @@ fn capture_with_type_annotation() {
     (identifier) @name :: string
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -123,7 +127,8 @@ fn capture_with_custom_type() {
     (function_declaration) @fn :: FunctionDecl
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -145,7 +150,8 @@ fn capture_without_type_annotation() {
     (identifier) @name
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -166,7 +172,8 @@ fn multiple_captures_with_types() {
         right: (_) @right :: string) @expr :: BinaryExpr
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -214,7 +221,8 @@ fn sequence_capture_with_type() {
     {(a) (b)} @seq :: MySequence
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -243,7 +251,8 @@ fn alternation_capture_with_type() {
     [(identifier) (number)] @value :: Value
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -272,7 +281,8 @@ fn quantified_capture_with_type() {
     (statement)+ @stmts :: Statement
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -299,7 +309,8 @@ fn nested_captures_with_types() {
             (statement)* @body_stmts :: Statement)) @func :: Function
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture
@@ -353,7 +364,9 @@ fn capture_with_type_no_spaces() {
     (identifier) @name::string
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Capture

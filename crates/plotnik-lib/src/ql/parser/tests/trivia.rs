@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,8 @@ fn whitespace_preserved() {
     (identifier)  @name
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       Def
         Capture
@@ -29,7 +30,8 @@ fn comment_preserved() {
     (identifier)
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       LineComment "// comment"
       Newline "\n"
@@ -50,7 +52,8 @@ fn multiline() {
     (b)
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       Def
         Tree
@@ -80,7 +83,8 @@ fn comment_inside_pattern() {
         name: (identifier))
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       Def
         Tree
@@ -110,7 +114,8 @@ fn trivia_filtered_by_default() {
     (identifier)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -129,7 +134,8 @@ fn trivia_between_alternation_items() {
     ]
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       Def
         Alt
@@ -156,7 +162,8 @@ fn trivia_between_alternation_items() {
 fn whitespace_only() {
     let input = "    ";
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       Whitespace "    "
     "#);
@@ -168,7 +175,8 @@ fn comment_only_raw() {
     // just a comment
     "#};
 
-    insta::assert_snapshot!(snapshot_raw(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
     Root
       LineComment "// just a comment"
       Newline "\n"

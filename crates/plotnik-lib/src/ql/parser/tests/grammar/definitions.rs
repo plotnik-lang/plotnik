@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,8 @@ fn simple_named_def() {
     Expr = (identifier)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Expr"
@@ -25,7 +26,8 @@ fn named_def_with_alternation() {
     Value = [(identifier) (number) (string)]
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Value"
@@ -54,7 +56,8 @@ fn named_def_with_sequence() {
     Pair = {(identifier) (expression)}
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Pair"
@@ -82,7 +85,8 @@ fn named_def_with_captures() {
         right: (_) @right)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "BinaryOp"
@@ -129,7 +133,8 @@ fn multiple_named_defs() {
     Stmt = (statement)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Expr"
@@ -155,7 +160,8 @@ fn named_def_then_pattern() {
     (program (Expr) @value)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Expr"
@@ -193,7 +199,8 @@ fn named_def_referencing_another() {
     Expr = [(identifier) (Literal)]
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Literal"
@@ -232,7 +239,8 @@ fn named_def_with_quantifier() {
     Statements = (statement)+
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Statements"
@@ -254,7 +262,8 @@ fn named_def_complex_recursive() {
         arguments: (arguments))
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "NestedCall"
@@ -301,7 +310,8 @@ fn named_def_with_type_annotation() {
         body: (_) @body)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Func"
@@ -342,13 +352,19 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
     (Expr)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
           ParenOpen "("
           UpperIdent "Expr"
           ParenClose ")"
+    ---
+    error: undefined reference: `Expr`
+      |
+    1 | (Expr)
+      |  ^^^^
     "#);
 }
 
@@ -358,7 +374,8 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     Expr
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -377,7 +394,8 @@ fn named_def_missing_equals() {
     Expr (identifier)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Error
@@ -406,7 +424,8 @@ fn unnamed_def_allowed_as_last() {
     (program (Expr) @value)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         UpperIdent "Expr"
@@ -438,7 +457,8 @@ fn unnamed_def_not_allowed_in_middle() {
     (last)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -473,7 +493,8 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     (third)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree

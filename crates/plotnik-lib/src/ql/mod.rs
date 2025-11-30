@@ -34,8 +34,10 @@
 //!
 //! This ensures downstream tooling (CLI, LSP) always has a tree to work with.
 
+pub mod ast;
 pub mod lexer;
 pub mod parser;
+pub mod resolve;
 pub mod syntax_kind;
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use crate::ql::parser::tests::helpers::*;
+use crate::Query;
 use indoc::indoc;
 
 #[test]
@@ -7,7 +7,9 @@ fn missing_paren() {
     (identifier
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -29,7 +31,9 @@ fn missing_bracket() {
     [(identifier) (string)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Alt
@@ -58,7 +62,9 @@ fn missing_brace() {
     {(a) (b)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Seq
@@ -87,7 +93,9 @@ fn nested_unclosed() {
     (a (b (c)
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -116,7 +124,9 @@ fn deeply_nested_unclosed() {
     (a (b (c (d
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
@@ -147,7 +157,9 @@ fn unclosed_alternation_nested() {
     [(a) (b
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Alt
@@ -175,7 +187,9 @@ fn empty_parens() {
     ()
     "#};
 
-    insta::assert_snapshot!(snapshot(input), @r#"
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
         Tree
