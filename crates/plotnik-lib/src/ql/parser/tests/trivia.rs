@@ -65,6 +65,11 @@ fn multiline() {
           LowerIdent "b"
           ParenClose ")"
       Newline "\n"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (a)`
+      |
+    1 | (a)
+      | ^^^
     "#);
 }
 

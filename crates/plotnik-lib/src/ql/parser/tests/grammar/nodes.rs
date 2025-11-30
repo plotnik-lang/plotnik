@@ -136,6 +136,15 @@ fn multiple_patterns() {
           ParenOpen "("
           LowerIdent "number"
           ParenClose ")"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (identifier)`
+      |
+    1 | (identifier)
+      | ^^^^^^^^^^^^
+    error: unnamed definition must be last in file; add a name: `Name = (string)`
+      |
+    2 | (string)
+      | ^^^^^^^^
     "#);
 }
 

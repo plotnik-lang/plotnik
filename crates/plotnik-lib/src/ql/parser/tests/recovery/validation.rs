@@ -96,6 +96,10 @@ fn capture_dotted_followed_by_field() {
       |        ^^^^^^^^
       help: captures become struct fields; use @foo_bar instead
       suggestion: `@foo_bar`
+    error: unnamed definition must be last in file; add a name: `Name = (node) @foo.bar`
+      |
+    1 | (node) @foo.bar name: (other)
+      | ^^^^^^^^^^^^^^^
     "#);
 }
 
@@ -126,6 +130,10 @@ fn capture_space_after_dot_breaks_chain() {
       |              ^^^^^
       help: captures become struct fields; use @foo instead
       suggestion: `@foo`
+    error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
+      |
+    1 | (identifier) @foo. bar
+      | ^^^^^^^^^^^^^^^^^^
     "#);
 }
 
@@ -147,11 +155,11 @@ fn single_quote_string_suggests_double_quotes() {
             SingleQuoteLit "'if'"
           ParenClose ")"
     ---
-    error: use double quotes for string literals
+    error: single quotes are not valid for string literals
       |
     1 | (node 'if')
       |       ^^^^
-      help: use double quotes for literals
+      help: use double quotes
       suggestion: `"if"`
     "#);
 }
@@ -171,17 +179,17 @@ fn single_quote_in_alternation() {
             SingleQuoteLit "'private'"
           BracketClose "]"
     ---
-    error: use double quotes for string literals
+    error: single quotes are not valid for string literals
       |
     1 | ['public' 'private']
       |  ^^^^^^^^
-      help: use double quotes for literals
+      help: use double quotes
       suggestion: `"public"`
-    error: use double quotes for string literals
+    error: single quotes are not valid for string literals
       |
     1 | ['public' 'private']
       |           ^^^^^^^^^
-      help: use double quotes for literals
+      help: use double quotes
       suggestion: `"private"`
     "#);
 }
@@ -200,11 +208,11 @@ fn single_quote_with_escape() {
             SingleQuoteLit "'it\\'s'"
           ParenClose ")"
     ---
-    error: use double quotes for string literals
+    error: single quotes are not valid for string literals
       |
     1 | (node 'it\'s')
       |       ^^^^^^^
-      help: use double quotes for literals
+      help: use double quotes
       suggestion: `"it\'s"`
     "#);
 }
@@ -233,11 +241,11 @@ fn comma_in_node_children() {
             ParenClose ")"
           ParenClose ")"
     ---
-    error: plotnik uses whitespace for separation; remove ','
+    error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node (a), (b))
       |          ^
-      help: remove ','
+      help: remove separator
       suggestion: ``
     "#);
 }
@@ -259,17 +267,17 @@ fn comma_in_alternation() {
             LowerIdent "c"
           BracketClose "]"
     ---
-    error: plotnik uses whitespace for separation; remove ','
+    error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [a, b, c]
       |   ^
-      help: remove ','
+      help: remove separator
       suggestion: ``
-    error: plotnik uses whitespace for separation; remove ','
+    error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [a, b, c]
       |      ^
-      help: remove ','
+      help: remove separator
       suggestion: ``
     "#);
 }
@@ -291,17 +299,17 @@ fn pipe_in_alternation() {
             LowerIdent "c"
           BracketClose "]"
     ---
-    error: plotnik uses whitespace for separation; remove '|'
+    error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [a | b | c]
       |    ^
-      help: remove '|'
+      help: remove separator
       suggestion: ``
-    error: plotnik uses whitespace for separation; remove '|'
+    error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [a | b | c]
       |        ^
-      help: remove '|'
+      help: remove separator
       suggestion: ``
     "#);
 }
@@ -325,11 +333,11 @@ fn comma_in_sequence() {
             ParenClose ")"
           BraceClose "}"
     ---
-    error: plotnik uses whitespace for separation; remove ','
+    error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a), (b)}
       |     ^
-      help: remove ','
+      help: remove separator
       suggestion: ``
     "#);
 }
@@ -356,11 +364,11 @@ fn single_colon_type_annotation() {
             Colon ":"
             UpperIdent "Type"
     ---
-    error: use '::' for type annotations, not ':'
+    error: single colon is not valid for type annotations
       |
     1 | (identifier) @name : Type
       |                    ^
-      help: use '::' for type annotations
+      help: use '::'
       suggestion: `::`
     "#);
 }
@@ -383,11 +391,11 @@ fn single_colon_type_annotation_no_space() {
             Colon ":"
             UpperIdent "Type"
     ---
-    error: use '::' for type annotations, not ':'
+    error: single colon is not valid for type annotations
       |
     1 | (identifier) @name:Type
       |                   ^
-      help: use '::' for type annotations
+      help: use '::'
       suggestion: `::`
     "#);
 }
@@ -422,6 +430,14 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       |      ^
+    error: unnamed definition must be last in file; add a name: `Name = @`
+      |
+    1 | @val : string
+      | ^
+    error: unnamed definition must be last in file; add a name: `Name = val :`
+      |
+    1 | @val : string
+      |  ^^^^^
     "#);
 }
 
@@ -531,11 +547,11 @@ fn field_equals_typo() {
               ParenClose ")"
           ParenClose ")"
     ---
-    error: use ':' for field constraints, not '='
+    error: '=' is not valid for field constraints
       |
     1 | (node name = (identifier))
       |            ^
-      help: use ':' for fields
+      help: use ':'
       suggestion: `:`
     "#);
 }
@@ -559,11 +575,11 @@ fn field_equals_typo_no_space() {
               ParenClose ")"
           ParenClose ")"
     ---
-    error: use ':' for field constraints, not '='
+    error: '=' is not valid for field constraints
       |
     1 | (node name=(identifier))
       |           ^
-      help: use ':' for fields
+      help: use ':'
       suggestion: `:`
     "#);
 }
@@ -597,38 +613,42 @@ fn multiple_suggestions_combined() {
         Error
           ParenClose ")"
     ---
-    error: use ':' for field constraints, not '='
+    error: '=' is not valid for field constraints
       |
     1 | (node name = 'foo', @val : Type)
       |            ^
-      help: use ':' for fields
+      help: use ':'
       suggestion: `:`
-    error: use double quotes for string literals
+    error: single quotes are not valid for string literals
       |
     1 | (node name = 'foo', @val : Type)
       |              ^^^^^
-      help: use double quotes for literals
+      help: use double quotes
       suggestion: `"foo"`
-    error: plotnik uses whitespace for separation; remove ','
+    error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node name = 'foo', @val : Type)
       |                   ^
-      help: remove ','
+      help: remove separator
       suggestion: ``
     error: expected closing ')' for tree
       |
     1 | (node name = 'foo', @val : Type)
       |                     ^
-    error: use '::' for type annotations, not ':'
+    error: single colon is not valid for type annotations
       |
     1 | (node name = 'foo', @val : Type)
       |                          ^
-      help: use '::' for type annotations
+      help: use '::'
       suggestion: `::`
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (node name = 'foo', @val : Type)
       |                                ^
+    error: unnamed definition must be last in file; add a name: `Name = (node name = 'foo', @val : Type`
+      |
+    1 | (node name = 'foo', @val : Type)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     "#);
 }
 

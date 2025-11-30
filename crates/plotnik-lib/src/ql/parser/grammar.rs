@@ -17,6 +17,9 @@ impl Parser<'_> {
     pub fn parse_root(&mut self) {
         self.start_node(SyntaxKind::Root);
 
+        // Track spans of unnamed defs to emit errors for non-last ones
+        let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
+
         while self.peek() != SyntaxKind::Error || !self.eof() {
             if self.eof() {
                 break;
@@ -25,10 +28,29 @@ impl Parser<'_> {
             if self.peek() == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
             } else {
-                // Anonymous def: wrap expression in Def node (invalid, lacks assignment)
+                // Anonymous def: wrap expression in Def node
+                let start = self.current_span().start();
                 self.start_node(SyntaxKind::Def);
                 self.parse_expr_or_error();
                 self.finish_node();
+                // Record span for later validation (only last unnamed def is allowed)
+                // Find last non-trivia token end (peek() may have buffered trailing trivia)
+                let end = self.last_non_trivia_end().unwrap_or(start);
+                unnamed_def_spans.push(TextRange::new(start, end));
+            }
+        }
+
+        // Emit errors for all unnamed defs except the last one
+        if unnamed_def_spans.len() > 1 {
+            for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
+                let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
+                self.errors.push(super::error::SyntaxError::new(
+                    *span,
+                    format!(
+                        "unnamed definition must be last in file; add a name: `Name = {}`",
+                        def_text.trim()
+                    ),
+                ));
             }
         }
 
@@ -360,8 +382,8 @@ impl Parser<'_> {
         let text = token_text(self.source, &self.tokens[self.pos]);
         // Convert 'foo' to "foo"
         let inner = &text[1..text.len() - 1];
-        let fix = Fix::new(format!("\"{}\"", inner), "use double quotes for literals");
-        self.error_with_fix(span, "use double quotes for string literals", fix);
+        let fix = Fix::new(format!("\"{}\"", inner), "use double quotes");
+        self.error_with_fix(span, "single quotes are not valid for string literals", fix);
 
         self.bump();
         self.finish_node();
@@ -481,8 +503,8 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Type);
 
         let span = self.current_span();
-        let fix = Fix::new("::", "use '::' for type annotations");
-        self.error_with_fix(span, "use '::' for type annotations, not ':'", fix);
+        let fix = Fix::new("::", "use '::'");
+        self.error_with_fix(span, "single colon is not valid for type annotations", fix);
 
         self.bump();
 
@@ -564,8 +586,8 @@ impl Parser<'_> {
         self.bump();
         self.peek();
         let span = self.current_span();
-        let fix = Fix::new(":", "use ':' for fields");
-        self.error_with_fix(span, "use ':' for field constraints, not '='", fix);
+        let fix = Fix::new(":", "use ':'");
+        self.error_with_fix(span, "'=' is not valid for field constraints", fix);
         self.bump();
 
         if EXPR_FIRST.contains(self.peek()) {
@@ -581,16 +603,16 @@ impl Parser<'_> {
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
-        let (char_name, fix_desc) = match kind {
-            SyntaxKind::Comma => (",", "remove ','"),
-            SyntaxKind::Pipe => ("|", "remove '|'"),
+        let char_name = match kind {
+            SyntaxKind::Comma => ",",
+            SyntaxKind::Pipe => "|",
             _ => return,
         };
-        let fix = Fix::new("", fix_desc);
+        let fix = Fix::new("", "remove separator");
         self.error_with_fix(
             span,
             format!(
-                "plotnik uses whitespace for separation; remove '{}'",
+                "'{}' is not valid syntax; plotnik uses whitespace for separation",
                 char_name
             ),
             fix,

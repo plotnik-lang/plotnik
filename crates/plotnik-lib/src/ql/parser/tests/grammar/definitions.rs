@@ -382,5 +382,113 @@ fn named_def_missing_equals() {
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = Expr`
+      |
+    1 | Expr (identifier)
+      | ^^^^
+    "#);
+}
+
+#[test]
+fn unnamed_def_allowed_as_last() {
+    let input = indoc! {r#"
+    Expr = (identifier)
+    (program (Expr) @value)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Def
+        UpperIdent "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "program"
+          Capture
+            Tree
+              ParenOpen "("
+              UpperIdent "Expr"
+              ParenClose ")"
+            At "@"
+            LowerIdent "value"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn unnamed_def_not_allowed_in_middle() {
+    let input = indoc! {r#"
+    (first)
+    Expr = (identifier)
+    (last)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "first"
+          ParenClose ")"
+      Def
+        UpperIdent "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "last"
+          ParenClose ")"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (first)`
+      |
+    1 | (first)
+      | ^^^^^^^
+    "#);
+}
+
+#[test]
+fn multiple_unnamed_defs_errors_for_all_but_last() {
+    let input = indoc! {r#"
+    (first)
+    (second)
+    (third)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "first"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "second"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          LowerIdent "third"
+          ParenClose ")"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (first)`
+      |
+    1 | (first)
+      | ^^^^^^^
+    error: unnamed definition must be last in file; add a name: `Name = (second)`
+      |
+    2 | (second)
+      | ^^^^^^^^
     "#);
 }

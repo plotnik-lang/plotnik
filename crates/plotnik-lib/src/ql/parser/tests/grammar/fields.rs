@@ -165,5 +165,10 @@ fn multiple_patterns_with_captures() {
             ParenClose ")"
           At "@"
           LowerIdent "cls"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (function) @func`
+      |
+    1 | (function) @func
+      | ^^^^^^^^^^^^^^^^
     "#);
 }

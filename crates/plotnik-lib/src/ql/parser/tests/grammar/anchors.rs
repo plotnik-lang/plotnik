@@ -188,5 +188,14 @@ fn capture_space_after_dot_is_anchor() {
           ParenOpen "("
           LowerIdent "other"
           ParenClose ")"
+    ---
+    error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
+      |
+    1 | (identifier) @foo . (other)
+      | ^^^^^^^^^^^^^^^^^
+    error: unnamed definition must be last in file; add a name: `Name = .`
+      |
+    1 | (identifier) @foo . (other)
+      |                   ^
     "#);
 }

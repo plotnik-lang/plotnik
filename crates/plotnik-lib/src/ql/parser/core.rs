@@ -326,6 +326,17 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Get the end position of the last non-trivia token before current position.
+    /// Used when trivia may have been buffered ahead but we need the expression's end.
+    pub(super) fn last_non_trivia_end(&self) -> Option<TextSize> {
+        for i in (0..self.pos).rev() {
+            if !self.tokens[i].kind.is_trivia() {
+                return Some(self.tokens[i].span.end());
+            }
+        }
+        None
+    }
+
     /// Record an error with an associated fix suggestion.
     pub(super) fn error_with_fix(
         &mut self,

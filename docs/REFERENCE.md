@@ -8,17 +8,18 @@ Plotnik QL is a pattern-matching language for tree-sitter syntax trees. It exten
 
 ## File Structure
 
-A Plotnik file contains one or more subqueries. Subqueries can be named or unnamed:
+A Plotnik file contains one or more definitions. All definitions must be named (`Name = expr`) except optionally the last one, which becomes the entry point:
 
 ```
-; named subquery
+; named definitions (required for all but last)
 Expr = [(identifier) (number) (string)]
+Stmt = (statement)
 
-; unnamed subquery (the entry point)
+; unnamed entry point (only allowed as last definition)
 (assignment_expression right: (Expr) @value)
 ```
 
-By default, the last subquery becomes the entry point. Alternatively, an entry point could be specified by the user. Unnamed subqueries somewhere in the middle of a file are unreachable and produce a warning.
+An unnamed definition that is not the last in the file produces an error. The error message includes the entire unnamed definition to help identify and fix it.
 
 ---
 

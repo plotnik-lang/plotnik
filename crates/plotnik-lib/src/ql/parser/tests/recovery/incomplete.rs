@@ -200,6 +200,18 @@ fn mixed_valid_invalid_captures() {
       |
     1 | (a) @ok @ @name
       |           ^
+    error: unnamed definition must be last in file; add a name: `Name = (a) @ok`
+      |
+    1 | (a) @ok @ @name
+      | ^^^^^^^
+    error: unnamed definition must be last in file; add a name: `Name = @`
+      |
+    1 | (a) @ok @ @name
+      |         ^
+    error: unnamed definition must be last in file; add a name: `Name = @`
+      |
+    1 | (a) @ok @ @name
+      |           ^
     "#);
 }
 
@@ -235,6 +247,10 @@ fn type_annotation_invalid_token_after() {
       |                       -^
       |                       |
       |                       tree started here
+    error: unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
+      |
+    1 | (identifier) @name :: (
+      | ^^^^^^^^^^^^^^^^^^^^^
     "#);
 }
 

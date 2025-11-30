@@ -58,6 +58,7 @@ An expression (`Expr`) is one of: `Tree | Alt | Seq | Quantifier | Capture`
 
 ## Grammar Constraints
 
+- Definitions: All definitions must be named (`Name = expr`) except optionally the last one, which becomes the entry point. Unnamed definitions that aren't last produce an error showing the full definition text.
 - Fields: `field: expr` constraints are strict. The expression must be a tree, alternation, or quantifier. Sibling sequences `{...}` are not allowed as direct field values.
 - Alternations: In unlabeled alternations, captures with the same name must have the same type across all branches where they appear. A capture is required if present in all branches, optional otherwise. When branches mix bare nodes and structures, bare node captures are auto-promoted to single-field structures. Merged structures require explicit type annotation (`@x :: TypeName`) for codegen. Use tagged alternations (`[A: ... B: ...]`) for discriminated unions.
 - Anchors: The `.` anchor enforces strict adjacency. Without it, sibling matching allows gaps (scanning).
