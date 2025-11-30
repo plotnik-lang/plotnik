@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn capture_with_type_annotation() {
     let input = indoc! {r#"
-    (identifier) @name::string
+    (identifier) @name :: string
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -25,7 +25,7 @@ fn capture_with_type_annotation() {
 #[test]
 fn capture_with_custom_type() {
     let input = indoc! {r#"
-    (function_declaration) @fn::FunctionDecl
+    (function_declaration) @fn :: FunctionDecl
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -65,8 +65,8 @@ fn capture_without_type_annotation() {
 fn multiple_captures_with_types() {
     let input = indoc! {r#"
     (binary
-        left: (_) @left::Node
-        right: (_) @right::string) @expr::BinaryExpr
+        left: (_) @left :: Node
+        right: (_) @right :: string) @expr :: BinaryExpr
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -113,7 +113,7 @@ fn multiple_captures_with_types() {
 #[test]
 fn capture_type_missing_type_name() {
     let input = indoc! {r#"
-    (identifier) @name::
+    (identifier) @name ::
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -130,15 +130,15 @@ fn capture_type_missing_type_name() {
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
-    1 | (identifier) @name::
-      |                     ^
+    1 | (identifier) @name ::
+      |                      ^
     "#);
 }
 
 #[test]
 fn sequence_capture_with_type() {
     let input = indoc! {r#"
-    {(a) (b)} @seq::MySequence
+    {(a) (b)} @seq :: MySequence
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -166,7 +166,7 @@ fn sequence_capture_with_type() {
 #[test]
 fn alternation_capture_with_type() {
     let input = indoc! {r#"
-    [(identifier) (number)] @value::Value
+    [(identifier) (number)] @value :: Value
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -194,7 +194,7 @@ fn alternation_capture_with_type() {
 #[test]
 fn quantified_capture_with_type() {
     let input = indoc! {r#"
-    (statement)+ @stmts::Statement
+    (statement)+ @stmts :: Statement
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -218,9 +218,9 @@ fn quantified_capture_with_type() {
 fn nested_captures_with_types() {
     let input = indoc! {r#"
     (function
-        name: (identifier) @name::string
+        name: (identifier) @name :: string
         body: (block
-            (statement)* @body_stmts::Statement)) @func::Function
+            (statement)* @body_stmts :: Statement)) @func :: Function
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -273,7 +273,7 @@ fn nested_captures_with_types() {
 #[test]
 fn type_annotation_invalid_token_after() {
     let input = indoc! {r#"
-    (identifier) @name::(
+    (identifier) @name :: (
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -292,11 +292,33 @@ fn type_annotation_invalid_token_after() {
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
-    1 | (identifier) @name::(
-      |                     ^
+    1 | (identifier) @name :: (
+      |                       ^
     error: unexpected end of input inside node; expected a child pattern or closing delimiter
       |
-    1 | (identifier) @name::(
-      |                      ^
+    1 | (identifier) @name :: (
+      |                        ^
+    "#);
+}
+
+#[test]
+fn capture_with_type_no_spaces() {
+    // Parser should accept both spaced and non-spaced forms
+    let input = indoc! {r#"
+    (identifier) @name::string
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "name"
+        Type
+          DoubleColon "::"
+          LowerIdent "string"
     "#);
 }

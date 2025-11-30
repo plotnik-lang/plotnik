@@ -190,7 +190,7 @@ fn multiple_definitions_with_garbage_between() {
 fn capture_with_type_and_upper_ident() {
     // Even if capture name is UpperIdent, type annotation should still work
     let input = indoc! {r#"
-    (identifier) @Name::MyType
+    (identifier) @Name :: MyType
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"

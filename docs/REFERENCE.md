@@ -107,27 +107,27 @@ The `@func` capture on the group creates a nested scope. All captures inside (`@
 The `::` syntax after a capture names the output type for codegen:
 
 ```
-@x::MyType    // name this capture's type "MyType"
-@x::string    // special: extract node.text as a string
+@x :: MyType    // name this capture's type "MyType"
+@x :: string    // special: extract node.text as a string
 ```
 
-| Annotation   | Effect                                      |
-| ------------ | ------------------------------------------- |
-| `@x`         | inferred type (usually `Node`)              |
-| `@x::string` | converts to `string` (extracts `node.text`) |
-| `@x::T`      | names the type `T` in generated code        |
+| Annotation     | Effect                                      |
+| -------------- | ------------------------------------------- |
+| `@x`           | inferred type (usually `Node`)              |
+| `@x :: string` | converts to `string` (extracts `node.text`) |
+| `@x :: T`      | names the type `T` in generated code        |
 
-Only `::string` changes the actual data. Other `::T` annotations only affect generated type/interface names.
+Only `:: string` changes the actual data. Other `:: T` annotations only affect generated type/interface names.
 
 Example with type annotation on a group:
 
 ```
 {
   (function_declaration
-    name: (identifier) @name::string
+    name: (identifier) @name :: string
     body: (_) @body
   ) @node
-} @func::FunctionDeclaration
+} @func :: FunctionDeclaration
 ```
 
 Output type:
@@ -135,7 +135,7 @@ Output type:
 ```typescript
 interface FunctionDeclaration {
   node: Node;
-  name: string; // ::string converted this
+  name: string; // :: string converted this
   body: Node;
 }
 
@@ -152,8 +152,8 @@ interface FunctionDeclaration {
 | `(pattern)? @x`           | optional field                         |
 | `(pattern)* @x`           | array field                            |
 | `{...} @x` or `[...] @x`  | nested object (new scope for captures) |
-| `@x::string`              | string value instead of Node           |
-| `@x::TypeName`            | custom type name in codegen            |
+| `@x :: string`            | string value instead of Node           |
+| `@x :: TypeName`          | custom type name in codegen            |
 
 ---
 
@@ -291,7 +291,7 @@ With type annotations:
 
 ```
 (assignment_expression
-  left: (identifier) @target::string
+  left: (identifier) @target :: string
   right: (call_expression) @value)
 ```
 
@@ -390,7 +390,7 @@ Capture the entire sequence with a type name:
 {
   (comment)+
   (function_declaration) @fn
-}+ @sections::Section
+}+ @sections :: Section
 ```
 
 Output type:
@@ -420,7 +420,7 @@ Match one of several alternatives with `[...]`:
 
 Without labels, captures from all branches merge. If a capture appears in all branches, it's required; otherwise optional. Captures with the same name must have the same type across all branches where they appear.
 
-All branches must be type-compatible: either all branches produce bare nodes (no internal captures), or all branches produce structures (have internal captures). When branches mix nodes and structures, bare node captures are auto-promoted to single-field structures. When merging structures, the captured alternation requires an explicit type annotation (`@x::TypeName`) for codegen.
+All branches must be type-compatible: either all branches produce bare nodes (no internal captures), or all branches produce structures (have internal captures). When branches mix nodes and structures, bare node captures are auto-promoted to single-field structures. When merging structures, the captured alternation requires an explicit type annotation (`@x :: TypeName`) for codegen.
 
 ```
 (statement
@@ -475,7 +475,7 @@ Output type:
 Type mismatch is an error:
 
 ```
-[(identifier) @x::string (number) @x::number]  // ERROR: @x has different types
+[(identifier) @x :: string (number) @x :: number]  // ERROR: @x has different types
 ```
 
 With a capture on the alternation itself, the type is non-optional since exactly one branch must match:
@@ -503,7 +503,7 @@ Labels create a discriminated union:
 [
   Assign: (assignment_expression left: (identifier) @left)
   Call: (call_expression function: (identifier) @func)
-] @stmt::Stmt
+] @stmt :: Stmt
 ```
 
 Output type (discriminant is always `tag`):
@@ -530,7 +530,7 @@ When a merge alternation produces a structure (branches have internal captures),
   function: [
     (identifier) @fn
     (member_expression property: (property_identifier) @method)
-  ] @target::Target)
+  ] @target :: Target)
 ```
 
 Output type:
@@ -680,19 +680,19 @@ type MemberChain =
 ```
 Statement = [
   Assign: (assignment_expression
-    left: (identifier) @target::string
+    left: (identifier) @target :: string
     right: (Expression) @value)
   Call: (call_expression
-    function: (identifier) @func::string
+    function: (identifier) @func :: string
     arguments: (arguments (Expression)* @args))
   Return: (return_statement
     (Expression)? @value)
 ]
 
 Expression = [
-  Ident: (identifier) @name::string
-  Num: (number) @value::string
-  Str: (string) @value::string
+  Ident: (identifier) @name :: string
+  Num: (number) @value :: string
+  Str: (string) @value :: string
 ]
 
 (program (Statement)+ @statements)
@@ -723,8 +723,8 @@ type Root = {
 | Feature              | Tree-sitter      | Plotnik                   |
 | -------------------- | ---------------- | ------------------------- |
 | Capture              | `@name`          | `@name` (snake_case only) |
-| Type annotation      |                  | `@x::T`                   |
-| Text extraction      |                  | `@x::string`              |
+| Type annotation      |                  | `@x :: T`                 |
+| Text extraction      |                  | `@x :: string`            |
 | Named node           | `(type)`         | `(type)`                  |
 | Anonymous node       | `"text"`         | `"text"`                  |
 | Any node             | `_`              | `_`                       |

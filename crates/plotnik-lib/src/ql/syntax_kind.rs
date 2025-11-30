@@ -51,7 +51,7 @@ pub enum SyntaxKind {
     #[token("}")]
     BraceClose,
 
-    /// Double colon for type annotations: `@name::Type`
+    /// Double colon for type annotations: `@name :: Type`
     /// Must be defined before single Colon for correct precedence
     #[token("::")]
     DoubleColon,
@@ -155,7 +155,7 @@ pub enum SyntaxKind {
     Lit,
     /// Field specification: `name: pattern`
     Field,
-    /// Capture binding: `@name` or `@name::Type`
+    /// Capture binding: `@name` or `@name :: Type`
     Capture,
     /// Type annotation: `::Type` after a capture
     Type,

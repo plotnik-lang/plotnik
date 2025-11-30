@@ -332,7 +332,7 @@ fn named_def_complex_recursive() {
 fn named_def_with_type_annotation() {
     let input = indoc! {r#"
     Func = (function_declaration
-        name: (identifier) @name::string
+        name: (identifier) @name :: string
         body: (_) @body)
     "#};
 

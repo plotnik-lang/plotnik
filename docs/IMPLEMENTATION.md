@@ -81,21 +81,21 @@ Traversal is bottom-up. Each AST node returns:
 
 ### Rules by AST Node
 
-| Node                      | Type                             | Fields Contributed                              |
-| ------------------------- | -------------------------------- | ----------------------------------------------- |
-| `(node_type)` uncaptured  | —                                | none                                            |
-| `(node_type) @x`          | `Node`                           | `x: Node`                                       |
-| `(node_type) @x::string`  | `String`                         | `x: String`                                     |
-| `(_) @x`                  | `Node`                           | `x: Node`                                       |
-| `(NamedExpr) @x`          | `Ref("NamedExpr")`               | `x: Ref("NamedExpr")`                           |
-| `{...}` uncaptured        | —                                | flattened inner fields                          |
-| `{...} @x`                | `Struct(inner_fields)`           | `x: Struct(...)`                                |
-| `{...} @x::T`             | `Struct(inner_fields)` named `T` | `x: T`                                          |
-| `[...]` unlabeled         | `Union(...)`                     | merged fields (optional if not in all branches) |
-| `[A: ... B: ...]` labeled | `Tagged(...)`                    | — (each branch has own fields)                  |
-| `pattern?`                | `Optional(inner)`                | field becomes optional                          |
-| `pattern*`                | `Array(inner, false)`            | field becomes array                             |
-| `pattern+`                | `Array(inner, true)`             | field becomes non-empty array                   |
+| Node                       | Type                             | Fields Contributed                              |
+| -------------------------- | -------------------------------- | ----------------------------------------------- |
+| `(node_type)` uncaptured   | —                                | none                                            |
+| `(node_type) @x`           | `Node`                           | `x: Node`                                       |
+| `(node_type) @x :: string` | `String`                         | `x: String`                                     |
+| `(_) @x`                   | `Node`                           | `x: Node`                                       |
+| `(NamedExpr) @x`           | `Ref("NamedExpr")`               | `x: Ref("NamedExpr")`                           |
+| `{...}` uncaptured         | —                                | flattened inner fields                          |
+| `{...} @x`                 | `Struct(inner_fields)`           | `x: Struct(...)`                                |
+| `{...} @x :: T`            | `Struct(inner_fields)` named `T` | `x: T`                                          |
+| `[...]` unlabeled          | `Union(...)`                     | merged fields (optional if not in all branches) |
+| `[A: ... B: ...]` labeled  | `Tagged(...)`                    | — (each branch has own fields)                  |
+| `pattern?`                 | `Optional(inner)`                | field becomes optional                          |
+| `pattern*`                 | `Array(inner, false)`            | field becomes array                             |
+| `pattern+`                 | `Array(inner, true)`             | field becomes non-empty array                   |
 
 ### Scope Rules
 
@@ -143,7 +143,7 @@ Type inference alone doesn't catch all errors. Separate validation passes:
 ### 5.2 Type Mismatches in Alternations
 
 - Same capture name with different types across branches
-- Example: `[(identifier) @x::string (number) @x::number]` — error
+- Example: `[(identifier) @x :: string (number) @x :: number]` — error
 
 ### 5.3 Infinite Patterns (No Base Case)
 

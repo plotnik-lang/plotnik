@@ -127,7 +127,7 @@ fn tagged_alternation_with_type_annotation() {
     [
         Base: (identifier) @name
         Access: (member_expression object: (_) @obj)
-    ] @chain::MemberChain
+    ] @chain :: MemberChain
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
@@ -489,9 +489,9 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
 fn tagged_alternation_full_example() {
     let input = indoc! {r#"
     Expression = [
-        Ident: (identifier) @name::string
-        Num: (number) @value::string
-        Str: (string) @value::string
+        Ident: (identifier) @name :: string
+        Num: (number) @value :: string
+        Str: (string) @value :: string
         Binary: (binary_expression
             left: (Expression) @left
             right: (Expression) @right)

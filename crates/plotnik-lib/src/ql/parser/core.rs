@@ -304,7 +304,6 @@ impl<'src> Parser<'src> {
             return;
         }
         self.last_error_pos = Some(pos);
-        self.errors
-            .push(SyntaxError::with_fix(range, message, fix));
+        self.errors.push(SyntaxError::with_fix(range, message, fix));
     }
 }

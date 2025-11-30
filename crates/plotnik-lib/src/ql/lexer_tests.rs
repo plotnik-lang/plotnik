@@ -328,6 +328,16 @@ fn empty_input() {
 
 #[test]
 fn double_colon() {
+    insta::assert_snapshot!(snapshot("@name :: Type"), @r#"
+    At "@"
+    LowerIdent "name"
+    DoubleColon "::"
+    UpperIdent "Type"
+    "#);
+}
+
+#[test]
+fn double_colon_no_spaces() {
     insta::assert_snapshot!(snapshot("@name::Type"), @r#"
     At "@"
     LowerIdent "name"
@@ -348,7 +358,7 @@ fn double_colon_vs_single_colon() {
 
 #[test]
 fn double_colon_string_type() {
-    insta::assert_snapshot!(snapshot("@name::string"), @r#"
+    insta::assert_snapshot!(snapshot("@name :: string"), @r#"
     At "@"
     LowerIdent "name"
     DoubleColon "::"
@@ -442,7 +452,7 @@ fn supertype_path_pattern() {
 
 #[test]
 fn type_annotation_full() {
-    insta::assert_snapshot!(snapshot("(identifier) @name::string"), @r#"
+    insta::assert_snapshot!(snapshot("(identifier) @name :: string"), @r#"
     ParenOpen "("
     LowerIdent "identifier"
     ParenClose ")"
@@ -509,7 +519,7 @@ fn special_node_missing_with_arg() {
 
 #[test]
 fn type_annotation_upper() {
-    insta::assert_snapshot!(snapshot("@val::Type"), @r#"
+    insta::assert_snapshot!(snapshot("@val :: Type"), @r#"
     At "@"
     LowerIdent "val"
     DoubleColon "::"

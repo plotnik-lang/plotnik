@@ -275,7 +275,7 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Capture binding: `@name` or `@name::Type`
+    /// Capture binding: `@name` or `@name :: Type`
     /// Accepts UpperIdent for resilience; validation will catch casing errors.
     /// Detects tree-sitter style dotted captures (`@foo.bar.baz`) and emits helpful errors.
     fn parse_capture(&mut self) {
@@ -320,10 +320,13 @@ impl Parser<'_> {
         // The first part was already consumed, get it from the previous token
         let mut parts: Vec<String> = Vec::new();
         if let Some(prev_span) = self.prev_span() {
-            let prev_text = token_text(self.source, &crate::ql::lexer::Token {
-                kind: SyntaxKind::LowerIdent,
-                span: prev_span,
-            });
+            let prev_text = token_text(
+                self.source,
+                &crate::ql::lexer::Token {
+                    kind: SyntaxKind::LowerIdent,
+                    span: prev_span,
+                },
+            );
             parts.push(prev_text.to_string());
         }
 
@@ -332,7 +335,8 @@ impl Parser<'_> {
             self.bump(); // consume dot
 
             // Check if next token is an adjacent identifier
-            if (self.current() == SyntaxKind::LowerIdent || self.current() == SyntaxKind::UpperIdent)
+            if (self.current() == SyntaxKind::LowerIdent
+                || self.current() == SyntaxKind::UpperIdent)
                 && self.is_adjacent_to_prev()
             {
                 let ident_text = token_text(self.source, &self.tokens[self.pos]);
@@ -351,14 +355,13 @@ impl Parser<'_> {
         let suggested_name = parts.join("_");
         let fix = Fix::new(
             format!("@{}", suggested_name),
-            format!("captures become struct fields; use @{} instead", suggested_name),
+            format!(
+                "captures become struct fields; use @{} instead",
+                suggested_name
+            ),
         );
 
-        self.error_with_fix(
-            error_range,
-            "capture names cannot contain dots",
-            fix,
-        );
+        self.error_with_fix(error_range, "capture names cannot contain dots", fix);
 
         true
     }
