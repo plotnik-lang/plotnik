@@ -542,3 +542,69 @@ fn named_def_with_sequence() {
     BraceClose "}"
     "#);
 }
+
+#[test]
+fn comma_token() {
+    insta::assert_snapshot!(snapshot("a, b, c"), @r#"
+    LowerIdent "a"
+    Comma ","
+    LowerIdent "b"
+    Comma ","
+    LowerIdent "c"
+    "#);
+}
+
+#[test]
+fn pipe_token() {
+    insta::assert_snapshot!(snapshot("a | b | c"), @r#"
+    LowerIdent "a"
+    Pipe "|"
+    LowerIdent "b"
+    Pipe "|"
+    LowerIdent "c"
+    "#);
+}
+
+#[test]
+fn single_quote_string() {
+    insta::assert_snapshot!(snapshot("'hello'"), @r#"SingleQuoteLit "'hello'""#);
+}
+
+#[test]
+fn single_quote_string_with_escape() {
+    insta::assert_snapshot!(snapshot(r"'it\'s'"), @r#"SingleQuoteLit "'it\\'s'""#);
+}
+
+#[test]
+fn single_vs_double_quote_strings() {
+    insta::assert_snapshot!(snapshot(r#"'single' "double""#), @r#"
+    SingleQuoteLit "'single'"
+    StringLit "\"double\""
+    "#);
+}
+
+#[test]
+fn comma_in_pattern_context() {
+    insta::assert_snapshot!(snapshot("[(a), (b)]"), @r#"
+    BracketOpen "["
+    ParenOpen "("
+    LowerIdent "a"
+    ParenClose ")"
+    Comma ","
+    ParenOpen "("
+    LowerIdent "b"
+    ParenClose ")"
+    BracketClose "]"
+    "#);
+}
+
+#[test]
+fn pipe_in_pattern_context() {
+    insta::assert_snapshot!(snapshot("[a | b]"), @r#"
+    BracketOpen "["
+    LowerIdent "a"
+    Pipe "|"
+    LowerIdent "b"
+    BracketClose "]"
+    "#);
+}

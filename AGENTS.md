@@ -67,3 +67,4 @@ Short, punchy names for CST node kinds:
 - Follow established parser patterns (see rnix-parser, taplo for reference)
 - Keep tokens span-based, avoid storing text in intermediate structures
 - Don't write AI slop code comments, write only useful ones
+- When generating test snapshots (`insta`), don't place values by yourself, instead write empty strings (as required with @), then run `insta` util for update inline snapshots

@@ -10,6 +10,7 @@ mod quantifiers_test;
 mod resilience_test;
 mod sequences_test;
 mod special_nodes_test;
+mod suggestions_test;
 mod supertypes_test;
 mod tagged_alternations_test;
 mod trivia_test;

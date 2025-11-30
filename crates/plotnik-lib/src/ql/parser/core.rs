@@ -193,6 +193,14 @@ impl<'src> Parser<'src> {
         self.pos += 1;
     }
 
+    /// Skip current token without adding to tree. Used for invalid separators.
+    pub(super) fn skip_token(&mut self) {
+        assert!(!self.eof(), "skip_token called at EOF");
+        #[cfg(debug_assertions)]
+        self.fuel.set(DEFAULT_FUEL);
+        self.pos += 1;
+    }
+
     pub(super) fn eat(&mut self, kind: SyntaxKind) -> bool {
         if self.at(kind) {
             self.bump();

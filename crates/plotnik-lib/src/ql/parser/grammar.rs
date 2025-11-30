@@ -10,7 +10,7 @@ use super::error::Fix;
 use crate::ql::lexer::token_text;
 use crate::ql::syntax_kind::SyntaxKind;
 use crate::ql::syntax_kind::token_sets::{
-    ALT_RECOVERY, DEF_RECOVERY, NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEQ_RECOVERY,
+    ALT_RECOVERY, DEF_RECOVERY, NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY,
 };
 
 impl Parser<'_> {
@@ -40,7 +40,7 @@ impl Parser<'_> {
         // UpperIdent already verified by caller via peek()
         self.bump();
 
-        self.peek(); // skip trivia before '='
+        self.peek();
         if !self.expect(SyntaxKind::Equals) {
             self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
             self.finish_node();
@@ -86,6 +86,7 @@ impl Parser<'_> {
             SyntaxKind::BraceOpen => self.parse_seq(),
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::StringLit => self.parse_lit(),
+            SyntaxKind::SingleQuoteLit => self.parse_single_quote_lit(),
             SyntaxKind::At => self.parse_capture(),
             SyntaxKind::Dot => self.parse_anchor(),
             SyntaxKind::Negation => self.parse_negated_field(),
@@ -180,6 +181,10 @@ impl Parser<'_> {
                 );
                 break;
             }
+            if SEPARATORS.contains(kind) {
+                self.error_skip_separator();
+                continue;
+            }
             if PATTERN_FIRST.contains(kind) {
                 self.parse_pattern();
             } else if recovery.contains(kind) {
@@ -216,10 +221,17 @@ impl Parser<'_> {
                 );
                 break;
             }
+            if SEPARATORS.contains(kind) {
+                self.error_skip_separator();
+                continue;
+            }
 
             // LL(2): UpperIdent followed by Colon → tagged branch
             if kind == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Colon {
                 self.parse_branch();
+            // LL(2): LowerIdent followed by Colon → likely mistyped branch label
+            } else if kind == SyntaxKind::LowerIdent && self.peek_nth(1) == SyntaxKind::Colon {
+                self.parse_branch_lowercase_label();
             } else if PATTERN_FIRST.contains(kind) {
                 self.parse_pattern();
             } else if ALT_RECOVERY.contains(kind) {
@@ -239,7 +251,38 @@ impl Parser<'_> {
         // UpperIdent already verified by caller via peek()
         self.bump();
 
-        self.peek(); // skip trivia before ':'
+        self.peek();
+        self.expect(SyntaxKind::Colon);
+
+        if PATTERN_FIRST.contains(self.peek()) {
+            self.parse_pattern();
+        } else {
+            self.error("expected pattern after label in alternation branch");
+        }
+
+        self.finish_node();
+    }
+
+    /// Parse a branch with lowercase label - parse as Branch but emit error.
+    fn parse_branch_lowercase_label(&mut self) {
+        self.start_node(SyntaxKind::Branch);
+
+        let span = self.current_span();
+        let label_text = token_text(self.source, &self.tokens[self.pos]);
+        let capitalized = capitalize_first(label_text);
+
+        let fix = Fix::new(
+            capitalized.clone(),
+            format!("capitalize as `{}`", capitalized),
+        );
+        self.error_with_fix(
+            span,
+            "tagged alternation labels must be Capitalized (they map to enum variants)",
+            fix,
+        );
+
+        self.bump();
+        self.peek();
         self.expect(SyntaxKind::Colon);
 
         if PATTERN_FIRST.contains(self.peek()) {
@@ -275,6 +318,21 @@ impl Parser<'_> {
         self.finish_node();
     }
 
+    /// Single-quoted literal - parse as Lit but emit error about using double quotes.
+    fn parse_single_quote_lit(&mut self) {
+        self.start_node(SyntaxKind::Lit);
+
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        // Convert 'foo' to "foo"
+        let inner = &text[1..text.len() - 1];
+        let fix = Fix::new(format!("\"{}\"", inner), "use double quotes for literals");
+        self.error_with_fix(span, "use double quotes for string literals", fix);
+
+        self.bump();
+        self.finish_node();
+    }
+
     /// Capture binding: `@name` or `@name :: Type`
     /// Accepts UpperIdent for resilience; validation will catch casing errors.
     /// Detects tree-sitter style dotted captures (`@foo.bar.baz`) and emits helpful errors.
@@ -301,7 +359,10 @@ impl Parser<'_> {
             return;
         }
 
-        if self.peek() == SyntaxKind::DoubleColon {
+        // Check for single colon (common mistake: @x : Type instead of @x :: Type)
+        if self.peek() == SyntaxKind::Colon {
+            self.parse_type_annotation_single_colon();
+        } else if self.peek() == SyntaxKind::DoubleColon {
             self.parse_type_annotation();
         }
 
@@ -316,7 +377,6 @@ impl Parser<'_> {
             return false;
         }
 
-        // Collect the parts for building the fix suggestion
         // The first part was already consumed, get it from the previous token
         let mut parts: Vec<String> = Vec::new();
         if let Some(prev_span) = self.prev_span() {
@@ -330,28 +390,24 @@ impl Parser<'_> {
             parts.push(prev_text.to_string());
         }
 
-        // Consume all adjacent .ident pairs
         while self.current() == SyntaxKind::Dot && self.is_adjacent_to_prev() {
-            self.bump(); // consume dot
+            self.bump();
 
-            // Check if next token is an adjacent identifier
             if (self.current() == SyntaxKind::LowerIdent
                 || self.current() == SyntaxKind::UpperIdent)
                 && self.is_adjacent_to_prev()
             {
                 let ident_text = token_text(self.source, &self.tokens[self.pos]);
                 parts.push(ident_text.to_string());
-                self.bump(); // consume ident
+                self.bump();
             } else {
                 break;
             }
         }
 
-        // Build the error span from @ to the last consumed token
         let end = self.prev_span().map_or(at_start, |s| s.end());
         let error_range = TextRange::new(at_start, end);
 
-        // Build the suggested fix: replace dots with underscores
         let suggested_name = parts.join("_");
         let fix = Fix::new(
             format!("@{}", suggested_name),
@@ -383,6 +439,34 @@ impl Parser<'_> {
         self.finish_node();
     }
 
+    /// Handle single colon type annotation (common mistake: `@x : Type` instead of `@x :: Type`)
+    fn parse_type_annotation_single_colon(&mut self) {
+        // Check if followed by something that looks like a type
+        if !matches!(
+            self.peek_nth(1),
+            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent
+        ) {
+            return;
+        }
+
+        self.start_node(SyntaxKind::Type);
+
+        let span = self.current_span();
+        let fix = Fix::new("::", "use '::' for type annotations");
+        self.error_with_fix(span, "use '::' for type annotations, not ':'", fix);
+
+        self.bump();
+
+        match self.peek() {
+            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => {
+                self.bump();
+            }
+            _ => {}
+        }
+
+        self.finish_node();
+    }
+
     /// Anchor for anonymous nodes: `.`
     fn parse_anchor(&mut self) {
         self.start_node(SyntaxKind::Anchor);
@@ -407,9 +491,12 @@ impl Parser<'_> {
     }
 
     /// Disambiguate `field: pattern` from bare identifier via LL(2) lookahead.
+    /// Also handles `field = pattern` typo (should be `field: pattern`).
     fn parse_node_or_field(&mut self) {
         if self.peek_nth(1) == SyntaxKind::Colon {
             self.parse_field();
+        } else if self.peek_nth(1) == SyntaxKind::Equals {
+            self.parse_field_equals_typo();
         } else {
             self.start_node(SyntaxKind::Node);
             self.bump();
@@ -438,6 +525,47 @@ impl Parser<'_> {
         self.finish_node();
     }
 
+    /// Handle `field = pattern` typo - parse as Field but emit error.
+    fn parse_field_equals_typo(&mut self) {
+        self.start_node(SyntaxKind::Field);
+
+        self.bump();
+        self.peek();
+        let span = self.current_span();
+        let fix = Fix::new(":", "use ':' for fields");
+        self.error_with_fix(span, "use ':' for field constraints, not '='", fix);
+        self.bump();
+
+        if PATTERN_FIRST.contains(self.peek()) {
+            self.parse_pattern();
+        } else {
+            self.error("expected pattern after field name");
+        }
+
+        self.finish_node();
+    }
+
+    /// Skip a separator token (comma or pipe) and emit helpful error.
+    fn error_skip_separator(&mut self) {
+        let kind = self.current();
+        let span = self.current_span();
+        let (char_name, fix_desc) = match kind {
+            SyntaxKind::Comma => (",", "remove ','"),
+            SyntaxKind::Pipe => ("|", "remove '|'"),
+            _ => return,
+        };
+        let fix = Fix::new("", fix_desc);
+        self.error_with_fix(
+            span,
+            format!(
+                "plotnik uses whitespace for separation; remove '{}'",
+                char_name
+            ),
+            fix,
+        );
+        self.skip_token();
+    }
+
     /// If current token is quantifier, wrap preceding pattern using checkpoint.
     fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
         if self.at_set(QUANTIFIERS) {
@@ -445,5 +573,14 @@ impl Parser<'_> {
             self.bump();
             self.finish_node();
         }
+    }
+}
+
+/// Capitalize the first letter of a string.
+fn capitalize_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().chain(chars).collect(),
     }
 }

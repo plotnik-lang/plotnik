@@ -96,9 +96,21 @@ pub enum SyntaxKind {
     #[token("/")]
     Slash,
 
+    /// Comma (invalid separator, for error recovery)
+    #[token(",")]
+    Comma,
+
+    /// Pipe (invalid separator, for error recovery)
+    #[token("|")]
+    Pipe,
+
     /// Double-quoted string with backslash escapes
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     StringLit,
+
+    /// Single-quoted string (invalid, for error recovery - should use double quotes)
+    #[regex(r"'(?:[^'\\]|\\.)*'")]
+    SingleQuoteLit,
 
     /// ERROR keyword for matching parser error nodes
     #[token("ERROR")]
@@ -221,7 +233,10 @@ impl SyntaxKind {
             PlusQuestion => "'+?' (non-greedy)",
             QuestionQuestion => "'??' (non-greedy)",
             Slash => "'/'",
+            Comma => "','",
+            Pipe => "'|'",
             StringLit => "string literal",
+            SingleQuoteLit => "single-quoted string",
             KwError => "'ERROR'",
             KwMissing => "'MISSING'",
             UpperIdent => "type name",
@@ -374,6 +389,7 @@ pub mod token_sets {
         UpperIdent,
         LowerIdent,
         StringLit,
+        SingleQuoteLit,
         At,
         Dot,
         Negation,
@@ -393,6 +409,9 @@ pub mod token_sets {
 
     /// Trivia tokens.
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
+
+    /// Invalid separator tokens (comma, pipe) - for error recovery
+    pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
     pub const NODE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
 
