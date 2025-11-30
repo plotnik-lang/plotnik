@@ -60,6 +60,10 @@ impl Parser<'_> {
         let kind = self.peek();
         if PATTERN_FIRST.contains(kind) {
             self.parse_pattern();
+        } else if kind == SyntaxKind::Predicate {
+            self.error_and_bump(
+                "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
+            );
         } else {
             self.error_and_bump(
                 "unexpected token; expected a pattern like (node), [choice], {sequence}, \"literal\", @capture, or _",
@@ -187,6 +191,10 @@ impl Parser<'_> {
             }
             if PATTERN_FIRST.contains(kind) {
                 self.parse_pattern();
+            } else if kind == SyntaxKind::Predicate {
+                self.error_and_bump(
+                    "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
+                );
             } else if recovery.contains(kind) {
                 break;
             } else {

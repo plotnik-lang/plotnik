@@ -233,6 +233,65 @@ fn xml_self_closing() {
 }
 
 #[test]
+fn predicate_unsupported() {
+    let input = indoc! {r#"
+    (a (#eq? @x "foo") b)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r##"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "a"
+        Node
+          ParenOpen "("
+          Error
+            Predicate "#eq?"
+          Capture
+            At "@"
+            LowerIdent "x"
+          Lit
+            StringLit "\"foo\""
+          ParenClose ")"
+        Node
+          LowerIdent "b"
+        ParenClose ")"
+    ---
+    error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+      |
+    1 | (a (#eq? @x "foo") b)
+      |     ^^^^
+    "##);
+}
+
+#[test]
+fn predicate_match() {
+    let input = indoc! {r#"
+    (identifier) #match? @name "test"
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r##"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Error
+        Predicate "#match?"
+      Capture
+        At "@"
+        LowerIdent "name"
+      Lit
+        StringLit "\"test\""
+    ---
+    error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+      |
+    1 | (identifier) #match? @name "test"
+      |              ^^^^^^^
+    "##);
+}
+
+#[test]
 fn multiline_garbage_recovery() {
     let input = indoc! {r#"
     (a

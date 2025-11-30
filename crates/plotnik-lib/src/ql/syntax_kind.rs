@@ -154,6 +154,10 @@ pub enum SyntaxKind {
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
     XMLGarbage,
+    /// Tree-sitter predicate syntax (unsupported, for clear error messages)
+    /// Matches #eq?, #match?, #set!, #is?, etc.
+    #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*[?!]?")]
+    Predicate,
     /// Consecutive unrecognized characters coalesced into one token
     Garbage,
     /// Generic error token
@@ -208,7 +212,7 @@ impl SyntaxKind {
     /// Returns `true` if this is an error token.
     #[inline]
     pub fn is_error(self) -> bool {
-        matches!(self, Error | XMLGarbage | Garbage)
+        matches!(self, Error | XMLGarbage | Garbage | Predicate)
     }
 }
 

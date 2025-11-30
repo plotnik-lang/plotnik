@@ -282,6 +282,26 @@ fn error_unexpected_xml_self_closing() {
 }
 
 #[test]
+fn error_predicate_eq() {
+    insta::assert_snapshot!(snapshot("#eq?"), @r##"Predicate "#eq?""##);
+}
+
+#[test]
+fn error_predicate_match() {
+    insta::assert_snapshot!(snapshot("#match?"), @r##"Predicate "#match?""##);
+}
+
+#[test]
+fn error_predicate_set() {
+    insta::assert_snapshot!(snapshot("#set!"), @r##"Predicate "#set!""##);
+}
+
+#[test]
+fn error_predicate_no_suffix() {
+    insta::assert_snapshot!(snapshot("#is_not"), @r##"Predicate "#is_not""##);
+}
+
+#[test]
 fn error_single_char() {
     insta::assert_snapshot!(snapshot("^"), @r#"Garbage "^""#);
 }
