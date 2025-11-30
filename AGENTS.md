@@ -19,13 +19,24 @@
 
 - Lexer: all token types including trivia, error coalescing
 - Parser structure: trivia handling, error recovery, checkpoints
-- Basic grammar: named nodes `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` (snake_case only) with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`
+- Basic grammar: named nodes `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = pattern`, tagged alternations `[A: ... B: ...]`
+- Parser accepts UpperIdent in capture/field positions for resilience (validation catches casing errors)
+
+## SyntaxKind naming convention
+
+Short, punchy names for CST node kinds:
+- `Node` - parenthesized patterns: `(type)`, `(_)`, `(ERROR)`, `(MISSING)`
+- `Lit` - literal/anonymous nodes: `"keyword"`
+- `Def` - named definitions: `Name = pattern`
+- `Alt` - alternations: `[a b c]`
+- `Branch` - tagged alternation branch: `Label: pattern`
+- `Seq` - sibling sequences: `{a b c}`
+- `Type` - type annotations: `::T`
 
 ## What's NOT yet implemented
 
-- Named expressions / subqueries (the "extended" part of the QL)
-- AST layer: typed wrappers over `SyntaxNode` (like `struct NamedNode(SyntaxNode)`)
-- Full grammar validation (some patterns may parse but be semantically invalid)
+- Semantic validation (Phase 5): field value constraints, alternation style mixing, casing rules
+- AST layer: typed wrappers over `SyntaxNode` (like `struct Node(SyntaxNode)`)
 
 ## Intentionally deferred (post-MVP)
 

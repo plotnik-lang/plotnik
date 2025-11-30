@@ -147,29 +147,26 @@ pub enum SyntaxKind {
     /// Generic error token
     Error,
 
-    // ========== NODE KINDS ==========
     /// Root node containing the entire query
     Root,
-    /// Named node pattern: `(type children...)`
-    NamedNode,
-    /// Anonymous/literal node pattern: `"keyword"`
-    AnonNode,
+    /// Node pattern: `(type children...)`, `(_)`, `(ERROR)`, `(MISSING ...)`
+    Node,
+    /// Literal/anonymous node pattern: `"keyword"`
+    Lit,
     /// Field specification: `name: pattern`
     Field,
     /// Capture binding: `@name` or `@name::Type`
     Capture,
     /// Type annotation: `::Type` after a capture
-    TypeAnnotation,
-    /// Quantifier wrapping a pattern, e.g., `(expr)*` becomes `Quantifier { NamedNode, Star }`
+    Type,
+    /// Quantifier wrapping a pattern, e.g., `(expr)*` becomes `Quantifier { Node, Star }`
     Quantifier,
-    /// Grouping of patterns
-    Group,
     /// Sibling sequence: `{pattern1 pattern2 ...}`
-    Sequence,
+    Seq,
     /// Choice between alternatives: `[a b c]`
-    Alternation,
+    Alt,
     /// Branch in a tagged alternation: `Label: pattern`
-    AltBranch,
+    Branch,
     /// Wildcard: `_` matches any node
     Wildcard,
     /// Anchor: `.` constrains position relative to siblings
@@ -177,7 +174,7 @@ pub enum SyntaxKind {
     /// Negated field assertion: `!field` asserts field is absent
     NegatedField,
     /// Named expression definition: `Name = pattern`
-    NamedDef,
+    Def,
 
     // Must be last - used for bounds checking in `kind_from_raw`
     #[doc(hidden)]
@@ -237,20 +234,19 @@ impl SyntaxKind {
             UnexpectedFragment => "unexpected characters",
             Error => "error",
             Root => "query",
-            NamedNode => "node pattern",
-            AnonNode => "anonymous node",
+            Node => "node pattern",
+            Lit => "literal node",
             Field => "field",
             Capture => "capture",
-            TypeAnnotation => "type annotation",
+            Type => "type annotation",
             Quantifier => "quantifier",
-            Group => "group",
-            Sequence => "sequence",
-            Alternation => "alternation",
-            AltBranch => "alternation branch",
+            Seq => "sequence",
+            Alt => "alternation",
+            Branch => "alternation branch",
             Wildcard => "wildcard",
             Anchor => "anchor",
             NegatedField => "negated field",
-            NamedDef => "named definition",
+            Def => "definition",
             __LAST => "unknown",
         }
     }
@@ -398,10 +394,9 @@ pub mod token_sets {
     /// Trivia tokens.
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
 
-    pub const NAMED_NODE_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
+    pub const NODE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
 
-    pub const ALTERNATION_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
+    pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
 
     pub const FIELD_RECOVERY: TokenSet =
         TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
@@ -410,11 +405,10 @@ pub mod token_sets {
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);
 
     /// Recovery set for named definitions (Name = ...)
-    pub const NAMED_DEF_RECOVERY: TokenSet =
+    pub const DEF_RECOVERY: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
 
-    pub const SEQUENCE_RECOVERY: TokenSet =
-        TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
+    pub const SEQ_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
 }
 
 #[cfg(test)]
@@ -472,7 +466,6 @@ mod tests {
 
     #[test]
     fn test_new_tokens_exist() {
-        // Verify new Phase 1 tokens are defined
         assert_eq!(BraceOpen.human_name(), "'{'");
         assert_eq!(BraceClose.human_name(), "'}'");
         assert_eq!(DoubleColon.human_name(), "'::'");
@@ -483,10 +476,9 @@ mod tests {
 
     #[test]
     fn test_new_nodes_exist() {
-        // Verify new Phase 1 nodes are defined
-        assert_eq!(Sequence.human_name(), "sequence");
-        assert_eq!(TypeAnnotation.human_name(), "type annotation");
-        assert_eq!(NamedDef.human_name(), "named definition");
-        assert_eq!(AltBranch.human_name(), "alternation branch");
+        assert_eq!(Seq.human_name(), "sequence");
+        assert_eq!(Type.human_name(), "type annotation");
+        assert_eq!(Def.human_name(), "definition");
+        assert_eq!(Branch.human_name(), "alternation branch");
     }
 }

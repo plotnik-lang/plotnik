@@ -9,13 +9,13 @@ fn simple_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -31,7 +31,7 @@ fn empty_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
         BraceClose "}"
     "#);
@@ -45,9 +45,9 @@ fn sequence_single_element() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -63,10 +63,10 @@ fn sequence_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
         Quantifier
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "comment"
             ParenClose ")"
@@ -74,7 +74,7 @@ fn sequence_with_captures() {
         Capture
           At "@"
           LowerIdent "comments"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "function"
           ParenClose ")"
@@ -94,13 +94,13 @@ fn sequence_with_quantifier() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        Sequence
+        Seq
           BraceOpen "{"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -117,18 +117,18 @@ fn nested_sequences() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        Sequence
+        Seq
           BraceOpen "{"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
           BraceClose "}"
-        Sequence
+        Seq
           BraceOpen "{"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
@@ -145,16 +145,16 @@ fn sequence_in_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "block"
-        Sequence
+        Seq
           BraceOpen "{"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "statement"
             ParenClose ")"
@@ -171,20 +171,20 @@ fn sequence_with_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        Alternation
+        Alt
           BracketOpen "["
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "a"
             ParenClose ")"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "b"
             ParenClose ")"
           BracketClose "]"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "c"
           ParenClose ")"
@@ -200,18 +200,18 @@ fn sequence_comma_separated_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "number"
           ParenClose ")"
         Quantifier
-          Sequence
+          Seq
             BraceOpen "{"
-            AnonNode
+            Lit
               StringLit "\",\""
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "number"
               ParenClose ")"
@@ -229,13 +229,13 @@ fn sequence_missing_close_brace() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -255,15 +255,15 @@ fn sequence_with_anchor() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
         Anchor
           Dot "."
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "first"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "second"
           ParenClose ")"

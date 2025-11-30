@@ -9,7 +9,7 @@ fn error_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwError "ERROR"
         ParenClose ")"
@@ -24,7 +24,7 @@ fn error_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwError "ERROR"
         ParenClose ")"
@@ -42,7 +42,7 @@ fn missing_node_bare() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwMissing "MISSING"
         ParenClose ")"
@@ -57,7 +57,7 @@ fn missing_node_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwMissing "MISSING"
         LowerIdent "identifier"
@@ -73,7 +73,7 @@ fn missing_node_with_string() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwMissing "MISSING"
         StringLit "\";\""
@@ -89,7 +89,7 @@ fn missing_node_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwMissing "MISSING"
         StringLit "\";\""
@@ -108,13 +108,13 @@ fn error_in_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           KwError "ERROR"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -130,14 +130,14 @@ fn missing_in_sequence() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           KwMissing "MISSING"
           StringLit "\";\""
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -154,16 +154,16 @@ fn special_node_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function_definition"
         Field
           LowerIdent "body"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "block"
-            NamedNode
+            Node
               ParenOpen "("
               KwError "ERROR"
               ParenClose ")"
@@ -181,7 +181,7 @@ fn error_with_quantifier() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        NamedNode
+        Node
           ParenOpen "("
           KwError "ERROR"
           ParenClose ")"
@@ -198,7 +198,7 @@ fn missing_with_quantifier() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        NamedNode
+        Node
           ParenOpen "("
           KwMissing "MISSING"
           LowerIdent "identifier"
@@ -215,10 +215,10 @@ fn error_with_unexpected_content() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         KwError "ERROR"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "something"
           ParenClose ")"

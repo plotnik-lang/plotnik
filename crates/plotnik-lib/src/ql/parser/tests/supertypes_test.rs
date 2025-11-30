@@ -9,7 +9,7 @@ fn supertype_basic() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -26,7 +26,7 @@ fn supertype_with_string_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -43,7 +43,7 @@ fn supertype_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -65,7 +65,7 @@ fn supertype_with_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -73,7 +73,7 @@ fn supertype_with_children() {
         Field
           LowerIdent "left"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
@@ -83,7 +83,7 @@ fn supertype_with_children() {
         Field
           LowerIdent "right"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
@@ -103,12 +103,12 @@ fn supertype_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "statement"
         Slash "/"
         LowerIdent "expression_statement"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
@@ -126,15 +126,15 @@ fn supertype_in_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
           LowerIdent "identifier"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "expression"
           Slash "/"
@@ -152,7 +152,7 @@ fn supertype_missing_subtype() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expression"
         Slash "/"
@@ -173,7 +173,7 @@ fn no_supertype_plain_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"

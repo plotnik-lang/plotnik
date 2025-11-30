@@ -9,7 +9,7 @@ fn error_missing_paren() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
     ---
@@ -28,13 +28,13 @@ fn error_unexpected_token() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Error
         UnexpectedFragment "^^^"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "string"
         ParenClose ")"
@@ -54,13 +54,13 @@ fn error_missing_bracket() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "string"
           ParenClose ")"
@@ -80,7 +80,7 @@ fn error_empty_parens() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         ParenClose ")"
     ---
@@ -99,10 +99,10 @@ fn error_recovery_continues_parsing() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -112,12 +112,12 @@ fn error_recovery_continues_parsing() {
           At "@"
         Capture
           At "@"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "c"
           ParenClose ")"
         ParenClose ")"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "d"
         ParenClose ")"
@@ -145,7 +145,7 @@ fn error_missing_capture_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -167,7 +167,7 @@ fn error_missing_field_value() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Field
@@ -197,7 +197,7 @@ fn error_unexpected_xml_tag() {
     Root
       Error
         UnexpectedXML "<div>"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -223,13 +223,13 @@ fn error_nested_unclosed() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "c"
             ParenClose ")"
@@ -255,7 +255,7 @@ fn error_multiple_consecutive() {
         UnexpectedFragment "$$$"
       Error
         UnexpectedFragment "%%%"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "ok"
         ParenClose ")"
@@ -283,15 +283,15 @@ fn error_inside_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
         Error
           UnexpectedFragment "^^^"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -312,7 +312,7 @@ fn error_empty_alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
         BracketClose "]"
     "#);
@@ -326,13 +326,13 @@ fn error_unclosed_alternation_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
     ---
@@ -353,7 +353,7 @@ fn error_at_start() {
     Root
       Error
         UnexpectedFragment "^^^"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
@@ -397,7 +397,7 @@ fn error_negated_field_missing_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         NegatedField
@@ -419,12 +419,12 @@ fn error_field_missing_colon() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
-        NamedNode
+        Node
           LowerIdent "name"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
@@ -440,7 +440,7 @@ fn error_capture_with_invalid_char() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -464,16 +464,16 @@ fn error_deeply_nested_unclosed() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "c"
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "d"
     ---
@@ -492,7 +492,7 @@ fn error_mixed_valid_invalid_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
@@ -522,7 +522,7 @@ fn error_xml_self_closing() {
     Root
       Error
         UnexpectedXML "<br/>"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
@@ -542,7 +542,7 @@ fn error_recovery_alternation_to_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
         Error
           UnexpectedFragment "^^^"
@@ -568,12 +568,12 @@ fn error_multiline_recovery() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
         Error
           UnexpectedFragment "^^^"
-        NamedNode
+        Node
           LowerIdent "b"
         ParenClose ")"
     ---
@@ -592,7 +592,7 @@ fn error_field_value_is_error_token() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Field

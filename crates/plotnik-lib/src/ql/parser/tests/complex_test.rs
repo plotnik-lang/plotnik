@@ -12,13 +12,13 @@ fn complex_function_query() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function_definition"
         Field
           LowerIdent "name"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -29,7 +29,7 @@ fn complex_function_query() {
           LowerIdent "parameters"
           Colon ":"
           Quantifier
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "parameters"
               ParenClose ")"
@@ -37,11 +37,11 @@ fn complex_function_query() {
         Field
           LowerIdent "body"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "block"
             Quantifier
-              NamedNode
+              Node
                 ParenOpen "("
                 LowerIdent "statement"
                 ParenClose ")"
@@ -60,12 +60,12 @@ fn anchor_dot() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "block"
         Anchor
           Dot "."
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "first_statement"
           ParenClose ")"
@@ -84,24 +84,24 @@ fn mixed_children_and_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "if"
         Field
           LowerIdent "condition"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "expr"
             ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "then_block"
           ParenClose ")"
         Field
           LowerIdent "else"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "else_block"
             ParenClose ")"

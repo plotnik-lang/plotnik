@@ -9,13 +9,13 @@ fn alternation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "string"
           ParenClose ")"
@@ -31,11 +31,11 @@ fn alternation_with_anonymous() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        AnonNode
+        Lit
           StringLit "\"true\""
-        AnonNode
+        Lit
           StringLit "\"false\""
         BracketClose "]"
     "#);
@@ -49,13 +49,13 @@ fn alternation_with_capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "string"
           ParenClose ")"
@@ -75,16 +75,16 @@ fn alternation_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "expr"
-        Alternation
+        Alt
           BracketOpen "["
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "binary"
             ParenClose ")"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "unary"
             ParenClose ")"
@@ -102,19 +102,19 @@ fn alternation_in_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Field
           LowerIdent "arguments"
           Colon ":"
-          Alternation
+          Alt
             BracketOpen "["
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "string"
               ParenClose ")"
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "number"
               ParenClose ")"

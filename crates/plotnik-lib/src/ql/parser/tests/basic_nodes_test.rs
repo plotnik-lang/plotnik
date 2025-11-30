@@ -14,7 +14,7 @@ fn simple_named_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -29,7 +29,7 @@ fn wildcard() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         Underscore "_"
         ParenClose ")"
@@ -44,7 +44,7 @@ fn anonymous_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      AnonNode
+      Lit
         StringLit "\"if\""
     "#);
 }
@@ -57,7 +57,7 @@ fn anonymous_node_operator() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      AnonNode
+      Lit
         StringLit "\"+=\""
     "#);
 }
@@ -70,13 +70,13 @@ fn nested_node() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function_definition"
         Field
           LowerIdent "name"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -95,16 +95,16 @@ fn deeply_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "c"
-            NamedNode
+            Node
               ParenOpen "("
               LowerIdent "d"
               ParenClose ")"
@@ -125,18 +125,18 @@ fn sibling_children() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "block"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"

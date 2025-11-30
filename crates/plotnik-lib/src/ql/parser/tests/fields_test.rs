@@ -9,13 +9,13 @@ fn field_pattern() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Field
           LowerIdent "function"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -33,20 +33,20 @@ fn multiple_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "assignment"
         Field
           LowerIdent "left"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
         Field
           LowerIdent "right"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "expression"
             ParenClose ")"
@@ -62,7 +62,7 @@ fn negated_field() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function"
         NegatedField
@@ -82,7 +82,7 @@ fn negated_and_regular_fields() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function"
         NegatedField
@@ -91,7 +91,7 @@ fn negated_and_regular_fields() {
         Field
           LowerIdent "name"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -109,15 +109,15 @@ fn multiple_patterns() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "string"
         ParenClose ")"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "number"
         ParenClose ")"
@@ -133,14 +133,14 @@ fn multiple_patterns_with_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "func"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "class"
         ParenClose ")"

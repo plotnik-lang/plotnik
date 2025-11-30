@@ -8,7 +8,7 @@ use rowan::Checkpoint;
 use super::core::Parser;
 use crate::ql::syntax_kind::SyntaxKind;
 use crate::ql::syntax_kind::token_sets::{
-    ALTERNATION_RECOVERY, NAMED_NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEQUENCE_RECOVERY,
+    ALT_RECOVERY, DEF_RECOVERY, NODE_RECOVERY, PATTERN_FIRST, QUANTIFIERS, SEQ_RECOVERY,
 };
 
 impl Parser<'_> {
@@ -19,10 +19,38 @@ impl Parser<'_> {
             if self.eof() {
                 break;
             }
-            self.parse_pattern_or_error();
+            // LL(2): UpperIdent followed by Equals → named definition
+            if self.peek() == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
+                self.parse_def();
+            } else {
+                self.parse_pattern_or_error();
+            }
         }
 
         self.eat_trivia();
+        self.finish_node();
+    }
+
+    /// Named expression definition: `Name = pattern`
+    fn parse_def(&mut self) {
+        self.start_node(SyntaxKind::Def);
+
+        // UpperIdent already verified by caller via peek()
+        self.bump();
+
+        self.peek(); // skip trivia before '='
+        if !self.expect(SyntaxKind::Equals) {
+            self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
+            self.finish_node();
+            return;
+        }
+
+        if PATTERN_FIRST.contains(self.peek()) {
+            self.parse_pattern();
+        } else {
+            self.error("expected pattern after '=' in named definition");
+        }
+
         self.finish_node();
     }
 
@@ -40,7 +68,6 @@ impl Parser<'_> {
     /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier suffix.
     fn parse_pattern(&mut self) {
         if !self.enter_recursion() {
-            // On limit: consume everything as error, prevent infinite recursion
             self.start_node(SyntaxKind::Error);
             while !self.eof() {
                 self.bump();
@@ -52,17 +79,16 @@ impl Parser<'_> {
         let checkpoint = self.checkpoint();
 
         match self.peek() {
-            SyntaxKind::ParenOpen => self.parse_named_node(),
-            SyntaxKind::BracketOpen => self.parse_alternation(),
-            SyntaxKind::BraceOpen => self.parse_sequence(),
+            SyntaxKind::ParenOpen => self.parse_node(),
+            SyntaxKind::BracketOpen => self.parse_alt(),
+            SyntaxKind::BraceOpen => self.parse_seq(),
             SyntaxKind::Underscore => self.parse_wildcard(),
-            SyntaxKind::StringLit => self.parse_anonymous_node(),
+            SyntaxKind::StringLit => self.parse_lit(),
             SyntaxKind::At => self.parse_capture(),
             SyntaxKind::Dot => self.parse_anchor(),
             SyntaxKind::Negation => self.parse_negated_field(),
             SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => self.parse_node_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
-                // Bare ERROR/MISSING outside parens - treat as error
                 self.error_and_bump(
                     "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)",
                 );
@@ -77,10 +103,10 @@ impl Parser<'_> {
         self.exit_recursion();
     }
 
-    /// Named node pattern: `(type ...)`, `(_ ...)`, `(ERROR)`, `(MISSING ...)`.
+    /// Node pattern: `(type ...)`, `(_ ...)`, `(ERROR)`, `(MISSING ...)`.
     /// Also handles supertype/subtype: `(expression/binary_expression)`.
-    fn parse_named_node(&mut self) {
-        self.start_node(SyntaxKind::NamedNode);
+    fn parse_node(&mut self) {
+        self.start_node(SyntaxKind::Node);
         self.expect(SyntaxKind::ParenOpen);
 
         match self.peek() {
@@ -92,7 +118,6 @@ impl Parser<'_> {
             }
             SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
                 self.bump();
-                // Optional subtype: `expression/binary_expression` or `expr/"()"`
                 if self.peek() == SyntaxKind::Slash {
                     self.bump();
                     match self.peek() {
@@ -111,7 +136,7 @@ impl Parser<'_> {
                 self.bump();
                 if self.peek() != SyntaxKind::ParenClose {
                     self.error("(ERROR) takes no arguments");
-                    self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
+                    self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
                 }
                 self.expect(SyntaxKind::ParenClose);
                 self.finish_node();
@@ -125,7 +150,7 @@ impl Parser<'_> {
                     }
                     SyntaxKind::ParenClose => {}
                     _ => {
-                        self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
+                        self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
                     }
                 }
                 self.expect(SyntaxKind::ParenClose);
@@ -135,18 +160,13 @@ impl Parser<'_> {
             _ => {}
         }
 
-        self.parse_node_children(SyntaxKind::ParenClose, NAMED_NODE_RECOVERY);
+        self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY);
         self.expect(SyntaxKind::ParenClose);
         self.finish_node();
     }
 
     /// Parse children until `until` token or recovery set hit.
-    /// Recovery set lets parent handle mismatched delimiters gracefully.
-    fn parse_node_children(
-        &mut self,
-        until: SyntaxKind,
-        recovery: crate::ql::syntax_kind::TokenSet,
-    ) {
+    fn parse_children(&mut self, until: SyntaxKind, recovery: crate::ql::syntax_kind::TokenSet) {
         loop {
             let kind = self.peek();
             if kind == until {
@@ -170,23 +190,71 @@ impl Parser<'_> {
         }
     }
 
-    /// Alternation/choice: `[pattern1 pattern2 ...]`
-    fn parse_alternation(&mut self) {
-        self.start_node(SyntaxKind::Alternation);
+    /// Alternation/choice: `[pattern1 pattern2 ...]` or `[Label: pattern ...]`
+    fn parse_alt(&mut self) {
+        self.start_node(SyntaxKind::Alt);
         self.expect(SyntaxKind::BracketOpen);
 
-        self.parse_node_children(SyntaxKind::BracketClose, ALTERNATION_RECOVERY);
+        self.parse_alt_children();
 
         self.expect(SyntaxKind::BracketClose);
         self.finish_node();
     }
 
+    /// Parse alternation children, handling both tagged `Label: pattern` and unlabeled patterns.
+    fn parse_alt_children(&mut self) {
+        loop {
+            let kind = self.peek();
+            if kind == SyntaxKind::BracketClose {
+                break;
+            }
+            if self.eof() {
+                self.error(
+                    "unexpected end of input inside node; expected a child pattern or closing delimiter",
+                );
+                break;
+            }
+
+            // LL(2): UpperIdent followed by Colon → tagged branch
+            if kind == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Colon {
+                self.parse_branch();
+            } else if PATTERN_FIRST.contains(kind) {
+                self.parse_pattern();
+            } else if ALT_RECOVERY.contains(kind) {
+                break;
+            } else {
+                self.error_and_bump(
+                    "unexpected token inside node; expected a child pattern or closing delimiter",
+                );
+            }
+        }
+    }
+
+    /// Tagged alternation branch: `Label: pattern`
+    fn parse_branch(&mut self) {
+        self.start_node(SyntaxKind::Branch);
+
+        // UpperIdent already verified by caller via peek()
+        self.bump();
+
+        self.peek(); // skip trivia before ':'
+        self.expect(SyntaxKind::Colon);
+
+        if PATTERN_FIRST.contains(self.peek()) {
+            self.parse_pattern();
+        } else {
+            self.error("expected pattern after label in alternation branch");
+        }
+
+        self.finish_node();
+    }
+
     /// Sibling sequence: `{pattern1 pattern2 ...}`
-    fn parse_sequence(&mut self) {
-        self.start_node(SyntaxKind::Sequence);
+    fn parse_seq(&mut self) {
+        self.start_node(SyntaxKind::Seq);
         self.expect(SyntaxKind::BraceOpen);
 
-        self.parse_node_children(SyntaxKind::BraceClose, SEQUENCE_RECOVERY);
+        self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY);
 
         self.expect(SyntaxKind::BraceClose);
         self.finish_node();
@@ -198,27 +266,30 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Anonymous (literal) node: `"if"`, `"+"`, etc.
-    fn parse_anonymous_node(&mut self) {
-        self.start_node(SyntaxKind::AnonNode);
+    /// Literal (anonymous) node: `"if"`, `"+"`, etc.
+    fn parse_lit(&mut self) {
+        self.start_node(SyntaxKind::Lit);
         self.expect(SyntaxKind::StringLit);
         self.finish_node();
     }
 
     /// Capture binding: `@name` or `@name::Type`
+    /// Accepts UpperIdent for resilience; validation will catch casing errors.
     fn parse_capture(&mut self) {
         self.start_node(SyntaxKind::Capture);
         self.expect(SyntaxKind::At);
 
-        if self.peek() == SyntaxKind::LowerIdent {
-            self.bump();
-        } else {
-            self.error("expected capture name after '@' (e.g., @name, @my_var)");
-            self.finish_node();
-            return;
+        match self.peek() {
+            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
+                self.bump();
+            }
+            _ => {
+                self.error("expected capture name after '@' (e.g., @name, @my_var)");
+                self.finish_node();
+                return;
+            }
         }
 
-        // Check for type annotation: `::Type` or `::string`
         if self.peek() == SyntaxKind::DoubleColon {
             self.parse_type_annotation();
         }
@@ -228,7 +299,7 @@ impl Parser<'_> {
 
     /// Type annotation: `::Type` (UpperIdent) or `::string` (LowerIdent primitive)
     fn parse_type_annotation(&mut self) {
-        self.start_node(SyntaxKind::TypeAnnotation);
+        self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon);
 
         match self.peek() {
@@ -251,13 +322,17 @@ impl Parser<'_> {
     }
 
     /// Negated field assertion: `!field` (field must be absent)
+    /// Accepts UpperIdent for resilience; validation will catch casing errors.
     fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
         self.expect(SyntaxKind::Negation);
-        if matches!(self.peek(), SyntaxKind::LowerIdent) {
-            self.bump();
-        } else {
-            self.error("expected field name after '!' (e.g., !value)");
+        match self.peek() {
+            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
+                self.bump();
+            }
+            _ => {
+                self.error("expected field name after '!' (e.g., !value)");
+            }
         }
         self.finish_node();
     }
@@ -267,20 +342,24 @@ impl Parser<'_> {
         if self.peek_nth(1) == SyntaxKind::Colon {
             self.parse_field();
         } else {
-            self.start_node(SyntaxKind::NamedNode);
+            self.start_node(SyntaxKind::Node);
             self.bump();
             self.finish_node();
         }
     }
 
     /// Field constraint: `field_name: pattern`
+    /// Accepts UpperIdent for resilience; validation will catch casing errors.
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        if matches!(self.peek(), SyntaxKind::LowerIdent | SyntaxKind::UpperIdent) {
-            self.bump();
-        } else {
-            self.error("expected field name before ':'");
+        match self.peek() {
+            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
+                self.bump();
+            }
+            _ => {
+                self.error("expected field name before ':'");
+            }
         }
 
         self.expect(SyntaxKind::Colon);

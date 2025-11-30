@@ -9,14 +9,14 @@ fn capture_with_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "name"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           LowerIdent "string"
     "#);
@@ -30,14 +30,14 @@ fn capture_with_custom_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function_declaration"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "fn"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "FunctionDecl"
     "#);
@@ -51,7 +51,7 @@ fn capture_without_type_annotation() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -71,40 +71,40 @@ fn multiple_captures_with_types() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "binary"
         Field
           LowerIdent "left"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
         Capture
           At "@"
           LowerIdent "left"
-          TypeAnnotation
+          Type
             DoubleColon "::"
             UpperIdent "Node"
         Field
           LowerIdent "right"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
         Capture
           At "@"
           LowerIdent "right"
-          TypeAnnotation
+          Type
             DoubleColon "::"
             LowerIdent "string"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "expr"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "BinaryExpr"
     "#);
@@ -118,14 +118,14 @@ fn capture_type_missing_type_name() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "name"
-        TypeAnnotation
+        Type
           DoubleColon "::"
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)
@@ -143,13 +143,13 @@ fn sequence_capture_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Sequence
+      Seq
         BraceOpen "{"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"
@@ -157,7 +157,7 @@ fn sequence_capture_with_type() {
       Capture
         At "@"
         LowerIdent "seq"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "MySequence"
     "#);
@@ -171,13 +171,13 @@ fn alternation_capture_with_type() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "identifier"
           ParenClose ")"
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "number"
           ParenClose ")"
@@ -185,7 +185,7 @@ fn alternation_capture_with_type() {
       Capture
         At "@"
         LowerIdent "value"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "Value"
     "#);
@@ -200,7 +200,7 @@ fn quantified_capture_with_type() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Quantifier
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "statement"
           ParenClose ")"
@@ -208,7 +208,7 @@ fn quantified_capture_with_type() {
       Capture
         At "@"
         LowerIdent "stmts"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "Statement"
     "#);
@@ -225,30 +225,30 @@ fn nested_captures_with_types() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "function"
         Field
           LowerIdent "name"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
         Capture
           At "@"
           LowerIdent "name"
-          TypeAnnotation
+          Type
             DoubleColon "::"
             LowerIdent "string"
         Field
           LowerIdent "body"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "block"
             Quantifier
-              NamedNode
+              Node
                 ParenOpen "("
                 LowerIdent "statement"
                 ParenClose ")"
@@ -256,7 +256,7 @@ fn nested_captures_with_types() {
             Capture
               At "@"
               LowerIdent "body_stmts"
-              TypeAnnotation
+              Type
                 DoubleColon "::"
                 UpperIdent "Statement"
             ParenClose ")"
@@ -264,7 +264,7 @@ fn nested_captures_with_types() {
       Capture
         At "@"
         LowerIdent "func"
-        TypeAnnotation
+        Type
           DoubleColon "::"
           UpperIdent "Function"
     "#);
@@ -278,16 +278,16 @@ fn type_annotation_invalid_token_after() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
       Capture
         At "@"
         LowerIdent "name"
-        TypeAnnotation
+        Type
           DoubleColon "::"
-      NamedNode
+      Node
         ParenOpen "("
     ---
     error: expected type name after '::' (e.g., ::MyType or ::string)

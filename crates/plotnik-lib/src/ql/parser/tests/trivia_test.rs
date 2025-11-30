@@ -9,7 +9,7 @@ fn trivia_whitespace_preserved() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -32,7 +32,7 @@ fn trivia_comment_preserved() {
     Root
       LineComment "// comment"
       Newline "\n"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -50,13 +50,13 @@ fn trivia_multiline() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "a"
         ParenClose ")"
       Newline "\n"
       Newline "\n"
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "b"
         ParenClose ")"
@@ -73,7 +73,7 @@ fn trivia_comment_inside_pattern() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Whitespace " "
@@ -84,7 +84,7 @@ fn trivia_comment_inside_pattern() {
           LowerIdent "name"
           Colon ":"
           Whitespace " "
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -102,7 +102,7 @@ fn trivia_filtered_by_default() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -120,17 +120,17 @@ fn trivia_between_alternation_items() {
 
     insta::assert_snapshot!(snapshot_raw(input), @r#"
     Root
-      Alternation
+      Alt
         BracketOpen "["
         Newline "\n"
         Whitespace "    "
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "a"
           ParenClose ")"
         Newline "\n"
         Whitespace "    "
-        NamedNode
+        Node
           ParenOpen "("
           LowerIdent "b"
           ParenClose ")"

@@ -9,7 +9,7 @@ fn capture() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "identifier"
         ParenClose ")"
@@ -27,13 +27,13 @@ fn capture_nested() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "call"
         Field
           LowerIdent "function"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
@@ -54,13 +54,13 @@ fn multiple_captures() {
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
-      NamedNode
+      Node
         ParenOpen "("
         LowerIdent "binary"
         Field
           LowerIdent "left"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
@@ -70,7 +70,7 @@ fn multiple_captures() {
         Field
           LowerIdent "right"
           Colon ":"
-          NamedNode
+          Node
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
