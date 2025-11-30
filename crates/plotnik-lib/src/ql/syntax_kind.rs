@@ -210,61 +210,6 @@ impl SyntaxKind {
     pub fn is_error(self) -> bool {
         matches!(self, Error | XMLGarbage | Garbage)
     }
-
-    /// Returns a human-readable name for use in error messages.
-    pub fn human_name(self) -> &'static str {
-        match self {
-            ParenOpen => "'('",
-            ParenClose => "')'",
-            BracketOpen => "'['",
-            BracketClose => "']'",
-            BraceOpen => "'{'",
-            BraceClose => "'}'",
-            DoubleColon => "'::'",
-            Colon => "':'",
-            Equals => "'='",
-            Negation => "'!'",
-            Tilde => "'~'",
-            Underscore => "'_' (wildcard)",
-            Star => "'*'",
-            Plus => "'+'",
-            Question => "'?'",
-            StarQuestion => "'*?' (non-greedy)",
-            PlusQuestion => "'+?' (non-greedy)",
-            QuestionQuestion => "'??' (non-greedy)",
-            Slash => "'/'",
-            Comma => "','",
-            Pipe => "'|'",
-            StringLit => "string literal",
-            SingleQuoteLit => "single-quoted string",
-            KwError => "'ERROR'",
-            KwMissing => "'MISSING'",
-            UpperIdent => "type name",
-            LowerIdent => "identifier",
-            Dot => "'.' (anchor)",
-            At => "'@'",
-            Whitespace | Newline => "whitespace",
-            LineComment | BlockComment => "comment",
-            XMLGarbage => "unexpected XML",
-            Garbage => "unexpected characters",
-            Error => "error",
-            Root => "query",
-            Node => "node pattern",
-            Lit => "literal node",
-            Field => "field",
-            Capture => "capture",
-            Type => "type annotation",
-            Quantifier => "quantifier",
-            Seq => "sequence",
-            Alt => "alternation",
-            Branch => "alternation branch",
-            Wildcard => "wildcard",
-            Anchor => "anchor",
-            NegatedField => "negated field",
-            Def => "definition",
-            __LAST => "unknown",
-        }
-    }
 }
 
 impl From<SyntaxKind> for rowan::SyntaxKind {
@@ -481,23 +426,5 @@ mod tests {
             "SyntaxKind has {} variants, exceeds TokenSet capacity of 64",
             __LAST as u16
         );
-    }
-
-    #[test]
-    fn test_new_tokens_exist() {
-        assert_eq!(BraceOpen.human_name(), "'{'");
-        assert_eq!(BraceClose.human_name(), "'}'");
-        assert_eq!(DoubleColon.human_name(), "'::'");
-        assert_eq!(Slash.human_name(), "'/'");
-        assert_eq!(KwError.human_name(), "'ERROR'");
-        assert_eq!(KwMissing.human_name(), "'MISSING'");
-    }
-
-    #[test]
-    fn test_new_nodes_exist() {
-        assert_eq!(Seq.human_name(), "sequence");
-        assert_eq!(Type.human_name(), "type annotation");
-        assert_eq!(Def.human_name(), "definition");
-        assert_eq!(Branch.human_name(), "alternation branch");
     }
 }

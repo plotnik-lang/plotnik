@@ -211,11 +211,11 @@ impl<'src> Parser<'src> {
     }
 
     /// Expect token. On mismatch: emit error but don't consume (allows parent recovery).
-    pub(super) fn expect(&mut self, kind: SyntaxKind) -> bool {
+    pub(super) fn expect(&mut self, kind: SyntaxKind, what: &str) -> bool {
         if self.eat(kind) {
             return true;
         }
-        self.error_expected(&[kind]);
+        self.error(format!("expected {}", what));
         false
     }
 
@@ -227,16 +227,6 @@ impl<'src> Parser<'src> {
         }
         self.last_error_pos = Some(pos);
         self.errors.push(SyntaxError::new(range, message));
-    }
-
-    pub(super) fn error_expected(&mut self, expected: &[SyntaxKind]) {
-        let msg = if expected.len() == 1 {
-            format!("expected {}", expected[0].human_name())
-        } else {
-            let names: Vec<_> = expected.iter().map(|k| k.human_name()).collect();
-            format!("expected one of: {}", names.join(", "))
-        };
-        self.error(msg);
     }
 
     /// Wrap unexpected token in Error node and consume it.

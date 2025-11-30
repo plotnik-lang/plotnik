@@ -151,7 +151,7 @@ fn tagged_branch_missing_pattern() {
           Colon ":"
         BracketClose "]"
     ---
-    error: expected pattern after label in alternation branch
+    error: expected node, alternation, sequence, or literal after branch label
       |
     1 | [Label:]
       |        ^
