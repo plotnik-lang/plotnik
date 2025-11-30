@@ -377,9 +377,9 @@ pub mod token_sets {
     /// Invalid separator tokens (comma, pipe) - for error recovery
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
-    pub const TREE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
+    pub const TREE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
 
-    pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
+    pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose]);
 
     pub const FIELD_RECOVERY: TokenSet =
         TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
@@ -391,7 +391,7 @@ pub mod token_sets {
     pub const DEF_RECOVERY: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
 
-    pub const SEQ_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
+    pub const SEQ_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose]);
 }
 
 #[cfg(test)]

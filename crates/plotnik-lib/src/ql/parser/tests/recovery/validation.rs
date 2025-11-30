@@ -575,22 +575,22 @@ fn multiple_suggestions_combined() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Def
-        Capture
+        Tree
+          ParenOpen "("
+          LowerIdent "node"
+          Field
+            LowerIdent "name"
+            Equals "="
+            Lit
+              SingleQuoteLit "'foo'"
+          Error
+            At "@"
+          Field
+            LowerIdent "val"
+            Error
+              Colon ":"
           Tree
-            ParenOpen "("
-            LowerIdent "node"
-            Field
-              LowerIdent "name"
-              Equals "="
-              Lit
-                SingleQuoteLit "'foo'"
-          At "@"
-          LowerIdent "val"
-          Type
-            Colon ":"
             UpperIdent "Type"
-      Def
-        Error
           ParenClose ")"
     ---
     error: '=' is not valid for field constraints
@@ -611,20 +611,18 @@ fn multiple_suggestions_combined() {
       |                   ^
       help: remove separator
       suggestion: ``
-    error: expected closing ')' for tree
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (node name = 'foo', @val : Type)
       |                     ^
-    error: single colon is not valid for type annotations
+    error: expected ':' to separate field name from its value
+      |
+    1 | (node name = 'foo', @val : Type)
+      |                         ^
+    error: unexpected token; expected an expression
       |
     1 | (node name = 'foo', @val : Type)
       |                          ^
-      help: use '::'
-      suggestion: `::`
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | (node name = 'foo', @val : Type)
-      |                                ^
     "#);
 }
 

@@ -145,27 +145,23 @@ fn garbage_inside_node() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Def
-        Capture
-          Tree
-            ParenOpen "("
-            LowerIdent "a"
-            Capture
-              Tree
-                ParenOpen "("
-                LowerIdent "b"
-                ParenClose ")"
-              At "@"
-          At "@"
-      Def
-        Error
-          At "@"
-      Def
         Tree
           ParenOpen "("
-          LowerIdent "c"
-          ParenClose ")"
-      Def
-        Error
+          LowerIdent "a"
+          Capture
+            Tree
+              ParenOpen "("
+              LowerIdent "b"
+              ParenClose ")"
+            At "@"
+          Error
+            At "@"
+          Error
+            At "@"
+          Tree
+            ParenOpen "("
+            LowerIdent "c"
+            ParenClose ")"
           ParenClose ")"
       Def
         Tree
@@ -177,22 +173,14 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       |         ^
-    error: expected capture name after '@' (e.g., @name, @my_var)
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unnamed definition must be last in file; add a name: `Name = (a (b) @@@ (c))`
       |
     1 | (a (b) @@@ (c)) (d)
-      |               ^
-    error: unnamed definition must be last in file; add a name: `Name = (a (b) @@`
-      |
-    1 | (a (b) @@@ (c)) (d)
-      | ^^^^^^^^^
-    error: unnamed definition must be last in file; add a name: `Name = (c)`
-      |
-    1 | (a (b) @@@ (c)) (d)
-      |            ^^^
+      | ^^^^^^^^^^^^^^^
     "#);
 }
 
@@ -264,40 +252,29 @@ fn predicate_unsupported() {
         Tree
           ParenOpen "("
           LowerIdent "a"
-          Capture
+          Tree
+            ParenOpen "("
+            Error
+              Predicate "#eq?"
+            Error
+              At "@"
             Tree
-              ParenOpen "("
-              Error
-                Predicate "#eq?"
-            At "@"
-            LowerIdent "x"
-          Lit
-            StringLit "\"foo\""
+              LowerIdent "x"
+            Lit
+              StringLit "\"foo\""
+            ParenClose ")"
+          Tree
+            LowerIdent "b"
           ParenClose ")"
-      Def
-        Tree
-          LowerIdent "b"
-      Def
-        Error
-          ParenClose ")"
-        Error
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
-    error: expected closing ')' for tree
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (#eq? @x "foo") b)
       |          ^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | (a (#eq? @x "foo") b)
-      |                     ^
-    error: unnamed definition must be last in file; add a name: `Name = (a (#eq? @x "foo")`
-      |
-    1 | (a (#eq? @x "foo") b)
-      | ^^^^^^^^^^^^^^^^^^
     "##);
 }
 
@@ -424,30 +401,24 @@ fn alternation_recovery_to_capture() {
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Def
-        Capture
-          Alt
-            BracketOpen "["
-            Error
-              Garbage "^^^"
-          At "@"
-          LowerIdent "name"
-      Def
-        Error
+        Alt
+          BracketOpen "["
+          Error
+            Garbage "^^^"
+          Error
+            At "@"
+          Tree
+            LowerIdent "name"
           BracketClose "]"
-        Error
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
       |  ^^^
-    error: expected closing ']' for alternation
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
       |      ^
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-      |
-    1 | [^^^ @name]
-      |           ^
     "#);
 }
 
