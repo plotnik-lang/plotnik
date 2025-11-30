@@ -1,8 +1,130 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 // ============================================================================
-// Single-quoted strings (should use double quotes)
+// Dotted Capture Names
+// ============================================================================
+
+#[test]
+fn capture_dotted_error() {
+    let input = indoc! {r#"
+    (identifier) @foo.bar
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "foo"
+        Dot "."
+        LowerIdent "bar"
+    ---
+    error: capture names cannot contain dots
+      |
+    1 | (identifier) @foo.bar
+      |              ^^^^^^^^
+      help: captures become struct fields; use @foo_bar instead
+      suggestion: `@foo_bar`
+    "#);
+}
+
+#[test]
+fn capture_dotted_multiple_parts() {
+    let input = indoc! {r#"
+    (identifier) @foo.bar.baz
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "foo"
+        Dot "."
+        LowerIdent "bar"
+        Dot "."
+        LowerIdent "baz"
+    ---
+    error: capture names cannot contain dots
+      |
+    1 | (identifier) @foo.bar.baz
+      |              ^^^^^^^^^^^^
+      help: captures become struct fields; use @foo_bar_baz instead
+      suggestion: `@foo_bar_baz`
+    "#);
+}
+
+#[test]
+fn capture_dotted_followed_by_field() {
+    let input = indoc! {r#"
+    (node) @foo.bar name: (other)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "node"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "foo"
+        Dot "."
+        LowerIdent "bar"
+      Field
+        LowerIdent "name"
+        Colon ":"
+        Node
+          ParenOpen "("
+          LowerIdent "other"
+          ParenClose ")"
+    ---
+    error: capture names cannot contain dots
+      |
+    1 | (node) @foo.bar name: (other)
+      |        ^^^^^^^^
+      help: captures become struct fields; use @foo_bar instead
+      suggestion: `@foo_bar`
+    "#);
+}
+
+#[test]
+fn capture_space_after_dot_breaks_chain() {
+    let input = indoc! {r#"
+    (identifier) @foo. bar
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "foo"
+        Dot "."
+      Node
+        LowerIdent "bar"
+    ---
+    error: capture names cannot contain dots
+      |
+    1 | (identifier) @foo. bar
+      |              ^^^^^
+      help: captures become struct fields; use @foo instead
+      suggestion: `@foo`
+    "#);
+}
+
+// ============================================================================
+// Single-Quoted Strings
 // ============================================================================
 
 #[test]
@@ -79,7 +201,7 @@ fn single_quote_with_escape() {
 }
 
 // ============================================================================
-// Invalid separators (comma, pipe)
+// Invalid Separators
 // ============================================================================
 
 #[test]
@@ -200,7 +322,7 @@ fn comma_in_sequence() {
 }
 
 // ============================================================================
-// Single colon for type annotation (should use ::)
+// Single Colon for Type Annotation
 // ============================================================================
 
 #[test]
@@ -278,7 +400,7 @@ fn single_colon_primitive_type() {
 }
 
 // ============================================================================
-// Lowercase branch labels (should be Capitalized)
+// Lowercase Branch Labels
 // ============================================================================
 
 #[test]
@@ -359,7 +481,7 @@ fn mixed_case_branch_labels() {
 }
 
 // ============================================================================
-// Field equals typo (field = pattern instead of field: pattern)
+// Field Equals Typo
 // ============================================================================
 
 #[test]
@@ -417,7 +539,7 @@ fn field_equals_typo_no_space() {
 }
 
 // ============================================================================
-// Combined errors (multiple suggestions in one query)
+// Combined Errors
 // ============================================================================
 
 #[test]
@@ -470,7 +592,7 @@ fn multiple_suggestions_combined() {
 }
 
 // ============================================================================
-// Correct syntax still works (no false positives)
+// Correct Syntax (No False Positives)
 // ============================================================================
 
 #[test]
@@ -568,5 +690,88 @@ fn whitespace_separation_no_error() {
         Node
           LowerIdent "c"
         BracketClose "]"
+    "#);
+}
+
+// ============================================================================
+// Resilience Tests (Parser Accepts for Better Error Recovery)
+// ============================================================================
+
+#[test]
+fn field_with_upper_ident_parses() {
+    let input = indoc! {r#"
+    (node FieldTypo: (x))
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "node"
+        Field
+          UpperIdent "FieldTypo"
+          Colon ":"
+          Node
+            ParenOpen "("
+            LowerIdent "x"
+            ParenClose ")"
+        ParenClose ")"
+    "#);
+}
+
+#[test]
+fn capture_with_upper_ident_parses() {
+    let input = indoc! {r#"
+    (identifier) @Name
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        UpperIdent "Name"
+    "#);
+}
+
+#[test]
+fn negated_field_with_upper_ident_parses() {
+    let input = indoc! {r#"
+    (call !Arguments)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "call"
+        NegatedField
+          Negation "!"
+          UpperIdent "Arguments"
+        ParenClose ")"
+    "#);
+}
+
+#[test]
+fn capture_with_type_and_upper_ident() {
+    let input = indoc! {r#"
+    (identifier) @Name :: MyType
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        UpperIdent "Name"
+        Type
+          DoubleColon "::"
+          UpperIdent "MyType"
     "#);
 }

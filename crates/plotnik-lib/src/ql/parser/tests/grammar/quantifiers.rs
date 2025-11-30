@@ -1,4 +1,4 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]

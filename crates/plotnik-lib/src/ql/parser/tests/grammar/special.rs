@@ -1,4 +1,4 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]
@@ -204,65 +204,5 @@ fn missing_with_quantifier() {
           LowerIdent "identifier"
           ParenClose ")"
         Question "?"
-    "#);
-}
-
-#[test]
-fn error_with_unexpected_content() {
-    let input = indoc! {r#"
-    (ERROR (something))
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Node
-        ParenOpen "("
-        KwError "ERROR"
-        Node
-          ParenOpen "("
-          LowerIdent "something"
-          ParenClose ")"
-        ParenClose ")"
-    ---
-    error: (ERROR) takes no arguments
-      |
-    1 | (ERROR (something))
-      |        ^
-    "#);
-}
-
-#[test]
-fn bare_error_keyword() {
-    let input = indoc! {r#"
-    ERROR
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Error
-        KwError "ERROR"
-    ---
-    error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
-      |
-    1 | ERROR
-      | ^^^^^
-    "#);
-}
-
-#[test]
-fn bare_missing_keyword() {
-    let input = indoc! {r#"
-    MISSING
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Error
-        KwMissing "MISSING"
-    ---
-    error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
-      |
-    1 | MISSING
-      | ^^^^^^^
     "#);
 }

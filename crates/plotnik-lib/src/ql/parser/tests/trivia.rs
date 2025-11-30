@@ -1,8 +1,8 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]
-fn trivia_whitespace_preserved() {
+fn whitespace_preserved() {
     let input = indoc! {r#"
     (identifier)  @name
     "#};
@@ -22,7 +22,7 @@ fn trivia_whitespace_preserved() {
 }
 
 #[test]
-fn trivia_comment_preserved() {
+fn comment_preserved() {
     let input = indoc! {r#"
     // comment
     (identifier)
@@ -41,7 +41,7 @@ fn trivia_comment_preserved() {
 }
 
 #[test]
-fn trivia_multiline() {
+fn multiline() {
     let input = indoc! {r#"
     (a)
 
@@ -65,7 +65,7 @@ fn trivia_multiline() {
 }
 
 #[test]
-fn trivia_comment_inside_pattern() {
+fn comment_inside_pattern() {
     let input = indoc! {r#"
     (call // inline
         name: (identifier))

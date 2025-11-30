@@ -1,4 +1,4 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]
@@ -100,26 +100,37 @@ fn negated_and_regular_fields() {
 }
 
 #[test]
-fn multiple_patterns() {
+fn mixed_children_and_fields() {
     let input = indoc! {r#"
-    (identifier)
-    (string)
-    (number)
+    (if
+        condition: (expr)
+        (then_block)
+        else: (else_block))
     "#};
 
     insta::assert_snapshot!(snapshot(input), @r#"
     Root
       Node
         ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Node
-        ParenOpen "("
-        LowerIdent "string"
-        ParenClose ")"
-      Node
-        ParenOpen "("
-        LowerIdent "number"
+        LowerIdent "if"
+        Field
+          LowerIdent "condition"
+          Colon ":"
+          Node
+            ParenOpen "("
+            LowerIdent "expr"
+            ParenClose ")"
+        Node
+          ParenOpen "("
+          LowerIdent "then_block"
+          ParenClose ")"
+        Field
+          LowerIdent "else"
+          Colon ":"
+          Node
+            ParenOpen "("
+            LowerIdent "else_block"
+            ParenClose ")"
         ParenClose ")"
     "#);
 }

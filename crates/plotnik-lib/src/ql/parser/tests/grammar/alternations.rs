@@ -1,5 +1,183 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
+
+// ============================================================================
+// Unlabeled Alternations
+// ============================================================================
+
+#[test]
+fn alternation() {
+    let input = indoc! {r#"
+    [(identifier) (string)]
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Alt
+        BracketOpen "["
+        Node
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+        Node
+          ParenOpen "("
+          LowerIdent "string"
+          ParenClose ")"
+        BracketClose "]"
+    "#);
+}
+
+#[test]
+fn alternation_with_anonymous() {
+    let input = indoc! {r#"
+    ["true" "false"]
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Alt
+        BracketOpen "["
+        Lit
+          StringLit "\"true\""
+        Lit
+          StringLit "\"false\""
+        BracketClose "]"
+    "#);
+}
+
+#[test]
+fn alternation_with_capture() {
+    let input = indoc! {r#"
+    [(identifier) (string)] @value
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Alt
+        BracketOpen "["
+        Node
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+        Node
+          ParenOpen "("
+          LowerIdent "string"
+          ParenClose ")"
+        BracketClose "]"
+      Capture
+        At "@"
+        LowerIdent "value"
+    "#);
+}
+
+#[test]
+fn alternation_nested() {
+    let input = indoc! {r#"
+    (expr
+        [(binary) (unary)])
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "expr"
+        Alt
+          BracketOpen "["
+          Node
+            ParenOpen "("
+            LowerIdent "binary"
+            ParenClose ")"
+          Node
+            ParenOpen "("
+            LowerIdent "unary"
+            ParenClose ")"
+          BracketClose "]"
+        ParenClose ")"
+    "#);
+}
+
+#[test]
+fn alternation_in_field() {
+    let input = indoc! {r#"
+    (call
+        arguments: [(string) (number)])
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "call"
+        Field
+          LowerIdent "arguments"
+          Colon ":"
+          Alt
+            BracketOpen "["
+            Node
+              ParenOpen "("
+              LowerIdent "string"
+              ParenClose ")"
+            Node
+              ParenOpen "("
+              LowerIdent "number"
+              ParenClose ")"
+            BracketClose "]"
+        ParenClose ")"
+    "#);
+}
+
+#[test]
+fn unlabeled_alternation_three_items() {
+    let input = indoc! {r#"
+    [(identifier) (number) (string)]
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Alt
+        BracketOpen "["
+        Node
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
+        Node
+          ParenOpen "("
+          LowerIdent "number"
+          ParenClose ")"
+        Node
+          ParenOpen "("
+          LowerIdent "string"
+          ParenClose ")"
+        BracketClose "]"
+    "#);
+}
+
+#[test]
+fn upper_ident_in_alternation_not_followed_by_colon() {
+    let input = indoc! {r#"
+    [(Expr) (Statement)]
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Alt
+        BracketOpen "["
+        Node
+          ParenOpen "("
+          UpperIdent "Expr"
+          ParenClose ")"
+        Node
+          ParenOpen "("
+          UpperIdent "Statement"
+          ParenClose ")"
+        BracketClose "]"
+    "#);
+}
+
+// ============================================================================
+// Tagged Alternations
+// ============================================================================
 
 #[test]
 fn tagged_alternation_simple() {
@@ -353,53 +531,6 @@ fn mixed_tagged_and_untagged() {
 }
 
 #[test]
-fn tagged_branch_missing_pattern() {
-    let input = indoc! {r#"
-    [Label:]
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "Label"
-          Colon ":"
-        BracketClose "]"
-    ---
-    error: expected pattern after label in alternation branch
-      |
-    1 | [Label:]
-      |        ^
-    "#);
-}
-
-#[test]
-fn tagged_branch_missing_pattern_with_more() {
-    // When A: has no immediate pattern, B: (b) is parsed as a field inside parse_pattern
-    let input = indoc! {r#"
-    [A: B: (b)]
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Alt
-        BracketOpen "["
-        Branch
-          UpperIdent "A"
-          Colon ":"
-          Field
-            UpperIdent "B"
-            Colon ":"
-            Node
-              ParenOpen "("
-              LowerIdent "b"
-              ParenClose ")"
-        BracketClose "]"
-    "#);
-}
-
-#[test]
 fn tagged_alternation_with_nested_alternation() {
     let input = indoc! {r#"
     [
@@ -433,54 +564,6 @@ fn tagged_alternation_with_nested_alternation() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-        BracketClose "]"
-    "#);
-}
-
-#[test]
-fn unlabeled_alternation_unchanged() {
-    let input = indoc! {r#"
-    [(identifier) (number) (string)]
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Alt
-        BracketOpen "["
-        Node
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          LowerIdent "number"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          LowerIdent "string"
-          ParenClose ")"
-        BracketClose "]"
-    "#);
-}
-
-#[test]
-fn upper_ident_in_alternation_not_followed_by_colon() {
-    let input = indoc! {r#"
-    [(Expr) (Statement)]
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Alt
-        BracketOpen "["
-        Node
-          ParenOpen "("
-          UpperIdent "Expr"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          UpperIdent "Statement"
-          ParenClose ")"
         BracketClose "]"
     "#);
 }

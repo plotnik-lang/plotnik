@@ -1,17 +1,53 @@
-mod alternations_test;
-mod basic_nodes_test;
-mod captures_test;
-mod complex_test;
-mod errors_test;
-mod fields_test;
-mod helpers_test;
-mod named_defs_test;
-mod quantifiers_test;
-mod resilience_test;
-mod sequences_test;
-mod special_nodes_test;
-mod suggestions_test;
-mod supertypes_test;
-mod tagged_alternations_test;
-mod trivia_test;
-mod type_annotations_test;
+mod grammar;
+mod helpers;
+mod recovery;
+mod trivia;
+
+// JSON serialization tests for the error API
+mod json_serialization {
+    use crate::ql::parser::parse;
+
+    #[test]
+    fn error_json_serialization() {
+        let input = "(identifier) @foo.bar";
+        let result = parse(input);
+        let errors = result.errors();
+
+        assert_eq!(errors.len(), 1);
+        let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+
+        insta::assert_snapshot!(json, @r#"
+        {
+          "range": {
+            "start": 13,
+            "end": 21
+          },
+          "message": "capture names cannot contain dots",
+          "fix": {
+            "replacement": "@foo_bar",
+            "description": "captures become struct fields; use @foo_bar instead"
+          }
+        }
+        "#);
+    }
+
+    #[test]
+    fn error_json_serialization_no_fix() {
+        let input = "(identifier) @";
+        let result = parse(input);
+        let errors = result.errors();
+
+        assert_eq!(errors.len(), 1);
+        let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+
+        insta::assert_snapshot!(json, @r#"
+        {
+          "range": {
+            "start": 14,
+            "end": 14
+          },
+          "message": "expected capture name after '@' (e.g., @name, @my_var)"
+        }
+        "#);
+    }
+}

@@ -1,4 +1,4 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]
@@ -218,32 +218,6 @@ fn sequence_comma_separated_pattern() {
             BraceClose "}"
           Star "*"
         BraceClose "}"
-    "#);
-}
-
-#[test]
-fn sequence_missing_close_brace() {
-    let input = indoc! {r#"
-    {(a) (b)
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Seq
-        BraceOpen "{"
-        Node
-          ParenOpen "("
-          LowerIdent "a"
-          ParenClose ")"
-        Node
-          ParenOpen "("
-          LowerIdent "b"
-          ParenClose ")"
-    ---
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
-      |
-    1 | {(a) (b)
-      |         ^
     "#);
 }
 

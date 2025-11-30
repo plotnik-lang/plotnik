@@ -1,4 +1,4 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
 
 #[test]
@@ -246,42 +246,6 @@ fn named_def_with_quantifier() {
 }
 
 #[test]
-fn named_def_missing_pattern() {
-    let input = indoc! {r#"
-    Expr =
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Def
-        UpperIdent "Expr"
-        Equals "="
-    ---
-    error: expected pattern after '=' in named definition
-      |
-    1 | Expr =
-      |       ^
-    "#);
-}
-
-#[test]
-fn named_def_missing_equals() {
-    let input = indoc! {r#"
-    Expr (identifier)
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Node
-        UpperIdent "Expr"
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-    "#);
-}
-
-#[test]
 fn named_def_complex_recursive() {
     let input = indoc! {r#"
     NestedCall = (call_expression
@@ -396,5 +360,22 @@ fn bare_upper_ident_not_followed_by_equals_is_node() {
     Root
       Node
         UpperIdent "Expr"
+    "#);
+}
+
+#[test]
+fn named_def_missing_equals() {
+    let input = indoc! {r#"
+    Expr (identifier)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        UpperIdent "Expr"
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
     "#);
 }

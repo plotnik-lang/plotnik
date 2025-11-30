@@ -1,5 +1,96 @@
-use super::helpers_test::*;
+use crate::ql::parser::tests::helpers::*;
 use indoc::indoc;
+
+// ============================================================================
+// Basic Captures
+// ============================================================================
+
+#[test]
+fn capture() {
+    let input = indoc! {r#"
+    (identifier) @name
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "identifier"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "name"
+    "#);
+}
+
+#[test]
+fn capture_nested() {
+    let input = indoc! {r#"
+    (call function: (identifier) @func)
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "call"
+        Field
+          LowerIdent "function"
+          Colon ":"
+          Node
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+        Capture
+          At "@"
+          LowerIdent "func"
+        ParenClose ")"
+    "#);
+}
+
+#[test]
+fn multiple_captures() {
+    let input = indoc! {r#"
+    (binary
+        left: (_) @left
+        right: (_) @right) @expr
+    "#};
+
+    insta::assert_snapshot!(snapshot(input), @r#"
+    Root
+      Node
+        ParenOpen "("
+        LowerIdent "binary"
+        Field
+          LowerIdent "left"
+          Colon ":"
+          Node
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        Capture
+          At "@"
+          LowerIdent "left"
+        Field
+          LowerIdent "right"
+          Colon ":"
+          Node
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        Capture
+          At "@"
+          LowerIdent "right"
+        ParenClose ")"
+      Capture
+        At "@"
+        LowerIdent "expr"
+    "#);
+}
+
+// ============================================================================
+// Type Annotations
+// ============================================================================
 
 #[test]
 fn capture_with_type_annotation() {
@@ -107,31 +198,6 @@ fn multiple_captures_with_types() {
         Type
           DoubleColon "::"
           UpperIdent "BinaryExpr"
-    "#);
-}
-
-#[test]
-fn capture_type_missing_type_name() {
-    let input = indoc! {r#"
-    (identifier) @name ::
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Capture
-        At "@"
-        LowerIdent "name"
-        Type
-          DoubleColon "::"
-    ---
-    error: expected type name after '::' (e.g., ::MyType or ::string)
-      |
-    1 | (identifier) @name ::
-      |                      ^
     "#);
 }
 
@@ -271,39 +337,7 @@ fn nested_captures_with_types() {
 }
 
 #[test]
-fn type_annotation_invalid_token_after() {
-    let input = indoc! {r#"
-    (identifier) @name :: (
-    "#};
-
-    insta::assert_snapshot!(snapshot(input), @r#"
-    Root
-      Node
-        ParenOpen "("
-        LowerIdent "identifier"
-        ParenClose ")"
-      Capture
-        At "@"
-        LowerIdent "name"
-        Type
-          DoubleColon "::"
-      Node
-        ParenOpen "("
-    ---
-    error: expected type name after '::' (e.g., ::MyType or ::string)
-      |
-    1 | (identifier) @name :: (
-      |                       ^
-    error: unexpected end of input inside node; expected a child pattern or closing delimiter
-      |
-    1 | (identifier) @name :: (
-      |                        ^
-    "#);
-}
-
-#[test]
 fn capture_with_type_no_spaces() {
-    // Parser should accept both spaced and non-spaced forms
     let input = indoc! {r#"
     (identifier) @name::string
     "#};
