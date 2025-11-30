@@ -63,7 +63,9 @@ impl Parser<'_> {
             SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => self.parse_node_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
                 // Bare ERROR/MISSING outside parens - treat as error
-                self.error_and_bump("ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)");
+                self.error_and_bump(
+                    "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)",
+                );
             }
             _ => {
                 self.error_and_bump("unexpected token; expected a pattern");
@@ -98,7 +100,9 @@ impl Parser<'_> {
                             self.bump();
                         }
                         _ => {
-                            self.error("expected subtype after '/' (e.g., expression/binary_expression)");
+                            self.error(
+                                "expected subtype after '/' (e.g., expression/binary_expression)",
+                            );
                         }
                     }
                 }
