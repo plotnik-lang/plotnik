@@ -1,4 +1,5 @@
 use crate::ql::lexer::{lex, token_text};
+use crate::ql::syntax_kind::SyntaxKind;
 
 /// Format tokens without trivia (default for most tests)
 fn snapshot(input: &str) -> String {
@@ -39,17 +40,33 @@ macro_rules! assert_lex_raw {
 
 #[test]
 fn punctuation() {
-    assert_lex!("( ) [ ] : = ! ~ _ .", @r#"
+    assert_lex!("( ) [ ] { } : = ! ~ _ .", @r#"
     ParenOpen "("
     ParenClose ")"
     BracketOpen "["
     BracketClose "]"
+    BraceOpen "{"
+    BraceClose "}"
     Colon ":"
     Equals "="
     Negation "!"
     Tilde "~"
     Underscore "_"
     Dot "."
+    "#);
+}
+
+#[test]
+fn braces() {
+    assert_lex!("{ (a) (b) }", @r#"
+    BraceOpen "{"
+    ParenOpen "("
+    LowerIdent "a"
+    ParenClose ")"
+    ParenOpen "("
+    LowerIdent "b"
+    ParenClose ")"
+    BraceClose "}"
     "#);
 }
 
@@ -328,4 +345,193 @@ fn alternation_pattern() {
 #[test]
 fn empty_input() {
     assert_lex!("", @"");
+}
+
+#[test]
+fn double_colon() {
+    assert_lex!("@name::Type", @r#"
+    At "@"
+    LowerIdent "name"
+    DoubleColon "::"
+    UpperIdent "Type"
+    "#);
+}
+
+#[test]
+fn double_colon_vs_single_colon() {
+    // DoubleColon must take precedence over two Colons
+    assert_lex!(":: : ::", @r#"
+    DoubleColon "::"
+    Colon ":"
+    DoubleColon "::"
+    "#);
+}
+
+#[test]
+fn double_colon_string_type() {
+    assert_lex!("@name::string", @r#"
+    At "@"
+    LowerIdent "name"
+    DoubleColon "::"
+    LowerIdent "string"
+    "#);
+}
+
+#[test]
+fn slash() {
+    assert_lex!("expression/binary_expression", @r#"
+    LowerIdent "expression"
+    Slash "/"
+    LowerIdent "binary_expression"
+    "#);
+}
+
+#[test]
+fn slash_vs_comment() {
+    // Slash must not conflict with line comments
+    assert_lex_raw!("a/b // comment", @r#"
+    LowerIdent "a"
+    Slash "/"
+    LowerIdent "b"
+    Whitespace " "
+    LineComment "// comment"
+    "#);
+}
+
+#[test]
+fn slash_vs_block_comment() {
+    // Slash must not conflict with block comments
+    assert_lex_raw!("a/b /* comment */", @r#"
+    LowerIdent "a"
+    Slash "/"
+    LowerIdent "b"
+    Whitespace " "
+    BlockComment "/* comment */"
+    "#);
+}
+
+#[test]
+fn keyword_error() {
+    assert_lex!("(ERROR)", @r#"
+    ParenOpen "("
+    KwError "ERROR"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn keyword_missing() {
+    assert_lex!("(MISSING identifier)", @r#"
+    ParenOpen "("
+    KwMissing "MISSING"
+    LowerIdent "identifier"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn keyword_error_vs_upper_ident() {
+    // ERROR keyword must take precedence over UpperIdent
+    // But ERRORx should be UpperIdent
+    assert_lex!("ERROR ERRORx Errors", @r#"
+    KwError "ERROR"
+    UpperIdent "ERRORx"
+    UpperIdent "Errors"
+    "#);
+}
+
+#[test]
+fn keyword_missing_vs_upper_ident() {
+    // MISSING keyword must take precedence over UpperIdent
+    assert_lex!("MISSING MISSINGx Missing", @r#"
+    KwMissing "MISSING"
+    UpperIdent "MISSINGx"
+    UpperIdent "Missing"
+    "#);
+}
+
+#[test]
+fn supertype_path_pattern() {
+    assert_lex!("(expression/binary_expression)", @r#"
+    ParenOpen "("
+    LowerIdent "expression"
+    Slash "/"
+    LowerIdent "binary_expression"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn type_annotation_full() {
+    assert_lex!("(identifier) @name::string", @r#"
+    ParenOpen "("
+    LowerIdent "identifier"
+    ParenClose ")"
+    At "@"
+    LowerIdent "name"
+    DoubleColon "::"
+    LowerIdent "string"
+    "#);
+}
+
+#[test]
+fn sequence_pattern() {
+    assert_lex!("{ (a) (b) }*", @r#"
+    BraceOpen "{"
+    ParenOpen "("
+    LowerIdent "a"
+    ParenClose ")"
+    ParenOpen "("
+    LowerIdent "b"
+    ParenClose ")"
+    BraceClose "}"
+    Star "*"
+    "#);
+}
+
+#[test]
+fn named_def_tokens() {
+    assert_lex!("Expr = (identifier)", @r#"
+    UpperIdent "Expr"
+    Equals "="
+    ParenOpen "("
+    LowerIdent "identifier"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn all_phase1_tokens_together() {
+    // Comprehensive test with all new tokens
+    let input = r#"
+        Def = { (expr/lit) (ERROR) (MISSING ";") } @val::Type
+    "#;
+    let tokens = lex(input);
+    let kinds: Vec<_> = tokens.iter()
+        .filter(|t| !t.kind.is_trivia())
+        .map(|t| t.kind)
+        .collect();
+    
+    assert_eq!(kinds, vec![
+        SyntaxKind::UpperIdent,   // Def
+        SyntaxKind::Equals,       // =
+        SyntaxKind::BraceOpen,    // {
+        SyntaxKind::ParenOpen,    // (
+        SyntaxKind::LowerIdent,   // expr
+        SyntaxKind::Slash,        // /
+        SyntaxKind::LowerIdent,   // lit
+        SyntaxKind::ParenClose,   // )
+        SyntaxKind::ParenOpen,    // (
+        SyntaxKind::KwError,      // ERROR
+        SyntaxKind::ParenClose,   // )
+        SyntaxKind::ParenOpen,    // (
+        SyntaxKind::KwMissing,    // MISSING
+        SyntaxKind::StringLit,    // ";"
+        SyntaxKind::ParenClose,   // )
+        SyntaxKind::BraceClose,   // }
+        SyntaxKind::At,           // @
+        SyntaxKind::LowerIdent,   // val
+        SyntaxKind::DoubleColon,  // ::
+        SyntaxKind::UpperIdent,   // Type
+    ]);
 }

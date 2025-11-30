@@ -45,6 +45,17 @@ pub enum SyntaxKind {
     #[token("]")]
     BracketClose,
 
+    #[token("{")]
+    BraceOpen,
+
+    #[token("}")]
+    BraceClose,
+
+    /// Double colon for type annotations: `@name::Type`
+    /// Must be defined before single Colon for correct precedence
+    #[token("::")]
+    DoubleColon,
+
     #[token(":")]
     Colon,
 
@@ -81,11 +92,24 @@ pub enum SyntaxKind {
     #[token("??")]
     QuestionQuestion,
 
+    /// Slash for supertype paths: `(expression/binary_expression)`
+    #[token("/")]
+    Slash,
+
     /// Double-quoted string with backslash escapes
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     StringLit,
 
+    /// ERROR keyword for matching parser error nodes
+    #[token("ERROR")]
+    KwError,
+
+    /// MISSING keyword for matching error recovery nodes
+    #[token("MISSING")]
+    KwMissing,
+
     /// PascalCase identifier (e.g., `Foo`, `Bar`)
+    /// Defined after KwError/KwMissing so keywords take precedence
     #[regex(r"[A-Z][A-Za-z0-9]*")]
     UpperIdent,
 
@@ -123,6 +147,8 @@ pub enum SyntaxKind {
     /// Generic error token
     Error,
 
+    // ========== NODE KINDS ==========
+
     /// Root node containing the entire query
     Root,
     /// A pattern matching a node (e.g., `(identifier)`)
@@ -133,20 +159,32 @@ pub enum SyntaxKind {
     AnonNode,
     /// Field specification: `name: pattern`
     Field,
-    /// Capture binding: `@name` or `@name.field`
+    /// Capture binding: `@name` or `@name::Type`
     Capture,
+    /// Type annotation: `::Type` after a capture
+    TypeAnnotation,
     /// Quantifier wrapping a pattern, e.g., `(expr)*` becomes `Quantifier { NamedNode, Star }`
     Quantifier,
     /// Grouping of patterns
     Group,
+    /// Sibling sequence: `{pattern1 pattern2 ...}`
+    Sequence,
     /// Choice between alternatives: `[a b c]`
     Alternation,
+    /// Branch in a tagged alternation: `Label: pattern`
+    AltBranch,
     /// Wildcard: `_` matches any node
     Wildcard,
     /// Anchor: `.` constrains position relative to siblings
     Anchor,
     /// Negated field assertion: `!field` asserts field is absent
     NegatedField,
+    /// Special node: `(ERROR)` or `(MISSING ...)` for error recovery nodes
+    SpecialNode,
+    /// Supertype path: `expression/binary_expression`
+    SupertypePath,
+    /// Named expression definition: `Name = pattern`
+    NamedDef,
 
     // Must be last - used for bounds checking in `kind_from_raw`
     #[doc(hidden)]
@@ -178,6 +216,9 @@ impl SyntaxKind {
             ParenClose => "')'",
             BracketOpen => "'['",
             BracketClose => "']'",
+            BraceOpen => "'{'",
+            BraceClose => "'}'",
+            DoubleColon => "'::'",
             Colon => "':'",
             Equals => "'='",
             Negation => "'!'",
@@ -189,7 +230,10 @@ impl SyntaxKind {
             StarQuestion => "'*?' (non-greedy)",
             PlusQuestion => "'+?' (non-greedy)",
             QuestionQuestion => "'??' (non-greedy)",
+            Slash => "'/'",
             StringLit => "string literal",
+            KwError => "'ERROR'",
+            KwMissing => "'MISSING'",
             UpperIdent => "type name",
             LowerIdent => "identifier",
             Dot => "'.' (anchor)",
@@ -205,12 +249,18 @@ impl SyntaxKind {
             AnonNode => "anonymous node",
             Field => "field",
             Capture => "capture",
+            TypeAnnotation => "type annotation",
             Quantifier => "quantifier",
             Group => "group",
+            Sequence => "sequence",
             Alternation => "alternation",
+            AltBranch => "alternation branch",
             Wildcard => "wildcard",
             Anchor => "anchor",
             NegatedField => "negated field",
+            SpecialNode => "special node",
+            SupertypePath => "supertype path",
+            NamedDef => "named definition",
             __LAST => "unknown",
         }
     }
@@ -333,6 +383,7 @@ pub mod token_sets {
     pub const PATTERN_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
+        BraceOpen,
         Underscore,
         UpperIdent,
         LowerIdent,
@@ -340,6 +391,8 @@ pub mod token_sets {
         At,
         Dot,
         Negation,
+        KwError,
+        KwMissing,
     ]);
 
     /// Quantifier tokens that can follow a pattern.
@@ -356,14 +409,19 @@ pub mod token_sets {
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
 
     pub const NAMED_NODE_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, At]);
+        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, At]);
 
     pub const ALTERNATION_RECOVERY: TokenSet = TokenSet::new(&[ParenClose, At]);
 
     pub const FIELD_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenClose, BracketClose, At, Colon]);
+        TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
 
-    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen]);
+    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);
+
+    /// Recovery set for named definitions (Name = ...)
+    pub const NAMED_DEF_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
+
+    pub const SEQUENCE_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose, At]);
 }
 
 #[cfg(test)]
@@ -407,5 +465,37 @@ mod tests {
         assert!(BlockComment.is_trivia());
         assert!(!ParenOpen.is_trivia());
         assert!(!Error.is_trivia());
+    }
+
+    #[test]
+    fn test_syntax_kind_count_under_64() {
+        // Ensure we don't exceed TokenSet capacity
+        assert!(
+            (__LAST as u16) < 64,
+            "SyntaxKind has {} variants, exceeds TokenSet capacity of 64",
+            __LAST as u16
+        );
+    }
+
+    #[test]
+    fn test_new_tokens_exist() {
+        // Verify new Phase 1 tokens are defined
+        assert_eq!(BraceOpen.human_name(), "'{'");
+        assert_eq!(BraceClose.human_name(), "'}'");
+        assert_eq!(DoubleColon.human_name(), "'::'");
+        assert_eq!(Slash.human_name(), "'/'");
+        assert_eq!(KwError.human_name(), "'ERROR'");
+        assert_eq!(KwMissing.human_name(), "'MISSING'");
+    }
+
+    #[test]
+    fn test_new_nodes_exist() {
+        // Verify new Phase 1 nodes are defined
+        assert_eq!(Sequence.human_name(), "sequence");
+        assert_eq!(TypeAnnotation.human_name(), "type annotation");
+        assert_eq!(SupertypePath.human_name(), "supertype path");
+        assert_eq!(SpecialNode.human_name(), "special node");
+        assert_eq!(NamedDef.human_name(), "named definition");
+        assert_eq!(AltBranch.human_name(), "alternation branch");
     }
 }
