@@ -11,9 +11,12 @@
 //!
 //! Rowan requires a `Language` trait implementation to convert between our `SyntaxKind`
 //! and its internal `rowan::SyntaxKind` (a newtype over `u16`). That's what `QLang` provides.
+//!
+//! Logos is derived directly on this enum; node kinds simply lack token/regex attributes.
 
 #![allow(dead_code)] // Some items are for future use
 
+use logos::Logos;
 use rowan::Language;
 
 /// All kinds of tokens and nodes in the syntax tree.
@@ -27,46 +30,98 @@ use rowan::Language;
 ///
 /// The parser only ever builds nodes; tokens come from the lexer.
 /// A token's text is sliced from source on demand via its span.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Logos, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum SyntaxKind {
     // =========================
     // Tokens (terminal symbols)
     // =========================
+    #[token("(")]
     ParenOpen = 0,
+
+    #[token(")")]
     ParenClose,
+
+    #[token("[")]
     BracketOpen,
+
+    #[token("]")]
     BracketClose,
+
+    #[token(":")]
     Colon,
+
+    #[token("=")]
     Equals,
+
+    #[token("!")]
     Negation,
+
+    #[token("~")]
     Tilde,
+
+    #[token("_")]
     Underscore,
+
+    #[token("*")]
     Star,
+
+    #[token("+")]
     Plus,
+
+    #[token("?")]
     Question,
+
     /// Non-greedy `*?` quantifier (matches minimum repetitions)
+    #[token("*?")]
     StarQuestion,
+
     /// Non-greedy `+?` quantifier
+    #[token("+?")]
     PlusQuestion,
+
     /// Non-greedy `??` quantifier
+    #[token("??")]
     QuestionQuestion,
+
+    /// Double-quoted string with backslash escapes
+    #[regex(r#""(?:[^"\\]|\\.)*""#)]
     StringLit,
+
     /// PascalCase identifier (e.g., `Foo`, `Bar`)
+    #[regex(r"[A-Z][A-Za-z0-9]*")]
     UpperIdent,
+
     /// snake_case identifier (e.g., `identifier`, `function_definition`). Also used for capture names.
+    #[regex(r"[a-z][a-z0-9_]*")]
     LowerIdent,
+
+    #[token(".")]
     Dot,
+
+    #[token("@")]
     At,
 
     // Trivia tokens
+    /// Horizontal whitespace (spaces, tabs)
+    #[regex(r"[ \t]+")]
     Whitespace,
+
+    #[token("\n")]
+    #[token("\r\n")]
     Newline,
+
+    #[regex(r"//[^\n]*")]
     LineComment,
+
+    #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
     // Error tokens
     /// XML-like tags explicitly matched as errors (common LLM mistake)
+    #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
+    #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
+    #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
     UnexpectedXML,
     /// Consecutive unrecognized characters coalesced into one token
     UnexpectedFragment,
