@@ -1,6 +1,6 @@
 //! Syntax error types and rendering utilities.
 
-use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 use rowan::{TextRange, TextSize};
 use serde::{Serialize, Serializer};
 
@@ -48,8 +48,8 @@ pub struct SyntaxError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fix: Option<Fix>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub related: Option<RelatedInfo>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub related: Vec<RelatedInfo>,
 }
 
 fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok, S::Error> {
@@ -66,7 +66,7 @@ impl SyntaxError {
             range,
             message: message.into(),
             fix: None,
-            related: None,
+            related: Vec::new(),
         }
     }
 
@@ -75,7 +75,7 @@ impl SyntaxError {
             range,
             message: message.into(),
             fix: Some(fix),
-            related: None,
+            related: Vec::new(),
         }
     }
 
@@ -88,7 +88,20 @@ impl SyntaxError {
             range,
             message: message.into(),
             fix: None,
-            related: Some(related),
+            related: vec![related],
+        }
+    }
+
+    pub fn with_related_many(
+        range: TextRange,
+        message: impl Into<String>,
+        related: Vec<RelatedInfo>,
+    ) -> Self {
+        Self {
+            range,
+            message: message.into(),
+            fix: None,
+            related,
         }
     }
 
@@ -109,7 +122,7 @@ impl std::fmt::Display for SyntaxError {
         if let Some(fix) = &self.fix {
             write!(f, " (fix: {})", fix.description)?;
         }
-        if let Some(related) = &self.related {
+        for related in &self.related {
             write!(
                 f,
                 " (related: {} at {}..{})",
@@ -125,7 +138,7 @@ impl std::fmt::Display for SyntaxError {
 impl std::error::Error for SyntaxError {}
 
 /// Render syntax errors using annotate-snippets for nice diagnostic output.
-pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
+pub fn render_errors(source: &str, errors: &[SyntaxError], path: Option<&str>) -> String {
     if errors.is_empty() {
         return String::new();
     }
@@ -145,10 +158,14 @@ pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
 
         let mut snippet = Snippet::source(source)
             .line_start(1)
-            .annotation(AnnotationKind::Primary.span(start..end));
+            .annotation(AnnotationKind::Primary.span(start..end).label(&err.message));
 
-        // Add related span if present
-        if let Some(related) = &err.related {
+        if let Some(p) = path {
+            snippet = snippet.path(p);
+        }
+
+        // Add related spans
+        for related in &err.related {
             let rel_start: usize = related.range.start().into();
             let rel_end: usize = related.range.end().into();
             let rel_end = if rel_start == rel_end {
@@ -163,17 +180,24 @@ pub fn render_errors(source: &str, errors: &[SyntaxError]) -> String {
             );
         }
 
-        let report = &[Level::ERROR.primary_title(&err.message).element(snippet)];
+        let error_group = Level::ERROR.primary_title(&err.message).element(snippet);
+
+        let mut report: Vec<Group> = vec![error_group];
+
+        if let Some(fix) = &err.fix {
+            report.push(
+                Level::HELP.secondary_title(&fix.description).element(
+                    Snippet::source(source)
+                        .line_start(1)
+                        .patch(Patch::new(start..end, &fix.replacement)),
+                ),
+            );
+        }
 
         if i > 0 {
             output.push('\n');
         }
-        output.push_str(&renderer.render(report).to_string());
-
-        if let Some(fix) = &err.fix {
-            output.push_str(&format!("\n  help: {}", fix.description));
-            output.push_str(&format!("\n  suggestion: `{}`", fix.replacement));
-        }
+        output.push_str(&renderer.render(&report).to_string());
     }
 
     output

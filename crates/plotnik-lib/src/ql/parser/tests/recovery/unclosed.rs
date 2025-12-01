@@ -19,7 +19,7 @@ fn missing_paren() {
     error: unclosed tree; expected ')'
       |
     1 | (identifier
-      | -          ^
+      | -          ^ unclosed tree; expected ')'
       | |
       | tree started here
     "#);
@@ -50,7 +50,7 @@ fn missing_bracket() {
     error: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
-      | -                     ^
+      | -                     ^ unclosed alternation; expected ']'
       | |
       | alternation started here
     "#);
@@ -81,7 +81,7 @@ fn missing_brace() {
     error: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      | -       ^
+      | -       ^ unclosed sequence; expected '}'
       | |
       | sequence started here
     "#);
@@ -112,7 +112,7 @@ fn nested_unclosed() {
     error: unclosed tree; expected ')'
       |
     1 | (a (b (c)
-      |    -     ^
+      |    -     ^ unclosed tree; expected ')'
       |    |
       |    tree started here
     "#);
@@ -145,7 +145,7 @@ fn deeply_nested_unclosed() {
     error: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
-      |          - ^
+      |          - ^ unclosed tree; expected ')'
       |          |
       |          tree started here
     "#);
@@ -175,7 +175,7 @@ fn unclosed_alternation_nested() {
     error: unclosed tree; expected ')'
       |
     1 | [(a) (b
-      |      - ^
+      |      - ^ unclosed tree; expected ')'
       |      |
       |      tree started here
     "#);
@@ -199,6 +199,6 @@ fn empty_parens() {
     error: empty tree expression - expected node type or children
       |
     1 | ()
-      |  ^
+      |  ^ empty tree expression - expected node type or children
     "#);
 }

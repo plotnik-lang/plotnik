@@ -93,7 +93,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(kind) {
             self.parse_expr();
             true
-        } else if kind == SyntaxKind::At {
+        } else if kind == SyntaxKind::CaptureName {
             self.error_and_bump("capture '@' must follow an expression to capture");
             false
         } else if kind == SyntaxKind::Predicate {
@@ -402,26 +402,16 @@ impl Parser<'_> {
 
     /// Parse capture suffix: `@name` or `@name :: Type`
     /// Called after the expression to capture has already been parsed.
-    /// Accepts UpperIdent for resilience; validation will catch casing errors.
-    /// Detects tree-sitter style dotted captures (`@foo.bar.baz`) and emits helpful errors.
-    fn parse_capture_suffix(&mut self, at_span_start: rowan::TextSize) {
-        self.expect(SyntaxKind::At, "'@' for capture");
+    /// The lexer accepts tree-sitter style captures (@foo.bar, @foo-bar);
+    /// we validate here and emit friendly errors for non-snake_case names.
+    fn parse_capture_suffix(&mut self) {
+        let span = self.current_span();
+        let capture_text = token_text(self.source, &self.tokens[self.pos]);
+        self.bump(); // consume CaptureName
 
-        match self.peek() {
-            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
-                self.bump();
-            }
-            _ => {
-                self.error("expected capture name after '@' (e.g., @name, @my_var)");
-                return;
-            }
-        }
-
-        // Detect tree-sitter style dotted captures: @foo.bar.baz
-        // Only trigger when tokens are adjacent (no whitespace)
-        if self.check_and_consume_dotted_capture(at_span_start) {
-            return;
-        }
+        // Validate: must be @[a-z][a-z0-9_]* (snake_case)
+        let name = &capture_text[1..]; // skip '@'
+        self.validate_capture_name(name, span);
 
         // Check for single colon (common mistake: @x : Type instead of @x :: Type)
         if self.peek() == SyntaxKind::Colon {
@@ -431,57 +421,42 @@ impl Parser<'_> {
         }
     }
 
-    /// Check for adjacent dotted capture name (`@foo.bar.baz`) and consume it if present.
-    /// Returns true if a dotted capture was found (error already emitted).
-    fn check_and_consume_dotted_capture(&mut self, at_start: rowan::TextSize) -> bool {
-        // Check if current token (without skipping trivia) is an adjacent Dot
-        if self.current() != SyntaxKind::Dot || !self.is_adjacent_to_prev() {
-            return false;
-        }
-
-        // The first part was already consumed, get it from the previous token
-        let mut parts: Vec<String> = Vec::new();
-        if let Some(prev_span) = self.prev_span() {
-            let prev_text = token_text(
-                self.source,
-                &crate::ql::lexer::Token {
-                    kind: SyntaxKind::LowerIdent,
-                    span: prev_span,
-                },
+    /// Validate capture name follows plotnik convention (snake_case).
+    /// Emits error with fix suggestion for invalid names.
+    fn validate_capture_name(&mut self, name: &str, span: TextRange) {
+        // Check for dots (tree-sitter style)
+        if name.contains('.') {
+            let suggested = name.replace('.', "_").replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                format!("@{}", suggested),
+                format!("captures become struct fields; use @{} instead", suggested),
             );
-            parts.push(prev_text.to_string());
+            self.error_with_fix(span, "capture names cannot contain dots", fix);
+            return;
         }
 
-        while self.current() == SyntaxKind::Dot && self.is_adjacent_to_prev() {
-            self.bump();
-
-            if (self.current() == SyntaxKind::LowerIdent
-                || self.current() == SyntaxKind::UpperIdent)
-                && self.is_adjacent_to_prev()
-            {
-                let ident_text = token_text(self.source, &self.tokens[self.pos]);
-                parts.push(ident_text.to_string());
-                self.bump();
-            } else {
-                break;
-            }
+        // Check for hyphens
+        if name.contains('-') {
+            let suggested = name.replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                format!("@{}", suggested),
+                format!("captures become struct fields; use @{} instead", suggested),
+            );
+            self.error_with_fix(span, "capture names cannot contain hyphens", fix);
+            return;
         }
 
-        let end = self.prev_span().map_or(at_start, |s| s.end());
-        let error_range = TextRange::new(at_start, end);
-
-        let suggested_name = parts.join("_");
-        let fix = Fix::new(
-            format!("@{}", suggested_name),
-            format!(
-                "captures become struct fields; use @{} instead",
-                suggested_name
-            ),
-        );
-
-        self.error_with_fix(error_range, "capture names cannot contain dots", fix);
-
-        true
+        // Check for uppercase (must be snake_case)
+        if name.chars().next().map_or(false, |c| c.is_ascii_uppercase()) {
+            let suggested = to_snake_case(name);
+            let fix = Fix::new(
+                format!("@{}", suggested),
+                format!("capture names must be snake_case; use @{} instead", suggested),
+            );
+            self.error_with_fix(span, "capture names must start with lowercase", fix);
+        }
     }
 
     /// Type annotation: `::Type` (UpperIdent) or `::string` (LowerIdent primitive)
@@ -641,15 +616,30 @@ impl Parser<'_> {
         }
     }
 
-    /// If current token is `@`, wrap preceding expression with Capture using checkpoint.
+    /// If current token is a capture (`@name`), wrap preceding expression with Capture using checkpoint.
     fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        if self.peek() == SyntaxKind::At {
-            let at_span_start = self.current_span().start();
+        if self.peek() == SyntaxKind::CaptureName {
             self.start_node_at(checkpoint, SyntaxKind::Capture);
-            self.parse_capture_suffix(at_span_start);
+            self.parse_capture_suffix();
             self.finish_node();
         }
     }
+}
+
+/// Convert a name to snake_case.
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                result.push('_');
+            }
+            result.push(c.to_ascii_lowercase());
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }
 
 /// Capitalize the first letter of a string.

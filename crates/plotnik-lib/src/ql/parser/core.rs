@@ -345,26 +345,6 @@ impl<'src> Parser<'src> {
             .push(SyntaxError::with_related(range, message, related));
     }
 
-    /// Check if current token is immediately adjacent to the previous token (no whitespace).
-    /// Returns false if at start or EOF.
-    pub(super) fn is_adjacent_to_prev(&self) -> bool {
-        if self.pos == 0 || self.pos >= self.tokens.len() {
-            return false;
-        }
-        let prev_end = self.tokens[self.pos - 1].span.end();
-        let curr_start = self.tokens[self.pos].span.start();
-        prev_end == curr_start
-    }
-
-    /// Get the span of the previous token (if any).
-    pub(super) fn prev_span(&self) -> Option<TextRange> {
-        if self.pos == 0 {
-            None
-        } else {
-            Some(self.tokens[self.pos - 1].span)
-        }
-    }
-
     /// Get the end position of the last non-trivia token before current position.
     /// Used when trivia may have been buffered ahead but we need the expression's end.
     pub(super) fn last_non_trivia_end(&self) -> Option<TextSize> {

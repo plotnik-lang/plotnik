@@ -144,36 +144,27 @@ fn strings_empty() {
 
 #[test]
 fn capture_simple() {
-    insta::assert_snapshot!(snapshot("@name"), @r#"
-    At "@"
-    LowerIdent "name"
-    "#);
+    insta::assert_snapshot!(snapshot("@name"), @r#"CaptureName "@name""#);
 }
 
 #[test]
 fn capture_with_underscores() {
-    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"
-    At "@"
-    LowerIdent "my_capture_name"
-    "#);
+    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"CaptureName "@my_capture_name""#);
 }
 
 #[test]
 fn capture_multiple() {
     insta::assert_snapshot!(snapshot("@name @value @other"), @r#"
-    At "@"
-    LowerIdent "name"
-    At "@"
-    LowerIdent "value"
-    At "@"
-    LowerIdent "other"
+    CaptureName "@name"
+    CaptureName "@value"
+    CaptureName "@other"
     "#);
 }
 
 #[test]
 fn capture_bare_at() {
     insta::assert_snapshot!(snapshot("@ foo"), @r#"
-    At "@"
+    Garbage "@"
     LowerIdent "foo"
     "#);
 }
@@ -181,10 +172,7 @@ fn capture_bare_at() {
 #[test]
 fn capture_uppercase_not_valid() {
     // Uppercase after @ is not a valid capture - lexed as At + UpperIdent
-    insta::assert_snapshot!(snapshot("@Name"), @r#"
-    At "@"
-    UpperIdent "Name"
-    "#);
+    insta::assert_snapshot!(snapshot("@Name"), @r#"CaptureName "@Name""#);
 }
 
 #[test]
@@ -324,8 +312,7 @@ fn complex_pattern() {
     ParenOpen "("
     LowerIdent "identifier"
     ParenClose ")"
-    At "@"
-    LowerIdent "name"
+    CaptureName "@name"
     ParenClose ")"
     "#);
 }
@@ -349,8 +336,7 @@ fn empty_input() {
 #[test]
 fn double_colon() {
     insta::assert_snapshot!(snapshot("@name :: Type"), @r#"
-    At "@"
-    LowerIdent "name"
+    CaptureName "@name"
     DoubleColon "::"
     UpperIdent "Type"
     "#);
@@ -359,8 +345,7 @@ fn double_colon() {
 #[test]
 fn double_colon_no_spaces() {
     insta::assert_snapshot!(snapshot("@name::Type"), @r#"
-    At "@"
-    LowerIdent "name"
+    CaptureName "@name"
     DoubleColon "::"
     UpperIdent "Type"
     "#);
@@ -379,8 +364,7 @@ fn double_colon_vs_single_colon() {
 #[test]
 fn double_colon_string_type() {
     insta::assert_snapshot!(snapshot("@name :: string"), @r#"
-    At "@"
-    LowerIdent "name"
+    CaptureName "@name"
     DoubleColon "::"
     LowerIdent "string"
     "#);
@@ -476,8 +460,7 @@ fn type_annotation_full() {
     ParenOpen "("
     LowerIdent "identifier"
     ParenClose ")"
-    At "@"
-    LowerIdent "name"
+    CaptureName "@name"
     DoubleColon "::"
     LowerIdent "string"
     "#);
@@ -540,8 +523,7 @@ fn special_node_missing_with_arg() {
 #[test]
 fn type_annotation_upper() {
     insta::assert_snapshot!(snapshot("@val :: Type"), @r#"
-    At "@"
-    LowerIdent "val"
+    CaptureName "@val"
     DoubleColon "::"
     UpperIdent "Type"
     "#);

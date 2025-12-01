@@ -42,10 +42,10 @@ mod json_serialization {
         insta::assert_snapshot!(json, @r#"
         {
           "range": {
-            "start": 14,
+            "start": 13,
             "end": 14
           },
-          "message": "expected capture name after '@' (e.g., @name, @my_var)"
+          "message": "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _"
         }
         "#);
     }

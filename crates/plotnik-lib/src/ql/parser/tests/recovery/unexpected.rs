@@ -28,11 +28,11 @@ fn unexpected_token() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (identifier) ^^^ (string)
-      |              ^^^
+      |              ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier) ^^^ (string)
-      | ^^^^^^^^^^^^
+      | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
     "#);
 }
 
@@ -61,7 +61,7 @@ fn multiple_consecutive_garbage() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
-      | ^^^
+      | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -87,7 +87,7 @@ fn garbage_at_start() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ (a)
-      | ^^^
+      | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -110,7 +110,7 @@ fn only_garbage() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$
-      | ^^^
+      | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -142,7 +142,7 @@ fn garbage_inside_alternation() {
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) ^^^ (b)]
-      |      ^^^
+      |      ^^^ unexpected token; expected a child expression or closing delimiter
     "#);
 }
 
@@ -160,16 +160,12 @@ fn garbage_inside_node() {
         Tree
           ParenOpen "("
           LowerIdent "a"
-          Capture
-            Tree
-              ParenOpen "("
-              LowerIdent "b"
-              ParenClose ")"
-            At "@"
+          Tree
+            ParenOpen "("
+            LowerIdent "b"
+            ParenClose ")"
           Error
-            At "@"
-          Error
-            At "@"
+            Garbage "@@@"
           Tree
             ParenOpen "("
             LowerIdent "c"
@@ -181,18 +177,14 @@ fn garbage_inside_node() {
           LowerIdent "d"
           ParenClose ")"
     ---
-    error: expected capture name after '@' (e.g., @name, @my_var)
-      |
-    1 | (a (b) @@@ (c)) (d)
-      |         ^
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (b) @@@ (c)) (d)
-      |          ^
+      |        ^^^ unexpected token; expected a child expression or closing delimiter
     error: unnamed definition must be last in file; add a name: `Name = (a (b) @@@ (c))`
       |
     1 | (a (b) @@@ (c)) (d)
-      | ^^^^^^^^^^^^^^^
+      | ^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (a (b) @@@ (c))`
     "#);
 }
 
@@ -222,11 +214,11 @@ fn xml_tag_garbage() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
-      | ^^^^^
+      | ^^^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
-      |                  ^^^^^^
+      |                  ^^^^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -252,7 +244,7 @@ fn xml_self_closing() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <br/> (a)
-      | ^^^^^
+      | ^^^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -275,9 +267,7 @@ fn predicate_unsupported() {
             Error
               Predicate "#eq?"
             Error
-              At "@"
-            Error
-              LowerIdent "x"
+              CaptureName "@x"
             Lit
               StringLit "\"foo\""
             ParenClose ")"
@@ -288,19 +278,15 @@ fn predicate_unsupported() {
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
-      |     ^^^^
+      |     ^^^^ tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (#eq? @x "foo") b)
-      |          ^
+      |          ^^ unexpected token; expected a child expression or closing delimiter
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a (#eq? @x "foo") b)
-      |           ^
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | (a (#eq? @x "foo") b)
-      |                    ^
+      |                    ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "##);
 }
 
@@ -323,8 +309,7 @@ fn predicate_match() {
         Error
           Predicate "#match?"
         Error
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
       Def
         Lit
           StringLit "\"test\""
@@ -332,11 +317,11 @@ fn predicate_match() {
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (identifier) #match? @name "test"
-      |              ^^^^^^^
+      |              ^^^^^^^ tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier) #match? @name "test"
-      | ^^^^^^^^^^^^
+      | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
     "##);
 }
 
@@ -365,11 +350,11 @@ fn multiline_garbage_recovery() {
     error: unexpected token; expected a child expression or closing delimiter
       |
     2 | ^^^
-      | ^^^
+      | ^^^ unexpected token; expected a child expression or closing delimiter
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     3 | b)
-      | ^
+      | ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "#);
 }
 
@@ -384,21 +369,19 @@ fn capture_with_invalid_char() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        Capture
-          Tree
-            ParenOpen "("
-            LowerIdent "identifier"
-            ParenClose ")"
-          At "@"
+        Tree
+          ParenOpen "("
+          LowerIdent "identifier"
+          ParenClose ")"
       Def
         Error
-          Garbage "123"
+          Garbage "@123"
         Error
     ---
-    error: expected capture name after '@' (e.g., @name, @my_var)
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (identifier) @123
-      |               ^^^
+      |              ^^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -426,7 +409,7 @@ fn field_value_is_garbage() {
     error: unexpected token; expected an expression
       |
     1 | (call name: %%%)
-      |             ^^^
+      |             ^^^ unexpected token; expected an expression
     "#);
 }
 
@@ -446,23 +429,17 @@ fn alternation_recovery_to_capture() {
           Error
             Garbage "^^^"
           Error
-            At "@"
-          Error
-            LowerIdent "name"
+            CaptureName "@name"
           BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
-      |  ^^^
+      |  ^^^ unexpected token; expected a child expression or closing delimiter
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
-      |      ^
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | [^^^ @name]
-      |       ^^^^
+      |      ^^^^^ unexpected token; expected a child expression or closing delimiter
     "#);
 }
 
@@ -497,7 +474,7 @@ fn top_level_garbage_recovery() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr = (a) ^^^ Expr2 = (b)
-      |            ^^^
+      |            ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -546,10 +523,10 @@ fn multiple_definitions_with_garbage_between() {
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     2 | ^^^
-      | ^^^
+      | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     4 | $$$
-      | ^^^
+      | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }

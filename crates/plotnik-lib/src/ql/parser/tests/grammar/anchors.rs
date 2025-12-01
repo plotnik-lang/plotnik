@@ -65,8 +65,7 @@ fn anchor_adjacency() {
               ParenOpen "("
               LowerIdent "identifier"
               ParenClose ")"
-            At "@"
-            LowerIdent "a"
+            CaptureName "@a"
           Anchor
             Dot "."
           Capture
@@ -74,8 +73,7 @@ fn anchor_adjacency() {
               ParenOpen "("
               LowerIdent "identifier"
               ParenClose ")"
-            At "@"
-            LowerIdent "b"
+            CaptureName "@b"
           ParenClose ")"
     "#);
 }
@@ -185,8 +183,7 @@ fn capture_space_after_dot_is_anchor() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "foo"
+          CaptureName "@foo"
       Def
         Anchor
           Dot "."
@@ -199,10 +196,10 @@ fn capture_space_after_dot_is_anchor() {
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
       |
     1 | (identifier) @foo . (other)
-      | ^^^^^^^^^^^^^^^^^
+      | ^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
     error: unnamed definition must be last in file; add a name: `Name = .`
       |
     1 | (identifier) @foo . (other)
-      |                   ^
+      |                   ^ unnamed definition must be last in file; add a name: `Name = .`
     "#);
 }

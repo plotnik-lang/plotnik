@@ -146,11 +146,11 @@ fn multiple_patterns() {
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier)
-      | ^^^^^^^^^^^^
+      | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
     error: unnamed definition must be last in file; add a name: `Name = (string)`
       |
     2 | (string)
-      | ^^^^^^^^
+      | ^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (string)`
     "#);
 }
 
@@ -269,8 +269,7 @@ fn supertype_with_capture() {
             Slash "/"
             LowerIdent "binary_expression"
             ParenClose ")"
-          At "@"
-          LowerIdent "expr"
+          CaptureName "@expr"
     "#);
 }
 
@@ -299,8 +298,7 @@ fn supertype_with_children() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              LowerIdent "left"
+              CaptureName "@left"
           Field
             LowerIdent "right"
             Colon ":"
@@ -309,8 +307,7 @@ fn supertype_with_children() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              LowerIdent "right"
+              CaptureName "@right"
           ParenClose ")"
     "#);
 }

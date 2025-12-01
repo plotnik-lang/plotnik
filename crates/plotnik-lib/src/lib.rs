@@ -48,6 +48,10 @@ impl<'a> Query<'a> {
         let mut errors = parse.errors().to_vec();
         errors.extend(resolve_result.errors);
 
+        // Check for recursive patterns with no escape path
+        let escape_errors = ql::escape::check_escape(&root, &resolve_result.symbols);
+        errors.extend(escape_errors);
+
         Self {
             source,
             parse,
@@ -88,7 +92,7 @@ impl<'a> Query<'a> {
 
     /// Render errors as a human-readable diagnostic report.
     pub fn render_errors(&self) -> String {
-        parser::render_errors(&self.source, &self.errors)
+        parser::render_errors(&self.source, &self.errors, None)
     }
 }
 

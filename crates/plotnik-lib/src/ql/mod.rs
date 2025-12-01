@@ -35,6 +35,7 @@
 //! This ensures downstream tooling (CLI, LSP) always has a tree to work with.
 
 pub mod ast;
+pub mod escape;
 pub mod lexer;
 pub mod parser;
 pub mod resolve;

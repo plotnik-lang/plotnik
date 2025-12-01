@@ -16,8 +16,7 @@ fn whitespace_preserved() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
       Whitespace "  "
       Newline "\n"
     "#);
@@ -72,7 +71,7 @@ fn multiline() {
     error: unnamed definition must be last in file; add a name: `Name = (a)`
       |
     1 | (a)
-      | ^^^
+      | ^^^ unnamed definition must be last in file; add a name: `Name = (a)`
     "#);
 }
 

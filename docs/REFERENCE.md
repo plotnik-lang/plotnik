@@ -237,15 +237,15 @@ Output type:
 - `(MISSING ";")` — matches a missing anonymous node
 
 ```
-(ERROR) @syntax-error
-(MISSING ";") @missing-semicolon
+(ERROR) @syntax_error
+(MISSING ";") @missing_semicolon
 ```
 
 Output type:
 
 ```typescript
-{ "syntax-error": Node }
-{ "missing-semicolon": Node }
+{ syntax_error: Node }
+{ missing_semicolon: Node }
 ```
 
 ### Supertypes
@@ -260,14 +260,14 @@ Query a specific subtype within a supertype context:
 
 ```
 (expression/binary_expression) @binary
-(expression/"()") @empty-parens
+(expression/"()") @empty_parens
 ```
 
 Output type:
 
 ```typescript
 { binary: Node }
-{ "empty-parens": Node }
+{ empty_parens: Node }
 ```
 
 ---

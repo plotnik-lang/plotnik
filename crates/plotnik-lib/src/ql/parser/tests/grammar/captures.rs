@@ -20,8 +20,7 @@ fn capture() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
     "#);
 }
 
@@ -46,8 +45,7 @@ fn capture_nested() {
                 ParenOpen "("
                 LowerIdent "identifier"
                 ParenClose ")"
-              At "@"
-              LowerIdent "func"
+              CaptureName "@func"
           ParenClose ")"
     "#);
 }
@@ -76,8 +74,7 @@ fn multiple_captures() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
-                LowerIdent "left"
+                CaptureName "@left"
             Field
               LowerIdent "right"
               Colon ":"
@@ -86,11 +83,9 @@ fn multiple_captures() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
-                LowerIdent "right"
+                CaptureName "@right"
             ParenClose ")"
-          At "@"
-          LowerIdent "expr"
+          CaptureName "@expr"
     "#);
 }
 
@@ -113,8 +108,7 @@ fn capture_with_type_annotation() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
           Type
             DoubleColon "::"
             LowerIdent "string"
@@ -136,8 +130,7 @@ fn capture_with_custom_type() {
             ParenOpen "("
             LowerIdent "function_declaration"
             ParenClose ")"
-          At "@"
-          LowerIdent "fn"
+          CaptureName "@fn"
           Type
             DoubleColon "::"
             UpperIdent "FunctionDecl"
@@ -159,8 +152,7 @@ fn capture_without_type_annotation() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
     "#);
 }
 
@@ -188,8 +180,7 @@ fn multiple_captures_with_types() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
-                LowerIdent "left"
+                CaptureName "@left"
                 Type
                   DoubleColon "::"
                   UpperIdent "Node"
@@ -201,14 +192,12 @@ fn multiple_captures_with_types() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
-                LowerIdent "right"
+                CaptureName "@right"
                 Type
                   DoubleColon "::"
                   LowerIdent "string"
             ParenClose ")"
-          At "@"
-          LowerIdent "expr"
+          CaptureName "@expr"
           Type
             DoubleColon "::"
             UpperIdent "BinaryExpr"
@@ -237,8 +226,7 @@ fn sequence_capture_with_type() {
               LowerIdent "b"
               ParenClose ")"
             BraceClose "}"
-          At "@"
-          LowerIdent "seq"
+          CaptureName "@seq"
           Type
             DoubleColon "::"
             UpperIdent "MySequence"
@@ -267,8 +255,7 @@ fn alternation_capture_with_type() {
               LowerIdent "number"
               ParenClose ")"
             BracketClose "]"
-          At "@"
-          LowerIdent "value"
+          CaptureName "@value"
           Type
             DoubleColon "::"
             UpperIdent "Value"
@@ -292,8 +279,7 @@ fn quantified_capture_with_type() {
               LowerIdent "statement"
               ParenClose ")"
             Plus "+"
-          At "@"
-          LowerIdent "stmts"
+          CaptureName "@stmts"
           Type
             DoubleColon "::"
             UpperIdent "Statement"
@@ -325,8 +311,7 @@ fn nested_captures_with_types() {
                   ParenOpen "("
                   LowerIdent "identifier"
                   ParenClose ")"
-                At "@"
-                LowerIdent "name"
+                CaptureName "@name"
                 Type
                   DoubleColon "::"
                   LowerIdent "string"
@@ -343,15 +328,13 @@ fn nested_captures_with_types() {
                       LowerIdent "statement"
                       ParenClose ")"
                     Star "*"
-                  At "@"
-                  LowerIdent "body_stmts"
+                  CaptureName "@body_stmts"
                   Type
                     DoubleColon "::"
                     UpperIdent "Statement"
                 ParenClose ")"
             ParenClose ")"
-          At "@"
-          LowerIdent "func"
+          CaptureName "@func"
           Type
             DoubleColon "::"
             UpperIdent "Function"
@@ -374,8 +357,7 @@ fn capture_with_type_no_spaces() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
           Type
             DoubleColon "::"
             LowerIdent "string"

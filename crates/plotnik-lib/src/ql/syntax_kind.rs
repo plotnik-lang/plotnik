@@ -132,8 +132,10 @@ pub enum SyntaxKind {
     #[token(".")]
     Dot,
 
-    #[token("@")]
-    At,
+    /// Capture name: `@name`, `@foo_bar`, or tree-sitter style `@foo.bar`, `@foo-bar`
+    /// The lexer accepts all forms; the parser validates plotnik conventions (snake_case only)
+    #[regex(r"@[a-zA-Z_][a-zA-Z0-9_.\-]*")]
+    CaptureName,
 
     /// Horizontal whitespace (spaces, tabs)
     #[regex(r"[ \t]+")]
@@ -330,7 +332,7 @@ pub mod token_sets {
     use super::*;
 
     /// Tokens that can start an expression (FIRST set of the expression production).
-    /// Note: At (@) is not included because captures wrap expressions, they don't start them.
+    /// Note: CaptureName is not included because captures wrap expressions, they don't start them.
     pub const EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
@@ -382,7 +384,7 @@ pub mod token_sets {
     pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose]);
 
     pub const FIELD_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
+        TokenSet::new(&[ParenClose, BracketClose, BraceClose, CaptureName, Colon]);
 
     pub const ROOT_RECOVERY: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);

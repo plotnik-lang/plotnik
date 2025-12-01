@@ -102,16 +102,14 @@ fn named_def_with_captures() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              LowerIdent "left"
+              CaptureName "@left"
           Field
             LowerIdent "operator"
             Colon ":"
             Capture
               Wildcard
                 Underscore "_"
-              At "@"
-              LowerIdent "op"
+              CaptureName "@op"
           Field
             LowerIdent "right"
             Colon ":"
@@ -120,8 +118,7 @@ fn named_def_with_captures() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              LowerIdent "right"
+              CaptureName "@right"
           ParenClose ")"
     "#);
 }
@@ -186,8 +183,7 @@ fn named_def_then_pattern() {
               ParenOpen "("
               UpperIdent "Expr"
               ParenClose ")"
-            At "@"
-            LowerIdent "value"
+            CaptureName "@value"
           ParenClose ")"
     "#);
 }
@@ -281,15 +277,13 @@ fn named_def_complex_recursive() {
                   ParenOpen "("
                   LowerIdent "identifier"
                   ParenClose ")"
-                At "@"
-                LowerIdent "name"
+                CaptureName "@name"
               Capture
                 Tree
                   ParenOpen "("
                   UpperIdent "NestedCall"
                   ParenClose ")"
-                At "@"
-                LowerIdent "inner"
+                CaptureName "@inner"
               BracketClose "]"
           Field
             LowerIdent "arguments"
@@ -327,8 +321,7 @@ fn named_def_with_type_annotation() {
                 ParenOpen "("
                 LowerIdent "identifier"
                 ParenClose ")"
-              At "@"
-              LowerIdent "name"
+              CaptureName "@name"
               Type
                 DoubleColon "::"
                 LowerIdent "string"
@@ -340,8 +333,7 @@ fn named_def_with_type_annotation() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              LowerIdent "body"
+              CaptureName "@body"
           ParenClose ")"
     "#);
 }
@@ -364,7 +356,7 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
     error: undefined reference: `Expr`
       |
     1 | (Expr)
-      |  ^^^^
+      |  ^^^^ undefined reference: `Expr`
     "#);
 }
 
@@ -384,7 +376,7 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr
-      | ^^^^
+      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "#);
 }
 
@@ -409,11 +401,11 @@ fn named_def_missing_equals() {
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr (identifier)
-      | ^^^^
+      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     error: unnamed definition must be last in file; add a name: `Name = Expr`
       |
     1 | Expr (identifier)
-      | ^^^^
+      | ^^^^ unnamed definition must be last in file; add a name: `Name = Expr`
     "#);
 }
 
@@ -443,8 +435,7 @@ fn unnamed_def_allowed_as_last() {
               ParenOpen "("
               UpperIdent "Expr"
               ParenClose ")"
-            At "@"
-            LowerIdent "value"
+            CaptureName "@value"
           ParenClose ")"
     "#);
 }
@@ -481,7 +472,7 @@ fn unnamed_def_not_allowed_in_middle() {
     error: unnamed definition must be last in file; add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^
+      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
     "#);
 }
 
@@ -515,10 +506,10 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     error: unnamed definition must be last in file; add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^
+      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
     error: unnamed definition must be last in file; add a name: `Name = (second)`
       |
     2 | (second)
-      | ^^^^^^^^
+      | ^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (second)`
     "#);
 }

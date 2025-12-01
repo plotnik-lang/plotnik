@@ -80,15 +80,13 @@ fn sequence_with_captures() {
                 LowerIdent "comment"
                 ParenClose ")"
               Star "*"
-            At "@"
-            LowerIdent "comments"
+            CaptureName "@comments"
           Capture
             Tree
               ParenOpen "("
               LowerIdent "function"
               ParenClose ")"
-            At "@"
-            LowerIdent "fn"
+            CaptureName "@fn"
           BraceClose "}"
     "#);
 }

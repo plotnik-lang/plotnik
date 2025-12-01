@@ -161,20 +161,18 @@ fn multiple_patterns_with_captures() {
             ParenOpen "("
             LowerIdent "function"
             ParenClose ")"
-          At "@"
-          LowerIdent "func"
+          CaptureName "@func"
       Def
         Capture
           Tree
             ParenOpen "("
             LowerIdent "class"
             ParenClose ")"
-          At "@"
-          LowerIdent "cls"
+          CaptureName "@cls"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (function) @func`
       |
     1 | (function) @func
-      | ^^^^^^^^^^^^^^^^
+      | ^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (function) @func`
     "#);
 }

@@ -33,8 +33,7 @@ fn error_node_with_capture() {
             ParenOpen "("
             KwError "ERROR"
             ParenClose ")"
-          At "@"
-          LowerIdent "err"
+          CaptureName "@err"
     "#);
 }
 
@@ -107,8 +106,7 @@ fn missing_node_with_capture() {
             KwMissing "MISSING"
             StringLit "\";\""
             ParenClose ")"
-          At "@"
-          LowerIdent "missing_semi"
+          CaptureName "@missing_semi"
     "#);
 }
 

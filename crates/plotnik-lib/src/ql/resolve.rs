@@ -7,19 +7,19 @@
 use crate::ql::ast::{Expr, Root, Tree};
 use crate::ql::parser::SyntaxError;
 use crate::ql::syntax_kind::SyntaxKind;
+use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
-use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
-    defs: HashMap<String, DefInfo>,
+    defs: IndexMap<String, DefInfo>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DefInfo {
     pub name: String,
     pub range: TextRange,
-    pub refs: HashSet<String>,
+    pub refs: IndexSet<String>,
 }
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl SymbolTable {
 }
 
 pub fn resolve(root: &Root) -> ResolveResult {
-    let mut defs = HashMap::new();
+    let mut defs = IndexMap::new();
     let mut errors = Vec::new();
 
     // Pass 1: collect definitions
@@ -66,7 +66,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
                     format!("duplicate definition: `{}`", name),
                 ));
             } else {
-                let mut refs = HashSet::new();
+                let mut refs = IndexSet::new();
                 if let Some(body) = def.body() {
                     collect_refs(&body, &mut refs);
                 }
@@ -92,7 +92,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
     ResolveResult { symbols, errors }
 }
 
-fn collect_refs(expr: &Expr, refs: &mut HashSet<String>) {
+fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
     match expr {
         Expr::Tree(tree) => {
             if let Some(type_token) = tree.node_type() {
@@ -247,7 +247,7 @@ mod tests {
         error: undefined reference: `Undefined`
           |
         1 | Call = (call_expression function: (Undefined))
-          |                                    ^^^^^^^^^
+          |                                    ^^^^^^^^^ undefined reference: `Undefined`
         ");
     }
 
@@ -270,6 +270,16 @@ mod tests {
         insta::assert_snapshot!(query.snapshot_refs(), @r"
         A -> B
         B -> A
+        ---
+        error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+          |
+        1 | A = (foo (B))
+          |           - `A` references `B` (completing cycle)
+        2 | B = (bar (A))
+          |           ^
+          |           |
+          |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+          |           `B` references `A`
         ");
     }
 
@@ -287,7 +297,7 @@ mod tests {
         error: duplicate definition: `Expr`
           |
         2 | Expr = (other)
-          | ^^^^
+          | ^^^^ duplicate definition: `Expr`
         ");
     }
 
@@ -368,7 +378,7 @@ mod tests {
         error: undefined reference: `Unknown`
           |
         1 | (call function: (Unknown))
-          |                  ^^^^^^^
+          |                  ^^^^^^^ undefined reference: `Unknown`
         ");
     }
 
@@ -407,15 +417,15 @@ mod tests {
         error: undefined reference: `X`
           |
         1 | (foo (X) (Y) (Z))
-          |       ^
+          |       ^ undefined reference: `X`
         error: undefined reference: `Y`
           |
         1 | (foo (X) (Y) (Z))
-          |           ^
+          |           ^ undefined reference: `Y`
         error: undefined reference: `Z`
           |
         1 | (foo (X) (Y) (Z))
-          |               ^
+          |               ^ undefined reference: `Z`
         ");
     }
 }

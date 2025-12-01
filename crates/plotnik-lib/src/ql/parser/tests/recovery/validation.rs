@@ -21,17 +21,18 @@ fn capture_dotted_error() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "foo"
-          Dot "."
-          LowerIdent "bar"
+          CaptureName "@foo.bar"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar
-      |              ^^^^^^^^
-      help: captures become struct fields; use @foo_bar instead
-      suggestion: `@foo_bar`
+      |              ^^^^^^^^ capture names cannot contain dots
+      |
+    help: captures become struct fields; use @foo_bar instead
+      |
+    1 - (identifier) @foo.bar
+    1 + (identifier) @foo_bar
+      |
     "#);
 }
 
@@ -51,19 +52,18 @@ fn capture_dotted_multiple_parts() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "foo"
-          Dot "."
-          LowerIdent "bar"
-          Dot "."
-          LowerIdent "baz"
+          CaptureName "@foo.bar.baz"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar.baz
-      |              ^^^^^^^^^^^^
-      help: captures become struct fields; use @foo_bar_baz instead
-      suggestion: `@foo_bar_baz`
+      |              ^^^^^^^^^^^^ capture names cannot contain dots
+      |
+    help: captures become struct fields; use @foo_bar_baz instead
+      |
+    1 - (identifier) @foo.bar.baz
+    1 + (identifier) @foo_bar_baz
+      |
     "#);
 }
 
@@ -83,10 +83,7 @@ fn capture_dotted_followed_by_field() {
             ParenOpen "("
             LowerIdent "node"
             ParenClose ")"
-          At "@"
-          LowerIdent "foo"
-          Dot "."
-          LowerIdent "bar"
+          CaptureName "@foo.bar"
       Def
         Field
           LowerIdent "name"
@@ -99,13 +96,17 @@ fn capture_dotted_followed_by_field() {
     error: capture names cannot contain dots
       |
     1 | (node) @foo.bar name: (other)
-      |        ^^^^^^^^
-      help: captures become struct fields; use @foo_bar instead
-      suggestion: `@foo_bar`
+      |        ^^^^^^^^ capture names cannot contain dots
+      |
+    help: captures become struct fields; use @foo_bar instead
+      |
+    1 - (node) @foo.bar name: (other)
+    1 + (node) @foo_bar name: (other)
+      |
     error: unnamed definition must be last in file; add a name: `Name = (node) @foo.bar`
       |
     1 | (node) @foo.bar name: (other)
-      | ^^^^^^^^^^^^^^^
+      | ^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (node) @foo.bar`
     "#);
 }
 
@@ -125,9 +126,7 @@ fn capture_space_after_dot_breaks_chain() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "foo"
-          Dot "."
+          CaptureName "@foo."
       Def
         Error
           LowerIdent "bar"
@@ -135,22 +134,123 @@ fn capture_space_after_dot_breaks_chain() {
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo. bar
-      |              ^^^^^
-      help: captures become struct fields; use @foo instead
-      suggestion: `@foo`
+      |              ^^^^^ capture names cannot contain dots
+      |
+    help: captures become struct fields; use @foo_ instead
+      |
+    1 - (identifier) @foo. bar
+    1 + (identifier) @foo_ bar
+      |
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (identifier) @foo. bar
-      |                    ^^^
+      |                    ^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
       |
     1 | (identifier) @foo. bar
-      | ^^^^^^^^^^^^^^^^^^
+      | ^^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
     "#);
 }
 
 // ============================================================================
-// Single-Quoted Strings
+// Hyphenated Capture Names
+// ============================================================================
+
+#[test]
+fn capture_hyphenated_error() {
+    let input = indoc! {r#"
+    (identifier) @foo-bar
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          CaptureName "@foo-bar"
+    ---
+    error: capture names cannot contain hyphens
+      |
+    1 | (identifier) @foo-bar
+      |              ^^^^^^^^ capture names cannot contain hyphens
+      |
+    help: captures become struct fields; use @foo_bar instead
+      |
+    1 - (identifier) @foo-bar
+    1 + (identifier) @foo_bar
+      |
+    "#);
+}
+
+#[test]
+fn capture_hyphenated_multiple() {
+    let input = indoc! {r#"
+    (identifier) @foo-bar-baz
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          CaptureName "@foo-bar-baz"
+    ---
+    error: capture names cannot contain hyphens
+      |
+    1 | (identifier) @foo-bar-baz
+      |              ^^^^^^^^^^^^ capture names cannot contain hyphens
+      |
+    help: captures become struct fields; use @foo_bar_baz instead
+      |
+    1 - (identifier) @foo-bar-baz
+    1 + (identifier) @foo_bar_baz
+      |
+    "#);
+}
+
+#[test]
+fn capture_mixed_dots_and_hyphens() {
+    let input = indoc! {r#"
+    (identifier) @foo.bar-baz
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Capture
+          Tree
+            ParenOpen "("
+            LowerIdent "identifier"
+            ParenClose ")"
+          CaptureName "@foo.bar-baz"
+    ---
+    error: capture names cannot contain dots
+      |
+    1 | (identifier) @foo.bar-baz
+      |              ^^^^^^^^^^^^ capture names cannot contain dots
+      |
+    help: captures become struct fields; use @foo_bar_baz instead
+      |
+    1 - (identifier) @foo.bar-baz
+    1 + (identifier) @foo_bar_baz
+      |
+    "#);
+}
+
+// ============================================================================
+// Single Quote Strings
 // ============================================================================
 
 #[test]
@@ -172,9 +272,13 @@ fn single_quote_string_suggests_double_quotes() {
     error: single quotes are not valid for string literals
       |
     1 | (node 'if')
-      |       ^^^^
-      help: use double quotes
-      suggestion: `"if"`
+      |       ^^^^ single quotes are not valid for string literals
+      |
+    help: use double quotes
+      |
+    1 - (node 'if')
+    1 + (node "if")
+      |
     "#);
 }
 
@@ -198,15 +302,23 @@ fn single_quote_in_alternation() {
     error: single quotes are not valid for string literals
       |
     1 | ['public' 'private']
-      |  ^^^^^^^^
-      help: use double quotes
-      suggestion: `"public"`
+      |  ^^^^^^^^ single quotes are not valid for string literals
+      |
+    help: use double quotes
+      |
+    1 - ['public' 'private']
+    1 + ["public" 'private']
+      |
     error: single quotes are not valid for string literals
       |
     1 | ['public' 'private']
-      |           ^^^^^^^^^
-      help: use double quotes
-      suggestion: `"private"`
+      |           ^^^^^^^^^ single quotes are not valid for string literals
+      |
+    help: use double quotes
+      |
+    1 - ['public' 'private']
+    1 + ['public' "private"]
+      |
     "#);
 }
 
@@ -229,9 +341,13 @@ fn single_quote_with_escape() {
     error: single quotes are not valid for string literals
       |
     1 | (node 'it\'s')
-      |       ^^^^^^^
-      help: use double quotes
-      suggestion: `"it\'s"`
+      |       ^^^^^^^ single quotes are not valid for string literals
+      |
+    help: use double quotes
+      |
+    1 - (node 'it\'s')
+    1 + (node "it\'s")
+      |
     "#);
 }
 
@@ -264,9 +380,13 @@ fn comma_in_node_children() {
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node (a), (b))
-      |          ^
-      help: remove separator
-      suggestion: ``
+      |          ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - (node (a), (b))
+    1 + (node (a) (b))
+      |
     "#);
 }
 
@@ -298,15 +418,23 @@ fn comma_in_alternation() {
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |     ^
-      help: remove separator
-      suggestion: ``
+      |     ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - [(a), (b), (c)]
+    1 + [(a) (b), (c)]
+      |
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |          ^
-      help: remove separator
-      suggestion: ``
+      |          ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - [(a), (b), (c)]
+    1 + [(a), (b) (c)]
+      |
     "#);
 }
 
@@ -338,15 +466,23 @@ fn pipe_in_alternation() {
     error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |      ^
-      help: remove separator
-      suggestion: ``
+      |      ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - [(a) | (b) | (c)]
+    1 + [(a)  (b) | (c)]
+      |
     error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |            ^
-      help: remove separator
-      suggestion: ``
+      |            ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - [(a) | (b) | (c)]
+    1 + [(a) | (b)  (c)]
+      |
     "#);
 }
 
@@ -374,9 +510,13 @@ fn comma_in_sequence() {
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a), (b)}
-      |     ^
-      help: remove separator
-      suggestion: ``
+      |     ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - {(a), (b)}
+    1 + {(a) (b)}
+      |
     "#);
 }
 
@@ -398,8 +538,7 @@ fn single_colon_type_annotation() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
           Type
             Colon ":"
             UpperIdent "Type"
@@ -407,9 +546,12 @@ fn single_colon_type_annotation() {
     error: single colon is not valid for type annotations
       |
     1 | (identifier) @name : Type
-      |                    ^
-      help: use '::'
-      suggestion: `::`
+      |                    ^ single colon is not valid for type annotations
+      |
+    help: use '::'
+      |
+    1 | (identifier) @name :: Type
+      |                     +
     "#);
 }
 
@@ -427,8 +569,7 @@ fn single_colon_type_annotation_no_space() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
           Type
             Colon ":"
             UpperIdent "Type"
@@ -436,9 +577,12 @@ fn single_colon_type_annotation_no_space() {
     error: single colon is not valid for type annotations
       |
     1 | (identifier) @name:Type
-      |                   ^
-      help: use '::'
-      suggestion: `::`
+      |                   ^ single colon is not valid for type annotations
+      |
+    help: use '::'
+      |
+    1 | (identifier) @name::Type
+      |                    +
     "#);
 }
 
@@ -452,16 +596,15 @@ fn single_colon_primitive_type() {
     Root
       Def
         Error
-          At "@"
+          CaptureName "@val"
         Error
-          LowerIdent "val"
           Colon ":"
           LowerIdent "string"
     ---
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
-      | ^
+      | ^^^^ capture '@' must follow an expression to capture
     "#);
 }
 
@@ -504,15 +647,23 @@ fn lowercase_branch_label() {
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     2 |   left: (a)
-      |   ^^^^
-      help: capitalize as `Left`
-      suggestion: `Left`
+      |   ^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |
+    help: capitalize as `Left`
+      |
+    2 -   left: (a)
+    2 +   Left: (a)
+      |
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     3 |   right: (b)
-      |   ^^^^^
-      help: capitalize as `Right`
-      suggestion: `Right`
+      |   ^^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |
+    help: capitalize as `Right`
+      |
+    3 -   right: (b)
+    3 +   Right: (b)
+      |
     "#);
 }
 
@@ -546,9 +697,13 @@ fn mixed_case_branch_labels() {
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [foo: (a) Bar: (b)]
-      |  ^^^
-      help: capitalize as `Foo`
-      suggestion: `Foo`
+      |  ^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |
+    help: capitalize as `Foo`
+      |
+    1 - [foo: (a) Bar: (b)]
+    1 + [Foo: (a) Bar: (b)]
+      |
     "#);
 }
 
@@ -580,9 +735,13 @@ fn field_equals_typo() {
     error: '=' is not valid for field constraints
       |
     1 | (node name = (identifier))
-      |            ^
-      help: use ':'
-      suggestion: `:`
+      |            ^ '=' is not valid for field constraints
+      |
+    help: use ':'
+      |
+    1 - (node name = (identifier))
+    1 + (node name : (identifier))
+      |
     "#);
 }
 
@@ -610,9 +769,13 @@ fn field_equals_typo_no_space() {
     error: '=' is not valid for field constraints
       |
     1 | (node name=(identifier))
-      |           ^
-      help: use ':'
-      suggestion: `:`
+      |           ^ '=' is not valid for field constraints
+      |
+    help: use ':'
+      |
+    1 - (node name=(identifier))
+    1 + (node name:(identifier))
+      |
     "#);
 }
 
@@ -638,11 +801,9 @@ fn multiple_suggestions_combined() {
             Lit
               SingleQuoteLit "'foo'"
           Error
-            At "@"
-          Field
-            LowerIdent "val"
-            Error
-              Colon ":"
+            CaptureName "@val"
+          Error
+            Colon ":"
           Error
             UpperIdent "Type"
           ParenClose ")"
@@ -650,37 +811,45 @@ fn multiple_suggestions_combined() {
     error: '=' is not valid for field constraints
       |
     1 | (node name = 'foo', @val : Type)
-      |            ^
-      help: use ':'
-      suggestion: `:`
+      |            ^ '=' is not valid for field constraints
+      |
+    help: use ':'
+      |
+    1 - (node name = 'foo', @val : Type)
+    1 + (node name : 'foo', @val : Type)
+      |
     error: single quotes are not valid for string literals
       |
     1 | (node name = 'foo', @val : Type)
-      |              ^^^^^
-      help: use double quotes
-      suggestion: `"foo"`
+      |              ^^^^^ single quotes are not valid for string literals
+      |
+    help: use double quotes
+      |
+    1 - (node name = 'foo', @val : Type)
+    1 + (node name = "foo", @val : Type)
+      |
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node name = 'foo', @val : Type)
-      |                   ^
-      help: remove separator
-      suggestion: ``
+      |                   ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |
+    help: remove separator
+      |
+    1 - (node name = 'foo', @val : Type)
+    1 + (node name = 'foo' @val : Type)
+      |
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (node name = 'foo', @val : Type)
-      |                     ^
-    error: expected ':' to separate field name from its value
+      |                     ^^^^ unexpected token; expected a child expression or closing delimiter
+    error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (node name = 'foo', @val : Type)
-      |                         ^
-    error: unexpected token; expected an expression
-      |
-    1 | (node name = 'foo', @val : Type)
-      |                          ^
+      |                          ^ unexpected token; expected a child expression or closing delimiter
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (node name = 'foo', @val : Type)
-      |                            ^^^^
+      |                            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "#);
 }
 
@@ -720,8 +889,7 @@ fn double_colon_no_error() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          LowerIdent "name"
+          CaptureName "@name"
           Type
             DoubleColon "::"
             UpperIdent "Type"
@@ -852,8 +1020,18 @@ fn capture_with_upper_ident_parses() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          UpperIdent "Name"
+          CaptureName "@Name"
+    ---
+    error: capture names must start with lowercase
+      |
+    1 | (identifier) @Name
+      |              ^^^^^ capture names must start with lowercase
+      |
+    help: capture names must be snake_case; use @name instead
+      |
+    1 - (identifier) @Name
+    1 + (identifier) @name
+      |
     "#);
 }
 
@@ -894,10 +1072,20 @@ fn capture_with_type_and_upper_ident() {
             ParenOpen "("
             LowerIdent "identifier"
             ParenClose ")"
-          At "@"
-          UpperIdent "Name"
+          CaptureName "@Name"
           Type
             DoubleColon "::"
             UpperIdent "MyType"
+    ---
+    error: capture names must start with lowercase
+      |
+    1 | (identifier) @Name :: MyType
+      |              ^^^^^ capture names must start with lowercase
+      |
+    help: capture names must be snake_case; use @name instead
+      |
+    1 - (identifier) @Name :: MyType
+    1 + (identifier) @name :: MyType
+      |
     "#);
 }

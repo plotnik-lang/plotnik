@@ -71,8 +71,7 @@ fn alternation_with_capture() {
               LowerIdent "string"
               ParenClose ")"
             BracketClose "]"
-          At "@"
-          LowerIdent "value"
+          CaptureName "@value"
     "#);
 }
 
@@ -190,11 +189,11 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
     error: undefined reference: `Expr`
       |
     1 | [(Expr) (Statement)]
-      |   ^^^^
+      |   ^^^^ undefined reference: `Expr`
     error: undefined reference: `Statement`
       |
     1 | [(Expr) (Statement)]
-      |          ^^^^^^^^^
+      |          ^^^^^^^^^ undefined reference: `Statement`
     "#);
 }
 
@@ -302,8 +301,7 @@ fn tagged_alternation_with_captures() {
                       ParenOpen "("
                       LowerIdent "identifier"
                       ParenClose ")"
-                    At "@"
-                    LowerIdent "left"
+                    CaptureName "@left"
                 ParenClose ")"
             Branch
               UpperIdent "Call"
@@ -319,12 +317,10 @@ fn tagged_alternation_with_captures() {
                       ParenOpen "("
                       LowerIdent "identifier"
                       ParenClose ")"
-                    At "@"
-                    LowerIdent "func"
+                    CaptureName "@func"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          LowerIdent "stmt"
+          CaptureName "@stmt"
     "#);
 }
 
@@ -352,8 +348,7 @@ fn tagged_alternation_with_type_annotation() {
                   ParenOpen "("
                   LowerIdent "identifier"
                   ParenClose ")"
-                At "@"
-                LowerIdent "name"
+                CaptureName "@name"
             Branch
               UpperIdent "Access"
               Colon ":"
@@ -368,12 +363,10 @@ fn tagged_alternation_with_type_annotation() {
                       ParenOpen "("
                       Underscore "_"
                       ParenClose ")"
-                    At "@"
-                    LowerIdent "obj"
+                    CaptureName "@obj"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          LowerIdent "chain"
+          CaptureName "@chain"
           Type
             DoubleColon "::"
             UpperIdent "MemberChain"
@@ -639,8 +632,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 LowerIdent "identifier"
                 ParenClose ")"
-              At "@"
-              LowerIdent "name"
+              CaptureName "@name"
               Type
                 DoubleColon "::"
                 LowerIdent "string"
@@ -652,8 +644,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 LowerIdent "number"
                 ParenClose ")"
-              At "@"
-              LowerIdent "value"
+              CaptureName "@value"
               Type
                 DoubleColon "::"
                 LowerIdent "string"
@@ -665,8 +656,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 LowerIdent "string"
                 ParenClose ")"
-              At "@"
-              LowerIdent "value"
+              CaptureName "@value"
               Type
                 DoubleColon "::"
                 LowerIdent "string"
@@ -684,8 +674,7 @@ fn tagged_alternation_full_example() {
                     ParenOpen "("
                     UpperIdent "Expression"
                     ParenClose ")"
-                  At "@"
-                  LowerIdent "left"
+                  CaptureName "@left"
               Field
                 LowerIdent "right"
                 Colon ":"
@@ -694,8 +683,7 @@ fn tagged_alternation_full_example() {
                     ParenOpen "("
                     UpperIdent "Expression"
                     ParenClose ")"
-                  At "@"
-                  LowerIdent "right"
+                  CaptureName "@right"
               ParenClose ")"
           BracketClose "]"
     "#);
