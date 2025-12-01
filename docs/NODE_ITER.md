@@ -201,6 +201,7 @@ fn match_quantifier(cursor: &mut TreeCursor, pattern: &Pattern) -> Option<Captur
 
 - Early termination when all pattern children satisfied
 - Heuristics for choosing greedy vs non-greedy quantifier expansion
+- Use `goto_first_child_for_byte` to skip ahead when byte offset is known from prior matches
 
 ## Key Insights
 
