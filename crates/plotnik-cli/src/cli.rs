@@ -21,6 +21,7 @@ pub enum Command {
 │ --query-refs    │      ✓      │              │
 │ --query-types   │      ✓      │              │
 │ --source-ast    │             │      ✓       │
+│ --source-ast-raw│             │      ✓       │
 │ --trace         │      ✓      │      ✓       │
 │ --result        │      ✓      │      ✓       │
 └─────────────────┴─────────────┴──────────────┘
@@ -107,9 +108,13 @@ pub struct OutputArgs {
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
     pub query_types: bool,
 
-    /// Show tree-sitter AST of source (S-expression format)
+    /// Show tree-sitter AST of source (semantic nodes only)
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
     pub source_ast: bool,
+
+    /// Show tree-sitter AST of source (all nodes including anonymous)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub source_ast_raw: bool,
 
     /// Show execution trace
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
