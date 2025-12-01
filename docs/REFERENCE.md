@@ -244,8 +244,12 @@ Output type:
 Output type:
 
 ```typescript
-{ syntax_error: Node }
-{ missing_semicolon: Node }
+{
+  syntax_error: Node;
+}
+{
+  missing_semicolon: Node;
+}
 ```
 
 ### Supertypes
@@ -266,8 +270,12 @@ Query a specific subtype within a supertype context:
 Output type:
 
 ```typescript
-{ binary: Node }
-{ empty_parens: Node }
+{
+  binary: Node;
+}
+{
+  empty_parens: Node;
+}
 ```
 
 ---

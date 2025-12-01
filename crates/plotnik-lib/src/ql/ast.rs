@@ -4,6 +4,7 @@
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
 
 use crate::ql::syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
+use std::fmt::Write;
 
 macro_rules! ast_node {
     ($name:ident, $kind:ident) => {
@@ -250,5 +251,141 @@ impl Lit {
             .children_with_tokens()
             .filter_map(|it| it.into_token())
             .find(|t| t.kind() == SyntaxKind::StringLit)
+    }
+}
+
+pub fn format_ast(root: &Root) -> String {
+    let mut out = String::new();
+    format_root(root, &mut out);
+    out
+}
+
+fn format_root(root: &Root, out: &mut String) {
+    out.push_str("Root\n");
+    for def in root.defs() {
+        format_def(&def, 1, out);
+    }
+    for expr in root.exprs() {
+        format_expr(&expr, 1, out);
+    }
+}
+
+fn format_def(def: &Def, indent: usize, out: &mut String) {
+    let prefix = "  ".repeat(indent);
+    let name = def.name().map(|t| t.text().to_string());
+    match name {
+        Some(n) => {
+            let _ = writeln!(out, "{}Def {}", prefix, n);
+        }
+        None => {
+            let _ = writeln!(out, "{}Def", prefix);
+        }
+    }
+    if let Some(body) = def.body() {
+        format_expr(&body, indent + 1, out);
+    }
+}
+
+fn format_expr(expr: &Expr, indent: usize, out: &mut String) {
+    let prefix = "  ".repeat(indent);
+    match expr {
+        Expr::Tree(t) => {
+            let node_type = t.node_type().map(|tok| tok.text().to_string());
+            match node_type {
+                Some(ty) => {
+                    let _ = writeln!(out, "{}Tree {}", prefix, ty);
+                }
+                None => {
+                    let _ = writeln!(out, "{}Tree", prefix);
+                }
+            }
+            for child in t.children() {
+                format_expr(&child, indent + 1, out);
+            }
+        }
+        Expr::Ref(r) => {
+            let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
+            let _ = writeln!(out, "{}Ref {}", prefix, name);
+        }
+        Expr::Lit(l) => {
+            let value = l.value().map(|t| t.text().to_string()).unwrap_or_default();
+            let _ = writeln!(out, "{}Lit {}", prefix, value);
+        }
+        Expr::Alt(a) => {
+            let _ = writeln!(out, "{}Alt", prefix);
+            for branch in a.branches() {
+                format_branch(&branch, indent + 1, out);
+            }
+            for expr in a.exprs() {
+                format_expr(&expr, indent + 1, out);
+            }
+        }
+        Expr::Seq(s) => {
+            let _ = writeln!(out, "{}Seq", prefix);
+            for child in s.children() {
+                format_expr(&child, indent + 1, out);
+            }
+        }
+        Expr::Capture(c) => {
+            let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
+            let type_ann = c
+                .type_annotation()
+                .and_then(|t| t.name())
+                .map(|t| t.text().to_string());
+            match type_ann {
+                Some(ty) => {
+                    let _ = writeln!(out, "{}Capture @{} :: {}", prefix, name, ty);
+                }
+                None => {
+                    let _ = writeln!(out, "{}Capture @{}", prefix, name);
+                }
+            }
+            if let Some(inner) = c.inner() {
+                format_expr(&inner, indent + 1, out);
+            }
+        }
+        Expr::Quantifier(q) => {
+            let op = q
+                .operator()
+                .map(|t| t.text().to_string())
+                .unwrap_or_default();
+            let _ = writeln!(out, "{}Quantifier {}", prefix, op);
+            if let Some(inner) = q.inner() {
+                format_expr(&inner, indent + 1, out);
+            }
+        }
+        Expr::Field(f) => {
+            let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
+            let _ = writeln!(out, "{}Field {}:", prefix, name);
+            if let Some(value) = f.value() {
+                format_expr(&value, indent + 1, out);
+            }
+        }
+        Expr::NegatedField(f) => {
+            let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
+            let _ = writeln!(out, "{}NegatedField !{}", prefix, name);
+        }
+        Expr::Wildcard(_) => {
+            let _ = writeln!(out, "{}Wildcard", prefix);
+        }
+        Expr::Anchor(_) => {
+            let _ = writeln!(out, "{}Anchor", prefix);
+        }
+    }
+}
+
+fn format_branch(branch: &Branch, indent: usize, out: &mut String) {
+    let prefix = "  ".repeat(indent);
+    let label = branch.label().map(|t| t.text().to_string());
+    match label {
+        Some(l) => {
+            let _ = writeln!(out, "{}Branch {}:", prefix, l);
+        }
+        None => {
+            let _ = writeln!(out, "{}Branch", prefix);
+        }
+    }
+    if let Some(body) = branch.body() {
+        format_expr(&body, indent + 1, out);
     }
 }

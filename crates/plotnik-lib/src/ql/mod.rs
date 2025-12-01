@@ -42,4 +42,6 @@ pub mod resolve;
 pub mod syntax_kind;
 
 #[cfg(test)]
+mod ast_tests;
+#[cfg(test)]
 mod lexer_tests;

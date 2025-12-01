@@ -17,7 +17,7 @@
 
 pub mod ql;
 
-use ql::ast::Root;
+use ql::ast::{Root, format_ast};
 use ql::parser::{self, ErrorStage, Parse, SyntaxError};
 use ql::resolve::SymbolTable;
 use ql::syntax_kind::SyntaxNode;
@@ -151,6 +151,11 @@ impl<'a> Query<'a> {
         out
     }
 
+    /// Format AST structure (semantic tree without syntactic tokens).
+    pub fn format_ast(&self) -> String {
+        format_ast(&self.root())
+    }
+
     /// Format symbol references (without errors).
     pub fn format_refs(&self) -> String {
         let mut out = String::new();
@@ -175,6 +180,17 @@ impl<'a> Query<'a> {
     /// Snapshot of CST structure (without trivia, with errors).
     pub fn snapshot_cst(&self) -> String {
         let mut out = self.format_cst();
+        if !self.errors.is_empty() {
+            out.push_str("---\n");
+            out.push_str(&self.render_errors());
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Snapshot of AST structure (with errors).
+    pub fn snapshot_ast(&self) -> String {
+        let mut out = self.format_ast();
         if !self.errors.is_empty() {
             out.push_str("---\n");
             out.push_str(&self.render_errors());

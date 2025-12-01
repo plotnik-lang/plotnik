@@ -22,6 +22,25 @@
 - Basic grammar: tree expressions `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = expr`, tagged alternations `[A: ... B: ...]`
 - Parser accepts UpperIdent in capture/field positions for resilience (validation catches casing errors)
 
+## Error Pipeline
+
+Errors flow through staged analysis:
+- `Parse`: Syntax structure errors (lexer/parser)
+- `Resolve`: Name resolution errors (undefined references, duplicate definitions)
+- `Escape`: Recursive pattern detection errors
+
+Errors are collected, not fail-fast. Use `Query::errors_in_stage()` for filtering, `Query::render_errors_grouped()` for CLI output.
+
+## CLI
+
+Debug flags for introspection (composable, multiple can be enabled):
+- `--query-cst`: Concrete syntax tree (all tokens)
+- `--query-ast`: Abstract syntax tree (semantic structure, concise)
+- `--query-refs`: Name resolution references
+- Future: `--query-types`, `--source-ast`, `--result`
+
+Designed for LLM-friendly debugging. Errors render at the end, grouped by stage.
+
 ## SyntaxKind naming convention
 
 Short, punchy names for CST node kinds:
@@ -47,7 +66,6 @@ An expression (`Expr`) is one of: `Tree | Alt | Seq | Quantifier | Capture`
 ## What's NOT yet implemented
 
 - Semantic validation (Phase 5): field value constraints, alternation style mixing, casing rules
-- AST layer: typed wrappers over `SyntaxNode` (like `struct Node(SyntaxNode)`)
 
 ## Intentionally deferred (post-MVP)
 
@@ -71,6 +89,21 @@ An expression (`Expr`) is one of: `Tree | Alt | Seq | Quantifier | Capture`
 - **Structure**: New data scopes/nesting are created ONLY by capturing sequences `{...} @seq` or alternations `[...] @choice`.
 - **Arrays**: Quantifiers `?`, `*`, `+` determine the cardinality (optional, list, non-empty list).
 - **Fields**: Captures `@name` create fields within the current scope.
+
+## AST Layer
+
+Typed wrappers over CST (`SyntaxNode`) in `ql/ast.rs`:
+- `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`
+- `Expr` enum for any expression node
+- `format_ast()` for concise semantic tree output (vs CST which includes all tokens)
+- Tests using AST should use `snapshot_ast()` for cleaner output
+
+## AST Casting Convention
+
+- Use `Option<T>` for casting methods, not `TryFrom`/`TryInto`
+- `None` is not always an error—parsing resilience requires flexible conversion
+- Validation is a separate layer from casting; don't embed error logic in cast methods
+- Consistent with rnix-parser, rowan ecosystem patterns
 
 ## General rules
 

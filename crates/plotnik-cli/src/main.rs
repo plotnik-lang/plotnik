@@ -12,6 +12,7 @@ use std::path::PathBuf;
 │ Output          │ Needs Query │ Needs Source │
 ├─────────────────┼─────────────┼──────────────┤
 │ --query-cst     │      ✓      │              │
+│ --query-ast     │      ✓      │              │
 │ --query-refs    │      ✓      │              │
 │ --query-types   │      ✓      │              │
 │ --source-ast    │             │      ✓       │
@@ -92,6 +93,10 @@ struct OutputArgs {
     #[arg(long)]
     query_cst: bool,
 
+    /// Show parsed query AST (abstract syntax tree, semantic structure)
+    #[arg(long)]
+    query_ast: bool,
+
     /// Show name resolution (definitions and references)
     #[arg(long)]
     query_refs: bool,
@@ -125,8 +130,15 @@ fn main() {
     let has_source = cli.source.source_text.is_some() || cli.source.source_file.is_some();
 
     // Validate output dependencies
-    if (cli.output.query_cst || cli.output.query_refs || cli.output.query_types) && !has_query {
-        eprintln!("error: --query-cst, --query-refs, and --query-types require --query-text or --query-file");
+    if (cli.output.query_cst
+        || cli.output.query_ast
+        || cli.output.query_refs
+        || cli.output.query_types)
+        && !has_query
+    {
+        eprintln!(
+            "error: --query-cst, --query-ast, --query-refs, and --query-types require --query-text or --query-file"
+        );
         std::process::exit(1);
     }
 
@@ -150,6 +162,7 @@ fn main() {
         || (has_query
             && has_source
             && !cli.output.query_cst
+            && !cli.output.query_ast
             && !cli.output.query_refs
             && !cli.output.query_types
             && !cli.output.source_ast
@@ -174,6 +187,13 @@ fn main() {
         println!("=== QUERY CST ===");
         if let Some(ref q) = query {
             print!("{}", q.format_cst());
+        }
+    }
+
+    if cli.output.query_ast {
+        println!("=== QUERY AST ===");
+        if let Some(ref q) = query {
+            print!("{}", q.format_ast());
         }
     }
 
@@ -223,15 +243,15 @@ fn load_query(args: &QueryArgs) -> String {
     if let Some(ref path) = args.query_file {
         if path.as_os_str() == "-" {
             let mut buf = String::new();
-            io::stdin().read_to_string(&mut buf).expect("failed to read stdin");
+            io::stdin()
+                .read_to_string(&mut buf)
+                .expect("failed to read stdin");
             return buf;
         }
         return fs::read_to_string(path).expect("failed to read query file");
     }
     unreachable!()
 }
-
-
 
 fn print_help(topic: Option<&str>) {
     match topic {
