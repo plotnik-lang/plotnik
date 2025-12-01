@@ -27,21 +27,20 @@ use ql::syntax_kind::SyntaxNode;
 /// Construction always succeeds. Check [`is_valid`](Self::is_valid) or
 /// [`errors`](Self::errors) to determine if the query is usable.
 #[derive(Debug, Clone)]
-pub struct Query {
-    source: String,
+pub struct Query<'a> {
+    source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
     errors: Vec<SyntaxError>,
 }
 
-impl Query {
+impl<'a> Query<'a> {
     /// Parse and resolve a query from source text.
     ///
     /// This never fails. Parse and resolution errors are collected
     /// and accessible via [`errors`](Self::errors).
-    pub fn new(source: impl Into<String>) -> Self {
-        let source = source.into();
-        let parse = parser::parse(&source);
+    pub fn new(source: &'a str) -> Self {
+        let parse = parser::parse(source);
 
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
         let resolve_result = ql::resolve::resolve(&root);
@@ -94,7 +93,7 @@ impl Query {
 }
 
 #[cfg(test)]
-impl Query {
+impl Query<'_> {
     /// Snapshot of AST structure (without trivia).
     pub fn snapshot_ast(&self) -> String {
         let mut out = String::new();
