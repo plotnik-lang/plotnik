@@ -4,6 +4,29 @@ use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 use rowan::{TextRange, TextSize};
 use serde::{Serialize, Serializer};
 
+/// The stage at which an error occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ErrorStage {
+    /// Lexing/parsing errors (syntax structure)
+    #[default]
+    Parse,
+    /// Name resolution errors (undefined/duplicate references)
+    Resolve,
+    /// Escape analysis errors (infinite recursion)
+    Escape,
+}
+
+impl std::fmt::Display for ErrorStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorStage::Parse => write!(f, "parse"),
+            ErrorStage::Resolve => write!(f, "resolve"),
+            ErrorStage::Escape => write!(f, "escape"),
+        }
+    }
+}
+
 /// A suggested fix for a syntax error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Fix {
@@ -43,6 +66,7 @@ impl RelatedInfo {
 /// A syntax error with location, message, and optional fix.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SyntaxError {
+    pub stage: ErrorStage,
     #[serde(serialize_with = "serialize_text_range")]
     pub range: TextRange,
     pub message: String,
@@ -63,6 +87,7 @@ fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok,
 impl SyntaxError {
     pub fn new(range: TextRange, message: impl Into<String>) -> Self {
         Self {
+            stage: ErrorStage::default(),
             range,
             message: message.into(),
             fix: None,
@@ -70,8 +95,14 @@ impl SyntaxError {
         }
     }
 
+    pub fn with_stage(mut self, stage: ErrorStage) -> Self {
+        self.stage = stage;
+        self
+    }
+
     pub fn with_fix(range: TextRange, message: impl Into<String>, fix: Fix) -> Self {
         Self {
+            stage: ErrorStage::default(),
             range,
             message: message.into(),
             fix: Some(fix),
@@ -85,6 +116,7 @@ impl SyntaxError {
         related: RelatedInfo,
     ) -> Self {
         Self {
+            stage: ErrorStage::default(),
             range,
             message: message.into(),
             fix: None,
@@ -98,6 +130,7 @@ impl SyntaxError {
         related: Vec<RelatedInfo>,
     ) -> Self {
         Self {
+            stage: ErrorStage::default(),
             range,
             message: message.into(),
             fix: None,

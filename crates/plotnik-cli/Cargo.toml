@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.51", features = ["derive"] }
+plotnik-lib = { path = "../plotnik-lib" }
+rowan = "0.16"

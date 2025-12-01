@@ -8,7 +8,7 @@ fn anchor_first_child() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -31,7 +31,7 @@ fn anchor_last_child() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -54,7 +54,7 @@ fn anchor_adjacency() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -87,7 +87,7 @@ fn anchor_both_ends() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -112,7 +112,7 @@ fn anchor_multiple_adjacent() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -149,7 +149,7 @@ fn anchor_in_sequence() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -177,7 +177,7 @@ fn capture_space_after_dot_is_anchor() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture

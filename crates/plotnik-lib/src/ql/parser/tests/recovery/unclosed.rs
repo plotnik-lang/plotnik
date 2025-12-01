@@ -9,7 +9,7 @@ fn missing_paren() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -33,7 +33,7 @@ fn missing_bracket() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -64,7 +64,7 @@ fn missing_brace() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -95,7 +95,7 @@ fn nested_unclosed() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -126,7 +126,7 @@ fn deeply_nested_unclosed() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -159,7 +159,7 @@ fn unclosed_alternation_nested() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -189,7 +189,7 @@ fn empty_parens() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree

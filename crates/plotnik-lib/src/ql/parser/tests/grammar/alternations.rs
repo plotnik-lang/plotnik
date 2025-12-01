@@ -12,7 +12,7 @@ fn alternation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -36,7 +36,7 @@ fn alternation_with_anonymous() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -56,7 +56,7 @@ fn alternation_with_capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -84,7 +84,7 @@ fn alternation_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -113,7 +113,7 @@ fn alternation_in_field() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -144,7 +144,7 @@ fn unlabeled_alternation_three_items() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -172,7 +172,7 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -212,7 +212,7 @@ fn tagged_alternation_simple() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -242,7 +242,7 @@ fn tagged_alternation_single_line() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -282,7 +282,7 @@ fn tagged_alternation_with_captures() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -338,7 +338,7 @@ fn tagged_alternation_with_type_annotation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -391,7 +391,7 @@ fn tagged_alternation_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -429,7 +429,7 @@ fn tagged_alternation_in_named_def() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Statement"
@@ -471,7 +471,7 @@ fn tagged_alternation_with_quantifier() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -506,7 +506,7 @@ fn tagged_alternation_with_sequence() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -543,7 +543,7 @@ fn mixed_tagged_and_untagged() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -580,7 +580,7 @@ fn tagged_alternation_with_nested_alternation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -624,7 +624,7 @@ fn tagged_alternation_full_example() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expression"

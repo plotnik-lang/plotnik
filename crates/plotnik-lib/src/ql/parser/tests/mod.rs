@@ -17,6 +17,7 @@ mod json_serialization {
 
         insta::assert_snapshot!(json, @r#"
         {
+          "stage": "parse",
           "range": {
             "start": 14,
             "end": 21
@@ -41,6 +42,7 @@ mod json_serialization {
 
         insta::assert_snapshot!(json, @r#"
         {
+          "stage": "parse",
           "range": {
             "start": 14,
             "end": 14

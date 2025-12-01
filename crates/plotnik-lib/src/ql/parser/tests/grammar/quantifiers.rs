@@ -8,7 +8,7 @@ fn quantifier_star() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Quantifier
@@ -27,7 +27,7 @@ fn quantifier_plus() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Quantifier
@@ -46,7 +46,7 @@ fn quantifier_optional() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Quantifier
@@ -65,7 +65,7 @@ fn quantifier_with_capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -89,7 +89,7 @@ fn quantifier_inside_node() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree

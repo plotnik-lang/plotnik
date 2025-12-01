@@ -14,7 +14,7 @@ fn ref_with_children_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -49,7 +49,7 @@ fn ref_with_multiple_children_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -91,7 +91,7 @@ fn ref_with_field_children_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -129,7 +129,7 @@ fn ref_without_children_is_valid() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -165,7 +165,7 @@ fn capture_dotted_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -197,7 +197,7 @@ fn capture_dotted_multiple_parts() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -229,7 +229,7 @@ fn capture_dotted_followed_by_field() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -273,7 +273,7 @@ fn capture_space_after_dot_breaks_chain() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -320,7 +320,7 @@ fn capture_hyphenated_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -352,7 +352,7 @@ fn capture_hyphenated_multiple() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -384,7 +384,7 @@ fn capture_mixed_dots_and_hyphens() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -418,7 +418,7 @@ fn single_quote_string_suggests_double_quotes() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -447,7 +447,7 @@ fn single_quote_in_alternation() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -487,7 +487,7 @@ fn single_quote_with_escape() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -520,7 +520,7 @@ fn comma_in_node_children() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -555,7 +555,7 @@ fn comma_in_alternation() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -603,7 +603,7 @@ fn pipe_in_alternation() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -651,7 +651,7 @@ fn comma_in_sequence() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -689,7 +689,7 @@ fn single_colon_type_annotation() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -721,7 +721,7 @@ fn single_colon_type_annotation_no_space() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -753,7 +753,7 @@ fn single_colon_primitive_type() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -805,7 +805,7 @@ fn lowercase_branch_label() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -855,7 +855,7 @@ fn mixed_case_branch_labels() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -899,7 +899,7 @@ fn field_equals_typo() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -933,7 +933,7 @@ fn field_equals_typo_no_space() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -971,7 +971,7 @@ fn multiple_suggestions_combined() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -1051,7 +1051,7 @@ fn double_quotes_no_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -1069,7 +1069,7 @@ fn double_colon_no_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -1091,7 +1091,7 @@ fn field_colon_no_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -1114,7 +1114,7 @@ fn capitalized_branch_label_no_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -1143,7 +1143,7 @@ fn whitespace_separation_no_error() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -1176,7 +1176,7 @@ fn field_with_upper_ident_parses() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -1212,7 +1212,7 @@ fn capture_with_upper_ident_parses() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -1244,7 +1244,7 @@ fn negated_field_with_upper_ident_parses() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -1276,7 +1276,7 @@ fn capture_with_type_and_upper_ident() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture

@@ -8,7 +8,7 @@ fn simple_sequence() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -32,7 +32,7 @@ fn empty_sequence() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -48,7 +48,7 @@ fn sequence_single_element() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -68,7 +68,7 @@ fn sequence_with_captures() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -100,7 +100,7 @@ fn sequence_with_quantifier() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Quantifier
@@ -126,7 +126,7 @@ fn nested_sequences() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -157,7 +157,7 @@ fn sequence_in_named_node() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -185,7 +185,7 @@ fn sequence_with_alternation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -216,7 +216,7 @@ fn sequence_comma_separated_pattern() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq
@@ -247,7 +247,7 @@ fn sequence_with_anchor() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Seq

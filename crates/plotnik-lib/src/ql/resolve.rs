@@ -5,7 +5,7 @@
 //! 2. Check that all `(UpperIdent)` references are defined
 
 use crate::ql::ast::{Expr, Ref, Root};
-use crate::ql::parser::SyntaxError;
+use crate::ql::parser::{ErrorStage, SyntaxError};
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
@@ -60,10 +60,10 @@ pub fn resolve(root: &Root) -> ResolveResult {
             let range = name_token.text_range();
 
             if defs.contains_key(&name) {
-                errors.push(SyntaxError::new(
-                    range,
-                    format!("duplicate definition: `{}`", name),
-                ));
+                errors.push(
+                    SyntaxError::new(range, format!("duplicate definition: `{}`", name))
+                        .with_stage(ErrorStage::Resolve),
+                );
             } else {
                 let mut refs = IndexSet::new();
                 if let Some(body) = def.body() {
@@ -185,10 +185,13 @@ fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<SyntaxEr
     if let Some(name_token) = r.name() {
         let name = name_token.text();
         if symbols.get(name).is_none() {
-            errors.push(SyntaxError::new(
-                name_token.text_range(),
-                format!("undefined reference: `{}`", name),
-            ));
+            errors.push(
+                SyntaxError::new(
+                    name_token.text_range(),
+                    format!("undefined reference: `{}`", name),
+                )
+                .with_stage(ErrorStage::Resolve),
+            );
         }
     }
 }

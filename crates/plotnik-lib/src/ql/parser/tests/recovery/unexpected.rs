@@ -9,7 +9,7 @@ fn unexpected_token() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -44,7 +44,7 @@ fn multiple_consecutive_garbage() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -73,7 +73,7 @@ fn garbage_at_start() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -99,7 +99,7 @@ fn only_garbage() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -122,7 +122,7 @@ fn garbage_inside_alternation() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -154,7 +154,7 @@ fn garbage_inside_node() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -204,7 +204,7 @@ fn xml_tag_garbage() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -238,7 +238,7 @@ fn xml_self_closing() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Error
@@ -264,7 +264,7 @@ fn predicate_unsupported() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r##"
+    insta::assert_snapshot!(query.snapshot_cst(), @r##"
     Root
       Def
         Tree
@@ -312,7 +312,7 @@ fn predicate_match() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r##"
+    insta::assert_snapshot!(query.snapshot_cst(), @r##"
     Root
       Def
         Tree
@@ -360,7 +360,7 @@ fn multiline_garbage_recovery() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -391,7 +391,7 @@ fn capture_with_invalid_char() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Capture
@@ -420,7 +420,7 @@ fn field_value_is_garbage() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -448,7 +448,7 @@ fn alternation_recovery_to_capture() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Alt
@@ -484,7 +484,7 @@ fn top_level_garbage_recovery() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -523,7 +523,7 @@ fn multiple_definitions_with_garbage_between() {
 
     let query = Query::new(input);
 
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Id "A"

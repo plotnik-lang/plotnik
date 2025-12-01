@@ -18,7 +18,7 @@
 pub mod ql;
 
 use ql::ast::Root;
-use ql::parser::{self, Parse, SyntaxError};
+use ql::parser::{self, ErrorStage, Parse, SyntaxError};
 use ql::resolve::SymbolTable;
 use ql::syntax_kind::SyntaxNode;
 
@@ -94,36 +94,65 @@ impl<'a> Query<'a> {
     pub fn render_errors(&self) -> String {
         parser::render_errors(&self.source, &self.errors, None)
     }
-}
 
-#[cfg(test)]
-impl Query<'_> {
-    /// Snapshot of AST structure (without trivia).
-    pub fn snapshot_ast(&self) -> String {
+    /// Filter errors by stage.
+    pub fn errors_by_stage(&self, stage: ErrorStage) -> Vec<&SyntaxError> {
+        self.errors.iter().filter(|e| e.stage == stage).collect()
+    }
+
+    /// Returns `true` if there are parse-stage errors.
+    pub fn has_parse_errors(&self) -> bool {
+        self.errors.iter().any(|e| e.stage == ErrorStage::Parse)
+    }
+
+    /// Returns `true` if there are resolve-stage errors.
+    pub fn has_resolve_errors(&self) -> bool {
+        self.errors.iter().any(|e| e.stage == ErrorStage::Resolve)
+    }
+
+    /// Returns `true` if there are escape-stage errors.
+    pub fn has_escape_errors(&self) -> bool {
+        self.errors.iter().any(|e| e.stage == ErrorStage::Escape)
+    }
+
+    /// Render errors for a specific stage.
+    pub fn render_errors_by_stage(&self, stage: ErrorStage) -> String {
+        let filtered: Vec<_> = self.errors_by_stage(stage).into_iter().cloned().collect();
+        parser::render_errors(&self.source, &filtered, None)
+    }
+
+    /// Render errors grouped by stage.
+    pub fn render_errors_grouped(&self) -> String {
+        let mut out = String::new();
+        for stage in [ErrorStage::Parse, ErrorStage::Resolve, ErrorStage::Escape] {
+            let stage_errors: Vec<_> = self.errors_by_stage(stage).into_iter().cloned().collect();
+            if !stage_errors.is_empty() {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&format!("=== {} errors ===\n", stage));
+                out.push_str(&parser::render_errors(&self.source, &stage_errors, None));
+            }
+        }
+        out
+    }
+
+    /// Format CST structure (without trivia, without errors).
+    pub fn format_cst(&self) -> String {
         let mut out = String::new();
         Self::format_tree(&self.syntax(), 0, &mut out, false);
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-            out.push('\n');
-        }
         out
     }
 
-    /// Snapshot of AST structure (with trivia).
-    pub fn snapshot_ast_raw(&self) -> String {
+    /// Format CST structure (with trivia, without errors).
+    pub fn format_cst_raw(&self) -> String {
         let mut out = String::new();
         Self::format_tree(&self.syntax(), 0, &mut out, true);
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-            out.push('\n');
-        }
         out
     }
 
-    /// Snapshot of symbol references.
-    pub fn snapshot_refs(&self) -> String {
+    /// Format symbol references (without errors).
+    pub fn format_refs(&self) -> String {
         let mut out = String::new();
 
         let mut defs: Vec<_> = self.symbols.iter().collect();
@@ -140,11 +169,38 @@ impl Query<'_> {
             out.push('\n');
         }
 
+        out
+    }
+
+    /// Snapshot of CST structure (without trivia, with errors).
+    pub fn snapshot_cst(&self) -> String {
+        let mut out = self.format_cst();
+        if !self.errors.is_empty() {
+            out.push_str("---\n");
+            out.push_str(&self.render_errors());
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Snapshot of CST structure (with trivia, with errors).
+    pub fn snapshot_cst_raw(&self) -> String {
+        let mut out = self.format_cst_raw();
+        if !self.errors.is_empty() {
+            out.push_str("---\n");
+            out.push_str(&self.render_errors());
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Snapshot of symbol references (with errors).
+    pub fn snapshot_refs(&self) -> String {
+        let mut out = self.format_refs();
         if !self.errors.is_empty() {
             out.push_str("---\n");
             out.push_str(&self.render_errors());
         }
-
         out
     }
 
@@ -159,7 +215,8 @@ impl Query<'_> {
                 }
                 rowan::NodeOrToken::Token(t) => {
                     if include_trivia || !t.kind().is_trivia() {
-                        let _ = writeln!(out, "{}  {:?} {:?}", prefix, t.kind(), t.text());
+                        let child_prefix = "  ".repeat(indent + 1);
+                        let _ = writeln!(out, "{}{:?} {:?}", child_prefix, t.kind(), t.text());
                     }
                 }
             }
@@ -198,5 +255,46 @@ mod tests {
         assert!(!q.is_valid());
         // Both parse issues and resolution errors should be present
         assert!(!q.errors().is_empty());
+    }
+
+    #[test]
+    fn error_stage_filtering() {
+        use ql::parser::ErrorStage;
+
+        // Parse error only
+        let q = Query::new("(unclosed");
+        assert!(q.has_parse_errors());
+        assert!(!q.has_resolve_errors());
+        assert!(!q.has_escape_errors());
+        assert_eq!(q.errors_by_stage(ErrorStage::Parse).len(), 1);
+
+        // Resolve error only
+        let q = Query::new("(call (Undefined))");
+        assert!(!q.has_parse_errors());
+        assert!(q.has_resolve_errors());
+        assert!(!q.has_escape_errors());
+        assert_eq!(q.errors_by_stage(ErrorStage::Resolve).len(), 1);
+
+        // Escape error only
+        let q = Query::new("Expr = (call (Expr))");
+        assert!(!q.has_parse_errors());
+        assert!(!q.has_resolve_errors());
+        assert!(q.has_escape_errors());
+        assert_eq!(q.errors_by_stage(ErrorStage::Escape).len(), 1);
+
+        // Mixed errors
+        let q = Query::new("Expr = (call (Expr)) (unclosed");
+        assert!(q.has_parse_errors());
+        assert!(!q.has_resolve_errors());
+        assert!(q.has_escape_errors());
+    }
+
+    #[test]
+    fn render_errors_grouped() {
+        let q = Query::new("Expr = (call (Expr)) (unclosed");
+        let grouped = q.render_errors_grouped();
+        assert!(grouped.contains("=== parse errors ==="));
+        assert!(grouped.contains("=== escape errors ==="));
+        assert!(!grouped.contains("=== resolve errors ==="));
     }
 }

@@ -8,7 +8,7 @@ fn whitespace_preserved() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       Def
         Capture
@@ -31,7 +31,7 @@ fn comment_preserved() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       LineComment "// comment"
       Newline "\n"
@@ -53,7 +53,7 @@ fn multiline() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       Def
         Tree
@@ -84,7 +84,7 @@ fn comment_inside_pattern() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       Def
         Tree
@@ -115,7 +115,7 @@ fn trivia_filtered_by_default() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
         Tree
@@ -135,7 +135,7 @@ fn trivia_between_alternation_items() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       Def
         Alt
@@ -163,7 +163,7 @@ fn whitespace_only() {
     let input = "    ";
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       Whitespace "    "
     "#);
@@ -176,7 +176,7 @@ fn comment_only_raw() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast_raw(), @r#"
+    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
     Root
       LineComment "// just a comment"
       Newline "\n"

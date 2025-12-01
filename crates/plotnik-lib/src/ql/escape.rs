@@ -4,7 +4,7 @@
 //! infinitely nested structures (recursion with no escape path).
 
 use crate::ql::ast::{Def, Expr, Root};
-use crate::ql::parser::{RelatedInfo, SyntaxError};
+use crate::ql::parser::{ErrorStage, RelatedInfo, SyntaxError};
 use crate::ql::resolve::SymbolTable;
 use crate::ql::syntax_kind::SyntaxKind;
 use indexmap::{IndexMap, IndexSet};
@@ -308,6 +308,7 @@ fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> 
         ),
         related,
     )
+    .with_stage(ErrorStage::Escape)
 }
 
 #[cfg(test)]
