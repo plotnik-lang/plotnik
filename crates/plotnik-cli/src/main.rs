@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand};
+use plotnik_langs::Lang;
 use plotnik_lib::Query;
 use std::fs;
 use std::io::{self, Read};
@@ -61,6 +62,9 @@ EXAMPLES:
         /// Topic to display (e.g., "reference", "examples")
         topic: Option<String>,
     },
+
+    /// List supported languages
+    Langs,
 }
 
 #[derive(Args)]
@@ -133,6 +137,17 @@ fn main() {
         } => {
             run_debug(query, source, lang, output);
         }
+        Command::Langs => {
+            list_langs();
+        }
+    }
+}
+
+fn list_langs() {
+    let langs = Lang::all();
+    println!("Supported languages ({}):", langs.len());
+    for lang in langs {
+        println!("  {}", lang.name());
     }
 }
 

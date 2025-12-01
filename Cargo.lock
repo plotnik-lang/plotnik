@@ -338,6 +338,7 @@ name = "plotnik-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "plotnik-langs",
  "plotnik-lib",
  "rowan",
 ]

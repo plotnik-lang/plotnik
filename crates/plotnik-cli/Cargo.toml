@@ -3,7 +3,62 @@ name = "plotnik-cli"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = [
+    "bash",
+    "c",
+    "cpp",
+    "csharp",
+    "css",
+    "elixir",
+    "go",
+    "haskell",
+    "hcl",
+    "html",
+    "java",
+    "javascript",
+    "json",
+    "kotlin",
+    "lua",
+    "nix",
+    "php",
+    "python",
+    "ruby",
+    "rust",
+    "scala",
+    "solidity",
+    "swift",
+    "typescript",
+    "yaml",
+]
+bash = ["plotnik-langs/bash"]
+c = ["plotnik-langs/c"]
+cpp = ["plotnik-langs/cpp"]
+csharp = ["plotnik-langs/csharp"]
+css = ["plotnik-langs/css"]
+elixir = ["plotnik-langs/elixir"]
+go = ["plotnik-langs/go"]
+haskell = ["plotnik-langs/haskell"]
+hcl = ["plotnik-langs/hcl"]
+html = ["plotnik-langs/html"]
+java = ["plotnik-langs/java"]
+javascript = ["plotnik-langs/javascript"]
+json = ["plotnik-langs/json"]
+kotlin = ["plotnik-langs/kotlin"]
+lua = ["plotnik-langs/lua"]
+nix = ["plotnik-langs/nix"]
+php = ["plotnik-langs/php"]
+python = ["plotnik-langs/python"]
+ruby = ["plotnik-langs/ruby"]
+rust = ["plotnik-langs/rust"]
+scala = ["plotnik-langs/scala"]
+solidity = ["plotnik-langs/solidity"]
+swift = ["plotnik-langs/swift"]
+typescript = ["plotnik-langs/typescript"]
+yaml = ["plotnik-langs/yaml"]
+
 [dependencies]
 clap = { version = "4.5.51", features = ["derive"] }
+plotnik-langs = { path = "../plotnik-langs", default-features = false }
 plotnik-lib = { path = "../plotnik-lib" }
 rowan = "0.16"

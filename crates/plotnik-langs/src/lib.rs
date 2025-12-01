@@ -236,6 +236,63 @@ impl Lang {
         }
     }
 
+    pub fn all() -> &'static [Self] {
+        &[
+            #[cfg(feature = "bash")]
+            Self::Bash,
+            #[cfg(feature = "c")]
+            Self::C,
+            #[cfg(feature = "cpp")]
+            Self::Cpp,
+            #[cfg(feature = "csharp")]
+            Self::CSharp,
+            #[cfg(feature = "css")]
+            Self::Css,
+            #[cfg(feature = "elixir")]
+            Self::Elixir,
+            #[cfg(feature = "go")]
+            Self::Go,
+            #[cfg(feature = "haskell")]
+            Self::Haskell,
+            #[cfg(feature = "hcl")]
+            Self::Hcl,
+            #[cfg(feature = "html")]
+            Self::Html,
+            #[cfg(feature = "java")]
+            Self::Java,
+            #[cfg(feature = "javascript")]
+            Self::JavaScript,
+            #[cfg(feature = "json")]
+            Self::Json,
+            #[cfg(feature = "kotlin")]
+            Self::Kotlin,
+            #[cfg(feature = "lua")]
+            Self::Lua,
+            #[cfg(feature = "nix")]
+            Self::Nix,
+            #[cfg(feature = "php")]
+            Self::Php,
+            #[cfg(feature = "python")]
+            Self::Python,
+            #[cfg(feature = "ruby")]
+            Self::Ruby,
+            #[cfg(feature = "rust")]
+            Self::Rust,
+            #[cfg(feature = "scala")]
+            Self::Scala,
+            #[cfg(feature = "solidity")]
+            Self::Solidity,
+            #[cfg(feature = "swift")]
+            Self::Swift,
+            #[cfg(feature = "typescript")]
+            Self::TypeScript,
+            #[cfg(feature = "typescript")]
+            Self::Tsx,
+            #[cfg(feature = "yaml")]
+            Self::Yaml,
+        ]
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             #[cfg(feature = "bash")]
