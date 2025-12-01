@@ -360,7 +360,11 @@ mod tests {
     #[test]
     #[cfg(feature = "hcl")]
     fn smoke_parse_hcl() {
-        smoke_test(Lang::Hcl, "resource \"aws_instance\" \"x\" {}", "config_file");
+        smoke_test(
+            Lang::Hcl,
+            "resource \"aws_instance\" \"x\" {}",
+            "config_file",
+        );
     }
 
     #[test]
@@ -378,7 +382,11 @@ mod tests {
     #[test]
     #[cfg(feature = "javascript")]
     fn smoke_parse_javascript() {
-        smoke_test(Lang::JavaScript, "function hello() { return 42; }", "program");
+        smoke_test(
+            Lang::JavaScript,
+            "function hello() { return 42; }",
+            "program",
+        );
     }
 
     #[test]
