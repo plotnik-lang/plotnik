@@ -58,7 +58,7 @@ typescript = ["plotnik-langs/typescript"]
 yaml = ["plotnik-langs/yaml"]
 
 [dependencies]
-clap = { version = "=4.5.51", features = ["derive"] }
+clap = { version = "=4.5.53", features = ["derive"] }
 plotnik-langs = { path = "../plotnik-langs", default-features = false }
 plotnik-lib = { path = "../plotnik-lib" }
 tree-sitter = "=0.25.10"
