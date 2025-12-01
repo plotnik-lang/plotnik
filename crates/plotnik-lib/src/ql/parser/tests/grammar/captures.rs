@@ -381,3 +381,88 @@ fn capture_with_type_no_spaces() {
             Id "string"
     "#);
 }
+
+// ============================================================================
+// Literal Captures
+// ============================================================================
+
+#[test]
+fn capture_literal() {
+    let input = indoc! {r#"
+    "foo" @keyword
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
+      Def
+        Capture
+          Lit
+            StringLit "\"foo\""
+          At "@"
+          Id "keyword"
+    "#);
+}
+
+#[test]
+fn capture_literal_with_type() {
+    let input = indoc! {r#"
+    "return" @kw :: string
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
+      Def
+        Capture
+          Lit
+            StringLit "\"return\""
+          At "@"
+          Id "kw"
+          Type
+            DoubleColon "::"
+            Id "string"
+    "#);
+}
+
+#[test]
+fn capture_literal_in_tree() {
+    let input = indoc! {r#"
+    (binary_expression "+" @op)
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
+      Def
+        Tree
+          ParenOpen "("
+          Id "binary_expression"
+          Capture
+            Lit
+              StringLit "\"+\""
+            At "@"
+            Id "op"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn capture_literal_with_quantifier() {
+    let input = indoc! {r#"
+    ","* @commas
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
+      Def
+        Capture
+          Quantifier
+            Lit
+              StringLit "\",\""
+            Star "*"
+          At "@"
+          Id "commas"
+    "#);
+}

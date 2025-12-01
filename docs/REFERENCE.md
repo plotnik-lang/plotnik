@@ -198,18 +198,18 @@ Match literal tokens (operators, keywords, punctuation) with double quotes:
 (return_statement "return")
 ```
 
-Anonymous nodes cannot be captured directly. Capture the parent or use a wildcard:
+Anonymous nodes can be captured directly:
 
 ```
-(binary_expression operator: _ @op)   ; captures the operator token
+(binary_expression "+" @op)
+"return" @keyword
 ```
 
 Output type:
 
 ```typescript
-{
-  op: Node;
-}
+{ op: Node }
+{ keyword: Node }
 ```
 
 ### Wildcards
