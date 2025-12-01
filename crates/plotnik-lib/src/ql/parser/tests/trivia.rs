@@ -14,9 +14,10 @@ fn whitespace_preserved() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
       Whitespace "  "
       Newline "\n"
     "#);
@@ -37,7 +38,7 @@ fn comment_preserved() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Newline "\n"
     "#);
@@ -57,14 +58,14 @@ fn multiline() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           ParenClose ")"
       Newline "\n"
       Newline "\n"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          Id "b"
           ParenClose ")"
       Newline "\n"
     ---
@@ -88,18 +89,18 @@ fn comment_inside_pattern() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Whitespace " "
           LineComment "// inline"
           Newline "\n"
           Whitespace "    "
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Whitespace " "
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
       Newline "\n"
@@ -119,7 +120,7 @@ fn trivia_filtered_by_default() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     "#);
 }
@@ -143,13 +144,13 @@ fn trivia_between_alternation_items() {
           Whitespace "    "
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Newline "\n"
           Whitespace "    "
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           BracketClose "]"
       Newline "\n"

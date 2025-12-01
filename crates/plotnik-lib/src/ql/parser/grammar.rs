@@ -24,8 +24,8 @@ impl Parser<'_> {
             if self.eof() {
                 break;
             }
-            // LL(2): UpperIdent followed by Equals → named definition
-            if self.peek() == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
+            // LL(2): Id followed by Equals → named definition (if PascalCase)
+            if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
             } else {
                 // Anonymous def: wrap expression in Def node
@@ -67,8 +67,10 @@ impl Parser<'_> {
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
 
-        // UpperIdent already verified by caller via peek()
+        let span = self.current_span();
+        let name = token_text(self.source, &self.tokens[self.pos]);
         self.bump();
+        self.validate_def_name(name, span);
 
         self.peek();
         if !self.expect(SyntaxKind::Equals, "'=' after definition name") {
@@ -93,7 +95,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(kind) {
             self.parse_expr();
             true
-        } else if kind == SyntaxKind::CaptureName {
+        } else if kind == SyntaxKind::At {
             self.error_and_bump("capture '@' must follow an expression to capture");
             false
         } else if kind == SyntaxKind::Predicate {
@@ -131,7 +133,7 @@ impl Parser<'_> {
             SyntaxKind::SingleQuoteLit => self.parse_single_quote_lit(),
             SyntaxKind::Dot => self.parse_anchor(),
             SyntaxKind::Negation => self.parse_negated_field(),
-            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => self.parse_tree_or_field(),
+            SyntaxKind::Id => self.parse_tree_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
                 self.error_and_bump(
                     "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)",
@@ -150,24 +152,57 @@ impl Parser<'_> {
 
     /// Tree expression: `(type ...)`, `(_ ...)`, `(ERROR)`, `(MISSING ...)`.
     /// Also handles supertype/subtype: `(expression/binary_expression)`.
+    /// Parse a tree expression `(type ...)` or a reference `(RefName)`.
+    /// PascalCase identifiers without children become `Ref` nodes.
+    /// PascalCase identifiers with children emit an error but parse as `Tree`.
     fn parse_tree(&mut self) {
-        self.start_node(SyntaxKind::Tree);
+        // Use checkpoint so we can decide Tree vs Ref after seeing the full content
+        let checkpoint = self.checkpoint();
         self.push_delimiter(SyntaxKind::ParenOpen);
-        self.expect(SyntaxKind::ParenOpen, "opening '(' for node");
+        self.bump(); // consume '('
+
+        // Track if this is a reference (PascalCase identifier)
+        let mut is_ref = false;
+        let mut ref_name: Option<String> = None;
 
         match self.peek() {
             SyntaxKind::ParenClose => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.error("empty tree expression - expected node type or children");
+                self.pop_delimiter();
+                self.bump(); // consume ')'
+                self.finish_node();
+                return;
             }
             SyntaxKind::Underscore => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
             }
-            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
+            SyntaxKind::Id => {
+                let name = token_text(self.source, &self.tokens[self.pos]).to_string();
+                let is_pascal_case = name
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c.is_ascii_uppercase());
                 self.bump();
+
+                if is_pascal_case {
+                    is_ref = true;
+                    ref_name = Some(name);
+                } else {
+                    self.start_node_at(checkpoint, SyntaxKind::Tree);
+                }
+
                 if self.peek() == SyntaxKind::Slash {
+                    // Supertype syntax - commit to Tree
+                    if is_ref {
+                        self.start_node_at(checkpoint, SyntaxKind::Tree);
+                        self.error("references cannot use supertype syntax (/)");
+                        is_ref = false;
+                    }
                     self.bump();
                     match self.peek() {
-                        SyntaxKind::LowerIdent | SyntaxKind::StringLit => {
+                        SyntaxKind::Id | SyntaxKind::StringLit => {
                             self.bump();
                         }
                         _ => {
@@ -179,6 +214,7 @@ impl Parser<'_> {
                 }
             }
             SyntaxKind::KwError => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
                 if self.peek() != SyntaxKind::ParenClose {
                     self.error("(ERROR) takes no arguments");
@@ -190,9 +226,10 @@ impl Parser<'_> {
                 return;
             }
             SyntaxKind::KwMissing => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
                 match self.peek() {
-                    SyntaxKind::LowerIdent | SyntaxKind::StringLit => {
+                    SyntaxKind::Id | SyntaxKind::StringLit => {
                         self.bump();
                     }
                     SyntaxKind::ParenClose => {}
@@ -205,12 +242,46 @@ impl Parser<'_> {
                 self.finish_node();
                 return;
             }
-            _ => {}
+            _ => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
+            }
         }
 
-        self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+        // Check if there are children
+        let has_children = self.peek() != SyntaxKind::ParenClose;
+
+        if is_ref {
+            if has_children {
+                // Reference with children: commit to Tree and emit error
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
+                let children_start = self.current_span().start();
+                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+                let children_end = self.last_non_trivia_end().unwrap_or(children_start);
+                let children_span = TextRange::new(children_start, children_end);
+
+                if let Some(name) = &ref_name {
+                    self.errors.push(super::error::SyntaxError::new(
+                        children_span,
+                        format!("reference `{}` cannot contain children", name),
+                    ));
+                }
+            } else {
+                // Valid reference: no children
+                self.start_node_at(checkpoint, SyntaxKind::Ref);
+            }
+        } else {
+            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+        }
+
         self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, "closing ')' for tree");
+        self.expect(
+            SyntaxKind::ParenClose,
+            if is_ref && !has_children {
+                "closing ')' for reference"
+            } else {
+                "closing ')' for tree"
+            },
+        );
         self.finish_node();
     }
 
@@ -291,12 +362,16 @@ impl Parser<'_> {
                 continue;
             }
 
-            // LL(2): UpperIdent followed by Colon → tagged branch
-            if kind == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Colon {
-                self.parse_branch();
-            // LL(2): LowerIdent followed by Colon → likely mistyped branch label
-            } else if kind == SyntaxKind::LowerIdent && self.peek_nth(1) == SyntaxKind::Colon {
-                self.parse_branch_lowercase_label();
+            // LL(2): Id followed by Colon → branch label or field (check casing)
+            if kind == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Colon {
+                let text = token_text(self.source, &self.tokens[self.pos]);
+                let first_char = text.chars().next().unwrap_or('a');
+                if first_char.is_ascii_uppercase() {
+                    self.parse_branch();
+                } else {
+                    // Lowercase: likely mistyped branch label
+                    self.parse_branch_lowercase_label();
+                }
             } else if EXPR_FIRST.contains(kind) {
                 self.parse_expr();
             } else if ALT_RECOVERY.contains(kind) {
@@ -313,8 +388,10 @@ impl Parser<'_> {
     fn parse_branch(&mut self) {
         self.start_node(SyntaxKind::Branch);
 
-        // UpperIdent already verified by caller via peek()
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
         self.bump();
+        self.validate_branch_label(text, span);
 
         self.peek();
         self.expect(SyntaxKind::Colon, "':' after branch label");
@@ -402,15 +479,19 @@ impl Parser<'_> {
 
     /// Parse capture suffix: `@name` or `@name :: Type`
     /// Called after the expression to capture has already been parsed.
-    /// The lexer accepts tree-sitter style captures (@foo.bar, @foo-bar);
-    /// we validate here and emit friendly errors for non-snake_case names.
+    /// Expects current token to be `At`, followed by `Id`.
     fn parse_capture_suffix(&mut self) {
-        let span = self.current_span();
-        let capture_text = token_text(self.source, &self.tokens[self.pos]);
-        self.bump(); // consume CaptureName
+        self.bump(); // consume At
 
-        // Validate: must be @[a-z][a-z0-9_]* (snake_case)
-        let name = &capture_text[1..]; // skip '@'
+        if self.peek() != SyntaxKind::Id {
+            self.error("expected capture name after '@'");
+            return;
+        }
+
+        let span = self.current_span();
+        let name = token_text(self.source, &self.tokens[self.pos]);
+        self.bump(); // consume Id
+
         self.validate_capture_name(name, span);
 
         // Check for single colon (common mistake: @x : Type instead of @x :: Type)
@@ -421,56 +502,18 @@ impl Parser<'_> {
         }
     }
 
-    /// Validate capture name follows plotnik convention (snake_case).
-    /// Emits error with fix suggestion for invalid names.
-    fn validate_capture_name(&mut self, name: &str, span: TextRange) {
-        // Check for dots (tree-sitter style)
-        if name.contains('.') {
-            let suggested = name.replace('.', "_").replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                format!("@{}", suggested),
-                format!("captures become struct fields; use @{} instead", suggested),
-            );
-            self.error_with_fix(span, "capture names cannot contain dots", fix);
-            return;
-        }
-
-        // Check for hyphens
-        if name.contains('-') {
-            let suggested = name.replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                format!("@{}", suggested),
-                format!("captures become struct fields; use @{} instead", suggested),
-            );
-            self.error_with_fix(span, "capture names cannot contain hyphens", fix);
-            return;
-        }
-
-        // Check for uppercase (must be snake_case)
-        if name.chars().next().map_or(false, |c| c.is_ascii_uppercase()) {
-            let suggested = to_snake_case(name);
-            let fix = Fix::new(
-                format!("@{}", suggested),
-                format!("capture names must be snake_case; use @{} instead", suggested),
-            );
-            self.error_with_fix(span, "capture names must start with lowercase", fix);
-        }
-    }
-
-    /// Type annotation: `::Type` (UpperIdent) or `::string` (LowerIdent primitive)
+    /// Type annotation: `::Type` (PascalCase) or `::string` (primitive)
     fn parse_type_annotation(&mut self) {
         self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
-        match self.peek() {
-            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => {
-                self.bump();
-            }
-            _ => {
-                self.error("expected type name after '::' (e.g., ::MyType or ::string)");
-            }
+        if self.peek() == SyntaxKind::Id {
+            let span = self.current_span();
+            let text = token_text(self.source, &self.tokens[self.pos]);
+            self.bump();
+            self.validate_type_name(text, span);
+        } else {
+            self.error("expected type name after '::' (e.g., ::MyType or ::string)");
         }
 
         self.finish_node();
@@ -479,10 +522,7 @@ impl Parser<'_> {
     /// Handle single colon type annotation (common mistake: `@x : Type` instead of `@x :: Type`)
     fn parse_type_annotation_single_colon(&mut self) {
         // Check if followed by something that looks like a type
-        if !matches!(
-            self.peek_nth(1),
-            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent
-        ) {
+        if self.peek_nth(1) != SyntaxKind::Id {
             return;
         }
 
@@ -494,11 +534,8 @@ impl Parser<'_> {
 
         self.bump();
 
-        match self.peek() {
-            SyntaxKind::UpperIdent | SyntaxKind::LowerIdent => {
-                self.bump();
-            }
-            _ => {}
+        if self.peek() == SyntaxKind::Id {
+            self.bump();
         }
 
         self.finish_node();
@@ -512,17 +549,16 @@ impl Parser<'_> {
     }
 
     /// Negated field assertion: `!field` (field must be absent)
-    /// Accepts UpperIdent for resilience; validation will catch casing errors.
     fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
         self.expect(SyntaxKind::Negation, "'!' for negated field");
-        match self.peek() {
-            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
-                self.bump();
-            }
-            _ => {
-                self.error("expected field name after '!' (e.g., !value)");
-            }
+        if self.peek() == SyntaxKind::Id {
+            let span = self.current_span();
+            let text = token_text(self.source, &self.tokens[self.pos]);
+            self.bump();
+            self.validate_field_name(text, span);
+        } else {
+            self.error("expected field name after '!' (e.g., !value)");
         }
         self.finish_node();
     }
@@ -543,17 +579,16 @@ impl Parser<'_> {
     }
 
     /// Field constraint: `field_name: expr`
-    /// Accepts UpperIdent for resilience; validation will catch casing errors.
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        match self.peek() {
-            SyntaxKind::LowerIdent | SyntaxKind::UpperIdent => {
-                self.bump();
-            }
-            _ => {
-                self.error("expected field name before ':'");
-            }
+        if self.peek() == SyntaxKind::Id {
+            let span = self.current_span();
+            let text = token_text(self.source, &self.tokens[self.pos]);
+            self.bump();
+            self.validate_field_name(text, span);
+        } else {
+            self.error("expected field name before ':'");
         }
 
         self.expect(
@@ -618,10 +653,155 @@ impl Parser<'_> {
 
     /// If current token is a capture (`@name`), wrap preceding expression with Capture using checkpoint.
     fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        if self.peek() == SyntaxKind::CaptureName {
+        if self.peek() == SyntaxKind::At {
             self.start_node_at(checkpoint, SyntaxKind::Capture);
             self.parse_capture_suffix();
             self.finish_node();
+        }
+    }
+
+    // ============================================================
+    // Validation helpers - enforce naming conventions per context
+    // ============================================================
+
+    /// Validate capture name follows plotnik convention (snake_case).
+    fn validate_capture_name(&mut self, name: &str, span: TextRange) {
+        if name.contains('.') {
+            let suggested = name.replace('.', "_").replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                suggested.clone(),
+                format!("captures become struct fields; use @{} instead", suggested),
+            );
+            self.error_with_fix(span, "capture names cannot contain dots", fix);
+            return;
+        }
+
+        if name.contains('-') {
+            let suggested = name.replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                suggested.clone(),
+                format!("captures become struct fields; use @{} instead", suggested),
+            );
+            self.error_with_fix(span, "capture names cannot contain hyphens", fix);
+            return;
+        }
+
+        if name
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_uppercase())
+        {
+            let suggested = to_snake_case(name);
+            let fix = Fix::new(
+                suggested.clone(),
+                format!(
+                    "capture names must be snake_case; use @{} instead",
+                    suggested
+                ),
+            );
+            self.error_with_fix(span, "capture names must start with lowercase", fix);
+        }
+    }
+
+    /// Validate definition name follows PascalCase convention.
+    fn validate_def_name(&mut self, name: &str, span: TextRange) {
+        if !name
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_uppercase())
+        {
+            let suggested = to_pascal_case(name);
+            let fix = Fix::new(
+                suggested.clone(),
+                format!(
+                    "definition names must be PascalCase; use {} instead",
+                    suggested
+                ),
+            );
+            self.error_with_fix(span, "definition names must start with uppercase", fix);
+            return;
+        }
+
+        if name.contains('_') || name.contains('-') || name.contains('.') {
+            let suggested = to_pascal_case(name);
+            let fix = Fix::new(
+                suggested.clone(),
+                format!(
+                    "definition names must be PascalCase; use {} instead",
+                    suggested
+                ),
+            );
+            self.error_with_fix(span, "definition names cannot contain separators", fix);
+        }
+    }
+
+    /// Validate branch label follows PascalCase convention.
+    fn validate_branch_label(&mut self, name: &str, span: TextRange) {
+        if name.contains('_') || name.contains('-') || name.contains('.') {
+            let suggested = to_pascal_case(name);
+            let fix = Fix::new(
+                format!("{}:", suggested),
+                format!(
+                    "branch labels must be PascalCase; use {}: instead",
+                    suggested
+                ),
+            );
+            self.error_with_fix(span, "branch labels cannot contain separators", fix);
+        }
+    }
+
+    /// Validate field name follows snake_case convention.
+    fn validate_field_name(&mut self, name: &str, span: TextRange) {
+        if name.contains('.') {
+            let suggested = name.replace('.', "_").replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                format!("{}:", suggested),
+                format!("field names must be snake_case; use {}: instead", suggested),
+            );
+            self.error_with_fix(span, "field names cannot contain dots", fix);
+            return;
+        }
+
+        if name.contains('-') {
+            let suggested = name.replace('-', "_");
+            let suggested = to_snake_case(&suggested);
+            let fix = Fix::new(
+                format!("{}:", suggested),
+                format!("field names must be snake_case; use {}: instead", suggested),
+            );
+            self.error_with_fix(span, "field names cannot contain hyphens", fix);
+            return;
+        }
+
+        if name
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_uppercase())
+        {
+            let suggested = to_snake_case(name);
+            let fix = Fix::new(
+                format!("{}:", suggested),
+                format!("field names must be snake_case; use {}: instead", suggested),
+            );
+            self.error_with_fix(span, "field names must start with lowercase", fix);
+        }
+    }
+
+    /// Validate type annotation name (PascalCase for user types, snake_case for primitives allowed).
+    fn validate_type_name(&mut self, name: &str, span: TextRange) {
+        if name.contains('.') || name.contains('-') {
+            let suggested = to_pascal_case(name);
+            let fix = Fix::new(
+                format!("::{}", suggested),
+                format!(
+                    "type names cannot contain separators; use ::{} instead",
+                    suggested
+                ),
+            );
+            self.error_with_fix(span, "type names cannot contain dots or hyphens", fix);
         }
     }
 }
@@ -631,12 +811,33 @@ fn to_snake_case(s: &str) -> String {
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
         if c.is_ascii_uppercase() {
-            if i > 0 {
+            if i > 0 && !result.ends_with('_') {
                 result.push('_');
             }
             result.push(c.to_ascii_lowercase());
+        } else if c == '-' || c == '.' {
+            if !result.ends_with('_') {
+                result.push('_');
+            }
         } else {
             result.push(c);
+        }
+    }
+    result
+}
+
+/// Convert a name to PascalCase.
+fn to_pascal_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if c == '_' || c == '-' || c == '.' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(c.to_ascii_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(c.to_ascii_lowercase());
         }
     }
     result

@@ -13,12 +13,12 @@ fn anchor_first_child() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "block"
+          Id "block"
           Anchor
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "first_statement"
+            Id "first_statement"
             ParenClose ")"
           ParenClose ")"
     "#);
@@ -36,10 +36,10 @@ fn anchor_last_child() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "block"
+          Id "block"
           Tree
             ParenOpen "("
-            LowerIdent "last_statement"
+            Id "last_statement"
             ParenClose ")"
           Anchor
             Dot "."
@@ -59,21 +59,23 @@ fn anchor_adjacency() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "dotted_name"
+          Id "dotted_name"
           Capture
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
-            CaptureName "@a"
+            At "@"
+            Id "a"
           Anchor
             Dot "."
           Capture
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
-            CaptureName "@b"
+            At "@"
+            Id "b"
           ParenClose ")"
     "#);
 }
@@ -90,12 +92,12 @@ fn anchor_both_ends() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "array"
+          Id "array"
           Anchor
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "element"
+            Id "element"
             ParenClose ")"
           Anchor
             Dot "."
@@ -115,24 +117,24 @@ fn anchor_multiple_adjacent() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "tuple"
+          Id "tuple"
           Anchor
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Anchor
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           Anchor
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           Anchor
             Dot "."
@@ -156,11 +158,11 @@ fn anchor_in_sequence() {
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "first"
+            Id "first"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "second"
+            Id "second"
             ParenClose ")"
           Anchor
             Dot "."
@@ -181,16 +183,17 @@ fn capture_space_after_dot_is_anchor() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo"
+          At "@"
+          Id "foo"
       Def
         Anchor
           Dot "."
       Def
         Tree
           ParenOpen "("
-          LowerIdent "other"
+          Id "other"
           ParenClose ")"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`

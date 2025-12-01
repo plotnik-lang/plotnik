@@ -18,9 +18,10 @@ fn capture() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
     "#);
 }
 
@@ -36,16 +37,17 @@ fn capture_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Field
-            LowerIdent "function"
+            Id "function"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
-                LowerIdent "identifier"
+                Id "identifier"
                 ParenClose ")"
-              CaptureName "@func"
+              At "@"
+              Id "func"
           ParenClose ")"
     "#);
 }
@@ -65,27 +67,30 @@ fn multiple_captures() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "binary"
+            Id "binary"
             Field
-              LowerIdent "left"
+              Id "left"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                CaptureName "@left"
+                At "@"
+                Id "left"
             Field
-              LowerIdent "right"
+              Id "right"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                CaptureName "@right"
+                At "@"
+                Id "right"
             ParenClose ")"
-          CaptureName "@expr"
+          At "@"
+          Id "expr"
     "#);
 }
 
@@ -106,12 +111,13 @@ fn capture_with_type_annotation() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             DoubleColon "::"
-            LowerIdent "string"
+            Id "string"
     "#);
 }
 
@@ -128,12 +134,13 @@ fn capture_with_custom_type() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "function_declaration"
+            Id "function_declaration"
             ParenClose ")"
-          CaptureName "@fn"
+          At "@"
+          Id "fn"
           Type
             DoubleColon "::"
-            UpperIdent "FunctionDecl"
+            Id "FunctionDecl"
     "#);
 }
 
@@ -150,9 +157,10 @@ fn capture_without_type_annotation() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
     "#);
 }
 
@@ -171,36 +179,39 @@ fn multiple_captures_with_types() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "binary"
+            Id "binary"
             Field
-              LowerIdent "left"
+              Id "left"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                CaptureName "@left"
+                At "@"
+                Id "left"
                 Type
                   DoubleColon "::"
-                  UpperIdent "Node"
+                  Id "Node"
             Field
-              LowerIdent "right"
+              Id "right"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                CaptureName "@right"
+                At "@"
+                Id "right"
                 Type
                   DoubleColon "::"
-                  LowerIdent "string"
+                  Id "string"
             ParenClose ")"
-          CaptureName "@expr"
+          At "@"
+          Id "expr"
           Type
             DoubleColon "::"
-            UpperIdent "BinaryExpr"
+            Id "BinaryExpr"
     "#);
 }
 
@@ -219,17 +230,18 @@ fn sequence_capture_with_type() {
             BraceOpen "{"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
             BraceClose "}"
-          CaptureName "@seq"
+          At "@"
+          Id "seq"
           Type
             DoubleColon "::"
-            UpperIdent "MySequence"
+            Id "MySequence"
     "#);
 }
 
@@ -248,17 +260,18 @@ fn alternation_capture_with_type() {
             BracketOpen "["
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "number"
+              Id "number"
               ParenClose ")"
             BracketClose "]"
-          CaptureName "@value"
+          At "@"
+          Id "value"
           Type
             DoubleColon "::"
-            UpperIdent "Value"
+            Id "Value"
     "#);
 }
 
@@ -276,13 +289,14 @@ fn quantified_capture_with_type() {
           Quantifier
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
             Plus "+"
-          CaptureName "@stmts"
+          At "@"
+          Id "stmts"
           Type
             DoubleColon "::"
-            UpperIdent "Statement"
+            Id "Statement"
     "#);
 }
 
@@ -302,42 +316,45 @@ fn nested_captures_with_types() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "function"
+            Id "function"
             Field
-              LowerIdent "name"
+              Id "name"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
-                  LowerIdent "identifier"
+                  Id "identifier"
                   ParenClose ")"
-                CaptureName "@name"
+                At "@"
+                Id "name"
                 Type
                   DoubleColon "::"
-                  LowerIdent "string"
+                  Id "string"
             Field
-              LowerIdent "body"
+              Id "body"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "block"
+                Id "block"
                 Capture
                   Quantifier
                     Tree
                       ParenOpen "("
-                      LowerIdent "statement"
+                      Id "statement"
                       ParenClose ")"
                     Star "*"
-                  CaptureName "@body_stmts"
+                  At "@"
+                  Id "body_stmts"
                   Type
                     DoubleColon "::"
-                    UpperIdent "Statement"
+                    Id "Statement"
                 ParenClose ")"
             ParenClose ")"
-          CaptureName "@func"
+          At "@"
+          Id "func"
           Type
             DoubleColon "::"
-            UpperIdent "Function"
+            Id "Function"
     "#);
 }
 
@@ -355,11 +372,12 @@ fn capture_with_type_no_spaces() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             DoubleColon "::"
-            LowerIdent "string"
+            Id "string"
     "#);
 }

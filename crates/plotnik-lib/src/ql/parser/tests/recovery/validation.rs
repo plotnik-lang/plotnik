@@ -2,6 +2,158 @@ use crate::Query;
 use indoc::indoc;
 
 // ============================================================================
+// Reference with Children (Invalid)
+// ============================================================================
+
+#[test]
+fn ref_with_children_error() {
+    let input = indoc! {r#"
+    Expr = (identifier)
+    (Expr (child))
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Id "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          Id "Expr"
+          Tree
+            ParenOpen "("
+            Id "child"
+            ParenClose ")"
+          ParenClose ")"
+    ---
+    error: reference `Expr` cannot contain children
+      |
+    2 | (Expr (child))
+      |       ^^^^^^^ reference `Expr` cannot contain children
+    "#);
+}
+
+#[test]
+fn ref_with_multiple_children_error() {
+    let input = indoc! {r#"
+    Expr = (identifier)
+    (Expr (a) (b) @cap)
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Id "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          Id "Expr"
+          Tree
+            ParenOpen "("
+            Id "a"
+            ParenClose ")"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+            At "@"
+            Id "cap"
+          ParenClose ")"
+    ---
+    error: reference `Expr` cannot contain children
+      |
+    2 | (Expr (a) (b) @cap)
+      |       ^^^^^^^^^^^^ reference `Expr` cannot contain children
+    "#);
+}
+
+#[test]
+fn ref_with_field_children_error() {
+    let input = indoc! {r#"
+    Expr = (identifier)
+    (Expr name: (identifier))
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Id "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          Id "Expr"
+          Field
+            Id "name"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          ParenClose ")"
+    ---
+    error: reference `Expr` cannot contain children
+      |
+    2 | (Expr name: (identifier))
+      |       ^^^^^^^^^^^^^^^^^^ reference `Expr` cannot contain children
+    "#);
+}
+
+#[test]
+fn ref_without_children_is_valid() {
+    let input = indoc! {r#"
+    Expr = (identifier)
+    (program (Expr) @e)
+    "#};
+
+    let query = Query::new(input);
+
+    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    Root
+      Def
+        Id "Expr"
+        Equals "="
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Def
+        Tree
+          ParenOpen "("
+          Id "program"
+          Capture
+            Ref
+              ParenOpen "("
+              Id "Expr"
+              ParenClose ")"
+            At "@"
+            Id "e"
+          ParenClose ")"
+    "#);
+}
+
+// ============================================================================
 // Dotted Capture Names
 // ============================================================================
 
@@ -19,14 +171,15 @@ fn capture_dotted_error() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo.bar"
+          At "@"
+          Id "foo.bar"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar
-      |              ^^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^ capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -50,14 +203,15 @@ fn capture_dotted_multiple_parts() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo.bar.baz"
+          At "@"
+          Id "foo.bar.baz"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar.baz
-      |              ^^^^^^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^^^^^ capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -81,22 +235,23 @@ fn capture_dotted_followed_by_field() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "node"
+            Id "node"
             ParenClose ")"
-          CaptureName "@foo.bar"
+          At "@"
+          Id "foo.bar"
       Def
         Field
-          LowerIdent "name"
+          Id "name"
           Colon ":"
           Tree
             ParenOpen "("
-            LowerIdent "other"
+            Id "other"
             ParenClose ")"
     ---
     error: capture names cannot contain dots
       |
     1 | (node) @foo.bar name: (other)
-      |        ^^^^^^^^ capture names cannot contain dots
+      |         ^^^^^^^ capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -124,17 +279,18 @@ fn capture_space_after_dot_breaks_chain() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo."
+          At "@"
+          Id "foo."
       Def
         Error
-          LowerIdent "bar"
+          Id "bar"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo. bar
-      |              ^^^^^ capture names cannot contain dots
+      |               ^^^^ capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_ instead
       |
@@ -170,14 +326,15 @@ fn capture_hyphenated_error() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo-bar"
+          At "@"
+          Id "foo-bar"
     ---
     error: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar
-      |              ^^^^^^^^ capture names cannot contain hyphens
+      |               ^^^^^^^ capture names cannot contain hyphens
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -201,14 +358,15 @@ fn capture_hyphenated_multiple() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo-bar-baz"
+          At "@"
+          Id "foo-bar-baz"
     ---
     error: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar-baz
-      |              ^^^^^^^^^^^^ capture names cannot contain hyphens
+      |               ^^^^^^^^^^^ capture names cannot contain hyphens
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -232,14 +390,15 @@ fn capture_mixed_dots_and_hyphens() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@foo.bar-baz"
+          At "@"
+          Id "foo.bar-baz"
     ---
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar-baz
-      |              ^^^^^^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^^^^^ capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -264,7 +423,7 @@ fn single_quote_string_suggests_double_quotes() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Lit
             SingleQuoteLit "'if'"
           ParenClose ")"
@@ -333,7 +492,7 @@ fn single_quote_with_escape() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Lit
             SingleQuoteLit "'it\\'s'"
           ParenClose ")"
@@ -366,14 +525,14 @@ fn comma_in_node_children() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           ParenClose ")"
     ---
@@ -403,15 +562,15 @@ fn comma_in_alternation() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           BracketClose "]"
     ---
@@ -451,15 +610,15 @@ fn pipe_in_alternation() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           BracketClose "]"
     ---
@@ -499,11 +658,11 @@ fn comma_in_sequence() {
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           BraceClose "}"
     ---
@@ -536,12 +695,13 @@ fn single_colon_type_annotation() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             Colon ":"
-            UpperIdent "Type"
+            Id "Type"
     ---
     error: single colon is not valid for type annotations
       |
@@ -567,12 +727,13 @@ fn single_colon_type_annotation_no_space() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             Colon ":"
-            UpperIdent "Type"
+            Id "Type"
     ---
     error: single colon is not valid for type annotations
       |
@@ -596,15 +757,36 @@ fn single_colon_primitive_type() {
     Root
       Def
         Error
-          CaptureName "@val"
+          At "@"
+      Def
+        Field
+          Id "val"
+          Error
+            Colon ":"
+      Def
         Error
-          Colon ":"
-          LowerIdent "string"
+          Id "string"
     ---
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
-      | ^^^^ capture '@' must follow an expression to capture
+      | ^ capture '@' must follow an expression to capture
+    error: expected ':' to separate field name from its value
+      |
+    1 | @val : string
+      |     ^ expected ':' to separate field name from its value
+    error: unexpected token; expected an expression
+      |
+    1 | @val : string
+      |      ^ unexpected token; expected an expression
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | @val : string
+      |        ^^^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unnamed definition must be last in file; add a name: `Name = val :`
+      |
+    1 | @val : string
+      |  ^^^^^ unnamed definition must be last in file; add a name: `Name = val :`
     "#);
 }
 
@@ -629,18 +811,18 @@ fn lowercase_branch_label() {
         Alt
           BracketOpen "["
           Branch
-            LowerIdent "left"
+            Id "left"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
           Branch
-            LowerIdent "right"
+            Id "right"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
           BracketClose "]"
     ---
@@ -679,18 +861,18 @@ fn mixed_case_branch_labels() {
         Alt
           BracketOpen "["
           Branch
-            LowerIdent "foo"
+            Id "foo"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
           Branch
-            UpperIdent "Bar"
+            Id "Bar"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
           BracketClose "]"
     ---
@@ -722,13 +904,13 @@ fn field_equals_typo() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Field
-            LowerIdent "name"
+            Id "name"
             Equals "="
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     ---
@@ -756,13 +938,13 @@ fn field_equals_typo_no_space() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Field
-            LowerIdent "name"
+            Id "name"
             Equals "="
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     ---
@@ -794,18 +976,20 @@ fn multiple_suggestions_combined() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Field
-            LowerIdent "name"
+            Id "name"
             Equals "="
             Lit
               SingleQuoteLit "'foo'"
           Error
-            CaptureName "@val"
+            At "@"
+          Field
+            Id "val"
+            Error
+              Colon ":"
           Error
-            Colon ":"
-          Error
-            UpperIdent "Type"
+            Id "Type"
           ParenClose ")"
     ---
     error: '=' is not valid for field constraints
@@ -841,11 +1025,15 @@ fn multiple_suggestions_combined() {
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (node name = 'foo', @val : Type)
-      |                     ^^^^ unexpected token; expected a child expression or closing delimiter
-    error: unexpected token; expected a child expression or closing delimiter
+      |                     ^ unexpected token; expected a child expression or closing delimiter
+    error: expected ':' to separate field name from its value
       |
     1 | (node name = 'foo', @val : Type)
-      |                          ^ unexpected token; expected a child expression or closing delimiter
+      |                         ^ expected ':' to separate field name from its value
+    error: unexpected token; expected an expression
+      |
+    1 | (node name = 'foo', @val : Type)
+      |                          ^ unexpected token; expected an expression
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (node name = 'foo', @val : Type)
@@ -868,7 +1056,7 @@ fn double_quotes_no_error() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Lit
             StringLit "\"if\""
           ParenClose ")"
@@ -887,12 +1075,13 @@ fn double_colon_no_error() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             DoubleColon "::"
-            UpperIdent "Type"
+            Id "Type"
     "#);
 }
 
@@ -907,13 +1096,13 @@ fn field_colon_no_error() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -931,18 +1120,18 @@ fn capitalized_branch_label_no_error() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Left"
+            Id "Left"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
           Branch
-            UpperIdent "Right"
+            Id "Right"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -961,15 +1150,15 @@ fn whitespace_separation_no_error() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -992,15 +1181,26 @@ fn field_with_upper_ident_parses() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "node"
+          Id "node"
           Field
-            UpperIdent "FieldTypo"
+            Id "FieldTypo"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "x"
+              Id "x"
               ParenClose ")"
           ParenClose ")"
+    ---
+    error: field names must start with lowercase
+      |
+    1 | (node FieldTypo: (x))
+      |       ^^^^^^^^^ field names must start with lowercase
+      |
+    help: field names must be snake_case; use field_typo: instead
+      |
+    1 - (node FieldTypo: (x))
+    1 + (node field_typo:: (x))
+      |
     "#);
 }
 
@@ -1018,14 +1218,15 @@ fn capture_with_upper_ident_parses() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@Name"
+          At "@"
+          Id "Name"
     ---
     error: capture names must start with lowercase
       |
     1 | (identifier) @Name
-      |              ^^^^^ capture names must start with lowercase
+      |               ^^^^ capture names must start with lowercase
       |
     help: capture names must be snake_case; use @name instead
       |
@@ -1048,11 +1249,22 @@ fn negated_field_with_upper_ident_parses() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           NegatedField
             Negation "!"
-            UpperIdent "Arguments"
+            Id "Arguments"
           ParenClose ")"
+    ---
+    error: field names must start with lowercase
+      |
+    1 | (call !Arguments)
+      |        ^^^^^^^^^ field names must start with lowercase
+      |
+    help: field names must be snake_case; use arguments: instead
+      |
+    1 - (call !Arguments)
+    1 + (call !arguments:)
+      |
     "#);
 }
 
@@ -1070,17 +1282,18 @@ fn capture_with_type_and_upper_ident() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@Name"
+          At "@"
+          Id "Name"
           Type
             DoubleColon "::"
-            UpperIdent "MyType"
+            Id "MyType"
     ---
     error: capture names must start with lowercase
       |
     1 | (identifier) @Name :: MyType
-      |              ^^^^^ capture names must start with lowercase
+      |               ^^^^ capture names must start with lowercase
       |
     help: capture names must be snake_case; use @name instead
       |

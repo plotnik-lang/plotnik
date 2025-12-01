@@ -14,7 +14,7 @@ fn missing_paren() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
     ---
     error: unclosed tree; expected ')'
       |
@@ -40,11 +40,11 @@ fn missing_bracket() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "string"
+            Id "string"
             ParenClose ")"
     ---
     error: unclosed alternation; expected ']'
@@ -71,11 +71,11 @@ fn missing_brace() {
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
     ---
     error: unclosed sequence; expected '}'
@@ -100,13 +100,13 @@ fn nested_unclosed() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             Tree
               ParenOpen "("
-              LowerIdent "c"
+              Id "c"
               ParenClose ")"
     ---
     error: unclosed tree; expected ')'
@@ -131,16 +131,16 @@ fn deeply_nested_unclosed() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             Tree
               ParenOpen "("
-              LowerIdent "c"
+              Id "c"
               Tree
                 ParenOpen "("
-                LowerIdent "d"
+                Id "d"
     ---
     error: unclosed tree; expected ')'
       |
@@ -166,11 +166,11 @@ fn unclosed_alternation_nested() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
     ---
     error: unclosed tree; expected ')'
       |

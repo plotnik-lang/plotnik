@@ -4,9 +4,8 @@
 //! 1. Collect all `Name = expr` definitions
 //! 2. Check that all `(UpperIdent)` references are defined
 
-use crate::ql::ast::{Expr, Root, Tree};
+use crate::ql::ast::{Expr, Ref, Root};
 use crate::ql::parser::SyntaxError;
-use crate::ql::syntax_kind::SyntaxKind;
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
@@ -94,12 +93,12 @@ pub fn resolve(root: &Root) -> ResolveResult {
 
 fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
     match expr {
-        Expr::Tree(tree) => {
-            if let Some(type_token) = tree.node_type() {
-                if type_token.kind() == SyntaxKind::UpperIdent {
-                    refs.insert(type_token.text().to_string());
-                }
+        Expr::Ref(r) => {
+            if let Some(name_token) = r.name() {
+                refs.insert(name_token.text().to_string());
             }
+        }
+        Expr::Tree(tree) => {
             for child in tree.children() {
                 collect_refs(&child, refs);
             }
@@ -140,8 +139,10 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
 
 fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
     match expr {
+        Expr::Ref(r) => {
+            check_ref_reference(r, symbols, errors);
+        }
         Expr::Tree(tree) => {
-            check_tree_reference(tree, symbols, errors);
             for child in tree.children() {
                 collect_reference_errors(&child, symbols, errors);
             }
@@ -180,16 +181,14 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
     }
 }
 
-fn check_tree_reference(tree: &Tree, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
-    if let Some(type_token) = tree.node_type() {
-        if type_token.kind() == SyntaxKind::UpperIdent {
-            let name = type_token.text();
-            if symbols.get(name).is_none() {
-                errors.push(SyntaxError::new(
-                    type_token.text_range(),
-                    format!("undefined reference: `{}`", name),
-                ));
-            }
+fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
+    if let Some(name_token) = r.name() {
+        let name = name_token.text();
+        if symbols.get(name).is_none() {
+            errors.push(SyntaxError::new(
+                name_token.text_range(),
+                format!("undefined reference: `{}`", name),
+            ));
         }
     }
 }

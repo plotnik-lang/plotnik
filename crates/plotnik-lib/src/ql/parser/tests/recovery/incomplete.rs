@@ -12,19 +12,17 @@ fn missing_capture_name() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
-      Def
-        Error
-          Garbage "@"
-        Error
+        Capture
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+          At "@"
     ---
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: expected capture name after '@'
       |
     1 | (identifier) @
-      |              ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |               ^ expected capture name after '@'
     "#);
 }
 
@@ -41,9 +39,9 @@ fn missing_field_value() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Error
               ParenClose ")"
@@ -70,7 +68,7 @@ fn named_def_eof_after_equals() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
     ---
     error: expected expression after '=' in named definition
@@ -94,9 +92,10 @@ fn missing_type_name() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             DoubleColon "::"
     ---
@@ -120,7 +119,7 @@ fn missing_negated_field_name() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           NegatedField
             Negation "!"
           ParenClose ")"
@@ -145,7 +144,7 @@ fn missing_subtype() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          Id "expression"
           Slash "/"
           ParenClose ")"
     ---
@@ -170,7 +169,7 @@ fn tagged_branch_missing_pattern() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Label"
+            Id "Label"
             Colon ":"
           BracketClose "]"
     ---
@@ -195,19 +194,31 @@ fn mixed_valid_invalid_captures() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
-          CaptureName "@ok"
+          At "@"
+          Id "ok"
       Def
         Error
-          Garbage "@"
+          At "@"
         Error
-          CaptureName "@name"
+          At "@"
+      Def
+        Error
+          Id "name"
     ---
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: capture '@' must follow an expression to capture
       |
     1 | (a) @ok @ @name
-      |         ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |         ^ capture '@' must follow an expression to capture
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (a) @ok @ @name
+      |            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unnamed definition must be last in file; add a name: `Name = (a) @ok`
+      |
+    1 | (a) @ok @ @name
+      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (a) @ok`
     "#);
 }
 
@@ -225,9 +236,10 @@ fn type_annotation_invalid_token_after() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          CaptureName "@name"
+          At "@"
+          Id "name"
           Type
             DoubleColon "::"
       Def
@@ -267,7 +279,7 @@ fn error_with_unexpected_content() {
           KwError "ERROR"
           Tree
             ParenOpen "("
-            LowerIdent "something"
+            Id "something"
             ParenClose ")"
           ParenClose ")"
     ---

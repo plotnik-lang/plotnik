@@ -15,11 +15,11 @@ fn simple_sequence() {
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           BraceClose "}"
     "#);
@@ -55,7 +55,7 @@ fn sequence_single_element() {
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           BraceClose "}"
     "#);
@@ -77,16 +77,18 @@ fn sequence_with_captures() {
             Quantifier
               Tree
                 ParenOpen "("
-                LowerIdent "comment"
+                Id "comment"
                 ParenClose ")"
               Star "*"
-            CaptureName "@comments"
+            At "@"
+            Id "comments"
           Capture
             Tree
               ParenOpen "("
-              LowerIdent "function"
+              Id "function"
               ParenClose ")"
-            CaptureName "@fn"
+            At "@"
+            Id "fn"
           BraceClose "}"
     "#);
 }
@@ -106,11 +108,11 @@ fn sequence_with_quantifier() {
             BraceOpen "{"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
             BraceClose "}"
           Plus "+"
@@ -133,14 +135,14 @@ fn nested_sequences() {
             BraceOpen "{"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
             BraceClose "}"
           Seq
             BraceOpen "{"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
             BraceClose "}"
           BraceClose "}"
@@ -160,16 +162,16 @@ fn sequence_in_named_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "block"
+          Id "block"
           Seq
             BraceOpen "{"
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
             BraceClose "}"
           ParenClose ")"
@@ -192,16 +194,16 @@ fn sequence_with_alternation() {
             BracketOpen "["
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
             BracketClose "]"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           BraceClose "}"
     "#);
@@ -221,7 +223,7 @@ fn sequence_comma_separated_pattern() {
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           Quantifier
             Seq
@@ -230,7 +232,7 @@ fn sequence_comma_separated_pattern() {
                 StringLit "\",\""
               Tree
                 ParenOpen "("
-                LowerIdent "number"
+                Id "number"
                 ParenClose ")"
               BraceClose "}"
             Star "*"
@@ -254,11 +256,11 @@ fn sequence_with_anchor() {
             Dot "."
           Tree
             ParenOpen "("
-            LowerIdent "first"
+            Id "first"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "second"
+            Id "second"
             ParenClose ")"
           Anchor
             Dot "."

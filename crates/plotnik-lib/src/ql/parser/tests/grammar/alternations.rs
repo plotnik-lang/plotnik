@@ -19,11 +19,11 @@ fn alternation() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "string"
+            Id "string"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -64,14 +64,15 @@ fn alternation_with_capture() {
             BracketOpen "["
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "string"
+              Id "string"
               ParenClose ")"
             BracketClose "]"
-          CaptureName "@value"
+          At "@"
+          Id "value"
     "#);
 }
 
@@ -88,16 +89,16 @@ fn alternation_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expr"
+          Id "expr"
           Alt
             BracketOpen "["
             Tree
               ParenOpen "("
-              LowerIdent "binary"
+              Id "binary"
               ParenClose ")"
             Tree
               ParenOpen "("
-              LowerIdent "unary"
+              Id "unary"
               ParenClose ")"
             BracketClose "]"
           ParenClose ")"
@@ -117,19 +118,19 @@ fn alternation_in_field() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Field
-            LowerIdent "arguments"
+            Id "arguments"
             Colon ":"
             Alt
               BracketOpen "["
               Tree
                 ParenOpen "("
-                LowerIdent "string"
+                Id "string"
                 ParenClose ")"
               Tree
                 ParenOpen "("
-                LowerIdent "number"
+                Id "number"
                 ParenClose ")"
               BracketClose "]"
           ParenClose ")"
@@ -150,15 +151,15 @@ fn unlabeled_alternation_three_items() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "string"
+            Id "string"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -176,13 +177,13 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
       Def
         Alt
           BracketOpen "["
-          Tree
+          Ref
             ParenOpen "("
-            UpperIdent "Expr"
+            Id "Expr"
             ParenClose ")"
-          Tree
+          Ref
             ParenOpen "("
-            UpperIdent "Statement"
+            Id "Statement"
             ParenClose ")"
           BracketClose "]"
     ---
@@ -217,18 +218,18 @@ fn tagged_alternation_simple() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Ident"
+            Id "Ident"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           Branch
-            UpperIdent "Num"
+            Id "Num"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "number"
+              Id "number"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -247,25 +248,25 @@ fn tagged_alternation_single_line() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "A"
+            Id "A"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
           Branch
-            UpperIdent "B"
+            Id "B"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "b"
+              Id "b"
               ParenClose ")"
           Branch
-            UpperIdent "C"
+            Id "C"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "c"
+              Id "c"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -288,39 +289,42 @@ fn tagged_alternation_with_captures() {
           Alt
             BracketOpen "["
             Branch
-              UpperIdent "Assign"
+              Id "Assign"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "assignment_expression"
+                Id "assignment_expression"
                 Field
-                  LowerIdent "left"
+                  Id "left"
                   Colon ":"
                   Capture
                     Tree
                       ParenOpen "("
-                      LowerIdent "identifier"
+                      Id "identifier"
                       ParenClose ")"
-                    CaptureName "@left"
+                    At "@"
+                    Id "left"
                 ParenClose ")"
             Branch
-              UpperIdent "Call"
+              Id "Call"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "call_expression"
+                Id "call_expression"
                 Field
-                  LowerIdent "function"
+                  Id "function"
                   Colon ":"
                   Capture
                     Tree
                       ParenOpen "("
-                      LowerIdent "identifier"
+                      Id "identifier"
                       ParenClose ")"
-                    CaptureName "@func"
+                    At "@"
+                    Id "func"
                 ParenClose ")"
             BracketClose "]"
-          CaptureName "@stmt"
+          At "@"
+          Id "stmt"
     "#);
 }
 
@@ -341,35 +345,38 @@ fn tagged_alternation_with_type_annotation() {
           Alt
             BracketOpen "["
             Branch
-              UpperIdent "Base"
+              Id "Base"
               Colon ":"
               Capture
                 Tree
                   ParenOpen "("
-                  LowerIdent "identifier"
+                  Id "identifier"
                   ParenClose ")"
-                CaptureName "@name"
+                At "@"
+                Id "name"
             Branch
-              UpperIdent "Access"
+              Id "Access"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "member_expression"
+                Id "member_expression"
                 Field
-                  LowerIdent "object"
+                  Id "object"
                   Colon ":"
                   Capture
                     Tree
                       ParenOpen "("
                       Underscore "_"
                       ParenClose ")"
-                    CaptureName "@obj"
+                    At "@"
+                    Id "obj"
                 ParenClose ")"
             BracketClose "]"
-          CaptureName "@chain"
+          At "@"
+          Id "chain"
           Type
             DoubleColon "::"
-            UpperIdent "MemberChain"
+            Id "MemberChain"
     "#);
 }
 
@@ -389,22 +396,22 @@ fn tagged_alternation_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expr"
+          Id "expr"
           Alt
             BracketOpen "["
             Branch
-              UpperIdent "Binary"
+              Id "Binary"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "binary_expression"
+                Id "binary_expression"
                 ParenClose ")"
             Branch
-              UpperIdent "Unary"
+              Id "Unary"
               Colon ":"
               Tree
                 ParenOpen "("
-                LowerIdent "unary_expression"
+                Id "unary_expression"
                 ParenClose ")"
             BracketClose "]"
           ParenClose ")"
@@ -425,30 +432,30 @@ fn tagged_alternation_in_named_def() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Statement"
+        Id "Statement"
         Equals "="
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Assign"
+            Id "Assign"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "assignment_expression"
+              Id "assignment_expression"
               ParenClose ")"
           Branch
-            UpperIdent "Call"
+            Id "Call"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "call_expression"
+              Id "call_expression"
               ParenClose ")"
           Branch
-            UpperIdent "Return"
+            Id "Return"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "return_statement"
+              Id "return_statement"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -470,19 +477,19 @@ fn tagged_alternation_with_quantifier() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Single"
+            Id "Single"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
           Branch
-            UpperIdent "Multiple"
+            Id "Multiple"
             Colon ":"
             Quantifier
               Tree
                 ParenOpen "("
-                LowerIdent "statement"
+                Id "statement"
                 ParenClose ")"
               Plus "+"
           BracketClose "]"
@@ -505,25 +512,25 @@ fn tagged_alternation_with_sequence() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Pair"
+            Id "Pair"
             Colon ":"
             Seq
               BraceOpen "{"
               Tree
                 ParenOpen "("
-                LowerIdent "key"
+                Id "key"
                 ParenClose ")"
               Tree
                 ParenOpen "("
-                LowerIdent "value"
+                Id "value"
                 ParenClose ")"
               BraceClose "}"
           Branch
-            UpperIdent "Single"
+            Id "Single"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "value"
+              Id "value"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -542,22 +549,22 @@ fn mixed_tagged_and_untagged() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Tagged"
+            Id "Tagged"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "a"
+              Id "a"
               ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           Branch
-            UpperIdent "Another"
+            Id "Another"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "c"
+              Id "c"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -579,25 +586,25 @@ fn tagged_alternation_with_nested_alternation() {
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Literal"
+            Id "Literal"
             Colon ":"
             Alt
               BracketOpen "["
               Tree
                 ParenOpen "("
-                LowerIdent "number"
+                Id "number"
                 ParenClose ")"
               Tree
                 ParenOpen "("
-                LowerIdent "string"
+                Id "string"
                 ParenClose ")"
               BracketClose "]"
           Branch
-            UpperIdent "Ident"
+            Id "Ident"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           BracketClose "]"
     "#);
@@ -620,70 +627,75 @@ fn tagged_alternation_full_example() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expression"
+        Id "Expression"
         Equals "="
         Alt
           BracketOpen "["
           Branch
-            UpperIdent "Ident"
+            Id "Ident"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
-                LowerIdent "identifier"
+                Id "identifier"
                 ParenClose ")"
-              CaptureName "@name"
+              At "@"
+              Id "name"
               Type
                 DoubleColon "::"
-                LowerIdent "string"
+                Id "string"
           Branch
-            UpperIdent "Num"
+            Id "Num"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
-                LowerIdent "number"
+                Id "number"
                 ParenClose ")"
-              CaptureName "@value"
+              At "@"
+              Id "value"
               Type
                 DoubleColon "::"
-                LowerIdent "string"
+                Id "string"
           Branch
-            UpperIdent "Str"
+            Id "Str"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
-                LowerIdent "string"
+                Id "string"
                 ParenClose ")"
-              CaptureName "@value"
+              At "@"
+              Id "value"
               Type
                 DoubleColon "::"
-                LowerIdent "string"
+                Id "string"
           Branch
-            UpperIdent "Binary"
+            Id "Binary"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "binary_expression"
+              Id "binary_expression"
               Field
-                LowerIdent "left"
+                Id "left"
                 Colon ":"
                 Capture
-                  Tree
+                  Ref
                     ParenOpen "("
-                    UpperIdent "Expression"
+                    Id "Expression"
                     ParenClose ")"
-                  CaptureName "@left"
+                  At "@"
+                  Id "left"
               Field
-                LowerIdent "right"
+                Id "right"
                 Colon ":"
                 Capture
-                  Tree
+                  Ref
                     ParenOpen "("
-                    UpperIdent "Expression"
+                    Id "Expression"
                     ParenClose ")"
-                  CaptureName "@right"
+                  At "@"
+                  Id "right"
               ParenClose ")"
           BracketClose "]"
     "#);

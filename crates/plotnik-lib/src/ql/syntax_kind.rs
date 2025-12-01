@@ -120,22 +120,18 @@ pub enum SyntaxKind {
     #[token("MISSING")]
     KwMissing,
 
-    /// PascalCase identifier (e.g., `Foo`, `Bar`)
-    /// Defined after KwError/KwMissing so keywords take precedence
-    #[regex(r"[A-Z][A-Za-z0-9]*")]
-    UpperIdent,
-
-    /// snake_case identifier (e.g., `identifier`, `function_definition`). Also used for capture names.
-    #[regex(r"[a-z][a-z0-9_]*")]
-    LowerIdent,
+    /// Loose identifier for all naming contexts (definitions, fields, node types, etc.)
+    /// Accepts dots and hyphens for tree-sitter compatibility; parser validates per context.
+    /// Defined after KwError/KwMissing so keywords take precedence.
+    #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]
+    Id,
 
     #[token(".")]
     Dot,
 
-    /// Capture name: `@name`, `@foo_bar`, or tree-sitter style `@foo.bar`, `@foo-bar`
-    /// The lexer accepts all forms; the parser validates plotnik conventions (snake_case only)
-    #[regex(r"@[a-zA-Z_][a-zA-Z0-9_.\-]*")]
-    CaptureName,
+    /// At sign for captures: `@`
+    #[token("@")]
+    At,
 
     /// Horizontal whitespace (spaces, tabs)
     #[regex(r"[ \t]+")]
@@ -169,6 +165,8 @@ pub enum SyntaxKind {
     Root,
     /// Tree expression: `(type children...)`, `(_)`, `(ERROR)`, `(MISSING ...)`
     Tree,
+    /// Reference to user-defined expression: `(Expr)` where Expr is PascalCase
+    Ref,
     /// Literal/anonymous node: `"keyword"`
     Lit,
     /// Field specification: `name: expr`
@@ -332,14 +330,13 @@ pub mod token_sets {
     use super::*;
 
     /// Tokens that can start an expression (FIRST set of the expression production).
-    /// Note: CaptureName is not included because captures wrap expressions, they don't start them.
+    /// Note: At is not included because captures wrap expressions, they don't start them.
     pub const EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
         BraceOpen,
         Underscore,
-        UpperIdent,
-        LowerIdent,
+        Id,
         StringLit,
         SingleQuoteLit,
         Dot,
@@ -349,14 +346,14 @@ pub mod token_sets {
     ]);
 
     /// Tokens that can start a valid expression at root level (anonymous definition).
-    /// Excludes LowerIdent (only valid as node type inside parens), Dot (anchor),
+    /// Excludes bare Id (only valid as node type inside parens), Dot (anchor),
     /// and Negation (negated field) which only make sense inside tree context.
     pub const ROOT_EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
         BraceOpen,
         Underscore,
-        UpperIdent,
+        Id,
         StringLit,
         SingleQuoteLit,
         KwError,
@@ -384,14 +381,13 @@ pub mod token_sets {
     pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose]);
 
     pub const FIELD_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenClose, BracketClose, BraceClose, CaptureName, Colon]);
+        TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
 
-    pub const ROOT_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent]);
+    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);
 
     /// Recovery set for named definitions (Name = ...)
     pub const DEF_RECOVERY: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, UpperIdent, Equals]);
+        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id, Equals]);
 
     pub const SEQ_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose]);
 }

@@ -57,12 +57,16 @@ pub fn check_escape(root: &Root, symbols: &SymbolTable) -> Vec<SyntaxError> {
 
 fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
     match expr {
-        Expr::Tree(tree) => {
-            if let Some(type_token) = tree.node_type() {
-                if type_token.kind() == SyntaxKind::UpperIdent && scc.contains(type_token.text()) {
-                    return false;
-                }
+        Expr::Ref(r) => {
+            // A Ref is always a reference to a user-defined expression
+            // If it's in the SCC, it doesn't provide an escape path
+            if let Some(name_token) = r.name() {
+                !scc.contains(name_token.text())
+            } else {
+                true
             }
+        }
+        Expr::Tree(tree) => {
             let children: Vec<_> = tree.children().collect();
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc))
         }
@@ -194,15 +198,17 @@ fn find_reference_location(root: &Root, from: &str, to: &str) -> Option<TextRang
 
 fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
     match expr {
-        Expr::Tree(tree) => {
-            if let Some(type_token) = tree.node_type() {
-                if type_token.kind() == SyntaxKind::UpperIdent && type_token.text() == target {
-                    return Some(type_token.text_range());
+        Expr::Ref(r) => {
+            if let Some(name_token) = r.name() {
+                if name_token.text() == target {
+                    return Some(name_token.text_range());
                 }
             }
-            tree.children()
-                .find_map(|child| find_ref_in_expr(&child, target))
+            None
         }
+        Expr::Tree(tree) => tree
+            .children()
+            .find_map(|child| find_ref_in_expr(&child, target)),
         Expr::Alt(alt) => alt
             .branches()
             .find_map(|b| b.body().and_then(|body| find_ref_in_expr(&body, target)))

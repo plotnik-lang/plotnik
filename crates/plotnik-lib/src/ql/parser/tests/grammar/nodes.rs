@@ -23,7 +23,7 @@ fn simple_named_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     "#);
 }
@@ -40,13 +40,13 @@ fn nested_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "function_definition"
+          Id "function_definition"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -67,16 +67,16 @@ fn deeply_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             Tree
               ParenOpen "("
-              LowerIdent "c"
+              Id "c"
               Tree
                 ParenOpen "("
-                LowerIdent "d"
+                Id "d"
                 ParenClose ")"
               ParenClose ")"
             ParenClose ")"
@@ -99,18 +99,18 @@ fn sibling_children() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "block"
+          Id "block"
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           ParenClose ")"
     "#);
@@ -130,17 +130,17 @@ fn multiple_patterns() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "string"
+          Id "string"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "number"
+          Id "number"
           ParenClose ")"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
@@ -225,9 +225,9 @@ fn supertype_basic() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          Id "expression"
           Slash "/"
-          LowerIdent "binary_expression"
+          Id "binary_expression"
           ParenClose ")"
     "#);
 }
@@ -245,7 +245,7 @@ fn supertype_with_string_subtype() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          Id "expression"
           Slash "/"
           StringLit "\"()\""
           ParenClose ")"
@@ -265,11 +265,12 @@ fn supertype_with_capture() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "expression"
+            Id "expression"
             Slash "/"
-            LowerIdent "binary_expression"
+            Id "binary_expression"
             ParenClose ")"
-          CaptureName "@expr"
+          At "@"
+          Id "expr"
     "#);
 }
 
@@ -287,27 +288,29 @@ fn supertype_with_children() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          Id "expression"
           Slash "/"
-          LowerIdent "binary_expression"
+          Id "binary_expression"
           Field
-            LowerIdent "left"
+            Id "left"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              CaptureName "@left"
+              At "@"
+              Id "left"
           Field
-            LowerIdent "right"
+            Id "right"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              CaptureName "@right"
+              At "@"
+              Id "right"
           ParenClose ")"
     "#);
 }
@@ -325,14 +328,14 @@ fn supertype_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "statement"
+          Id "statement"
           Slash "/"
-          LowerIdent "expression_statement"
+          Id "expression_statement"
           Tree
             ParenOpen "("
-            LowerIdent "expression"
+            Id "expression"
             Slash "/"
-            LowerIdent "call_expression"
+            Id "call_expression"
             ParenClose ")"
           ParenClose ")"
     "#);
@@ -353,15 +356,15 @@ fn supertype_in_alternation() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "expression"
+            Id "expression"
             Slash "/"
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "expression"
+            Id "expression"
             Slash "/"
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -379,7 +382,7 @@ fn no_supertype_plain_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     "#);
 }

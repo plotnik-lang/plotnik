@@ -13,13 +13,13 @@ fn field_pattern() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Field
-            LowerIdent "function"
+            Id "function"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -39,20 +39,20 @@ fn multiple_fields() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "assignment"
+          Id "assignment"
           Field
-            LowerIdent "left"
+            Id "left"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           Field
-            LowerIdent "right"
+            Id "right"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "expression"
+              Id "expression"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -70,10 +70,10 @@ fn negated_field() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "function"
+          Id "function"
           NegatedField
             Negation "!"
-            LowerIdent "async"
+            Id "async"
           ParenClose ")"
     "#);
 }
@@ -92,16 +92,16 @@ fn negated_and_regular_fields() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "function"
+          Id "function"
           NegatedField
             Negation "!"
-            LowerIdent "async"
+            Id "async"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "identifier"
+              Id "identifier"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -122,24 +122,24 @@ fn mixed_children_and_fields() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "if"
+          Id "if"
           Field
-            LowerIdent "condition"
+            Id "condition"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "expr"
+              Id "expr"
               ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "then_block"
+            Id "then_block"
             ParenClose ")"
           Field
-            LowerIdent "else"
+            Id "else"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "else_block"
+              Id "else_block"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -159,16 +159,18 @@ fn multiple_patterns_with_captures() {
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "function"
+            Id "function"
             ParenClose ")"
-          CaptureName "@func"
+          At "@"
+          Id "func"
       Def
         Capture
           Tree
             ParenOpen "("
-            LowerIdent "class"
+            Id "class"
             ParenClose ")"
-          CaptureName "@cls"
+          At "@"
+          Id "cls"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (function) @func`
       |

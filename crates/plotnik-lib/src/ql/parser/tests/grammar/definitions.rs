@@ -11,11 +11,11 @@ fn simple_named_def() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     "#);
 }
@@ -30,21 +30,21 @@ fn named_def_with_alternation() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Value"
+        Id "Value"
         Equals "="
         Alt
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "string"
+            Id "string"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -60,17 +60,17 @@ fn named_def_with_sequence() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Pair"
+        Id "Pair"
         Equals "="
         Seq
           BraceOpen "{"
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "expression"
+            Id "expression"
             ParenClose ")"
           BraceClose "}"
     "#);
@@ -89,36 +89,39 @@ fn named_def_with_captures() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "BinaryOp"
+        Id "BinaryOp"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "binary_expression"
+          Id "binary_expression"
           Field
-            LowerIdent "left"
+            Id "left"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              CaptureName "@left"
+              At "@"
+              Id "left"
           Field
-            LowerIdent "operator"
+            Id "operator"
             Colon ":"
             Capture
               Wildcard
                 Underscore "_"
-              CaptureName "@op"
+              At "@"
+              Id "op"
           Field
-            LowerIdent "right"
+            Id "right"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              CaptureName "@right"
+              At "@"
+              Id "right"
           ParenClose ")"
     "#);
 }
@@ -134,18 +137,18 @@ fn multiple_named_defs() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "expression"
+          Id "expression"
           ParenClose ")"
       Def
-        UpperIdent "Stmt"
+        Id "Stmt"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "statement"
+          Id "statement"
           ParenClose ")"
     "#);
 }
@@ -161,29 +164,30 @@ fn named_def_then_pattern() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Alt
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           BracketClose "]"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "program"
+          Id "program"
           Capture
-            Tree
+            Ref
               ParenOpen "("
-              UpperIdent "Expr"
+              Id "Expr"
               ParenClose ")"
-            CaptureName "@value"
+            At "@"
+            Id "value"
           ParenClose ")"
     "#);
 }
@@ -199,31 +203,31 @@ fn named_def_referencing_another() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Literal"
+        Id "Literal"
         Equals "="
         Alt
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "number"
+            Id "number"
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "string"
+            Id "string"
             ParenClose ")"
           BracketClose "]"
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Alt
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
-          Tree
+          Ref
             ParenOpen "("
-            UpperIdent "Literal"
+            Id "Literal"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -239,12 +243,12 @@ fn named_def_with_quantifier() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Statements"
+        Id "Statements"
         Equals "="
         Quantifier
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Plus "+"
     "#);
@@ -262,35 +266,37 @@ fn named_def_complex_recursive() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "NestedCall"
+        Id "NestedCall"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "call_expression"
+          Id "call_expression"
           Field
-            LowerIdent "function"
+            Id "function"
             Colon ":"
             Alt
               BracketOpen "["
               Capture
                 Tree
                   ParenOpen "("
-                  LowerIdent "identifier"
+                  Id "identifier"
                   ParenClose ")"
-                CaptureName "@name"
+                At "@"
+                Id "name"
               Capture
-                Tree
+                Ref
                   ParenOpen "("
-                  UpperIdent "NestedCall"
+                  Id "NestedCall"
                   ParenClose ")"
-                CaptureName "@inner"
+                At "@"
+                Id "inner"
               BracketClose "]"
           Field
-            LowerIdent "arguments"
+            Id "arguments"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "arguments"
+              Id "arguments"
               ParenClose ")"
           ParenClose ")"
     "#);
@@ -308,32 +314,34 @@ fn named_def_with_type_annotation() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Func"
+        Id "Func"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "function_declaration"
+          Id "function_declaration"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
-                LowerIdent "identifier"
+                Id "identifier"
                 ParenClose ")"
-              CaptureName "@name"
+              At "@"
+              Id "name"
               Type
                 DoubleColon "::"
-                LowerIdent "string"
+                Id "string"
           Field
-            LowerIdent "body"
+            Id "body"
             Colon ":"
             Capture
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              CaptureName "@body"
+              At "@"
+              Id "body"
           ParenClose ")"
     "#);
 }
@@ -348,9 +356,9 @@ fn upper_ident_not_followed_by_equals_is_pattern() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        Tree
+        Ref
           ParenOpen "("
-          UpperIdent "Expr"
+          Id "Expr"
           ParenClose ")"
     ---
     error: undefined reference: `Expr`
@@ -371,7 +379,7 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     Root
       Def
         Error
-          UpperIdent "Expr"
+          Id "Expr"
     ---
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
@@ -391,11 +399,11 @@ fn named_def_missing_equals() {
     Root
       Def
         Error
-          UpperIdent "Expr"
+          Id "Expr"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     ---
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -420,22 +428,23 @@ fn unnamed_def_allowed_as_last() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "program"
+          Id "program"
           Capture
-            Tree
+            Ref
               ParenOpen "("
-              UpperIdent "Expr"
+              Id "Expr"
               ParenClose ")"
-            CaptureName "@value"
+            At "@"
+            Id "value"
           ParenClose ")"
     "#);
 }
@@ -454,19 +463,19 @@ fn unnamed_def_not_allowed_in_middle() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "first"
+          Id "first"
           ParenClose ")"
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "last"
+          Id "last"
           ParenClose ")"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (first)`
@@ -490,17 +499,17 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "first"
+          Id "first"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "second"
+          Id "second"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "third"
+          Id "third"
           ParenClose ")"
     ---
     error: unnamed definition must be last in file; add a name: `Name = (first)`

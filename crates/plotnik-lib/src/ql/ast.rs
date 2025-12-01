@@ -25,6 +25,7 @@ macro_rules! ast_node {
 ast_node!(Root, Root);
 ast_node!(Def, Def);
 ast_node!(Tree, Tree);
+ast_node!(Ref, Ref);
 ast_node!(Lit, Lit);
 ast_node!(Alt, Alt);
 ast_node!(Branch, Branch);
@@ -41,6 +42,7 @@ ast_node!(Anchor, Anchor);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     Tree(Tree),
+    Ref(Ref),
     Lit(Lit),
     Alt(Alt),
     Seq(Seq),
@@ -56,6 +58,7 @@ impl Expr {
     pub fn cast(node: SyntaxNode) -> Option<Self> {
         match node.kind() {
             SyntaxKind::Tree => Tree::cast(node).map(Expr::Tree),
+            SyntaxKind::Ref => Ref::cast(node).map(Expr::Ref),
             SyntaxKind::Lit => Lit::cast(node).map(Expr::Lit),
             SyntaxKind::Alt => Alt::cast(node).map(Expr::Alt),
             SyntaxKind::Seq => Seq::cast(node).map(Expr::Seq),
@@ -72,6 +75,7 @@ impl Expr {
     pub fn syntax(&self) -> &SyntaxNode {
         match self {
             Expr::Tree(n) => n.syntax(),
+            Expr::Ref(n) => n.syntax(),
             Expr::Lit(n) => n.syntax(),
             Expr::Alt(n) => n.syntax(),
             Expr::Seq(n) => n.syntax(),
@@ -102,7 +106,7 @@ impl Def {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::UpperIdent)
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 
     pub fn body(&self) -> Option<Expr> {
@@ -118,8 +122,7 @@ impl Tree {
             .find(|t| {
                 matches!(
                     t.kind(),
-                    SyntaxKind::LowerIdent
-                        | SyntaxKind::UpperIdent
+                    SyntaxKind::Id
                         | SyntaxKind::Underscore
                         | SyntaxKind::KwError
                         | SyntaxKind::KwMissing
@@ -129,6 +132,15 @@ impl Tree {
 
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
+    }
+}
+
+impl Ref {
+    pub fn name(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 }
 
@@ -147,7 +159,7 @@ impl Branch {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::UpperIdent)
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 
     pub fn body(&self) -> Option<Expr> {
@@ -166,7 +178,7 @@ impl Capture {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| matches!(t.kind(), SyntaxKind::LowerIdent | SyntaxKind::UpperIdent))
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 
     pub fn inner(&self) -> Option<Expr> {
@@ -183,7 +195,7 @@ impl Type {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| matches!(t.kind(), SyntaxKind::UpperIdent | SyntaxKind::LowerIdent))
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 }
 
@@ -215,7 +227,7 @@ impl Field {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| matches!(t.kind(), SyntaxKind::LowerIdent | SyntaxKind::UpperIdent))
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 
     pub fn value(&self) -> Option<Expr> {
@@ -228,7 +240,7 @@ impl NegatedField {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| matches!(t.kind(), SyntaxKind::LowerIdent | SyntaxKind::UpperIdent))
+            .find(|t| t.kind() == SyntaxKind::Id)
     }
 }
 

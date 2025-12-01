@@ -48,10 +48,10 @@ fn braces() {
     insta::assert_snapshot!(snapshot("{ (a) (b) }"), @r#"
     BraceOpen "{"
     ParenOpen "("
-    LowerIdent "a"
+    Id "a"
     ParenClose ")"
     ParenOpen "("
-    LowerIdent "b"
+    Id "b"
     ParenClose ")"
     BraceClose "}"
     "#);
@@ -78,17 +78,17 @@ fn quantifiers_non_greedy() {
 #[test]
 fn quantifiers_attached() {
     insta::assert_snapshot!(snapshot("foo* bar+ baz? qux*? lazy+? greedy??"), @r#"
-    LowerIdent "foo"
+    Id "foo"
     Star "*"
-    LowerIdent "bar"
+    Id "bar"
     Plus "+"
-    LowerIdent "baz"
+    Id "baz"
     Question "?"
-    LowerIdent "qux"
+    Id "qux"
     StarQuestion "*?"
-    LowerIdent "lazy"
+    Id "lazy"
     PlusQuestion "+?"
-    LowerIdent "greedy"
+    Id "greedy"
     QuestionQuestion "??"
     "#);
 }
@@ -96,28 +96,28 @@ fn quantifiers_attached() {
 #[test]
 fn identifiers_lower() {
     insta::assert_snapshot!(snapshot("foo bar_baz test123"), @r#"
-    LowerIdent "foo"
-    LowerIdent "bar_baz"
-    LowerIdent "test123"
+    Id "foo"
+    Id "bar_baz"
+    Id "test123"
     "#);
 }
 
 #[test]
 fn identifiers_upper() {
     insta::assert_snapshot!(snapshot("Foo BarBaz Test123"), @r#"
-    UpperIdent "Foo"
-    UpperIdent "BarBaz"
-    UpperIdent "Test123"
+    Id "Foo"
+    Id "BarBaz"
+    Id "Test123"
     "#);
 }
 
 #[test]
 fn identifiers_mixed() {
     insta::assert_snapshot!(snapshot("Foo Bar baz test_case"), @r#"
-    UpperIdent "Foo"
-    UpperIdent "Bar"
-    LowerIdent "baz"
-    LowerIdent "test_case"
+    Id "Foo"
+    Id "Bar"
+    Id "baz"
+    Id "test_case"
     "#);
 }
 
@@ -144,35 +144,47 @@ fn strings_empty() {
 
 #[test]
 fn capture_simple() {
-    insta::assert_snapshot!(snapshot("@name"), @r#"CaptureName "@name""#);
+    insta::assert_snapshot!(snapshot("@name"), @r#"
+    At "@"
+    Id "name"
+    "#);
 }
 
 #[test]
 fn capture_with_underscores() {
-    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"CaptureName "@my_capture_name""#);
+    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"
+    At "@"
+    Id "my_capture_name"
+    "#);
 }
 
 #[test]
 fn capture_multiple() {
     insta::assert_snapshot!(snapshot("@name @value @other"), @r#"
-    CaptureName "@name"
-    CaptureName "@value"
-    CaptureName "@other"
+    At "@"
+    Id "name"
+    At "@"
+    Id "value"
+    At "@"
+    Id "other"
     "#);
 }
 
 #[test]
 fn capture_bare_at() {
     insta::assert_snapshot!(snapshot("@ foo"), @r#"
-    Garbage "@"
-    LowerIdent "foo"
+    At "@"
+    Id "foo"
     "#);
 }
 
 #[test]
-fn capture_uppercase_not_valid() {
-    // Uppercase after @ is not a valid capture - lexed as At + UpperIdent
-    insta::assert_snapshot!(snapshot("@Name"), @r#"CaptureName "@Name""#);
+fn capture_uppercase() {
+    // Uppercase after @ is now just At + Id (parser validates)
+    insta::assert_snapshot!(snapshot("@Name"), @r#"
+    At "@"
+    Id "Name"
+    "#);
 }
 
 #[test]
@@ -197,8 +209,8 @@ fn comment_line_then_block() {
 #[test]
 fn comment_between_tokens() {
     insta::assert_snapshot!(snapshot("foo /* comment */ bar"), @r#"
-    LowerIdent "foo"
-    LowerIdent "bar"
+    Id "foo"
+    Id "bar"
     "#);
 }
 
@@ -227,17 +239,17 @@ fn trivia_mixed() {
 #[test]
 fn trivia_between_tokens() {
     insta::assert_snapshot!(snapshot_raw("foo  bar"), @r#"
-    LowerIdent "foo"
+    Id "foo"
     Whitespace "  "
-    LowerIdent "bar"
+    Id "bar"
     "#);
 }
 
 #[test]
 fn trivia_filtered_by_default() {
     insta::assert_snapshot!(snapshot("foo  bar"), @r#"
-    LowerIdent "foo"
-    LowerIdent "bar"
+    Id "foo"
+    Id "bar"
     "#);
 }
 
@@ -245,11 +257,11 @@ fn trivia_filtered_by_default() {
 fn error_coalescing() {
     insta::assert_snapshot!(snapshot("(foo) ^$%& (bar)"), @r#"
     ParenOpen "("
-    LowerIdent "foo"
+    Id "foo"
     ParenClose ")"
     Garbage "^$%&"
     ParenOpen "("
-    LowerIdent "bar"
+    Id "bar"
     ParenClose ")"
     "#);
 }
@@ -297,7 +309,7 @@ fn error_single_char() {
 #[test]
 fn error_at_end() {
     insta::assert_snapshot!(snapshot("foo ^^^"), @r#"
-    LowerIdent "foo"
+    Id "foo"
     Garbage "^^^"
     "#);
 }
@@ -306,13 +318,14 @@ fn error_at_end() {
 fn complex_pattern() {
     insta::assert_snapshot!(snapshot("(function_definition name: (identifier) @name)"), @r#"
     ParenOpen "("
-    LowerIdent "function_definition"
-    LowerIdent "name"
+    Id "function_definition"
+    Id "name"
     Colon ":"
     ParenOpen "("
-    LowerIdent "identifier"
+    Id "identifier"
     ParenClose ")"
-    CaptureName "@name"
+    At "@"
+    Id "name"
     ParenClose ")"
     "#);
 }
@@ -336,18 +349,20 @@ fn empty_input() {
 #[test]
 fn double_colon() {
     insta::assert_snapshot!(snapshot("@name :: Type"), @r#"
-    CaptureName "@name"
+    At "@"
+    Id "name"
     DoubleColon "::"
-    UpperIdent "Type"
+    Id "Type"
     "#);
 }
 
 #[test]
 fn double_colon_no_spaces() {
     insta::assert_snapshot!(snapshot("@name::Type"), @r#"
-    CaptureName "@name"
+    At "@"
+    Id "name"
     DoubleColon "::"
-    UpperIdent "Type"
+    Id "Type"
     "#);
 }
 
@@ -364,18 +379,19 @@ fn double_colon_vs_single_colon() {
 #[test]
 fn double_colon_string_type() {
     insta::assert_snapshot!(snapshot("@name :: string"), @r#"
-    CaptureName "@name"
+    At "@"
+    Id "name"
     DoubleColon "::"
-    LowerIdent "string"
+    Id "string"
     "#);
 }
 
 #[test]
 fn slash() {
     insta::assert_snapshot!(snapshot("expression/binary_expression"), @r#"
-    LowerIdent "expression"
+    Id "expression"
     Slash "/"
-    LowerIdent "binary_expression"
+    Id "binary_expression"
     "#);
 }
 
@@ -383,9 +399,9 @@ fn slash() {
 fn slash_vs_comment() {
     // Slash must not conflict with line comments
     insta::assert_snapshot!(snapshot_raw("a/b // comment"), @r#"
-    LowerIdent "a"
+    Id "a"
     Slash "/"
-    LowerIdent "b"
+    Id "b"
     Whitespace " "
     LineComment "// comment"
     "#);
@@ -395,9 +411,9 @@ fn slash_vs_comment() {
 fn slash_vs_block_comment() {
     // Slash must not conflict with block comments
     insta::assert_snapshot!(snapshot_raw("a/b /* comment */"), @r#"
-    LowerIdent "a"
+    Id "a"
     Slash "/"
-    LowerIdent "b"
+    Id "b"
     Whitespace " "
     BlockComment "/* comment */"
     "#);
@@ -417,29 +433,29 @@ fn keyword_missing() {
     insta::assert_snapshot!(snapshot("(MISSING identifier)"), @r#"
     ParenOpen "("
     KwMissing "MISSING"
-    LowerIdent "identifier"
+    Id "identifier"
     ParenClose ")"
     "#);
 }
 
 #[test]
-fn keyword_error_vs_upper_ident() {
-    // ERROR keyword must take precedence over UpperIdent
-    // But ERRORx should be UpperIdent
+fn keyword_error_vs_id() {
+    // ERROR keyword must take precedence over Id
+    // But ERRORx should be Id
     insta::assert_snapshot!(snapshot("ERROR ERRORx Errors"), @r#"
     KwError "ERROR"
-    UpperIdent "ERRORx"
-    UpperIdent "Errors"
+    Id "ERRORx"
+    Id "Errors"
     "#);
 }
 
 #[test]
-fn keyword_missing_vs_upper_ident() {
-    // MISSING keyword must take precedence over UpperIdent
+fn keyword_missing_vs_id() {
+    // MISSING keyword must take precedence over Id
     insta::assert_snapshot!(snapshot("MISSING MISSINGx Missing"), @r#"
     KwMissing "MISSING"
-    UpperIdent "MISSINGx"
-    UpperIdent "Missing"
+    Id "MISSINGx"
+    Id "Missing"
     "#);
 }
 
@@ -447,9 +463,9 @@ fn keyword_missing_vs_upper_ident() {
 fn supertype_path_pattern() {
     insta::assert_snapshot!(snapshot("(expression/binary_expression)"), @r#"
     ParenOpen "("
-    LowerIdent "expression"
+    Id "expression"
     Slash "/"
-    LowerIdent "binary_expression"
+    Id "binary_expression"
     ParenClose ")"
     "#);
 }
@@ -458,11 +474,12 @@ fn supertype_path_pattern() {
 fn type_annotation_full() {
     insta::assert_snapshot!(snapshot("(identifier) @name :: string"), @r#"
     ParenOpen "("
-    LowerIdent "identifier"
+    Id "identifier"
     ParenClose ")"
-    CaptureName "@name"
+    At "@"
+    Id "name"
     DoubleColon "::"
-    LowerIdent "string"
+    Id "string"
     "#);
 }
 
@@ -471,10 +488,10 @@ fn sequence_pattern() {
     insta::assert_snapshot!(snapshot("{ (a) (b) }*"), @r#"
     BraceOpen "{"
     ParenOpen "("
-    LowerIdent "a"
+    Id "a"
     ParenClose ")"
     ParenOpen "("
-    LowerIdent "b"
+    Id "b"
     ParenClose ")"
     BraceClose "}"
     Star "*"
@@ -484,10 +501,10 @@ fn sequence_pattern() {
 #[test]
 fn named_def_tokens() {
     insta::assert_snapshot!(snapshot("Expr = (identifier)"), @r#"
-    UpperIdent "Expr"
+    Id "Expr"
     Equals "="
     ParenOpen "("
-    LowerIdent "identifier"
+    Id "identifier"
     ParenClose ")"
     "#);
 }
@@ -523,23 +540,24 @@ fn special_node_missing_with_arg() {
 #[test]
 fn type_annotation_upper() {
     insta::assert_snapshot!(snapshot("@val :: Type"), @r#"
-    CaptureName "@val"
+    At "@"
+    Id "val"
     DoubleColon "::"
-    UpperIdent "Type"
+    Id "Type"
     "#);
 }
 
 #[test]
 fn named_def_with_sequence() {
     insta::assert_snapshot!(snapshot("Def = { (a) (b) }"), @r#"
-    UpperIdent "Def"
+    Id "Def"
     Equals "="
     BraceOpen "{"
     ParenOpen "("
-    LowerIdent "a"
+    Id "a"
     ParenClose ")"
     ParenOpen "("
-    LowerIdent "b"
+    Id "b"
     ParenClose ")"
     BraceClose "}"
     "#);
@@ -548,22 +566,22 @@ fn named_def_with_sequence() {
 #[test]
 fn comma_token() {
     insta::assert_snapshot!(snapshot("a, b, c"), @r#"
-    LowerIdent "a"
+    Id "a"
     Comma ","
-    LowerIdent "b"
+    Id "b"
     Comma ","
-    LowerIdent "c"
+    Id "c"
     "#);
 }
 
 #[test]
 fn pipe_token() {
     insta::assert_snapshot!(snapshot("a | b | c"), @r#"
-    LowerIdent "a"
+    Id "a"
     Pipe "|"
-    LowerIdent "b"
+    Id "b"
     Pipe "|"
-    LowerIdent "c"
+    Id "c"
     "#);
 }
 
@@ -590,11 +608,11 @@ fn comma_in_pattern_context() {
     insta::assert_snapshot!(snapshot("[(a), (b)]"), @r#"
     BracketOpen "["
     ParenOpen "("
-    LowerIdent "a"
+    Id "a"
     ParenClose ")"
     Comma ","
     ParenOpen "("
-    LowerIdent "b"
+    Id "b"
     ParenClose ")"
     BracketClose "]"
     "#);
@@ -604,9 +622,9 @@ fn comma_in_pattern_context() {
 fn pipe_in_pattern_context() {
     insta::assert_snapshot!(snapshot("[a | b]"), @r#"
     BracketOpen "["
-    LowerIdent "a"
+    Id "a"
     Pipe "|"
-    LowerIdent "b"
+    Id "b"
     BracketClose "]"
     "#);
 }

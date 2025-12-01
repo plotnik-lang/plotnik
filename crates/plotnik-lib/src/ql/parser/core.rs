@@ -299,7 +299,7 @@ impl<'src> Parser<'src> {
     fn at_def_start(&mut self) -> bool {
         let kind = self.peek();
         // Named def: UpperIdent followed by =
-        if kind == SyntaxKind::UpperIdent && self.peek_nth(1) == SyntaxKind::Equals {
+        if kind == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
             return true;
         }
         // Anonymous def: tokens that can validly start a root-level expression

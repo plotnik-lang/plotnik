@@ -33,7 +33,8 @@ fn error_node_with_capture() {
             ParenOpen "("
             KwError "ERROR"
             ParenClose ")"
-          CaptureName "@err"
+          At "@"
+          Id "err"
     "#);
 }
 
@@ -67,7 +68,7 @@ fn missing_node_with_type() {
         Tree
           ParenOpen "("
           KwMissing "MISSING"
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
     "#);
 }
@@ -106,7 +107,8 @@ fn missing_node_with_capture() {
             KwMissing "MISSING"
             StringLit "\";\""
             ParenClose ")"
-          CaptureName "@missing_semi"
+          At "@"
+          Id "missing_semi"
     "#);
 }
 
@@ -128,7 +130,7 @@ fn error_in_alternation() {
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           BracketClose "]"
     "#);
@@ -153,7 +155,7 @@ fn missing_in_sequence() {
             ParenClose ")"
           Tree
             ParenOpen "("
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           BraceClose "}"
     "#);
@@ -172,13 +174,13 @@ fn special_node_nested() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "function_definition"
+          Id "function_definition"
           Field
-            LowerIdent "body"
+            Id "body"
             Colon ":"
             Tree
               ParenOpen "("
-              LowerIdent "block"
+              Id "block"
               Tree
                 ParenOpen "("
                 KwError "ERROR"
@@ -221,7 +223,7 @@ fn missing_with_quantifier() {
           Tree
             ParenOpen "("
             KwMissing "MISSING"
-            LowerIdent "identifier"
+            Id "identifier"
             ParenClose ")"
           Question "?"
     "#);

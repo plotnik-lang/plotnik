@@ -18,12 +18,12 @@ mod json_serialization {
         insta::assert_snapshot!(json, @r#"
         {
           "range": {
-            "start": 13,
+            "start": 14,
             "end": 21
           },
           "message": "capture names cannot contain dots",
           "fix": {
-            "replacement": "@foo_bar",
+            "replacement": "foo_bar",
             "description": "captures become struct fields; use @foo_bar instead"
           }
         }
@@ -42,10 +42,10 @@ mod json_serialization {
         insta::assert_snapshot!(json, @r#"
         {
           "range": {
-            "start": 13,
+            "start": 14,
             "end": 14
           },
-          "message": "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _"
+          "message": "expected capture name after '@'"
         }
         "#);
     }

@@ -14,7 +14,7 @@ fn quantifier_star() {
         Quantifier
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Star "*"
     "#);
@@ -33,7 +33,7 @@ fn quantifier_plus() {
         Quantifier
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Plus "+"
     "#);
@@ -52,7 +52,7 @@ fn quantifier_optional() {
         Quantifier
           Tree
             ParenOpen "("
-            LowerIdent "statement"
+            Id "statement"
             ParenClose ")"
           Question "?"
     "#);
@@ -72,10 +72,11 @@ fn quantifier_with_capture() {
           Quantifier
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
             Star "*"
-          CaptureName "@statements"
+          At "@"
+          Id "statements"
     "#);
 }
 
@@ -93,11 +94,11 @@ fn quantifier_inside_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "block"
+          Id "block"
           Quantifier
             Tree
               ParenOpen "("
-              LowerIdent "statement"
+              Id "statement"
               ParenClose ")"
             Star "*"
           ParenClose ")"

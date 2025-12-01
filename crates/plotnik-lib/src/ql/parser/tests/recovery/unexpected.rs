@@ -14,7 +14,7 @@ fn unexpected_token() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Error
@@ -22,7 +22,7 @@ fn unexpected_token() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "string"
+          Id "string"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -55,7 +55,7 @@ fn multiple_consecutive_garbage() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "ok"
+          Id "ok"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -81,7 +81,7 @@ fn garbage_at_start() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -129,13 +129,13 @@ fn garbage_inside_alternation() {
           BracketOpen "["
           Tree
             ParenOpen "("
-            LowerIdent "a"
+            Id "a"
             ParenClose ")"
           Error
             Garbage "^^^"
           Tree
             ParenOpen "("
-            LowerIdent "b"
+            Id "b"
             ParenClose ")"
           BracketClose "]"
     ---
@@ -159,28 +159,36 @@ fn garbage_inside_node() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
-          Tree
-            ParenOpen "("
-            LowerIdent "b"
-            ParenClose ")"
+          Id "a"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+            At "@"
           Error
-            Garbage "@@@"
+            At "@"
+          Error
+            At "@"
           Tree
             ParenOpen "("
-            LowerIdent "c"
+            Id "c"
             ParenClose ")"
           ParenClose ")"
       Def
         Tree
           ParenOpen "("
-          LowerIdent "d"
+          Id "d"
           ParenClose ")"
     ---
+    error: expected capture name after '@'
+      |
+    1 | (a (b) @@@ (c)) (d)
+      |         ^ expected capture name after '@'
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (b) @@@ (c)) (d)
-      |        ^^^ unexpected token; expected a child expression or closing delimiter
+      |          ^ unexpected token; expected a child expression or closing delimiter
     error: unnamed definition must be last in file; add a name: `Name = (a (b) @@@ (c))`
       |
     1 | (a (b) @@@ (c)) (d)
@@ -204,7 +212,7 @@ fn xml_tag_garbage() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Error
@@ -238,7 +246,7 @@ fn xml_self_closing() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -261,18 +269,20 @@ fn predicate_unsupported() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           Tree
             ParenOpen "("
             Error
               Predicate "#eq?"
             Error
-              CaptureName "@x"
+              At "@"
+            Error
+              Id "x"
             Lit
               StringLit "\"foo\""
             ParenClose ")"
           Error
-            LowerIdent "b"
+            Id "b"
           ParenClose ")"
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
@@ -282,7 +292,11 @@ fn predicate_unsupported() {
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (#eq? @x "foo") b)
-      |          ^^ unexpected token; expected a child expression or closing delimiter
+      |          ^ unexpected token; expected a child expression or closing delimiter
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (a (#eq? @x "foo") b)
+      |           ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a (#eq? @x "foo") b)
@@ -303,13 +317,16 @@ fn predicate_match() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "identifier"
+          Id "identifier"
           ParenClose ")"
       Def
         Error
           Predicate "#match?"
         Error
-          CaptureName "@name"
+          At "@"
+      Def
+        Error
+          Id "name"
       Def
         Lit
           StringLit "\"test\""
@@ -318,10 +335,18 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^ tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (identifier) #match? @name "test"
+      |                       ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier) #match? @name "test"
       | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
+    error: unnamed definition must be last in file; add a name: `Name = name`
+      |
+    1 | (identifier) #match? @name "test"
+      |                       ^^^^ unnamed definition must be last in file; add a name: `Name = name`
     "##);
 }
 
@@ -340,11 +365,11 @@ fn multiline_garbage_recovery() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           Error
             Garbage "^^^"
           Error
-            LowerIdent "b"
+            Id "b"
           ParenClose ")"
     ---
     error: unexpected token; expected a child expression or closing delimiter
@@ -369,19 +394,21 @@ fn capture_with_invalid_char() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        Tree
-          ParenOpen "("
-          LowerIdent "identifier"
-          ParenClose ")"
+        Capture
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+          At "@"
       Def
         Error
-          Garbage "@123"
+          Garbage "123"
         Error
     ---
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: expected capture name after '@'
       |
     1 | (identifier) @123
-      |              ^^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |               ^^^ expected capture name after '@'
     "#);
 }
 
@@ -398,9 +425,9 @@ fn field_value_is_garbage() {
       Def
         Tree
           ParenOpen "("
-          LowerIdent "call"
+          Id "call"
           Field
-            LowerIdent "name"
+            Id "name"
             Colon ":"
             Error
               Garbage "%%%"
@@ -429,7 +456,9 @@ fn alternation_recovery_to_capture() {
           Error
             Garbage "^^^"
           Error
-            CaptureName "@name"
+            At "@"
+          Error
+            Id "name"
           BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter
@@ -439,7 +468,11 @@ fn alternation_recovery_to_capture() {
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
-      |      ^^^^^ unexpected token; expected a child expression or closing delimiter
+      |      ^ unexpected token; expected a child expression or closing delimiter
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | [^^^ @name]
+      |       ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "#);
 }
 
@@ -454,21 +487,21 @@ fn top_level_garbage_recovery() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "Expr"
+        Id "Expr"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           ParenClose ")"
       Def
         Error
           Garbage "^^^"
       Def
-        UpperIdent "Expr2"
+        Id "Expr2"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          Id "b"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -493,31 +526,31 @@ fn multiple_definitions_with_garbage_between() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        UpperIdent "A"
+        Id "A"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "a"
+          Id "a"
           ParenClose ")"
       Def
         Error
           Garbage "^^^"
       Def
-        UpperIdent "B"
+        Id "B"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "b"
+          Id "b"
           ParenClose ")"
       Def
         Error
           Garbage "$$$"
       Def
-        UpperIdent "C"
+        Id "C"
         Equals "="
         Tree
           ParenOpen "("
-          LowerIdent "c"
+          Id "c"
           ParenClose ")"
     ---
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
