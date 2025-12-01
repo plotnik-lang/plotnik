@@ -7,7 +7,15 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(name = "plotnik", bin_name = "plotnik")]
 #[command(about = "Query language for tree-sitter AST with type inference")]
-#[command(after_help = r#"OUTPUT DEPENDENCIES:
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Debug and inspect queries and source files
+    #[command(after_help = r#"OUTPUT DEPENDENCIES:
 ┌─────────────────┬─────────────┬──────────────┐
 │ Output          │ Needs Query │ Needs Source │
 ├─────────────────┼─────────────┼──────────────┤
@@ -22,40 +30,32 @@ use std::path::PathBuf;
 
 EXAMPLES:
   # Parse and typecheck query only
-  plotnik --query-text '(identifier) @id' --query-cst --query-types
+  plotnik debug --query-text '(identifier) @id' --query-cst --query-types
 
   # Dump tree-sitter AST of source file
-  plotnik --source-file app.ts --source-ast
+  plotnik debug --source-file app.ts --source-ast
 
   # Full pipeline: match query against source
-  plotnik --query-file rules.pql --source-file app.ts --result
+  plotnik debug --query-file rules.pql --source-file app.ts --result
 
   # Debug with trace
-  plotnik --query-text '(function_declaration) @fn' \
-          --source-text 'function foo() {}' --lang typescript --trace
+  plotnik debug --query-text '(function_declaration) @fn' \
+          --source-text 'function foo() {}' --lang typescript --trace"#)]
+    Debug {
+        #[command(flatten)]
+        query: QueryArgs,
 
-  # Show documentation
-  plotnik docs reference"#)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Command>,
+        #[command(flatten)]
+        source: SourceArgs,
 
-    #[command(flatten)]
-    query: QueryArgs,
+        /// Language for source (required for --source-text, inferred from extension for --source-file)
+        #[arg(long, short = 'l', value_name = "LANG")]
+        lang: Option<String>,
 
-    #[command(flatten)]
-    source: SourceArgs,
+        #[command(flatten)]
+        output: OutputArgs,
+    },
 
-    /// Language for source (required for --source-text, inferred from extension for --source-file)
-    #[arg(long, short = 'l', value_name = "LANG")]
-    lang: Option<String>,
-
-    #[command(flatten)]
-    output: OutputArgs,
-}
-
-#[derive(Subcommand)]
-enum Command {
     /// Print documentation
     Docs {
         /// Topic to display (e.g., "reference", "examples")
@@ -121,19 +121,32 @@ struct OutputArgs {
 fn main() {
     let cli = Cli::parse();
 
-    if let Some(Command::Docs { topic }) = cli.command {
-        print_help(topic.as_deref());
-        return;
+    match cli.command {
+        Command::Docs { topic } => {
+            print_help(topic.as_deref());
+        }
+        Command::Debug {
+            query,
+            source,
+            lang,
+            output,
+        } => {
+            run_debug(query, source, lang, output);
+        }
     }
+}
 
-    let has_query = cli.query.query_text.is_some() || cli.query.query_file.is_some();
-    let has_source = cli.source.source_text.is_some() || cli.source.source_file.is_some();
+fn run_debug(
+    query_args: QueryArgs,
+    source_args: SourceArgs,
+    lang: Option<String>,
+    output: OutputArgs,
+) {
+    let has_query = query_args.query_text.is_some() || query_args.query_file.is_some();
+    let has_source = source_args.source_text.is_some() || source_args.source_file.is_some();
 
     // Validate output dependencies
-    if (cli.output.query_cst
-        || cli.output.query_ast
-        || cli.output.query_refs
-        || cli.output.query_types)
+    if (output.query_cst || output.query_ast || output.query_refs || output.query_types)
         && !has_query
     {
         eprintln!(
@@ -142,81 +155,81 @@ fn main() {
         std::process::exit(1);
     }
 
-    if cli.output.source_ast && !has_source {
+    if output.source_ast && !has_source {
         eprintln!("error: --source-ast requires --source-text or --source-file");
         std::process::exit(1);
     }
 
-    if cli.output.trace && !(has_query && has_source) {
+    if output.trace && !(has_query && has_source) {
         eprintln!("error: --trace requires both query and source inputs");
         std::process::exit(1);
     }
 
-    if cli.output.result && !(has_query && has_source) {
+    if output.result && !(has_query && has_source) {
         eprintln!("error: --result requires both query and source inputs");
         std::process::exit(1);
     }
 
     // If both inputs provided and no outputs selected, default to --result
-    let show_result = cli.output.result
+    let show_result = output.result
         || (has_query
             && has_source
-            && !cli.output.query_cst
-            && !cli.output.query_ast
-            && !cli.output.query_refs
-            && !cli.output.query_types
-            && !cli.output.source_ast
-            && !cli.output.trace);
+            && !output.query_cst
+            && !output.query_ast
+            && !output.query_refs
+            && !output.query_types
+            && !output.source_ast
+            && !output.trace);
 
     // Validate --lang requirement
-    if cli.source.source_text.is_some() && cli.lang.is_none() {
+    if source_args.source_text.is_some() && lang.is_none() {
         eprintln!("error: --lang is required when using --source-text");
         std::process::exit(1);
     }
 
     // Load query if needed
     let query_source = if has_query {
-        Some(load_query(&cli.query))
+        Some(load_query(&query_args))
     } else {
         None
     };
 
     let query = query_source.as_ref().map(|src| Query::new(src));
 
-    if cli.output.query_cst {
+    if output.query_cst {
         println!("=== QUERY CST ===");
         if let Some(ref q) = query {
             print!("{}", q.format_cst());
         }
     }
 
-    if cli.output.query_ast {
+    if output.query_ast {
         println!("=== QUERY AST ===");
         if let Some(ref q) = query {
             print!("{}", q.format_ast());
         }
     }
 
-    if cli.output.query_refs {
+    if output.query_refs {
         println!("=== QUERY REFS ===");
         if let Some(ref q) = query {
             print!("{}", q.format_refs());
         }
     }
 
-    if cli.output.query_types {
+    if output.query_types {
         println!("=== QUERY TYPES ===");
         println!("(not implemented)");
         println!();
     }
 
-    if cli.output.source_ast {
+    if output.source_ast {
         println!("=== SOURCE AST ===");
         println!("(not implemented)");
         println!();
     }
 
-    if cli.output.trace {
+    if output.trace {
         println!("=== TRACE ===");
         println!("(not implemented)");
         println!();
@@ -263,7 +276,6 @@ fn print_help(topic: Option<&str>) {
             println!("Usage: plotnik docs <topic>");
         }
         Some("reference") => {
-            // TODO: include_str! the actual REFERENCE.md
             println!("{}", include_str!("../../../docs/REFERENCE.md"));
         }
         Some("examples") => {
@@ -271,7 +283,7 @@ fn print_help(topic: Option<&str>) {
         }
         Some(other) => {
             eprintln!("Unknown help topic: {}", other);
-            eprintln!("Run 'plotnik help' to see available topics");
+            eprintln!("Run 'plotnik docs' to see available topics");
             std::process::exit(1);
         }
     }
