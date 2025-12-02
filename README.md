@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/zharinov/plotnik/actions/workflows/test.yml"><img src="https://github.com/zharinov/plotnik/actions/workflows/test.yml/badge.svg" alt="Build Status"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
