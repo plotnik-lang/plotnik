@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/zharinov/plotnik/actions/workflows/test.yml"><img src="https://github.com/zharinov/plotnik/actions/workflows/test.yml/badge.svg" alt="Build Status"></a>
-  <a href="https://codecov.io/gh/zharinov/plotnik"><img src="https://codecov.io/gh/zharinov/plotnik/branch/master/graph/badge.svg" alt="Code Coverage"></a>
+  <a href="https://codecov.io/gh/zharinov/plotnik"><img src="https://codecov.io/gh/zharinov/plotnik/graph/badge.svg?token=LU4FGJ2ER0"/></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
