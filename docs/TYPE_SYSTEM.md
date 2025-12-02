@@ -1,3 +1,7 @@
+-------------------------------------------------------------------------------------------
+NOTE: THIS DOCUMENT IS NOT A PART OF SPECIFICATION, IT'S EXPERIMENTAL AND WILL BE REWRITTEN
+-------------------------------------------------------------------------------------------
+
 # Plotnik Type System
 
 This document specifies how types are inferred from Plotnik queries. It serves both as a formal specification and a practical user guide with extensive examples.
