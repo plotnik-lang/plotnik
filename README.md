@@ -5,7 +5,7 @@
 <h1 align="center">Plotnik</h1>
 
 <p align="center">
-  <i>An advanced query language for <a href="https://tree-sitter.github.io/">tree-sitter</a> AST</i>
+  <i>Typed query language for <a href="https://tree-sitter.github.io/">tree-sitter</a></i>
 </p>
 
 <p align="center">
