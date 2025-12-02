@@ -166,8 +166,40 @@ Output shows file path and comma-separated uncovered line numbers:
 
 **Don't:**
 
-- Aim for 100% — some branches are defensive/unreachable
+- Aim for 100%
 - Write tests without seeing the uncovered code first
+
+## Invariants
+
+Two-tier resilience strategy:
+
+1. **Parser**: resilient, collects errors, continues parsing
+2. **Post-parse phases**: strict invariants, panic on violations
+
+For code paths that "should never happen" (e.g., malformed AST after successful parsing, dead code branches), use `panic!` with informative messages instead of silent defaults:
+
+```rust
+// Bad: hides bugs
+let Some(name) = node.name() else {
+    return Default::default();
+};
+
+// Good: fails fast with context
+let name = node.name().unwrap_or_else(|| {
+    panic!(
+        "phase_name: Node missing name at {:?} (should be caught by parser)",
+        node.syntax().text_range()
+    )
+});
+```
+
+Include in panic messages:
+- Phase/function name
+- What invariant was violated
+- Location (text range)
+- Which earlier phase should have caught it
+
+Uncovered lines that are all panics = correct coverage. The panic paths exist to catch bugs, not to be exercised in normal tests.
 
 ## Not implemented
 
