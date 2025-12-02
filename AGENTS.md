@@ -135,6 +135,41 @@ Never write snapshot content manually. Let insta generate it.
 - Valid parsing: `assert!(query.is_valid())` + snapshot `format_*()` output
 - Error recovery: `assert!(!query.is_valid())` + snapshot `render_errors()` only
 
+## Coverage
+
+Uses `cargo-llvm-cov`, already installed.
+
+**Single command to see uncovered lines with code:**
+
+```sh
+cargo llvm-cov --package plotnik-lib --text -- <test_filter> 2>/dev/null | sed -n '/<file>/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
+```
+
+Example for `grammar.rs`:
+
+```sh
+cargo llvm-cov --package plotnik-lib --text -- parser 2>/dev/null | sed -n '/grammar\.rs:/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
+```
+
+Output shows line number and actual code:
+
+```
+   78|      0|            self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
+  128|      0|            self.start_node(SyntaxKind::Error);
+```
+
+**Workflow:**
+
+1. Run command above for target file
+2. Output shows exactly what code paths need tests
+3. Add minimal tests exercising those paths
+4. Re-run to verify
+
+**Don't:**
+
+- Aim for 100% — some branches are defensive/unreachable
+- Write tests without seeing the uncovered code first
+
 ## Not implemented
 
 - Semantic validation (phase 5): field constraints, casing rules
