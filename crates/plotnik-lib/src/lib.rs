@@ -203,7 +203,6 @@ impl<'a> Query<'a> {
         out
     }
 
-
     fn format_tree(node: &SyntaxNode, indent: usize, out: &mut String, include_trivia: bool) {
         use std::fmt::Write;
         let prefix = "  ".repeat(indent);
