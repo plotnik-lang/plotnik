@@ -100,7 +100,7 @@ Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Quer
 
 Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 
-Use `Option<T>` for casts, not `TryFrom`. `ast::format_ast()` for concise output.
+Use `Option<T>` for casts, not `TryFrom`. Use `QueryPrinter` from `query/printer.rs` for output.
 
 ## Testing
 
@@ -142,8 +142,10 @@ Never write snapshot content manually. Let insta generate it.
 
 Uses `cargo-llvm-cov`, already installed.
 
+Find uncovered lines per file:
+
 ```sh
-cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- <test_filter> 2>/dev/null | grep '<file>:'
+cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]\+\(, [0-9]\+\)\*\?'
 ```
 
 ## Invariants

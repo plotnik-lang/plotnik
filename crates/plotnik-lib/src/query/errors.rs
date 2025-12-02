@@ -88,8 +88,14 @@ impl Query<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::ErrorStage;
+    use crate::ast::{ErrorStage, RenderOptions, Severity};
     use crate::query::Query;
+
+    #[test]
+    fn diagnostics_alias() {
+        let q = Query::new("(valid)");
+        assert_eq!(q.diagnostics().len(), q.errors().len());
+    }
 
     #[test]
     fn error_stage_filtering() {
@@ -143,5 +149,37 @@ mod tests {
         assert!(!q.has_warnings());
         assert_eq!(q.error_count(), 1);
         assert_eq!(q.warning_count(), 0);
+    }
+
+    #[test]
+    fn errors_only_and_warnings_only() {
+        let q = Query::new("(unclosed");
+        let errors = q.errors_only();
+        let warnings = q.warnings_only();
+        assert_eq!(errors.len(), 1);
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn render_diagnostics_method() {
+        let q = Query::new("(unclosed");
+        let rendered = q.render_diagnostics(RenderOptions::plain());
+        insta::assert_snapshot!(rendered, @r"
+        error: unclosed tree; expected ')'
+          |
+        1 | (unclosed
+          | -        ^ unclosed tree; expected ')'
+          | |
+          | tree started here
+        ");
+    }
+
+    #[test]
+    fn filter_by_severity() {
+        let q = Query::new("(unclosed");
+        let errors = q.filter_by_severity(Severity::Error);
+        let warnings = q.filter_by_severity(Severity::Warning);
+        assert_eq!(errors.len(), 1);
+        assert!(warnings.is_empty());
     }
 }

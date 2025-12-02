@@ -577,4 +577,68 @@ mod tests {
         let query = Query::new("E = [(E) (x)]");
         assert!(query.is_valid());
     }
+
+    #[test]
+    fn escape_via_literal_string() {
+        let input = indoc! {r#"
+            A = [(A) "escape"]
+        "#};
+        let query = Query::new(input);
+        assert!(query.is_valid());
+    }
+
+    #[test]
+    fn escape_via_wildcard() {
+        let input = indoc! {r#"
+            A = [(A) _]
+        "#};
+        let query = Query::new(input);
+        assert!(query.is_valid());
+    }
+
+    #[test]
+    fn escape_via_childless_tree() {
+        let input = indoc! {r#"
+            A = [(A) (leaf)]
+        "#};
+        let query = Query::new(input);
+        assert!(query.is_valid());
+    }
+
+    #[test]
+    fn escape_via_anchor() {
+        let input = indoc! {r#"
+            A = (foo . [(A) (x)])
+        "#};
+        let query = Query::new(input);
+        assert!(query.is_valid());
+    }
+
+    #[test]
+    fn no_escape_tree_all_recursive() {
+        let input = indoc! {r#"
+            A = (foo (A))
+        "#};
+        let query = Query::new(input);
+        assert!(!query.is_valid());
+        assert!(query.dump_errors().contains("recursive pattern"));
+    }
+
+    #[test]
+    fn escape_in_capture_inner() {
+        let input = indoc! {r#"
+            A = [(x)@cap (foo (A))]
+        "#};
+        let query = Query::new(input);
+        assert!(query.is_valid());
+    }
+
+    #[test]
+    fn ref_in_quantifier_plus_no_escape() {
+        let input = indoc! {r#"
+            A = (foo (A)+)
+        "#};
+        let query = Query::new(input);
+        assert!(!query.is_valid());
+    }
 }

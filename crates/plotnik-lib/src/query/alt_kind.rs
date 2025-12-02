@@ -17,9 +17,11 @@ pub fn validate(root: &Root) -> Vec<Diagnostic> {
         }
     }
 
-    for expr in root.exprs() {
-        validate_expr(&expr, &mut errors);
-    }
+    // Parser wraps all top-level exprs in Def nodes, so this should be empty
+    assert!(
+        root.exprs().next().is_none(),
+        "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
+    );
 
     errors
 }
@@ -33,9 +35,11 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
                     validate_expr(&body, errors);
                 }
             }
-            for child in alt.exprs() {
-                validate_expr(&child, errors);
-            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
         Expr::Tree(tree) => {
             for child in tree.children() {
@@ -95,7 +99,9 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
     }
 
     let (Some(tagged_branch), Some(untagged_branch)) = (first_tagged, first_untagged) else {
-        return;
+        panic!(
+            "alt_kind: Mixed alternation without both tagged and untagged branches (should be caught by AltKind::compute_kind)"
+        );
     };
 
     let tagged_range = tagged_branch

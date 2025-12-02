@@ -46,6 +46,7 @@ pub use error::{
     render_diagnostics, render_errors,
 };
 
+pub use core::ParserOptions;
 use core::{Parse as ParseInner, Parser};
 
 use super::lexer::lex;
@@ -65,6 +66,7 @@ pub struct Parse {
 }
 
 impl Parse {
+    #[allow(dead_code)]
     pub fn green(&self) -> &rowan::GreenNode {
         &self.inner.green
     }
@@ -79,6 +81,7 @@ impl Parse {
         &self.inner.errors
     }
 
+    #[allow(dead_code)]
     pub fn is_valid(&self) -> bool {
         self.inner.errors.is_empty()
     }
@@ -91,8 +94,24 @@ impl Parse {
 
 /// Main entry point. Always succeeds—errors embedded in the returned tree.
 pub fn parse(source: &str) -> Parse {
+    parse_with_options(source, ParserOptions::default())
+}
+
+/// Parse with custom options (e.g., disable fuel for pathological test inputs).
+#[cfg(debug_assertions)]
+pub fn parse_with_options(source: &str, options: ParserOptions) -> Parse {
     let tokens = lex(source);
-    let mut parser = Parser::new(source, tokens);
+    let mut parser = Parser::with_options(source, tokens, options);
+    parser.parse_root();
+    Parse {
+        inner: parser.finish(),
+    }
+}
+
+#[cfg(not(debug_assertions))]
+pub fn parse_with_options(source: &str, _options: ParserOptions) -> Parse {
+    let tokens = lex(source);
+    let mut parser = Parser::with_options(source, tokens, ParserOptions::default());
     parser.parse_root();
     Parse {
         inner: parser.finish(),

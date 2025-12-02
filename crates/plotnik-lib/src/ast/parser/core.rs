@@ -19,6 +19,14 @@ use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 #[cfg(debug_assertions)]
 const DEFAULT_FUEL: u32 = 256;
 
+/// Options for parser behavior, primarily for testing.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ParserOptions {
+    /// Disable fuel checking (debug mode only). Use for pathological test inputs.
+    #[cfg(debug_assertions)]
+    pub disable_fuel: bool,
+}
+
 /// Parse result containing the green tree and any errors.
 ///
 /// The tree is always complete—errors are recorded separately and also
@@ -59,10 +67,12 @@ pub struct Parser<'src> {
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
     #[cfg(debug_assertions)]
     pub(super) fuel: std::cell::Cell<u32>,
+    #[cfg(debug_assertions)]
+    pub(super) fuel_enabled: bool,
 }
 
 impl<'src> Parser<'src> {
-    pub fn new(source: &'src str, tokens: Vec<Token>) -> Self {
+    pub fn with_options(source: &'src str, tokens: Vec<Token>, options: ParserOptions) -> Self {
         Self {
             source,
             tokens,
@@ -75,6 +85,8 @@ impl<'src> Parser<'src> {
             delimiter_stack: Vec::with_capacity(8),
             #[cfg(debug_assertions)]
             fuel: std::cell::Cell::new(DEFAULT_FUEL),
+            #[cfg(debug_assertions)]
+            fuel_enabled: !options.disable_fuel,
         }
     }
 
@@ -94,7 +106,7 @@ impl<'src> Parser<'src> {
     /// Lookahead by `n` tokens (0 = current). Consumes fuel in debug mode.
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
         #[cfg(debug_assertions)]
-        {
+        if self.fuel_enabled {
             if self.fuel.get() == 0 {
                 panic!(
                     "parser is stuck: no progress made in {} iterations",

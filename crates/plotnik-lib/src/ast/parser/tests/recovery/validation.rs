@@ -1,10 +1,6 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Reference with Children (Invalid)
-// ============================================================================
-
 #[test]
 fn ref_with_children_error() {
     let input = indoc! {r#"
@@ -88,10 +84,6 @@ fn ref_without_children_is_valid() {
           ParenClose ")"
     "#);
 }
-
-// ============================================================================
-// Dotted Capture Names
-// ============================================================================
 
 #[test]
 fn capture_dotted_error() {
@@ -193,10 +185,6 @@ fn capture_space_after_dot_breaks_chain() {
     "#);
 }
 
-// ============================================================================
-// Hyphenated Capture Names
-// ============================================================================
-
 #[test]
 fn capture_hyphenated_error() {
     let input = indoc! {r#"
@@ -263,10 +251,6 @@ fn capture_mixed_dots_and_hyphens() {
     "#);
 }
 
-// ============================================================================
-// Single Quote Strings
-// ============================================================================
-
 #[test]
 fn single_quote_string_is_valid() {
     let input = "(node 'if')";
@@ -331,10 +315,6 @@ fn single_quote_with_escape() {
           ParenClose ")"
     "#);
 }
-
-// ============================================================================
-// Invalid Separators
-// ============================================================================
 
 #[test]
 fn comma_in_node_children() {
@@ -436,10 +416,6 @@ fn comma_in_sequence() {
     "#);
 }
 
-// ============================================================================
-// Single Colon for Type Annotation
-// ============================================================================
-
 #[test]
 fn single_colon_type_annotation() {
     let input = "(identifier) @name : Type";
@@ -508,10 +484,6 @@ fn single_colon_primitive_type() {
     "#);
 }
 
-// ============================================================================
-// Lowercase Branch Labels
-// ============================================================================
-
 #[test]
 fn lowercase_branch_label() {
     let input = indoc! {r#"
@@ -566,10 +538,6 @@ fn mixed_case_branch_labels() {
       |
     "#);
 }
-
-// ============================================================================
-// Field Equals Typo
-// ============================================================================
 
 #[test]
 fn field_equals_typo() {
@@ -635,10 +603,6 @@ fn field_equals_typo_no_expression() {
     ");
 }
 
-// ============================================================================
-// Combined Errors
-// ============================================================================
-
 #[test]
 fn multiple_suggestions_combined() {
     let input = "(node name = 'foo', @val : Type)";
@@ -684,10 +648,6 @@ fn multiple_suggestions_combined() {
       |                            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     "#);
 }
-
-// ============================================================================
-// Correct Syntax (No False Positives)
-// ============================================================================
 
 #[test]
 fn double_quotes_no_error() {
@@ -813,10 +773,6 @@ fn whitespace_separation_no_error() {
     "#);
 }
 
-// ============================================================================
-// Resilience Tests (Parser Accepts for Better Error Recovery)
-// ============================================================================
-
 #[test]
 fn field_with_upper_ident_parses() {
     let input = indoc! {r#"
@@ -905,10 +861,6 @@ fn capture_with_type_and_upper_ident() {
     "#);
 }
 
-// ============================================================================
-// Definition name validation
-// ============================================================================
-
 #[test]
 fn def_name_lowercase_error() {
     let input = "lowercase = (x)";
@@ -968,10 +920,6 @@ fn def_name_with_hyphens_error() {
       |
     ");
 }
-
-// ============================================================================
-// Branch label validation
-// ============================================================================
 
 #[test]
 fn branch_label_with_underscores_error() {
@@ -1037,10 +985,6 @@ fn lowercase_branch_label_missing_expression() {
     ");
 }
 
-// ============================================================================
-// Field name validation
-// ============================================================================
-
 #[test]
 fn field_name_with_dots_error() {
     let input = "(call foo.bar: (x))";
@@ -1080,10 +1024,6 @@ fn field_name_with_hyphens_error() {
       |
     ");
 }
-
-// ============================================================================
-// Type name validation
-// ============================================================================
 
 #[test]
 fn type_name_with_dots_error() {
@@ -1125,10 +1065,6 @@ fn type_name_with_hyphens_error() {
     ");
 }
 
-// ============================================================================
-// String literal validation
-// ============================================================================
-
 #[test]
 fn unclosed_double_quote_string() {
     let input = r#"(call "foo)"#;
@@ -1169,10 +1105,6 @@ fn unclosed_single_quote_string() {
     ");
 }
 
-// ============================================================================
-// Reference validation
-// ============================================================================
-
 #[test]
 fn reference_with_supertype_syntax_error() {
     let input = "(RefName/subtype)";
@@ -1186,10 +1118,6 @@ fn reference_with_supertype_syntax_error() {
       |         ^ references cannot use supertype syntax (/)
     ");
 }
-
-// ============================================================================
-// MISSING node with children (exercises parse_children fallback)
-// ============================================================================
 
 #[test]
 fn missing_with_nested_tree_parses() {

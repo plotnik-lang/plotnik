@@ -10,7 +10,7 @@ use super::error::{Fix, RelatedInfo};
 
 use crate::ast::lexer::token_text;
 use crate::ast::syntax_kind::token_sets::{
-    ALT_RECOVERY, DEF_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
+    ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
 use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 
@@ -22,9 +22,6 @@ impl Parser<'_> {
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
         while self.peek() != SyntaxKind::Error || !self.eof() {
-            if self.eof() {
-                break;
-            }
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
@@ -74,11 +71,12 @@ impl Parser<'_> {
         self.validate_def_name(name, span);
 
         self.peek();
-        if !self.expect(SyntaxKind::Equals, "'=' after definition name") {
-            self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
-            self.finish_node();
-            return;
-        }
+        // Invariant: parse_def is only called after verifying peek_nth(1) == Equals in parse_root
+        assert!(
+            self.eat(SyntaxKind::Equals),
+            "parse_def: expected '=' but found {:?} (caller should verify Equals is present)",
+            self.current()
+        );
 
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
@@ -311,15 +309,20 @@ impl Parser<'_> {
                 let (construct, delim) = match until {
                     SyntaxKind::ParenClose => ("tree", "')'"),
                     SyntaxKind::BraceClose => ("sequence", "'}'"),
-                    _ => ("construct", "closing delimiter"),
+                    _ => panic!(
+                        "parse_children: unexpected delimiter {:?} (only ParenClose/BraceClose supported)",
+                        until
+                    ),
                 };
                 let msg = format!("unclosed {construct}; expected {delim}");
-                if let Some(open) = self.delimiter_stack.last() {
-                    let related = RelatedInfo::new(open.span, format!("{construct} started here"));
-                    self.error_with_related(msg, related);
-                } else {
-                    self.error(msg);
-                }
+                let open = self.delimiter_stack.last().unwrap_or_else(|| {
+                    panic!(
+                        "parse_children: unclosed {construct} at EOF but delimiter_stack is empty \
+                         (caller must push delimiter before calling)"
+                    )
+                });
+                let related = RelatedInfo::new(open.span, format!("{construct} started here"));
+                self.error_with_related(msg, related);
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -364,12 +367,14 @@ impl Parser<'_> {
             }
             if self.eof() {
                 let msg = "unclosed alternation; expected ']'";
-                if let Some(open) = self.delimiter_stack.last() {
-                    let related = RelatedInfo::new(open.span, "alternation started here");
-                    self.error_with_related(msg, related);
-                } else {
-                    self.error(msg);
-                }
+                let open = self.delimiter_stack.last().unwrap_or_else(|| {
+                    panic!(
+                        "parse_alt_children: unclosed alternation at EOF but delimiter_stack is empty \
+                         (caller must push delimiter before calling)"
+                    )
+                });
+                let related = RelatedInfo::new(open.span, "alternation started here");
+                self.error_with_related(msg, related);
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -491,11 +496,15 @@ impl Parser<'_> {
         }
 
         // Expect matching closing quote
-        if self.peek() == open_quote {
-            self.bump();
-        } else {
-            self.error("unclosed string literal");
-        }
+        // Invariant: lexer only produces quote tokens from valid StringLiteral (both quotes present)
+        assert!(
+            self.peek() == open_quote,
+            "bump_string_tokens: expected closing {:?} but found {:?} \
+             (lexer should only produce quote tokens from complete strings)",
+            open_quote,
+            self.peek()
+        );
+        self.bump();
     }
 
     /// Parse capture suffix: `@name` or `@name :: Type`
@@ -603,14 +612,16 @@ impl Parser<'_> {
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        if self.peek() == SyntaxKind::Id {
-            let span = self.current_span();
-            let text = token_text(self.source, &self.tokens[self.pos]);
-            self.bump();
-            self.validate_field_name(text, span);
-        } else {
-            self.error("expected field name before ':'");
-        }
+        // Invariant: parse_field is only called from parse_tree_or_field when peek() == Id
+        assert!(
+            self.peek() == SyntaxKind::Id,
+            "parse_field: expected Id but found {:?} (caller should verify Id is present)",
+            self.peek()
+        );
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        self.bump();
+        self.validate_field_name(text, span);
 
         self.expect(
             SyntaxKind::Colon,
@@ -646,10 +657,14 @@ impl Parser<'_> {
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
+        // Invariant: only called when SEPARATORS.contains(kind), which only has Comma and Pipe
         let char_name = match kind {
             SyntaxKind::Comma => ",",
             SyntaxKind::Pipe => "|",
-            _ => return,
+            _ => panic!(
+                "error_skip_separator: unexpected token {:?} (only Comma/Pipe expected)",
+                kind
+            ),
         };
         let fix = Fix::new("", "remove separator");
         self.error_with_fix(
@@ -680,10 +695,6 @@ impl Parser<'_> {
             self.finish_node();
         }
     }
-
-    // ============================================================
-    // Validation helpers - enforce naming conventions per context
-    // ============================================================
 
     /// Validate capture name follows plotnik convention (snake_case).
     fn validate_capture_name(&mut self, name: &str, span: TextRange) {
@@ -824,10 +835,6 @@ fn to_snake_case(s: &str) -> String {
                 result.push('_');
             }
             result.push(c.to_ascii_lowercase());
-        } else if c == '-' || c == '.' {
-            if !result.ends_with('_') {
-                result.push('_');
-            }
         } else {
             result.push(c);
         }
@@ -856,7 +863,7 @@ fn to_pascal_case(s: &str) -> String {
 fn capitalize_first(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
-        None => String::new(),
+        None => panic!("capitalize_first: called with empty string (should never happen)"),
         Some(c) => c.to_uppercase().chain(chars).collect(),
     }
 }

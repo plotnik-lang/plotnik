@@ -15,7 +15,7 @@ mod shape_cardinalities_tests;
 
 use std::collections::HashMap;
 
-use crate::ast::{self, Diagnostic, Parse, Root, SyntaxNode};
+use crate::ast::{self, Diagnostic, Parse, ParserOptions, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
@@ -37,7 +37,14 @@ impl<'a> Query<'a> {
     ///
     /// This never fails. Errors are collected and accessible via [`errors`](Self::errors).
     pub fn new(source: &'a str) -> Self {
-        let parse = ast::parse(source);
+        Self::with_options(source, ParserOptions::default())
+    }
+
+    /// Parse and analyze with custom parser options.
+    ///
+    /// Use this for pathological test inputs that need fuel checking disabled.
+    pub fn with_options(source: &'a str, options: ParserOptions) -> Self {
+        let parse = ast::parse_with_options(source, options);
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
 
         let mut errors = parse.errors().to_vec();
@@ -70,6 +77,7 @@ impl<'a> Query<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn source(&self) -> &str {
         self.source
     }

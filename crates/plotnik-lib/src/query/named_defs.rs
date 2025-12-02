@@ -84,10 +84,11 @@ pub fn resolve(root: &Root) -> ResolveResult {
         }
     }
 
-    // Also check top-level expressions (entry point)
-    for expr in root.exprs() {
-        collect_reference_errors(&expr, &symbols, &mut errors);
-    }
+    // Parser wraps all top-level exprs in Def nodes, so this should be empty
+    assert!(
+        root.exprs().next().is_none(),
+        "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
+    );
 
     ResolveResult { symbols, errors }
 }
@@ -110,9 +111,11 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                     collect_refs(&body, refs);
                 }
             }
-            for expr in alt.exprs() {
-                collect_refs(&expr, refs);
-            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
         Expr::Seq(seq) => {
             for child in seq.children() {
@@ -154,9 +157,11 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
                     collect_reference_errors(&body, symbols, errors);
                 }
             }
-            for expr in alt.exprs() {
-                collect_reference_errors(&expr, symbols, errors);
-            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
         Expr::Seq(seq) => {
             for child in seq.children() {
@@ -451,6 +456,38 @@ mod tests {
           |
         1 | (foo (X) (Y) (Z))
           |               ^ undefined reference: `Z`
+        ");
+    }
+
+    #[test]
+    fn reference_inside_tree_child() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (b (A))
+        "#};
+
+        let query = Query::new(input);
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
+        ");
+    }
+
+    #[test]
+    fn reference_inside_capture() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (A)@x
+        "#};
+
+        let query = Query::new(input);
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
         ");
     }
 }

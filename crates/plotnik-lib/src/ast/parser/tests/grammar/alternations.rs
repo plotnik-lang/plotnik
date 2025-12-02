@@ -1,10 +1,6 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Unlabeled Alternations
-// ============================================================================
-
 #[test]
 fn alternation() {
     let input = indoc! {r#"
@@ -242,10 +238,6 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
       |          ^^^^^^^^^ undefined reference: `Statement`
     "#);
 }
-
-// ============================================================================
-// Tagged Alternations
-// ============================================================================
 
 #[test]
 fn tagged_alternation_simple() {
