@@ -52,11 +52,9 @@ Module = "what", function = "action".
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-| Command        | Purpose                          |
-| -------------- | -------------------------------- |
-| `debug`        | Inspect queries/sources          |
-| `docs [topic]` | Print docs (reference, examples) |
-| `langs`        | List supported languages         |
+- `debug` — Inspect queries/sources
+- `docs [topic]` — Print docs (reference, examples)
+- `langs` — List supported languages
 
 ### debug options
 
@@ -76,13 +74,13 @@ cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l t
 
 Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Type`, `field:`, `*+?`, `"lit"`/`'lit'`, `(a/b)` (supertype), `(ERROR)`, `Name = expr` (def), `[A: ... B: ...]` (tagged alt)
 
-SyntaxKind: `Tree`, `Lit`, `Def`, `Alt`, `Branch`, `Seq`, `Quantifier`, `Capture`, `Type`
+SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifier`, `Seq`, `Alt`, `Branch`, `Wildcard`, `Anchor`, `NegatedField`, `Def`
 
-Expr = `Tree | Alt | Seq | Quantifier | Capture`. Quantifier/Capture wrap their target.
+Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | NegatedField | Wildcard | Anchor`. Quantifier/Capture wrap their target.
 
 ## Errors
 
-Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Query::errors_for_stage()`, `Query::dump_errors_grouped()`.
+Stages: `Parse` → `Validate` → `Resolve` → `Escape`. Use `Query::errors_for_stage()`.
 
 ## Constraints
 
@@ -101,7 +99,7 @@ Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Quer
 
 ## AST Layer (`ast/nodes.rs`)
 
-Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
+Types: `Root`, `Def`, `Tree`, `Ref`, `Str`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 
 Use `Option<T>` for casts, not `TryFrom`. Use `QueryPrinter` from `query/printer.rs` for output.
 
