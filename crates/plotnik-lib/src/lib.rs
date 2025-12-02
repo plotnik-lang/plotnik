@@ -46,6 +46,11 @@ impl<'a> Query<'a> {
         let resolve_result = ql::resolve::resolve(&root);
 
         let mut errors = parse.errors().to_vec();
+
+        // Semantic validation (mixed alternations, etc.)
+        let validate_errors = ql::validate::validate(&root);
+        errors.extend(validate_errors);
+
         errors.extend(resolve_result.errors);
 
         // Check for recursive patterns with no escape path
@@ -105,6 +110,11 @@ impl<'a> Query<'a> {
         self.errors.iter().any(|e| e.stage == ErrorStage::Parse)
     }
 
+    /// Returns `true` if there are validate-stage errors.
+    pub fn has_validate_errors(&self) -> bool {
+        self.errors.iter().any(|e| e.stage == ErrorStage::Validate)
+    }
+
     /// Returns `true` if there are resolve-stage errors.
     pub fn has_resolve_errors(&self) -> bool {
         self.errors.iter().any(|e| e.stage == ErrorStage::Resolve)
@@ -124,7 +134,7 @@ impl<'a> Query<'a> {
     /// Render errors grouped by stage.
     pub fn render_errors_grouped(&self) -> String {
         let mut out = String::new();
-        for stage in [ErrorStage::Parse, ErrorStage::Resolve, ErrorStage::Escape] {
+        for stage in [ErrorStage::Parse, ErrorStage::Validate, ErrorStage::Resolve, ErrorStage::Escape] {
             let stage_errors: Vec<_> = self.errors_by_stage(stage).into_iter().cloned().collect();
             if !stage_errors.is_empty() {
                 if !out.is_empty() {
@@ -291,9 +301,18 @@ mod tests {
         assert!(!q.has_escape_errors());
         assert_eq!(q.errors_by_stage(ErrorStage::Resolve).len(), 1);
 
+        // Validate error only
+        let q = Query::new("[A: (a) (b)]");
+        assert!(!q.has_parse_errors());
+        assert!(q.has_validate_errors());
+        assert!(!q.has_resolve_errors());
+        assert!(!q.has_escape_errors());
+        assert_eq!(q.errors_by_stage(ErrorStage::Validate).len(), 1);
+
         // Escape error only
         let q = Query::new("Expr = (call (Expr))");
         assert!(!q.has_parse_errors());
+        assert!(!q.has_validate_errors());
         assert!(!q.has_resolve_errors());
         assert!(q.has_escape_errors());
         assert_eq!(q.errors_by_stage(ErrorStage::Escape).len(), 1);

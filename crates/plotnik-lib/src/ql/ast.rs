@@ -29,7 +29,7 @@ ast_node!(Tree, Tree);
 ast_node!(Ref, Ref);
 ast_node!(Lit, Lit);
 ast_node!(Str, Str);
-ast_node!(Alt, Alt);
+
 ast_node!(Branch, Branch);
 ast_node!(Seq, Seq);
 ast_node!(Capture, Capture);
@@ -39,6 +39,65 @@ ast_node!(Field, Field);
 ast_node!(NegatedField, NegatedField);
 ast_node!(Wildcard, Wildcard);
 ast_node!(Anchor, Anchor);
+
+/// Whether an alternation uses tagged or untagged branches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AltKind {
+    /// All branches have labels: `[A: expr1 B: expr2]`
+    Tagged,
+    /// No branches have labels: `[expr1 expr2]`
+    Untagged,
+    /// Mixed tagged and untagged branches (invalid)
+    Mixed,
+}
+
+/// Alternation node with cached kind.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Alt {
+    node: SyntaxNode,
+    kind: AltKind,
+}
+
+impl Alt {
+    pub fn cast(node: SyntaxNode) -> Option<Self> {
+        (node.kind() == SyntaxKind::Alt).then(|| {
+            let kind = Self::compute_kind(&node);
+            Self { node, kind }
+        })
+    }
+
+    fn compute_kind(node: &SyntaxNode) -> AltKind {
+        let mut tagged = false;
+        let mut untagged = false;
+
+        for child in node.children().filter(|c| c.kind() == SyntaxKind::Branch) {
+            let has_label = child
+                .children_with_tokens()
+                .filter_map(|it| it.into_token())
+                .any(|t| t.kind() == SyntaxKind::Id);
+
+            if has_label {
+                tagged = true;
+            } else {
+                untagged = true;
+            }
+        }
+
+        match (tagged, untagged) {
+            (true, true) => AltKind::Mixed,
+            (true, false) => AltKind::Tagged,
+            _ => AltKind::Untagged,
+        }
+    }
+
+    pub fn kind(&self) -> AltKind {
+        self.kind
+    }
+
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.node
+    }
+}
 
 /// Expression: any pattern that can appear in the tree.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -151,11 +210,11 @@ impl Ref {
 
 impl Alt {
     pub fn branches(&self) -> impl Iterator<Item = Branch> + '_ {
-        self.0.children().filter_map(Branch::cast)
+        self.node.children().filter_map(Branch::cast)
     }
 
     pub fn exprs(&self) -> impl Iterator<Item = Expr> + '_ {
-        self.0.children().filter_map(Expr::cast)
+        self.node.children().filter_map(Expr::cast)
     }
 }
 

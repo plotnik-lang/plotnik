@@ -11,6 +11,8 @@ pub enum ErrorStage {
     /// Lexing/parsing errors (syntax structure)
     #[default]
     Parse,
+    /// Semantic validation errors (mixed alternations, etc.)
+    Validate,
     /// Name resolution errors (undefined/duplicate references)
     Resolve,
     /// Escape analysis errors (infinite recursion)
@@ -21,6 +23,7 @@ impl std::fmt::Display for ErrorStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorStage::Parse => write!(f, "parse"),
+            ErrorStage::Validate => write!(f, "validate"),
             ErrorStage::Resolve => write!(f, "resolve"),
             ErrorStage::Escape => write!(f, "escape"),
         }

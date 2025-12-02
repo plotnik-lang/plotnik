@@ -621,6 +621,13 @@ fn mixed_tagged_and_untagged() {
               Id "c"
               ParenClose ")"
           BracketClose "]"
+    ---
+    error: mixed tagged and untagged branches in alternation
+      |
+    1 | [Tagged: (a) (b) Another: (c)]
+      |  ------      ^^^ mixed tagged and untagged branches in alternation
+      |  |
+      |  tagged branch here
     "#);
 }
 

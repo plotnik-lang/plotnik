@@ -40,6 +40,7 @@ pub mod lexer;
 pub mod parser;
 pub mod resolve;
 pub mod syntax_kind;
+pub mod validate;
 
 #[cfg(test)]
 mod ast_tests;
