@@ -117,7 +117,7 @@ fn sibling_children() {
 }
 
 #[test]
-fn multiple_patterns() {
+fn multiple_expressions() {
     let input = indoc! {r#"
     (identifier)
     (string)

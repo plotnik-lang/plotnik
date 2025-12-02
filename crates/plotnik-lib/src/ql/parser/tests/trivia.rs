@@ -77,7 +77,7 @@ fn multiline() {
 }
 
 #[test]
-fn comment_inside_pattern() {
+fn comment_inside_expression() {
     let input = indoc! {r#"
     (call // inline
         name: (identifier))

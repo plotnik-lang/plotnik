@@ -315,7 +315,7 @@ fn error_at_end() {
 }
 
 #[test]
-fn complex_pattern() {
+fn complex_expression() {
     insta::assert_snapshot!(snapshot("(function_definition name: (identifier) @name)"), @r#"
     ParenOpen "("
     Id "function_definition"
@@ -331,7 +331,7 @@ fn complex_pattern() {
 }
 
 #[test]
-fn alternation_pattern() {
+fn alternation_expression() {
     insta::assert_snapshot!(snapshot("[\"public\" \"private\" \"protected\"]"), @r#"
     BracketOpen "["
     StringLit "\"public\""
@@ -460,7 +460,7 @@ fn keyword_missing_vs_id() {
 }
 
 #[test]
-fn supertype_path_pattern() {
+fn supertype_path_expression() {
     insta::assert_snapshot!(snapshot("(expression/binary_expression)"), @r#"
     ParenOpen "("
     Id "expression"
@@ -484,7 +484,7 @@ fn type_annotation_full() {
 }
 
 #[test]
-fn sequence_pattern() {
+fn sequence_expression() {
     insta::assert_snapshot!(snapshot("{ (a) (b) }*"), @r#"
     BraceOpen "{"
     ParenOpen "("
@@ -604,7 +604,7 @@ fn single_vs_double_quote_strings() {
 }
 
 #[test]
-fn comma_in_pattern_context() {
+fn comma_in_expression_context() {
     insta::assert_snapshot!(snapshot("[(a), (b)]"), @r#"
     BracketOpen "["
     ParenOpen "("
@@ -619,7 +619,7 @@ fn comma_in_pattern_context() {
 }
 
 #[test]
-fn pipe_in_pattern_context() {
+fn pipe_in_expression_context() {
     insta::assert_snapshot!(snapshot("[a | b]"), @r#"
     BracketOpen "["
     Id "a"

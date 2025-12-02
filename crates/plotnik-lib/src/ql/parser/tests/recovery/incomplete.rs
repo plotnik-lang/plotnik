@@ -156,7 +156,7 @@ fn missing_subtype() {
 }
 
 #[test]
-fn tagged_branch_missing_pattern() {
+fn tagged_branch_missing_expression() {
     let input = indoc! {r#"
     [Label:]
     "#};

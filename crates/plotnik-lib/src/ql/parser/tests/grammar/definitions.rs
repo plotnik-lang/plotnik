@@ -157,7 +157,7 @@ fn multiple_named_defs() {
 }
 
 #[test]
-fn named_def_then_pattern() {
+fn named_def_then_expression() {
     let input = indoc! {r#"
     Expr = [(identifier) (number)]
     (program (Expr) @value)
@@ -358,7 +358,7 @@ fn named_def_with_type_annotation() {
 }
 
 #[test]
-fn upper_ident_not_followed_by_equals_is_pattern() {
+fn upper_ident_not_followed_by_equals_is_expression() {
     let input = indoc! {r#"
     (Expr)
     "#};

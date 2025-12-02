@@ -2,7 +2,7 @@ use crate::Query;
 use indoc::indoc;
 
 #[test]
-fn field_pattern() {
+fn field_expression() {
     let input = indoc! {r#"
     (call function: (identifier))
     "#};

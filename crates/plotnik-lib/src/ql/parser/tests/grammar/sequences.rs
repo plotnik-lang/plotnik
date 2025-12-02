@@ -212,7 +212,7 @@ fn sequence_with_alternation() {
 }
 
 #[test]
-fn sequence_comma_separated_pattern() {
+fn sequence_comma_separated_expression() {
     let input = indoc! {r#"
     {(number) {"," (number)}*}
     "#};
