@@ -315,11 +315,10 @@ impl std::fmt::Debug for TokenSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut list = f.debug_set();
         for i in 0..64u16 {
-            if self.0 & (1 << i) != 0
-                && i < __LAST as u16 {
-                    let kind: SyntaxKind = unsafe { std::mem::transmute(i) };
-                    list.entry(&kind);
-                }
+            if self.0 & (1 << i) != 0 && i < __LAST as u16 {
+                let kind: SyntaxKind = unsafe { std::mem::transmute(i) };
+                list.entry(&kind);
+            }
         }
         list.finish()
     }

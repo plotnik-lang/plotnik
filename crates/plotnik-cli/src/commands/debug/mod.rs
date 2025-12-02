@@ -45,14 +45,16 @@ pub fn run(
     let query = query_source.as_ref().map(|src| Query::new(src));
 
     if output.query_cst
-        && let Some(ref q) = query {
-            output::print_query_cst(q, show_headers);
-        }
+        && let Some(ref q) = query
+    {
+        output::print_query_cst(q, show_headers);
+    }
 
     if output.query_ast
-        && let Some(ref q) = query {
-            output::print_query_ast(q, show_headers);
-        }
+        && let Some(ref q) = query
+    {
+        output::print_query_ast(q, show_headers);
+    }
 
     if output.query_refs
         && let Some(ref q) = query

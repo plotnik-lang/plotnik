@@ -275,6 +275,7 @@ impl<'src> Parser<'src> {
     /// - `UpperIdent` followed by `=` (named definition)
     /// - A token in EXPR_FIRST (potential anonymous definition)
     /// - EOF
+    ///
     /// Returns true if any tokens were consumed.
     pub(super) fn synchronize_to_def_start(&mut self) -> bool {
         if self.eof() {

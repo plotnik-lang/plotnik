@@ -192,10 +192,7 @@ impl Parser<'_> {
             }
             SyntaxKind::Id => {
                 let name = token_text(self.source, &self.tokens[self.pos]).to_string();
-                let is_pascal_case = name
-                    .chars()
-                    .next()
-                    .is_some_and(|c| c.is_ascii_uppercase());
+                let is_pascal_case = name.chars().next().is_some_and(|c| c.is_ascii_uppercase());
                 self.bump();
 
                 if is_pascal_case {
@@ -712,11 +709,7 @@ impl Parser<'_> {
             return;
         }
 
-        if name
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_uppercase())
-        {
+        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
             let fix = Fix::new(
                 suggested.clone(),
@@ -731,11 +724,7 @@ impl Parser<'_> {
 
     /// Validate definition name follows PascalCase convention.
     fn validate_def_name(&mut self, name: &str, span: TextRange) {
-        if !name
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_uppercase())
-        {
+        if !name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_pascal_case(name);
             let fix = Fix::new(
                 suggested.clone(),
@@ -800,11 +789,7 @@ impl Parser<'_> {
             return;
         }
 
-        if name
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_uppercase())
-        {
+        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
             let fix = Fix::new(
                 format!("{}:", suggested),

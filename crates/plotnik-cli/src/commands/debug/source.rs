@@ -32,15 +32,16 @@ pub fn resolve_lang(lang: &Option<String>, source_args: &SourceArgs) -> Lang {
 
     if let Some(path) = &source_args.source_file
         && path.as_os_str() != "-"
-            && let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                return Lang::from_extension(ext).unwrap_or_else(|| {
-                    eprintln!(
-                        "error: cannot infer language from extension '.{}', use --lang",
-                        ext
-                    );
-                    std::process::exit(1);
-                });
-            }
+        && let Some(ext) = path.extension().and_then(|e| e.to_str())
+    {
+        return Lang::from_extension(ext).unwrap_or_else(|| {
+            eprintln!(
+                "error: cannot infer language from extension '.{}', use --lang",
+                ext
+            );
+            std::process::exit(1);
+        });
+    }
 
     eprintln!("error: --lang is required (cannot infer from input)");
     std::process::exit(1);
