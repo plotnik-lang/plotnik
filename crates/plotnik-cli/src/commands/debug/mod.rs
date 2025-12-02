@@ -28,10 +28,10 @@ pub fn run(
             && has_source
             && !output.query_cst
             && !output.query_ast
-            && !output.query_refs
+            && !output.query_symbols
             && !output.query_types
             && !output.source_ast
-            && !output.source_ast_raw
+            && !output.source_ast_full
             && !output.trace);
 
     let show_headers = count_outputs(&output, show_result) >= 2;
@@ -56,10 +56,10 @@ pub fn run(
         output::print_query_ast(q, show_headers);
     }
 
-    if output.query_refs
+    if output.query_symbols
         && let Some(ref q) = query
     {
-        output::print_query_refs(q, show_headers);
+        output::print_query_symbols(q, show_headers);
     }
 
     if output.query_types {
@@ -70,7 +70,7 @@ pub fn run(
         output::print_source_ast(&source_args, &lang, show_headers, false);
     }
 
-    if output.source_ast_raw {
+    if output.source_ast_full {
         output::print_source_ast(&source_args, &lang, show_headers, true);
     }
 
@@ -111,7 +111,7 @@ fn validate_inputs(
     source_args: &SourceArgs,
     lang: &Option<String>,
 ) -> Result<(), &'static str> {
-    if (output.query_cst || output.query_ast || output.query_refs || output.query_types)
+    if (output.query_cst || output.query_ast || output.query_symbols || output.query_types)
         && !has_query
     {
         return Err(
@@ -119,8 +119,8 @@ fn validate_inputs(
         );
     }
 
-    if (output.source_ast || output.source_ast_raw) && !has_source {
-        return Err("--source-ast and --source-ast-raw require --source-text or --source-file");
+    if (output.source_ast || output.source_ast_full) && !has_source {
+        return Err("--source-ast and --source-ast-full require --source-text or --source-file");
     }
 
     if output.trace && !(has_query && has_source) {
@@ -142,10 +142,10 @@ fn count_outputs(output: &OutputArgs, show_result: bool) -> usize {
     [
         output.query_cst,
         output.query_ast,
-        output.query_refs,
+        output.query_symbols,
         output.query_types,
         output.source_ast,
-        output.source_ast_raw,
+        output.source_ast_full,
         output.trace,
         show_result,
     ]

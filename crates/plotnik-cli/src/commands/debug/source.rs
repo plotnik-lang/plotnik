@@ -55,7 +55,7 @@ pub fn parse_tree(source: &str, lang: Lang) -> tree_sitter::Tree {
     parser.parse(source, None).expect("failed to parse source")
 }
 
-pub fn format_ast(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {
+pub fn dump_source(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {
     format_node(tree.root_node(), source, 0, include_anonymous) + "\n"
 }
 

@@ -8,32 +8,49 @@ Lexer (logos) + parser (rowan) are resilient: collect errors, don't fail-fast.
 
 ```
 crates/
-  plotnik-lib/        # Core library
+  plotnik-lib/         # Core library
     src/
-      lexer.rs        # Token definitions (logos)
-      syntax_kind.rs  # SyntaxKind enum
-      parser/
-        core.rs       # Parser infrastructure
-        grammar.rs    # Grammar rules
-        error.rs      # Parse errors
-        tests/        # Parser tests (snapshots)
-      ast.rs          # Typed AST layer over CST
-      resolve.rs      # Name resolution, symbol table
-      escape.rs       # Escape analysis (recursion validation)
-      validate.rs     # Semantic validation
-      lib.rs          # Public API (Query type)
-  plotnik-cli/        # CLI tool
-    src/commands/     # Subcommands (debug, docs, langs)
-  plotnik-langs/      # Tree-sitter language bindings
+      ast/             # Syntax infrastructure
+        lexer.rs       # Token definitions (logos)
+        syntax_kind.rs # SyntaxKind enum
+        nodes.rs       # Typed AST wrappers over CST
+        parser/
+          core.rs      # Parser infrastructure
+          grammar.rs   # Grammar rules
+          error.rs     # Parse errors
+          tests/       # Parser tests (snapshots)
+      query/           # Query processing
+        mod.rs         # Query struct, new(), pipeline
+        dump.rs        # dump_* debug output methods
+        errors.rs      # Error access methods
+        alt_kind.rs    # Alternation validation
+        named_defs.rs  # Name resolution, symbol table
+        ref_cycles.rs  # Escape analysis (recursion validation)
+        shape_cardinalities.rs  # Shape inference
+      lib.rs           # Re-exports Query
+  plotnik-cli/         # CLI tool
+    src/commands/      # Subcommands (debug, docs, langs)
+  plotnik-langs/       # Tree-sitter language bindings
 docs/
-  REFERENCE.md        # Language specification
+  REFERENCE.md         # Language specification
 ```
+
+## Pipeline
+
+```rust
+ast::parse()                      // Parse → CST
+alt_kind::validate()              // Validate alternation kinds
+named_defs::resolve()             // Resolve names → SymbolTable
+ref_cycles::validate()            // Validate recursion termination
+shape_cardinalities::infer()      // Infer shape cardinalities
+shape_cardinalities::validate()   // Validate field constraints
+```
+
+Module = "what", function = "action".
 
 ## CLI
 
 Run: `cargo run -p plotnik-cli -- <command>`
-
-**Update this section when CLI changes.**
 
 | Command        | Purpose                          |
 | -------------- | -------------------------------- |
@@ -45,26 +62,12 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 Inputs: `--query-text <Q>`, `--query-file <F>`, `--source-text <S>`, `--source-file <F>`, `-l/--lang <L>`
 
-Use `debug` to explore tree-sitter ASTs and test queries interactively:
-
 ```sh
-# See what tree-sitter nodes exist in a file
 cargo run -p plotnik-cli -- debug --source-file example.ts --source-ast
-
-# Raw tree-sitter output (with anonymous nodes)
-cargo run -p plotnik-cli -- debug --source-file example.ts --source-ast-raw
-
-# Test a query against source
-cargo run -p plotnik-cli -- debug --query-text '(function_declaration) @fn' --source-file example.ts --result
-
-# Debug query parsing
+cargo run -p plotnik-cli -- debug --source-file example.ts --source-ast-full
 cargo run -p plotnik-cli -- debug --query-text '[(a) (b)]' --query-cst --query-ast
-
-# Inline source for quick tests
 cargo run -p plotnik-cli -- debug --query-text '(x)' --source-text 'x' --lang typescript
 ```
-
-This is the primary way to understand what nodes to match before writing queries.
 
 ## Syntax
 
@@ -76,7 +79,7 @@ Expr = `Tree | Alt | Seq | Quantifier | Capture`. Quantifier/Capture wrap their 
 
 ## Errors
 
-Stages: `Parse` → `Resolve` → `Escape`. Use `Query::errors_in_stage()`, `Query::render_errors_grouped()`.
+Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Query::errors_for_stage()`, `Query::dump_errors_grouped()`.
 
 ## Constraints
 
@@ -93,11 +96,11 @@ Stages: `Parse` → `Resolve` → `Escape`. Use `Query::errors_in_stage()`, `Que
 - New scopes only from captured `{...}@s` or `[...]@c`
 - `?`/`*`/`+` = optional/list/non-empty list
 
-## AST Layer (`ql/ast.rs`)
+## AST Layer (`ast/nodes.rs`)
 
 Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 
-Use `Option<T>` for casts, not `TryFrom`. `format_ast()` for concise output.
+Use `Option<T>` for casts, not `TryFrom`. `ast::format_ast()` for concise output.
 
 ## Testing
 
@@ -117,7 +120,7 @@ fn my_test() {
 
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.format_ast(), @""); // <-- empty string, always
+    insta::assert_snapshot!(query.dump_ast(), @""); // <-- empty string, always
 }
 ```
 
@@ -132,42 +135,16 @@ Never write snapshot content manually. Let insta generate it.
 
 **Test patterns:**
 
-- Valid parsing: `assert!(query.is_valid())` + snapshot `format_*()` output
-- Error recovery: `assert!(!query.is_valid())` + snapshot `render_errors()` only
+- Valid parsing: `assert!(query.is_valid())` + snapshot `dump_*()` output
+- Error recovery: `assert!(!query.is_valid())` + snapshot `dump_errors()` only
 
 ## Coverage
 
 Uses `cargo-llvm-cov`, already installed.
 
-**Single command to see uncovered lines:**
-
 ```sh
 cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- <test_filter> 2>/dev/null | grep '<file>:'
 ```
-
-Example for `grammar.rs`:
-
-```sh
-cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- parser 2>/dev/null | grep 'grammar\.rs:'
-```
-
-Output shows file path and comma-separated uncovered line numbers:
-
-```
-/path/to/grammar.rs: 26, 78, 79, 80, 128, 129, 130, ...
-```
-
-**Workflow:**
-
-1. Run command above for target file
-2. Output shows exactly what code paths need tests
-3. Add minimal tests exercising those paths
-4. Re-run to verify
-
-**Don't:**
-
-- Aim for 100%
-- Write tests without seeing the uncovered code first
 
 ## Invariants
 
@@ -176,15 +153,9 @@ Two-tier resilience strategy:
 1. **Parser**: resilient, collects errors, continues parsing
 2. **Post-parse phases**: strict invariants, panic on violations
 
-For code paths that "should never happen" (e.g., malformed AST after successful parsing, dead code branches), use `panic!` with informative messages instead of silent defaults:
+For code paths that "should never happen", use `panic!` with informative messages:
 
 ```rust
-// Bad: hides bugs
-let Some(name) = node.name() else {
-    return Default::default();
-};
-
-// Good: fails fast with context
 let name = node.name().unwrap_or_else(|| {
     panic!(
         "phase_name: Node missing name at {:?} (should be caught by parser)",
@@ -193,17 +164,9 @@ let name = node.name().unwrap_or_else(|| {
 });
 ```
 
-Include in panic messages:
-- Phase/function name
-- What invariant was violated
-- Location (text range)
-- Which earlier phase should have caught it
-
-Uncovered lines that are all panics = correct coverage. The panic paths exist to catch bugs, not to be exercised in normal tests.
-
 ## Not implemented
 
-- Semantic validation (phase 5): field constraints, casing rules
+- Semantic validation: casing rules
 
 ## Deferred
 

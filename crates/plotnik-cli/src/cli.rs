@@ -14,22 +14,10 @@ pub struct Cli {
 pub enum Command {
     /// Debug and inspect queries and source files
     #[command(after_help = r#"OUTPUT DEPENDENCIES:
-┌─────────────────┬─────────────┬──────────────┐
-│ Output          │ Needs Query │ Needs Source │
-├─────────────────┼─────────────┼──────────────┤
-│ --query-cst     │      ✓      │              │
-│ --query-ast     │      ✓      │              │
-│ --query-refs    │      ✓      │              │
-│ --query-types   │      ✓      │              │
-│ --source-ast    │             │      ✓       │
-│ --source-ast-raw│             │      ✓       │
-│ --trace         │      ✓      │      ✓       │
-│ --result        │      ✓      │      ✓       │
-└─────────────────┴─────────────┴──────────────┘
 
 EXAMPLES:
   # Parse and typecheck query only
-  plotnik debug --query-text '(identifier) @id' --query-cst --query-types
+  plotnik debug --query-text '(identifier) @id' --query-cst --query-symbols
 
   # Dump tree-sitter AST of source file
   plotnik debug --source-file app.ts --source-ast
@@ -103,7 +91,7 @@ pub struct OutputArgs {
 
     /// Show name resolution (definitions and references)
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub query_refs: bool,
+    pub query_symbols: bool,
 
     /// Show inferred output types
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
@@ -115,7 +103,7 @@ pub struct OutputArgs {
 
     /// Show tree-sitter AST of source (all nodes including anonymous)
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub source_ast_raw: bool,
+    pub source_ast_full: bool,
 
     /// Show execution trace
     #[arg(long, num_args = 0..=1, default_missing_value = "true")]
