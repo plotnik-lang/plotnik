@@ -462,17 +462,10 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Single-quoted literal - parse as Lit but emit error about using double quotes.
+    /// Single-quoted literal - equivalent to double-quoted.
+    /// Single quotes are useful when the query itself is wrapped in double quotes (e.g., tool calling).
     fn parse_single_quote_lit(&mut self) {
         self.start_node(SyntaxKind::Lit);
-
-        let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
-        // Convert 'foo' to "foo"
-        let inner = &text[1..text.len() - 1];
-        let fix = Fix::new(format!("\"{}\"", inner), "use double quotes");
-        self.error_with_fix(span, "single quotes are not valid for string literals", fix);
-
         self.bump();
         self.finish_node();
     }

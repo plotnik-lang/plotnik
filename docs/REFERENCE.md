@@ -255,11 +255,17 @@ Output type:
 
 ### Anonymous Nodes
 
-Match literal tokens (operators, keywords, punctuation) with double quotes:
+Match literal tokens (operators, keywords, punctuation) with double or single quotes:
 
 ```
 (binary_expression operator: "!=")
 (return_statement "return")
+```
+
+Single quotes are equivalent to double quotes, useful when the query itself is wrapped in double quotes (e.g., in tool calls or JSON):
+
+```
+(return_statement 'return')
 ```
 
 Anonymous nodes can be captured directly:

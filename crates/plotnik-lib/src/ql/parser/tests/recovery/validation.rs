@@ -413,7 +413,7 @@ fn capture_mixed_dots_and_hyphens() {
 // ============================================================================
 
 #[test]
-fn single_quote_string_suggests_double_quotes() {
+fn single_quote_string_is_valid() {
     let input = "(node 'if')";
 
     let query = Query::new(input);
@@ -427,17 +427,6 @@ fn single_quote_string_suggests_double_quotes() {
           Lit
             SingleQuoteLit "'if'"
           ParenClose ")"
-    ---
-    error: single quotes are not valid for string literals
-      |
-    1 | (node 'if')
-      |       ^^^^ single quotes are not valid for string literals
-      |
-    help: use double quotes
-      |
-    1 - (node 'if')
-    1 + (node "if")
-      |
     "#);
 }
 
@@ -457,27 +446,6 @@ fn single_quote_in_alternation() {
           Lit
             SingleQuoteLit "'private'"
           BracketClose "]"
-    ---
-    error: single quotes are not valid for string literals
-      |
-    1 | ['public' 'private']
-      |  ^^^^^^^^ single quotes are not valid for string literals
-      |
-    help: use double quotes
-      |
-    1 - ['public' 'private']
-    1 + ["public" 'private']
-      |
-    error: single quotes are not valid for string literals
-      |
-    1 | ['public' 'private']
-      |           ^^^^^^^^^ single quotes are not valid for string literals
-      |
-    help: use double quotes
-      |
-    1 - ['public' 'private']
-    1 + ['public' "private"]
-      |
     "#);
 }
 
@@ -496,17 +464,6 @@ fn single_quote_with_escape() {
           Lit
             SingleQuoteLit "'it\\'s'"
           ParenClose ")"
-    ---
-    error: single quotes are not valid for string literals
-      |
-    1 | (node 'it\'s')
-      |       ^^^^^^^ single quotes are not valid for string literals
-      |
-    help: use double quotes
-      |
-    1 - (node 'it\'s')
-    1 + (node "it\'s")
-      |
     "#);
 }
 
@@ -1001,16 +958,6 @@ fn multiple_suggestions_combined() {
       |
     1 - (node name = 'foo', @val : Type)
     1 + (node name : 'foo', @val : Type)
-      |
-    error: single quotes are not valid for string literals
-      |
-    1 | (node name = 'foo', @val : Type)
-      |              ^^^^^ single quotes are not valid for string literals
-      |
-    help: use double quotes
-      |
-    1 - (node name = 'foo', @val : Type)
-    1 + (node name = "foo", @val : Type)
       |
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
