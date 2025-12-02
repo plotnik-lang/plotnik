@@ -611,6 +611,30 @@ fn field_equals_typo_no_space() {
     "#);
 }
 
+#[test]
+fn field_equals_typo_no_expression() {
+    let input = "(call name=)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: '=' is not valid for field constraints
+      |
+    1 | (call name=)
+      |           ^ '=' is not valid for field constraints
+      |
+    help: use ':'
+      |
+    1 - (call name=)
+    1 + (call name:)
+      |
+    error: expected expression after field name
+      |
+    1 | (call name=)
+      |            ^ expected expression after field name
+    ");
+}
+
 // ============================================================================
 // Combined Errors
 // ============================================================================
@@ -878,5 +902,311 @@ fn capture_with_type_and_upper_ident() {
     1 - (identifier) @Name :: MyType
     1 + (identifier) @name :: MyType
       |
+    "#);
+}
+
+// ============================================================================
+// Definition name validation
+// ============================================================================
+
+#[test]
+fn def_name_lowercase_error() {
+    let input = "lowercase = (x)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: definition names must start with uppercase
+      |
+    1 | lowercase = (x)
+      | ^^^^^^^^^ definition names must start with uppercase
+      |
+    help: definition names must be PascalCase; use Lowercase instead
+      |
+    1 - lowercase = (x)
+    1 + Lowercase = (x)
+      |
+    ");
+}
+
+#[test]
+fn def_name_with_underscores_error() {
+    let input = "Some_Thing = (x)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: definition names cannot contain separators
+      |
+    1 | Some_Thing = (x)
+      | ^^^^^^^^^^ definition names cannot contain separators
+      |
+    help: definition names must be PascalCase; use SomeThing instead
+      |
+    1 - Some_Thing = (x)
+    1 + SomeThing = (x)
+      |
+    ");
+}
+
+#[test]
+fn def_name_with_hyphens_error() {
+    let input = "Some-Thing = (x)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: definition names cannot contain separators
+      |
+    1 | Some-Thing = (x)
+      | ^^^^^^^^^^ definition names cannot contain separators
+      |
+    help: definition names must be PascalCase; use SomeThing instead
+      |
+    1 - Some-Thing = (x)
+    1 + SomeThing = (x)
+      |
+    ");
+}
+
+// ============================================================================
+// Branch label validation
+// ============================================================================
+
+#[test]
+fn branch_label_with_underscores_error() {
+    let input = "[Some_Label: (x)]";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: branch labels cannot contain separators
+      |
+    1 | [Some_Label: (x)]
+      |  ^^^^^^^^^^ branch labels cannot contain separators
+      |
+    help: branch labels must be PascalCase; use SomeLabel: instead
+      |
+    1 - [Some_Label: (x)]
+    1 + [SomeLabel:: (x)]
+      |
+    ");
+}
+
+#[test]
+fn branch_label_with_hyphens_error() {
+    let input = "[Some-Label: (x)]";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: branch labels cannot contain separators
+      |
+    1 | [Some-Label: (x)]
+      |  ^^^^^^^^^^ branch labels cannot contain separators
+      |
+    help: branch labels must be PascalCase; use SomeLabel: instead
+      |
+    1 - [Some-Label: (x)]
+    1 + [SomeLabel:: (x)]
+      |
+    ");
+}
+
+#[test]
+fn lowercase_branch_label_missing_expression() {
+    let input = "[label:]";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: tagged alternation labels must be Capitalized (they map to enum variants)
+      |
+    1 | [label:]
+      |  ^^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |
+    help: capitalize as `Label`
+      |
+    1 - [label:]
+    1 + [Label:]
+      |
+    error: expected expression after branch label
+      |
+    1 | [label:]
+      |        ^ expected expression after branch label
+    ");
+}
+
+// ============================================================================
+// Field name validation
+// ============================================================================
+
+#[test]
+fn field_name_with_dots_error() {
+    let input = "(call foo.bar: (x))";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: field names cannot contain dots
+      |
+    1 | (call foo.bar: (x))
+      |       ^^^^^^^ field names cannot contain dots
+      |
+    help: field names must be snake_case; use foo_bar: instead
+      |
+    1 - (call foo.bar: (x))
+    1 + (call foo_bar:: (x))
+      |
+    ");
+}
+
+#[test]
+fn field_name_with_hyphens_error() {
+    let input = "(call foo-bar: (x))";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: field names cannot contain hyphens
+      |
+    1 | (call foo-bar: (x))
+      |       ^^^^^^^ field names cannot contain hyphens
+      |
+    help: field names must be snake_case; use foo_bar: instead
+      |
+    1 - (call foo-bar: (x))
+    1 + (call foo_bar:: (x))
+      |
+    ");
+}
+
+// ============================================================================
+// Type name validation
+// ============================================================================
+
+#[test]
+fn type_name_with_dots_error() {
+    let input = "(x) @name :: Some.Type";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: type names cannot contain dots or hyphens
+      |
+    1 | (x) @name :: Some.Type
+      |              ^^^^^^^^^ type names cannot contain dots or hyphens
+      |
+    help: type names cannot contain separators; use ::SomeType instead
+      |
+    1 - (x) @name :: Some.Type
+    1 + (x) @name :: ::SomeType
+      |
+    ");
+}
+
+#[test]
+fn type_name_with_hyphens_error() {
+    let input = "(x) @name :: Some-Type";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: type names cannot contain dots or hyphens
+      |
+    1 | (x) @name :: Some-Type
+      |              ^^^^^^^^^ type names cannot contain dots or hyphens
+      |
+    help: type names cannot contain separators; use ::SomeType instead
+      |
+    1 - (x) @name :: Some-Type
+    1 + (x) @name :: ::SomeType
+      |
+    ");
+}
+
+// ============================================================================
+// String literal validation
+// ============================================================================
+
+#[test]
+fn unclosed_double_quote_string() {
+    let input = r#"(call "foo)"#;
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | (call "foo)
+      |       ^^^^^ unexpected token; expected a child expression or closing delimiter
+    error: unclosed tree; expected ')'
+      |
+    1 | (call "foo)
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
+    "#);
+}
+
+#[test]
+fn unclosed_single_quote_string() {
+    let input = "(call 'foo)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | (call 'foo)
+      |       ^^^^^ unexpected token; expected a child expression or closing delimiter
+    error: unclosed tree; expected ')'
+      |
+    1 | (call 'foo)
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
+    ");
+}
+
+// ============================================================================
+// Reference validation
+// ============================================================================
+
+#[test]
+fn reference_with_supertype_syntax_error() {
+    let input = "(RefName/subtype)";
+
+    let query = Query::new(input);
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r"
+    error: references cannot use supertype syntax (/)
+      |
+    1 | (RefName/subtype)
+      |         ^ references cannot use supertype syntax (/)
+    ");
+}
+
+// ============================================================================
+// MISSING node with children (exercises parse_children fallback)
+// ============================================================================
+
+#[test]
+fn missing_with_nested_tree_parses() {
+    let input = "(MISSING (something))";
+
+    let query = Query::new(input);
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
+    Root
+      Def
+        Tree
+          ParenOpen "("
+          KwMissing "MISSING"
+          Tree
+            ParenOpen "("
+            Id "something"
+            ParenClose ")"
+          ParenClose ")"
     "#);
 }
