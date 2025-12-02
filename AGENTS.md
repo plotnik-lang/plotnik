@@ -1,116 +1,92 @@
-# Project context
+# plotnik
 
-> See [docs/REFERENCE.md](docs/REFERENCE.md) for the full language specification.
+Query language for tree-sitter AST with named subqueries, recursion, and type inference. See [docs/REFERENCE.md](docs/REFERENCE.md) for spec.
 
-- This is `plotnik`: a query language and toolkit for tree-sitter AST
-  - Query language (QL) is similar to `tree-sitter` queries, but more powerful
-    - named subqueries (expressions)
-    - recursion
-    - structured data capture with type inference
-  - Types of data are inferred from the structure of query
-    - could be output in several formats: Rust, TypeScript, Python, etc
-    - Rust could use type information to compile queries via procedural macros
-    - TypeScript/Python/etc bindings could use type information to avoid the manual data shape checks
-- The goal of QL lexer (using `logos`) and parser (using `rowan`) is to be resilient:
-  - Do not fail-fast
-  - Provide necessary context which could be used by CLI and LSP tooling being built
-
-## What's implemented
-
-- Lexer: all token types including trivia, error coalescing
-- Parser structure: trivia handling, error recovery, checkpoints
-- Basic grammar: tree expressions `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"` or `'literal'`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = expr`, tagged alternations `[A: ... B: ...]`
-- String literals: both `"double"` and `'single'` quotes are valid and equivalent. Single quotes are useful when the query is embedded in double-quoted strings (e.g., JSON, tool calling).
-- Parser accepts UpperIdent in capture/field positions for resilience (validation catches casing errors)
-
-## Error Pipeline
-
-Errors flow through staged analysis:
-- `Parse`: Syntax structure errors (lexer/parser)
-- `Resolve`: Name resolution errors (undefined references, duplicate definitions)
-- `Escape`: Recursive pattern detection errors
-
-Errors are collected, not fail-fast. Use `Query::errors_in_stage()` for filtering, `Query::render_errors_grouped()` for CLI output.
+Lexer (logos) + parser (rowan) are resilient: collect errors, don't fail-fast.
 
 ## CLI
 
-Debug flags for introspection (composable, multiple can be enabled):
-- `--query-cst`: Concrete syntax tree (all tokens)
-- `--query-ast`: Abstract syntax tree (semantic structure, concise)
-- `--query-refs`: Name resolution references
-- Future: `--query-types`, `--source-ast`, `--result`
+Run: `cargo run -p plotnik-cli -- <command>`
 
-Designed for LLM-friendly debugging. Errors render at the end, grouped by stage.
+**Update this section when CLI changes.**
 
-## SyntaxKind naming convention
+| Command        | Purpose                          |
+| -------------- | -------------------------------- |
+| `debug`        | Inspect queries/sources          |
+| `docs [topic]` | Print docs (reference, examples) |
+| `langs`        | List supported languages         |
 
-Short, punchy names for CST node kinds:
+### debug options
 
-- `Tree` - parenthesized tree expressions: `(type)`, `(_)`, `(ERROR)`, `(MISSING)`
-- `Lit` - literal/anonymous nodes: `"keyword"`
-- `Def` - named definitions: `Name = expr`
-- `Alt` - alternations: `[a b c]`
-- `Branch` - tagged alternation branch: `Label: expr`
-- `Seq` - sibling sequences: `{a b c}`
-- `Quantifier` - wraps an expression with `*`, `+`, or `?`
-- `Capture` - wraps an expression with `@name` and optional `::Type`
-- `Type` - type annotations: `::T`
+Inputs: `--query-text <Q>`, `--query-file <F>`, `--source-text <S>`, `--source-file <F>`, `-l/--lang <L>`
 
-## Expression structure
+Outputs (composable):
+| Flag | Needs |
+|------|-------|
+| `--query-cst` | query |
+| `--query-ast` | query |
+| `--query-refs` | query |
+| `--query-types` | query |
+| `--source-ast` | source |
+| `--source-ast-raw` | source |
+| `--trace` | both |
+| `--result` | both |
 
-An expression (`Expr`) is one of: `Tree | Alt | Seq | Quantifier | Capture`
+Examples:
 
-- `Quantifier` wraps the expression it quantifies: `(x)*` → `Quantifier { Tree, Star }`
-- `Capture` wraps the expression it captures: `(x) @name` → `Capture { Tree, @name }`
-- Captures must follow an expression; standalone `@name` is invalid
+```sh
+cargo run -p plotnik-cli -- debug --query-text '(identifier) @id' --query-ast
+cargo run -p plotnik-cli -- debug --source-file f.ts --source-ast
+cargo run -p plotnik-cli -- debug --query-text '(fn) @f' --source-file f.ts --result
+cargo run -p plotnik-cli -- debug --query-text '(x)' --source-text 'x' --lang typescript
+```
 
-## What's NOT yet implemented
+## Syntax
 
-- Semantic validation (Phase 5): field value constraints, alternation style mixing, casing rules
+Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Type`, `field:`, `*+?`, `"lit"`/`'lit'`, `(a/b)` (supertype), `(ERROR)`, `Name = expr` (def), `[A: ... B: ...]` (tagged alt)
 
-## Intentionally deferred (post-MVP)
+SyntaxKind: `Tree`, `Lit`, `Def`, `Alt`, `Branch`, `Seq`, `Quantifier`, `Capture`, `Type`
 
-- Predicates (`#match?`, `#eq?`, etc.) and directives (`#set!`, etc.) from tree-sitter QL
-  - These are runtime filters, not structural patterns
-  - Plotnik's value is in named expressions, recursion, and type inference
-  - May be added later if there's demand, but not a priority
+Expr = `Tree | Alt | Seq | Quantifier | Capture`. Quantifier/Capture wrap their target.
 
-## Grammar Constraints
+## Errors
 
-- Definitions: All definitions must be named (`Name = expr`) except optionally the last one, which becomes the entry point. Unnamed definitions that aren't last produce an error showing the full definition text.
-- Fields: `field: expr` constraints are strict. The expression must be a tree, alternation, or quantifier. Sibling sequences `{...}` are not allowed as direct field values.
-- Alternations: In unlabeled alternations, captures with the same name must have the same type across all branches where they appear. A capture is required if present in all branches, optional otherwise. When branches mix bare nodes and structures, bare node captures are auto-promoted to single-field structures. Merged structures require explicit type annotation (`@x :: TypeName`) for codegen. Use tagged alternations (`[A: ... B: ...]`) for discriminated unions.
-- Anchors: The `.` anchor enforces strict adjacency. Without it, sibling matching allows gaps (scanning).
-- Naming: Capitalized names (`Expr`) are user-defined (expressions, labels). Lowercase names (`stmt`) are language-defined (tree-sitter nodes).
-- Captures: Must use snake_case (`@name`, `@func_body`). Dots are not allowed in capture names. This ensures captures map directly to valid struct field names in generated code (Rust, TypeScript, Python).
+Stages: `Parse` → `Resolve` → `Escape`. Use `Query::errors_in_stage()`, `Query::render_errors_grouped()`.
+
+## Constraints
+
+- Defs must be named except last (entry point)
+- Fields: `field: expr` — no sequences as direct values
+- Alternations: same-name captures need same type; use `@x :: T` for merged structs; tagged alts for discriminated unions
+- `.` anchor = strict adjacency; without = scanning
+- Names: `Upper` = user-defined, `lower` = tree-sitter nodes
+- Captures: snake_case only, no dots
 
 ## Data Model
 
-- **Flattening**: Node nesting in the query does NOT create nesting in the output. `(a (b @b))` yields `{ b: Node }`.
-- **Structure**: New data scopes/nesting are created ONLY by capturing sequences `{...} @seq` or alternations `[...] @choice`.
-- **Arrays**: Quantifiers `?`, `*`, `+` determine the cardinality (optional, list, non-empty list).
-- **Fields**: Captures `@name` create fields within the current scope.
+- Nesting in query ≠ nesting in output: `(a (b @b))` → `{b: Node}`
+- New scopes only from captured `{...}@s` or `[...]@c`
+- `?`/`*`/`+` = optional/list/non-empty list
 
-## AST Layer
+## AST Layer (`ql/ast.rs`)
 
-Typed wrappers over CST (`SyntaxNode`) in `ql/ast.rs`:
-- `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`
-- `Expr` enum for any expression node
-- `format_ast()` for concise semantic tree output (vs CST which includes all tokens)
-- Tests using AST should use `snapshot_ast()` for cleaner output
+Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 
-## AST Casting Convention
+Use `Option<T>` for casts, not `TryFrom`. `format_ast()` for concise output.
 
-- Use `Option<T>` for casting methods, not `TryFrom`/`TryInto`
-- `None` is not always an error—parsing resilience requires flexible conversion
-- Validation is a separate layer from casting; don't embed error logic in cast methods
-- Consistent with rnix-parser, rowan ecosystem patterns
+## Not implemented
 
-## General rules
+- Semantic validation (phase 5): field constraints, casing rules
 
-- When the changes are made, propose an update to AGENTS.md file if it provides valuable context for future LLM agent calls
-- Check diagnostics after your changes
-- Follow established parser patterns (see rnix-parser, taplo for reference)
-- Keep tokens span-based, avoid storing text in intermediate structures
-- Don't write AI slop code comments, write only useful ones
-- When generating test snapshots (`insta`), don't place values by yourself, instead write empty strings (as required with @), then run `insta` util for update inline snapshots
+## Deferred
+
+- Predicates (`#match?` etc.) — runtime filters, not structural
+
+## Rules
+
+- Update AGENTS.md when changes add useful context
+- Check diagnostics after changes
+- Follow rnix-parser/taplo patterns
+- Span-based tokens, no text in intermediate structures
+- No slop comments
+- For insta snapshots: write empty strings, run `cargo insta`
