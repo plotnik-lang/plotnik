@@ -38,14 +38,16 @@ fn missing_bracket() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "string"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
     ---
     error: unclosed alternation; expected ']'
       |
@@ -164,13 +166,15 @@ fn unclosed_alternation_nested() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
     ---
     error: unclosed tree; expected ')'
       |

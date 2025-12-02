@@ -127,16 +127,18 @@ fn garbage_inside_alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
           Error
             Garbage "^^^"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
           BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter
@@ -457,8 +459,9 @@ fn alternation_recovery_to_capture() {
             Garbage "^^^"
           Error
             At "@"
-          Error
-            Id "name"
+          Branch
+            Error
+              Id "name"
           BracketClose "]"
     ---
     error: unexpected token; expected a child expression or closing delimiter

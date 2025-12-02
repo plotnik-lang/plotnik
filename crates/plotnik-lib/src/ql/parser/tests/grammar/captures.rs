@@ -258,14 +258,16 @@ fn alternation_capture_with_type() {
         Capture
           Alt
             BracketOpen "["
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-            Tree
-              ParenOpen "("
-              Id "number"
-              ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "identifier"
+                ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "number"
+                ParenClose ")"
             BracketClose "]"
           At "@"
           Id "value"

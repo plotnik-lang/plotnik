@@ -17,14 +17,16 @@ fn alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "string"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }
@@ -41,10 +43,12 @@ fn alternation_with_anonymous() {
       Def
         Alt
           BracketOpen "["
-          Lit
-            StringLit "\"true\""
-          Lit
-            StringLit "\"false\""
+          Branch
+            Lit
+              StringLit "\"true\""
+          Branch
+            Lit
+              StringLit "\"false\""
           BracketClose "]"
     "#);
 }
@@ -62,17 +66,53 @@ fn alternation_with_capture() {
         Capture
           Alt
             BracketOpen "["
+            Branch
+              Tree
+                ParenOpen "("
+                Id "identifier"
+                ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "string"
+                ParenClose ")"
+            BracketClose "]"
+          At "@"
+          Id "value"
+    "#);
+}
+
+#[test]
+fn alternation_with_quantifier() {
+    let input = indoc! {r#"
+    [
+      (identifier)
+      (string)* @strings
+    ]
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
+      Def
+        Alt
+          BracketOpen "["
+          Branch
             Tree
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
-            Tree
-              ParenOpen "("
-              Id "string"
-              ParenClose ")"
-            BracketClose "]"
-          At "@"
-          Id "value"
+          Branch
+            Capture
+              Quantifier
+                Tree
+                  ParenOpen "("
+                  Id "string"
+                  ParenClose ")"
+                Star "*"
+              At "@"
+              Id "strings"
+          BracketClose "]"
     "#);
 }
 
@@ -92,14 +132,16 @@ fn alternation_nested() {
           Id "expr"
           Alt
             BracketOpen "["
-            Tree
-              ParenOpen "("
-              Id "binary"
-              ParenClose ")"
-            Tree
-              ParenOpen "("
-              Id "unary"
-              ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "binary"
+                ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "unary"
+                ParenClose ")"
             BracketClose "]"
           ParenClose ")"
     "#);
@@ -124,14 +166,16 @@ fn alternation_in_field() {
             Colon ":"
             Alt
               BracketOpen "["
-              Tree
-                ParenOpen "("
-                Id "string"
-                ParenClose ")"
-              Tree
-                ParenOpen "("
-                Id "number"
-                ParenClose ")"
+              Branch
+                Tree
+                  ParenOpen "("
+                  Id "string"
+                  ParenClose ")"
+              Branch
+                Tree
+                  ParenOpen "("
+                  Id "number"
+                  ParenClose ")"
               BracketClose "]"
           ParenClose ")"
     "#);
@@ -149,18 +193,21 @@ fn unlabeled_alternation_three_items() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "number"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "string"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }
@@ -177,14 +224,16 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
       Def
         Alt
           BracketOpen "["
-          Ref
-            ParenOpen "("
-            Id "Expr"
-            ParenClose ")"
-          Ref
-            ParenOpen "("
-            Id "Statement"
-            ParenClose ")"
+          Branch
+            Ref
+              ParenOpen "("
+              Id "Expr"
+              ParenClose ")"
+          Branch
+            Ref
+              ParenOpen "("
+              Id "Statement"
+              ParenClose ")"
           BracketClose "]"
     ---
     error: undefined reference: `Expr`
@@ -555,10 +604,11 @@ fn mixed_tagged_and_untagged() {
               ParenOpen "("
               Id "a"
               ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
           Branch
             Id "Another"
             Colon ":"
@@ -590,14 +640,16 @@ fn tagged_alternation_with_nested_alternation() {
             Colon ":"
             Alt
               BracketOpen "["
-              Tree
-                ParenOpen "("
-                Id "number"
-                ParenClose ")"
-              Tree
-                ParenOpen "("
-                Id "string"
-                ParenClose ")"
+              Branch
+                Tree
+                  ParenOpen "("
+                  Id "number"
+                  ParenClose ")"
+              Branch
+                Tree
+                  ParenOpen "("
+                  Id "string"
+                  ParenClose ")"
               BracketClose "]"
           Branch
             Id "Ident"

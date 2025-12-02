@@ -354,18 +354,20 @@ fn supertype_in_alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "expression"
-            Slash "/"
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "expression"
-            Slash "/"
-            Id "number"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "expression"
+              Slash "/"
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "expression"
+              Slash "/"
+              Id "number"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }

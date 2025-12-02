@@ -100,13 +100,15 @@ fn reference() {
 #[test]
 fn alternation_unlabeled() {
     let query = Query::new("[(identifier) (number)]");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_ast(), @r"
     Root
       Def
         Alt
-          Tree identifier
-          Tree number
-    "#);
+          Branch
+            Tree identifier
+          Branch
+            Tree number
+    ");
 }
 
 #[test]

@@ -124,14 +124,16 @@ fn error_in_alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            KwError "ERROR"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              KwError "ERROR"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }

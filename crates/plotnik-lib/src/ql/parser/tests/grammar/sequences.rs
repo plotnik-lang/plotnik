@@ -192,14 +192,16 @@ fn sequence_with_alternation() {
           BraceOpen "{"
           Alt
             BracketOpen "["
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "a"
+                ParenClose ")"
+            Branch
+              Tree
+                ParenOpen "("
+                Id "b"
+                ParenClose ")"
             BracketClose "]"
           Tree
             ParenOpen "("

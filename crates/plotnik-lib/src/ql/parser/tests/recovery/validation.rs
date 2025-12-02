@@ -441,10 +441,12 @@ fn single_quote_in_alternation() {
       Def
         Alt
           BracketOpen "["
-          Lit
-            SingleQuoteLit "'public'"
-          Lit
-            SingleQuoteLit "'private'"
+          Branch
+            Lit
+              SingleQuoteLit "'public'"
+          Branch
+            Lit
+              SingleQuoteLit "'private'"
           BracketClose "]"
     "#);
 }
@@ -517,18 +519,21 @@ fn comma_in_alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "c"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "c"
+              ParenClose ")"
           BracketClose "]"
     ---
     error: ',' is not valid syntax; plotnik uses whitespace for separation
@@ -565,18 +570,21 @@ fn pipe_in_alternation() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "c"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "c"
+              ParenClose ")"
           BracketClose "]"
     ---
     error: '|' is not valid syntax; plotnik uses whitespace for separation
@@ -1095,18 +1103,21 @@ fn whitespace_separation_no_error() {
       Def
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "c"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "c"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }

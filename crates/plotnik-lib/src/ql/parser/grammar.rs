@@ -385,7 +385,9 @@ impl Parser<'_> {
                     self.parse_branch_lowercase_label();
                 }
             } else if EXPR_FIRST.contains(kind) {
+                self.start_node(SyntaxKind::Branch);
                 self.parse_expr();
+                self.finish_node();
             } else if ALT_RECOVERY.contains(kind) {
                 break;
             } else {

@@ -142,16 +142,18 @@ fn trivia_between_alternation_items() {
           BracketOpen "["
           Newline "\n"
           Whitespace "    "
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
           Newline "\n"
           Whitespace "    "
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
           BracketClose "]"
       Newline "\n"
       Newline "\n"

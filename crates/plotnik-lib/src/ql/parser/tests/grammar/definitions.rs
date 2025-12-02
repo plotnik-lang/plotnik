@@ -34,18 +34,21 @@ fn named_def_with_alternation() {
         Equals "="
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "number"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "string"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }
@@ -168,14 +171,16 @@ fn named_def_then_pattern() {
         Equals "="
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "number"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
           BracketClose "]"
       Def
         Tree
@@ -207,28 +212,32 @@ fn named_def_referencing_another() {
         Equals "="
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "number"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "string"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
           BracketClose "]"
       Def
         Id "Expr"
         Equals "="
         Alt
           BracketOpen "["
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          Ref
-            ParenOpen "("
-            Id "Literal"
-            ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          Branch
+            Ref
+              ParenOpen "("
+              Id "Literal"
+              ParenClose ")"
           BracketClose "]"
     "#);
 }
@@ -276,20 +285,22 @@ fn named_def_complex_recursive() {
             Colon ":"
             Alt
               BracketOpen "["
-              Capture
-                Tree
-                  ParenOpen "("
-                  Id "identifier"
-                  ParenClose ")"
-                At "@"
-                Id "name"
-              Capture
-                Ref
-                  ParenOpen "("
-                  Id "NestedCall"
-                  ParenClose ")"
-                At "@"
-                Id "inner"
+              Branch
+                Capture
+                  Tree
+                    ParenOpen "("
+                    Id "identifier"
+                    ParenClose ")"
+                  At "@"
+                  Id "name"
+              Branch
+                Capture
+                  Ref
+                    ParenOpen "("
+                    Id "NestedCall"
+                    ParenClose ")"
+                  At "@"
+                  Id "inner"
               BracketClose "]"
           Field
             Id "arguments"
