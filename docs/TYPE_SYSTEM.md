@@ -13,21 +13,21 @@ T ::= Node                              -- tree-sitter node reference
     | string                            -- extracted text (via :: string)
     | { f₁: T₁, ..., fₙ: Tₙ }           -- record (struct)
     | T?                                -- optional (zero or one)
-    | T[]                               -- array (zero or more)
-    | T⁺                                -- non-empty array (one or more)
-    | ⟨L₁: T₁, ..., Lₙ: Tₙ⟩             -- tagged union (labeled alternation)
+    | T*                                -- array (zero or more)
+    | T+                                -- non-empty array (one or more)
+    | <L₁: T₁, ..., Lₙ: Tₙ>             -- tagged union (labeled alternation)
     | Name                              -- named type reference
     | ()                                -- unit (no captures)
 ```
 
 ### Cardinality
 
-| Quantifier | Type modifier | Rust        | TypeScript       |
-| ---------- | ------------- | ----------- | ---------------- |
-| (none)     | `T`           | `T`         | `T`              |
-| `?`        | `T?`          | `Option<T>` | `T \| undefined` |
-| `*`        | `T[]`         | `Vec<T>`    | `T[]`            |
-| `+`        | `T⁺`          | `Vec<T>`    | `[T, ...T[]]`    |
+| Quantifier | Type modifier | Rust          | TypeScript       |
+| ---------- | ------------- | ------------- | ---------------- |
+| (none)     | `T`           | `T`           | `T`              |
+| `?`        | `T?`          | `Option<T>`   | `T \| undefined` |
+| `*`        | `T*`          | `Vec<T>`      | `T[]`            |
+| `+`        | `T+`          | `(T, Vec<T>)` | `[T, ...T[]]`    |
 
 Non-greedy variants (`??`, `*?`, `+?`) have the same types as their greedy counterparts.
 
@@ -35,9 +35,12 @@ Non-greedy variants (`??`, `*?`, `+?`) have the same types as their greedy count
 
 ```
 ()? ≡ ()                    -- optional unit is unit
-()[] ≡ ()                   -- array of unit is unit
+()* ≡ ()                    -- array of unit is unit
+()+ ≡ ()                    -- non-empty array of unit is unit
+{}  ≡ ()                    -- empty record is unit
 { f: () } ≡ ()              -- record with only unit fields collapses
-T | T ≡ T                   -- union with itself
+{ f: (), g: T } ≡ { g: T }  -- unit fields are eliminated
+T | T ≡ T                   -- union with itself (idempotence)
 ```
 
 ---
@@ -46,12 +49,12 @@ T | T ≡ T                   -- union with itself
 
 Type inference tracks two things for each expression:
 
-- **value**: the type when this expression is captured as a whole
-- **fields**: captures that bubble up to the enclosing scope if NOT captured
+- **type**: the type when this expression is captured as a whole
+- **bindings**: captures that bubble up to the enclosing scope if NOT captured
 
 ### The Duality Explained
 
-Every expression has both a "value" (what it is if you capture it) and "fields" (what escapes from inside it if you don't). This is the fundamental insight.
+Every expression has both a "type" (what it is if you capture it) and "bindings" (what escapes from inside it if you don't). This is the fundamental insight.
 
 **Example 1: Simple tree node**
 
@@ -59,8 +62,8 @@ Every expression has both a "value" (what it is if you capture it) and "fields" 
 (identifier)
 ```
 
-- `value = Node` — if captured, you get a Node
-- `fields = ∅` — nothing bubbles up (no inner captures)
+- `type = Node` — if captured, you get a Node
+- `bindings = ∅` — nothing bubbles up (no inner captures)
 
 **Example 2: Tree with a capture inside**
 
@@ -68,8 +71,8 @@ Every expression has both a "value" (what it is if you capture it) and "fields" 
 (function_declaration name: (identifier) @name)
 ```
 
-- `value = Node` — the tree itself is a Node
-- `fields = { name: Node }` — `@name` bubbles up to enclosing scope
+- `type = Node` — the tree itself is a Node
+- `bindings = { name: Node }` — `@name` bubbles up to enclosing scope
 
 **Example 3: Capturing a tree with inner captures**
 
@@ -77,10 +80,10 @@ Every expression has both a "value" (what it is if you capture it) and "fields" 
 (function_declaration name: (identifier) @name) @func
 ```
 
-- The inner expression has `fields = { name: Node }`
+- The inner expression has `bindings = { name: Node }`
 - `@func` captures the tree node itself (adds `func: Node`)
-- Inner fields continue to bubble up alongside the new capture
-- Result: `fields = { func: Node, name: Node }` — FLAT, both bubble up
+- Inner bindings continue to bubble up alongside the new capture
+- Result: `bindings = { func: Node, name: Node }` — FLAT, both bubble up
 
 **Example 4: When DO we get nesting?**
 
@@ -91,8 +94,8 @@ Only `{...}` sequences and `[...]` alternations create scope boundaries when cap
 ```
 
 - The `{...}` is a sequence (scope boundary when captured)
-- `@func` captures the sequence, absorbing inner fields
-- Result: `fields = { func: { name: Node } }` — nested
+- `@func` captures the sequence, absorbing inner bindings
+- Result: `bindings = { func: { name: Node } }` — nested
 
 Compare:
 
@@ -159,16 +162,16 @@ You control nesting explicitly by using grouping constructs (`{...}` and `[...]`
 
 ### Scope Boundaries
 
-Fields bubble up until they hit one of these:
+Bindings bubble up until they hit one of these:
 
 1. **Root of a definition** — top-level scope collects everything
-2. **Captured sequence** — `{...} @name` absorbs inner fields
-3. **Captured alternation** — `[...] @name` absorbs inner fields
+2. **Captured sequence** — `{...} @name` absorbs inner bindings
+3. **Captured alternation** — `[...] @name` absorbs inner bindings
 4. **Tagged alternation branches** — each `Label: ...` is its own scope
 
 **NOT scope boundaries:**
 
-- Captured trees: `(node) @name` — inner fields continue to bubble up
+- Captured trees: `(node) @name` — inner bindings continue to bubble up
 - Captured wildcards: `(_) @name` — just adds a capture
 - Field constraints: `field: expr` — transparent
 
@@ -212,7 +215,7 @@ All three captures bubble up together: `{ func: Node, name: Node, body: Node }`
 ] @value
 ```
 
-The `[...] @value` absorbs inner fields: `{ value: { id?: Node, num?: Node } }`
+The `[...] @value` absorbs inner bindings: `{ value: { id?: Node, num?: Node } }`
 
 Without the capture on alternation:
 
@@ -236,7 +239,7 @@ Fields bubble up: `{ id?: Node, num?: Node }`
 
 Each branch has its own scope. The `@name` in `Func:` and the `@name` in `Class:` are independent — they don't merge.
 
-Output: `{ item: ⟨Func: { name: Node }, Class: { name: Node }⟩ }`
+Output: `{ item: <Func: { name: Node }, Class: { name: Node }> }`
 
 **Pattern: Capturing Both Node and Structure**
 
@@ -279,13 +282,13 @@ Each capture has one job. The verbosity pays for explicitness — you always kno
 ### Notation
 
 - `Γ` — environment mapping definition names to types
-- `infer(E) → (value, fields)` — inference judgment
-- `merge(F₁, F₂)` — combine field sets (same-name fields must have same type)
+- `infer(E) → (type, bindings)` — inference judgment
+- `merge(B₁, B₂)` — combine binding sets (same-name bindings must have same type)
 
 ### Terminals
 
 ```
-infer((node_type children...)) = (Node, merge(fields(c) for c in children))
+infer((node_type children...)) = (Node, merge(bindings(c) for c in children))
 infer((_)) = (Node, ∅)
 infer(_) = (Node, ∅)
 infer("literal") = (Node, ∅)
@@ -293,7 +296,7 @@ infer(.) = (Node, ∅)           -- anchor
 infer(!field) = (Node, ∅)      -- negated field
 ```
 
-Trees produce `Node` as their value. Child captures bubble up.
+Trees produce `Node` as their type. Child captures bubble up.
 
 **Example: Tree with children**
 
@@ -378,19 +381,19 @@ The capture rule depends on whether the captured expression is a scope boundary:
 
 ```
 infer(E @name) =
-  let (innerValue, innerFields) = infer(E)
-  let capturedValue = if innerValue = () then Node else innerValue
+  let (innerType, innerBindings) = infer(E)
+  let capturedType = if innerType = () then Node else innerType
 
   if E is Seq or E is Alt:
-    -- SCOPE BOUNDARY: absorb inner fields into a struct
-    let T = if innerFields = ∅ then capturedValue else { innerFields }
+    -- SCOPE BOUNDARY: absorb inner bindings into a struct
+    let T = if innerBindings = ∅ then capturedType else { innerBindings }
     ({ name: T }, { name: T })
   else:
-    -- NOT a scope boundary: capture + inner fields both bubble up
-    (capturedValue, merge({ name: capturedValue }, innerFields))
+    -- NOT a scope boundary: capture + inner bindings both bubble up
+    (capturedType, merge({ name: capturedType }, innerBindings))
 ```
 
-**Example 1: Capturing a bare node (no inner fields)**
+**Example 1: Capturing a bare node (no inner bindings)**
 
 ```
 (identifier) @name
@@ -407,8 +410,8 @@ infer(E @name) =
 ```
 
 1. `infer((function ...))` = `(Node, { name: Node, body: Node })`
-2. Tree is NOT a scope boundary — fields continue bubbling
-3. Add `func: Node` to the fields
+2. Tree is NOT a scope boundary — bindings continue bubbling
+3. Add `func: Node` to the bindings
 4. Result: `(Node, { func: Node, name: Node, body: Node })`
 
 All three captures end up at the same level — flat!
@@ -420,7 +423,7 @@ All three captures end up at the same level — flat!
 ```
 
 1. `infer({...})` = `((), { name: Node, body: Node })`
-2. Sequence IS a scope boundary — absorb inner fields
+2. Sequence IS a scope boundary — absorb inner bindings
 3. Result: `({ func: { name: Node, body: Node } }, { func: { name: Node, body: Node } })`
 
 Nested structure because `{...}` creates a scope.
@@ -432,7 +435,7 @@ Nested structure because `{...}` creates a scope.
 ```
 
 1. `infer([...])` = `(Node, { id?: Node, num?: Node })`
-2. Alternation IS a scope boundary — absorb inner fields
+2. Alternation IS a scope boundary — absorb inner bindings
 3. Result: `({ value: { id?: Node, num?: Node } }, { value: { id?: Node, num?: Node } })`
 
 **Example 5: Unit promotion**
@@ -452,12 +455,12 @@ Rationale: if you capture something with no structure, you want the matched node
 
 ```
 infer(E @name :: string) =
-  -- :: string always extracts text, fields still bubble per scope rules
+  -- :: string always extracts text, bindings still bubble per scope rules
   if E is Seq or E is Alt:
     ({ name: string }, { name: string })
   else:
-    let (_, innerFields) = infer(E)
-    (string, merge({ name: string }, innerFields))
+    let (_, innerBindings) = infer(E)
+    (string, merge({ name: string }, innerBindings))
 
 infer(E @name :: TypeName) =
   -- :: TypeName names the type for codegen, follows same scope rules
@@ -478,7 +481,7 @@ Result: `{ name: string }` — the node's text is extracted.
 (function name: (identifier) @fn_name) @func :: string
 ```
 
-Tree is not a scope boundary, so inner fields bubble up:
+Tree is not a scope boundary, so inner bindings bubble up:
 Result: `{ func: string, fn_name: Node }` — both at same level
 
 **Example: Type naming on sequence**
@@ -487,18 +490,18 @@ Result: `{ func: string, fn_name: Node }` — both at same level
 {(function name: (identifier) @name body: (_) @body)} @func :: FunctionDef
 ```
 
-Sequence IS a scope boundary, so inner fields are absorbed:
+Sequence IS a scope boundary, so inner bindings are absorbed:
 Result: `{ func: FunctionDef }` where `FunctionDef = { name: Node, body: Node }`
 
 ### Quantifier
 
 ```
 infer(E?) = let (v, f) = infer(E) in (v?, apply_optional(f))
-infer(E*) = let (v, f) = infer(E) in (v[], apply_array(f))
-infer(E+) = let (v, f) = infer(E) in (v⁺, apply_nonempty(f))
+infer(E*) = let (v, f) = infer(E) in (v*, apply_array(f))
+infer(E+) = let (v, f) = infer(E) in (v+, apply_nonempty(f))
 ```
 
-Cardinality applies to both the value and all bubbling fields.
+Cardinality applies to both the type and all bubbling bindings.
 
 **Example 1: Optional quantifier**
 
@@ -517,9 +520,9 @@ Cardinality applies to both the value and all bubbling fields.
 ```
 
 1. `infer((parameter ...))` = `(Node, { name: Node })`
-2. Apply `*`: value becomes `Node[]`, fields become `{ name: Node[] }`
+2. Apply `*`: type becomes `Node[]`, bindings become `{ name: Node[] }`
 3. Capture `@params` on a tree (NOT a scope boundary)
-4. Add `params: Node[]` to bubbling fields
+4. Add `params: Node[]` to bubbling bindings
 5. Result: `{ params: Node[], name: Node[] }`
 
 Both `@params` and `@name` bubble up. Each is an array because of `*`.
@@ -531,9 +534,9 @@ Both `@params` and `@name` bubble up. Each is an array because of `*`.
 ```
 
 1. `infer({...})` = `((), { name: Node })`
-2. Apply `*`: value becomes `()[]`, fields become `{ name: Node[] }`
+2. Apply `*`: type becomes `()[]`, bindings become `{ name: Node[] }`
 3. Capture `@params` on a sequence (IS a scope boundary)
-4. Absorb inner fields: `{ name: Node }` per element
+4. Absorb inner bindings: `{ name: Node }` per element
 5. Result: `{ params: { name: Node }[] }`
 
 Array of structs because `{...}` creates scope, each iteration is a struct.
@@ -546,7 +549,7 @@ Array of structs because `{...}` creates scope, each iteration is a struct.
 
 Here the quantifier is on the tree, not on a capture. The inner `@name` bubbles up:
 
-1. One match produces `fields = { name: Node }`
+1. One match produces `bindings = { name: Node }`
 2. `*` quantifier: `apply_array({ name: Node }) = { name: Node[] }`
 3. Result: `(Node[], { name: Node[] })`
 
@@ -570,9 +573,9 @@ combine(NonEmpty, q) = if q = One then NonEmpty else Array
 ```
 
 1. `(x) @item` produces `{ item: Node }` (One)
-2. `{ ... }+ @batch` wraps in non-empty array: `{ batch: { item: Node }⁺ }` (NonEmpty)
+2. `{ ... }+ @batch` wraps in non-empty array: `{ batch: { item: Node }+ }` (NonEmpty)
 3. Outer `*` combines: `combine(NonEmpty, Array) = Array`
-4. Result: `{ batch: { item: Node }⁺[] }` — array of non-empty arrays
+4. Result: `{ batch: { item: Node }+* }` — array of non-empty arrays
 
 **Example: Optional over optional**
 
@@ -612,11 +615,11 @@ Each match either contributes a node or nothing. The array collects all the node
 
 ```
 infer({ E₁ E₂ ... }) =
-  let fields = merge(infer(E₁).fields, infer(E₂).fields, ...)
-  ({ fields }, fields)
+  let bindings = merge(infer(E₁).bindings, infer(E₂).bindings, ...)
+  ({ bindings }, bindings)
 ```
 
-Sequences merge child fields. When captured, they become a struct.
+Sequences merge child bindings. When captured, they become a struct.
 
 **Example 1: Simple sequence**
 
@@ -626,7 +629,7 @@ Sequences merge child fields. When captured, they become a struct.
 
 1. `infer((a) @x)` = `({ x: Node }, { x: Node })`
 2. `infer((b) @y)` = `({ y: Node }, { y: Node })`
-3. Merge fields: `{ x: Node, y: Node }`
+3. Merge bindings: `{ x: Node, y: Node }`
 4. Result: `({ x: Node, y: Node }, { x: Node, y: Node })`
 
 **Example 2: Captured sequence (scope boundary)**
@@ -635,8 +638,8 @@ Sequences merge child fields. When captured, they become a struct.
 { (a) @x (b) @y } @pair
 ```
 
-1. Inner sequence has `fields = { x: Node, y: Node }`
-2. Sequence IS a scope boundary — `@pair` absorbs inner fields
+1. Inner sequence has `bindings = { x: Node, y: Node }`
+2. Sequence IS a scope boundary — `@pair` absorbs inner bindings
 3. Result: `({ pair: { x: Node, y: Node } }, { pair: { x: Node, y: Node } })`
 
 Compare to tree capture (not a boundary):
@@ -656,8 +659,8 @@ Result: `{ pair: Node, x: Node, y: Node }` — all flat
 }
 ```
 
-1. Inner `{ (a) @a } @first`: `fields = { first: { a: Node } }`
-2. Inner `{ (b) @b } @second`: `fields = { second: { b: Node } }`
+1. Inner `{ (a) @a } @first`: `bindings = { first: { a: Node } }`
+2. Inner `{ (b) @b } @second`: `bindings = { second: { b: Node } }`
 3. Merge: `{ first: { a: Node }, second: { b: Node } }`
 
 ### Alternation (Unlabeled / Merge Style)
@@ -665,10 +668,10 @@ Result: `{ pair: Node, x: Node, y: Node }` — all flat
 ```
 infer([ E₁ E₂ ... ]) =
   let branches = [infer(E₁), infer(E₂), ...]
-  if all(b.fields = ∅ for b in branches):
+  if all(b.bindings = ∅ for b in branches):
     (Node, ∅)
   else:
-    let merged = merge_optional(branches.map(b → b.fields))
+    let merged = merge_optional(branches.map(b → b.bindings))
     ({ merged }, merged)
 ```
 
@@ -678,7 +681,7 @@ infer([ E₁ E₂ ... ]) =
 [(identifier) (number) (string)]
 ```
 
-All branches have `fields = ∅`, so result is `(Node, ∅)`.
+All branches have `bindings = ∅`, so result is `(Node, ∅)`.
 
 When captured:
 
@@ -697,8 +700,8 @@ Result: `{ value: Node }` — simple node capture.
 ]
 ```
 
-Branch 1: `fields = { name: Node }`
-Branch 2: `fields = { num: Node }`
+Branch 1: `bindings = { name: Node }`
+Branch 2: `bindings = { num: Node }`
 
 Merge:
 
@@ -716,8 +719,8 @@ Result: `({ name: Node?, num: Node? }, { name: Node?, num: Node? })`
 ]
 ```
 
-Branch 1: `fields = { x: Node }`
-Branch 2: `fields = { x: Node }`
+Branch 1: `bindings = { x: Node }`
+Branch 2: `bindings = { x: Node }`
 
 Merge:
 
@@ -734,8 +737,8 @@ Result: `({ x: Node }, { x: Node })`
 ]
 ```
 
-Branch 1: `fields = { left: Node, right: Node }`
-Branch 2: `fields = { left: Node }`
+Branch 1: `bindings = { left: Node, right: Node }`
+Branch 2: `bindings = { left: Node }`
 
 Merge:
 
@@ -763,17 +766,17 @@ Error: `@x` has different types across branches.
 ```
 infer([ L₁: E₁  L₂: E₂ ... ]) =
   let variants = [
-    (L₁, infer(E₁).fields),
-    (L₂, infer(E₂).fields),
+    (L₁, infer(E₁).bindings),
+    (L₂, infer(E₂).bindings),
     ...
   ]
-  (⟨L₁: {fields₁}, L₂: {fields₂}, ...⟩, ∅)
+  (⟨L₁: {bindings₁}, L₂: {bindings₂}, ...⟩, ∅)
 ```
 
 Tagged alternations:
 
 - Produce a discriminated union
-- Each branch has its own scope (fields don't bubble up)
+- Each branch has its own scope (bindings don't bubble up)
 - Must be captured to be useful
 
 **Example 1: Basic tagged alternation**
@@ -785,10 +788,10 @@ Tagged alternations:
 ] @expr
 ```
 
-- `Ident` branch: `fields = { name: Node }`
-- `Num` branch: `fields = { value: Node }`
+- `Ident` branch: `bindings = { name: Node }`
+- `Num` branch: `bindings = { value: Node }`
 
-Result: `{ expr: ⟨Ident: { name: Node }, Num: { value: Node }⟩ }`
+Result: `{ expr: <Ident: { name: Node }, Num: { value: Node }> }`
 
 **Example 2: Different fields per branch**
 
@@ -803,11 +806,11 @@ Result: `{ expr: ⟨Ident: { name: Node }, Num: { value: Node }⟩ }`
 Result:
 
 ```
-expr: ⟨
+expr: <>
   Binary: { left: Node, op: Node, right: Node },
   Unary: { op: Node, operand: Node },
   Literal: { value: Node }
-⟩
+>
 ```
 
 Each branch is independent. `@op` in `Binary` and `@op` in `Unary` are separate fields.
@@ -821,7 +824,7 @@ Each branch is independent. `@op` in `Binary` and `@op` in `Unary` are separate 
 ] @option
 ```
 
-Result: `{ option: ⟨Some: { val: Node }, None: { }⟩ }`
+Result: `{ option: <Some: { val: Node }, None: { }> }`
 
 The `None` variant has an empty struct (unit).
 
@@ -843,7 +846,7 @@ BinOp = (binary left: (_) @left right: (_) @right)
 
 `infer((binary ...))` = `(Node, { left: Node, right: Node })`
 
-The definition's type comes from root fields: `BinOp = { left: Node, right: Node }`
+The definition's type comes from root bindings: `BinOp = { left: Node, right: Node }`
 
 **Example: Reference in use**
 
@@ -868,9 +871,9 @@ The query's output type comes from:
 
 ```
 entry_type(root) =
-  let (value, fields) = infer(entry_expr)
-  if fields = ∅: value
-  else: { fields }
+  let (type, bindings) = infer(entry_expr)
+  if bindings = ∅: type
+  else: { bindings }
 ```
 
 **Example 1: Unnamed entry point**
@@ -995,7 +998,7 @@ Trace:
 
 1. `(decorator) @decorator` → `{ decorator: Node }`
 2. `(identifier) @fn_name` → `{ fn_name: Node }`
-3. Inner `{...}` is sequence — scope boundary, absorbs fields
+3. Inner `{...}` is sequence — scope boundary, absorbs bindings
 4. `@decorated_fn` captures: `{ decorated_fn: { decorator: Node, fn_name: Node } }`
 5. Outer `{...}*` is also sequence, absorbs on capture
 6. `@functions` captures: `{ functions: { decorated_fn: { decorator: Node, fn_name: Node } }[] }`
@@ -1026,7 +1029,7 @@ Trace:
 
 1. All captures are on trees, not sequences
 2. Trees are NOT scope boundaries
-3. All fields bubble up together
+3. All bindings bubble up together
 
 Output type:
 
@@ -1103,9 +1106,9 @@ type Stmt = { tag: "Assign"; target: Node } | { tag: "Call"; func: Node };
 Trace:
 
 1. `(element) @item` → `({ item: Node }, { item: Node })`
-2. `{...}` sequence has fields `{ item: Node }`
+2. `{...}` sequence has bindings `{ item: Node }`
 3. `{...}+`: value becomes array, each element is a struct
-4. `@items` captures sequence (scope boundary): absorbs inner fields
+4. `@items` captures sequence (scope boundary): absorbs inner bindings
 
 Output: `{ items: { item: Node }[] }` (non-empty array of structs)
 
@@ -1129,7 +1132,7 @@ Output: `{ items: Node[], item: Node[] }` — both flat arrays
 (array {(element) @item}+)
 ```
 
-No capture on the sequence, so fields bubble up: `{ item: Node[] }` (non-empty).
+No capture on the sequence, so bindings bubble up: `{ item: Node[] }` (non-empty).
 
 ---
 
@@ -1270,7 +1273,7 @@ Each `@item` is in its own scope. They don't conflict.
   ])                           -- WARNING: tags unused without capture
 ```
 
-Tags only matter when the alternation itself is captured. Without capture, fields merge as if unlabeled.
+Tags only matter when the alternation itself is captured. Without capture, bindings merge as if unlabeled.
 
 **Rationale:** You wrote labels but aren't using them. Probably a mistake.
 
@@ -1323,7 +1326,7 @@ Expr = [
 Produces:
 
 ```
-Expr = ⟨Leaf: { name: Node }, Binary: { left: Expr, right: Expr }⟩
+Expr = <Leaf: { name: Node }, Binary: { left: Expr, right: Expr }>
 ```
 
 **Why nominal?** Structural recursion is infinite. `Expr` refers to `Expr` by name, not by expanding it.
@@ -1379,9 +1382,9 @@ type Statement =
 | `string` | `string` |
 | `{ f: T }` | `{ f: T }` or `interface Name { f: T }` |
 | `T?` | `T \| undefined` or `f?: T` in objects |
-| `T[]` | `T[]` |
-| `T⁺` | `[T, ...T[]]` |
-| `⟨A: T₁, B: T₂⟩` | `{ tag: "A" } & T₁ \| { tag: "B" } & T₂` |
+| `T*` | `T[]` |
+| `T+` | `[T, ...T[]]` |
+| `<A: T₁, B: T₂>` | `{ tag: "A" } & T₁ \| { tag: "B" } & T₂` |
 
 ### Rust
 
@@ -1406,9 +1409,9 @@ enum Statement {
 | `string` | `String` |
 | `{ f: T }` | `struct Name { f: T }` |
 | `T?` | `Option<T>` |
-| `T[]` | `Vec<T>` |
-| `T⁺` | `Vec<T>` (non-empty invariant at runtime) |
-| `⟨A: T₁, B: T₂⟩` | `enum Name { A { ... }, B { ... } }` |
+| `T*` | `Vec<T>` |
+| `T+` | `(T, Vec<T>)` |
+| `<A: T₁, B: T₂>` | `enum Name { A { ... }, B { ... } }` |
 
 **Boxing:** Recursive types require indirection:
 
@@ -1443,9 +1446,9 @@ class Assign:
 | `string` | `str` |
 | `{ f: T }` | `@dataclass class Name` |
 | `T?` | `T \| None` |
-| `T[]` | `list[T]` |
-| `T⁺` | `list[T]` |
-| `⟨A: T₁, B: T₂⟩` | Union of dataclasses |
+| `T*` | `list[T]` |
+| `T+` | `list[T]` |
+| `<A: T₁, B: T₂>` | Union of dataclasses |
 
 ---
 
@@ -1468,14 +1471,14 @@ Scope {
 
 ### Phase 2: Infer
 
-Bottom-up traversal computing `(value, fields)` for each node.
+Bottom-up traversal computing `(type, bindings)` for each node.
 
 **Algorithm:**
 
 1. Start from leaves (terminals)
 2. Work up to root
 3. At each node, apply inference rule based on node type
-4. Propagate fields upward until hitting scope boundary
+4. Propagate bindings upward until hitting scope boundary
 
 ### Phase 3: Validate
 
