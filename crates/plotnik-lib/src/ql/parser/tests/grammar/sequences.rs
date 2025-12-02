@@ -230,8 +230,10 @@ fn sequence_comma_separated_expression() {
           Quantifier
             Seq
               BraceOpen "{"
-              Lit
-                StringLit "\",\""
+              Str
+                DoubleQuote "\""
+                StrVal ","
+                DoubleQuote "\""
               Tree
                 ParenOpen "("
                 Id "number"

@@ -86,7 +86,9 @@ fn missing_node_with_string() {
         Tree
           ParenOpen "("
           KwMissing "MISSING"
-          StringLit "\";\""
+          DoubleQuote "\""
+          StrVal ";"
+          DoubleQuote "\""
           ParenClose ")"
     "#);
 }
@@ -105,7 +107,9 @@ fn missing_node_with_capture() {
           Tree
             ParenOpen "("
             KwMissing "MISSING"
-            StringLit "\";\""
+            DoubleQuote "\""
+            StrVal ";"
+            DoubleQuote "\""
             ParenClose ")"
           At "@"
           Id "missing_semi"
@@ -153,7 +157,9 @@ fn missing_in_sequence() {
           Tree
             ParenOpen "("
             KwMissing "MISSING"
-            StringLit "\";\""
+            DoubleQuote "\""
+            StrVal ";"
+            DoubleQuote "\""
             ParenClose ")"
           Tree
             ParenOpen "("

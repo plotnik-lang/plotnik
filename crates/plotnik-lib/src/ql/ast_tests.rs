@@ -43,7 +43,7 @@ fn literal() {
     insta::assert_snapshot!(query.snapshot_ast(), @r#"
     Root
       Def
-        Lit "if"
+        Str "if"
     "#);
 }
 

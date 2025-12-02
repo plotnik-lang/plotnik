@@ -133,7 +133,11 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                 collect_refs(&value, refs);
             }
         }
-        Expr::Lit(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+        Expr::Lit(_)
+        | Expr::Str(_)
+        | Expr::Wildcard(_)
+        | Expr::Anchor(_)
+        | Expr::NegatedField(_) => {}
     }
 }
 
@@ -177,7 +181,11 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
                 collect_reference_errors(&value, symbols, errors);
             }
         }
-        Expr::Lit(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+        Expr::Lit(_)
+        | Expr::Str(_)
+        | Expr::Wildcard(_)
+        | Expr::Anchor(_)
+        | Expr::NegatedField(_) => {}
     }
 }
 

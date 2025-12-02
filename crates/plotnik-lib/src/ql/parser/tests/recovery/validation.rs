@@ -424,8 +424,10 @@ fn single_quote_string_is_valid() {
         Tree
           ParenOpen "("
           Id "node"
-          Lit
-            SingleQuoteLit "'if'"
+          Str
+            SingleQuote "'"
+            StrVal "if"
+            SingleQuote "'"
           ParenClose ")"
     "#);
 }
@@ -442,11 +444,15 @@ fn single_quote_in_alternation() {
         Alt
           BracketOpen "["
           Branch
-            Lit
-              SingleQuoteLit "'public'"
+            Str
+              SingleQuote "'"
+              StrVal "public"
+              SingleQuote "'"
           Branch
-            Lit
-              SingleQuoteLit "'private'"
+            Str
+              SingleQuote "'"
+              StrVal "private"
+              SingleQuote "'"
           BracketClose "]"
     "#);
 }
@@ -463,8 +469,10 @@ fn single_quote_with_escape() {
         Tree
           ParenOpen "("
           Id "node"
-          Lit
-            SingleQuoteLit "'it\\'s'"
+          Str
+            SingleQuote "'"
+            StrVal "it\\'s"
+            SingleQuote "'"
           ParenClose ")"
     "#);
 }
@@ -945,8 +953,10 @@ fn multiple_suggestions_combined() {
           Field
             Id "name"
             Equals "="
-            Lit
-              SingleQuoteLit "'foo'"
+            Str
+              SingleQuote "'"
+              StrVal "foo"
+              SingleQuote "'"
           Error
             At "@"
           Field
@@ -1012,8 +1022,10 @@ fn double_quotes_no_error() {
         Tree
           ParenOpen "("
           Id "node"
-          Lit
-            StringLit "\"if\""
+          Str
+            DoubleQuote "\""
+            StrVal "if"
+            DoubleQuote "\""
           ParenClose ")"
     "#);
 }

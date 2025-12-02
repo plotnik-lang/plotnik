@@ -139,8 +139,7 @@ impl Parser<'_> {
             SyntaxKind::BracketOpen => self.parse_alt(),
             SyntaxKind::BraceOpen => self.parse_seq(),
             SyntaxKind::Underscore => self.parse_wildcard(),
-            SyntaxKind::StringLit => self.parse_lit(),
-            SyntaxKind::SingleQuoteLit => self.parse_single_quote_lit(),
+            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_str(),
             SyntaxKind::Dot => self.parse_anchor(),
             SyntaxKind::Negation => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
@@ -214,8 +213,11 @@ impl Parser<'_> {
                     }
                     self.bump();
                     match self.peek() {
-                        SyntaxKind::Id | SyntaxKind::StringLit => {
+                        SyntaxKind::Id => {
                             self.bump();
+                        }
+                        SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
+                            self.bump_string_tokens();
                         }
                         _ => {
                             self.error(
@@ -241,8 +243,11 @@ impl Parser<'_> {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
                 match self.peek() {
-                    SyntaxKind::Id | SyntaxKind::StringLit => {
+                    SyntaxKind::Id => {
                         self.bump();
+                    }
+                    SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
+                        self.bump_string_tokens();
                     }
                     SyntaxKind::ParenClose => {}
                     _ => {
@@ -469,19 +474,30 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Literal (anonymous) node: `"if"`, `"+"`, etc.
-    fn parse_lit(&mut self) {
-        self.start_node(SyntaxKind::Lit);
-        self.expect(SyntaxKind::StringLit, "double-quoted string literal");
+    /// String literal: `"if"`, `'+'`, etc.
+    /// Parses: quote + optional content + quote into a Str node
+    fn parse_str(&mut self) {
+        self.start_node(SyntaxKind::Str);
+        self.bump_string_tokens();
         self.finish_node();
     }
 
-    /// Single-quoted literal - equivalent to double-quoted.
-    /// Single quotes are useful when the query itself is wrapped in double quotes (e.g., tool calling).
-    fn parse_single_quote_lit(&mut self) {
-        self.start_node(SyntaxKind::Lit);
-        self.bump();
-        self.finish_node();
+    /// Consume string tokens (quote + optional content + quote) without creating a node.
+    /// Used for contexts where string appears as a raw value (supertype, MISSING arg).
+    fn bump_string_tokens(&mut self) {
+        let open_quote = self.peek();
+        self.bump(); // opening quote
+
+        if self.peek() == SyntaxKind::StrVal {
+            self.bump(); // content
+        }
+
+        // Expect matching closing quote
+        if self.peek() == open_quote {
+            self.bump();
+        } else {
+            self.error("unclosed string literal");
+        }
     }
 
     /// Parse capture suffix: `@name` or `@name :: Type`

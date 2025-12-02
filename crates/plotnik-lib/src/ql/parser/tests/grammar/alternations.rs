@@ -44,11 +44,15 @@ fn alternation_with_anonymous() {
         Alt
           BracketOpen "["
           Branch
-            Lit
-              StringLit "\"true\""
+            Str
+              DoubleQuote "\""
+              StrVal "true"
+              DoubleQuote "\""
           Branch
-            Lit
-              StringLit "\"false\""
+            Str
+              DoubleQuote "\""
+              StrVal "false"
+              DoubleQuote "\""
           BracketClose "]"
     "#);
 }

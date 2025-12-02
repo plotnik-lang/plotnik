@@ -399,8 +399,10 @@ fn capture_literal() {
     Root
       Def
         Capture
-          Lit
-            StringLit "\"foo\""
+          Str
+            DoubleQuote "\""
+            StrVal "foo"
+            DoubleQuote "\""
           At "@"
           Id "keyword"
     "#);
@@ -417,8 +419,10 @@ fn capture_literal_with_type() {
     Root
       Def
         Capture
-          Lit
-            StringLit "\"return\""
+          Str
+            DoubleQuote "\""
+            StrVal "return"
+            DoubleQuote "\""
           At "@"
           Id "kw"
           Type
@@ -441,8 +445,10 @@ fn capture_literal_in_tree() {
           ParenOpen "("
           Id "binary_expression"
           Capture
-            Lit
-              StringLit "\"+\""
+            Str
+              DoubleQuote "\""
+              StrVal "+"
+              DoubleQuote "\""
             At "@"
             Id "op"
           ParenClose ")"
@@ -461,8 +467,10 @@ fn capture_literal_with_quantifier() {
       Def
         Capture
           Quantifier
-            Lit
-              StringLit "\",\""
+            Str
+              DoubleQuote "\""
+              StrVal ","
+              DoubleQuote "\""
             Star "*"
           At "@"
           Id "commas"

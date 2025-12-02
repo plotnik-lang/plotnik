@@ -102,7 +102,11 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
 
         Expr::Field(f) => f.value().map(|v| expr_has_escape(&v, scc)).unwrap_or(true),
 
-        Expr::Lit(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => true,
+        Expr::Lit(_)
+        | Expr::Str(_)
+        | Expr::Wildcard(_)
+        | Expr::Anchor(_)
+        | Expr::NegatedField(_) => true,
     }
 }
 

@@ -33,7 +33,9 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
 
 /// Tokenizes source into a vector of span-based tokens.
 ///
-/// Post-processes the Logos output to coalesce consecutive lexer errors into single `Garbage` tokens.
+/// Post-processes the Logos output:
+/// - Coalesces consecutive lexer errors into single `Garbage` tokens
+/// - Splits `StringLiteral` tokens into quote + content + quote
 pub fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = SyntaxKind::lexer(source);
@@ -51,7 +53,11 @@ pub fn lex(source: &str) -> Vec<Token> {
                 }
 
                 let span = lexer.span();
-                tokens.push(Token::new(kind, range_to_text_range(span)));
+                if kind == SyntaxKind::StringLiteral {
+                    split_string_literal(source, span, &mut tokens);
+                } else {
+                    tokens.push(Token::new(kind, range_to_text_range(span)));
+                }
             }
             Some(Err(())) => {
                 if error_start.is_none() {
@@ -71,6 +77,37 @@ pub fn lex(source: &str) -> Vec<Token> {
     }
 
     tokens
+}
+
+/// Splits a string literal token into: quote + content + quote
+fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token>) {
+    let text = &source[span.clone()];
+    let quote_char = text.chars().next().unwrap();
+    let quote_kind = if quote_char == '"' {
+        SyntaxKind::DoubleQuote
+    } else {
+        SyntaxKind::SingleQuote
+    };
+
+    let start = span.start;
+    let end = span.end;
+
+    // Opening quote
+    tokens.push(Token::new(
+        quote_kind,
+        range_to_text_range(start..start + 1),
+    ));
+
+    // Content (may be empty)
+    if end - start > 2 {
+        tokens.push(Token::new(
+            SyntaxKind::StrVal,
+            range_to_text_range(start + 1..end - 1),
+        ));
+    }
+
+    // Closing quote
+    tokens.push(Token::new(quote_kind, range_to_text_range(end - 1..end)));
 }
 
 /// Retrieves the text slice for a token. O(1) slice into source.

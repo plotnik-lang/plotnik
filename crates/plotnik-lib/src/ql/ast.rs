@@ -28,6 +28,7 @@ ast_node!(Def, Def);
 ast_node!(Tree, Tree);
 ast_node!(Ref, Ref);
 ast_node!(Lit, Lit);
+ast_node!(Str, Str);
 ast_node!(Alt, Alt);
 ast_node!(Branch, Branch);
 ast_node!(Seq, Seq);
@@ -45,6 +46,7 @@ pub enum Expr {
     Tree(Tree),
     Ref(Ref),
     Lit(Lit),
+    Str(Str),
     Alt(Alt),
     Seq(Seq),
     Capture(Capture),
@@ -61,6 +63,7 @@ impl Expr {
             SyntaxKind::Tree => Tree::cast(node).map(Expr::Tree),
             SyntaxKind::Ref => Ref::cast(node).map(Expr::Ref),
             SyntaxKind::Lit => Lit::cast(node).map(Expr::Lit),
+            SyntaxKind::Str => Str::cast(node).map(Expr::Str),
             SyntaxKind::Alt => Alt::cast(node).map(Expr::Alt),
             SyntaxKind::Seq => Seq::cast(node).map(Expr::Seq),
             SyntaxKind::Capture => Capture::cast(node).map(Expr::Capture),
@@ -78,6 +81,7 @@ impl Expr {
             Expr::Tree(n) => n.syntax(),
             Expr::Ref(n) => n.syntax(),
             Expr::Lit(n) => n.syntax(),
+            Expr::Str(n) => n.syntax(),
             Expr::Alt(n) => n.syntax(),
             Expr::Seq(n) => n.syntax(),
             Expr::Capture(n) => n.syntax(),
@@ -250,7 +254,16 @@ impl Lit {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StringLit)
+            .find(|t| t.kind() == SyntaxKind::StrVal)
+    }
+}
+
+impl Str {
+    pub fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::StrVal)
     }
 }
 
@@ -310,6 +323,10 @@ fn format_expr(expr: &Expr, indent: usize, out: &mut String) {
         Expr::Lit(l) => {
             let value = l.value().map(|t| t.text().to_string()).unwrap_or_default();
             let _ = writeln!(out, "{}Lit {}", prefix, value);
+        }
+        Expr::Str(s) => {
+            let value = s.value().map(|t| t.text().to_string()).unwrap_or_default();
+            let _ = writeln!(out, "{}Str \"{}\"", prefix, value);
         }
         Expr::Alt(a) => {
             let _ = writeln!(out, "{}Alt", prefix);

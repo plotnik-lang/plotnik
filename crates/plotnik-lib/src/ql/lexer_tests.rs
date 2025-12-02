@@ -124,22 +124,33 @@ fn identifiers_mixed() {
 #[test]
 fn strings_simple() {
     insta::assert_snapshot!(snapshot(r#""hello" "world""#), @r#"
-    StringLit "\"hello\""
-    StringLit "\"world\""
+    DoubleQuote "\""
+    StrVal "hello"
+    DoubleQuote "\""
+    DoubleQuote "\""
+    StrVal "world"
+    DoubleQuote "\""
     "#);
 }
 
 #[test]
 fn strings_with_escapes() {
     insta::assert_snapshot!(snapshot(r#""hello\nworld" "tab\there""#), @r#"
-    StringLit "\"hello\\nworld\""
-    StringLit "\"tab\\there\""
+    DoubleQuote "\""
+    StrVal "hello\\nworld"
+    DoubleQuote "\""
+    DoubleQuote "\""
+    StrVal "tab\\there"
+    DoubleQuote "\""
     "#);
 }
 
 #[test]
 fn strings_empty() {
-    insta::assert_snapshot!(snapshot(r#""""#), @r#"StringLit "\"\"""#);
+    insta::assert_snapshot!(snapshot(r#""""#), @r#"
+    DoubleQuote "\""
+    DoubleQuote "\""
+    "#);
 }
 
 #[test]
@@ -334,9 +345,15 @@ fn complex_expression() {
 fn alternation_expression() {
     insta::assert_snapshot!(snapshot("[\"public\" \"private\" \"protected\"]"), @r#"
     BracketOpen "["
-    StringLit "\"public\""
-    StringLit "\"private\""
-    StringLit "\"protected\""
+    DoubleQuote "\""
+    StrVal "public"
+    DoubleQuote "\""
+    DoubleQuote "\""
+    StrVal "private"
+    DoubleQuote "\""
+    DoubleQuote "\""
+    StrVal "protected"
+    DoubleQuote "\""
     BracketClose "]"
     "#);
 }
@@ -532,7 +549,9 @@ fn special_node_missing_with_arg() {
     insta::assert_snapshot!(snapshot(r#"(MISSING ";")"#), @r#"
     ParenOpen "("
     KwMissing "MISSING"
-    StringLit "\";\""
+    DoubleQuote "\""
+    StrVal ";"
+    DoubleQuote "\""
     ParenClose ")"
     "#);
 }
@@ -587,19 +606,31 @@ fn pipe_token() {
 
 #[test]
 fn single_quote_string() {
-    insta::assert_snapshot!(snapshot("'hello'"), @r#"SingleQuoteLit "'hello'""#);
+    insta::assert_snapshot!(snapshot("'hello'"), @r#"
+    SingleQuote "'"
+    StrVal "hello"
+    SingleQuote "'"
+    "#);
 }
 
 #[test]
 fn single_quote_string_with_escape() {
-    insta::assert_snapshot!(snapshot(r"'it\'s'"), @r#"SingleQuoteLit "'it\\'s'""#);
+    insta::assert_snapshot!(snapshot(r"'it\'s'"), @r#"
+    SingleQuote "'"
+    StrVal "it\\'s"
+    SingleQuote "'"
+    "#);
 }
 
 #[test]
 fn single_vs_double_quote_strings() {
     insta::assert_snapshot!(snapshot(r#"'single' "double""#), @r#"
-    SingleQuoteLit "'single'"
-    StringLit "\"double\""
+    SingleQuote "'"
+    StrVal "single"
+    SingleQuote "'"
+    DoubleQuote "\""
+    StrVal "double"
+    DoubleQuote "\""
     "#);
 }
 

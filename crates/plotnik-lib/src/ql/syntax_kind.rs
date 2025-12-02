@@ -104,13 +104,19 @@ pub enum SyntaxKind {
     #[token("|")]
     Pipe,
 
-    /// Double-quoted string with backslash escapes
+    /// String literal (double or single quoted) - split by lexer post-processing
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
-    StringLit,
-
-    /// Single-quoted string (equivalent to double quotes, useful for tool calling)
     #[regex(r"'(?:[^'\\]|\\.)*'")]
-    SingleQuoteLit,
+    StringLiteral,
+
+    /// Double quote character (from string literal splitting)
+    DoubleQuote,
+
+    /// Single quote character (from string literal splitting)
+    SingleQuote,
+
+    /// String content between quotes (from string literal splitting)
+    StrVal,
 
     /// ERROR keyword for matching parser error nodes
     #[token("ERROR")]
@@ -167,8 +173,10 @@ pub enum SyntaxKind {
     Tree,
     /// Reference to user-defined expression: `(Expr)` where Expr is PascalCase
     Ref,
-    /// Literal/anonymous node: `"keyword"`
+    /// Literal/anonymous node: `"keyword"` (legacy, use Str)
     Lit,
+    /// String literal node containing quote tokens and content
+    Str,
     /// Field specification: `name: expr`
     Field,
     /// Capture wrapping an expression: `(expr) @name` or `(expr) @name :: Type`
@@ -337,8 +345,8 @@ pub mod token_sets {
         BraceOpen,
         Underscore,
         Id,
-        StringLit,
-        SingleQuoteLit,
+        DoubleQuote,
+        SingleQuote,
         Dot,
         Negation,
         KwError,
@@ -354,8 +362,8 @@ pub mod token_sets {
         BraceOpen,
         Underscore,
         Id,
-        StringLit,
-        SingleQuoteLit,
+        DoubleQuote,
+        SingleQuote,
         KwError,
         KwMissing,
     ]);

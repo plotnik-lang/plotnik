@@ -189,8 +189,10 @@ fn anonymous_node() {
     insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
-        Lit
-          StringLit "\"if\""
+        Str
+          DoubleQuote "\""
+          StrVal "if"
+          DoubleQuote "\""
     "#);
 }
 
@@ -204,8 +206,10 @@ fn anonymous_node_operator() {
     insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
-        Lit
-          StringLit "\"+=\""
+        Str
+          DoubleQuote "\""
+          StrVal "+="
+          DoubleQuote "\""
     "#);
 }
 
@@ -247,7 +251,9 @@ fn supertype_with_string_subtype() {
           ParenOpen "("
           Id "expression"
           Slash "/"
-          StringLit "\"()\""
+          DoubleQuote "\""
+          StrVal "()"
+          DoubleQuote "\""
           ParenClose ")"
     "#);
 }

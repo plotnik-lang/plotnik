@@ -280,8 +280,10 @@ fn predicate_unsupported() {
               At "@"
             Error
               Id "x"
-            Lit
-              StringLit "\"foo\""
+            Str
+              DoubleQuote "\""
+              StrVal "foo"
+              DoubleQuote "\""
             ParenClose ")"
           Error
             Id "b"
@@ -330,8 +332,10 @@ fn predicate_match() {
         Error
           Id "name"
       Def
-        Lit
-          StringLit "\"test\""
+        Str
+          DoubleQuote "\""
+          StrVal "test"
+          DoubleQuote "\""
     ---
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
