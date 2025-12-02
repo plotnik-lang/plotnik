@@ -56,76 +56,79 @@ pub fn parse_tree(source: &str, lang: Lang) -> tree_sitter::Tree {
 }
 
 pub fn format_ast(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {
-    let mut output = String::new();
-    format_node(&mut output, tree.root_node(), source, 0, include_anonymous);
-    output
+    format_node(tree.root_node(), source, 0, include_anonymous) + "\n"
 }
 
 fn format_node(
-    out: &mut String,
     node: tree_sitter::Node,
     source: &str,
     depth: usize,
     include_anonymous: bool,
-) {
-    format_node_with_field(out, node, None, source, depth, include_anonymous);
+) -> String {
+    format_node_with_field(node, None, source, depth, include_anonymous)
 }
 
 fn format_node_with_field(
-    out: &mut String,
     node: tree_sitter::Node,
     field_name: Option<&str>,
     source: &str,
     depth: usize,
     include_anonymous: bool,
-) {
+) -> String {
     if !include_anonymous && !node.is_named() {
-        return;
+        return String::new();
     }
 
     let indent = "  ".repeat(depth);
     let kind = node.kind();
     let field_prefix = field_name.map(|f| format!("{}: ", f)).unwrap_or_default();
 
-    if node.child_count() == 0 {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<invalid utf8>");
-        if text == kind {
-            out.push_str(&format!(
-                "{}{}\"{}\"\n",
-                indent,
-                field_prefix,
-                escape_string(kind)
-            ));
-        } else {
-            let escaped = escape_string(text);
-            out.push_str(&format!(
-                "{}{}{} \"{}\"\n",
-                indent, field_prefix, kind, escaped
-            ));
-        }
-    } else {
-        out.push_str(&format!("{}{}{}\n", indent, field_prefix, kind));
-
+    let children: Vec<_> = {
         let mut cursor = node.walk();
+        let mut result = Vec::new();
         if cursor.goto_first_child() {
             loop {
                 let child = cursor.node();
-                let child_field = cursor.field_name();
-                format_node_with_field(
-                    out,
-                    child,
-                    child_field,
-                    source,
-                    depth + 1,
-                    include_anonymous,
-                );
+                if include_anonymous || child.is_named() {
+                    result.push((child, cursor.field_name()));
+                }
                 if !cursor.goto_next_sibling() {
                     break;
                 }
             }
         }
+        result
+    };
+
+    if children.is_empty() {
+        let text = node
+            .utf8_text(source.as_bytes())
+            .unwrap_or("<invalid utf8>");
+        if text == kind {
+            format!("{}{}(\"{}\")", indent, field_prefix, escape_string(kind))
+        } else {
+            format!(
+                "{}{}({} \"{}\")",
+                indent,
+                field_prefix,
+                kind,
+                escape_string(text)
+            )
+        }
+    } else {
+        let mut out = format!("{}{}({}", indent, field_prefix, kind);
+        for (child, child_field) in children {
+            out.push('\n');
+            out.push_str(&format_node_with_field(
+                child,
+                child_field,
+                source,
+                depth + 1,
+                include_anonymous,
+            ));
+        }
+        out.push(')');
+        out
     }
 }
 
