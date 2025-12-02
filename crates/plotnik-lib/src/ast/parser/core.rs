@@ -10,7 +10,7 @@
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::MAX_DEPTH;
-use super::error::{RelatedInfo, SyntaxError};
+use super::error::{Diagnostic, Fix, RelatedInfo};
 
 use crate::ast::lexer::{Token, token_text};
 use crate::ast::syntax_kind::token_sets::ROOT_EXPR_FIRST;
@@ -26,7 +26,7 @@ const DEFAULT_FUEL: u32 = 256;
 #[derive(Debug, Clone)]
 pub struct Parse {
     pub(super) green: GreenNode,
-    pub(super) errors: Vec<SyntaxError>,
+    pub(super) errors: Vec<Diagnostic>,
 }
 
 /// Parser state machine.
@@ -51,7 +51,7 @@ pub struct Parser<'src> {
     /// Drained into tree at `start_node()` / `checkpoint()`.
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
-    pub(super) errors: Vec<SyntaxError>,
+    pub(super) errors: Vec<Diagnostic>,
     pub(super) depth: u32,
     /// Last error position - used to suppress cascading errors at same span
     pub(super) last_error_pos: Option<TextSize>,
@@ -239,7 +239,7 @@ impl<'src> Parser<'src> {
             return;
         }
         self.last_error_pos = Some(pos);
-        self.errors.push(SyntaxError::new(range, message));
+        self.errors.push(Diagnostic::error(range, message));
     }
 
     /// Wrap unexpected token in Error node and consume it.
@@ -344,7 +344,7 @@ impl<'src> Parser<'src> {
         }
         self.last_error_pos = Some(pos);
         self.errors
-            .push(SyntaxError::with_related(range, message, related));
+            .push(Diagnostic::error(range, message).with_related(related));
     }
 
     /// Get the end position of the last non-trivia token before current position.
@@ -363,13 +363,14 @@ impl<'src> Parser<'src> {
         &mut self,
         range: TextRange,
         message: impl Into<String>,
-        fix: super::error::Fix,
+        fix: Fix,
     ) {
         let pos = range.start();
         if self.last_error_pos == Some(pos) {
             return;
         }
         self.last_error_pos = Some(pos);
-        self.errors.push(SyntaxError::with_fix(range, message, fix));
+        self.errors
+            .push(Diagnostic::error(range, message).with_fix(fix));
     }
 }

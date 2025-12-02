@@ -9,7 +9,7 @@
 
 use super::named_defs::SymbolTable;
 use crate::ast::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
-use crate::ast::{ErrorStage, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -183,7 +183,7 @@ pub fn validate(
     root: &Root,
     _symbols: &SymbolTable,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-) -> Vec<SyntaxError> {
+) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     validate_node(&root.syntax().clone(), cardinalities, &mut errors);
     errors
@@ -192,7 +192,7 @@ pub fn validate(
 fn validate_node(
     node: &SyntaxNode,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-    errors: &mut Vec<SyntaxError>,
+    errors: &mut Vec<Diagnostic>,
 ) {
     if let Some(field) = Field::cast(node.clone())
         && let Some(value) = field.value()
@@ -209,7 +209,7 @@ fn validate_node(
                 .unwrap_or_else(|| "field".to_string());
 
             errors.push(
-                SyntaxError::new(
+                Diagnostic::error(
                     value.syntax().text_range(),
                     format!(
                         "field `{}` value must match a single node, not a sequence",

@@ -7,7 +7,7 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use crate::ast::{ErrorStage, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage};
 use crate::ast::{Expr, Ref, Root};
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ pub struct DefInfo {
 #[derive(Debug)]
 pub struct ResolveResult {
     pub symbols: SymbolTable,
-    pub errors: Vec<SyntaxError>,
+    pub errors: Vec<Diagnostic>,
 }
 
 impl SymbolTable {
@@ -62,7 +62,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
 
             if defs.contains_key(&name) {
                 errors.push(
-                    SyntaxError::new(range, format!("duplicate definition: `{}`", name))
+                    Diagnostic::error(range, format!("duplicate definition: `{}`", name))
                         .with_stage(ErrorStage::Resolve),
                 );
             } else {
@@ -138,7 +138,7 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
     }
 }
 
-fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
+fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
     match expr {
         Expr::Ref(r) => {
             check_ref_reference(r, symbols, errors);
@@ -182,12 +182,12 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
     }
 }
 
-fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
+fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
     if let Some(name_token) = r.name() {
         let name = name_token.text();
         if symbols.get(name).is_none() {
             errors.push(
-                SyntaxError::new(
+                Diagnostic::error(
                     name_token.text_range(),
                     format!("undefined reference: `{}`", name),
                 )

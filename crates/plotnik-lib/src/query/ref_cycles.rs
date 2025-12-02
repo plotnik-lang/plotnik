@@ -8,9 +8,9 @@ use rowan::TextRange;
 
 use super::named_defs::SymbolTable;
 use crate::ast::{Def, Expr, Root, SyntaxKind};
-use crate::ast::{ErrorStage, RelatedInfo, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
 
-pub fn validate(root: &Root, symbols: &SymbolTable) -> Vec<SyntaxError> {
+pub fn validate(root: &Root, symbols: &SymbolTable) -> Vec<Diagnostic> {
     let sccs = find_sccs(symbols);
     let mut errors = Vec::new();
 
@@ -283,7 +283,7 @@ fn build_cycle_chain(root: &Root, symbols: &SymbolTable, scc: &[String]) -> Vec<
         .collect()
 }
 
-fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> SyntaxError {
+fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> Diagnostic {
     let cycle_str = if scc.len() == 1 {
         format!("`{}` → `{}`", primary_name, primary_name)
     } else {
@@ -297,14 +297,14 @@ fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> 
         .map(|r| r.range)
         .unwrap_or_else(|| TextRange::empty(0.into()));
 
-    SyntaxError::with_related_many(
+    Diagnostic::error(
         range,
         format!(
             "recursive pattern can never match: cycle {} has no escape path",
             cycle_str
         ),
-        related,
     )
+    .with_related_many(related)
     .with_stage(ErrorStage::Escape)
 }
 

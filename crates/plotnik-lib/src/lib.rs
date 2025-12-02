@@ -3,7 +3,7 @@
 //! # Example
 //!
 //! ```
-//! use plotnik_lib::Query;
+//! use plotnik_lib::{Query, RenderOptions};
 //!
 //! let query = Query::new(r#"
 //!     Expr = [(identifier) (number)]
@@ -11,11 +11,12 @@
 //! "#);
 //!
 //! if !query.is_valid() {
-//!     eprintln!("{}", query.dump_errors());
+//!     eprintln!("{}", query.render_diagnostics(RenderOptions::plain()));
 //! }
 //! ```
 
 pub mod ast;
 pub mod query;
 
+pub use ast::{Diagnostic, RenderOptions, Severity};
 pub use query::Query;

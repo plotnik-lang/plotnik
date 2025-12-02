@@ -4,6 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 
 use plotnik_lib::Query;
+use plotnik_lib::ast::RenderOptions;
 
 use source::{dump_source, load_source, parse_tree, resolve_lang};
 
@@ -20,6 +21,7 @@ pub struct DebugArgs {
     pub cst: bool,
     pub spans: bool,
     pub cardinalities: bool,
+    pub color: bool,
 }
 
 pub fn run(args: DebugArgs) {
@@ -88,7 +90,12 @@ pub fn run(args: DebugArgs) {
 
     if let Some(ref q) = query {
         if !q.is_valid() {
-            eprint!("{}", q.dump_errors_grouped());
+            let options = if args.color {
+                RenderOptions::colored()
+            } else {
+                RenderOptions::plain()
+            };
+            eprint!("{}", q.render_diagnostics(options));
         }
     }
 }

@@ -41,7 +41,10 @@ mod core;
 mod error;
 mod grammar;
 
-pub use error::{ErrorStage, Fix, RelatedInfo, SyntaxError, render_errors};
+pub use error::{
+    Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,
+    render_diagnostics, render_errors,
+};
 
 use core::{Parse as ParseInner, Parser};
 

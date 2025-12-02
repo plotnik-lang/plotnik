@@ -6,9 +6,9 @@
 use rowan::TextRange;
 
 use crate::ast::{Alt, AltKind, Branch, Expr, Root};
-use crate::ast::{ErrorStage, RelatedInfo, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
 
-pub fn validate(root: &Root) -> Vec<SyntaxError> {
+pub fn validate(root: &Root) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
 
     for def in root.defs() {
@@ -24,7 +24,7 @@ pub fn validate(root: &Root) -> Vec<SyntaxError> {
     errors
 }
 
-fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
+fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
     match expr {
         Expr::Alt(alt) => {
             check_mixed_alternation(alt, errors);
@@ -70,7 +70,7 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
     }
 }
 
-fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<SyntaxError>) {
+fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
     if alt.kind() != AltKind::Mixed {
         return;
     }
@@ -105,11 +105,11 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<SyntaxError>) {
 
     let untagged_range = branch_range(untagged_branch);
 
-    let error = SyntaxError::with_related(
+    let error = Diagnostic::error(
         untagged_range,
         "mixed tagged and untagged branches in alternation",
-        RelatedInfo::new(tagged_range, "tagged branch here"),
     )
+    .with_related(RelatedInfo::new(tagged_range, "tagged branch here"))
     .with_stage(ErrorStage::Validate);
 
     errors.push(error);

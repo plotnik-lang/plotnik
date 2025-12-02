@@ -15,7 +15,7 @@ mod shape_cardinalities_tests;
 
 use std::collections::HashMap;
 
-use crate::ast::{self, Parse, Root, SyntaxError, SyntaxNode};
+use crate::ast::{self, Diagnostic, Parse, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
@@ -28,7 +28,7 @@ pub struct Query<'a> {
     source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
-    errors: Vec<SyntaxError>,
+    errors: Vec<Diagnostic>,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
 }
 

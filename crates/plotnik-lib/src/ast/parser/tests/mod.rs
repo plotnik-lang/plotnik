@@ -17,6 +17,7 @@ mod json_serialization {
 
         insta::assert_snapshot!(json, @r#"
         {
+          "severity": "error",
           "stage": "parse",
           "range": {
             "start": 14,
@@ -42,6 +43,7 @@ mod json_serialization {
 
         insta::assert_snapshot!(json, @r#"
         {
+          "severity": "error",
           "stage": "parse",
           "range": {
             "start": 14,

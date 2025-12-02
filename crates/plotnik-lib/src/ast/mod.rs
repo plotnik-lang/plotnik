@@ -19,6 +19,9 @@ pub use nodes::{
 
 pub use parser::{Parse, parse};
 
-pub use parser::{ErrorStage, Fix, RelatedInfo, SyntaxError, render_errors};
+pub use parser::{
+    Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,
+    render_diagnostics, render_errors,
+};
 
 pub use nodes::format_ast;
