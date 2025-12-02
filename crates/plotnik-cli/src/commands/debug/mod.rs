@@ -46,36 +46,36 @@ pub fn run(args: DebugArgs) {
         .count()
         >= 2;
 
-    if args.query {
-        if let Some(ref q) = query {
-            if show_headers {
-                println!("=== QUERY ===");
-            }
-            print!(
-                "{}",
-                q.printer()
-                    .raw(args.cst || args.raw)
-                    .with_trivia(args.raw)
-                    .with_spans(args.spans)
-                    .with_cardinalities(args.cardinalities)
-                    .dump()
-            );
+    if args.query
+        && let Some(ref q) = query
+    {
+        if show_headers {
+            println!("=== QUERY ===");
         }
+        print!(
+            "{}",
+            q.printer()
+                .raw(args.cst || args.raw)
+                .with_trivia(args.raw)
+                .with_spans(args.spans)
+                .with_cardinalities(args.cardinalities)
+                .dump()
+        );
     }
 
-    if args.symbols {
-        if let Some(ref q) = query {
-            if show_headers {
-                println!("=== SYMBOLS ===");
-            }
-            print!(
-                "{}",
-                q.printer()
-                    .only_symbols(true)
-                    .with_cardinalities(args.cardinalities)
-                    .dump()
-            );
+    if args.symbols
+        && let Some(ref q) = query
+    {
+        if show_headers {
+            println!("=== SYMBOLS ===");
         }
+        print!(
+            "{}",
+            q.printer()
+                .only_symbols(true)
+                .with_cardinalities(args.cardinalities)
+                .dump()
+        );
     }
 
     if args.source {
@@ -88,15 +88,15 @@ pub fn run(args: DebugArgs) {
         print!("{}", dump_source(&tree, &source_code, args.raw));
     }
 
-    if let Some(ref q) = query {
-        if !q.is_valid() {
-            let options = if args.color {
-                RenderOptions::colored()
-            } else {
-                RenderOptions::plain()
-            };
-            eprint!("{}", q.render_diagnostics(options));
-        }
+    if let Some(ref q) = query
+        && !q.is_valid()
+    {
+        let options = if args.color {
+            RenderOptions::colored()
+        } else {
+            RenderOptions::plain()
+        };
+        eprint!("{}", q.render_diagnostics(options));
     }
 }
 
