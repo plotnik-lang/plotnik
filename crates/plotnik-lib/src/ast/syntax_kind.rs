@@ -173,8 +173,6 @@ pub enum SyntaxKind {
     Tree,
     /// Reference to user-defined expression: `(Expr)` where Expr is PascalCase
     Ref,
-    /// Literal/anonymous node: `"keyword"` (legacy, use Str)
-    Lit,
     /// String literal node containing quote tokens and content
     Str,
     /// Field specification: `name: expr`

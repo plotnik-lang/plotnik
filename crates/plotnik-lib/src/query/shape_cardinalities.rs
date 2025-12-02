@@ -94,9 +94,6 @@ fn compute_single(
 
     match expr {
         Expr::Tree(_) => ShapeCardinality::One,
-        Expr::Lit(_) => panic!(
-            "shape_cardinality: Expr::Lit is legacy and should never be produced by the parser"
-        ),
         Expr::Str(_) => ShapeCardinality::One,
         Expr::Wildcard(_) => ShapeCardinality::One,
         Expr::Anchor(_) => ShapeCardinality::One,

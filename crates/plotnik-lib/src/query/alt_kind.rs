@@ -63,7 +63,6 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
             }
         }
         Expr::Ref(_)
-        | Expr::Lit(_)
         | Expr::Str(_)
         | Expr::Wildcard(_)
         | Expr::Anchor(_)

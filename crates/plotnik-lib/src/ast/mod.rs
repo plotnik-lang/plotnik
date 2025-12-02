@@ -13,8 +13,8 @@ mod nodes_tests;
 pub use syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub use nodes::{
-    Alt, AltKind, Anchor, Branch, Capture, Def, Expr, Field, Lit, NegatedField, Quantifier, Ref,
-    Root, Seq, Str, Tree, Type, Wildcard,
+    Alt, AltKind, Anchor, Branch, Capture, Def, Expr, Field, NegatedField, Quantifier, Ref, Root,
+    Seq, Str, Tree, Type, Wildcard,
 };
 
 pub use parser::{Parse, parse};

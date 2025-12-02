@@ -27,7 +27,6 @@ ast_node!(Root, Root);
 ast_node!(Def, Def);
 ast_node!(Tree, Tree);
 ast_node!(Ref, Ref);
-ast_node!(Lit, Lit);
 ast_node!(Str, Str);
 
 ast_node!(Branch, Branch);
@@ -104,7 +103,6 @@ impl Alt {
 pub enum Expr {
     Tree(Tree),
     Ref(Ref),
-    Lit(Lit),
     Str(Str),
     Alt(Alt),
     Seq(Seq),
@@ -121,7 +119,6 @@ impl Expr {
         match node.kind() {
             SyntaxKind::Tree => Tree::cast(node).map(Expr::Tree),
             SyntaxKind::Ref => Ref::cast(node).map(Expr::Ref),
-            SyntaxKind::Lit => Lit::cast(node).map(Expr::Lit),
             SyntaxKind::Str => Str::cast(node).map(Expr::Str),
             SyntaxKind::Alt => Alt::cast(node).map(Expr::Alt),
             SyntaxKind::Seq => Seq::cast(node).map(Expr::Seq),
@@ -139,7 +136,6 @@ impl Expr {
         match self {
             Expr::Tree(n) => n.syntax(),
             Expr::Ref(n) => n.syntax(),
-            Expr::Lit(n) => n.syntax(),
             Expr::Str(n) => n.syntax(),
             Expr::Alt(n) => n.syntax(),
             Expr::Seq(n) => n.syntax(),
@@ -308,15 +304,6 @@ impl NegatedField {
     }
 }
 
-impl Lit {
-    pub fn value(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StrVal)
-    }
-}
-
 impl Str {
     pub fn value(&self) -> Option<SyntaxToken> {
         self.0
@@ -378,10 +365,6 @@ fn format_expr(expr: &Expr, indent: usize, out: &mut String) {
         Expr::Ref(r) => {
             let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
             let _ = writeln!(out, "{}Ref {}", prefix, name);
-        }
-        Expr::Lit(l) => {
-            let value = l.value().map(|t| t.text().to_string()).unwrap_or_default();
-            let _ = writeln!(out, "{}Lit {}", prefix, value);
         }
         Expr::Str(s) => {
             let value = s.value().map(|t| t.text().to_string()).unwrap_or_default();

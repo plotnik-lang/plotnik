@@ -102,10 +102,7 @@ impl Query<'_> {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
                 let _ = writeln!(out, "{}Ref{} {}", prefix, mark, name);
             }
-            ast::Expr::Lit(l) => {
-                let value = l.value().map(|t| t.text().to_string()).unwrap_or_default();
-                let _ = writeln!(out, "{}Lit{} {}", prefix, mark, value);
-            }
+
             ast::Expr::Str(s) => {
                 let value = s.value().map(|t| t.text().to_string()).unwrap_or_default();
                 let _ = writeln!(out, "{}Str{} \"{}\"", prefix, mark, value);
