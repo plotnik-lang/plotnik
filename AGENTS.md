@@ -181,4 +181,4 @@ let name = node.name().unwrap_or_else(|| {
 - Check diagnostics after changes
 - Follow rnix-parser/taplo patterns
 - Span-based tokens, no text in intermediate structures
-- No slop comments
+- Don't put AI slop comments in the code
