@@ -195,7 +195,7 @@ impl Parser<'_> {
                 let is_pascal_case = name
                     .chars()
                     .next()
-                    .map_or(false, |c| c.is_ascii_uppercase());
+                    .is_some_and(|c| c.is_ascii_uppercase());
                 self.bump();
 
                 if is_pascal_case {
@@ -691,7 +691,7 @@ impl Parser<'_> {
     /// Validate capture name follows plotnik convention (snake_case).
     fn validate_capture_name(&mut self, name: &str, span: TextRange) {
         if name.contains('.') {
-            let suggested = name.replace('.', "_").replace('-', "_");
+            let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
             let fix = Fix::new(
                 suggested.clone(),
@@ -715,7 +715,7 @@ impl Parser<'_> {
         if name
             .chars()
             .next()
-            .map_or(false, |c| c.is_ascii_uppercase())
+            .is_some_and(|c| c.is_ascii_uppercase())
         {
             let suggested = to_snake_case(name);
             let fix = Fix::new(
@@ -734,7 +734,7 @@ impl Parser<'_> {
         if !name
             .chars()
             .next()
-            .map_or(false, |c| c.is_ascii_uppercase())
+            .is_some_and(|c| c.is_ascii_uppercase())
         {
             let suggested = to_pascal_case(name);
             let fix = Fix::new(
@@ -779,7 +779,7 @@ impl Parser<'_> {
     /// Validate field name follows snake_case convention.
     fn validate_field_name(&mut self, name: &str, span: TextRange) {
         if name.contains('.') {
-            let suggested = name.replace('.', "_").replace('-', "_");
+            let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
             let fix = Fix::new(
                 format!("{}:", suggested),
@@ -803,7 +803,7 @@ impl Parser<'_> {
         if name
             .chars()
             .next()
-            .map_or(false, |c| c.is_ascii_uppercase())
+            .is_some_and(|c| c.is_ascii_uppercase())
         {
             let suggested = to_snake_case(name);
             let fix = Fix::new(

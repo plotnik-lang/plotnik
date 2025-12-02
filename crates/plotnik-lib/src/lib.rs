@@ -78,7 +78,7 @@ impl<'a> Query<'a> {
 
     /// The original source text.
     pub fn source(&self) -> &str {
-        &self.source
+        self.source
     }
 
     /// The concrete syntax tree root.
@@ -108,7 +108,7 @@ impl<'a> Query<'a> {
 
     /// Render errors as a human-readable diagnostic report.
     pub fn render_errors(&self) -> String {
-        parser::render_errors(&self.source, &self.errors, None)
+        parser::render_errors(self.source, &self.errors, None)
     }
 
     /// Filter errors by stage.
@@ -139,7 +139,7 @@ impl<'a> Query<'a> {
     /// Render errors for a specific stage.
     pub fn render_errors_by_stage(&self, stage: ErrorStage) -> String {
         let filtered: Vec<_> = self.errors_by_stage(stage).into_iter().cloned().collect();
-        parser::render_errors(&self.source, &filtered, None)
+        parser::render_errors(self.source, &filtered, None)
     }
 
     /// Render errors grouped by stage.
@@ -157,7 +157,7 @@ impl<'a> Query<'a> {
                     out.push('\n');
                 }
                 out.push_str(&format!("=== {} errors ===\n", stage));
-                out.push_str(&parser::render_errors(&self.source, &stage_errors, None));
+                out.push_str(&parser::render_errors(self.source, &stage_errors, None));
             }
         }
         out

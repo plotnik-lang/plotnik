@@ -18,32 +18,27 @@ pub fn check_escape(root: &Root, symbols: &SymbolTable) -> Vec<SyntaxError> {
     for scc in sccs {
         if scc.len() == 1 {
             let name = &scc[0];
-            if let Some(def_info) = symbols.get(name) {
-                if def_info.refs.contains(name) {
-                    if let Some(def) = find_def_by_name(root, name) {
-                        if let Some(body) = def.body() {
+            if let Some(def_info) = symbols.get(name)
+                && def_info.refs.contains(name)
+                    && let Some(def) = find_def_by_name(root, name)
+                        && let Some(body) = def.body() {
                             let scc_set: IndexSet<&str> = std::iter::once(name.as_str()).collect();
                             if !expr_has_escape(&body, &scc_set) {
                                 let chain = build_self_ref_chain(root, name);
                                 errors.push(make_error(name, &scc, chain));
                             }
                         }
-                    }
-                }
-            }
         } else {
             let scc_set: IndexSet<&str> = scc.iter().map(|s| s.as_str()).collect();
             let mut all_have_escape = true;
 
             for name in &scc {
-                if let Some(def) = find_def_by_name(root, name) {
-                    if let Some(body) = def.body() {
-                        if !expr_has_escape(&body, &scc_set) {
+                if let Some(def) = find_def_by_name(root, name)
+                    && let Some(body) = def.body()
+                        && !expr_has_escape(&body, &scc_set) {
                             all_have_escape = false;
                             break;
                         }
-                    }
-                }
             }
 
             if !all_have_escape {
@@ -204,11 +199,10 @@ fn find_reference_location(root: &Root, from: &str, to: &str) -> Option<TextRang
 fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
     match expr {
         Expr::Ref(r) => {
-            if let Some(name_token) = r.name() {
-                if name_token.text() == target {
+            if let Some(name_token) = r.name()
+                && name_token.text() == target {
                     return Some(name_token.text_range());
                 }
-            }
             None
         }
         Expr::Tree(tree) => tree

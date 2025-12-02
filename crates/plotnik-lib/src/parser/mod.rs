@@ -50,7 +50,7 @@ use super::syntax_kind::SyntaxNode;
 
 /// Stack depth limit. Tree-sitter queries can nest deeply via `(a (b (c ...)))`.
 /// 512 handles any reasonable input while preventing stack overflow on malicious input.
-pub(self) const MAX_DEPTH: u32 = 512;
+ const MAX_DEPTH: u32 = 512;
 
 /// Parse result containing the green tree and any errors.
 ///
