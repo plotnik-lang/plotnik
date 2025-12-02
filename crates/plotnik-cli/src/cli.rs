@@ -13,23 +13,12 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     /// Debug and inspect queries and source files
-    #[command(after_help = r#"OUTPUT DEPENDENCIES:
-
-EXAMPLES:
-  # Parse and typecheck query only
-  plotnik debug --query-text '(identifier) @id' --query-cst --query-symbols
-
-  # Dump tree-sitter AST of source file
-  plotnik debug --source-file app.ts --source-ast
-
-
-
-  # Full pipeline: match query against source
-  plotnik debug --query-file rules.pql --source-file app.ts --result
-
-  # Debug with trace
-  plotnik debug --query-text '(function_declaration) @fn' \
-          --source-text 'function foo() {}' --lang typescript --trace"#)]
+    #[command(after_help = r#"EXAMPLES:
+  plotnik debug -q '(identifier) @id' --show-query
+  plotnik debug -q '(identifier) @id' --only-symbols
+  plotnik debug -s app.ts --show-source
+  plotnik debug -s app.ts --show-source --raw
+  plotnik debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query"#)]
     Debug {
         #[command(flatten)]
         query: QueryArgs,
@@ -37,7 +26,7 @@ EXAMPLES:
         #[command(flatten)]
         source: SourceArgs,
 
-        /// Language for source (required for --source-text, inferred from extension for --source-file)
+        /// Language for source (required for inline text, inferred from extension otherwise)
         #[arg(long, short = 'l', value_name = "LANG")]
         lang: Option<String>,
 
@@ -59,11 +48,11 @@ EXAMPLES:
 #[group(id = "query_input", multiple = false)]
 pub struct QueryArgs {
     /// Query as inline text
-    #[arg(long, value_name = "QUERY")]
+    #[arg(short = 'q', long = "query", value_name = "QUERY")]
     pub query_text: Option<String>,
 
     /// Query from file (use "-" for stdin)
-    #[arg(long, value_name = "FILE")]
+    #[arg(long = "query-file", value_name = "FILE")]
     pub query_file: Option<PathBuf>,
 }
 
@@ -71,45 +60,41 @@ pub struct QueryArgs {
 #[group(id = "source_input", multiple = false)]
 pub struct SourceArgs {
     /// Source code as inline text
-    #[arg(long, value_name = "SOURCE")]
+    #[arg(long = "source", value_name = "SOURCE")]
     pub source_text: Option<String>,
 
     /// Source code from file (use "-" for stdin)
-    #[arg(long, value_name = "FILE")]
+    #[arg(short = 's', long = "source-file", value_name = "FILE")]
     pub source_file: Option<PathBuf>,
 }
 
 #[derive(Args)]
 pub struct OutputArgs {
-    /// Show parsed query CST (concrete syntax tree)
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub query_cst: bool,
+    /// Show query syntax tree
+    #[arg(long = "show-query")]
+    pub query: bool,
 
-    /// Show parsed query AST (abstract syntax tree, semantic structure)
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub query_ast: bool,
+    /// Show source syntax tree
+    #[arg(long = "show-source")]
+    pub source: bool,
 
-    /// Show name resolution (definitions and references)
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub query_symbols: bool,
+    /// Show only symbol table
+    #[arg(long = "only-symbols")]
+    pub symbols: bool,
 
-    /// Show inferred output types
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub query_types: bool,
+    /// Show query CST instead of AST (no effect on source)
+    #[arg(long)]
+    pub cst: bool,
 
-    /// Show tree-sitter AST of source (semantic nodes only)
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub source_ast: bool,
+    /// Include trivia tokens (whitespace, comments)
+    #[arg(long)]
+    pub raw: bool,
 
-    /// Show tree-sitter AST of source (all nodes including anonymous)
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub source_ast_full: bool,
+    /// Show source spans
+    #[arg(long)]
+    pub spans: bool,
 
-    /// Show execution trace
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub trace: bool,
-
-    /// Show match results
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub result: bool,
+    /// Show inferred cardinalities
+    #[arg(long)]
+    pub cardinalities: bool,
 }

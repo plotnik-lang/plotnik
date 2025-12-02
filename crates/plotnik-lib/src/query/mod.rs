@@ -2,6 +2,8 @@
 
 mod dump;
 mod errors;
+mod printer;
+pub use printer::QueryPrinter;
 
 pub mod alt_kind;
 pub mod named_defs;

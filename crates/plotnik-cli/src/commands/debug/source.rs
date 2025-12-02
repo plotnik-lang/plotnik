@@ -1,15 +1,14 @@
 use std::fs;
 use std::io::{self, Read};
+use std::path::PathBuf;
 
 use plotnik_langs::Lang;
 
-use crate::cli::SourceArgs;
-
-pub fn load_source(args: &SourceArgs) -> String {
-    if let Some(text) = &args.source_text {
-        return text.clone();
+pub fn load_source(text: &Option<String>, file: &Option<PathBuf>) -> String {
+    if let Some(t) = text {
+        return t.clone();
     }
-    if let Some(path) = &args.source_file {
+    if let Some(path) = file {
         if path.as_os_str() == "-" {
             let mut buf = String::new();
             io::stdin()
@@ -22,7 +21,11 @@ pub fn load_source(args: &SourceArgs) -> String {
     unreachable!()
 }
 
-pub fn resolve_lang(lang: &Option<String>, source_args: &SourceArgs) -> Lang {
+pub fn resolve_lang(
+    lang: &Option<String>,
+    _source_text: &Option<String>,
+    source_file: &Option<PathBuf>,
+) -> Lang {
     if let Some(name) = lang {
         return Lang::from_name(name).unwrap_or_else(|| {
             eprintln!("error: unknown language: {}", name);
@@ -30,7 +33,7 @@ pub fn resolve_lang(lang: &Option<String>, source_args: &SourceArgs) -> Lang {
         });
     }
 
-    if let Some(path) = &source_args.source_file
+    if let Some(path) = source_file
         && path.as_os_str() != "-"
         && let Some(ext) = path.extension().and_then(|e| e.to_str())
     {

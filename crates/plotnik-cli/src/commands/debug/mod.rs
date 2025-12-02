@@ -1,4 +1,3 @@
-mod output;
 mod source;
 
 use std::fs;
@@ -6,88 +5,95 @@ use std::io::{self, Read};
 
 use plotnik_lib::Query;
 
-use crate::cli::{OutputArgs, QueryArgs, SourceArgs};
+use source::{dump_source, load_source, parse_tree, resolve_lang};
 
-pub fn run(
-    query_args: QueryArgs,
-    source_args: SourceArgs,
-    lang: Option<String>,
-    output: OutputArgs,
-) {
-    let has_query = query_args.query_text.is_some() || query_args.query_file.is_some();
-    let has_source = source_args.source_text.is_some() || source_args.source_file.is_some();
+pub struct DebugArgs {
+    pub query_text: Option<String>,
+    pub query_file: Option<std::path::PathBuf>,
+    pub source_text: Option<String>,
+    pub source_file: Option<std::path::PathBuf>,
+    pub lang: Option<String>,
+    pub query: bool,
+    pub source: bool,
+    pub symbols: bool,
+    pub raw: bool,
+    pub cst: bool,
+    pub spans: bool,
+    pub cardinalities: bool,
+}
 
-    if let Err(msg) = validate_inputs(&output, has_query, has_source, &source_args, &lang) {
+pub fn run(args: DebugArgs) {
+    let has_query_input = args.query_text.is_some() || args.query_file.is_some();
+    let has_source_input = args.source_text.is_some() || args.source_file.is_some();
+
+    if let Err(msg) = validate(&args, has_query_input, has_source_input) {
         eprintln!("error: {}", msg);
         std::process::exit(1);
     }
 
-    // If both inputs provided and no outputs selected, default to --result
-    let show_result = output.result
-        || (has_query
-            && has_source
-            && !output.query_cst
-            && !output.query_ast
-            && !output.query_symbols
-            && !output.query_types
-            && !output.source_ast
-            && !output.source_ast_full
-            && !output.trace);
-
-    let show_headers = count_outputs(&output, show_result) >= 2;
-
-    // Load query if needed
-    let query_source = if has_query {
-        Some(load_query(&query_args))
+    let query_source = if has_query_input {
+        Some(load_query(&args))
     } else {
         None
     };
     let query = query_source.as_ref().map(|src| Query::new(src));
 
-    if output.query_cst
-        && let Some(ref q) = query
-    {
-        output::print_query_cst(q, show_headers);
+    let show_headers = [args.query, args.source, args.symbols]
+        .iter()
+        .filter(|&&x| x)
+        .count()
+        >= 2;
+
+    if args.query {
+        if let Some(ref q) = query {
+            if show_headers {
+                println!("=== QUERY ===");
+            }
+            print!(
+                "{}",
+                q.printer()
+                    .raw(args.cst || args.raw)
+                    .with_trivia(args.raw)
+                    .with_spans(args.spans)
+                    .with_cardinalities(args.cardinalities)
+                    .dump()
+            );
+        }
     }
 
-    if output.query_ast
-        && let Some(ref q) = query
-    {
-        output::print_query_ast(q, show_headers);
+    if args.symbols {
+        if let Some(ref q) = query {
+            if show_headers {
+                println!("=== SYMBOLS ===");
+            }
+            print!(
+                "{}",
+                q.printer()
+                    .only_symbols(true)
+                    .with_cardinalities(args.cardinalities)
+                    .dump()
+            );
+        }
     }
 
-    if output.query_symbols
-        && let Some(ref q) = query
-    {
-        output::print_query_symbols(q, show_headers);
-    }
-
-    if output.query_types {
-        output::print_query_types(show_headers);
-    }
-
-    if output.source_ast {
-        output::print_source_ast(&source_args, &lang, show_headers, false);
-    }
-
-    if output.source_ast_full {
-        output::print_source_ast(&source_args, &lang, show_headers, true);
-    }
-
-    if output.trace {
-        output::print_trace(show_headers);
-    }
-
-    if show_result {
-        output::print_result(show_headers);
+    if args.source {
+        let resolved_lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
+        let source_code = load_source(&args.source_text, &args.source_file);
+        let tree = parse_tree(&source_code, resolved_lang);
+        if show_headers {
+            println!("=== SOURCE ===");
+        }
+        print!("{}", dump_source(&tree, &source_code, args.raw));
     }
 
     if let Some(ref q) = query {
-        output::print_query_errors(q);
+        if !q.is_valid() {
+            eprint!("{}", q.dump_errors_grouped());
+        }
     }
 }
 
-fn load_query(args: &QueryArgs) -> String {
+fn load_query(args: &DebugArgs) -> String {
     if let Some(ref text) = args.query_text {
         return text.clone();
     }
@@ -104,52 +110,22 @@ fn load_query(args: &QueryArgs) -> String {
     unreachable!()
 }
 
-fn validate_inputs(
-    output: &OutputArgs,
-    has_query: bool,
-    has_source: bool,
-    source_args: &SourceArgs,
-    lang: &Option<String>,
-) -> Result<(), &'static str> {
-    if (output.query_cst || output.query_ast || output.query_symbols || output.query_types)
-        && !has_query
-    {
-        return Err(
-            "--query-cst, --query-ast, --query-refs, and --query-types require --query-text or --query-file",
-        );
+fn validate(args: &DebugArgs, has_query: bool, has_source: bool) -> Result<(), &'static str> {
+    if (args.query || args.symbols) && !has_query {
+        return Err("--query and --only-symbols require --query-text or --query-file");
     }
 
-    if (output.source_ast || output.source_ast_full) && !has_source {
-        return Err("--source-ast and --source-ast-full require --source-text or --source-file");
+    if args.source && !has_source {
+        return Err("--source requires --source-text or --source-file");
     }
 
-    if output.trace && !(has_query && has_source) {
-        return Err("--trace requires both query and source inputs");
-    }
-
-    if output.result && !(has_query && has_source) {
-        return Err("--result requires both query and source inputs");
-    }
-
-    if source_args.source_text.is_some() && lang.is_none() {
+    if args.source_text.is_some() && args.lang.is_none() {
         return Err("--lang is required when using --source-text");
     }
 
-    Ok(())
-}
+    if !args.query && !args.source && !args.symbols {
+        return Err("specify at least one output: --query, --source, or --only-symbols");
+    }
 
-fn count_outputs(output: &OutputArgs, show_result: bool) -> usize {
-    [
-        output.query_cst,
-        output.query_ast,
-        output.query_symbols,
-        output.query_types,
-        output.source_ast,
-        output.source_ast_full,
-        output.trace,
-        show_result,
-    ]
-    .iter()
-    .filter(|&&x| x)
-    .count()
+    Ok(())
 }

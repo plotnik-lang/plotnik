@@ -5,7 +5,7 @@ use indoc::indoc;
 fn tree_is_one() {
     let query = Query::new("(identifier)");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ identifier
@@ -16,7 +16,7 @@ fn tree_is_one() {
 fn singleton_seq_is_one() {
     let query = Query::new("{(identifier)}");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -28,7 +28,7 @@ fn singleton_seq_is_one() {
 fn nested_singleton_seq_is_one() {
     let query = Query::new("{{{(identifier)}}}");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -42,7 +42,7 @@ fn nested_singleton_seq_is_one() {
 fn multi_seq_is_many() {
     let query = Query::new("{(a) (b)}");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def⁺
         Seq⁺
@@ -55,7 +55,7 @@ fn multi_seq_is_many() {
 fn alt_is_one() {
     let query = Query::new("[(a) (b)]");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -73,7 +73,7 @@ fn alt_with_seq_branches() {
     "#};
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -94,7 +94,7 @@ fn ref_to_tree_is_one() {
     "#};
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def¹ X
         Tree¹ identifier
@@ -112,7 +112,7 @@ fn ref_to_seq_is_many() {
     "#};
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
@@ -128,7 +128,7 @@ fn ref_to_seq_is_many() {
 fn field_with_tree() {
     let query = Query::new("(call name: (identifier))");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ call
@@ -141,7 +141,7 @@ fn field_with_tree() {
 fn field_with_alt() {
     let query = Query::new("(call name: [(identifier) (string)])");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ call
@@ -158,7 +158,7 @@ fn field_with_alt() {
 fn field_with_seq_error() {
     let query = Query::new("(call name: {(a) (b)})");
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ call
@@ -183,7 +183,7 @@ fn field_with_ref_to_seq_error() {
     "#};
     let query = Query::new(input);
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
@@ -206,7 +206,7 @@ fn field_with_ref_to_seq_error() {
 fn quantifier_preserves_inner_shape() {
     let query = Query::new("(identifier)*");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Quantifier¹ *
@@ -218,7 +218,7 @@ fn quantifier_preserves_inner_shape() {
 fn capture_preserves_inner_shape() {
     let query = Query::new("(identifier) @name");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Capture¹ @name
@@ -230,7 +230,7 @@ fn capture_preserves_inner_shape() {
 fn capture_on_seq() {
     let query = Query::new("{(a) (b)} @items");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def⁺
         Capture⁺ @items
@@ -250,7 +250,7 @@ fn complex_nested_shapes() {
     "#};
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def¹ Stmt
         Alt¹
@@ -278,7 +278,7 @@ fn tagged_alt_shapes() {
     "#};
     let query = Query::new(input);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -293,7 +293,7 @@ fn tagged_alt_shapes() {
 fn anchor_is_one() {
     let query = Query::new("(block . (statement))");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ block
@@ -306,7 +306,7 @@ fn anchor_is_one() {
 fn negated_field_is_one() {
     let query = Query::new("(function !async)");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ function
@@ -318,7 +318,7 @@ fn negated_field_is_one() {
 fn tree_with_wildcard_type() {
     let query = Query::new("(_)");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ _
@@ -329,7 +329,7 @@ fn tree_with_wildcard_type() {
 fn bare_wildcard_is_one() {
     let query = Query::new("_");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Wildcard¹
@@ -340,7 +340,7 @@ fn bare_wildcard_is_one() {
 fn empty_seq_is_one() {
     let query = Query::new("{}");
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -351,7 +351,7 @@ fn empty_seq_is_one() {
 fn literal_is_one() {
     let query = Query::new(r#""if""#);
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_shapes(), @r#"
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r#"
     Root¹
       Def¹
         Str¹ "if"

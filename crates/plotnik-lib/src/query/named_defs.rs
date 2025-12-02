@@ -221,9 +221,9 @@ mod tests {
         let query = Query::new(input);
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
-        Decl
         Expr
         Stmt
+        Decl
         ");
     }
 
@@ -237,8 +237,9 @@ mod tests {
         let query = Query::new(input);
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
-        Call -> Expr
         Expr
+        Call
+          Expr
         ");
     }
 
@@ -262,7 +263,10 @@ mod tests {
 
         let query = Query::new(input);
         assert!(query.is_valid());
-        insta::assert_snapshot!(query.dump_symbols(), @"Expr -> Expr");
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        Expr
+          Expr (cycle)
+        ");
     }
 
     #[test]
@@ -315,7 +319,8 @@ mod tests {
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
-        Value -> Expr
+        Value
+          Expr
         ");
     }
 
@@ -330,7 +335,8 @@ mod tests {
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
-        Pair -> Expr
+        Pair
+          Expr
         ");
     }
 
@@ -345,7 +351,8 @@ mod tests {
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
-        List -> Expr
+        List
+          Expr
         ");
     }
 
@@ -360,7 +367,8 @@ mod tests {
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
-        Named -> Expr
+        Named
+          Expr
         ");
     }
 
@@ -411,9 +419,16 @@ mod tests {
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         A
-        B -> A
-        C -> B
-        D -> A, C
+        B
+          A
+        C
+          B
+            A
+        D
+          A
+          C
+            B
+              A
         ");
     }
 
