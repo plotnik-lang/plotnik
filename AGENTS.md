@@ -142,13 +142,13 @@ Uses `cargo-llvm-cov`, already installed.
 **Single command to see uncovered lines with code:**
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text -- <test_filter> 2>/dev/null | sed -n '/<file>/,/^\/.*\.rs:/p'
+cargo llvm-cov --package plotnik-lib --text -- <test_filter> 2>/dev/null | sed -n '/<file>/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
 ```
 
 Example for `grammar.rs`:
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text -- parser 2>/dev/null | sed -n '/grammar\.rs:/,/^\/.*\.rs:/p'
+cargo llvm-cov --package plotnik-lib --text -- parser 2>/dev/null | sed -n '/grammar\.rs:/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
 ```
 
 Output shows line number and actual code:
