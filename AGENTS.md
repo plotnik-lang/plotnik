@@ -139,23 +139,22 @@ Never write snapshot content manually. Let insta generate it.
 
 Uses `cargo-llvm-cov`, already installed.
 
-**Single command to see uncovered lines with code:**
+**Single command to see uncovered lines:**
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text -- <test_filter> 2>/dev/null | sed -n '/<file>/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
+cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- <test_filter> 2>/dev/null | grep '<file>:'
 ```
 
 Example for `grammar.rs`:
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text -- parser 2>/dev/null | sed -n '/grammar\.rs:/,/^\/Users.*\.rs:/p' | grep -E '^\s+[0-9]+\|\s+0\|'
+cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- parser 2>/dev/null | grep 'grammar\.rs:'
 ```
 
-Output shows line number and actual code:
+Output shows file path and comma-separated uncovered line numbers:
 
 ```
-   78|      0|            self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
-  128|      0|            self.start_node(SyntaxKind::Error);
+/path/to/grammar.rs: 26, 78, 79, 80, 128, 129, 130, ...
 ```
 
 **Workflow:**
