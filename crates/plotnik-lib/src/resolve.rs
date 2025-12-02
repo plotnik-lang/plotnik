@@ -4,10 +4,11 @@
 //! 1. Collect all `Name = expr` definitions
 //! 2. Check that all `(UpperIdent)` references are defined
 
-use crate::ast::{Expr, Ref, Root};
-use crate::parser::{ErrorStage, SyntaxError};
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
+
+use crate::ast::{Expr, Ref, Root};
+use crate::parser::{ErrorStage, SyntaxError};
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {

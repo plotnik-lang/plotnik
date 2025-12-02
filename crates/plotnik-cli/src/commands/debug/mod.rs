@@ -1,10 +1,12 @@
 mod output;
 mod source;
 
-use crate::cli::{OutputArgs, QueryArgs, SourceArgs};
-use plotnik_lib::Query;
 use std::fs;
 use std::io::{self, Read};
+
+use plotnik_lib::Query;
+
+use crate::cli::{OutputArgs, QueryArgs, SourceArgs};
 
 pub fn run(
     query_args: QueryArgs,
@@ -54,10 +56,10 @@ pub fn run(
         }
     }
 
-    if output.query_refs {
-        if let Some(ref q) = query {
-            output::print_query_refs(q, show_headers);
-        }
+    if output.query_refs
+        && let Some(ref q) = query
+    {
+        output::print_query_refs(q, show_headers);
     }
 
     if output.query_types {

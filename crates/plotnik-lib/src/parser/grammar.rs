@@ -7,11 +7,12 @@ use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
 use super::error::{Fix, RelatedInfo};
+
 use crate::lexer::token_text;
-use crate::syntax_kind::SyntaxKind;
 use crate::syntax_kind::token_sets::{
     ALT_RECOVERY, DEF_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
+use crate::syntax_kind::{SyntaxKind, TokenSet};
 
 impl Parser<'_> {
     pub fn parse_root(&mut self) {
@@ -303,7 +304,7 @@ impl Parser<'_> {
     }
 
     /// Parse children until `until` token or recovery set hit.
-    fn parse_children(&mut self, until: SyntaxKind, recovery: crate::syntax_kind::TokenSet) {
+    fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
             let kind = self.peek();
             if kind == until {

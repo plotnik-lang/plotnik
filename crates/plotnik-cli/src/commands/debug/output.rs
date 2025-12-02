@@ -1,6 +1,7 @@
+use plotnik_lib::Query;
+
 use super::source::{format_ast, load_source, parse_tree, resolve_lang};
 use crate::cli::SourceArgs;
-use plotnik_lib::Query;
 
 pub fn print_query_cst(query: &Query, show_header: bool) {
     if show_header {

@@ -1,7 +1,9 @@
-use crate::cli::SourceArgs;
-use plotnik_langs::Lang;
 use std::fs;
 use std::io::{self, Read};
+
+use plotnik_langs::Lang;
+
+use crate::cli::SourceArgs;
 
 pub fn load_source(args: &SourceArgs) -> String {
     if let Some(text) = &args.source_text {

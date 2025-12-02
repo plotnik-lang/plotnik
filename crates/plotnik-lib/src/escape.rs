@@ -3,12 +3,13 @@
 //! Detects patterns that can never match because they require
 //! infinitely nested structures (recursion with no escape path).
 
+use indexmap::{IndexMap, IndexSet};
+use rowan::TextRange;
+
 use crate::ast::{Def, Expr, Root};
 use crate::parser::{ErrorStage, RelatedInfo, SyntaxError};
 use crate::resolve::SymbolTable;
 use crate::syntax_kind::SyntaxKind;
-use indexmap::{IndexMap, IndexSet};
-use rowan::TextRange;
 
 pub fn check_escape(root: &Root, symbols: &SymbolTable) -> Vec<SyntaxError> {
     let sccs = find_sccs(symbols);

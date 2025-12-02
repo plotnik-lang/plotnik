@@ -3,9 +3,10 @@
 //! Checks constraints that are easier to express after parsing:
 //! - Mixed tagged/untagged alternations
 
+use rowan::TextRange;
+
 use crate::ast::{Alt, AltKind, Branch, Expr, Root};
 use crate::parser::{ErrorStage, RelatedInfo, SyntaxError};
-use rowan::TextRange;
 
 pub fn validate(root: &Root) -> Vec<SyntaxError> {
     let mut errors = Vec::new();

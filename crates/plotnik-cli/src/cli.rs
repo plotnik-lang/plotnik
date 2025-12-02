@@ -1,5 +1,6 @@
-use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "plotnik", bin_name = "plotnik")]
