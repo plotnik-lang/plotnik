@@ -7,7 +7,7 @@ fn missing_capture_name() {
     (identifier) @
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected capture name after '@'
@@ -23,34 +23,32 @@ fn missing_field_value() {
     (call name:)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected an expression
       |
     1 | (call name:)
       |            ^ unexpected token; expected an expression
-    error: unclosed tree; expected ')'
+    error: expected closing ')' for tree
       |
     1 | (call name:)
-      | -           ^ unclosed tree; expected ')'
-      | |
-      | tree started here
-    "#);
+      |             ^ expected closing ')' for tree
+    ");
 }
 
 #[test]
 fn named_def_eof_after_equals() {
     let input = "Expr = ";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: expected expression after '=' in named definition
       |
     1 | Expr = 
       |        ^ expected expression after '=' in named definition
-    "#);
+    ");
 }
 
 #[test]
@@ -59,7 +57,7 @@ fn missing_type_name() {
     (identifier) @name ::
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected type name after '::' (e.g., ::MyType or ::string)
@@ -75,7 +73,7 @@ fn missing_negated_field_name() {
     (call !)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected field name after '!' (e.g., !value)
@@ -91,7 +89,7 @@ fn missing_subtype() {
     (expression/)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected subtype after '/' (e.g., expression/binary_expression)
@@ -107,7 +105,7 @@ fn tagged_branch_missing_expression() {
     [Label:]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected expression after branch label
@@ -123,7 +121,7 @@ fn mixed_valid_invalid_captures() {
     (a) @ok @ @name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture '@' must follow an expression to capture
@@ -147,24 +145,22 @@ fn type_annotation_invalid_token_after() {
     (identifier) @name :: (
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name :: (
       |                       ^ expected type name after '::' (e.g., ::MyType or ::string)
-    error: unclosed tree; expected ')'
+    error: expected closing ')' for tree
       |
     1 | (identifier) @name :: (
-      |                       -^ unclosed tree; expected ')'
-      |                       |
-      |                       tree started here
+      |                        ^ expected closing ')' for tree
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
       |
     1 | (identifier) @name :: (
       | ^^^^^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
-    "#);
+    ");
 }
 
 #[test]
@@ -173,7 +169,7 @@ fn error_with_unexpected_content() {
     (ERROR (something))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: (ERROR) takes no arguments
@@ -189,7 +185,7 @@ fn bare_error_keyword() {
     ERROR
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
@@ -205,7 +201,7 @@ fn bare_missing_keyword() {
     MISSING
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
@@ -226,7 +222,7 @@ fn deep_nesting_within_limit() {
         input.push(')');
     }
 
-    let result = crate::ast::parser::parse(&input);
+    let result = crate::ast::parser::parse(&input).unwrap();
     assert!(
         result.is_valid(),
         "expected no errors for depth {}, got: {:?}",

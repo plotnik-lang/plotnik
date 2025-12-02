@@ -1,6 +1,8 @@
 -------------------------------------------------------------------------------------------
 NOTE: THIS DOCUMENT IS NOT A PART OF SPECIFICATION, IT'S EXPERIMENTAL AND WILL BE REWRITTEN
--------------------------------------------------------------------------------------------
+---
+
+---
 
 # Plotnik Type System
 

@@ -21,7 +21,7 @@ impl Parser<'_> {
         // Track spans of unnamed defs to emit errors for non-last ones
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
-        while self.peek() != SyntaxKind::Error || !self.eof() {
+        while !self.has_fatal_error() && (self.peek() != SyntaxKind::Error || !self.eof()) {
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
@@ -124,7 +124,7 @@ impl Parser<'_> {
     fn parse_expr_inner(&mut self, with_suffix: bool) {
         if !self.enter_recursion() {
             self.start_node(SyntaxKind::Error);
-            while !self.eof() {
+            while !self.should_stop() {
                 self.bump();
             }
             self.finish_node();
@@ -301,6 +301,9 @@ impl Parser<'_> {
     /// Parse children until `until` token or recovery set hit.
     fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
+            if self.should_stop() {
+                break;
+            }
             let kind = self.peek();
             if kind == until {
                 break;
@@ -361,6 +364,9 @@ impl Parser<'_> {
     /// Parse alternation children, handling both tagged `Label: expr` and unlabeled expressions.
     fn parse_alt_children(&mut self) {
         loop {
+            if self.has_fatal_error() {
+                break;
+            }
             let kind = self.peek();
             if kind == SyntaxKind::BracketClose {
                 break;

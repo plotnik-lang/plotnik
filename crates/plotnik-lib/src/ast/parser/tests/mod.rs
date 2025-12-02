@@ -9,7 +9,7 @@ mod json_serialization {
     #[test]
     fn error_json_serialization() {
         let input = "(identifier) @foo.bar";
-        let result = parse(input);
+        let result = parse(input).unwrap();
         let errors = result.errors();
 
         assert_eq!(errors.len(), 1);
@@ -35,7 +35,7 @@ mod json_serialization {
     #[test]
     fn error_json_serialization_no_fix() {
         let input = "(identifier) @";
-        let result = parse(input);
+        let result = parse(input).unwrap();
         let errors = result.errors();
 
         assert_eq!(errors.len(), 1);

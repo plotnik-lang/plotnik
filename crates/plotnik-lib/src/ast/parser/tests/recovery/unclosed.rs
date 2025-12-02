@@ -7,16 +7,14 @@ fn missing_paren() {
     (identifier
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unclosed tree; expected ')'
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected closing ')' for tree
       |
     1 | (identifier
-      | -          ^ unclosed tree; expected ')'
-      | |
-      | tree started here
-    "#);
+      |            ^ expected closing ')' for tree
+    ");
 }
 
 #[test]
@@ -25,7 +23,7 @@ fn missing_bracket() {
     [(identifier) (string)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unclosed alternation; expected ']'
@@ -43,16 +41,14 @@ fn missing_brace() {
     {(a) (b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unclosed sequence; expected '}'
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected closing '}' for sequence
       |
     1 | {(a) (b)
-      | -       ^ unclosed sequence; expected '}'
-      | |
-      | sequence started here
-    "#);
+      |         ^ expected closing '}' for sequence
+    ");
 }
 
 #[test]
@@ -61,16 +57,14 @@ fn nested_unclosed() {
     (a (b (c)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unclosed tree; expected ')'
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected closing ')' for tree
       |
     1 | (a (b (c)
-      |    -     ^ unclosed tree; expected ')'
-      |    |
-      |    tree started here
-    "#);
+      |          ^ expected closing ')' for tree
+    ");
 }
 
 #[test]
@@ -79,16 +73,14 @@ fn deeply_nested_unclosed() {
     (a (b (c (d
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unclosed tree; expected ')'
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected closing ')' for tree
       |
     1 | (a (b (c (d
-      |          - ^ unclosed tree; expected ')'
-      |          |
-      |          tree started here
-    "#);
+      |            ^ expected closing ')' for tree
+    ");
 }
 
 #[test]
@@ -97,16 +89,14 @@ fn unclosed_alternation_nested() {
     [(a) (b
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unclosed tree; expected ')'
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected closing ')' for tree
       |
     1 | [(a) (b
-      |      - ^ unclosed tree; expected ')'
-      |      |
-      |      tree started here
-    "#);
+      |        ^ expected closing ')' for tree
+    ");
 }
 
 #[test]
@@ -115,7 +105,7 @@ fn empty_parens() {
     ()
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: empty tree expression - expected node type or children

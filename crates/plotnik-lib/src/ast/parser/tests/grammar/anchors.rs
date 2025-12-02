@@ -7,7 +7,7 @@ fn anchor_first_child() {
     (block . (first_statement))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -31,7 +31,7 @@ fn anchor_last_child() {
     (block (last_statement) .)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -55,7 +55,7 @@ fn anchor_adjacency() {
     (dotted_name (identifier) @a . (identifier) @b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -89,7 +89,7 @@ fn anchor_both_ends() {
     (array . (element) .)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -115,7 +115,7 @@ fn anchor_multiple_adjacent() {
     (tuple . (a) . (b) . (c) .)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -153,7 +153,7 @@ fn anchor_in_sequence() {
     {. (first) (second) .}
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -182,7 +182,7 @@ fn capture_space_after_dot_is_anchor() {
     (identifier) @foo . (other)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`

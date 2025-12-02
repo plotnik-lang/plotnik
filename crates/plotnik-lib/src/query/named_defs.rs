@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn single_definition() {
         let input = "Expr = (expression)";
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"Expr");
     }
@@ -223,7 +223,7 @@ mod tests {
         Decl = (declaration)
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -239,7 +239,7 @@ mod tests {
         Call = (call_expression function: (Expr))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -252,7 +252,7 @@ mod tests {
     fn undefined_reference() {
         let input = "Call = (call_expression function: (Undefined))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `Undefined`
@@ -266,7 +266,7 @@ mod tests {
     fn self_reference() {
         let input = "Expr = [(identifier) (call (Expr))]";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -281,7 +281,7 @@ mod tests {
         B = (bar (A))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -303,7 +303,7 @@ mod tests {
         Expr = (other)
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: duplicate definition: `Expr`
@@ -320,7 +320,7 @@ mod tests {
         Value = [(Expr) (literal)]
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -336,7 +336,7 @@ mod tests {
         Pair = {(Expr) (Expr)}
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -352,7 +352,7 @@ mod tests {
         List = (Expr)*
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -368,7 +368,7 @@ mod tests {
         Named = (Expr) @e
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -384,7 +384,7 @@ mod tests {
         (call function: (Expr))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"Expr");
     }
@@ -393,7 +393,7 @@ mod tests {
     fn entry_point_undefined_reference() {
         let input = "(call function: (Unknown))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `Unknown`
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn no_definitions() {
         let input = "(identifier)";
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"");
     }
@@ -420,7 +420,7 @@ mod tests {
         D = (d (C) (A))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         A
@@ -441,7 +441,7 @@ mod tests {
     fn multiple_undefined() {
         let input = "(foo (X) (Y) (Z))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `X`
@@ -466,7 +466,7 @@ mod tests {
             B = (b (A))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         A
@@ -482,7 +482,7 @@ mod tests {
             B = (A)@x
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         A

@@ -315,25 +315,25 @@ mod tests {
 
     #[test]
     fn escape_via_alternation() {
-        let query = Query::new("E = [(x) (call (E))]");
+        let query = Query::new("E = [(x) (call (E))]").unwrap();
         assert!(query.is_valid());
     }
 
     #[test]
     fn escape_via_optional() {
-        let query = Query::new("E = (call (E)?)");
+        let query = Query::new("E = (call (E)?)").unwrap();
         assert!(query.is_valid());
     }
 
     #[test]
     fn escape_via_star() {
-        let query = Query::new("E = (call (E)*)");
+        let query = Query::new("E = (call (E)*)").unwrap();
         assert!(query.is_valid());
     }
 
     #[test]
     fn no_escape_via_plus() {
-        let query = Query::new("E = (call (E)+)");
+        let query = Query::new("E = (call (E)+)").unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `E` → `E` has no escape path
@@ -348,20 +348,20 @@ mod tests {
 
     #[test]
     fn escape_via_empty_tree() {
-        let query = Query::new("E = [(call) (E)]");
+        let query = Query::new("E = [(call) (E)]").unwrap();
         assert!(query.is_valid());
     }
 
     #[test]
     fn lazy_quantifiers_same_as_greedy() {
-        assert!(Query::new("E = (call (E)??)").is_valid());
-        assert!(Query::new("E = (call (E)*?)").is_valid());
-        assert!(!Query::new("E = (call (E)+?)").is_valid());
+        assert!(Query::new("E = (call (E)??)").unwrap().is_valid());
+        assert!(Query::new("E = (call (E)*?)").unwrap().is_valid());
+        assert!(!Query::new("E = (call (E)+?)").unwrap().is_valid());
     }
 
     #[test]
     fn recursion_in_tree_child() {
-        let query = Query::new("E = (call (E))");
+        let query = Query::new("E = (call (E))").unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `E` → `E` has no escape path
@@ -376,28 +376,28 @@ mod tests {
 
     #[test]
     fn recursion_in_field() {
-        let query = Query::new("E = (call body: (E))");
+        let query = Query::new("E = (call body: (E))").unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
 
     #[test]
     fn recursion_in_capture() {
-        let query = Query::new("E = (call (E) @inner)");
+        let query = Query::new("E = (call (E) @inner)").unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
 
     #[test]
     fn recursion_in_sequence() {
-        let query = Query::new("E = (call {(a) (E)})");
+        let query = Query::new("E = (call {(a) (E)})").unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
 
     #[test]
     fn recursion_through_multiple_children() {
-        let query = Query::new("E = [(x) (call (a) (E))]");
+        let query = Query::new("E = [(x) (call (a) (E))]").unwrap();
         assert!(query.is_valid());
     }
 
@@ -407,7 +407,7 @@ mod tests {
             A = (foo (B))
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -428,7 +428,7 @@ mod tests {
             A = [(x) (foo (B))]
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -439,7 +439,7 @@ mod tests {
             B = (b (C))
             C = (c (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
@@ -451,7 +451,7 @@ mod tests {
             B = (b (C))
             C = (c (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -463,7 +463,7 @@ mod tests {
             C = (c (D))
             D = (d (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
@@ -474,7 +474,7 @@ mod tests {
             A = (foo body: (B))
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -495,7 +495,7 @@ mod tests {
             A = (foo (B) @cap)
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -516,7 +516,7 @@ mod tests {
             A = (foo {(x) (B)})
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -537,7 +537,7 @@ mod tests {
             A = (foo (B)?)
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -547,7 +547,7 @@ mod tests {
             A = (foo (B)+)
             B = (bar (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
@@ -558,7 +558,7 @@ mod tests {
             Leaf = (identifier)
             Tree = (call (Leaf))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -568,13 +568,13 @@ mod tests {
             E = [(x) (call (E))]
             (program (E))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
     #[test]
     fn direct_self_ref_in_alternation() {
-        let query = Query::new("E = [(E) (x)]");
+        let query = Query::new("E = [(E) (x)]").unwrap();
         assert!(query.is_valid());
     }
 
@@ -583,7 +583,7 @@ mod tests {
         let input = indoc! {r#"
             A = [(A) "escape"]
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -592,7 +592,7 @@ mod tests {
         let input = indoc! {r#"
             A = [(A) _]
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -601,7 +601,7 @@ mod tests {
         let input = indoc! {r#"
             A = [(A) (leaf)]
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -610,7 +610,7 @@ mod tests {
         let input = indoc! {r#"
             A = (foo . [(A) (x)])
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -619,7 +619,7 @@ mod tests {
         let input = indoc! {r#"
             A = (foo (A))
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         assert!(query.dump_errors().contains("recursive pattern"));
     }
@@ -629,7 +629,7 @@ mod tests {
         let input = indoc! {r#"
             A = [(x)@cap (foo (A))]
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
     }
 
@@ -638,7 +638,7 @@ mod tests {
         let input = indoc! {r#"
             A = (foo (A)+)
         "#};
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
     }
 }

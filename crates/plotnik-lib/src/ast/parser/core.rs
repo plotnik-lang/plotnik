@@ -5,27 +5,22 @@
 //! - Trivia buffering and attachment
 //! - Tree construction via Rowan
 //! - Error recording and recovery
-//! - Recursion depth limiting
+//! - Fuel-based limits (debug, execution, recursion)
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
-use super::MAX_DEPTH;
 use super::error::{Diagnostic, Fix, RelatedInfo};
 
+use crate::Error;
 use crate::ast::lexer::{Token, token_text};
 use crate::ast::syntax_kind::token_sets::ROOT_EXPR_FIRST;
 use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 
 #[cfg(debug_assertions)]
-const DEFAULT_FUEL: u32 = 256;
+const DEFAULT_DEBUG_FUEL: u32 = 256;
 
-/// Options for parser behavior, primarily for testing.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ParserOptions {
-    /// Disable fuel checking (debug mode only). Use for pathological test inputs.
-    #[cfg(debug_assertions)]
-    pub disable_fuel: bool,
-}
+const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
+const DEFAULT_RECURSION_FUEL: u32 = 512;
 
 /// Parse result containing the green tree and any errors.
 ///
@@ -37,11 +32,6 @@ pub struct Parse {
     pub(super) errors: Vec<Diagnostic>,
 }
 
-/// Parser state machine.
-///
-/// The token stream is processed left-to-right. Trivia tokens (whitespace, comments)
-/// are buffered separately and flushed as leading trivia when starting a new node.
-/// This gives predictable trivia attachment without backtracking.
 /// Tracks an open delimiter for better error messages on unclosed constructs.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OpenDelimiter {
@@ -50,6 +40,11 @@ pub(super) struct OpenDelimiter {
     pub span: TextRange,
 }
 
+/// Parser state machine.
+///
+/// The token stream is processed left-to-right. Trivia tokens (whitespace, comments)
+/// are buffered separately and flushed as leading trivia when starting a new node.
+/// This gives predictable trivia attachment without backtracking.
 pub struct Parser<'src> {
     pub(super) source: &'src str,
     pub(super) tokens: Vec<Token>,
@@ -60,19 +55,32 @@ pub struct Parser<'src> {
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
     pub(super) errors: Vec<Diagnostic>,
+    /// Current recursion depth.
     pub(super) depth: u32,
     /// Last error position - used to suppress cascading errors at same span
     pub(super) last_error_pos: Option<TextSize>,
     /// Stack of open delimiters for "unclosed X started here" errors.
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
+
+    // Fuel limits
+    /// Debug-only: loop detection fuel. Resets on bump(). Panics when exhausted.
     #[cfg(debug_assertions)]
-    pub(super) fuel: std::cell::Cell<u32>,
+    debug_fuel: std::cell::Cell<u32>,
     #[cfg(debug_assertions)]
-    pub(super) fuel_enabled: bool,
+    debug_fuel_limit: Option<u32>,
+
+    /// Execution fuel. Never replenishes.
+    exec_fuel_remaining: Option<u32>,
+
+    /// Recursion depth limit.
+    recursion_fuel_limit: Option<u32>,
+
+    /// Fatal error that stops parsing (fuel exhaustion).
+    fatal_error: Option<Error>,
 }
 
 impl<'src> Parser<'src> {
-    pub fn with_options(source: &'src str, tokens: Vec<Token>, options: ParserOptions) -> Self {
+    pub fn new(source: &'src str, tokens: Vec<Token>) -> Self {
         Self {
             source,
             tokens,
@@ -84,18 +92,49 @@ impl<'src> Parser<'src> {
             last_error_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             #[cfg(debug_assertions)]
-            fuel: std::cell::Cell::new(DEFAULT_FUEL),
+            debug_fuel: std::cell::Cell::new(DEFAULT_DEBUG_FUEL),
             #[cfg(debug_assertions)]
-            fuel_enabled: !options.disable_fuel,
+            debug_fuel_limit: Some(DEFAULT_DEBUG_FUEL),
+            exec_fuel_remaining: Some(DEFAULT_EXEC_FUEL),
+            recursion_fuel_limit: Some(DEFAULT_RECURSION_FUEL),
+            fatal_error: None,
         }
     }
 
-    pub fn finish(mut self) -> Parse {
+    /// Set debug fuel limit (debug builds only). None = infinite.
+    #[cfg(debug_assertions)]
+    pub fn with_debug_fuel(mut self, limit: Option<u32>) -> Self {
+        self.debug_fuel_limit = limit;
+        self.debug_fuel.set(limit.unwrap_or(u32::MAX));
+        self
+    }
+
+    /// Set execution fuel limit. None = infinite.
+    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
+        self.exec_fuel_remaining = limit;
+        self
+    }
+
+    /// Set recursion depth limit. None = infinite.
+    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
+        self.recursion_fuel_limit = limit;
+        self
+    }
+
+    pub fn finish(mut self) -> Result<Parse, Error> {
         self.drain_trivia();
-        Parse {
+        if let Some(err) = self.fatal_error {
+            return Err(err);
+        }
+        Ok(Parse {
             green: self.builder.finish(),
             errors: self.errors,
-        }
+        })
+    }
+
+    /// Check if a fatal error has occurred.
+    pub(super) fn has_fatal_error(&self) -> bool {
+        self.fatal_error.is_some()
     }
 
     /// Current token kind. Returns `Error` at EOF (acts as sentinel).
@@ -103,21 +142,32 @@ impl<'src> Parser<'src> {
         self.nth(0)
     }
 
-    /// Lookahead by `n` tokens (0 = current). Consumes fuel in debug mode.
+    /// Lookahead by `n` tokens (0 = current). Consumes debug fuel (panics if stuck).
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
         #[cfg(debug_assertions)]
-        if self.fuel_enabled {
-            if self.fuel.get() == 0 {
-                panic!(
-                    "parser is stuck: no progress made in {} iterations",
-                    DEFAULT_FUEL
-                );
+        if let Some(limit) = self.debug_fuel_limit {
+            if self.debug_fuel.get() == 0 {
+                panic!("parser is stuck: no progress made in {} iterations", limit);
             }
-            self.fuel.set(self.fuel.get() - 1);
+            self.debug_fuel.set(self.debug_fuel.get() - 1);
         }
+
         self.tokens
             .get(self.pos + lookahead)
             .map_or(SyntaxKind::Error, |t| t.kind)
+    }
+
+    /// Consume execution fuel. Sets fatal error if exhausted.
+    fn consume_exec_fuel(&mut self) {
+        if let Some(ref mut remaining) = self.exec_fuel_remaining {
+            if *remaining == 0 {
+                if self.fatal_error.is_none() {
+                    self.fatal_error = Some(Error::ExecFuelExhausted);
+                }
+                return;
+            }
+            *remaining -= 1;
+        }
     }
 
     pub(super) fn current_span(&self) -> TextRange {
@@ -132,6 +182,11 @@ impl<'src> Parser<'src> {
 
     pub(super) fn eof(&self) -> bool {
         self.pos >= self.tokens.len()
+    }
+
+    /// Check if at EOF or fatal error occurred.
+    pub(super) fn should_stop(&self) -> bool {
+        self.eof() || self.has_fatal_error()
     }
 
     pub(super) fn at(&self, kind: SyntaxKind) -> bool {
@@ -207,11 +262,17 @@ impl<'src> Parser<'src> {
         self.builder.checkpoint()
     }
 
-    /// Consume current token into tree. Resets fuel.
+    /// Consume current token into tree. Resets debug fuel, consumes exec fuel.
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
+
         #[cfg(debug_assertions)]
-        self.fuel.set(DEFAULT_FUEL);
+        if let Some(limit) = self.debug_fuel_limit {
+            self.debug_fuel.set(limit);
+        }
+
+        self.consume_exec_fuel();
+
         let token = self.tokens[self.pos];
         let text = token_text(self.source, &token);
         self.builder.token(token.kind.into(), text);
@@ -221,8 +282,14 @@ impl<'src> Parser<'src> {
     /// Skip current token without adding to tree. Used for invalid separators.
     pub(super) fn skip_token(&mut self) {
         assert!(!self.eof(), "skip_token called at EOF");
+
         #[cfg(debug_assertions)]
-        self.fuel.set(DEFAULT_FUEL);
+        if let Some(limit) = self.debug_fuel_limit {
+            self.debug_fuel.set(limit);
+        }
+
+        self.consume_exec_fuel();
+
         self.pos += 1;
     }
 
@@ -269,14 +336,14 @@ impl<'src> Parser<'src> {
     /// If already at recovery token, just emits error without consuming.
     #[allow(dead_code)] // Used by future grammar rules (named expressions)
     pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
-        if self.at_set(recovery) || self.eof() {
+        if self.at_set(recovery) || self.should_stop() {
             self.error(message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
         self.error(message);
-        while !self.at_set(recovery) && !self.eof() {
+        while !self.at_set(recovery) && !self.should_stop() {
             self.bump();
         }
         self.finish_node();
@@ -290,7 +357,7 @@ impl<'src> Parser<'src> {
     ///
     /// Returns true if any tokens were consumed.
     pub(super) fn synchronize_to_def_start(&mut self) -> bool {
-        if self.eof() {
+        if self.should_stop() {
             return false;
         }
 
@@ -300,7 +367,7 @@ impl<'src> Parser<'src> {
         }
 
         self.start_node(SyntaxKind::Error);
-        while !self.eof() && !self.at_def_start() {
+        while !self.should_stop() && !self.at_def_start() {
             self.bump();
             self.skip_trivia_to_buffer();
         }
@@ -322,9 +389,13 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn enter_recursion(&mut self) -> bool {
-        if self.depth >= MAX_DEPTH {
-            self.error("recursion limit exceeded");
-            return false;
+        if let Some(limit) = self.recursion_fuel_limit {
+            if self.depth >= limit {
+                if self.fatal_error.is_none() {
+                    self.fatal_error = Some(Error::RecursionLimitExceeded);
+                }
+                return false;
+            }
         }
         self.depth += 1;
         true

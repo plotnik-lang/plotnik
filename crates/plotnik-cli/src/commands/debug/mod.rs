@@ -38,7 +38,13 @@ pub fn run(args: DebugArgs) {
     } else {
         None
     };
-    let query = query_source.as_ref().map(|src| Query::new(src));
+
+    let query = query_source.as_ref().map(|src| {
+        Query::new(src).unwrap_or_else(|e| {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        })
+    });
 
     let show_headers = [args.query, args.source, args.symbols]
         .iter()

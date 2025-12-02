@@ -1,8 +1,6 @@
 //! Additional tests for parser coverage gaps.
 
 use crate::Query;
-#[cfg(debug_assertions)]
-use crate::ast::ParserOptions;
 use indoc::indoc;
 
 #[test]
@@ -11,7 +9,7 @@ fn named_def_missing_equals_with_garbage() {
     Expr ^^^ (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -36,7 +34,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
     Valid = (ok)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -56,7 +54,7 @@ fn def_name_snake_case_suggests_pascal() {
     my_expr = (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names must start with uppercase
@@ -78,7 +76,7 @@ fn def_name_kebab_case_suggests_pascal() {
     my-expr = (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names must start with uppercase
@@ -100,7 +98,7 @@ fn def_name_dotted_suggests_pascal() {
     my.expr = (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names must start with uppercase
@@ -122,7 +120,7 @@ fn branch_label_snake_case_suggests_pascal() {
     [My_branch: (a) Other: (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: branch labels cannot contain separators
@@ -144,7 +142,7 @@ fn branch_label_kebab_case_suggests_pascal() {
     [My-branch: (a) Other: (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: branch labels cannot contain separators
@@ -166,7 +164,7 @@ fn branch_label_dotted_suggests_pascal() {
     [My.branch: (a) Other: (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: branch labels cannot contain separators
@@ -188,7 +186,7 @@ fn type_annotation_dotted_suggests_pascal() {
     (a) @x :: My.Type
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: type names cannot contain dots or hyphens
@@ -210,7 +208,7 @@ fn type_annotation_kebab_suggests_pascal() {
     (a) @x :: My-Type
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: type names cannot contain dots or hyphens
@@ -232,7 +230,7 @@ fn lowercase_branch_label_suggests_capitalized() {
     [first: (a) Second: (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
@@ -254,7 +252,7 @@ fn predicate_in_alternation() {
     [(a) #eq? (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
@@ -270,7 +268,7 @@ fn predicate_in_sequence() {
     {(a) #set! (b)}
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
@@ -286,7 +284,7 @@ fn bare_capture_at_root() {
     @name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture '@' must follow an expression to capture
@@ -306,7 +304,7 @@ fn capture_at_start_of_alternation() {
     [@x (a)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
@@ -322,8 +320,8 @@ fn capture_at_start_of_alternation() {
 
 #[test]
 fn deeply_nested_trees_hit_recursion_limit() {
-    // MAX_DEPTH is 512, so 520 levels should hit the limit
-    let depth = 520;
+    // Test just over recursion limit (default is 512)
+    let depth = 513;
     let mut input = String::new();
     for _ in 0..depth {
         input.push_str("(a ");
@@ -332,21 +330,55 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    #[cfg(debug_assertions)]
-    let query = Query::with_options(&input, ParserOptions { disable_fuel: true });
-    #[cfg(not(debug_assertions))]
-    let query = Query::new(&input);
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
-    error: recursion limit exceeded
-      |
-    1 | ... (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a (a ))))))))))))))))))))))))))))))))))))))))))))))))))))))...
-      |                                                        ^ recursion limit exceeded
-    error: unclosed tree; expected ')'
-      |
-    1 | ...(a (a (a (a (a (a (a (a (a (a ))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
-      |       - tree started here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^ unclosed tree; expected ')'
-    ");
+    let result = Query::builder(&input).with_debug_fuel(None).build();
+
+    assert!(
+        matches!(result, Err(crate::Error::RecursionLimitExceeded)),
+        "expected RecursionLimitExceeded error, got {:?}",
+        result
+    );
+}
+
+#[test]
+fn deeply_nested_sequences_hit_recursion_limit() {
+    // Test just over recursion limit (default is 512)
+    let depth = 513;
+    let mut input = String::new();
+    for _ in 0..depth {
+        input.push_str("{(a) ");
+    }
+    for _ in 0..depth {
+        input.push('}');
+    }
+
+    let result = Query::builder(&input).with_debug_fuel(None).build();
+
+    assert!(
+        matches!(result, Err(crate::Error::RecursionLimitExceeded)),
+        "expected RecursionLimitExceeded error, got {:?}",
+        result
+    );
+}
+
+#[test]
+fn deeply_nested_alternations_hit_recursion_limit() {
+    // Test just over recursion limit (default is 512)
+    let depth = 513;
+    let mut input = String::new();
+    for _ in 0..depth {
+        input.push_str("[(a) ");
+    }
+    for _ in 0..depth {
+        input.push(']');
+    }
+
+    let result = Query::builder(&input).with_debug_fuel(None).build();
+
+    assert!(
+        matches!(result, Err(crate::Error::RecursionLimitExceeded)),
+        "expected RecursionLimitExceeded error, got {:?}",
+        result
+    );
 }
 
 #[test]
@@ -356,15 +388,13 @@ fn unclosed_tree_shows_open_location() {
         (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: unclosed tree; expected ')'
+    error: expected closing ')' for tree
       |
-    1 | (call
-      | - tree started here
     2 |     (identifier)
-      |                 ^ unclosed tree; expected ')'
+      |                 ^ expected closing ')' for tree
     ");
 }
 
@@ -376,7 +406,7 @@ fn unclosed_alternation_shows_open_location() {
         (b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: unclosed alternation; expected ']'
@@ -397,16 +427,13 @@ fn unclosed_sequence_shows_open_location() {
         (b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: unclosed sequence; expected '}'
+    error: expected closing '}' for sequence
       |
-    1 | {
-      | - sequence started here
-    2 |     (a)
     3 |     (b)
-      |        ^ unclosed sequence; expected '}'
+      |        ^ expected closing '}' for sequence
     ");
 }
 
@@ -416,7 +443,7 @@ fn single_colon_type_annotation_with_space() {
     (a) @x : Type
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: single colon is not valid for type annotations
@@ -437,7 +464,7 @@ fn field_equals_typo_in_tree() {
     (call name = (identifier))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '=' is not valid for field constraints
@@ -459,7 +486,7 @@ fn field_equals_typo_missing_value() {
     (call name = )
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '=' is not valid for field constraints
@@ -485,7 +512,7 @@ fn comma_between_defs() {
     A = (a), B = (b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -501,7 +528,7 @@ fn pipe_between_branches() {
     [(a) | (b)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '|' is not valid syntax; plotnik uses whitespace for separation
@@ -523,7 +550,7 @@ fn empty_double_quote_string() {
     (a "")
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -544,7 +571,7 @@ fn empty_single_quote_string() {
     (a '')
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -565,7 +592,7 @@ fn supertype_with_string_arg() {
     (expression/binary)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -585,7 +612,7 @@ fn missing_node_syntax() {
     (MISSING "identifier")
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -606,7 +633,7 @@ fn error_node_syntax() {
     (ERROR)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -624,7 +651,7 @@ fn capture_name_pascal_case_error() {
     (a) @Name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture names must start with lowercase
@@ -647,7 +674,7 @@ fn capture_name_pascal_case_with_hyphens_error() {
     (a) @My-Name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture names cannot contain hyphens
@@ -669,7 +696,7 @@ fn capture_name_with_hyphens_error() {
     (a) @my-name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture names cannot contain hyphens
@@ -691,7 +718,7 @@ fn field_name_pascal_case_error() {
     (call Name: (a))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: field names must start with lowercase
@@ -713,7 +740,7 @@ fn bare_capture_at_eof_triggers_sync() {
     // synchronize_to_def_start should return false (eof branch)
     let input = "@";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture '@' must follow an expression to capture
@@ -727,7 +754,7 @@ fn bare_capture_at_eof_triggers_sync() {
 fn bare_colon_in_tree() {
     let input = "(a : (b))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
@@ -741,7 +768,7 @@ fn bare_colon_in_tree() {
 fn pipe_in_tree() {
     let input = "(a | b)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '|' is not valid syntax; plotnik uses whitespace for separation
@@ -765,7 +792,7 @@ fn pipe_in_tree() {
 fn pipe_in_sequence() {
     let input = "{(a) | (b)}";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '|' is not valid syntax; plotnik uses whitespace for separation
@@ -785,7 +812,7 @@ fn pipe_in_sequence() {
 fn paren_close_inside_alternation() {
     let input = "[(a) ) (b)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected closing ']' for alternation
@@ -807,7 +834,7 @@ fn paren_close_inside_alternation() {
 fn type_annotation_missing_name() {
     let input = "(a) @x ::";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
@@ -821,7 +848,7 @@ fn type_annotation_missing_name() {
 fn type_annotation_missing_name_with_bracket() {
     let input = "[(a) @x :: ]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
@@ -835,7 +862,7 @@ fn type_annotation_missing_name_with_bracket() {
 fn predicate_in_tree() {
     let input = "(function #eq? @name \"test\")";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
@@ -858,7 +885,7 @@ fn single_colon_type_annotation_followed_by_non_id() {
     // @x : followed by ( which is not an Id - triggers early return in parse_type_annotation_single_colon
     let input = "(a) @x : (b)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -877,7 +904,7 @@ fn single_colon_type_annotation_at_eof() {
     // @x : at end of input
     let input = "(a) @x :";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
@@ -892,7 +919,7 @@ fn bracket_close_inside_sequence() {
     // ] inside {} triggers SEQ_RECOVERY break
     let input = "{(a) ] (b)}";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected closing '}' for sequence
@@ -915,7 +942,7 @@ fn paren_close_inside_sequence() {
     // ) inside {} triggers SEQ_RECOVERY break
     let input = "{(a) ) (b)}";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: expected closing '}' for sequence
