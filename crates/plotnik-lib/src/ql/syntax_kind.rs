@@ -108,7 +108,7 @@ pub enum SyntaxKind {
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     StringLit,
 
-    /// Single-quoted string (invalid, for error recovery - should use double quotes)
+    /// Single-quoted string (equivalent to double quotes, useful for tool calling)
     #[regex(r"'(?:[^'\\]|\\.)*'")]
     SingleQuoteLit,
 

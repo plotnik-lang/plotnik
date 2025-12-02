@@ -6,6 +6,70 @@ Plotnik QL is a pattern-matching language for tree-sitter syntax trees. It exten
 
 ---
 
+## Execution Model
+
+Plotnik uses an NFA-based recursive cursor walk with backtracking. Understanding this model helps predict matching behavior.
+
+### Key Properties
+
+- **Root-anchored:** Matching starts at the root of the target tree and must match the entire structure (like `^...$` in regex, not a substring search)
+- **Backtracking:** When a branch fails, the engine backtracks and tries alternatives
+- **Ordered choice:** In alternations `[A B C]`, branches are tried in order; first match wins (PEG semantics)
+
+### Trivia Handling
+
+Comments and other "extra" nodes (as defined by the tree-sitter grammar) are automatically skipped when walking siblings, unless explicitly matched in the pattern.
+
+```
+(function_declaration (identifier) @name (block) @body)
+```
+
+This matches even if comments appear between children:
+
+```javascript
+function foo /* comment */() {
+  /* body */
+}
+```
+
+The `.` anchor enforces strict adjacency (no trivia between):
+
+```
+(array . (identifier) @first)  ; first must be immediately after opening bracket
+```
+
+### Partial Matching (Open World)
+
+Node patterns `(type ...)` are partial—unmentioned children are ignored:
+
+```
+(binary_expression left: (identifier) @left)
+```
+
+Matches any `binary_expression` with an `identifier` in its `left` field, regardless of other children (`operator`, `right`, etc.).
+
+Sequences `{...}` advance the cursor through siblings in order, skipping non-matching nodes between elements.
+
+### Field Constraints
+
+Field constraints (`field: pattern`) add a field requirement to positional matching. The child must match both the pattern AND have the specified field:
+
+```
+(binary_expression
+  left: (identifier) @x
+  right: (number) @y
+)
+```
+
+This matches a `binary_expression` where:
+
+- The first matched child has field `left` and is an `identifier`
+- The second matched child has field `right` and is a `number`
+
+Field constraints participate in sequential matching just like regular children—they are not independent lookups.
+
+---
+
 ## File Structure
 
 A Plotnik file contains one or more definitions. All definitions must be named (`Name = expr`) except optionally the last one, which becomes the entry point:
@@ -191,11 +255,17 @@ Output type:
 
 ### Anonymous Nodes
 
-Match literal tokens (operators, keywords, punctuation) with double quotes:
+Match literal tokens (operators, keywords, punctuation) with double or single quotes:
 
 ```
 (binary_expression operator: "!=")
 (return_statement "return")
+```
+
+Single quotes are equivalent to double quotes, useful when the query itself is wrapped in double quotes (e.g., in tool calls or JSON):
+
+```
+(return_statement 'return')
 ```
 
 Anonymous nodes can be captured directly:
@@ -208,8 +278,12 @@ Anonymous nodes can be captured directly:
 Output type:
 
 ```typescript
-{ op: Node }
-{ keyword: Node }
+{
+  op: Node;
+}
+{
+  keyword: Node;
+}
 ```
 
 ### Wildcards
@@ -618,6 +692,8 @@ Output type:
   expr: BinaryOp;
 } // BinaryOp = { left: Node, op: Node, right: Node }
 ```
+
+> **Important: Encapsulation.** Named expressions encapsulate their captures. Using `(Name)` without a capture matches the pattern but extracts no data. You must capture the reference (`(Name) @x`) to access the named expression's fields via `x`. This is intentional—named expressions provide structural reuse (pattern abstraction), while captures provide data extraction (explicit addressing).
 
 Named expressions define both a pattern and a type. The type is inferred from captures within:
 

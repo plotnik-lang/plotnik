@@ -19,7 +19,8 @@
 
 - Lexer: all token types including trivia, error coalescing
 - Parser structure: trivia handling, error recovery, checkpoints
-- Basic grammar: tree expressions `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = expr`, tagged alternations `[A: ... B: ...]`
+- Basic grammar: tree expressions `(type)`, alternation `[a b]`, wildcards `_`, captures `@name` with types `::T`, fields `field:`, quantifiers `*+?` (and non-greedy), anonymous nodes `"literal"` or `'literal'`, supertypes `(a/b)`, special nodes `(ERROR)`, sequences `{...}`, named definitions `Name = expr`, tagged alternations `[A: ... B: ...]`
+- String literals: both `"double"` and `'single'` quotes are valid and equivalent. Single quotes are useful when the query is embedded in double-quoted strings (e.g., JSON, tool calling).
 - Parser accepts UpperIdent in capture/field positions for resilience (validation catches casing errors)
 
 ## Error Pipeline
