@@ -75,6 +75,17 @@ plotnik langs
 plotnik docs reference
 ```
 
+## Roadmap
+
+- [x] Query language parser (resilient, error-recovering)
+- [x] Typed AST layer over CST
+- [x] Name resolution and symbol table
+- [x] Escape analysis for recursion validation
+- [ ] Cardinality inference for output shape prediction
+- [ ] Type validation against `node-types.json` schemas
+- [ ] Runtime query execution engine
+- [ ] Proc macro compilation to optimized tree-walking code
+
 ## Documentation
 
 - [Language Reference](docs/REFERENCE.md) — full syntax and semantics
