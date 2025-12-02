@@ -11,12 +11,12 @@ use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::MAX_DEPTH;
 use super::error::{RelatedInfo, SyntaxError};
-use crate::ql::syntax_kind::token_sets::ROOT_EXPR_FIRST;
+use crate::syntax_kind::token_sets::ROOT_EXPR_FIRST;
 
 #[cfg(debug_assertions)]
 const DEFAULT_FUEL: u32 = 256;
-use crate::ql::lexer::{Token, token_text};
-use crate::ql::syntax_kind::{SyntaxKind, TokenSet};
+use crate::lexer::{Token, token_text};
+use crate::syntax_kind::{SyntaxKind, TokenSet};
 
 /// Parse result containing the green tree and any errors.
 ///

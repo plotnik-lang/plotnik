@@ -3,8 +3,8 @@
 //! Checks constraints that are easier to express after parsing:
 //! - Mixed tagged/untagged alternations
 
-use crate::ql::ast::{Alt, AltKind, Branch, Expr, Root};
-use crate::ql::parser::{ErrorStage, RelatedInfo, SyntaxError};
+use crate::ast::{Alt, AltKind, Branch, Expr, Root};
+use crate::parser::{ErrorStage, RelatedInfo, SyntaxError};
 use rowan::TextRange;
 
 pub fn validate(root: &Root) -> Vec<SyntaxError> {
@@ -174,12 +174,14 @@ mod tests {
 
     #[test]
     fn mixed_alternation_untagged_first() {
-        let query = Query::new(r#"
+        let query = Query::new(
+            r#"
         [
           (a)
           B: (b)
         ]
-        "#);
+        "#,
+        );
         insta::assert_snapshot!(query.snapshot_ast(), @r"
         Root
           Def

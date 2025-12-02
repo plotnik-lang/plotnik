@@ -4,7 +4,7 @@ mod trivia;
 
 // JSON serialization tests for the error API
 mod json_serialization {
-    use crate::ql::parser::parse;
+    use crate::parser::parse;
 
     #[test]
     fn error_json_serialization() {

@@ -3,10 +3,10 @@
 //! Detects patterns that can never match because they require
 //! infinitely nested structures (recursion with no escape path).
 
-use crate::ql::ast::{Def, Expr, Root};
-use crate::ql::parser::{ErrorStage, RelatedInfo, SyntaxError};
-use crate::ql::resolve::SymbolTable;
-use crate::ql::syntax_kind::SyntaxKind;
+use crate::ast::{Def, Expr, Root};
+use crate::parser::{ErrorStage, RelatedInfo, SyntaxError};
+use crate::resolve::SymbolTable;
+use crate::syntax_kind::SyntaxKind;
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 

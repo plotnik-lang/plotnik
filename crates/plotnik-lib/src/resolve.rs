@@ -4,8 +4,8 @@
 //! 1. Collect all `Name = expr` definitions
 //! 2. Check that all `(UpperIdent)` references are defined
 
-use crate::ql::ast::{Expr, Ref, Root};
-use crate::ql::parser::{ErrorStage, SyntaxError};
+use crate::ast::{Expr, Ref, Root};
+use crate::parser::{ErrorStage, SyntaxError};
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 

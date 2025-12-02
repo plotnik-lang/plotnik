@@ -15,12 +15,23 @@
 //! }
 //! ```
 
-pub mod ql;
+pub mod ast;
+pub mod escape;
+pub mod lexer;
+pub mod parser;
+pub mod resolve;
+pub mod syntax_kind;
+pub mod validate;
 
-use ql::ast::{Root, format_ast};
-use ql::parser::{self, ErrorStage, Parse, SyntaxError};
-use ql::resolve::SymbolTable;
-use ql::syntax_kind::SyntaxNode;
+#[cfg(test)]
+mod ast_tests;
+#[cfg(test)]
+mod lexer_tests;
+
+use ast::{Root, format_ast};
+use parser::{ErrorStage, Parse, SyntaxError};
+use resolve::SymbolTable;
+use syntax_kind::SyntaxNode;
 
 /// A parsed and resolved query.
 ///
@@ -43,18 +54,18 @@ impl<'a> Query<'a> {
         let parse = parser::parse(source);
 
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
-        let resolve_result = ql::resolve::resolve(&root);
+        let resolve_result = resolve::resolve(&root);
 
         let mut errors = parse.errors().to_vec();
 
         // Semantic validation (mixed alternations, etc.)
-        let validate_errors = ql::validate::validate(&root);
+        let validate_errors = validate::validate(&root);
         errors.extend(validate_errors);
 
         errors.extend(resolve_result.errors);
 
         // Check for recursive patterns with no escape path
-        let escape_errors = ql::escape::check_escape(&root, &resolve_result.symbols);
+        let escape_errors = escape::check_escape(&root, &resolve_result.symbols);
         errors.extend(escape_errors);
 
         Self {
@@ -134,7 +145,12 @@ impl<'a> Query<'a> {
     /// Render errors grouped by stage.
     pub fn render_errors_grouped(&self) -> String {
         let mut out = String::new();
-        for stage in [ErrorStage::Parse, ErrorStage::Validate, ErrorStage::Resolve, ErrorStage::Escape] {
+        for stage in [
+            ErrorStage::Parse,
+            ErrorStage::Validate,
+            ErrorStage::Resolve,
+            ErrorStage::Escape,
+        ] {
             let stage_errors: Vec<_> = self.errors_by_stage(stage).into_iter().cloned().collect();
             if !stage_errors.is_empty() {
                 if !out.is_empty() {
@@ -285,7 +301,7 @@ mod tests {
 
     #[test]
     fn error_stage_filtering() {
-        use ql::parser::ErrorStage;
+        use parser::ErrorStage;
 
         // Parse error only
         let q = Query::new("(unclosed");

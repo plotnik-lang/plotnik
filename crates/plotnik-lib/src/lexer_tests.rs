@@ -1,4 +1,4 @@
-use crate::ql::lexer::{lex, token_text};
+use crate::lexer::{lex, token_text};
 
 /// Format tokens without trivia (default for most tests)
 fn snapshot(input: &str) -> String {

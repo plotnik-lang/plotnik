@@ -7,9 +7,9 @@ use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
 use super::error::{Fix, RelatedInfo};
-use crate::ql::lexer::token_text;
-use crate::ql::syntax_kind::SyntaxKind;
-use crate::ql::syntax_kind::token_sets::{
+use crate::lexer::token_text;
+use crate::syntax_kind::SyntaxKind;
+use crate::syntax_kind::token_sets::{
     ALT_RECOVERY, DEF_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
 
@@ -303,7 +303,7 @@ impl Parser<'_> {
     }
 
     /// Parse children until `until` token or recovery set hit.
-    fn parse_children(&mut self, until: SyntaxKind, recovery: crate::ql::syntax_kind::TokenSet) {
+    fn parse_children(&mut self, until: SyntaxKind, recovery: crate::syntax_kind::TokenSet) {
         loop {
             let kind = self.peek();
             if kind == until {

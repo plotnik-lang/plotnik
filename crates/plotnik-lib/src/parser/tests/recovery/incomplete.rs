@@ -343,7 +343,7 @@ fn deep_nesting_within_limit() {
         input.push(')');
     }
 
-    let result = crate::ql::parser::parse(&input);
+    let result = crate::parser::parse(&input);
     assert!(
         result.is_valid(),
         "expected no errors for depth {}, got: {:?}",

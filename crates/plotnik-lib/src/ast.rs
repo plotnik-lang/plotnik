@@ -3,7 +3,7 @@
 //! Each struct wraps a `SyntaxNode` and provides typed accessors.
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
 
-use crate::ql::syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
 use std::fmt::Write;
 
 macro_rules! ast_node {
