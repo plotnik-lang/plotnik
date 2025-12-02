@@ -203,48 +203,6 @@ impl<'a> Query<'a> {
         out
     }
 
-    /// Snapshot of CST structure (without trivia, with errors).
-    pub fn snapshot_cst(&self) -> String {
-        let mut out = self.format_cst();
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-            out.push('\n');
-        }
-        out
-    }
-
-    /// Snapshot of AST structure (with errors).
-    pub fn snapshot_ast(&self) -> String {
-        let mut out = self.format_ast();
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-            out.push('\n');
-        }
-        out
-    }
-
-    /// Snapshot of CST structure (with trivia, with errors).
-    pub fn snapshot_cst_raw(&self) -> String {
-        let mut out = self.format_cst_raw();
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-            out.push('\n');
-        }
-        out
-    }
-
-    /// Snapshot of symbol references (with errors).
-    pub fn snapshot_refs(&self) -> String {
-        let mut out = self.format_refs();
-        if !self.errors.is_empty() {
-            out.push_str("---\n");
-            out.push_str(&self.render_errors());
-        }
-        out
-    }
 
     fn format_tree(node: &SyntaxNode, indent: usize, out: &mut String, include_trivia: bool) {
         use std::fmt::Write;

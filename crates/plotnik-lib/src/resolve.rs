@@ -214,7 +214,8 @@ mod tests {
     fn single_definition() {
         let input = "Expr = (expression)";
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @"Expr");
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @"Expr");
     }
 
     #[test]
@@ -226,7 +227,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Decl
         Expr
         Stmt
@@ -241,7 +243,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Call -> Expr
         Expr
         ");
@@ -252,9 +255,8 @@ mod tests {
         let input = "Call = (call_expression function: (Undefined))";
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
-        Call -> Undefined
-        ---
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.render_errors(), @r"
         error: undefined reference: `Undefined`
           |
         1 | Call = (call_expression function: (Undefined))
@@ -267,7 +269,8 @@ mod tests {
         let input = "Expr = [(identifier) (call (Expr))]";
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @"Expr -> Expr");
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @"Expr -> Expr");
     }
 
     #[test]
@@ -278,10 +281,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
-        A -> B
-        B -> A
-        ---
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.render_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
           |
         1 | A = (foo (B))
@@ -302,9 +303,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
-        Expr
-        ---
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.render_errors(), @r"
         error: duplicate definition: `Expr`
           |
         2 | Expr = (other)
@@ -320,7 +320,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Expr
         Value -> Expr
         ");
@@ -334,7 +335,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Expr
         Pair -> Expr
         ");
@@ -348,7 +350,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Expr
         List -> Expr
         ");
@@ -362,7 +365,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         Expr
         Named -> Expr
         ");
@@ -376,7 +380,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @"Expr");
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @"Expr");
     }
 
     #[test]
@@ -384,8 +389,8 @@ mod tests {
         let input = "(call function: (Unknown))";
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
-        ---
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.render_errors(), @r"
         error: undefined reference: `Unknown`
           |
         1 | (call function: (Unknown))
@@ -397,7 +402,8 @@ mod tests {
     fn no_definitions() {
         let input = "(identifier)";
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @"");
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @"");
     }
 
     #[test]
@@ -410,7 +416,8 @@ mod tests {
         "#};
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.format_refs(), @r"
         A
         B -> A
         C -> B
@@ -423,8 +430,8 @@ mod tests {
         let input = "(foo (X) (Y) (Z))";
 
         let query = Query::new(input);
-        insta::assert_snapshot!(query.snapshot_refs(), @r"
-        ---
+        assert!(!query.is_valid());
+        insta::assert_snapshot!(query.render_errors(), @r"
         error: undefined reference: `X`
           |
         1 | (foo (X) (Y) (Z))
