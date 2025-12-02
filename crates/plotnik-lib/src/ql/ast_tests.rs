@@ -228,11 +228,11 @@ fn complex_example() {
               Tree identifier
           Branch Binary:
             Tree binary_expression
-              Field left:
-                Capture @left
+              Capture @left
+                Field left:
                   Ref Expression
-              Field right:
-                Capture @right
+              Capture @right
+                Field right:
                   Ref Expression
     ");
 }
@@ -273,19 +273,19 @@ fn multiple_fields() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    insta::assert_snapshot!(query.snapshot_ast(), @r"
     Root
       Def
         Capture @expr
           Tree binary_expression
-            Field left:
-              Capture @left
+            Capture @left
+              Field left:
                 Tree _
-            Field operator:
-              Capture @op
+            Capture @op
+              Field operator:
                 Wildcard
-            Field right:
-              Capture @right
+            Capture @right
+              Field right:
                 Tree _
-    "#);
+    ");
 }

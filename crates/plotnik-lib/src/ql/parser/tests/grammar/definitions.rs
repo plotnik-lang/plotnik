@@ -94,34 +94,34 @@ fn named_def_with_captures() {
         Tree
           ParenOpen "("
           Id "binary_expression"
-          Field
-            Id "left"
-            Colon ":"
-            Capture
+          Capture
+            Field
+              Id "left"
+              Colon ":"
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              Id "left"
-          Field
-            Id "operator"
-            Colon ":"
-            Capture
+            At "@"
+            Id "left"
+          Capture
+            Field
+              Id "operator"
+              Colon ":"
               Wildcard
                 Underscore "_"
-              At "@"
-              Id "op"
-          Field
-            Id "right"
-            Colon ":"
-            Capture
+            At "@"
+            Id "op"
+          Capture
+            Field
+              Id "right"
+              Colon ":"
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              Id "right"
+            At "@"
+            Id "right"
           ParenClose ")"
     "#);
 }
@@ -319,29 +319,29 @@ fn named_def_with_type_annotation() {
         Tree
           ParenOpen "("
           Id "function_declaration"
-          Field
-            Id "name"
-            Colon ":"
-            Capture
+          Capture
+            Field
+              Id "name"
+              Colon ":"
               Tree
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-              At "@"
-              Id "name"
-              Type
-                DoubleColon "::"
-                Id "string"
-          Field
-            Id "body"
-            Colon ":"
-            Capture
+            At "@"
+            Id "name"
+            Type
+              DoubleColon "::"
+              Id "string"
+          Capture
+            Field
+              Id "body"
+              Colon ":"
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
-              Id "body"
+            At "@"
+            Id "body"
           ParenClose ")"
     "#);
 }

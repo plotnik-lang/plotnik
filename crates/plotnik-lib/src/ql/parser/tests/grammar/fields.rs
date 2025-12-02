@@ -146,35 +146,107 @@ fn mixed_children_and_fields() {
 }
 
 #[test]
-fn multiple_patterns_with_captures() {
+fn fields_and_quantifiers() {
     let input = indoc! {r#"
-    (function) @func
-    (class) @cls
+    (node
+        foo: (foo)?
+        foo: (foo)??
+        bar: (bar)*
+        bar: (bar)*?
+        baz: (baz)+?
+        baz: (baz)+?)
     "#};
 
     let query = Query::new(input);
     insta::assert_snapshot!(query.snapshot_cst(), @r#"
     Root
       Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "function"
-            ParenClose ")"
-          At "@"
-          Id "func"
+        Tree
+          ParenOpen "("
+          Id "node"
+          Quantifier
+            Field
+              Id "foo"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "foo"
+                ParenClose ")"
+            Question "?"
+          Quantifier
+            Field
+              Id "foo"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "foo"
+                ParenClose ")"
+            QuestionQuestion "??"
+          Quantifier
+            Field
+              Id "bar"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "bar"
+                ParenClose ")"
+            Star "*"
+          Quantifier
+            Field
+              Id "bar"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "bar"
+                ParenClose ")"
+            StarQuestion "*?"
+          Quantifier
+            Field
+              Id "baz"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "baz"
+                ParenClose ")"
+            PlusQuestion "+?"
+          Quantifier
+            Field
+              Id "baz"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Id "baz"
+                ParenClose ")"
+            PlusQuestion "+?"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn fields_with_quantifiers_and_captures() {
+    let input = indoc! {r#"
+    (node foo: (bar)* @baz)
+    "#};
+
+    let query = Query::new(input);
+    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    Root
       Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "class"
-            ParenClose ")"
-          At "@"
-          Id "cls"
-    ---
-    error: unnamed definition must be last in file; add a name: `Name = (function) @func`
-      |
-    1 | (function) @func
-      | ^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (function) @func`
+        Tree
+          ParenOpen "("
+          Id "node"
+          Capture
+            Quantifier
+              Field
+                Id "foo"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Id "bar"
+                  ParenClose ")"
+              Star "*"
+            At "@"
+            Id "baz"
+          ParenClose ")"
     "#);
 }

@@ -38,16 +38,16 @@ fn capture_nested() {
         Tree
           ParenOpen "("
           Id "call"
-          Field
-            Id "function"
-            Colon ":"
-            Capture
+          Capture
+            Field
+              Id "function"
+              Colon ":"
               Tree
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-              At "@"
-              Id "func"
+            At "@"
+            Id "func"
           ParenClose ")"
     "#);
 }
@@ -68,26 +68,26 @@ fn multiple_captures() {
           Tree
             ParenOpen "("
             Id "binary"
-            Field
-              Id "left"
-              Colon ":"
-              Capture
-                Tree
-                  ParenOpen "("
-                  Underscore "_"
-                  ParenClose ")"
-                At "@"
+            Capture
+              Field
                 Id "left"
-            Field
-              Id "right"
-              Colon ":"
-              Capture
+                Colon ":"
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
+              At "@"
+              Id "left"
+            Capture
+              Field
                 Id "right"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Underscore "_"
+                  ParenClose ")"
+              At "@"
+              Id "right"
             ParenClose ")"
           At "@"
           Id "expr"
@@ -180,32 +180,32 @@ fn multiple_captures_with_types() {
           Tree
             ParenOpen "("
             Id "binary"
-            Field
-              Id "left"
-              Colon ":"
-              Capture
-                Tree
-                  ParenOpen "("
-                  Underscore "_"
-                  ParenClose ")"
-                At "@"
+            Capture
+              Field
                 Id "left"
-                Type
-                  DoubleColon "::"
-                  Id "Node"
-            Field
-              Id "right"
-              Colon ":"
-              Capture
+                Colon ":"
                 Tree
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-                At "@"
+              At "@"
+              Id "left"
+              Type
+                DoubleColon "::"
+                Id "Node"
+            Capture
+              Field
                 Id "right"
-                Type
-                  DoubleColon "::"
-                  Id "string"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Underscore "_"
+                  ParenClose ")"
+              At "@"
+              Id "right"
+              Type
+                DoubleColon "::"
+                Id "string"
             ParenClose ")"
           At "@"
           Id "expr"
@@ -317,19 +317,19 @@ fn nested_captures_with_types() {
           Tree
             ParenOpen "("
             Id "function"
-            Field
-              Id "name"
-              Colon ":"
-              Capture
+            Capture
+              Field
+                Id "name"
+                Colon ":"
                 Tree
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
-                At "@"
-                Id "name"
-                Type
-                  DoubleColon "::"
-                  Id "string"
+              At "@"
+              Id "name"
+              Type
+                DoubleColon "::"
+                Id "string"
             Field
               Id "body"
               Colon ":"

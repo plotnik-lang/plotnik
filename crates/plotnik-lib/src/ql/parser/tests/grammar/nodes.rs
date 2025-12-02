@@ -291,26 +291,26 @@ fn supertype_with_children() {
           Id "expression"
           Slash "/"
           Id "binary_expression"
-          Field
-            Id "left"
-            Colon ":"
-            Capture
-              Tree
-                ParenOpen "("
-                Underscore "_"
-                ParenClose ")"
-              At "@"
+          Capture
+            Field
               Id "left"
-          Field
-            Id "right"
-            Colon ":"
-            Capture
+              Colon ":"
               Tree
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-              At "@"
+            At "@"
+            Id "left"
+          Capture
+            Field
               Id "right"
+              Colon ":"
+              Tree
+                ParenOpen "("
+                Underscore "_"
+                ParenClose ")"
+            At "@"
+            Id "right"
           ParenClose ")"
     "#);
 }

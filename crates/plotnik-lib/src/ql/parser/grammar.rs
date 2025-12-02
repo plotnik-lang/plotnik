@@ -113,6 +113,16 @@ impl Parser<'_> {
 
     /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier/capture suffix.
     fn parse_expr(&mut self) {
+        self.parse_expr_inner(true)
+    }
+
+    /// Parse expression without applying quantifier/capture suffix.
+    /// Used for field values so that `field: (x)*` parses as `(field: (x))*`.
+    fn parse_expr_no_suffix(&mut self) {
+        self.parse_expr_inner(false)
+    }
+
+    fn parse_expr_inner(&mut self, with_suffix: bool) {
         if !self.enter_recursion() {
             self.start_node(SyntaxKind::Error);
             while !self.eof() {
@@ -144,8 +154,10 @@ impl Parser<'_> {
             }
         }
 
-        self.try_parse_quantifier(checkpoint);
-        self.try_parse_capture(checkpoint);
+        if with_suffix {
+            self.try_parse_quantifier(checkpoint);
+            self.try_parse_capture(checkpoint);
+        }
 
         self.exit_recursion();
     }
@@ -589,7 +601,7 @@ impl Parser<'_> {
             "':' to separate field name from its value",
         );
 
-        self.parse_expr();
+        self.parse_expr_no_suffix();
 
         self.finish_node();
     }

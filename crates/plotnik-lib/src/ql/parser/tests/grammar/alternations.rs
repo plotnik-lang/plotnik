@@ -294,16 +294,16 @@ fn tagged_alternation_with_captures() {
               Tree
                 ParenOpen "("
                 Id "assignment_expression"
-                Field
-                  Id "left"
-                  Colon ":"
-                  Capture
+                Capture
+                  Field
+                    Id "left"
+                    Colon ":"
                     Tree
                       ParenOpen "("
                       Id "identifier"
                       ParenClose ")"
-                    At "@"
-                    Id "left"
+                  At "@"
+                  Id "left"
                 ParenClose ")"
             Branch
               Id "Call"
@@ -311,16 +311,16 @@ fn tagged_alternation_with_captures() {
               Tree
                 ParenOpen "("
                 Id "call_expression"
-                Field
-                  Id "function"
-                  Colon ":"
-                  Capture
+                Capture
+                  Field
+                    Id "function"
+                    Colon ":"
                     Tree
                       ParenOpen "("
                       Id "identifier"
                       ParenClose ")"
-                    At "@"
-                    Id "func"
+                  At "@"
+                  Id "func"
                 ParenClose ")"
             BracketClose "]"
           At "@"
@@ -360,16 +360,16 @@ fn tagged_alternation_with_type_annotation() {
               Tree
                 ParenOpen "("
                 Id "member_expression"
-                Field
-                  Id "object"
-                  Colon ":"
-                  Capture
+                Capture
+                  Field
+                    Id "object"
+                    Colon ":"
                     Tree
                       ParenOpen "("
                       Underscore "_"
                       ParenClose ")"
-                    At "@"
-                    Id "obj"
+                  At "@"
+                  Id "obj"
                 ParenClose ")"
             BracketClose "]"
           At "@"
@@ -676,26 +676,26 @@ fn tagged_alternation_full_example() {
             Tree
               ParenOpen "("
               Id "binary_expression"
-              Field
-                Id "left"
-                Colon ":"
-                Capture
-                  Ref
-                    ParenOpen "("
-                    Id "Expression"
-                    ParenClose ")"
-                  At "@"
+              Capture
+                Field
                   Id "left"
-              Field
-                Id "right"
-                Colon ":"
-                Capture
+                  Colon ":"
                   Ref
                     ParenOpen "("
                     Id "Expression"
                     ParenClose ")"
-                  At "@"
+                At "@"
+                Id "left"
+              Capture
+                Field
                   Id "right"
+                  Colon ":"
+                  Ref
+                    ParenOpen "("
+                    Id "Expression"
+                    ParenClose ")"
+                At "@"
+                Id "right"
               ParenClose ")"
           BracketClose "]"
     "#);
