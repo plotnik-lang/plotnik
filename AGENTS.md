@@ -74,6 +74,12 @@ Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `
 
 Use `Option<T>` for casts, not `TryFrom`. `format_ast()` for concise output.
 
+## Testing
+
+- Valid parsing: `assert!(query.is_valid())` + snapshot `format_*()` output
+- Error recovery: `assert!(!query.is_valid())` + snapshot `render_errors()` only
+- Use insta: write empty strings, run `cargo insta review`
+
 ## Not implemented
 
 - Semantic validation (phase 5): field constraints, casing rules

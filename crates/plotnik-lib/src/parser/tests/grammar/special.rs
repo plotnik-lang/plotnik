@@ -8,7 +8,8 @@ fn error_node() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -25,7 +26,8 @@ fn error_node_with_capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -45,7 +47,8 @@ fn missing_node_bare() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -62,7 +65,8 @@ fn missing_node_with_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -80,7 +84,8 @@ fn missing_node_with_string() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -100,7 +105,8 @@ fn missing_node_with_capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -123,7 +129,8 @@ fn error_in_alternation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Alt
@@ -149,7 +156,8 @@ fn missing_in_sequence() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Seq
@@ -177,7 +185,8 @@ fn special_node_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -205,7 +214,8 @@ fn error_with_quantifier() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Quantifier
@@ -224,7 +234,8 @@ fn missing_with_quantifier() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Quantifier

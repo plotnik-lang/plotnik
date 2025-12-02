@@ -8,7 +8,8 @@ fn field_expression() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -34,7 +35,8 @@ fn multiple_fields() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -65,7 +67,8 @@ fn negated_field() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -87,7 +90,8 @@ fn negated_and_regular_fields() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -117,7 +121,8 @@ fn mixed_children_and_fields() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -158,7 +163,8 @@ fn fields_and_quantifiers() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -229,7 +235,8 @@ fn fields_with_quantifiers_and_captures() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree

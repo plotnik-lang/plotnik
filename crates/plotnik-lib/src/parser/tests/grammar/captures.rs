@@ -12,7 +12,8 @@ fn capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -32,7 +33,8 @@ fn capture_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -61,7 +63,8 @@ fn multiple_captures() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -105,7 +108,8 @@ fn capture_with_type_annotation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -128,7 +132,8 @@ fn capture_with_custom_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -151,7 +156,8 @@ fn capture_without_type_annotation() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -173,7 +179,8 @@ fn multiple_captures_with_types() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -222,7 +229,8 @@ fn sequence_capture_with_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -252,7 +260,8 @@ fn alternation_capture_with_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -284,7 +293,8 @@ fn quantified_capture_with_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -312,7 +322,8 @@ fn nested_captures_with_types() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -367,8 +378,8 @@ fn capture_with_type_no_spaces() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -395,7 +406,8 @@ fn capture_literal() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -415,7 +427,8 @@ fn capture_literal_with_type() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -438,7 +451,8 @@ fn capture_literal_in_tree() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -462,7 +476,8 @@ fn capture_literal_with_quantifier() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture

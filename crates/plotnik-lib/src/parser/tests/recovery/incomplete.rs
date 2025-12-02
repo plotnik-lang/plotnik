@@ -8,17 +8,8 @@ fn missing_capture_name() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected capture name after '@'
       |
     1 | (identifier) @
@@ -33,19 +24,8 @@ fn missing_field_value() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "call"
-          Field
-            Id "name"
-            Colon ":"
-            Error
-              ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression
       |
     1 | (call name:)
@@ -64,13 +44,8 @@ fn named_def_eof_after_equals() {
     let input = "Expr = ";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected expression after '=' in named definition
       |
     1 | Expr = 
@@ -85,20 +60,8 @@ fn missing_type_name() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "name"
-          Type
-            DoubleColon "::"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name ::
@@ -113,17 +76,8 @@ fn missing_negated_field_name() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "call"
-          NegatedField
-            Negation "!"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected field name after '!' (e.g., !value)
       |
     1 | (call !)
@@ -138,16 +92,8 @@ fn missing_subtype() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "expression"
-          Slash "/"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected subtype after '/' (e.g., expression/binary_expression)
       |
     1 | (expression/)
@@ -162,17 +108,8 @@ fn tagged_branch_missing_expression() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Label"
-            Colon ":"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected expression after branch label
       |
     1 | [Label:]
@@ -187,26 +124,8 @@ fn mixed_valid_invalid_captures() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          At "@"
-          Id "ok"
-      Def
-        Error
-          At "@"
-        Error
-          At "@"
-      Def
-        Error
-          Id "name"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture '@' must follow an expression to capture
       |
     1 | (a) @ok @ @name
@@ -229,23 +148,8 @@ fn type_annotation_invalid_token_after() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "name"
-          Type
-            DoubleColon "::"
-      Def
-        Tree
-          ParenOpen "("
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name :: (
@@ -270,19 +174,8 @@ fn error_with_unexpected_content() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          KwError "ERROR"
-          Tree
-            ParenOpen "("
-            Id "something"
-            ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: (ERROR) takes no arguments
       |
     1 | (ERROR (something))
@@ -297,13 +190,8 @@ fn bare_error_keyword() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          KwError "ERROR"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
       |
     1 | ERROR
@@ -318,13 +206,8 @@ fn bare_missing_keyword() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          KwMissing "MISSING"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
       |
     1 | MISSING

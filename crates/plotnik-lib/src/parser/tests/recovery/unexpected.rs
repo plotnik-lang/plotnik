@@ -8,23 +8,8 @@ fn unexpected_token() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Error
-          Garbage "^^^"
-      Def
-        Tree
-          ParenOpen "("
-          Id "string"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (identifier) ^^^ (string)
@@ -43,21 +28,8 @@ fn multiple_consecutive_garbage() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          Garbage "^^^"
-        Error
-          Garbage "$$$"
-          Garbage "%%%"
-      Def
-        Tree
-          ParenOpen "("
-          Id "ok"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
@@ -72,18 +44,8 @@ fn garbage_at_start() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          Garbage "^^^"
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ (a)
@@ -98,15 +60,8 @@ fn only_garbage() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          Garbage "^^^"
-        Error
-          Garbage "$$$"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$
@@ -121,26 +76,8 @@ fn garbage_inside_alternation() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Error
-            Garbage "^^^"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) ^^^ (b)]
@@ -155,34 +92,8 @@ fn garbage_inside_node() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          Capture
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-            At "@"
-          Error
-            At "@"
-          Error
-            At "@"
-          Tree
-            ParenOpen "("
-            Id "c"
-            ParenClose ")"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "d"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected capture name after '@'
       |
     1 | (a (b) @@@ (c)) (d)
@@ -205,22 +116,8 @@ fn xml_tag_garbage() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          XMLGarbage "<div>"
-      Def
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Error
-          XMLGarbage "</div>"
-        Error
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
@@ -239,18 +136,8 @@ fn xml_self_closing() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          XMLGarbage "<br/>"
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <br/> (a)
@@ -265,30 +152,8 @@ fn predicate_unsupported() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r##"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          Tree
-            ParenOpen "("
-            Error
-              Predicate "#eq?"
-            Error
-              At "@"
-            Error
-              Id "x"
-            Str
-              DoubleQuote "\""
-              StrVal "foo"
-              DoubleQuote "\""
-            ParenClose ")"
-          Error
-            Id "b"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r##"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
@@ -315,28 +180,8 @@ fn predicate_match() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r##"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Error
-          Predicate "#match?"
-        Error
-          At "@"
-      Def
-        Error
-          Id "name"
-      Def
-        Str
-          DoubleQuote "\""
-          StrVal "test"
-          DoubleQuote "\""
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r##"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (identifier) #match? @name "test"
@@ -365,19 +210,8 @@ fn multiline_garbage_recovery() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          Error
-            Garbage "^^^"
-          Error
-            Id "b"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected a child expression or closing delimiter
       |
     2 | ^^^
@@ -396,21 +230,8 @@ fn capture_with_invalid_char() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-      Def
-        Error
-          Garbage "123"
-        Error
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: expected capture name after '@'
       |
     1 | (identifier) @123
@@ -425,20 +246,8 @@ fn field_value_is_garbage() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "call"
-          Field
-            Id "name"
-            Colon ":"
-            Error
-              Garbage "%%%"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression
       |
     1 | (call name: %%%)
@@ -453,21 +262,8 @@ fn alternation_recovery_to_capture() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Error
-            Garbage "^^^"
-          Error
-            At "@"
-          Branch
-            Error
-              Id "name"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
@@ -490,27 +286,8 @@ fn top_level_garbage_recovery() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-      Def
-        Error
-          Garbage "^^^"
-      Def
-        Id "Expr2"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "b"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr = (a) ^^^ Expr2 = (b)
@@ -529,37 +306,8 @@ fn multiple_definitions_with_garbage_between() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "A"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-      Def
-        Error
-          Garbage "^^^"
-      Def
-        Id "B"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "b"
-          ParenClose ")"
-      Def
-        Error
-          Garbage "$$$"
-      Def
-        Id "C"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "c"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     2 | ^^^

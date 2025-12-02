@@ -4,7 +4,8 @@ use indoc::indoc;
 #[test]
 fn simple_tree() {
     let query = Query::new("(identifier)");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree identifier
@@ -18,7 +19,8 @@ fn nested_tree() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree function_definition
@@ -30,7 +32,8 @@ fn nested_tree() {
 #[test]
 fn wildcard() {
     let query = Query::new("(_)");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree _
@@ -40,7 +43,8 @@ fn wildcard() {
 #[test]
 fn literal() {
     let query = Query::new(r#""if""#);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Str "if"
@@ -50,7 +54,8 @@ fn literal() {
 #[test]
 fn capture() {
     let query = Query::new("(identifier) @name");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Capture @name
@@ -61,7 +66,8 @@ fn capture() {
 #[test]
 fn capture_with_type() {
     let query = Query::new("(identifier) @name :: string");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Capture @name :: string
@@ -72,7 +78,8 @@ fn capture_with_type() {
 #[test]
 fn named_definition() {
     let query = Query::new("Expr = (expression)");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def Expr
         Tree expression
@@ -87,7 +94,8 @@ fn reference() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def Expr
         Tree identifier
@@ -100,7 +108,8 @@ fn reference() {
 #[test]
 fn alternation_unlabeled() {
     let query = Query::new("[(identifier) (number)]");
-    insta::assert_snapshot!(query.snapshot_ast(), @r"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r"
     Root
       Def
         Alt
@@ -118,7 +127,8 @@ fn alternation_tagged() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r"
     Root
       Def
         Alt
@@ -132,7 +142,8 @@ fn alternation_tagged() {
 #[test]
 fn sequence() {
     let query = Query::new("{(a) (b) (c)}");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Seq
@@ -145,7 +156,8 @@ fn sequence() {
 #[test]
 fn quantifier_star() {
     let query = Query::new("(statement)*");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Quantifier *
@@ -156,7 +168,8 @@ fn quantifier_star() {
 #[test]
 fn quantifier_plus() {
     let query = Query::new("(statement)+");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Quantifier +
@@ -167,7 +180,8 @@ fn quantifier_plus() {
 #[test]
 fn quantifier_optional() {
     let query = Query::new("(statement)?");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Quantifier ?
@@ -178,7 +192,8 @@ fn quantifier_optional() {
 #[test]
 fn quantifier_non_greedy() {
     let query = Query::new("(statement)*?");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Quantifier *?
@@ -189,7 +204,8 @@ fn quantifier_non_greedy() {
 #[test]
 fn anchor() {
     let query = Query::new("(block . (statement))");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree block
@@ -201,7 +217,8 @@ fn anchor() {
 #[test]
 fn negated_field() {
     let query = Query::new("(function !async)");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree function
@@ -221,7 +238,8 @@ fn complex_example() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r"
     Root
       Def Expression
         Alt
@@ -242,12 +260,8 @@ fn complex_example() {
 #[test]
 fn ast_with_errors() {
     let query = Query::new("(call (Undefined))");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
-    Root
-      Def
-        Tree call
-          Ref Undefined
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: undefined reference: `Undefined`
       |
     1 | (call (Undefined))
@@ -258,7 +272,8 @@ fn ast_with_errors() {
 #[test]
 fn supertype() {
     let query = Query::new("(expression/binary_expression)");
-    insta::assert_snapshot!(query.snapshot_ast(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r#"
     Root
       Def
         Tree expression
@@ -275,7 +290,8 @@ fn multiple_fields() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_ast(), @r"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_ast(), @r"
     Root
       Def
         Capture @expr

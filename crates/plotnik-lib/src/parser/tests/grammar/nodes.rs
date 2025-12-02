@@ -8,7 +8,8 @@ use indoc::indoc;
 #[test]
 fn empty_input() {
     let query = Query::new("");
-    insta::assert_snapshot!(query.snapshot_cst(), @"Root");
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @"Root");
 }
 
 #[test]
@@ -18,7 +19,8 @@ fn simple_named_node() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -35,7 +37,8 @@ fn nested_node() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -62,7 +65,8 @@ fn deeply_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -94,7 +98,8 @@ fn sibling_children() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -125,24 +130,8 @@ fn multiple_expressions() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "string"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "number"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
       |
     1 | (identifier)
@@ -165,7 +154,8 @@ fn wildcard() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -186,7 +176,8 @@ fn anonymous_node() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Str
@@ -203,7 +194,8 @@ fn anonymous_node_operator() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Str
@@ -224,7 +216,8 @@ fn supertype_basic() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -243,8 +236,8 @@ fn supertype_with_string_subtype() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -265,7 +258,8 @@ fn supertype_with_capture() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -289,7 +283,8 @@ fn supertype_with_children() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -329,7 +324,8 @@ fn supertype_nested() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -354,8 +350,8 @@ fn supertype_in_alternation() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Alt
@@ -385,7 +381,8 @@ fn no_supertype_plain_node() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree

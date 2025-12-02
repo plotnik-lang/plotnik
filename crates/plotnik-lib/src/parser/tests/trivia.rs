@@ -8,7 +8,8 @@ fn whitespace_preserved() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       Def
         Capture
@@ -31,7 +32,8 @@ fn comment_preserved() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       LineComment "// comment"
       Newline "\n"
@@ -53,22 +55,8 @@ fn multiline() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-      Newline "\n"
-      Newline "\n"
-      Def
-        Tree
-          ParenOpen "("
-          Id "b"
-          ParenClose ")"
-      Newline "\n"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (a)`
       |
     1 | (a)
@@ -84,7 +72,8 @@ fn comment_inside_expression() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       Def
         Tree
@@ -115,7 +104,8 @@ fn trivia_filtered_by_default() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -135,7 +125,8 @@ fn trivia_between_alternation_items() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       Def
         Alt
@@ -165,7 +156,8 @@ fn whitespace_only() {
     let input = "    ";
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       Whitespace "    "
     "#);
@@ -178,7 +170,8 @@ fn comment_only_raw() {
     "#};
 
     let query = Query::new(input);
-    insta::assert_snapshot!(query.snapshot_cst_raw(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst_raw(), @r#"
     Root
       LineComment "// just a comment"
       Newline "\n"

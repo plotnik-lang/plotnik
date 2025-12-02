@@ -13,26 +13,8 @@ fn ref_with_children_error() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "Expr"
-          Tree
-            ParenOpen "("
-            Id "child"
-            ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: reference `Expr` cannot contain children
       |
     2 | (Expr (child))
@@ -48,33 +30,8 @@ fn ref_with_multiple_children_error() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "Expr"
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Capture
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-            At "@"
-            Id "cap"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: reference `Expr` cannot contain children
       |
     2 | (Expr (a) (b) @cap)
@@ -90,29 +47,8 @@ fn ref_with_field_children_error() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
-      Def
-        Tree
-          ParenOpen "("
-          Id "Expr"
-          Field
-            Id "name"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: reference `Expr` cannot contain children
       |
     2 | (Expr name: (identifier))
@@ -128,8 +64,8 @@ fn ref_without_children_is_valid() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Id "Expr"
@@ -164,18 +100,8 @@ fn capture_dotted_error() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo.bar"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar
@@ -196,18 +122,8 @@ fn capture_dotted_multiple_parts() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo.bar.baz"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar.baz
@@ -228,26 +144,8 @@ fn capture_dotted_followed_by_field() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "node"
-            ParenClose ")"
-          At "@"
-          Id "foo.bar"
-      Def
-        Field
-          Id "name"
-          Colon ":"
-          Tree
-            ParenOpen "("
-            Id "other"
-            ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain dots
       |
     1 | (node) @foo.bar name: (other)
@@ -272,21 +170,8 @@ fn capture_space_after_dot_breaks_chain() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo."
-      Def
-        Error
-          Id "bar"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo. bar
@@ -319,18 +204,8 @@ fn capture_hyphenated_error() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo-bar"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar
@@ -351,18 +226,8 @@ fn capture_hyphenated_multiple() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo-bar-baz"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar-baz
@@ -383,18 +248,8 @@ fn capture_mixed_dots_and_hyphens() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "foo.bar-baz"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar-baz
@@ -417,8 +272,8 @@ fn single_quote_string_is_valid() {
     let input = "(node 'if')";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -437,8 +292,8 @@ fn single_quote_in_alternation() {
     let input = "['public' 'private']";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Alt
@@ -462,8 +317,8 @@ fn single_quote_with_escape() {
     let input = r"(node 'it\'s')";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -486,23 +341,8 @@ fn comma_in_node_children() {
     let input = "(node (a), (b))";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "node"
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node (a), (b))
@@ -521,29 +361,8 @@ fn comma_in_alternation() {
     let input = "[(a), (b), (c)]";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "c"
-              ParenClose ")"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
@@ -572,29 +391,8 @@ fn pipe_in_alternation() {
     let input = "[(a) | (b) | (c)]";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "c"
-              ParenClose ")"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
@@ -623,22 +421,8 @@ fn comma_in_sequence() {
     let input = "{(a), (b)}";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Seq
-          BraceOpen "{"
-          Tree
-            ParenOpen "("
-            Id "a"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "b"
-            ParenClose ")"
-          BraceClose "}"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a), (b)}
@@ -661,21 +445,8 @@ fn single_colon_type_annotation() {
     let input = "(identifier) @name : Type";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "name"
-          Type
-            Colon ":"
-            Id "Type"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: single colon is not valid for type annotations
       |
     1 | (identifier) @name : Type
@@ -693,21 +464,8 @@ fn single_colon_type_annotation_no_space() {
     let input = "(identifier) @name:Type";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "name"
-          Type
-            Colon ":"
-            Id "Type"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: single colon is not valid for type annotations
       |
     1 | (identifier) @name:Type
@@ -725,21 +483,8 @@ fn single_colon_primitive_type() {
     let input = "@val : string";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Error
-          At "@"
-      Def
-        Field
-          Id "val"
-          Error
-            Colon ":"
-      Def
-        Error
-          Id "string"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
@@ -777,28 +522,8 @@ fn lowercase_branch_label() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Id "left"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Branch
-            Id "right"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     2 |   left: (a)
@@ -827,28 +552,8 @@ fn mixed_case_branch_labels() {
     let input = "[foo: (a) Bar: (b)]";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Alt
-          BracketOpen "["
-          Branch
-            Id "foo"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Branch
-            Id "Bar"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          BracketClose "]"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [foo: (a) Bar: (b)]
@@ -871,22 +576,8 @@ fn field_equals_typo() {
     let input = "(node name = (identifier))";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "node"
-          Field
-            Id "name"
-            Equals "="
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: '=' is not valid for field constraints
       |
     1 | (node name = (identifier))
@@ -905,22 +596,8 @@ fn field_equals_typo_no_space() {
     let input = "(node name=(identifier))";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "node"
-          Field
-            Id "name"
-            Equals "="
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: '=' is not valid for field constraints
       |
     1 | (node name=(identifier))
@@ -943,30 +620,8 @@ fn multiple_suggestions_combined() {
     let input = "(node name = 'foo', @val : Type)";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "node"
-          Field
-            Id "name"
-            Equals "="
-            Str
-              SingleQuote "'"
-              StrVal "foo"
-              SingleQuote "'"
-          Error
-            At "@"
-          Field
-            Id "val"
-            Error
-              Colon ":"
-          Error
-            Id "Type"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: '=' is not valid for field constraints
       |
     1 | (node name = 'foo', @val : Type)
@@ -1015,8 +670,8 @@ fn double_quotes_no_error() {
     let input = r#"(node "if")"#;
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -1035,8 +690,8 @@ fn double_colon_no_error() {
     let input = "(identifier) @name :: Type";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Capture
@@ -1057,8 +712,8 @@ fn field_colon_no_error() {
     let input = "(node name: (identifier))";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Tree
@@ -1080,8 +735,8 @@ fn capitalized_branch_label_no_error() {
     let input = "[Left: (a) Right: (b)]";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Alt
@@ -1109,8 +764,8 @@ fn whitespace_separation_no_error() {
     let input = "[(a) (b) (c)]";
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.format_cst(), @r#"
     Root
       Def
         Alt
@@ -1145,22 +800,8 @@ fn field_with_upper_ident_parses() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "node"
-          Field
-            Id "FieldTypo"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "x"
-              ParenClose ")"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: field names must start with lowercase
       |
     1 | (node FieldTypo: (x))
@@ -1181,18 +822,8 @@ fn capture_with_upper_ident_parses() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "Name"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names must start with lowercase
       |
     1 | (identifier) @Name
@@ -1213,18 +844,8 @@ fn negated_field_with_upper_ident_parses() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Tree
-          ParenOpen "("
-          Id "call"
-          NegatedField
-            Negation "!"
-            Id "Arguments"
-          ParenClose ")"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: field names must start with lowercase
       |
     1 | (call !Arguments)
@@ -1245,21 +866,8 @@ fn capture_with_type_and_upper_ident() {
     "#};
 
     let query = Query::new(input);
-
-    insta::assert_snapshot!(query.snapshot_cst(), @r#"
-    Root
-      Def
-        Capture
-          Tree
-            ParenOpen "("
-            Id "identifier"
-            ParenClose ")"
-          At "@"
-          Id "Name"
-          Type
-            DoubleColon "::"
-            Id "MyType"
-    ---
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.render_errors(), @r#"
     error: capture names must start with lowercase
       |
     1 | (identifier) @Name :: MyType
