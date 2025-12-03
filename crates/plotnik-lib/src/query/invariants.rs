@@ -6,16 +6,18 @@ use crate::ast::{Alt, Branch, Ref, Root, SyntaxNode, SyntaxToken};
 
 #[inline]
 pub fn assert_root_no_bare_exprs(root: &Root) {
-    if root.exprs().next().is_some() {
-        panic!("alt_kind: unexpected bare Expr in Root (parser should wrap in Def)");
-    }
+    assert!(
+        root.exprs().next().is_none(),
+        "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
+    );
 }
 
 #[inline]
 pub fn assert_alt_no_bare_exprs(alt: &Alt) {
-    if alt.exprs().next().is_some() {
-        panic!("alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)");
-    }
+    assert!(
+        alt.exprs().next().is_none(),
+        "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
+    );
 }
 
 #[inline]
@@ -53,13 +55,12 @@ pub fn ensure_ref_name(r: &Ref) -> SyntaxToken {
 
 #[inline]
 pub fn assert_ref_in_symbols(name: &str, r: &Ref, found: bool) {
-    if !found {
-        panic!(
-            "shape_cardinality: Ref `{}` not in symbol table at {:?} (should be caught by resolution)",
-            name,
-            r.syntax().text_range()
-        );
-    }
+    assert!(
+        found,
+        "shape_cardinality: Ref `{}` not in symbol table at {:?} (should be caught by resolution)",
+        name,
+        r.syntax().text_range()
+    );
 }
 
 #[inline]

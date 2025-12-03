@@ -10,10 +10,12 @@ fn missing_paren() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (identifier
-      |            ^ expected closing ')' for tree
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
     ");
 }
 
@@ -44,10 +46,12 @@ fn missing_brace() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing '}' for sequence
+    error: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      |         ^ expected closing '}' for sequence
+      | -       ^ unclosed sequence; expected '}'
+      | |
+      | sequence started here
     ");
 }
 
@@ -60,10 +64,12 @@ fn nested_unclosed() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (a (b (c)
-      |          ^ expected closing ')' for tree
+      |    -     ^ unclosed tree; expected ')'
+      |    |
+      |    tree started here
     ");
 }
 
@@ -76,10 +82,12 @@ fn deeply_nested_unclosed() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
-      |            ^ expected closing ')' for tree
+      |          - ^ unclosed tree; expected ')'
+      |          |
+      |          tree started here
     ");
 }
 
@@ -92,10 +100,12 @@ fn unclosed_alternation_nested() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | [(a) (b
-      |        ^ expected closing ')' for tree
+      |      - ^ unclosed tree; expected ')'
+      |      |
+      |      tree started here
     ");
 }
 

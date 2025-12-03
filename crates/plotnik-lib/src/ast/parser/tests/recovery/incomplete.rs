@@ -26,14 +26,10 @@ fn missing_field_value() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: unexpected token; expected an expression
+    error: expected expression after field name
       |
     1 | (call name:)
-      |            ^ unexpected token; expected an expression
-    error: expected closing ')' for tree
-      |
-    1 | (call name:)
-      |             ^ expected closing ')' for tree
+      |            ^ expected expression after field name
     ");
 }
 
@@ -152,10 +148,12 @@ fn type_annotation_invalid_token_after() {
       |
     1 | (identifier) @name :: (
       |                       ^ expected type name after '::' (e.g., ::MyType or ::string)
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (identifier) @name :: (
-      |                        ^ expected closing ')' for tree
+      |                       -^ unclosed tree; expected ')'
+      |                       |
+      |                       tree started here
     error: unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
       |
     1 | (identifier) @name :: (

@@ -460,7 +460,7 @@ fn single_colon_primitive_type() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
@@ -469,19 +469,19 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       |     ^ expected ':' to separate field name from its value
-    error: unexpected token; expected an expression
+    error: expected expression after field name
       |
     1 | @val : string
-      |      ^ unexpected token; expected an expression
+      |      ^ expected expression after field name
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @val : string
       |        ^^^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = val :`
+    error: unnamed definition must be last in file; add a name: `Name = val`
       |
     1 | @val : string
-      |  ^^^^^ unnamed definition must be last in file; add a name: `Name = val :`
-    "#);
+      |  ^^^ unnamed definition must be last in file; add a name: `Name = val`
+    ");
 }
 
 #[test]
@@ -609,7 +609,7 @@ fn multiple_suggestions_combined() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: '=' is not valid for field constraints
       |
     1 | (node name = 'foo', @val : Type)
@@ -638,15 +638,15 @@ fn multiple_suggestions_combined() {
       |
     1 | (node name = 'foo', @val : Type)
       |                         ^ expected ':' to separate field name from its value
-    error: unexpected token; expected an expression
+    error: expected expression after field name
       |
     1 | (node name = 'foo', @val : Type)
-      |                          ^ unexpected token; expected an expression
+      |                          ^ expected expression after field name
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (node name = 'foo', @val : Type)
       |                            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "#);
+    ");
 }
 
 #[test]
@@ -1076,10 +1076,12 @@ fn unclosed_double_quote_string() {
       |
     1 | (call "foo)
       |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (call "foo)
-      |            ^ expected closing ')' for tree
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
     "#);
 }
 
@@ -1094,10 +1096,12 @@ fn unclosed_single_quote_string() {
       |
     1 | (call 'foo)
       |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (call 'foo)
-      |            ^ expected closing ')' for tree
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
     ");
 }
 
