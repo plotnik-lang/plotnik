@@ -7,7 +7,7 @@
     <p align="center">
       <img width="400" alt="Plotnik banner" src=".github/plotnik_banner.png" />
     </p>
-    <h1><p>plotnik</p></h1>  
+    <h1><p>Plotnik</p></h1>  
   </summary>
   </ul>
 </div>
