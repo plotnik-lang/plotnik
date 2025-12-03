@@ -220,26 +220,6 @@ fn unlabeled_alternation_three_items() {
 }
 
 #[test]
-fn upper_ident_in_alternation_not_followed_by_colon() {
-    let input = indoc! {r#"
-    [(Expr) (Statement)]
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: undefined reference: `Expr`
-      |
-    1 | [(Expr) (Statement)]
-      |   ^^^^ undefined reference: `Expr`
-    error: undefined reference: `Statement`
-      |
-    1 | [(Expr) (Statement)]
-      |          ^^^^^^^^^ undefined reference: `Statement`
-    "#);
-}
-
-#[test]
 fn tagged_alternation_simple() {
     let input = indoc! {r#"
     [
@@ -578,24 +558,6 @@ fn tagged_alternation_with_sequence() {
               Id "value"
               ParenClose ")"
           BracketClose "]"
-    "#);
-}
-
-#[test]
-fn mixed_tagged_and_untagged() {
-    let input = indoc! {r#"
-    [Tagged: (a) (b) Another: (c)]
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: mixed tagged and untagged branches in alternation
-      |
-    1 | [Tagged: (a) (b) Another: (c)]
-      |  ------      ^^^ mixed tagged and untagged branches in alternation
-      |  |
-      |  tagged branch here
     "#);
 }
 

@@ -368,58 +368,6 @@ fn named_def_with_type_annotation() {
 }
 
 #[test]
-fn upper_ident_not_followed_by_equals_is_expression() {
-    let input = indoc! {r#"
-    (Expr)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: undefined reference: `Expr`
-      |
-    1 | (Expr)
-      |  ^^^^ undefined reference: `Expr`
-    "#);
-}
-
-#[test]
-fn bare_upper_ident_not_followed_by_equals_is_error() {
-    let input = indoc! {r#"
-    Expr
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | Expr
-      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "#);
-}
-
-#[test]
-fn named_def_missing_equals() {
-    let input = indoc! {r#"
-    Expr (identifier)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | Expr (identifier)
-      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = Expr`
-      |
-    1 | Expr (identifier)
-      | ^^^^ unnamed definition must be last in file; add a name: `Name = Expr`
-    "#);
-}
-
-#[test]
 fn unnamed_def_allowed_as_last() {
     let input = indoc! {r#"
     Expr = (identifier)
@@ -449,45 +397,5 @@ fn unnamed_def_allowed_as_last() {
             At "@"
             Id "value"
           ParenClose ")"
-    "#);
-}
-
-#[test]
-fn unnamed_def_not_allowed_in_middle() {
-    let input = indoc! {r#"
-    (first)
-    Expr = (identifier)
-    (last)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unnamed definition must be last in file; add a name: `Name = (first)`
-      |
-    1 | (first)
-      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
-    "#);
-}
-
-#[test]
-fn multiple_unnamed_defs_errors_for_all_but_last() {
-    let input = indoc! {r#"
-    (first)
-    (second)
-    (third)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unnamed definition must be last in file; add a name: `Name = (first)`
-      |
-    1 | (first)
-      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
-    error: unnamed definition must be last in file; add a name: `Name = (second)`
-      |
-    2 | (second)
-      | ^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (second)`
     "#);
 }

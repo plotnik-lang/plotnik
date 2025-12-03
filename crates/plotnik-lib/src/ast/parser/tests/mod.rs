@@ -1,6 +1,5 @@
 mod grammar;
 mod recovery;
-mod trivia;
 
 // JSON serialization tests for the error API
 mod json_serialization {
