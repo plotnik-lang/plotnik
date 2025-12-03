@@ -11,7 +11,7 @@ use logos::Logos;
 use rowan::TextRange;
 use std::ops::Range;
 
-use super::syntax_kind::SyntaxKind;
+use super::cst::SyntaxKind;
 
 /// Zero-copy token: kind + span, text retrieved via [`token_text`] when needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 use super::Query;
-use crate::ast::{ErrorStage, RenderOptions, Severity};
+use crate::parser::{ErrorStage, RenderOptions, Severity};
 
 #[test]
 fn diagnostics_alias() {

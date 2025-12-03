@@ -17,10 +17,10 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod ast;
+pub mod parser;
 pub mod query;
 
-pub use ast::{Diagnostic, RenderOptions, Severity};
+pub use parser::{Diagnostic, RenderOptions, Severity};
 pub use query::{Query, QueryBuilder};
 
 /// Errors that can occur during query parsing.

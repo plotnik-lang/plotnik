@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 
 use plotnik_lib::Query;
-use plotnik_lib::ast::RenderOptions;
+use plotnik_lib::RenderOptions;
 
 use source::{dump_source, load_source, parse_tree, resolve_lang};
 

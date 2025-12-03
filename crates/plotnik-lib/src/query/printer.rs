@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use rowan::NodeOrToken;
 
-use crate::ast::{self, SyntaxNode};
+use crate::parser::{self as ast, SyntaxNode};
 
 use super::Query;
 use super::shape_cardinalities::ShapeCardinality;

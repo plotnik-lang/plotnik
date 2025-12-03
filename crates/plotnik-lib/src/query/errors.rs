@@ -1,4 +1,4 @@
-use crate::ast::{Diagnostic, ErrorStage, RenderOptions, Severity, render_diagnostics};
+use crate::parser::{Diagnostic, ErrorStage, RenderOptions, Severity, render_diagnostics};
 
 use super::Query;
 

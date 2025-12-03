@@ -2,7 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::ast::{Alt, Branch, Ref, Root, SyntaxNode, SyntaxToken};
+use crate::parser::{Alt, Branch, Ref, Root, SyntaxNode, SyntaxToken};
 
 #[inline]
 pub fn assert_root_no_bare_exprs(root: &Root) {

@@ -1,4 +1,4 @@
-use crate::ast::parser::parse;
+use crate::parser::parse;
 
 #[test]
 fn error_json_serialization() {

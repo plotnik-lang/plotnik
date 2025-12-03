@@ -8,8 +8,8 @@ use rowan::TextRange;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
-use crate::ast::{Alt, AltKind, Branch, Expr, Root};
-use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
+use crate::parser::{Alt, AltKind, Branch, Expr, Root};
+use crate::parser::{Diagnostic, ErrorStage, RelatedInfo};
 
 pub fn validate(root: &Root) -> Vec<Diagnostic> {
     let mut errors = Vec::new();

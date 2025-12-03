@@ -11,8 +11,8 @@ use super::invariants::{
     assert_ref_in_symbols, ensure_ref_body, ensure_ref_name, panic_unexpected_node,
 };
 use super::named_defs::SymbolTable;
-use crate::ast::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
-use crate::ast::{Diagnostic, ErrorStage};
+use crate::parser::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
+use crate::parser::{Diagnostic, ErrorStage};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
