@@ -25,7 +25,7 @@ const DEFAULT_RECURSION_FUEL: u32 = 4096;
 /// represented as `SyntaxKind::Error` nodes in the tree itself.
 #[derive(Debug, Clone)]
 pub struct Parse {
-    pub(super) green: GreenNode,
+    pub(super) cst: GreenNode,
     pub(super) errors: Vec<Diagnostic>,
 }
 
@@ -110,7 +110,7 @@ impl<'src> Parser<'src> {
             return Err(err);
         }
         Ok(Parse {
-            green: self.builder.finish(),
+            cst: self.builder.finish(),
             errors: self.errors,
         })
     }
