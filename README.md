@@ -13,7 +13,7 @@
 </div>
 
 <p align="center">
-  <i>Typed query language for <a href="https://tree-sitter.github.io/">tree-sitter</a></i>
+  Typed query language for <a href="https://tree-sitter.github.io/">tree-sitter</a>
 </p>
 
 <br/>
