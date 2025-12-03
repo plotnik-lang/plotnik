@@ -42,6 +42,7 @@
 mod core;
 mod error;
 mod grammar;
+mod invariants;
 
 pub use error::{
     Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,

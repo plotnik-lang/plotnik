@@ -5,6 +5,9 @@
 
 use rowan::TextRange;
 
+use super::invariants::{
+    assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
+};
 use crate::ast::{Alt, AltKind, Branch, Expr, Root};
 use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
 
@@ -17,11 +20,7 @@ pub fn validate(root: &Root) -> Vec<Diagnostic> {
         }
     }
 
-    // Parser wraps all top-level exprs in Def nodes, so this should be empty
-    assert!(
-        root.exprs().next().is_none(),
-        "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
-    );
+    assert_root_no_bare_exprs(root);
 
     errors
 }
@@ -35,11 +34,7 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
                     validate_expr(&body, errors);
                 }
             }
-            // Parser wraps all alt children in Branch nodes
-            assert!(
-                alt.exprs().next().is_none(),
-                "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
-            );
+            assert_alt_no_bare_exprs(alt);
         }
         Expr::Tree(tree) => {
             for child in tree.children() {
@@ -98,11 +93,7 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
         }
     }
 
-    let (Some(tagged_branch), Some(untagged_branch)) = (first_tagged, first_untagged) else {
-        panic!(
-            "alt_kind: Mixed alternation without both tagged and untagged branches (should be caught by AltKind::compute_kind)"
-        );
-    };
+    let (tagged_branch, untagged_branch) = ensure_both_branch_kinds(first_tagged, first_untagged);
 
     let tagged_range = tagged_branch
         .label()

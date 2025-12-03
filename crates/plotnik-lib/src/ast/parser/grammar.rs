@@ -7,6 +7,7 @@ use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
 use super::error::{Fix, RelatedInfo};
+use super::invariants::assert_nonempty;
 
 use crate::ast::lexer::token_text;
 use crate::ast::syntax_kind::token_sets::{
@@ -71,12 +72,8 @@ impl Parser<'_> {
         self.validate_def_name(name, span);
 
         self.peek();
-        // Invariant: parse_def is only called after verifying peek_nth(1) == Equals in parse_root
-        assert!(
-            self.eat(SyntaxKind::Equals),
-            "parse_def: expected '=' but found {:?} (caller should verify Equals is present)",
-            self.current()
-        );
+        let ate_equals = self.eat(SyntaxKind::Equals);
+        self.assert_equals_eaten(ate_equals);
 
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
@@ -501,15 +498,8 @@ impl Parser<'_> {
             self.bump(); // content
         }
 
-        // Expect matching closing quote
-        // Invariant: lexer only produces quote tokens from valid StringLiteral (both quotes present)
-        assert!(
-            self.peek() == open_quote,
-            "bump_string_tokens: expected closing {:?} but found {:?} \
-             (lexer should only produce quote tokens from complete strings)",
-            open_quote,
-            self.peek()
-        );
+        let closing = self.peek();
+        self.assert_string_quote_match(closing, open_quote);
         self.bump();
     }
 
@@ -618,12 +608,8 @@ impl Parser<'_> {
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        // Invariant: parse_field is only called from parse_tree_or_field when peek() == Id
-        assert!(
-            self.peek() == SyntaxKind::Id,
-            "parse_field: expected Id but found {:?} (caller should verify Id is present)",
-            self.peek()
-        );
+        let kind = self.peek();
+        self.assert_id_token(kind);
         let span = self.current_span();
         let text = token_text(self.source, &self.tokens[self.pos]);
         self.bump();
@@ -867,9 +853,8 @@ fn to_pascal_case(s: &str) -> String {
 
 /// Capitalize the first letter of a string.
 fn capitalize_first(s: &str) -> String {
+    assert_nonempty(s);
     let mut chars = s.chars();
-    match chars.next() {
-        None => panic!("capitalize_first: called with empty string (should never happen)"),
-        Some(c) => c.to_uppercase().chain(chars).collect(),
-    }
+    let c = chars.next().unwrap();
+    c.to_uppercase().chain(chars).collect()
 }

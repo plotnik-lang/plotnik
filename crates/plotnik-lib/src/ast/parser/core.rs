@@ -65,9 +65,9 @@ pub struct Parser<'src> {
     // Fuel limits
     /// Debug-only: loop detection fuel. Resets on bump(). Panics when exhausted.
     #[cfg(debug_assertions)]
-    debug_fuel: std::cell::Cell<u32>,
+    pub(super) debug_fuel: std::cell::Cell<u32>,
     #[cfg(debug_assertions)]
-    debug_fuel_limit: Option<u32>,
+    pub(super) debug_fuel_limit: Option<u32>,
 
     /// Execution fuel. Never replenishes.
     exec_fuel_remaining: Option<u32>,
@@ -145,11 +145,11 @@ impl<'src> Parser<'src> {
     /// Lookahead by `n` tokens (0 = current). Consumes debug fuel (panics if stuck).
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
         #[cfg(debug_assertions)]
-        if let Some(limit) = self.debug_fuel_limit {
-            if self.debug_fuel.get() == 0 {
-                panic!("parser is stuck: no progress made in {} iterations", limit);
+        {
+            self.assert_progress();
+            if self.debug_fuel_limit.is_some() {
+                self.debug_fuel.set(self.debug_fuel.get() - 1);
             }
-            self.debug_fuel.set(self.debug_fuel.get() - 1);
         }
 
         self.tokens

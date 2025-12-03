@@ -2,6 +2,7 @@
 
 mod dump;
 mod errors;
+mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
 
