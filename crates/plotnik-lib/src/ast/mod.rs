@@ -9,6 +9,8 @@ pub mod syntax_kind;
 mod lexer_tests;
 #[cfg(test)]
 mod nodes_tests;
+#[cfg(test)]
+mod syntax_kind_tests;
 
 pub use syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
 

@@ -1,0 +1,114 @@
+use crate::Query;
+
+#[test]
+fn tagged_alternation_valid() {
+    let query = Query::new("[A: (a) B: (b)]").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_ast(), @r"
+    Root
+      Def
+        Alt
+          Branch A:
+            Tree a
+          Branch B:
+            Tree b
+    ");
+}
+
+#[test]
+fn untagged_alternation_valid() {
+    let query = Query::new("[(a) (b)]").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_ast(), @r"
+    Root
+      Def
+        Alt
+          Branch
+            Tree a
+          Branch
+            Tree b
+    ");
+}
+
+#[test]
+fn mixed_alternation_tagged_first() {
+    let query = Query::new("[A: (a) (b)]").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: mixed tagged and untagged branches in alternation
+      |
+    1 | [A: (a) (b)]
+      |  -      ^^^ mixed tagged and untagged branches in alternation
+      |  |
+      |  tagged branch here
+    ");
+}
+
+#[test]
+fn mixed_alternation_untagged_first() {
+    let query = Query::new(
+        r#"
+    [
+      (a)
+      B: (b)
+    ]
+    "#,
+    )
+    .unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: mixed tagged and untagged branches in alternation
+      |
+    3 |       (a)
+      |       ^^^ mixed tagged and untagged branches in alternation
+    4 |       B: (b)
+      |       - tagged branch here
+    ");
+}
+
+#[test]
+fn nested_mixed_alternation() {
+    let query = Query::new("(call [A: (a) (b)])").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: mixed tagged and untagged branches in alternation
+      |
+    1 | (call [A: (a) (b)])
+      |        -      ^^^ mixed tagged and untagged branches in alternation
+      |        |
+      |        tagged branch here
+    ");
+}
+
+#[test]
+fn multiple_mixed_alternations() {
+    let query = Query::new("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: mixed tagged and untagged branches in alternation
+      |
+    1 | (foo [A: (a) (b)] [C: (c) (d)])
+      |       -      ^^^ mixed tagged and untagged branches in alternation
+      |       |
+      |       tagged branch here
+    error: mixed tagged and untagged branches in alternation
+      |
+    1 | (foo [A: (a) (b)] [C: (c) (d)])
+      |                    -      ^^^ mixed tagged and untagged branches in alternation
+      |                    |
+      |                    tagged branch here
+    ");
+}
+
+#[test]
+fn single_branch_no_error() {
+    let query = Query::new("[A: (a)]").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_ast(), @r"
+    Root
+      Def
+        Alt
+          Branch A:
+            Tree a
+    ");
+}

@@ -55,6 +55,9 @@ use super::lexer::lex;
 use super::syntax_kind::SyntaxNode;
 use crate::Result;
 
+#[cfg(test)]
+mod error_tests;
+
 /// Parse result containing the green tree and any errors.
 ///
 /// The tree is always complete—errors are recorded separately and also

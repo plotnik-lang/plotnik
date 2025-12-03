@@ -12,6 +12,18 @@ pub mod ref_cycles;
 pub mod shape_cardinalities;
 
 #[cfg(test)]
+mod alt_kind_tests;
+#[cfg(test)]
+mod errors_tests;
+#[cfg(test)]
+mod mod_tests;
+#[cfg(test)]
+mod named_defs_tests;
+#[cfg(test)]
+mod printer_tests;
+#[cfg(test)]
+mod ref_cycles_tests;
+#[cfg(test)]
 mod shape_cardinalities_tests;
 
 use std::collections::HashMap;
@@ -162,38 +174,5 @@ impl<'a> Query<'a> {
             .get(node)
             .copied()
             .unwrap_or(ShapeCardinality::One)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn valid_query() {
-        let q = Query::new("Expr = (expression)").unwrap();
-        assert!(q.is_valid());
-        assert!(q.symbols().get("Expr").is_some());
-    }
-
-    #[test]
-    fn parse_error() {
-        let q = Query::new("(unclosed").unwrap();
-        assert!(!q.is_valid());
-        assert!(q.dump_errors().contains("expected"));
-    }
-
-    #[test]
-    fn resolution_error() {
-        let q = Query::new("(call (Undefined))").unwrap();
-        assert!(!q.is_valid());
-        assert!(q.dump_errors().contains("undefined reference"));
-    }
-
-    #[test]
-    fn combined_errors() {
-        let q = Query::new("(call (Undefined) extra)").unwrap();
-        assert!(!q.is_valid());
-        assert!(!q.errors().is_empty());
     }
 }
