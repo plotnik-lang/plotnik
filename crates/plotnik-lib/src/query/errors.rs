@@ -165,10 +165,12 @@ mod tests {
         let q = Query::new("(unclosed").unwrap();
         let rendered = q.render_diagnostics(RenderOptions::plain());
         insta::assert_snapshot!(rendered, @r"
-        error: expected closing ')' for tree
+        error: unclosed tree; expected ')'
           |
         1 | (unclosed
-          |          ^ expected closing ')' for tree
+          | -        ^ unclosed tree; expected ')'
+          | |
+          | tree started here
         ");
     }
 

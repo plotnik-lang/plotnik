@@ -391,10 +391,12 @@ fn unclosed_tree_shows_open_location() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
+    1 | (call
+      | - tree started here
     2 |     (identifier)
-      |                 ^ expected closing ')' for tree
+      |                 ^ unclosed tree; expected ')'
     ");
 }
 
@@ -430,10 +432,13 @@ fn unclosed_sequence_shows_open_location() {
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected closing '}' for sequence
+    error: unclosed sequence; expected '}'
       |
+    1 | {
+      | - sequence started here
+    2 |     (a)
     3 |     (b)
-      |        ^ expected closing '}' for sequence
+      |        ^ unclosed sequence; expected '}'
     ");
 }
 

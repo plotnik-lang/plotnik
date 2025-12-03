@@ -182,3 +182,4 @@ let name = node.name().unwrap_or_else(|| {
 - Follow rnix-parser/taplo patterns
 - Span-based tokens, no text in intermediate structures
 - Don't put AI slop comments in the code
+- IMPORTANT: Avoid nesting logic, prefer early exit code flow in functions (return) and loops (continue/break)

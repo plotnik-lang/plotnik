@@ -1076,10 +1076,12 @@ fn unclosed_double_quote_string() {
       |
     1 | (call "foo)
       |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (call "foo)
-      |            ^ expected closing ')' for tree
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
     "#);
 }
 
@@ -1094,10 +1096,12 @@ fn unclosed_single_quote_string() {
       |
     1 | (call 'foo)
       |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: expected closing ')' for tree
+    error: unclosed tree; expected ')'
       |
     1 | (call 'foo)
-      |            ^ expected closing ')' for tree
+      | -          ^ unclosed tree; expected ')'
+      | |
+      | tree started here
     ");
 }
 
