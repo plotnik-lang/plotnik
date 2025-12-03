@@ -1,17 +1,13 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Basic Captures
-// ============================================================================
-
 #[test]
 fn capture() {
     let input = indoc! {r#"
     (identifier) @name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -32,7 +28,7 @@ fn capture_nested() {
     (call function: (identifier) @func)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -62,7 +58,7 @@ fn multiple_captures() {
         right: (_) @right) @expr
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -97,17 +93,13 @@ fn multiple_captures() {
     "#);
 }
 
-// ============================================================================
-// Type Annotations
-// ============================================================================
-
 #[test]
 fn capture_with_type_annotation() {
     let input = indoc! {r#"
     (identifier) @name :: string
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -131,7 +123,7 @@ fn capture_with_custom_type() {
     (function_declaration) @fn :: FunctionDecl
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -155,7 +147,7 @@ fn capture_without_type_annotation() {
     (identifier) @name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -178,7 +170,7 @@ fn multiple_captures_with_types() {
         right: (_) @right :: string) @expr :: BinaryExpr
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -228,7 +220,7 @@ fn sequence_capture_with_type() {
     {(a) (b)} @seq :: MySequence
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -259,7 +251,7 @@ fn alternation_capture_with_type() {
     [(identifier) (number)] @value :: Value
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -292,7 +284,7 @@ fn quantified_capture_with_type() {
     (statement)+ @stmts :: Statement
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -321,7 +313,7 @@ fn nested_captures_with_types() {
             (statement)* @body_stmts :: Statement)) @func :: Function
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -377,7 +369,7 @@ fn capture_with_type_no_spaces() {
     (identifier) @name::string
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -395,17 +387,13 @@ fn capture_with_type_no_spaces() {
     "#);
 }
 
-// ============================================================================
-// Literal Captures
-// ============================================================================
-
 #[test]
 fn capture_literal() {
     let input = indoc! {r#"
     "foo" @keyword
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -426,7 +414,7 @@ fn capture_literal_with_type() {
     "return" @kw :: string
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -450,7 +438,7 @@ fn capture_literal_in_tree() {
     (binary_expression "+" @op)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -475,7 +463,7 @@ fn capture_literal_with_quantifier() {
     ","* @commas
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

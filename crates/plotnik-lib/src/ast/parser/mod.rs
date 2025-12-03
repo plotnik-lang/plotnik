@@ -12,12 +12,14 @@
 //!
 //! # Error Recovery Strategy
 //!
-//! The parser never fails—it always produces a tree. Recovery follows these rules:
+//! The parser never fails on syntax errors—it always produces a tree. Recovery follows these rules:
 //!
 //! 1. Unknown tokens get wrapped in `SyntaxKind::Error` nodes and consumed
 //! 2. Missing expected tokens emit an error but don't consume (parent may handle)
 //! 3. Recovery sets define "synchronization points" per production
 //! 4. On recursion limit, remaining input goes into single Error node
+//!
+//! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an error immediately.
 //!
 //! # Grammar (EBNF-ish)
 //!
@@ -40,17 +42,18 @@
 mod core;
 mod error;
 mod grammar;
+mod invariants;
 
-pub use error::{ErrorStage, Fix, RelatedInfo, SyntaxError, render_errors};
+pub use error::{
+    Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,
+    render_diagnostics, render_errors,
+};
 
-use core::{Parse as ParseInner, Parser};
+pub(crate) use core::Parser;
 
 use super::lexer::lex;
 use super::syntax_kind::SyntaxNode;
-
-/// Stack depth limit. Tree-sitter queries can nest deeply via `(a (b (c ...)))`.
-/// 512 handles any reasonable input while preventing stack overflow on malicious input.
-const MAX_DEPTH: u32 = 512;
+use crate::Result;
 
 /// Parse result containing the green tree and any errors.
 ///
@@ -58,10 +61,11 @@ const MAX_DEPTH: u32 = 512;
 /// represented as `SyntaxKind::Error` nodes in the tree itself.
 #[derive(Debug, Clone)]
 pub struct Parse {
-    inner: ParseInner,
+    inner: core::Parse,
 }
 
 impl Parse {
+    #[allow(dead_code)]
     pub fn green(&self) -> &rowan::GreenNode {
         &self.inner.green
     }
@@ -76,6 +80,7 @@ impl Parse {
         &self.inner.errors
     }
 
+    #[allow(dead_code)]
     pub fn is_valid(&self) -> bool {
         self.inner.errors.is_empty()
     }
@@ -86,14 +91,17 @@ impl Parse {
     }
 }
 
-/// Main entry point. Always succeeds—errors embedded in the returned tree.
-pub fn parse(source: &str) -> Parse {
-    let tokens = lex(source);
-    let mut parser = Parser::new(source, tokens);
+/// Main entry point. Returns Err on fuel exhaustion.
+pub fn parse(source: &str) -> Result<Parse> {
+    parse_with_parser(Parser::new(source, lex(source)))
+}
+
+/// Parse with a pre-configured parser (for custom fuel limits).
+pub(crate) fn parse_with_parser(mut parser: Parser) -> Result<Parse> {
     parser.parse_root();
-    Parse {
-        inner: parser.finish(),
-    }
+    Ok(Parse {
+        inner: parser.finish()?,
+    })
 }
 
 #[cfg(test)]

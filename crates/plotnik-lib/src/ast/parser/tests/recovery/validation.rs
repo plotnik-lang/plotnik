@@ -1,10 +1,6 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Reference with Children (Invalid)
-// ============================================================================
-
 #[test]
 fn ref_with_children_error() {
     let input = indoc! {r#"
@@ -12,7 +8,7 @@ fn ref_with_children_error() {
     (Expr (child))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: reference `Expr` cannot contain children
@@ -29,7 +25,7 @@ fn ref_with_multiple_children_error() {
     (Expr (a) (b) @cap)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: reference `Expr` cannot contain children
@@ -46,7 +42,7 @@ fn ref_with_field_children_error() {
     (Expr name: (identifier))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: reference `Expr` cannot contain children
@@ -63,7 +59,7 @@ fn ref_without_children_is_valid() {
     (program (Expr) @e)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -89,17 +85,13 @@ fn ref_without_children_is_valid() {
     "#);
 }
 
-// ============================================================================
-// Dotted Capture Names
-// ============================================================================
-
 #[test]
 fn capture_dotted_error() {
     let input = indoc! {r#"
     (identifier) @foo.bar
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain dots
@@ -121,7 +113,7 @@ fn capture_dotted_multiple_parts() {
     (identifier) @foo.bar.baz
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain dots
@@ -143,7 +135,7 @@ fn capture_dotted_followed_by_field() {
     (node) @foo.bar name: (other)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain dots
@@ -169,7 +161,7 @@ fn capture_space_after_dot_breaks_chain() {
     (identifier) @foo. bar
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain dots
@@ -193,17 +185,13 @@ fn capture_space_after_dot_breaks_chain() {
     "#);
 }
 
-// ============================================================================
-// Hyphenated Capture Names
-// ============================================================================
-
 #[test]
 fn capture_hyphenated_error() {
     let input = indoc! {r#"
     (identifier) @foo-bar
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain hyphens
@@ -225,7 +213,7 @@ fn capture_hyphenated_multiple() {
     (identifier) @foo-bar-baz
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain hyphens
@@ -247,7 +235,7 @@ fn capture_mixed_dots_and_hyphens() {
     (identifier) @foo.bar-baz
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names cannot contain dots
@@ -263,15 +251,11 @@ fn capture_mixed_dots_and_hyphens() {
     "#);
 }
 
-// ============================================================================
-// Single Quote Strings
-// ============================================================================
-
 #[test]
 fn single_quote_string_is_valid() {
     let input = "(node 'if')";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -291,7 +275,7 @@ fn single_quote_string_is_valid() {
 fn single_quote_in_alternation() {
     let input = "['public' 'private']";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -316,7 +300,7 @@ fn single_quote_in_alternation() {
 fn single_quote_with_escape() {
     let input = r"(node 'it\'s')";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -332,15 +316,11 @@ fn single_quote_with_escape() {
     "#);
 }
 
-// ============================================================================
-// Invalid Separators
-// ============================================================================
-
 #[test]
 fn comma_in_node_children() {
     let input = "(node (a), (b))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
@@ -360,7 +340,7 @@ fn comma_in_node_children() {
 fn comma_in_alternation() {
     let input = "[(a), (b), (c)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
@@ -390,7 +370,7 @@ fn comma_in_alternation() {
 fn pipe_in_alternation() {
     let input = "[(a) | (b) | (c)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: '|' is not valid syntax; plotnik uses whitespace for separation
@@ -420,7 +400,7 @@ fn pipe_in_alternation() {
 fn comma_in_sequence() {
     let input = "{(a), (b)}";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: ',' is not valid syntax; plotnik uses whitespace for separation
@@ -436,15 +416,11 @@ fn comma_in_sequence() {
     "#);
 }
 
-// ============================================================================
-// Single Colon for Type Annotation
-// ============================================================================
-
 #[test]
 fn single_colon_type_annotation() {
     let input = "(identifier) @name : Type";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: single colon is not valid for type annotations
@@ -463,7 +439,7 @@ fn single_colon_type_annotation() {
 fn single_colon_type_annotation_no_space() {
     let input = "(identifier) @name:Type";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: single colon is not valid for type annotations
@@ -482,9 +458,9 @@ fn single_colon_type_annotation_no_space() {
 fn single_colon_primitive_type() {
     let input = "@val : string";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: capture '@' must follow an expression to capture
       |
     1 | @val : string
@@ -493,24 +469,20 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       |     ^ expected ':' to separate field name from its value
-    error: unexpected token; expected an expression
+    error: expected expression after field name
       |
     1 | @val : string
-      |      ^ unexpected token; expected an expression
+      |      ^ expected expression after field name
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @val : string
       |        ^^^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = val :`
+    error: unnamed definition must be last in file; add a name: `Name = val`
       |
     1 | @val : string
-      |  ^^^^^ unnamed definition must be last in file; add a name: `Name = val :`
-    "#);
+      |  ^^^ unnamed definition must be last in file; add a name: `Name = val`
+    ");
 }
-
-// ============================================================================
-// Lowercase Branch Labels
-// ============================================================================
 
 #[test]
 fn lowercase_branch_label() {
@@ -521,7 +493,7 @@ fn lowercase_branch_label() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
@@ -551,7 +523,7 @@ fn lowercase_branch_label() {
 fn mixed_case_branch_labels() {
     let input = "[foo: (a) Bar: (b)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
@@ -567,15 +539,11 @@ fn mixed_case_branch_labels() {
     "#);
 }
 
-// ============================================================================
-// Field Equals Typo
-// ============================================================================
-
 #[test]
 fn field_equals_typo() {
     let input = "(node name = (identifier))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: '=' is not valid for field constraints
@@ -595,7 +563,7 @@ fn field_equals_typo() {
 fn field_equals_typo_no_space() {
     let input = "(node name=(identifier))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: '=' is not valid for field constraints
@@ -615,7 +583,7 @@ fn field_equals_typo_no_space() {
 fn field_equals_typo_no_expression() {
     let input = "(call name=)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: '=' is not valid for field constraints
@@ -635,17 +603,13 @@ fn field_equals_typo_no_expression() {
     ");
 }
 
-// ============================================================================
-// Combined Errors
-// ============================================================================
-
 #[test]
 fn multiple_suggestions_combined() {
     let input = "(node name = 'foo', @val : Type)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: '=' is not valid for field constraints
       |
     1 | (node name = 'foo', @val : Type)
@@ -674,26 +638,22 @@ fn multiple_suggestions_combined() {
       |
     1 | (node name = 'foo', @val : Type)
       |                         ^ expected ':' to separate field name from its value
-    error: unexpected token; expected an expression
+    error: expected expression after field name
       |
     1 | (node name = 'foo', @val : Type)
-      |                          ^ unexpected token; expected an expression
+      |                          ^ expected expression after field name
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (node name = 'foo', @val : Type)
       |                            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "#);
+    ");
 }
-
-// ============================================================================
-// Correct Syntax (No False Positives)
-// ============================================================================
 
 #[test]
 fn double_quotes_no_error() {
     let input = r#"(node "if")"#;
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -713,7 +673,7 @@ fn double_quotes_no_error() {
 fn double_colon_no_error() {
     let input = "(identifier) @name :: Type";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -735,7 +695,7 @@ fn double_colon_no_error() {
 fn field_colon_no_error() {
     let input = "(node name: (identifier))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -758,7 +718,7 @@ fn field_colon_no_error() {
 fn capitalized_branch_label_no_error() {
     let input = "[Left: (a) Right: (b)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -787,7 +747,7 @@ fn capitalized_branch_label_no_error() {
 fn whitespace_separation_no_error() {
     let input = "[(a) (b) (c)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -813,17 +773,13 @@ fn whitespace_separation_no_error() {
     "#);
 }
 
-// ============================================================================
-// Resilience Tests (Parser Accepts for Better Error Recovery)
-// ============================================================================
-
 #[test]
 fn field_with_upper_ident_parses() {
     let input = indoc! {r#"
     (node FieldTypo: (x))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: field names must start with lowercase
@@ -845,7 +801,7 @@ fn capture_with_upper_ident_parses() {
     (identifier) @Name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names must start with lowercase
@@ -867,7 +823,7 @@ fn negated_field_with_upper_ident_parses() {
     (call !Arguments)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: field names must start with lowercase
@@ -889,7 +845,7 @@ fn capture_with_type_and_upper_ident() {
     (identifier) @Name :: MyType
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: capture names must start with lowercase
@@ -905,15 +861,11 @@ fn capture_with_type_and_upper_ident() {
     "#);
 }
 
-// ============================================================================
-// Definition name validation
-// ============================================================================
-
 #[test]
 fn def_name_lowercase_error() {
     let input = "lowercase = (x)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names must start with uppercase
@@ -933,7 +885,7 @@ fn def_name_lowercase_error() {
 fn def_name_with_underscores_error() {
     let input = "Some_Thing = (x)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names cannot contain separators
@@ -953,7 +905,7 @@ fn def_name_with_underscores_error() {
 fn def_name_with_hyphens_error() {
     let input = "Some-Thing = (x)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: definition names cannot contain separators
@@ -969,15 +921,11 @@ fn def_name_with_hyphens_error() {
     ");
 }
 
-// ============================================================================
-// Branch label validation
-// ============================================================================
-
 #[test]
 fn branch_label_with_underscores_error() {
     let input = "[Some_Label: (x)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: branch labels cannot contain separators
@@ -997,7 +945,7 @@ fn branch_label_with_underscores_error() {
 fn branch_label_with_hyphens_error() {
     let input = "[Some-Label: (x)]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: branch labels cannot contain separators
@@ -1017,7 +965,7 @@ fn branch_label_with_hyphens_error() {
 fn lowercase_branch_label_missing_expression() {
     let input = "[label:]";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
@@ -1037,15 +985,11 @@ fn lowercase_branch_label_missing_expression() {
     ");
 }
 
-// ============================================================================
-// Field name validation
-// ============================================================================
-
 #[test]
 fn field_name_with_dots_error() {
     let input = "(call foo.bar: (x))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: field names cannot contain dots
@@ -1065,7 +1009,7 @@ fn field_name_with_dots_error() {
 fn field_name_with_hyphens_error() {
     let input = "(call foo-bar: (x))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: field names cannot contain hyphens
@@ -1081,15 +1025,11 @@ fn field_name_with_hyphens_error() {
     ");
 }
 
-// ============================================================================
-// Type name validation
-// ============================================================================
-
 #[test]
 fn type_name_with_dots_error() {
     let input = "(x) @name :: Some.Type";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: type names cannot contain dots or hyphens
@@ -1109,7 +1049,7 @@ fn type_name_with_dots_error() {
 fn type_name_with_hyphens_error() {
     let input = "(x) @name :: Some-Type";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: type names cannot contain dots or hyphens
@@ -1125,15 +1065,11 @@ fn type_name_with_hyphens_error() {
     ");
 }
 
-// ============================================================================
-// String literal validation
-// ============================================================================
-
 #[test]
 fn unclosed_double_quote_string() {
     let input = r#"(call "foo)"#;
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unexpected token; expected a child expression or closing delimiter
@@ -1153,7 +1089,7 @@ fn unclosed_double_quote_string() {
 fn unclosed_single_quote_string() {
     let input = "(call 'foo)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
@@ -1169,15 +1105,11 @@ fn unclosed_single_quote_string() {
     ");
 }
 
-// ============================================================================
-// Reference validation
-// ============================================================================
-
 #[test]
 fn reference_with_supertype_syntax_error() {
     let input = "(RefName/subtype)";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r"
     error: references cannot use supertype syntax (/)
@@ -1187,15 +1119,11 @@ fn reference_with_supertype_syntax_error() {
     ");
 }
 
-// ============================================================================
-// MISSING node with children (exercises parse_children fallback)
-// ============================================================================
-
 #[test]
 fn missing_with_nested_tree_parses() {
     let input = "(MISSING (something))";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

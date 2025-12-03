@@ -1,13 +1,9 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Named Nodes
-// ============================================================================
-
 #[test]
 fn empty_input() {
-    let query = Query::new("");
+    let query = Query::new("").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @"Root");
 }
@@ -18,7 +14,7 @@ fn simple_named_node() {
     (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -36,7 +32,7 @@ fn nested_node() {
     (function_definition name: (identifier))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -64,7 +60,7 @@ fn deeply_nested() {
             (d))))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -97,7 +93,7 @@ fn sibling_children() {
         (statement))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -129,7 +125,7 @@ fn multiple_expressions() {
     (number)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (identifier)`
@@ -143,17 +139,13 @@ fn multiple_expressions() {
     "#);
 }
 
-// ============================================================================
-// Wildcards
-// ============================================================================
-
 #[test]
 fn wildcard() {
     let input = indoc! {r#"
     (_)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -165,17 +157,13 @@ fn wildcard() {
     "#);
 }
 
-// ============================================================================
-// Anonymous Nodes (Literals)
-// ============================================================================
-
 #[test]
 fn anonymous_node() {
     let input = indoc! {r#"
     "if"
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -193,7 +181,7 @@ fn anonymous_node_operator() {
     "+="
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -205,17 +193,13 @@ fn anonymous_node_operator() {
     "#);
 }
 
-// ============================================================================
-// Supertypes
-// ============================================================================
-
 #[test]
 fn supertype_basic() {
     let input = indoc! {r#"
     (expression/binary_expression)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -235,7 +219,7 @@ fn supertype_with_string_subtype() {
     (expression/"()")
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -257,7 +241,7 @@ fn supertype_with_capture() {
     (expression/binary_expression) @expr
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -282,7 +266,7 @@ fn supertype_with_children() {
         right: (_) @right)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -323,7 +307,7 @@ fn supertype_nested() {
         (expression/call_expression))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -349,7 +333,7 @@ fn supertype_in_alternation() {
     [(expression/identifier) (expression/number)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -380,7 +364,7 @@ fn no_supertype_plain_node() {
     (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

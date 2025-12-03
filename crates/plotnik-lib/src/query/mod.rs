@@ -2,6 +2,7 @@
 
 mod dump;
 mod errors;
+mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
 
@@ -15,29 +16,117 @@ mod shape_cardinalities_tests;
 
 use std::collections::HashMap;
 
-use crate::ast::{self, Parse, Root, SyntaxError, SyntaxNode};
+use crate::Result;
+use crate::ast::lexer::lex;
+use crate::ast::parser::{self, Parser};
+use crate::ast::{Diagnostic, Parse, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
+/// Builder for configuring and creating a [`Query`].
+pub struct QueryBuilder<'a> {
+    source: &'a str,
+    #[cfg(debug_assertions)]
+    debug_fuel: Option<Option<u32>>,
+    exec_fuel: Option<Option<u32>>,
+    recursion_fuel: Option<Option<u32>>,
+}
+
+impl<'a> QueryBuilder<'a> {
+    /// Create a new builder for the given source.
+    pub fn new(source: &'a str) -> Self {
+        Self {
+            source,
+            #[cfg(debug_assertions)]
+            debug_fuel: None,
+            exec_fuel: None,
+            recursion_fuel: None,
+        }
+    }
+
+    /// Set debug fuel limit (debug builds only). None = infinite.
+    ///
+    /// Debug fuel resets on each token consumed. It detects parser bugs
+    /// where no progress is made. Panics when exhausted.
+    #[cfg(debug_assertions)]
+    pub fn with_debug_fuel(mut self, limit: Option<u32>) -> Self {
+        self.debug_fuel = Some(limit);
+        self
+    }
+
+    /// Set execution fuel limit. None = infinite.
+    ///
+    /// Execution fuel never replenishes. It protects against large inputs.
+    /// Returns error when exhausted.
+    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
+        self.exec_fuel = Some(limit);
+        self
+    }
+
+    /// Set recursion depth limit. None = infinite.
+    ///
+    /// Recursion fuel restores when exiting recursion. It protects against
+    /// deeply nested input. Returns error when exhausted.
+    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
+        self.recursion_fuel = Some(limit);
+        self
+    }
+
+    /// Build the query, running all analysis passes.
+    ///
+    /// Returns `Err` if fuel limits are exceeded.
+    pub fn build(self) -> Result<Query<'a>> {
+        let tokens = lex(self.source);
+        let mut parser = Parser::new(self.source, tokens);
+
+        #[cfg(debug_assertions)]
+        if let Some(limit) = self.debug_fuel {
+            parser = parser.with_debug_fuel(limit);
+        }
+
+        if let Some(limit) = self.exec_fuel {
+            parser = parser.with_exec_fuel(limit);
+        }
+
+        if let Some(limit) = self.recursion_fuel {
+            parser = parser.with_recursion_fuel(limit);
+        }
+
+        let parse = parser::parse_with_parser(parser)?;
+        Ok(Query::from_parse(self.source, parse))
+    }
+}
+
 /// A parsed and analyzed query.
 ///
-/// Construction always succeeds. Check [`is_valid`](Self::is_valid) or
-/// [`errors`](Self::errors) to determine if the query is usable.
+/// Construction succeeds unless fuel limits are exceeded.
+/// Check [`is_valid`](Self::is_valid) or [`errors`](Self::errors)
+/// to determine if the query has syntax/semantic errors.
 #[derive(Debug, Clone)]
 pub struct Query<'a> {
     source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
-    errors: Vec<SyntaxError>,
+    errors: Vec<Diagnostic>,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
 }
 
 impl<'a> Query<'a> {
     /// Parse and analyze a query from source text.
     ///
-    /// This never fails. Errors are collected and accessible via [`errors`](Self::errors).
-    pub fn new(source: &'a str) -> Self {
-        let parse = ast::parse(source);
+    /// Returns `Err` if fuel limits are exceeded.
+    /// Syntax/semantic errors are collected and accessible via [`errors`](Self::errors).
+    pub fn new(source: &'a str) -> Result<Self> {
+        QueryBuilder::new(source).build()
+    }
+
+    /// Create a builder for configuring parser limits.
+    pub fn builder(source: &'a str) -> QueryBuilder<'a> {
+        QueryBuilder::new(source)
+    }
+
+    /// Internal: create Query from already-parsed input.
+    fn from_parse(source: &'a str, parse: Parse) -> Self {
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
 
         let mut errors = parse.errors().to_vec();
@@ -70,6 +159,7 @@ impl<'a> Query<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn source(&self) -> &str {
         self.source
     }
@@ -100,28 +190,28 @@ mod tests {
 
     #[test]
     fn valid_query() {
-        let q = Query::new("Expr = (expression)");
+        let q = Query::new("Expr = (expression)").unwrap();
         assert!(q.is_valid());
         assert!(q.symbols().get("Expr").is_some());
     }
 
     #[test]
     fn parse_error() {
-        let q = Query::new("(unclosed");
+        let q = Query::new("(unclosed").unwrap();
         assert!(!q.is_valid());
         assert!(q.dump_errors().contains("expected"));
     }
 
     #[test]
     fn resolution_error() {
-        let q = Query::new("(call (Undefined))");
+        let q = Query::new("(call (Undefined))").unwrap();
         assert!(!q.is_valid());
         assert!(q.dump_errors().contains("undefined reference"));
     }
 
     #[test]
     fn combined_errors() {
-        let q = Query::new("(call (Undefined) extra)");
+        let q = Query::new("(call (Undefined) extra)").unwrap();
         assert!(!q.is_valid());
         assert!(!q.errors().is_empty());
     }

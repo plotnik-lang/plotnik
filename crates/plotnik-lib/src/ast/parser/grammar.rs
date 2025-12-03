@@ -7,10 +7,11 @@ use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
 use super::error::{Fix, RelatedInfo};
+use super::invariants::assert_nonempty;
 
 use crate::ast::lexer::token_text;
 use crate::ast::syntax_kind::token_sets::{
-    ALT_RECOVERY, DEF_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
+    ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
 use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 
@@ -21,10 +22,7 @@ impl Parser<'_> {
         // Track spans of unnamed defs to emit errors for non-last ones
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
-        while self.peek() != SyntaxKind::Error || !self.eof() {
-            if self.eof() {
-                break;
-            }
+        while !self.has_fatal_error() && (self.peek() != SyntaxKind::Error || !self.eof()) {
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
@@ -50,7 +48,7 @@ impl Parser<'_> {
         if unnamed_def_spans.len() > 1 {
             for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
-                self.errors.push(super::error::SyntaxError::new(
+                self.errors.push(super::error::Diagnostic::error(
                     *span,
                     format!(
                         "unnamed definition must be last in file; add a name: `Name = {}`",
@@ -74,11 +72,8 @@ impl Parser<'_> {
         self.validate_def_name(name, span);
 
         self.peek();
-        if !self.expect(SyntaxKind::Equals, "'=' after definition name") {
-            self.error_recover("expected '=' after name in definition", DEF_RECOVERY);
-            self.finish_node();
-            return;
-        }
+        let ate_equals = self.eat(SyntaxKind::Equals);
+        self.assert_equals_eaten(ate_equals);
 
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
@@ -126,7 +121,7 @@ impl Parser<'_> {
     fn parse_expr_inner(&mut self, with_suffix: bool) {
         if !self.enter_recursion() {
             self.start_node(SyntaxKind::Error);
-            while !self.eof() {
+            while !self.should_stop() {
                 self.bump();
             }
             self.finish_node();
@@ -262,28 +257,23 @@ impl Parser<'_> {
             }
         }
 
-        // Check if there are children
         let has_children = self.peek() != SyntaxKind::ParenClose;
 
-        if is_ref {
-            if has_children {
-                // Reference with children: commit to Tree and emit error
-                self.start_node_at(checkpoint, SyntaxKind::Tree);
-                let children_start = self.current_span().start();
-                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
-                let children_end = self.last_non_trivia_end().unwrap_or(children_start);
-                let children_span = TextRange::new(children_start, children_end);
+        if is_ref && has_children {
+            self.start_node_at(checkpoint, SyntaxKind::Tree);
+            let children_start = self.current_span().start();
+            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+            let children_end = self.last_non_trivia_end().unwrap_or(children_start);
+            let children_span = TextRange::new(children_start, children_end);
 
-                if let Some(name) = &ref_name {
-                    self.errors.push(super::error::SyntaxError::new(
-                        children_span,
-                        format!("reference `{}` cannot contain children", name),
-                    ));
-                }
-            } else {
-                // Valid reference: no children
-                self.start_node_at(checkpoint, SyntaxKind::Ref);
+            if let Some(name) = &ref_name {
+                self.errors.push(super::error::Diagnostic::error(
+                    children_span,
+                    format!("reference `{}` cannot contain children", name),
+                ));
             }
+        } else if is_ref {
+            self.start_node_at(checkpoint, SyntaxKind::Ref);
         } else {
             self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
         }
@@ -303,23 +293,31 @@ impl Parser<'_> {
     /// Parse children until `until` token or recovery set hit.
     fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
-            let kind = self.peek();
-            if kind == until {
-                break;
-            }
             if self.eof() {
                 let (construct, delim) = match until {
                     SyntaxKind::ParenClose => ("tree", "')'"),
                     SyntaxKind::BraceClose => ("sequence", "'}'"),
-                    _ => ("construct", "closing delimiter"),
+                    _ => panic!(
+                        "parse_children: unexpected delimiter {:?} (only ParenClose/BraceClose supported)",
+                        until
+                    ),
                 };
                 let msg = format!("unclosed {construct}; expected {delim}");
-                if let Some(open) = self.delimiter_stack.last() {
-                    let related = RelatedInfo::new(open.span, format!("{construct} started here"));
-                    self.error_with_related(msg, related);
-                } else {
-                    self.error(msg);
-                }
+                let open = self.delimiter_stack.last().unwrap_or_else(|| {
+                    panic!(
+                        "parse_children: unclosed {construct} at EOF but delimiter_stack is empty \
+                         (caller must push delimiter before calling)"
+                    )
+                });
+                let related = RelatedInfo::new(open.span, format!("{construct} started here"));
+                self.error_with_related(msg, related);
+                break;
+            }
+            if self.has_fatal_error() {
+                break;
+            }
+            let kind = self.peek();
+            if kind == until {
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -328,17 +326,20 @@ impl Parser<'_> {
             }
             if EXPR_FIRST.contains(kind) {
                 self.parse_expr();
-            } else if kind == SyntaxKind::Predicate {
+                continue;
+            }
+            if kind == SyntaxKind::Predicate {
                 self.error_and_bump(
                     "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
                 );
-            } else if recovery.contains(kind) {
-                break;
-            } else {
-                self.error_and_bump(
-                    "unexpected token; expected a child expression or closing delimiter",
-                );
+                continue;
             }
+            if recovery.contains(kind) {
+                break;
+            }
+            self.error_and_bump(
+                "unexpected token; expected a child expression or closing delimiter",
+            );
         }
     }
 
@@ -358,18 +359,23 @@ impl Parser<'_> {
     /// Parse alternation children, handling both tagged `Label: expr` and unlabeled expressions.
     fn parse_alt_children(&mut self) {
         loop {
-            let kind = self.peek();
-            if kind == SyntaxKind::BracketClose {
-                break;
-            }
             if self.eof() {
                 let msg = "unclosed alternation; expected ']'";
-                if let Some(open) = self.delimiter_stack.last() {
-                    let related = RelatedInfo::new(open.span, "alternation started here");
-                    self.error_with_related(msg, related);
-                } else {
-                    self.error(msg);
-                }
+                let open = self.delimiter_stack.last().unwrap_or_else(|| {
+                    panic!(
+                        "parse_alt_children: unclosed alternation at EOF but delimiter_stack is empty \
+                         (caller must push delimiter before calling)"
+                    )
+                });
+                let related = RelatedInfo::new(open.span, "alternation started here");
+                self.error_with_related(msg, related);
+                break;
+            }
+            if self.has_fatal_error() {
+                break;
+            }
+            let kind = self.peek();
+            if kind == SyntaxKind::BracketClose {
                 break;
             }
             if SEPARATORS.contains(kind) {
@@ -384,20 +390,22 @@ impl Parser<'_> {
                 if first_char.is_ascii_uppercase() {
                     self.parse_branch();
                 } else {
-                    // Lowercase: likely mistyped branch label
                     self.parse_branch_lowercase_label();
                 }
-            } else if EXPR_FIRST.contains(kind) {
+                continue;
+            }
+            if EXPR_FIRST.contains(kind) {
                 self.start_node(SyntaxKind::Branch);
                 self.parse_expr();
                 self.finish_node();
-            } else if ALT_RECOVERY.contains(kind) {
-                break;
-            } else {
-                self.error_and_bump(
-                    "unexpected token; expected a child expression or closing delimiter",
-                );
+                continue;
             }
+            if ALT_RECOVERY.contains(kind) {
+                break;
+            }
+            self.error_and_bump(
+                "unexpected token; expected a child expression or closing delimiter",
+            );
         }
     }
 
@@ -490,12 +498,9 @@ impl Parser<'_> {
             self.bump(); // content
         }
 
-        // Expect matching closing quote
-        if self.peek() == open_quote {
-            self.bump();
-        } else {
-            self.error("unclosed string literal");
-        }
+        let closing = self.peek();
+        self.assert_string_quote_match(closing, open_quote);
+        self.bump();
     }
 
     /// Parse capture suffix: `@name` or `@name :: Type`
@@ -515,10 +520,11 @@ impl Parser<'_> {
 
         self.validate_capture_name(name, span);
 
-        // Check for single colon (common mistake: @x : Type instead of @x :: Type)
         if self.peek() == SyntaxKind::Colon {
             self.parse_type_annotation_single_colon();
-        } else if self.peek() == SyntaxKind::DoubleColon {
+            return;
+        }
+        if self.peek() == SyntaxKind::DoubleColon {
             self.parse_type_annotation();
         }
     }
@@ -542,7 +548,6 @@ impl Parser<'_> {
 
     /// Handle single colon type annotation (common mistake: `@x : Type` instead of `@x :: Type`)
     fn parse_type_annotation_single_colon(&mut self) {
-        // Check if followed by something that looks like a type
         if self.peek_nth(1) != SyntaxKind::Id {
             return;
         }
@@ -553,8 +558,9 @@ impl Parser<'_> {
         let fix = Fix::new("::", "use '::'");
         self.error_with_fix(span, "single colon is not valid for type annotations", fix);
 
-        self.bump();
+        self.bump(); // colon
 
+        // peek() skips whitespace, so this handles `@x : Type` with space
         if self.peek() == SyntaxKind::Id {
             self.bump();
         }
@@ -573,14 +579,17 @@ impl Parser<'_> {
     fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
         self.expect(SyntaxKind::Negation, "'!' for negated field");
-        if self.peek() == SyntaxKind::Id {
-            let span = self.current_span();
-            let text = token_text(self.source, &self.tokens[self.pos]);
-            self.bump();
-            self.validate_field_name(text, span);
-        } else {
+
+        if self.peek() != SyntaxKind::Id {
             self.error("expected field name after '!' (e.g., !value)");
+            self.finish_node();
+            return;
         }
+
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        self.bump();
+        self.validate_field_name(text, span);
         self.finish_node();
     }
 
@@ -603,21 +612,23 @@ impl Parser<'_> {
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        if self.peek() == SyntaxKind::Id {
-            let span = self.current_span();
-            let text = token_text(self.source, &self.tokens[self.pos]);
-            self.bump();
-            self.validate_field_name(text, span);
-        } else {
-            self.error("expected field name before ':'");
-        }
+        let kind = self.peek();
+        self.assert_id_token(kind);
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        self.bump();
+        self.validate_field_name(text, span);
 
         self.expect(
             SyntaxKind::Colon,
             "':' to separate field name from its value",
         );
 
-        self.parse_expr_no_suffix();
+        if EXPR_FIRST.contains(self.peek()) {
+            self.parse_expr_no_suffix();
+        } else {
+            self.error("expected expression after field name");
+        }
 
         self.finish_node();
     }
@@ -646,10 +657,14 @@ impl Parser<'_> {
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
+        // Invariant: only called when SEPARATORS.contains(kind), which only has Comma and Pipe
         let char_name = match kind {
             SyntaxKind::Comma => ",",
             SyntaxKind::Pipe => "|",
-            _ => return,
+            _ => panic!(
+                "error_skip_separator: unexpected token {:?} (only Comma/Pipe expected)",
+                kind
+            ),
         };
         let fix = Fix::new("", "remove separator");
         self.error_with_fix(
@@ -680,10 +695,6 @@ impl Parser<'_> {
             self.finish_node();
         }
     }
-
-    // ============================================================
-    // Validation helpers - enforce naming conventions per context
-    // ============================================================
 
     /// Validate capture name follows plotnik convention (snake_case).
     fn validate_capture_name(&mut self, name: &str, span: TextRange) {
@@ -824,10 +835,6 @@ fn to_snake_case(s: &str) -> String {
                 result.push('_');
             }
             result.push(c.to_ascii_lowercase());
-        } else if c == '-' || c == '.' {
-            if !result.ends_with('_') {
-                result.push('_');
-            }
         } else {
             result.push(c);
         }
@@ -854,9 +861,8 @@ fn to_pascal_case(s: &str) -> String {
 
 /// Capitalize the first letter of a string.
 fn capitalize_first(s: &str) -> String {
+    assert_nonempty(s);
     let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => c.to_uppercase().chain(chars).collect(),
-    }
+    let c = chars.next().unwrap();
+    c.to_uppercase().chain(chars).collect()
 }

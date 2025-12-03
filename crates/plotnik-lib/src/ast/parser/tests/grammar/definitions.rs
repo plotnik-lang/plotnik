@@ -7,7 +7,7 @@ fn simple_named_def() {
     Expr = (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -27,7 +27,7 @@ fn named_def_with_alternation() {
     Value = [(identifier) (number) (string)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -61,7 +61,7 @@ fn named_def_with_sequence() {
     Pair = {(identifier) (expression)}
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -91,7 +91,7 @@ fn named_def_with_captures() {
         right: (_) @right)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -140,7 +140,7 @@ fn multiple_named_defs() {
     Stmt = (statement)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -168,7 +168,7 @@ fn named_def_then_expression() {
     (program (Expr) @value)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -210,7 +210,7 @@ fn named_def_referencing_another() {
     Expr = [(identifier) (Literal)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -255,7 +255,7 @@ fn named_def_with_quantifier() {
     Statements = (statement)+
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -279,7 +279,7 @@ fn named_def_complex_recursive() {
         arguments: (arguments))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -330,7 +330,7 @@ fn named_def_with_type_annotation() {
         body: (_) @body)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -373,7 +373,7 @@ fn upper_ident_not_followed_by_equals_is_expression() {
     (Expr)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: undefined reference: `Expr`
@@ -389,7 +389,7 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     Expr
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -405,7 +405,7 @@ fn named_def_missing_equals() {
     Expr (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -426,7 +426,7 @@ fn unnamed_def_allowed_as_last() {
     (program (Expr) @value)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -460,7 +460,7 @@ fn unnamed_def_not_allowed_in_middle() {
     (last)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (first)`
@@ -478,7 +478,7 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     (third)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (first)`

@@ -3,7 +3,7 @@ use indoc::indoc;
 
 #[test]
 fn simple_tree() {
-    let query = Query::new("(identifier)");
+    let query = Query::new("(identifier)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -18,7 +18,7 @@ fn nested_tree() {
     (function_definition name: (identifier))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -31,7 +31,7 @@ fn nested_tree() {
 
 #[test]
 fn wildcard() {
-    let query = Query::new("(_)");
+    let query = Query::new("(_)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -42,7 +42,7 @@ fn wildcard() {
 
 #[test]
 fn literal() {
-    let query = Query::new(r#""if""#);
+    let query = Query::new(r#""if""#).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -53,7 +53,7 @@ fn literal() {
 
 #[test]
 fn capture() {
-    let query = Query::new("(identifier) @name");
+    let query = Query::new("(identifier) @name").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -65,7 +65,7 @@ fn capture() {
 
 #[test]
 fn capture_with_type() {
-    let query = Query::new("(identifier) @name :: string");
+    let query = Query::new("(identifier) @name :: string").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -77,7 +77,7 @@ fn capture_with_type() {
 
 #[test]
 fn named_definition() {
-    let query = Query::new("Expr = (expression)");
+    let query = Query::new("Expr = (expression)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -93,7 +93,7 @@ fn reference() {
     (call (Expr))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -107,7 +107,7 @@ fn reference() {
 
 #[test]
 fn alternation_unlabeled() {
-    let query = Query::new("[(identifier) (number)]");
+    let query = Query::new("[(identifier) (number)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -126,7 +126,7 @@ fn alternation_tagged() {
     [Ident: (identifier) Num: (number)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -141,7 +141,7 @@ fn alternation_tagged() {
 
 #[test]
 fn sequence() {
-    let query = Query::new("{(a) (b) (c)}");
+    let query = Query::new("{(a) (b) (c)}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -155,7 +155,7 @@ fn sequence() {
 
 #[test]
 fn quantifier_star() {
-    let query = Query::new("(statement)*");
+    let query = Query::new("(statement)*").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -167,7 +167,7 @@ fn quantifier_star() {
 
 #[test]
 fn quantifier_plus() {
-    let query = Query::new("(statement)+");
+    let query = Query::new("(statement)+").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -179,7 +179,7 @@ fn quantifier_plus() {
 
 #[test]
 fn quantifier_optional() {
-    let query = Query::new("(statement)?");
+    let query = Query::new("(statement)?").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -191,7 +191,7 @@ fn quantifier_optional() {
 
 #[test]
 fn quantifier_non_greedy() {
-    let query = Query::new("(statement)*?");
+    let query = Query::new("(statement)*?").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -203,7 +203,7 @@ fn quantifier_non_greedy() {
 
 #[test]
 fn anchor() {
-    let query = Query::new("(block . (statement))");
+    let query = Query::new("(block . (statement))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -216,7 +216,7 @@ fn anchor() {
 
 #[test]
 fn negated_field() {
-    let query = Query::new("(function !async)");
+    let query = Query::new("(function !async)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -237,7 +237,7 @@ fn complex_example() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -259,7 +259,7 @@ fn complex_example() {
 
 #[test]
 fn ast_with_errors() {
-    let query = Query::new("(call (Undefined))");
+    let query = Query::new("(call (Undefined))").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: undefined reference: `Undefined`
@@ -271,7 +271,7 @@ fn ast_with_errors() {
 
 #[test]
 fn supertype() {
-    let query = Query::new("(expression/binary_expression)");
+    let query = Query::new("(expression/binary_expression)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
@@ -289,7 +289,7 @@ fn multiple_fields() {
         right: (_) @right) @expr
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root

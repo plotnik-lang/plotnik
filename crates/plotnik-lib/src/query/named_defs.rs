@@ -7,7 +7,7 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use crate::ast::{ErrorStage, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage};
 use crate::ast::{Expr, Ref, Root};
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ pub struct DefInfo {
 #[derive(Debug)]
 pub struct ResolveResult {
     pub symbols: SymbolTable,
-    pub errors: Vec<SyntaxError>,
+    pub errors: Vec<Diagnostic>,
 }
 
 impl SymbolTable {
@@ -62,7 +62,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
 
             if defs.contains_key(&name) {
                 errors.push(
-                    SyntaxError::new(range, format!("duplicate definition: `{}`", name))
+                    Diagnostic::error(range, format!("duplicate definition: `{}`", name))
                         .with_stage(ErrorStage::Resolve),
                 );
             } else {
@@ -84,10 +84,11 @@ pub fn resolve(root: &Root) -> ResolveResult {
         }
     }
 
-    // Also check top-level expressions (entry point)
-    for expr in root.exprs() {
-        collect_reference_errors(&expr, &symbols, &mut errors);
-    }
+    // Parser wraps all top-level exprs in Def nodes, so this should be empty
+    assert!(
+        root.exprs().next().is_none(),
+        "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
+    );
 
     ResolveResult { symbols, errors }
 }
@@ -110,9 +111,11 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                     collect_refs(&body, refs);
                 }
             }
-            for expr in alt.exprs() {
-                collect_refs(&expr, refs);
-            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
         Expr::Seq(seq) => {
             for child in seq.children() {
@@ -138,7 +141,7 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
     }
 }
 
-fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
+fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
     match expr {
         Expr::Ref(r) => {
             check_ref_reference(r, symbols, errors);
@@ -154,9 +157,11 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
                     collect_reference_errors(&body, symbols, errors);
                 }
             }
-            for expr in alt.exprs() {
-                collect_reference_errors(&expr, symbols, errors);
-            }
+            // Parser wraps all alt children in Branch nodes
+            assert!(
+                alt.exprs().next().is_none(),
+                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
         Expr::Seq(seq) => {
             for child in seq.children() {
@@ -182,12 +187,12 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
     }
 }
 
-fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<SyntaxError>) {
+fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
     if let Some(name_token) = r.name() {
         let name = name_token.text();
         if symbols.get(name).is_none() {
             errors.push(
-                SyntaxError::new(
+                Diagnostic::error(
                     name_token.text_range(),
                     format!("undefined reference: `{}`", name),
                 )
@@ -205,7 +210,7 @@ mod tests {
     #[test]
     fn single_definition() {
         let input = "Expr = (expression)";
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"Expr");
     }
@@ -218,7 +223,7 @@ mod tests {
         Decl = (declaration)
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -234,7 +239,7 @@ mod tests {
         Call = (call_expression function: (Expr))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -247,7 +252,7 @@ mod tests {
     fn undefined_reference() {
         let input = "Call = (call_expression function: (Undefined))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `Undefined`
@@ -261,7 +266,7 @@ mod tests {
     fn self_reference() {
         let input = "Expr = [(identifier) (call (Expr))]";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -276,7 +281,7 @@ mod tests {
         B = (bar (A))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -298,7 +303,7 @@ mod tests {
         Expr = (other)
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: duplicate definition: `Expr`
@@ -315,7 +320,7 @@ mod tests {
         Value = [(Expr) (literal)]
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -331,7 +336,7 @@ mod tests {
         Pair = {(Expr) (Expr)}
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -347,7 +352,7 @@ mod tests {
         List = (Expr)*
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -363,7 +368,7 @@ mod tests {
         Named = (Expr) @e
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         Expr
@@ -379,7 +384,7 @@ mod tests {
         (call function: (Expr))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"Expr");
     }
@@ -388,7 +393,7 @@ mod tests {
     fn entry_point_undefined_reference() {
         let input = "(call function: (Unknown))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `Unknown`
@@ -401,7 +406,7 @@ mod tests {
     #[test]
     fn no_definitions() {
         let input = "(identifier)";
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @"");
     }
@@ -415,7 +420,7 @@ mod tests {
         D = (d (C) (A))
         "#};
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_symbols(), @r"
         A
@@ -436,7 +441,7 @@ mod tests {
     fn multiple_undefined() {
         let input = "(foo (X) (Y) (Z))";
 
-        let query = Query::new(input);
+        let query = Query::new(input).unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: undefined reference: `X`
@@ -451,6 +456,38 @@ mod tests {
           |
         1 | (foo (X) (Y) (Z))
           |               ^ undefined reference: `Z`
+        ");
+    }
+
+    #[test]
+    fn reference_inside_tree_child() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (b (A))
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
+        ");
+    }
+
+    #[test]
+    fn reference_inside_capture() {
+        let input = indoc! {r#"
+            A = (a)
+            B = (A)@x
+        "#};
+
+        let query = Query::new(input).unwrap();
+        assert!(query.is_valid());
+        insta::assert_snapshot!(query.dump_symbols(), @r"
+        A
+        B
+          A
         ");
     }
 }

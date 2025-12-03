@@ -27,6 +27,7 @@ fn main() {
                 cst: output.cst,
                 spans: output.spans,
                 cardinalities: output.cardinalities,
+                color: output.color.should_colorize(),
             });
         }
         Command::Docs { topic } => {

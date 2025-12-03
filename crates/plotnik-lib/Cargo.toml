@@ -3,6 +3,9 @@ name = "plotnik-lib"
 version = "0.1.0"
 edition = "2024"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
 [dependencies]
 annotate-snippets = "0.12.9"
 logos = "0.15.1"
@@ -10,6 +13,7 @@ petgraph = "0.8.3"
 indexmap = "2"
 rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
 
 [dev-dependencies]
 insta = { version = "=1.44.3", features = ["yaml"] }

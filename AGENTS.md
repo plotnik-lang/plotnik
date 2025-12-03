@@ -52,34 +52,35 @@ Module = "what", function = "action".
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-| Command        | Purpose                          |
-| -------------- | -------------------------------- |
-| `debug`        | Inspect queries/sources          |
-| `docs [topic]` | Print docs (reference, examples) |
-| `langs`        | List supported languages         |
+- `debug` — Inspect queries/sources
+- `docs [topic]` — Print docs (reference, examples)
+- `langs` — List supported languages
 
 ### debug options
 
-Inputs: `--query-text <Q>`, `--query-file <F>`, `--source-text <S>`, `--source-file <F>`, `-l/--lang <L>`
+Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
+
+Output: `--show-query`, `--show-source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
 
 ```sh
-cargo run -p plotnik-cli -- debug --source-file example.ts --source-ast
-cargo run -p plotnik-cli -- debug --source-file example.ts --source-ast-full
-cargo run -p plotnik-cli -- debug --query-text '[(a) (b)]' --query-cst --query-ast
-cargo run -p plotnik-cli -- debug --query-text '(x)' --source-text 'x' --lang typescript
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --show-query
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
+cargo run -p plotnik-cli -- debug -s app.ts --show-source
+cargo run -p plotnik-cli -- debug -s app.ts --show-source --raw
+cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query
 ```
 
 ## Syntax
 
 Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Type`, `field:`, `*+?`, `"lit"`/`'lit'`, `(a/b)` (supertype), `(ERROR)`, `Name = expr` (def), `[A: ... B: ...]` (tagged alt)
 
-SyntaxKind: `Tree`, `Lit`, `Def`, `Alt`, `Branch`, `Seq`, `Quantifier`, `Capture`, `Type`
+SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifier`, `Seq`, `Alt`, `Branch`, `Wildcard`, `Anchor`, `NegatedField`, `Def`
 
-Expr = `Tree | Alt | Seq | Quantifier | Capture`. Quantifier/Capture wrap their target.
+Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | NegatedField | Wildcard | Anchor`. Quantifier/Capture wrap their target.
 
 ## Errors
 
-Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Query::errors_for_stage()`, `Query::dump_errors_grouped()`.
+Stages: `Parse` → `Validate` → `Resolve` → `Escape`. Use `Query::errors_for_stage()`.
 
 ## Constraints
 
@@ -98,9 +99,9 @@ Stages: `Parse` → `Validate` → `Resolve` → `Escape` → `Shape`. Use `Quer
 
 ## AST Layer (`ast/nodes.rs`)
 
-Types: `Root`, `Def`, `Tree`, `Ref`, `Lit`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
+Types: `Root`, `Def`, `Tree`, `Ref`, `Str`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 
-Use `Option<T>` for casts, not `TryFrom`. `ast::format_ast()` for concise output.
+Use `Option<T>` for casts, not `TryFrom`. Use `QueryPrinter` from `query/printer.rs` for output.
 
 ## Testing
 
@@ -142,27 +143,27 @@ Never write snapshot content manually. Let insta generate it.
 
 Uses `cargo-llvm-cov`, already installed.
 
+Find uncovered lines per file:
+
 ```sh
-cargo llvm-cov --package plotnik-lib --text --show-missing-lines -- <test_filter> 2>/dev/null | grep '<file>:'
+cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]\+\(, [0-9]\+\)\*\?'
 ```
 
 ## Invariants
 
 Two-tier resilience strategy:
 
-1. **Parser**: resilient, collects errors, continues parsing
-2. **Post-parse phases**: strict invariants, panic on violations
+1. Parser: resilient, collects errors, continues parsing
+2. Our code: strict invariants, maximal coverage in tests, panic on violations
 
-For code paths that "should never happen", use `panic!` with informative messages:
-
-```rust
-let name = node.name().unwrap_or_else(|| {
-    panic!(
-        "phase_name: Node missing name at {:?} (should be caught by parser)",
-        node.syntax().text_range()
-    )
-});
-```
+Invariant checks live in dedicated modules named `invariants.rs`.
+They are excluded from test coverage because they're unreachable.
+They usually wrap a specific assert.
+It was done due to limitation of inline coverage exclusion in Rust.
+But it seems to be useful to extract such invariant check helpers anyways:
+- if it just performs assertion and doesn't return value, it starts with `assert_`
+- if it returns value, it's name consists of' `ensure_` and some statement about return value
+Find any of such files for more examples.
 
 ## Not implemented
 
@@ -178,4 +179,5 @@ let name = node.name().unwrap_or_else(|| {
 - Check diagnostics after changes
 - Follow rnix-parser/taplo patterns
 - Span-based tokens, no text in intermediate structures
-- No slop comments
+- Don't put AI slop comments in the code
+- IMPORTANT: Avoid nesting logic, prefer early exit code flow in functions (return) and loops (continue/break)

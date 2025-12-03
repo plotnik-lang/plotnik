@@ -1,17 +1,13 @@
 use crate::Query;
 use indoc::indoc;
 
-// ============================================================================
-// Unlabeled Alternations
-// ============================================================================
-
 #[test]
 fn alternation() {
     let input = indoc! {r#"
     [(identifier) (string)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -38,7 +34,7 @@ fn alternation_with_anonymous() {
     ["true" "false"]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -65,7 +61,7 @@ fn alternation_with_capture() {
     [(identifier) (string)] @value
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -98,7 +94,7 @@ fn alternation_with_quantifier() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -131,7 +127,7 @@ fn alternation_nested() {
         [(binary) (unary)])
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -163,7 +159,7 @@ fn alternation_in_field() {
         arguments: [(string) (number)])
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -197,7 +193,7 @@ fn unlabeled_alternation_three_items() {
     [(identifier) (number) (string)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -229,7 +225,7 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
     [(Expr) (Statement)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: undefined reference: `Expr`
@@ -243,10 +239,6 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
     "#);
 }
 
-// ============================================================================
-// Tagged Alternations
-// ============================================================================
-
 #[test]
 fn tagged_alternation_simple() {
     let input = indoc! {r#"
@@ -256,7 +248,7 @@ fn tagged_alternation_simple() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -287,7 +279,7 @@ fn tagged_alternation_single_line() {
     [A: (a) B: (b) C: (c)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -328,7 +320,7 @@ fn tagged_alternation_with_captures() {
     ] @stmt
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -385,7 +377,7 @@ fn tagged_alternation_with_type_annotation() {
     ] @chain :: MemberChain
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -439,7 +431,7 @@ fn tagged_alternation_nested() {
         ])
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -478,7 +470,7 @@ fn tagged_alternation_in_named_def() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -521,7 +513,7 @@ fn tagged_alternation_with_quantifier() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -557,7 +549,7 @@ fn tagged_alternation_with_sequence() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -595,7 +587,7 @@ fn mixed_tagged_and_untagged() {
     [Tagged: (a) (b) Another: (c)]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: mixed tagged and untagged branches in alternation
@@ -616,7 +608,7 @@ fn tagged_alternation_with_nested_alternation() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -663,7 +655,7 @@ fn tagged_alternation_full_example() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

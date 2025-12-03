@@ -7,7 +7,7 @@ fn whitespace_preserved() {
     (identifier)  @name
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
@@ -31,7 +31,7 @@ fn comment_preserved() {
     (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
@@ -54,7 +54,7 @@ fn multiline() {
     (b)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_errors(), @r#"
     error: unnamed definition must be last in file; add a name: `Name = (a)`
@@ -71,7 +71,7 @@ fn comment_inside_expression() {
         name: (identifier))
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
@@ -103,7 +103,7 @@ fn trivia_filtered_by_default() {
     (identifier)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -124,7 +124,7 @@ fn trivia_between_alternation_items() {
     ]
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
@@ -155,7 +155,7 @@ fn trivia_between_alternation_items() {
 fn whitespace_only() {
     let input = "    ";
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
@@ -169,7 +169,7 @@ fn comment_only_raw() {
     // just a comment
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root

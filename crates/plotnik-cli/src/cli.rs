@@ -1,6 +1,24 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum ColorChoice {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorChoice {
+    pub fn should_colorize(self) -> bool {
+        match self {
+            ColorChoice::Always => true,
+            ColorChoice::Never => false,
+            ColorChoice::Auto => std::io::IsTerminal::is_terminal(&std::io::stderr()),
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "plotnik", bin_name = "plotnik")]
@@ -73,6 +91,10 @@ pub struct OutputArgs {
     /// Show query syntax tree
     #[arg(long = "show-query")]
     pub query: bool,
+
+    /// Colorize output (auto-detected by default)
+    #[arg(long, default_value = "auto", value_name = "WHEN")]
+    pub color: ColorChoice,
 
     /// Show source syntax tree
     #[arg(long = "show-source")]

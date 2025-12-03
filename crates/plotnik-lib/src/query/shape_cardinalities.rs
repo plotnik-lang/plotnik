@@ -7,9 +7,12 @@
 //! Root node cardinality indicates definition count (one vs multiple subqueries),
 //! not node matching semantics.
 
+use super::invariants::{
+    assert_ref_in_symbols, ensure_ref_body, ensure_ref_name, panic_unexpected_node,
+};
 use super::named_defs::SymbolTable;
 use crate::ast::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
-use crate::ast::{ErrorStage, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -85,11 +88,7 @@ fn compute_single(
         if Type::cast(node.clone()).is_some() {
             return ShapeCardinality::One;
         }
-        panic!(
-            "shape_cardinality: unexpected non-Expr node kind {:?} at {:?}",
-            node.kind(),
-            node.text_range()
-        );
+        panic_unexpected_node(node);
     };
 
     match expr {
@@ -152,29 +151,12 @@ fn ref_cardinality(
     def_bodies: &HashMap<String, SyntaxNode>,
     cache: &mut HashMap<SyntaxNode, ShapeCardinality>,
 ) -> ShapeCardinality {
-    let name_tok = r.name().unwrap_or_else(|| {
-        panic!(
-            "shape_cardinality: Ref node missing name token at {:?} (should be caught by parser)",
-            r.syntax().text_range()
-        )
-    });
+    let name_tok = ensure_ref_name(r);
     let name = name_tok.text();
 
-    if symbols.get(name).is_none() {
-        panic!(
-            "shape_cardinality: Ref `{}` not in symbol table at {:?} (should be caught by resolution)",
-            name,
-            r.syntax().text_range()
-        );
-    }
+    assert_ref_in_symbols(name, r, symbols.get(name).is_some());
 
-    let body_node = def_bodies.get(name).unwrap_or_else(|| {
-        panic!(
-            "shape_cardinality: Ref `{}` in symbol table but no body found at {:?}",
-            name,
-            r.syntax().text_range()
-        )
-    });
+    let body_node = ensure_ref_body(name, r, def_bodies.get(name));
 
     get_or_compute(body_node, symbols, def_bodies, cache)
 }
@@ -183,7 +165,7 @@ pub fn validate(
     root: &Root,
     _symbols: &SymbolTable,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-) -> Vec<SyntaxError> {
+) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     validate_node(&root.syntax().clone(), cardinalities, &mut errors);
     errors
@@ -192,7 +174,7 @@ pub fn validate(
 fn validate_node(
     node: &SyntaxNode,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-    errors: &mut Vec<SyntaxError>,
+    errors: &mut Vec<Diagnostic>,
 ) {
     if let Some(field) = Field::cast(node.clone())
         && let Some(value) = field.value()
@@ -209,7 +191,7 @@ fn validate_node(
                 .unwrap_or_else(|| "field".to_string());
 
             errors.push(
-                SyntaxError::new(
+                Diagnostic::error(
                     value.syntax().text_range(),
                     format!(
                         "field `{}` value must match a single node, not a sequence",

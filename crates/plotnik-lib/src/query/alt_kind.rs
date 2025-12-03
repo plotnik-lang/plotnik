@@ -5,10 +5,13 @@
 
 use rowan::TextRange;
 
+use super::invariants::{
+    assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
+};
 use crate::ast::{Alt, AltKind, Branch, Expr, Root};
-use crate::ast::{ErrorStage, RelatedInfo, SyntaxError};
+use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
 
-pub fn validate(root: &Root) -> Vec<SyntaxError> {
+pub fn validate(root: &Root) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
 
     for def in root.defs() {
@@ -17,14 +20,12 @@ pub fn validate(root: &Root) -> Vec<SyntaxError> {
         }
     }
 
-    for expr in root.exprs() {
-        validate_expr(&expr, &mut errors);
-    }
+    assert_root_no_bare_exprs(root);
 
     errors
 }
 
-fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
+fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
     match expr {
         Expr::Alt(alt) => {
             check_mixed_alternation(alt, errors);
@@ -33,9 +34,7 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
                     validate_expr(&body, errors);
                 }
             }
-            for child in alt.exprs() {
-                validate_expr(&child, errors);
-            }
+            assert_alt_no_bare_exprs(alt);
         }
         Expr::Tree(tree) => {
             for child in tree.children() {
@@ -70,7 +69,7 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<SyntaxError>) {
     }
 }
 
-fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<SyntaxError>) {
+fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
     if alt.kind() != AltKind::Mixed {
         return;
     }
@@ -94,9 +93,7 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<SyntaxError>) {
         }
     }
 
-    let (Some(tagged_branch), Some(untagged_branch)) = (first_tagged, first_untagged) else {
-        return;
-    };
+    let (tagged_branch, untagged_branch) = ensure_both_branch_kinds(first_tagged, first_untagged);
 
     let tagged_range = tagged_branch
         .label()
@@ -105,11 +102,11 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<SyntaxError>) {
 
     let untagged_range = branch_range(untagged_branch);
 
-    let error = SyntaxError::with_related(
+    let error = Diagnostic::error(
         untagged_range,
         "mixed tagged and untagged branches in alternation",
-        RelatedInfo::new(tagged_range, "tagged branch here"),
     )
+    .with_related(RelatedInfo::new(tagged_range, "tagged branch here"))
     .with_stage(ErrorStage::Validate);
 
     errors.push(error);
@@ -125,7 +122,7 @@ mod tests {
 
     #[test]
     fn tagged_alternation_valid() {
-        let query = Query::new("[A: (a) B: (b)]");
+        let query = Query::new("[A: (a) B: (b)]").unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_ast(), @r"
         Root
@@ -140,7 +137,7 @@ mod tests {
 
     #[test]
     fn untagged_alternation_valid() {
-        let query = Query::new("[(a) (b)]");
+        let query = Query::new("[(a) (b)]").unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_ast(), @r"
         Root
@@ -155,7 +152,7 @@ mod tests {
 
     #[test]
     fn mixed_alternation_tagged_first() {
-        let query = Query::new("[A: (a) (b)]");
+        let query = Query::new("[A: (a) (b)]").unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: mixed tagged and untagged branches in alternation
@@ -176,7 +173,8 @@ mod tests {
           B: (b)
         ]
         "#,
-        );
+        )
+        .unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: mixed tagged and untagged branches in alternation
@@ -190,7 +188,7 @@ mod tests {
 
     #[test]
     fn nested_mixed_alternation() {
-        let query = Query::new("(call [A: (a) (b)])");
+        let query = Query::new("(call [A: (a) (b)])").unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: mixed tagged and untagged branches in alternation
@@ -204,7 +202,7 @@ mod tests {
 
     #[test]
     fn multiple_mixed_alternations() {
-        let query = Query::new("(foo [A: (a) (b)] [C: (c) (d)])");
+        let query = Query::new("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
         assert!(!query.is_valid());
         insta::assert_snapshot!(query.dump_errors(), @r"
         error: mixed tagged and untagged branches in alternation
@@ -224,7 +222,7 @@ mod tests {
 
     #[test]
     fn single_branch_no_error() {
-        let query = Query::new("[A: (a)]");
+        let query = Query::new("[A: (a)]").unwrap();
         assert!(query.is_valid());
         insta::assert_snapshot!(query.dump_ast(), @r"
         Root
