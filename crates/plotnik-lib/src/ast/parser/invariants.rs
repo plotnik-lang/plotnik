@@ -7,14 +7,12 @@ use crate::ast::syntax_kind::SyntaxKind;
 
 impl Parser<'_> {
     #[inline]
-    #[cfg(debug_assertions)]
-    pub(super) fn assert_progress(&self) {
-        if let Some(limit) = self.debug_fuel_limit {
-            assert!(
-                self.debug_fuel.get() != 0,
-                "parser is stuck: no progress made in {limit} iterations"
-            );
-        }
+    pub(super) fn ensure_progress(&self) {
+        assert!(
+            self.debug_fuel.get() != 0,
+            "parser is stuck: too many lookaheads"
+        );
+        self.debug_fuel.set(self.debug_fuel.get() - 1);
     }
 
     #[inline]
