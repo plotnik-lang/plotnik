@@ -26,8 +26,6 @@ use shape_cardinalities::ShapeCardinality;
 /// Builder for configuring and creating a [`Query`].
 pub struct QueryBuilder<'a> {
     source: &'a str,
-    #[cfg(debug_assertions)]
-    debug_fuel: Option<Option<u32>>,
     exec_fuel: Option<Option<u32>>,
     recursion_fuel: Option<Option<u32>>,
 }
@@ -37,21 +35,9 @@ impl<'a> QueryBuilder<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            #[cfg(debug_assertions)]
-            debug_fuel: None,
             exec_fuel: None,
             recursion_fuel: None,
         }
-    }
-
-    /// Set debug fuel limit (debug builds only). None = infinite.
-    ///
-    /// Debug fuel resets on each token consumed. It detects parser bugs
-    /// where no progress is made. Panics when exhausted.
-    #[cfg(debug_assertions)]
-    pub fn with_debug_fuel(mut self, limit: Option<u32>) -> Self {
-        self.debug_fuel = Some(limit);
-        self
     }
 
     /// Set execution fuel limit. None = infinite.
@@ -78,11 +64,6 @@ impl<'a> QueryBuilder<'a> {
     pub fn build(self) -> Result<Query<'a>> {
         let tokens = lex(self.source);
         let mut parser = Parser::new(self.source, tokens);
-
-        #[cfg(debug_assertions)]
-        if let Some(limit) = self.debug_fuel {
-            parser = parser.with_debug_fuel(limit);
-        }
 
         if let Some(limit) = self.exec_fuel {
             parser = parser.with_exec_fuel(limit);
