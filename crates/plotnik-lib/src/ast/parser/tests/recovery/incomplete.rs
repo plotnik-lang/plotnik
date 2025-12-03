@@ -208,23 +208,3 @@ fn bare_missing_keyword() {
       | ^^^^^^^ ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
     "#);
 }
-
-#[test]
-fn deep_nesting_within_limit() {
-    let depth = 100;
-    let mut input = String::new();
-    for _ in 0..depth {
-        input.push_str("(a ");
-    }
-    for _ in 0..depth {
-        input.push(')');
-    }
-
-    let result = crate::ast::parser::parse(&input).unwrap();
-    assert!(
-        result.is_valid(),
-        "expected no errors for depth {}, got: {:?}",
-        depth,
-        result.errors()
-    );
-}

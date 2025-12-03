@@ -20,7 +20,7 @@ use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 const DEFAULT_DEBUG_FUEL: u32 = 256;
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
-const DEFAULT_RECURSION_FUEL: u32 = 512;
+const DEFAULT_RECURSION_FUEL: u32 = 4096;
 
 /// Parse result containing the green tree and any errors.
 ///
