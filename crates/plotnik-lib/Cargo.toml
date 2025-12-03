@@ -9,7 +9,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 [dependencies]
 annotate-snippets = "0.12.9"
 logos = "0.15.1"
-petgraph = "0.8.3"
 indexmap = "2"
 rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
