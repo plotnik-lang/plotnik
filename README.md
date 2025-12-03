@@ -1,5 +1,4 @@
 <br/>
-<br/>
 
 <div id="user-content-toc" align="center">
   <ul>
@@ -26,9 +25,8 @@
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<br/>
-<br/>
 <hr/>
+<br/>
 
 ## Example
 
