@@ -16,9 +16,6 @@ use crate::ast::lexer::{Token, token_text};
 use crate::ast::syntax_kind::token_sets::ROOT_EXPR_FIRST;
 use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 
-#[cfg(debug_assertions)]
-const DEFAULT_DEBUG_FUEL: u32 = 256;
-
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 512;
 
@@ -63,11 +60,8 @@ pub struct Parser<'src> {
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
 
     // Fuel limits
-    /// Debug-only: loop detection fuel. Resets on bump(). Panics when exhausted.
-    #[cfg(debug_assertions)]
+    /// Loop detection fuel. Resets on bump(). Panics when exhausted.
     pub(super) debug_fuel: std::cell::Cell<u32>,
-    #[cfg(debug_assertions)]
-    pub(super) debug_fuel_limit: Option<u32>,
 
     /// Execution fuel. Never replenishes.
     exec_fuel_remaining: Option<u32>,
@@ -91,22 +85,11 @@ impl<'src> Parser<'src> {
             depth: 0,
             last_error_pos: None,
             delimiter_stack: Vec::with_capacity(8),
-            #[cfg(debug_assertions)]
-            debug_fuel: std::cell::Cell::new(DEFAULT_DEBUG_FUEL),
-            #[cfg(debug_assertions)]
-            debug_fuel_limit: Some(DEFAULT_DEBUG_FUEL),
+            debug_fuel: std::cell::Cell::new(256),
             exec_fuel_remaining: Some(DEFAULT_EXEC_FUEL),
             recursion_fuel_limit: Some(DEFAULT_RECURSION_FUEL),
             fatal_error: None,
         }
-    }
-
-    /// Set debug fuel limit (debug builds only). None = infinite.
-    #[cfg(debug_assertions)]
-    pub fn with_debug_fuel(mut self, limit: Option<u32>) -> Self {
-        self.debug_fuel_limit = limit;
-        self.debug_fuel.set(limit.unwrap_or(u32::MAX));
-        self
     }
 
     /// Set execution fuel limit. None = infinite.
@@ -142,15 +125,13 @@ impl<'src> Parser<'src> {
         self.nth(0)
     }
 
+    fn reset_debug_fuel(&self) {
+        self.debug_fuel.set(256);
+    }
+
     /// Lookahead by `n` tokens (0 = current). Consumes debug fuel (panics if stuck).
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
-        #[cfg(debug_assertions)]
-        {
-            self.assert_progress();
-            if self.debug_fuel_limit.is_some() {
-                self.debug_fuel.set(self.debug_fuel.get() - 1);
-            }
-        }
+        self.ensure_progress();
 
         self.tokens
             .get(self.pos + lookahead)
@@ -266,10 +247,7 @@ impl<'src> Parser<'src> {
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
 
-        #[cfg(debug_assertions)]
-        if let Some(limit) = self.debug_fuel_limit {
-            self.debug_fuel.set(limit);
-        }
+        self.reset_debug_fuel();
 
         self.consume_exec_fuel();
 
@@ -283,10 +261,7 @@ impl<'src> Parser<'src> {
     pub(super) fn skip_token(&mut self) {
         assert!(!self.eof(), "skip_token called at EOF");
 
-        #[cfg(debug_assertions)]
-        if let Some(limit) = self.debug_fuel_limit {
-            self.debug_fuel.set(limit);
-        }
+        self.reset_debug_fuel();
 
         self.consume_exec_fuel();
 
@@ -398,11 +373,13 @@ impl<'src> Parser<'src> {
             return false;
         }
         self.depth += 1;
+        self.reset_debug_fuel();
         true
     }
 
     pub(super) fn exit_recursion(&mut self) {
         self.depth = self.depth.saturating_sub(1);
+        self.reset_debug_fuel();
     }
 
     /// Push an opening delimiter onto the stack for tracking unclosed constructs.

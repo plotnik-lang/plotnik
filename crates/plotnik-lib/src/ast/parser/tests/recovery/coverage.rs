@@ -330,7 +330,7 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    let result = Query::builder(&input).with_debug_fuel(None).build();
+    let result = Query::builder(&input).build();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -351,7 +351,7 @@ fn deeply_nested_sequences_hit_recursion_limit() {
         input.push('}');
     }
 
-    let result = Query::builder(&input).with_debug_fuel(None).build();
+    let result = Query::builder(&input).build();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -372,7 +372,7 @@ fn deeply_nested_alternations_hit_recursion_limit() {
         input.push(']');
     }
 
-    let result = Query::builder(&input).with_debug_fuel(None).build();
+    let result = Query::builder(&input).build();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
