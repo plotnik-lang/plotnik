@@ -77,12 +77,12 @@ fn garbage_inside_alternation() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) ^^^ (b)]
       |      ^^^ unexpected token; expected a child expression or closing delimiter
-    "#);
+    ");
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn garbage_inside_node() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: expected capture name after '@'
       |
     1 | (a (b) @@@ (c)) (d)
@@ -106,7 +106,7 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       | ^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (a (b) @@@ (c))`
-    "#);
+    ");
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn predicate_unsupported() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r##"
+    insta::assert_snapshot!(query.dump_errors(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
@@ -170,7 +170,7 @@ fn predicate_unsupported() {
       |
     1 | (a (#eq? @x "foo") b)
       |                    ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "##);
+    "#);
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn predicate_match() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r##"
+    insta::assert_snapshot!(query.dump_errors(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (identifier) #match? @name "test"
@@ -198,7 +198,61 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |                       ^^^^ unnamed definition must be last in file; add a name: `Name = name`
-    "##);
+    "#);
+}
+
+#[test]
+fn predicate_in_tree() {
+    let input = "(function #eq? @name \"test\")";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+      |
+    1 | (function #eq? @name "test")
+      |           ^^^^ tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | (function #eq? @name "test")
+      |                ^ unexpected token; expected a child expression or closing delimiter
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | (function #eq? @name "test")
+      |                 ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    "#);
+}
+
+#[test]
+fn predicate_in_alternation() {
+    let input = indoc! {r#"
+    [(a) #eq? (b)]
+    "#};
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | [(a) #eq? (b)]
+      |      ^^^^ unexpected token; expected a child expression or closing delimiter
+    ");
+}
+
+#[test]
+fn predicate_in_sequence() {
+    let input = indoc! {r#"
+    {(a) #set! (b)}
+    "#};
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+      |
+    1 | {(a) #set! (b)}
+      |      ^^^^^ tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
+    ");
 }
 
 #[test]
@@ -211,7 +265,7 @@ fn multiline_garbage_recovery() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_errors(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     2 | ^^^
@@ -220,63 +274,7 @@ fn multiline_garbage_recovery() {
       |
     3 | b)
       | ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "#);
-}
-
-#[test]
-fn capture_with_invalid_char() {
-    let input = indoc! {r#"
-    (identifier) @123
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: expected capture name after '@'
-      |
-    1 | (identifier) @123
-      |               ^^^ expected capture name after '@'
-    "#);
-}
-
-#[test]
-fn field_value_is_garbage() {
-    let input = indoc! {r#"
-    (call name: %%%)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
-    error: expected expression after field name
-      |
-    1 | (call name: %%%)
-      |             ^^^ expected expression after field name
     ");
-}
-
-#[test]
-fn alternation_recovery_to_capture() {
-    let input = indoc! {r#"
-    [^^^ @name]
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | [^^^ @name]
-      |  ^^^ unexpected token; expected a child expression or closing delimiter
-    error: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | [^^^ @name]
-      |      ^ unexpected token; expected a child expression or closing delimiter
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | [^^^ @name]
-      |       ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    "#);
 }
 
 #[test]
@@ -316,5 +314,157 @@ fn multiple_definitions_with_garbage_between() {
       |
     4 | $$$
       | ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    "#);
+}
+
+#[test]
+fn alternation_recovery_to_capture() {
+    let input = indoc! {r#"
+    [^^^ @name]
+    "#};
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | [^^^ @name]
+      |  ^^^ unexpected token; expected a child expression or closing delimiter
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | [^^^ @name]
+      |      ^ unexpected token; expected a child expression or closing delimiter
+    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |
+    1 | [^^^ @name]
+      |       ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    ");
+}
+
+#[test]
+fn comma_between_defs() {
+    let input = indoc! {r#"
+    A = (a), B = (b)
+    "#};
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | A = (a), B = (b)
+      |        ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    "#);
+}
+
+#[test]
+fn bare_colon_in_tree() {
+    let input = "(a : (b))";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: unexpected token; expected a child expression or closing delimiter
+      |
+    1 | (a : (b))
+      |    ^ unexpected token; expected a child expression or closing delimiter
+    ");
+}
+
+#[test]
+fn paren_close_inside_alternation() {
+    let input = "[(a) ) (b)]";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: expected closing ']' for alternation
+      |
+    1 | [(a) ) (b)]
+      |      ^ expected closing ']' for alternation
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | [(a) ) (b)]
+      |           ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unnamed definition must be last in file; add a name: `Name = [(a)`
+      |
+    1 | [(a) ) (b)]
+      | ^^^^ unnamed definition must be last in file; add a name: `Name = [(a)`
+    "#);
+}
+
+#[test]
+fn bracket_close_inside_sequence() {
+    let input = "{(a) ] (b)}";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: expected closing '}' for sequence
+      |
+    1 | {(a) ] (b)}
+      |      ^ expected closing '}' for sequence
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | {(a) ] (b)}
+      |           ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unnamed definition must be last in file; add a name: `Name = {(a)`
+      |
+    1 | {(a) ] (b)}
+      | ^^^^ unnamed definition must be last in file; add a name: `Name = {(a)`
+    "#);
+}
+
+#[test]
+fn paren_close_inside_sequence() {
+    let input = "{(a) ) (b)}";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: expected closing '}' for sequence
+      |
+    1 | {(a) ) (b)}
+      |      ^ expected closing '}' for sequence
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | {(a) ) (b)}
+      |           ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unnamed definition must be last in file; add a name: `Name = {(a)`
+      |
+    1 | {(a) ) (b)}
+      | ^^^^ unnamed definition must be last in file; add a name: `Name = {(a)`
+    "#);
+}
+
+#[test]
+fn single_colon_type_annotation_followed_by_non_id() {
+    let input = "(a) @x : (b)";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | (a) @x : (b)
+      |        ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unnamed definition must be last in file; add a name: `Name = (a) @x`
+      |
+    1 | (a) @x : (b)
+      | ^^^^^^ unnamed definition must be last in file; add a name: `Name = (a) @x`
+    "#);
+}
+
+#[test]
+fn single_colon_type_annotation_at_eof() {
+    let input = "(a) @x :";
+
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_errors(), @r#"
+    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |
+    1 | (a) @x :
+      |        ^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }

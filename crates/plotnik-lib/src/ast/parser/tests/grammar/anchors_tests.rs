@@ -175,23 +175,3 @@ fn anchor_in_sequence() {
           BraceClose "}"
     "#);
 }
-
-#[test]
-fn capture_space_after_dot_is_anchor() {
-    let input = indoc! {r#"
-    (identifier) @foo . (other)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
-      |
-    1 | (identifier) @foo . (other)
-      | ^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
-    error: unnamed definition must be last in file; add a name: `Name = .`
-      |
-    1 | (identifier) @foo . (other)
-      |                   ^ unnamed definition must be last in file; add a name: `Name = .`
-    "#);
-}

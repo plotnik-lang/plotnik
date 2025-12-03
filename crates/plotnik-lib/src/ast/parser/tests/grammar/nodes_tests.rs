@@ -118,28 +118,6 @@ fn sibling_children() {
 }
 
 #[test]
-fn multiple_expressions() {
-    let input = indoc! {r#"
-    (identifier)
-    (string)
-    (number)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unnamed definition must be last in file; add a name: `Name = (identifier)`
-      |
-    1 | (identifier)
-      | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
-    error: unnamed definition must be last in file; add a name: `Name = (string)`
-      |
-    2 | (string)
-      | ^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (string)`
-    "#);
-}
-
-#[test]
 fn wildcard() {
     let input = indoc! {r#"
     (_)

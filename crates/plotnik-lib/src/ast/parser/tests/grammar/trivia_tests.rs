@@ -47,24 +47,6 @@ fn comment_preserved() {
 }
 
 #[test]
-fn multiline() {
-    let input = indoc! {r#"
-    (a)
-
-    (b)
-    "#};
-
-    let query = Query::new(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unnamed definition must be last in file; add a name: `Name = (a)`
-      |
-    1 | (a)
-      | ^^^ unnamed definition must be last in file; add a name: `Name = (a)`
-    "#);
-}
-
-#[test]
 fn comment_inside_expression() {
     let input = indoc! {r#"
     (call // inline
