@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_helpers {
     use crate::Query;
-    use crate::ast::{RenderOptions, render_diagnostics};
+    use crate::parser::{RenderOptions, render_diagnostics};
 
     impl Query<'_> {
         pub fn dump_cst(&self) -> String {

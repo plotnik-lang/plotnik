@@ -7,8 +7,8 @@ use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use super::named_defs::SymbolTable;
-use crate::ast::{Def, Expr, Root, SyntaxKind};
-use crate::ast::{Diagnostic, ErrorStage, RelatedInfo};
+use crate::parser::{Def, Expr, Root, SyntaxKind};
+use crate::parser::{Diagnostic, ErrorStage, RelatedInfo};
 
 pub fn validate(root: &Root, symbols: &SymbolTable) -> Vec<Diagnostic> {
     let sccs = find_sccs(symbols);

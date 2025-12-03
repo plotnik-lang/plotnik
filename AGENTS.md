@@ -10,15 +10,16 @@ Lexer (logos) + parser (rowan) are resilient: collect errors, don't fail-fast.
 crates/
   plotnik-lib/         # Core library
     src/
-      ast/             # Syntax infrastructure
+      parser/          # Syntax infrastructure
         lexer.rs       # Token definitions (logos)
-        syntax_kind.rs # SyntaxKind enum
-        nodes.rs       # Typed AST wrappers over CST
-        parser/
-          core.rs      # Parser infrastructure
-          grammar.rs   # Grammar rules
-          error.rs     # Parse errors
-          tests/       # Parser tests (snapshots)
+        cst.rs         # SyntaxKind enum
+        ast.rs         # Typed AST wrappers over CST
+        core.rs        # Parser infrastructure
+        grammar.rs     # Grammar rules
+        error.rs       # Parse errors
+        invariants.rs  # Parser invariant checks
+        mod.rs         # Re-exports, Parse struct, parse()
+        tests/         # Parser tests (snapshots)
       query/           # Query processing
         mod.rs         # Query struct, new(), pipeline
         dump.rs        # dump_* debug output methods
@@ -38,7 +39,7 @@ docs/
 ## Pipeline
 
 ```rust
-ast::parse()                      // Parse → CST
+parser::parse()                   // Parse → CST
 alt_kind::validate()              // Validate alternation kinds
 named_defs::resolve()             // Resolve names → SymbolTable
 ref_cycles::validate()            // Validate recursion termination
@@ -97,7 +98,7 @@ Stages: `Parse` → `Validate` → `Resolve` → `Escape`. Use `Query::errors_fo
 - New scopes only from captured `{...}@s` or `[...]@c`
 - `?`/`*`/`+` = optional/list/non-empty list
 
-## AST Layer (`ast/nodes.rs`)
+## AST Layer (`parser/ast.rs`)
 
 Types: `Root`, `Def`, `Tree`, `Ref`, `Str`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
 

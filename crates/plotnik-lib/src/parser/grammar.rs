@@ -9,11 +9,11 @@ use super::core::Parser;
 use super::error::{Fix, RelatedInfo};
 use super::invariants::assert_nonempty;
 
-use crate::ast::lexer::token_text;
-use crate::ast::syntax_kind::token_sets::{
+use super::cst::token_sets::{
     ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
-use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
+use super::cst::{SyntaxKind, TokenSet};
+use super::lexer::token_text;
 
 impl Parser<'_> {
     pub fn parse_root(&mut self) {

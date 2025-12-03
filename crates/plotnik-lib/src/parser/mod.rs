@@ -1,4 +1,4 @@
-//! Resilient LL parser for the query language.
+//! Parser infrastructure for the query language.
 //!
 //! # Architecture
 //!
@@ -20,43 +20,47 @@
 //! 4. On recursion limit, remaining input goes into single Error node
 //!
 //! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an error immediately.
-//!
-//! # Grammar (EBNF-ish)
-//!
-//! ```text
-//! root       = expr*
-//! expr       = tree | alternation | wildcard | anon_node
-//!            | anchor | negated_field | field | ident
-//! tree       = "(" [node_type] expr* ")"
-//! alternation= "[" expr* "]"
-//! wildcard   = "_"
-//! anon_node  = STRING
-//! capture    = "@" LOWER_IDENT
-//! anchor     = "."
-//! negated_field = "!" IDENT
-//! field      = IDENT ":" expr
-//! quantifier = expr ("*" | "+" | "?" | "*?" | "+?" | "??")
-//! capture    = expr "@" IDENT ["::" TYPE]
-//! ```
+
+pub mod ast;
+pub mod cst;
+pub mod lexer;
 
 mod core;
 mod error;
 mod grammar;
 mod invariants;
 
+#[cfg(test)]
+mod ast_tests;
+#[cfg(test)]
+mod cst_tests;
+#[cfg(test)]
+mod error_tests;
+#[cfg(test)]
+mod lexer_tests;
+#[cfg(test)]
+mod tests;
+
+// Re-exports from cst (was syntax_kind)
+pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+
+// Re-exports from ast (was nodes)
+pub use ast::{
+    Alt, AltKind, Anchor, Branch, Capture, Def, Expr, Field, NegatedField, Quantifier, Ref, Root,
+    Seq, Str, Tree, Type, Wildcard,
+};
+
+// Re-exports from error
 pub use error::{
     Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,
     render_diagnostics, render_errors,
 };
 
+// Internal use
 pub(crate) use core::Parser;
 
-use super::lexer::lex;
-use super::syntax_kind::SyntaxNode;
 use crate::Result;
-
-#[cfg(test)]
-mod error_tests;
+use lexer::lex;
 
 /// Parse result containing the green tree and any errors.
 ///
@@ -79,7 +83,7 @@ impl Parse {
         SyntaxNode::new_root(self.inner.green.clone())
     }
 
-    pub fn errors(&self) -> &[SyntaxError] {
+    pub fn errors(&self) -> &[Diagnostic] {
         &self.inner.errors
     }
 
@@ -106,6 +110,3 @@ pub(crate) fn parse_with_parser(mut parser: Parser) -> Result<Parse> {
         inner: parser.finish()?,
     })
 }
-
-#[cfg(test)]
-mod tests;

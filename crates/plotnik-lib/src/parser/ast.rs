@@ -3,7 +3,7 @@
 //! Each struct wraps a `SyntaxNode` and provides typed accessors.
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
 
-use super::syntax_kind::{SyntaxKind, SyntaxNode, SyntaxToken};
+use super::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 macro_rules! ast_node {
     ($name:ident, $kind:ident) => {

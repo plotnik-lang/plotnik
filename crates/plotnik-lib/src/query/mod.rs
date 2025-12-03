@@ -29,9 +29,9 @@ mod shape_cardinalities_tests;
 use std::collections::HashMap;
 
 use crate::Result;
-use crate::ast::lexer::lex;
-use crate::ast::parser::{self, Parser};
-use crate::ast::{Diagnostic, Parse, Root, SyntaxNode};
+use crate::parser::lexer::lex;
+use crate::parser::{self, Parser};
+use crate::parser::{Diagnostic, Parse, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 

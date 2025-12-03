@@ -9,12 +9,12 @@
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
+use super::cst::token_sets::ROOT_EXPR_FIRST;
+use super::cst::{SyntaxKind, TokenSet};
 use super::error::{Diagnostic, Fix, RelatedInfo};
+use super::lexer::{Token, token_text};
 
 use crate::Error;
-use crate::ast::lexer::{Token, token_text};
-use crate::ast::syntax_kind::token_sets::ROOT_EXPR_FIRST;
-use crate::ast::syntax_kind::{SyntaxKind, TokenSet};
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;

@@ -1,4 +1,4 @@
-use crate::ast::syntax_kind::{QLang, SyntaxKind::*, TokenSet};
+use crate::parser::cst::{QLang, SyntaxKind::*, TokenSet};
 use rowan::Language;
 
 #[test]

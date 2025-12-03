@@ -7,8 +7,8 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use crate::ast::{Diagnostic, ErrorStage};
-use crate::ast::{Expr, Ref, Root};
+use crate::parser::{Diagnostic, ErrorStage};
+use crate::parser::{Expr, Ref, Root};
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
