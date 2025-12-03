@@ -1,5 +1,4 @@
 <br/>
-<br/>
 
 <div id="user-content-toc" align="center">
   <ul>
