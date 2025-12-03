@@ -153,19 +153,17 @@ cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | g
 
 Two-tier resilience strategy:
 
-1. **Parser**: resilient, collects errors, continues parsing
-2. **Post-parse phases**: strict invariants, panic on violations
+1. Parser: resilient, collects errors, continues parsing
+2. Our code: strict invariants, maximal coverage in tests, panic on violations
 
-For code paths that "should never happen", use `panic!` with informative messages:
-
-```rust
-let name = node.name().unwrap_or_else(|| {
-    panic!(
-        "phase_name: Node missing name at {:?} (should be caught by parser)",
-        node.syntax().text_range()
-    )
-});
-```
+Invariant checks live in dedicated modules named `invariants.rs`.
+They are excluded from test coverage because they're unreachable.
+They usually wrap a specific assert.
+It was done due to limitation of inline coverage exclusion in Rust.
+But it seems to be useful to extract such invariant check helpers anyways:
+- if it just performs assertion and doesn't return value, it starts with `assert_`
+- if it returns value, it's name consists of' `ensure_` and some statement about return value
+Find any of such files for more examples.
 
 ## Not implemented
 
