@@ -624,7 +624,11 @@ impl Parser<'_> {
             "':' to separate field name from its value",
         );
 
-        self.parse_expr_no_suffix();
+        if EXPR_FIRST.contains(self.peek()) {
+            self.parse_expr_no_suffix();
+        } else {
+            self.error("expected expression after field name");
+        }
 
         self.finish_node();
     }

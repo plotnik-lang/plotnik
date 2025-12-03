@@ -247,12 +247,12 @@ fn field_value_is_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
-    error: unexpected token; expected an expression
+    insta::assert_snapshot!(query.dump_errors(), @r"
+    error: expected expression after field name
       |
     1 | (call name: %%%)
-      |             ^^^ unexpected token; expected an expression
-    "#);
+      |             ^^^ expected expression after field name
+    ");
 }
 
 #[test]
