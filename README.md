@@ -5,7 +5,7 @@
   <ul>
   <summary>
     <p align="center">
-      <img width="256" height="256" alt="logo" src="https://github.com/user-attachments/assets/2a93f290-a758-4b19-a38e-3f12b61743d7" />
+      <img width="400" alt="Plotnik banner" src=".github/plotnik_banner.png" />
     </p>
     <h1><p>plotnik</p></h1>  
   </summary>
@@ -27,8 +27,8 @@
 </p>
 
 <br/>
-<br/>
 <hr/>
+<br/>
 
 ## Example
 
