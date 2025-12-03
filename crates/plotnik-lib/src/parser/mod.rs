@@ -73,14 +73,14 @@ pub struct Parse {
 
 impl Parse {
     #[allow(dead_code)]
-    pub fn green(&self) -> &rowan::GreenNode {
-        &self.inner.green
+    pub fn as_cst(&self) -> &rowan::GreenNode {
+        &self.inner.cst
     }
 
     /// Creates a typed view over the immutable green tree.
     /// This is cheap—SyntaxNode is a thin wrapper with parent pointers.
     pub fn syntax(&self) -> SyntaxNode {
-        SyntaxNode::new_root(self.inner.green.clone())
+        SyntaxNode::new_root(self.inner.cst.clone())
     }
 
     pub fn errors(&self) -> &[Diagnostic] {
