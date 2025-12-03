@@ -389,13 +389,13 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn enter_recursion(&mut self) -> bool {
-        if let Some(limit) = self.recursion_fuel_limit {
-            if self.depth >= limit {
-                if self.fatal_error.is_none() {
-                    self.fatal_error = Some(Error::RecursionLimitExceeded);
-                }
-                return false;
+        if let Some(limit) = self.recursion_fuel_limit
+            && self.depth >= limit
+        {
+            if self.fatal_error.is_none() {
+                self.fatal_error = Some(Error::RecursionLimitExceeded);
             }
+            return false;
         }
         self.depth += 1;
         true
