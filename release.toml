@@ -1,21 +1,8 @@
-[workspace]
 allow-branch = ["master"]
 shared-version = true
 consolidate-commits = true
-consolidate-pushes = true
 
 pre-release-commit-message = "chore: release v{{version}}"
-tag-message = "v{{version}}"
+tag-prefix = ""
 tag-name = "v{{version}}"
-
-[[package]]
-name = "plotnik-lib"
-publish = true
-
-[[package]]
-name = "plotnik-langs"
-publish = true
-
-[[package]]
-name = "plotnik-cli"
-publish = true
+tag-message = "v{{version}}"
