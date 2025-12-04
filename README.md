@@ -21,6 +21,8 @@
 <br/>
 <br/>
 
+For more details, see [reference](docs/REFERENCE.md).
+
 ## Roadmap 🚀
 
 **Ignition** _(the parser)_
