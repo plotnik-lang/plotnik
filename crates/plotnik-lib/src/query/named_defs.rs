@@ -7,7 +7,8 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics};
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Expr, Ref, Root};
 
 #[derive(Debug, Clone)]
@@ -20,12 +21,6 @@ pub struct DefInfo {
     pub name: String,
     pub range: TextRange,
     pub refs: IndexSet<String>,
-}
-
-#[derive(Debug)]
-pub struct ResolveResult {
-    pub symbols: SymbolTable,
-    pub diagnostics: Diagnostics,
 }
 
 impl SymbolTable {
@@ -50,7 +45,7 @@ impl SymbolTable {
     }
 }
 
-pub fn resolve(root: &Root) -> ResolveResult {
+pub fn resolve(root: &Root) -> PassResult<SymbolTable> {
     let mut defs = IndexMap::new();
     let mut diagnostics = Diagnostics::new();
 
@@ -64,10 +59,9 @@ pub fn resolve(root: &Root) -> ResolveResult {
         let range = name_token.text_range();
 
         if defs.contains_key(&name) {
-            diagnostics.push(
-                DiagnosticMessage::error(range, format!("duplicate definition: `{}`", name))
-                    .with_stage(DiagnosticStage::Resolve),
-            );
+            diagnostics
+                .error(format!("duplicate definition: `{}`", name), range)
+                .emit();
             continue;
         }
 
@@ -92,10 +86,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
         "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
     );
 
-    ResolveResult {
-        symbols,
-        diagnostics,
-    }
+    Ok((symbols, diagnostics))
 }
 
 fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
@@ -195,11 +186,10 @@ fn check_ref_diagnostic(r: &Ref, symbols: &SymbolTable, diagnostics: &mut Diagno
         return;
     }
 
-    diagnostics.push(
-        DiagnosticMessage::error(
-            name_token.text_range(),
+    diagnostics
+        .error(
             format!("undefined reference: `{}`", name),
+            name_token.text_range(),
         )
-        .with_stage(DiagnosticStage::Resolve),
-    );
+        .emit();
 }

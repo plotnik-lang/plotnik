@@ -8,10 +8,11 @@ use rowan::TextRange;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
-use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics, RelatedInfo};
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Alt, AltKind, Branch, Expr, Root};
 
-pub fn validate(root: &Root) -> Diagnostics {
+pub fn validate(root: &Root) -> PassResult<()> {
     let mut errors = Diagnostics::new();
 
     for def in root.defs() {
@@ -22,7 +23,7 @@ pub fn validate(root: &Root) -> Diagnostics {
 
     assert_root_no_bare_exprs(root);
 
-    errors
+    Ok(((), errors))
 }
 
 fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
@@ -102,14 +103,13 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Diagnostics) {
 
     let untagged_range = branch_range(untagged_branch);
 
-    let error = DiagnosticMessage::error(
-        untagged_range,
-        "mixed tagged and untagged branches in alternation",
-    )
-    .with_related(RelatedInfo::new(tagged_range, "tagged branch here"))
-    .with_stage(DiagnosticStage::Validate);
-
-    errors.push(error);
+    errors
+        .error(
+            "mixed tagged and untagged branches in alternation",
+            untagged_range,
+        )
+        .related_to("tagged branch here", tagged_range)
+        .emit();
 }
 
 fn branch_range(branch: &Branch) -> TextRange {

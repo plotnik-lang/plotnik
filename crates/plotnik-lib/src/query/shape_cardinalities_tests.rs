@@ -357,3 +357,47 @@ fn literal_is_one() {
         Str¹ "if"
     "#);
 }
+
+#[test]
+fn invalid_error_node() {
+    let query = Query::new("(foo %)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_cst_with_cardinalities(), @r#"
+    Root¹
+      Def¹
+        Tree¹
+          ParenOpen "("
+          Id "foo"
+          Error⁻
+            Garbage "%"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn invalid_undefined_ref() {
+    let query = Query::new("(Undefined)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def⁻
+        Ref⁻ Undefined
+    ");
+}
+
+#[test]
+fn invalid_ref_to_bodyless_def() {
+    let input = indoc! {r#"
+    X = %
+    (X)
+    "#};
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root⁺
+      Def¹ X
+      Def¹
+      Def⁻
+        Ref⁻ X
+    ");
+}

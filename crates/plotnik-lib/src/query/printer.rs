@@ -318,6 +318,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         match self.query.shape_cardinality(node) {
             ShapeCardinality::One => "¹",
             ShapeCardinality::Many => "⁺",
+            ShapeCardinality::Invalid => "⁻",
         }
     }
 

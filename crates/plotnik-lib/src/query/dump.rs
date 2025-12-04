@@ -19,12 +19,16 @@ mod test_helpers {
             self.printer().with_cardinalities(true).dump()
         }
 
+        pub fn dump_cst_with_cardinalities(&self) -> String {
+            self.printer().raw(true).with_cardinalities(true).dump()
+        }
+
         pub fn dump_symbols(&self) -> String {
             self.printer().only_symbols(true).dump()
         }
 
         pub fn dump_diagnostics(&self) -> String {
-            self.diagnostics_printer().render()
+            self.render_diagnostics()
         }
     }
 }

@@ -12,22 +12,12 @@ use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, TokenSet};
 use super::lexer::{Token, token_text};
-use crate::diagnostics::{DiagnosticMessage, Diagnostics, Fix, RelatedInfo};
+use crate::diagnostics::Diagnostics;
 
 use crate::Error;
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;
-
-/// Parse result containing the green tree and any diagnostics.
-///
-/// The tree is always complete—diagnostics are recorded separately and also
-/// represented as `SyntaxKind::Error` nodes in the tree itself.
-#[derive(Debug, Clone)]
-pub struct Parse {
-    pub(super) cst: GreenNode,
-    pub(super) diagnostics: Diagnostics,
-}
 
 /// Tracks an open delimiter for better error messages on unclosed constructs.
 #[derive(Debug, Clone, Copy)]
@@ -104,15 +94,12 @@ impl<'src> Parser<'src> {
         self
     }
 
-    pub fn finish(mut self) -> Result<Parse, Error> {
+    pub fn finish(mut self) -> Result<(GreenNode, Diagnostics), Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
-        Ok(Parse {
-            cst: self.builder.finish(),
-            diagnostics: self.diagnostics,
-        })
+        Ok((self.builder.finish(), self.diagnostics))
     }
 
     /// Check if a fatal error has occurred.
@@ -293,8 +280,7 @@ impl<'src> Parser<'src> {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
-        self.diagnostics
-            .push(DiagnosticMessage::error(range, message));
+        self.diagnostics.error(message, range).emit();
     }
 
     /// Wrap unexpected token in Error node and consume it.
@@ -397,7 +383,12 @@ impl<'src> Parser<'src> {
     }
 
     /// Record a diagnostic with a related location (e.g., where an unclosed delimiter started).
-    pub(super) fn error_with_related(&mut self, message: impl Into<String>, related: RelatedInfo) {
+    pub(super) fn error_with_related(
+        &mut self,
+        message: impl Into<String>,
+        related_msg: impl Into<String>,
+        related_range: TextRange,
+    ) {
         let range = self.current_span();
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
@@ -405,7 +396,9 @@ impl<'src> Parser<'src> {
         }
         self.last_diagnostic_pos = Some(pos);
         self.diagnostics
-            .push(DiagnosticMessage::error(range, message).with_related(related));
+            .error(message, range)
+            .related_to(related_msg, related_range)
+            .emit();
     }
 
     /// Get the end position of the last non-trivia token before current position.
@@ -424,7 +417,8 @@ impl<'src> Parser<'src> {
         &mut self,
         range: TextRange,
         message: impl Into<String>,
-        fix: Fix,
+        fix_description: impl Into<String>,
+        fix_replacement: impl Into<String>,
     ) {
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
@@ -432,6 +426,8 @@ impl<'src> Parser<'src> {
         }
         self.last_diagnostic_pos = Some(pos);
         self.diagnostics
-            .push(DiagnosticMessage::error(range, message).with_fix(fix));
+            .error(message, range)
+            .fix(fix_description, fix_replacement)
+            .emit();
     }
 }

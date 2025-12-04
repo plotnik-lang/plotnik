@@ -7,10 +7,11 @@ use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use super::named_defs::SymbolTable;
-use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics, RelatedInfo};
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Def, Expr, Root, SyntaxKind};
 
-pub fn validate(root: &Root, symbols: &SymbolTable) -> Diagnostics {
+pub fn validate(root: &Root, symbols: &SymbolTable) -> PassResult<()> {
     let sccs = find_sccs(symbols);
     let mut errors = Diagnostics::new();
 
@@ -36,7 +37,7 @@ pub fn validate(root: &Root, symbols: &SymbolTable) -> Diagnostics {
             let scc_set: IndexSet<&str> = std::iter::once(name.as_str()).collect();
             if !expr_has_escape(&body, &scc_set) {
                 let chain = build_self_ref_chain(root, name);
-                errors.push(make_error(name, &scc, chain));
+                emit_error(&mut errors, name, &scc, chain);
             }
             continue;
         }
@@ -56,11 +57,11 @@ pub fn validate(root: &Root, symbols: &SymbolTable) -> Diagnostics {
 
         if !any_has_escape {
             let chain = build_cycle_chain(root, symbols, &scc);
-            errors.push(make_error(&scc[0], &scc, chain));
+            emit_error(&mut errors, &scc[0], &scc, chain);
         }
     }
 
-    errors
+    Ok(((), errors))
 }
 
 fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
@@ -230,18 +231,17 @@ fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
     }
 }
 
-fn build_self_ref_chain(root: &Root, name: &str) -> Vec<RelatedInfo> {
+fn build_self_ref_chain(root: &Root, name: &str) -> Vec<(TextRange, String)> {
     find_reference_location(root, name, name)
-        .map(|range| {
-            vec![RelatedInfo::new(
-                range,
-                format!("`{}` references itself", name),
-            )]
-        })
+        .map(|range| vec![(range, format!("`{}` references itself", name))])
         .unwrap_or_default()
 }
 
-fn build_cycle_chain(root: &Root, symbols: &SymbolTable, scc: &[String]) -> Vec<RelatedInfo> {
+fn build_cycle_chain(
+    root: &Root,
+    symbols: &SymbolTable,
+    scc: &[String],
+) -> Vec<(TextRange, String)> {
     let scc_set: IndexSet<&str> = scc.iter().map(|s| s.as_str()).collect();
     let mut visited = IndexSet::new();
     let mut path = Vec::new();
@@ -287,13 +287,18 @@ fn build_cycle_chain(root: &Root, symbols: &SymbolTable, scc: &[String]) -> Vec<
                 } else {
                     format!("`{}` references `{}`", from, to)
                 };
-                RelatedInfo::new(range, msg)
+                (range, msg)
             })
         })
         .collect()
 }
 
-fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> DiagnosticMessage {
+fn emit_error(
+    errors: &mut Diagnostics,
+    primary_name: &str,
+    scc: &[String],
+    related: Vec<(TextRange, String)>,
+) {
     let cycle_str = if scc.len() == 1 {
         format!("`{}` → `{}`", primary_name, primary_name)
     } else {
@@ -304,16 +309,20 @@ fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> 
 
     let range = related
         .first()
-        .map(|r| r.range)
+        .map(|(r, _)| *r)
         .unwrap_or_else(|| TextRange::empty(0.into()));
 
-    DiagnosticMessage::error(
-        range,
+    let mut builder = errors.error(
         format!(
             "recursive pattern can never match: cycle {} has no escape path",
             cycle_str
         ),
-    )
-    .with_related_many(related)
-    .with_stage(DiagnosticStage::Escape)
+        range,
+    );
+
+    for (rel_range, rel_msg) in related {
+        builder = builder.related_to(rel_msg, rel_range);
+    }
+
+    builder.emit();
 }

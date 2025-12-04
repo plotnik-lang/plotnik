@@ -1,7 +1,6 @@
 //! Compiler diagnostics infrastructure.
 //!
-//! This module provides types for collecting, filtering, and rendering
-//! diagnostic messages from parsing and analysis stages.
+//! This module provides types for collecting and rendering diagnostic messages.
 
 mod message;
 mod printer;
@@ -9,93 +8,92 @@ mod printer;
 #[cfg(test)]
 mod tests;
 
-pub use message::{DiagnosticMessage, DiagnosticStage, Fix, RelatedInfo, Severity};
+use rowan::TextRange;
+
+pub use message::Severity;
 pub use printer::DiagnosticsPrinter;
+
+use message::{DiagnosticMessage, Fix, RelatedInfo};
 
 /// Collection of diagnostic messages from parsing and analysis.
 #[derive(Debug, Clone, Default)]
-pub struct Diagnostics(Vec<DiagnosticMessage>);
+pub struct Diagnostics {
+    messages: Vec<DiagnosticMessage>,
+}
+
+/// Builder for constructing a diagnostic message.
+#[must_use = "diagnostic not emitted, call .emit()"]
+pub struct DiagnosticBuilder<'a> {
+    diagnostics: &'a mut Diagnostics,
+    message: DiagnosticMessage,
+}
 
 impl Diagnostics {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self {
+            messages: Vec::new(),
+        }
     }
 
-    pub fn push(&mut self, msg: DiagnosticMessage) {
-        self.0.push(msg);
+    pub fn error(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
+        DiagnosticBuilder {
+            diagnostics: self,
+            message: DiagnosticMessage::error(range, msg),
+        }
     }
 
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = DiagnosticMessage>) {
-        self.0.extend(iter);
+    pub fn warning(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
+        DiagnosticBuilder {
+            diagnostics: self,
+            message: DiagnosticMessage::warning(range, msg),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.messages.is_empty()
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &DiagnosticMessage> + Clone {
-        self.0.iter()
+        self.messages.len()
     }
 
     pub fn has_errors(&self) -> bool {
-        self.0.iter().any(|d| d.is_error())
+        self.messages.iter().any(|d| d.is_error())
     }
 
     pub fn has_warnings(&self) -> bool {
-        self.0.iter().any(|d| d.is_warning())
-    }
-
-    pub fn as_slice(&self) -> &[DiagnosticMessage] {
-        &self.0
-    }
-
-    pub fn into_vec(self) -> Vec<DiagnosticMessage> {
-        self.0
+        self.messages.iter().any(|d| d.is_warning())
     }
 
     pub fn error_count(&self) -> usize {
-        self.0.iter().filter(|d| d.is_error()).count()
+        self.messages.iter().filter(|d| d.is_error()).count()
     }
 
     pub fn warning_count(&self) -> usize {
-        self.0.iter().filter(|d| d.is_warning()).count()
+        self.messages.iter().filter(|d| d.is_warning()).count()
     }
 
-    pub fn filter_by_severity(&self, severity: Severity) -> Vec<&DiagnosticMessage> {
-        self.0.iter().filter(|d| d.severity == severity).collect()
+    pub fn printer<'a>(&'a self, source: &'a str) -> DiagnosticsPrinter<'a> {
+        DiagnosticsPrinter::new(&self.messages, source)
     }
 
-    pub fn printer(
-        &self,
-    ) -> DiagnosticsPrinter<'_, impl Iterator<Item = &DiagnosticMessage> + Clone> {
-        DiagnosticsPrinter::new(self.iter())
+    pub fn extend(&mut self, other: Diagnostics) {
+        self.messages.extend(other.messages);
     }
 }
 
-impl IntoIterator for Diagnostics {
-    type Item = DiagnosticMessage;
-    type IntoIter = std::vec::IntoIter<DiagnosticMessage>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+impl<'a> DiagnosticBuilder<'a> {
+    pub fn related_to(mut self, msg: impl Into<String>, range: TextRange) -> Self {
+        self.message.related.push(RelatedInfo::new(range, msg));
+        self
     }
-}
 
-impl<'a> IntoIterator for &'a Diagnostics {
-    type Item = &'a DiagnosticMessage;
-    type IntoIter = std::slice::Iter<'a, DiagnosticMessage>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+    pub fn fix(mut self, description: impl Into<String>, replacement: impl Into<String>) -> Self {
+        self.message.fix = Some(Fix::new(replacement, description));
+        self
     }
-}
 
-impl FromIterator<DiagnosticMessage> for Diagnostics {
-    fn from_iter<T: IntoIterator<Item = DiagnosticMessage>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+    pub fn emit(self) {
+        self.diagnostics.messages.push(self.message);
     }
 }

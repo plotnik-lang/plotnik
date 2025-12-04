@@ -7,29 +7,21 @@ use rowan::TextRange;
 
 use super::message::{DiagnosticMessage, Severity};
 
-pub struct DiagnosticsPrinter<'a, I> {
-    diagnostics: I,
-    source: Option<&'a str>,
+pub struct DiagnosticsPrinter<'a> {
+    diagnostics: &'a [DiagnosticMessage],
+    source: &'a str,
     path: Option<&'a str>,
     colored: bool,
 }
 
-impl<'a, I> DiagnosticsPrinter<'a, I>
-where
-    I: Iterator<Item = &'a DiagnosticMessage> + Clone,
-{
-    pub fn new(diagnostics: I) -> Self {
+impl<'a> DiagnosticsPrinter<'a> {
+    pub(crate) fn new(diagnostics: &'a [DiagnosticMessage], source: &'a str) -> Self {
         Self {
             diagnostics,
-            source: None,
+            source,
             path: None,
             colored: false,
         }
-    }
-
-    pub fn source(mut self, source: &'a str) -> Self {
-        self.source = Some(source);
-        self
     }
 
     pub fn path(mut self, path: &'a str) -> Self {
@@ -49,20 +41,16 @@ where
     }
 
     pub fn format(&self, w: &mut impl Write) -> std::fmt::Result {
-        let Some(source) = self.source else {
-            return self.format_plain(w);
-        };
-
         let renderer = if self.colored {
             Renderer::styled()
         } else {
             Renderer::plain()
         };
 
-        for (i, diag) in self.diagnostics.clone().enumerate() {
-            let range = adjust_range(diag.range, source.len());
+        for (i, diag) in self.diagnostics.iter().enumerate() {
+            let range = adjust_range(diag.range, self.source.len());
 
-            let mut snippet = Snippet::source(source).line_start(1).annotation(
+            let mut snippet = Snippet::source(self.source).line_start(1).annotation(
                 AnnotationKind::Primary
                     .span(range.clone())
                     .label(&diag.message),
@@ -75,7 +63,7 @@ where
             for related in &diag.related {
                 snippet = snippet.annotation(
                     AnnotationKind::Context
-                        .span(adjust_range(related.range, source.len()))
+                        .span(adjust_range(related.range, self.source.len()))
                         .label(&related.message),
                 );
             }
@@ -88,7 +76,7 @@ where
             if let Some(fix) = &diag.fix {
                 report.push(
                     Level::HELP.secondary_title(&fix.description).element(
-                        Snippet::source(source)
+                        Snippet::source(self.source)
                             .line_start(1)
                             .patch(Patch::new(range, &fix.replacement)),
                     ),
@@ -101,16 +89,6 @@ where
             write!(w, "{}", renderer.render(&report))?;
         }
 
-        Ok(())
-    }
-
-    fn format_plain(&self, w: &mut impl Write) -> std::fmt::Result {
-        for (i, diag) in self.diagnostics.clone().enumerate() {
-            if i > 0 {
-                w.write_char('\n')?;
-            }
-            write!(w, "{}", diag)?;
-        }
         Ok(())
     }
 }

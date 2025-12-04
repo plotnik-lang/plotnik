@@ -4,14 +4,15 @@
 //! or multiple sequential positions (`Many`). Used to validate field constraints:
 //! `field: expr` requires `expr` to have `ShapeCardinality::One`.
 //!
+//! `Invalid` marks nodes where cardinality cannot be determined (error nodes,
+//! undefined refs, etc.).
+//!
 //! Root node cardinality indicates definition count (one vs multiple subqueries),
 //! not node matching semantics.
 
-use super::invariants::{
-    assert_ref_in_symbols, ensure_ref_body, ensure_ref_name, panic_unexpected_node,
-};
 use super::named_defs::SymbolTable;
-use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics};
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
 use std::collections::HashMap;
 
@@ -19,10 +20,15 @@ use std::collections::HashMap;
 pub enum ShapeCardinality {
     One,
     Many,
+    Invalid,
 }
 
-pub fn infer(root: &Root, symbols: &SymbolTable) -> HashMap<SyntaxNode, ShapeCardinality> {
+pub fn analyze(
+    root: &Root,
+    symbols: &SymbolTable,
+) -> PassResult<HashMap<SyntaxNode, ShapeCardinality>> {
     let mut result = HashMap::new();
+    let mut errors = Diagnostics::new();
     let mut def_bodies: HashMap<String, SyntaxNode> = HashMap::new();
 
     for def in root.defs() {
@@ -32,8 +38,9 @@ pub fn infer(root: &Root, symbols: &SymbolTable) -> HashMap<SyntaxNode, ShapeCar
     }
 
     compute_node_cardinality(&root.syntax().clone(), symbols, &def_bodies, &mut result);
+    validate_node(&root.syntax().clone(), &result, &mut errors);
 
-    result
+    Ok((result, errors))
 }
 
 fn compute_node_cardinality(
@@ -84,8 +91,9 @@ fn compute_single(
         return ShapeCardinality::One;
     }
 
+    // Error nodes and other non-Expr nodes: mark as Invalid
     let Some(expr) = Expr::cast(node.clone()) else {
-        panic_unexpected_node(node);
+        return ShapeCardinality::Invalid;
     };
 
     match expr {
@@ -148,24 +156,20 @@ fn ref_cardinality(
     def_bodies: &HashMap<String, SyntaxNode>,
     cache: &mut HashMap<SyntaxNode, ShapeCardinality>,
 ) -> ShapeCardinality {
-    let name_tok = ensure_ref_name(r);
+    let Some(name_tok) = r.name() else {
+        return ShapeCardinality::Invalid;
+    };
     let name = name_tok.text();
 
-    assert_ref_in_symbols(name, r, symbols.get(name).is_some());
+    if symbols.get(name).is_none() {
+        return ShapeCardinality::Invalid;
+    }
 
-    let body_node = ensure_ref_body(name, r, def_bodies.get(name));
+    let Some(body_node) = def_bodies.get(name) else {
+        return ShapeCardinality::Invalid;
+    };
 
     get_or_compute(body_node, symbols, def_bodies, cache)
-}
-
-pub fn validate(
-    root: &Root,
-    _symbols: &SymbolTable,
-    cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-) -> Diagnostics {
-    let mut errors = Diagnostics::new();
-    validate_node(&root.syntax().clone(), cardinalities, &mut errors);
-    errors
 }
 
 fn validate_node(
@@ -187,16 +191,15 @@ fn validate_node(
                 .map(|t| t.text().to_string())
                 .unwrap_or_else(|| "field".to_string());
 
-            errors.push(
-                DiagnosticMessage::error(
-                    value.syntax().text_range(),
+            errors
+                .error(
                     format!(
                         "field `{}` value must match a single node, not a sequence",
                         field_name
                     ),
+                    value.syntax().text_range(),
                 )
-                .with_stage(DiagnosticStage::Validate),
-            );
+                .emit();
         }
     }
 

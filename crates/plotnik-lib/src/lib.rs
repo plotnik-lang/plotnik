@@ -11,7 +11,7 @@
 //! "#).expect("valid query");
 //!
 //! if !query.is_valid() {
-//!     eprintln!("{}", query.diagnostics_printer().render());
+//!     eprintln!("{}", query.render_diagnostics());
 //! }
 //! ```
 
@@ -21,9 +21,13 @@ pub mod diagnostics;
 pub mod parser;
 pub mod query;
 
-pub use diagnostics::{
-    DiagnosticMessage, DiagnosticStage, Diagnostics, DiagnosticsPrinter, Fix, RelatedInfo, Severity,
-};
+/// Result type for analysis passes that produce both output and diagnostics.
+///
+/// Each pass returns its typed output alongside any diagnostics it collected.
+/// Fatal errors (like fuel exhaustion) use the outer `Result`.
+pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
+
+pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity};
 pub use query::{Query, QueryBuilder};
 
 /// Errors that can occur during query parsing.

@@ -49,54 +49,38 @@ pub use ast::{
 
 pub use core::Parser;
 
-use crate::{Diagnostics, Result};
+use crate::PassResult;
 use lexer::lex;
 
-/// Parse result containing the green tree and any diagnostics.
+/// Parse result containing the green tree.
 ///
-/// The tree is always complete—diagnostics are recorded separately and also
-/// represented as `SyntaxKind::Error` nodes in the tree itself.
+/// The tree is always complete—diagnostics are returned separately.
+/// Error nodes in the tree represent recovery points.
 #[derive(Debug, Clone)]
 pub struct Parse {
-    inner: core::Parse,
+    cst: rowan::GreenNode,
 }
 
 impl Parse {
-    #[allow(dead_code)]
     pub fn as_cst(&self) -> &rowan::GreenNode {
-        &self.inner.cst
+        &self.cst
     }
 
     /// Creates a typed view over the immutable green tree.
     /// This is cheap—SyntaxNode is a thin wrapper with parent pointers.
     pub fn syntax(&self) -> SyntaxNode {
-        SyntaxNode::new_root(self.inner.cst.clone())
-    }
-
-    pub fn diagnostics(&self) -> &Diagnostics {
-        &self.inner.diagnostics
-    }
-
-    #[allow(dead_code)]
-    pub fn is_valid(&self) -> bool {
-        self.inner.diagnostics.is_empty()
-    }
-
-    /// Render diagnostics as a human-readable string using annotate-snippets.
-    pub fn render_diagnostics(&self, source: &str) -> String {
-        self.inner.diagnostics.printer().source(source).render()
+        SyntaxNode::new_root(self.cst.clone())
     }
 }
 
 /// Main entry point. Returns Err on fuel exhaustion.
-pub fn parse(source: &str) -> Result<Parse> {
+pub fn parse(source: &str) -> PassResult<Parse> {
     parse_with_parser(Parser::new(source, lex(source)))
 }
 
 /// Parse with a pre-configured parser (for custom fuel limits).
-pub(crate) fn parse_with_parser(mut parser: Parser) -> Result<Parse> {
+pub(crate) fn parse_with_parser(mut parser: Parser) -> PassResult<Parse> {
     parser.parse_root();
-    Ok(Parse {
-        inner: parser.finish()?,
-    })
+    let (cst, diagnostics) = parser.finish()?;
+    Ok((Parse { cst }, diagnostics))
 }

@@ -96,7 +96,7 @@ pub fn run(args: DebugArgs) {
     if let Some(ref q) = query
         && !q.is_valid()
     {
-        eprint!("{}", q.diagnostics_printer().colored(args.color).render());
+        eprint!("{}", q.render_diagnostics_colored(args.color));
     }
 }
 

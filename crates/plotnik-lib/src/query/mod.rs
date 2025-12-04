@@ -1,7 +1,6 @@
 //! Query processing: parsing, analysis, and validation pipeline.
 
 mod dump;
-mod errors;
 mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
@@ -83,8 +82,8 @@ impl<'a> QueryBuilder<'a> {
             parser = parser.with_recursion_fuel(limit);
         }
 
-        let parse = parser::parse_with_parser(parser)?;
-        Ok(Query::from_parse(self.source, parse))
+        let (parse, parse_diagnostics) = parser::parse_with_parser(parser)?;
+        Ok(Query::from_parse(self.source, parse, parse_diagnostics))
     }
 }
 
@@ -98,8 +97,13 @@ pub struct Query<'a> {
     source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
-    diagnostics: Diagnostics,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
+    // Diagnostics per pass
+    parse_diagnostics: Diagnostics,
+    alt_kind_diagnostics: Diagnostics,
+    resolve_diagnostics: Diagnostics,
+    ref_cycle_diagnostics: Diagnostics,
+    shape_diagnostics: Diagnostics,
 }
 
 impl<'a> Query<'a> {
@@ -116,36 +120,32 @@ impl<'a> Query<'a> {
         QueryBuilder::new(source)
     }
 
-    /// Internal: create Query from already-parsed input.
-    fn from_parse(source: &'a str, parse: Parse) -> Self {
+    fn from_parse(source: &'a str, parse: Parse, parse_diagnostics: Diagnostics) -> Self {
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
 
-        let mut diagnostics = parse.diagnostics().clone();
+        let ((), alt_kind_diagnostics) =
+            alt_kind::validate(&root).expect("alt_kind::validate is infallible");
 
-        let alt_kind_diags = alt_kind::validate(&root);
-        diagnostics.extend(alt_kind_diags);
+        let (symbols, resolve_diagnostics) =
+            named_defs::resolve(&root).expect("named_defs::resolve is infallible");
 
-        let resolve_result = named_defs::resolve(&root);
-        diagnostics.extend(resolve_result.diagnostics);
+        let ((), ref_cycle_diagnostics) =
+            ref_cycles::validate(&root, &symbols).expect("ref_cycles::validate is infallible");
 
-        let ref_cycle_diags = ref_cycles::validate(&root, &resolve_result.symbols);
-        diagnostics.extend(ref_cycle_diags);
-
-        let shape_cardinalities = if diagnostics.is_empty() {
-            let cards = shape_cardinalities::infer(&root, &resolve_result.symbols);
-            let shape_diags = shape_cardinalities::validate(&root, &resolve_result.symbols, &cards);
-            diagnostics.extend(shape_diags);
-            cards
-        } else {
-            HashMap::new()
-        };
+        let (shape_cardinalities, shape_diagnostics) =
+            shape_cardinalities::analyze(&root, &symbols)
+                .expect("shape_cardinalities::analyze is infallible");
 
         Self {
             source,
             parse,
-            symbols: resolve_result.symbols,
-            diagnostics,
+            symbols,
             shape_cardinalities,
+            parse_diagnostics,
+            alt_kind_diagnostics,
+            resolve_diagnostics,
+            ref_cycle_diagnostics,
+            shape_diagnostics,
         }
     }
 
@@ -171,5 +171,60 @@ impl<'a> Query<'a> {
             .get(node)
             .copied()
             .unwrap_or(ShapeCardinality::One)
+    }
+
+    /// All diagnostics combined from all passes.
+    pub fn all_diagnostics(&self) -> Diagnostics {
+        let mut all = Diagnostics::new();
+        all.extend(self.parse_diagnostics.clone());
+        all.extend(self.alt_kind_diagnostics.clone());
+        all.extend(self.resolve_diagnostics.clone());
+        all.extend(self.ref_cycle_diagnostics.clone());
+        all.extend(self.shape_diagnostics.clone());
+        all
+    }
+
+    pub fn parse_diagnostics(&self) -> &Diagnostics {
+        &self.parse_diagnostics
+    }
+
+    pub fn alt_kind_diagnostics(&self) -> &Diagnostics {
+        &self.alt_kind_diagnostics
+    }
+
+    pub fn resolve_diagnostics(&self) -> &Diagnostics {
+        &self.resolve_diagnostics
+    }
+
+    pub fn ref_cycle_diagnostics(&self) -> &Diagnostics {
+        &self.ref_cycle_diagnostics
+    }
+
+    pub fn shape_diagnostics(&self) -> &Diagnostics {
+        &self.shape_diagnostics
+    }
+
+    pub fn diagnostics(&self) -> Diagnostics {
+        self.all_diagnostics()
+    }
+
+    /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
+    pub fn is_valid(&self) -> bool {
+        !self.parse_diagnostics.has_errors()
+            && !self.alt_kind_diagnostics.has_errors()
+            && !self.resolve_diagnostics.has_errors()
+            && !self.ref_cycle_diagnostics.has_errors()
+            && !self.shape_diagnostics.has_errors()
+    }
+
+    pub fn render_diagnostics(&self) -> String {
+        self.all_diagnostics().printer(self.source).render()
+    }
+
+    pub fn render_diagnostics_colored(&self, colored: bool) -> String {
+        self.all_diagnostics()
+            .printer(self.source)
+            .colored(colored)
+            .render()
     }
 }
