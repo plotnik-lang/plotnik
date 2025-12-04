@@ -62,7 +62,7 @@ jobs:
           prefix-key: v0-rust-stable
 
       - name: Check publishable
-        uses: katyo/publish-crates@v2
+        uses: katyo/publish-crates@02cc2f1ad653fb25c7d1ff9eb590a8a50d06186b # v2
         with:
           dry-run: true
           check-repo: false
