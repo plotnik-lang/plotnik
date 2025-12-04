@@ -1,356 +1,287 @@
+use std::sync::LazyLock;
 use tree_sitter::Language;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Lang {
-    #[cfg(feature = "bash")]
-    Bash,
-    #[cfg(feature = "c")]
-    C,
-    #[cfg(feature = "cpp")]
-    Cpp,
-    #[cfg(feature = "csharp")]
-    CSharp,
-    #[cfg(feature = "css")]
-    Css,
-    #[cfg(feature = "elixir")]
-    Elixir,
-    #[cfg(feature = "go")]
-    Go,
-    #[cfg(feature = "haskell")]
-    Haskell,
-    #[cfg(feature = "hcl")]
-    Hcl,
-    #[cfg(feature = "html")]
-    Html,
-    #[cfg(feature = "java")]
-    Java,
-    #[cfg(feature = "javascript")]
-    JavaScript,
-    #[cfg(feature = "json")]
-    Json,
-    #[cfg(feature = "kotlin")]
-    Kotlin,
-    #[cfg(feature = "lua")]
-    Lua,
-    #[cfg(feature = "nix")]
-    Nix,
-    #[cfg(feature = "php")]
-    Php,
-    #[cfg(feature = "python")]
-    Python,
-    #[cfg(feature = "ruby")]
-    Ruby,
-    #[cfg(feature = "rust")]
-    Rust,
-    #[cfg(feature = "scala")]
-    Scala,
-    #[cfg(feature = "solidity")]
-    Solidity,
-    #[cfg(feature = "swift")]
-    Swift,
-    #[cfg(feature = "typescript")]
-    TypeScript,
-    #[cfg(feature = "typescript")]
-    Tsx,
-    #[cfg(feature = "yaml")]
-    Yaml,
+#[derive(Debug, Clone)]
+pub struct Lang {
+    pub name: &'static str,
+    pub ts_lang: Language,
+    pub node_types_size: usize,
 }
 
-impl Lang {
-    pub fn language(&self) -> Language {
-        match self {
-            #[cfg(feature = "bash")]
-            Self::Bash => tree_sitter_bash::LANGUAGE.into(),
-            #[cfg(feature = "c")]
-            Self::C => tree_sitter_c::LANGUAGE.into(),
-            #[cfg(feature = "cpp")]
-            Self::Cpp => tree_sitter_cpp::LANGUAGE.into(),
-            #[cfg(feature = "csharp")]
-            Self::CSharp => tree_sitter_c_sharp::LANGUAGE.into(),
-            #[cfg(feature = "css")]
-            Self::Css => tree_sitter_css::LANGUAGE.into(),
-            #[cfg(feature = "elixir")]
-            Self::Elixir => tree_sitter_elixir::LANGUAGE.into(),
-            #[cfg(feature = "go")]
-            Self::Go => tree_sitter_go::LANGUAGE.into(),
-            #[cfg(feature = "haskell")]
-            Self::Haskell => tree_sitter_haskell::LANGUAGE.into(),
-            #[cfg(feature = "hcl")]
-            Self::Hcl => tree_sitter_hcl::LANGUAGE.into(),
-            #[cfg(feature = "html")]
-            Self::Html => tree_sitter_html::LANGUAGE.into(),
-            #[cfg(feature = "java")]
-            Self::Java => tree_sitter_java::LANGUAGE.into(),
-            #[cfg(feature = "javascript")]
-            Self::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
-            #[cfg(feature = "json")]
-            Self::Json => tree_sitter_json::LANGUAGE.into(),
-            #[cfg(feature = "kotlin")]
-            Self::Kotlin => tree_sitter_kotlin::LANGUAGE.into(),
-            #[cfg(feature = "lua")]
-            Self::Lua => tree_sitter_lua::LANGUAGE.into(),
-            #[cfg(feature = "nix")]
-            Self::Nix => tree_sitter_nix::LANGUAGE.into(),
-            #[cfg(feature = "php")]
-            Self::Php => tree_sitter_php::LANGUAGE_PHP.into(),
-            #[cfg(feature = "python")]
-            Self::Python => tree_sitter_python::LANGUAGE.into(),
-            #[cfg(feature = "ruby")]
-            Self::Ruby => tree_sitter_ruby::LANGUAGE.into(),
-            #[cfg(feature = "rust")]
-            Self::Rust => tree_sitter_rust::LANGUAGE.into(),
-            #[cfg(feature = "scala")]
-            Self::Scala => tree_sitter_scala::LANGUAGE.into(),
-            #[cfg(feature = "solidity")]
-            Self::Solidity => tree_sitter_solidity::LANGUAGE.into(),
-            #[cfg(feature = "swift")]
-            Self::Swift => tree_sitter_swift::LANGUAGE.into(),
-            #[cfg(feature = "typescript")]
-            Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            #[cfg(feature = "typescript")]
-            Self::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
-            #[cfg(feature = "yaml")]
-            Self::Yaml => tree_sitter_yaml::LANGUAGE.into(),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!("no languages enabled"),
-        }
-    }
+macro_rules! define_langs {
+    (
+        $(
+            $fn_name:ident => {
+                feature: $feature:literal,
+                name: $name:literal,
+                ts_lang: $ts_lang:expr,
+                node_types_key: $node_types_key:literal,
+                names: [$($alias:literal),* $(,)?],
+                extensions: [$($ext:literal),* $(,)?] $(,)?
+            }
+        ),* $(,)?
+    ) => {
+        // Generate node_types_size constants via proc macro
+        $(
+            #[cfg(feature = $feature)]
+            plotnik_macros::generate_node_types_size!($node_types_key);
+        )*
 
-    pub fn from_name(s: &str) -> Option<Self> {
-        match s.to_ascii_lowercase().as_str() {
-            #[cfg(feature = "bash")]
-            "bash" | "sh" | "shell" => Some(Self::Bash),
-            #[cfg(feature = "c")]
-            "c" => Some(Self::C),
-            #[cfg(feature = "cpp")]
-            "cpp" | "c++" | "cxx" | "cc" => Some(Self::Cpp),
-            #[cfg(feature = "csharp")]
-            "csharp" | "c#" | "cs" => Some(Self::CSharp),
-            #[cfg(feature = "css")]
-            "css" => Some(Self::Css),
-            #[cfg(feature = "elixir")]
-            "elixir" | "ex" => Some(Self::Elixir),
-            #[cfg(feature = "go")]
-            "go" | "golang" => Some(Self::Go),
-            #[cfg(feature = "haskell")]
-            "haskell" | "hs" => Some(Self::Haskell),
-            #[cfg(feature = "hcl")]
-            "hcl" | "terraform" | "tf" => Some(Self::Hcl),
-            #[cfg(feature = "html")]
-            "html" => Some(Self::Html),
-            #[cfg(feature = "java")]
-            "java" => Some(Self::Java),
-            #[cfg(feature = "javascript")]
-            "javascript" | "js" | "jsx" => Some(Self::JavaScript),
-            #[cfg(feature = "json")]
-            "json" => Some(Self::Json),
-            #[cfg(feature = "kotlin")]
-            "kotlin" | "kt" => Some(Self::Kotlin),
-            #[cfg(feature = "lua")]
-            "lua" => Some(Self::Lua),
-            #[cfg(feature = "nix")]
-            "nix" => Some(Self::Nix),
-            #[cfg(feature = "php")]
-            "php" => Some(Self::Php),
-            #[cfg(feature = "python")]
-            "python" | "py" => Some(Self::Python),
-            #[cfg(feature = "ruby")]
-            "ruby" | "rb" => Some(Self::Ruby),
-            #[cfg(feature = "rust")]
-            "rust" | "rs" => Some(Self::Rust),
-            #[cfg(feature = "scala")]
-            "scala" => Some(Self::Scala),
-            #[cfg(feature = "solidity")]
-            "solidity" | "sol" => Some(Self::Solidity),
-            #[cfg(feature = "swift")]
-            "swift" => Some(Self::Swift),
-            #[cfg(feature = "typescript")]
-            "typescript" | "ts" => Some(Self::TypeScript),
-            #[cfg(feature = "typescript")]
-            "tsx" => Some(Self::Tsx),
-            #[cfg(feature = "yaml")]
-            "yaml" | "yml" => Some(Self::Yaml),
-            _ => None,
-        }
-    }
+        // Generate lazy accessor functions
+        $(
+            #[cfg(feature = $feature)]
+            pub fn $fn_name() -> &'static Lang {
+                paste::paste! {
+                    static LANG: LazyLock<Lang> = LazyLock::new(|| Lang {
+                        name: $name,
+                        ts_lang: $ts_lang.into(),
+                        node_types_size: [<$node_types_key:upper _NODE_TYPES_SIZE>],
+                    });
+                }
+                &LANG
+            }
+        )*
 
-    pub fn from_extension(ext: &str) -> Option<Self> {
-        match ext.to_ascii_lowercase().as_str() {
-            #[cfg(feature = "bash")]
-            "sh" | "bash" | "zsh" => Some(Self::Bash),
-            #[cfg(feature = "c")]
-            "c" => Some(Self::C),
-            #[cfg(feature = "cpp")]
-            "cpp" | "cc" | "cxx" | "hpp" | "hh" | "hxx" | "h++" | "c++" => Some(Self::Cpp),
-            #[cfg(feature = "csharp")]
-            "cs" => Some(Self::CSharp),
-            #[cfg(feature = "css")]
-            "css" => Some(Self::Css),
-            #[cfg(feature = "elixir")]
-            "ex" | "exs" => Some(Self::Elixir),
-            #[cfg(feature = "go")]
-            "go" => Some(Self::Go),
-            #[cfg(feature = "haskell")]
-            "hs" | "lhs" => Some(Self::Haskell),
-            #[cfg(feature = "hcl")]
-            "hcl" | "tf" | "tfvars" => Some(Self::Hcl),
-            #[cfg(feature = "html")]
-            "html" | "htm" => Some(Self::Html),
-            #[cfg(feature = "java")]
-            "java" => Some(Self::Java),
-            #[cfg(feature = "javascript")]
-            "js" | "mjs" | "cjs" | "jsx" => Some(Self::JavaScript),
-            #[cfg(feature = "json")]
-            "json" => Some(Self::Json),
-            #[cfg(feature = "kotlin")]
-            "kt" | "kts" => Some(Self::Kotlin),
-            #[cfg(feature = "lua")]
-            "lua" => Some(Self::Lua),
-            #[cfg(feature = "nix")]
-            "nix" => Some(Self::Nix),
-            #[cfg(feature = "php")]
-            "php" => Some(Self::Php),
-            #[cfg(feature = "python")]
-            "py" | "pyi" | "pyw" => Some(Self::Python),
-            #[cfg(feature = "ruby")]
-            "rb" | "rake" | "gemspec" => Some(Self::Ruby),
-            #[cfg(feature = "rust")]
-            "rs" => Some(Self::Rust),
-            #[cfg(feature = "scala")]
-            "scala" | "sc" => Some(Self::Scala),
-            #[cfg(feature = "solidity")]
-            "sol" => Some(Self::Solidity),
-            #[cfg(feature = "swift")]
-            "swift" => Some(Self::Swift),
-            #[cfg(feature = "typescript")]
-            "ts" | "mts" | "cts" => Some(Self::TypeScript),
-            #[cfg(feature = "typescript")]
-            "tsx" => Some(Self::Tsx),
-            #[cfg(feature = "yaml")]
-            "yaml" | "yml" => Some(Self::Yaml),
-            // .h is ambiguous (C or C++), defaulting to C
-            #[cfg(feature = "c")]
-            "h" => Some(Self::C),
-            _ => None,
+        pub fn from_name(s: &str) -> Option<&'static Lang> {
+            match s.to_ascii_lowercase().as_str() {
+                $(
+                    #[cfg(feature = $feature)]
+                    $($alias)|* => Some($fn_name()),
+                )*
+                _ => None,
+            }
         }
-    }
 
-    pub fn all() -> &'static [Self] {
-        &[
-            #[cfg(feature = "bash")]
-            Self::Bash,
-            #[cfg(feature = "c")]
-            Self::C,
-            #[cfg(feature = "cpp")]
-            Self::Cpp,
-            #[cfg(feature = "csharp")]
-            Self::CSharp,
-            #[cfg(feature = "css")]
-            Self::Css,
-            #[cfg(feature = "elixir")]
-            Self::Elixir,
-            #[cfg(feature = "go")]
-            Self::Go,
-            #[cfg(feature = "haskell")]
-            Self::Haskell,
-            #[cfg(feature = "hcl")]
-            Self::Hcl,
-            #[cfg(feature = "html")]
-            Self::Html,
-            #[cfg(feature = "java")]
-            Self::Java,
-            #[cfg(feature = "javascript")]
-            Self::JavaScript,
-            #[cfg(feature = "json")]
-            Self::Json,
-            #[cfg(feature = "kotlin")]
-            Self::Kotlin,
-            #[cfg(feature = "lua")]
-            Self::Lua,
-            #[cfg(feature = "nix")]
-            Self::Nix,
-            #[cfg(feature = "php")]
-            Self::Php,
-            #[cfg(feature = "python")]
-            Self::Python,
-            #[cfg(feature = "ruby")]
-            Self::Ruby,
-            #[cfg(feature = "rust")]
-            Self::Rust,
-            #[cfg(feature = "scala")]
-            Self::Scala,
-            #[cfg(feature = "solidity")]
-            Self::Solidity,
-            #[cfg(feature = "swift")]
-            Self::Swift,
-            #[cfg(feature = "typescript")]
-            Self::TypeScript,
-            #[cfg(feature = "typescript")]
-            Self::Tsx,
-            #[cfg(feature = "yaml")]
-            Self::Yaml,
-        ]
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            #[cfg(feature = "bash")]
-            Self::Bash => "bash",
-            #[cfg(feature = "c")]
-            Self::C => "c",
-            #[cfg(feature = "cpp")]
-            Self::Cpp => "cpp",
-            #[cfg(feature = "csharp")]
-            Self::CSharp => "c_sharp",
-            #[cfg(feature = "css")]
-            Self::Css => "css",
-            #[cfg(feature = "elixir")]
-            Self::Elixir => "elixir",
-            #[cfg(feature = "go")]
-            Self::Go => "go",
-            #[cfg(feature = "haskell")]
-            Self::Haskell => "haskell",
-            #[cfg(feature = "hcl")]
-            Self::Hcl => "hcl",
-            #[cfg(feature = "html")]
-            Self::Html => "html",
-            #[cfg(feature = "java")]
-            Self::Java => "java",
-            #[cfg(feature = "javascript")]
-            Self::JavaScript => "javascript",
-            #[cfg(feature = "json")]
-            Self::Json => "json",
-            #[cfg(feature = "kotlin")]
-            Self::Kotlin => "kotlin",
-            #[cfg(feature = "lua")]
-            Self::Lua => "lua",
-            #[cfg(feature = "nix")]
-            Self::Nix => "nix",
-            #[cfg(feature = "php")]
-            Self::Php => "php",
-            #[cfg(feature = "python")]
-            Self::Python => "python",
-            #[cfg(feature = "ruby")]
-            Self::Ruby => "ruby",
-            #[cfg(feature = "rust")]
-            Self::Rust => "rust",
-            #[cfg(feature = "scala")]
-            Self::Scala => "scala",
-            #[cfg(feature = "solidity")]
-            Self::Solidity => "solidity",
-            #[cfg(feature = "swift")]
-            Self::Swift => "swift",
-            #[cfg(feature = "typescript")]
-            Self::TypeScript => "typescript",
-            #[cfg(feature = "typescript")]
-            Self::Tsx => "tsx",
-            #[cfg(feature = "yaml")]
-            Self::Yaml => "yaml",
-            #[allow(unreachable_patterns)]
-            _ => unreachable!("no languages enabled"),
+        pub fn from_ext(ext: &str) -> Option<&'static Lang> {
+            match ext.to_ascii_lowercase().as_str() {
+                $(
+                    #[cfg(feature = $feature)]
+                    $($ext)|* => Some($fn_name()),
+                )*
+                _ => None,
+            }
         }
-    }
+
+        pub fn all() -> Vec<&'static Lang> {
+            vec![
+                $(
+                    #[cfg(feature = $feature)]
+                    $fn_name(),
+                )*
+            ]
+        }
+    };
+}
+
+define_langs! {
+    bash => {
+        feature: "bash",
+        name: "bash",
+        ts_lang: tree_sitter_bash::LANGUAGE,
+        node_types_key: "bash",
+        names: ["bash", "sh", "shell"],
+        extensions: ["sh", "bash", "zsh"],
+    },
+    c => {
+        feature: "c",
+        name: "c",
+        ts_lang: tree_sitter_c::LANGUAGE,
+        node_types_key: "c",
+        names: ["c"],
+        extensions: ["c", "h"],
+    },
+    cpp => {
+        feature: "cpp",
+        name: "cpp",
+        ts_lang: tree_sitter_cpp::LANGUAGE,
+        node_types_key: "cpp",
+        names: ["cpp", "c++", "cxx", "cc"],
+        extensions: ["cpp", "cc", "cxx", "hpp", "hh", "hxx", "h++", "c++"],
+    },
+    csharp => {
+        feature: "csharp",
+        name: "c_sharp",
+        ts_lang: tree_sitter_c_sharp::LANGUAGE,
+        node_types_key: "csharp",
+        names: ["csharp", "c#", "cs", "c_sharp"],
+        extensions: ["cs"],
+    },
+    css => {
+        feature: "css",
+        name: "css",
+        ts_lang: tree_sitter_css::LANGUAGE,
+        node_types_key: "css",
+        names: ["css"],
+        extensions: ["css"],
+    },
+    elixir => {
+        feature: "elixir",
+        name: "elixir",
+        ts_lang: tree_sitter_elixir::LANGUAGE,
+        node_types_key: "elixir",
+        names: ["elixir", "ex"],
+        extensions: ["ex", "exs"],
+    },
+    go => {
+        feature: "go",
+        name: "go",
+        ts_lang: tree_sitter_go::LANGUAGE,
+        node_types_key: "go",
+        names: ["go", "golang"],
+        extensions: ["go"],
+    },
+    haskell => {
+        feature: "haskell",
+        name: "haskell",
+        ts_lang: tree_sitter_haskell::LANGUAGE,
+        node_types_key: "haskell",
+        names: ["haskell", "hs"],
+        extensions: ["hs", "lhs"],
+    },
+    hcl => {
+        feature: "hcl",
+        name: "hcl",
+        ts_lang: tree_sitter_hcl::LANGUAGE,
+        node_types_key: "hcl",
+        names: ["hcl", "terraform", "tf"],
+        extensions: ["hcl", "tf", "tfvars"],
+    },
+    html => {
+        feature: "html",
+        name: "html",
+        ts_lang: tree_sitter_html::LANGUAGE,
+        node_types_key: "html",
+        names: ["html", "htm"],
+        extensions: ["html", "htm"],
+    },
+    java => {
+        feature: "java",
+        name: "java",
+        ts_lang: tree_sitter_java::LANGUAGE,
+        node_types_key: "java",
+        names: ["java"],
+        extensions: ["java"],
+    },
+    javascript => {
+        feature: "javascript",
+        name: "javascript",
+        ts_lang: tree_sitter_javascript::LANGUAGE,
+        node_types_key: "javascript",
+        names: ["javascript", "js", "jsx", "ecmascript", "es"],
+        extensions: ["js", "mjs", "cjs", "jsx"],
+    },
+    json => {
+        feature: "json",
+        name: "json",
+        ts_lang: tree_sitter_json::LANGUAGE,
+        node_types_key: "json",
+        names: ["json"],
+        extensions: ["json"],
+    },
+    kotlin => {
+        feature: "kotlin",
+        name: "kotlin",
+        ts_lang: tree_sitter_kotlin::LANGUAGE,
+        node_types_key: "kotlin",
+        names: ["kotlin", "kt"],
+        extensions: ["kt", "kts"],
+    },
+    lua => {
+        feature: "lua",
+        name: "lua",
+        ts_lang: tree_sitter_lua::LANGUAGE,
+        node_types_key: "lua",
+        names: ["lua"],
+        extensions: ["lua"],
+    },
+    nix => {
+        feature: "nix",
+        name: "nix",
+        ts_lang: tree_sitter_nix::LANGUAGE,
+        node_types_key: "nix",
+        names: ["nix"],
+        extensions: ["nix"],
+    },
+    php => {
+        feature: "php",
+        name: "php",
+        ts_lang: tree_sitter_php::LANGUAGE_PHP,
+        node_types_key: "php",
+        names: ["php"],
+        extensions: ["php"],
+    },
+    python => {
+        feature: "python",
+        name: "python",
+        ts_lang: tree_sitter_python::LANGUAGE,
+        node_types_key: "python",
+        names: ["python", "py"],
+        extensions: ["py", "pyi", "pyw"],
+    },
+    ruby => {
+        feature: "ruby",
+        name: "ruby",
+        ts_lang: tree_sitter_ruby::LANGUAGE,
+        node_types_key: "ruby",
+        names: ["ruby", "rb"],
+        extensions: ["rb", "rake", "gemspec"],
+    },
+    rust => {
+        feature: "rust",
+        name: "rust",
+        ts_lang: tree_sitter_rust::LANGUAGE,
+        node_types_key: "rust",
+        names: ["rust", "rs"],
+        extensions: ["rs"],
+    },
+    scala => {
+        feature: "scala",
+        name: "scala",
+        ts_lang: tree_sitter_scala::LANGUAGE,
+        node_types_key: "scala",
+        names: ["scala"],
+        extensions: ["scala", "sc"],
+    },
+    solidity => {
+        feature: "solidity",
+        name: "solidity",
+        ts_lang: tree_sitter_solidity::LANGUAGE,
+        node_types_key: "solidity",
+        names: ["solidity", "sol"],
+        extensions: ["sol"],
+    },
+    swift => {
+        feature: "swift",
+        name: "swift",
+        ts_lang: tree_sitter_swift::LANGUAGE,
+        node_types_key: "swift",
+        names: ["swift"],
+        extensions: ["swift"],
+    },
+    typescript => {
+        feature: "typescript",
+        name: "typescript",
+        ts_lang: tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
+        node_types_key: "typescript",
+        names: ["typescript", "ts"],
+        extensions: ["ts", "mts", "cts"],
+    },
+    tsx => {
+        feature: "typescript",
+        name: "tsx",
+        ts_lang: tree_sitter_typescript::LANGUAGE_TSX,
+        node_types_key: "typescript_tsx",
+        names: ["tsx"],
+        extensions: ["tsx"],
+    },
+    yaml => {
+        feature: "yaml",
+        name: "yaml",
+        ts_lang: tree_sitter_yaml::LANGUAGE,
+        node_types_key: "yaml",
+        names: ["yaml", "yml"],
+        extensions: ["yaml", "yml"],
+    },
 }
 
 #[cfg(test)]
@@ -360,15 +291,50 @@ mod tests {
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_name() {
-        assert_eq!(Lang::from_name("js"), Some(Lang::JavaScript));
-        assert_eq!(Lang::from_name("JavaScript"), Some(Lang::JavaScript));
-        assert_eq!(Lang::from_name("unknown"), None);
+        assert_eq!(from_name("js").unwrap().name, "javascript");
+        assert_eq!(from_name("JavaScript").unwrap().name, "javascript");
+        assert!(from_name("unknown").is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "go")]
+    fn lang_from_name_golang() {
+        assert_eq!(from_name("go").unwrap().name, "go");
+        assert_eq!(from_name("golang").unwrap().name, "go");
+        assert_eq!(from_name("GOLANG").unwrap().name, "go");
     }
 
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_extension() {
-        assert_eq!(Lang::from_extension("js"), Some(Lang::JavaScript));
-        assert_eq!(Lang::from_extension("mjs"), Some(Lang::JavaScript));
+        assert_eq!(from_ext("js").unwrap().name, "javascript");
+        assert_eq!(from_ext("mjs").unwrap().name, "javascript");
+    }
+
+    #[test]
+    #[cfg(feature = "typescript")]
+    fn typescript_and_tsx() {
+        assert_eq!(typescript().name, "typescript");
+        assert_eq!(tsx().name, "tsx");
+        assert_eq!(from_ext("ts").unwrap().name, "typescript");
+        assert_eq!(from_ext("tsx").unwrap().name, "tsx");
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn node_types_size_matches_runtime() {
+        let runtime = std::fs::read_to_string(env!("PLOTNIK_NODE_TYPES_JAVASCRIPT"))
+            .unwrap()
+            .len();
+        assert_eq!(javascript().node_types_size, runtime);
+    }
+
+    #[test]
+    fn all_returns_enabled_langs() {
+        let langs = all();
+        assert!(!langs.is_empty());
+        for lang in &langs {
+            assert!(!lang.name.is_empty());
+        }
     }
 }
