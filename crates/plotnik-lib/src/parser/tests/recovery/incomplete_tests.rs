@@ -9,7 +9,7 @@ fn missing_capture_name() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected capture name after '@'
       |
     1 | (identifier) @
@@ -25,7 +25,7 @@ fn missing_field_value() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected expression after field name
       |
     1 | (call name:)
@@ -39,7 +39,7 @@ fn named_def_eof_after_equals() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected expression after '=' in named definition
       |
     1 | Expr = 
@@ -55,7 +55,7 @@ fn missing_type_name() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name ::
@@ -71,7 +71,7 @@ fn missing_negated_field_name() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected field name after '!' (e.g., !value)
       |
     1 | (call !)
@@ -87,7 +87,7 @@ fn missing_subtype() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected subtype after '/' (e.g., expression/binary_expression)
       |
     1 | (expression/)
@@ -103,7 +103,7 @@ fn tagged_branch_missing_expression() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected expression after branch label
       |
     1 | [Label:]
@@ -117,7 +117,7 @@ fn type_annotation_missing_name_at_eof() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (a) @x ::
@@ -131,7 +131,7 @@ fn type_annotation_missing_name_with_bracket() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | [(a) @x :: ]
@@ -147,7 +147,7 @@ fn type_annotation_invalid_token_after() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name :: (
@@ -173,7 +173,7 @@ fn field_value_is_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected expression after field name
       |
     1 | (call name: %%%)
@@ -189,7 +189,7 @@ fn capture_with_invalid_char() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected capture name after '@'
       |
     1 | (identifier) @123
@@ -203,7 +203,7 @@ fn bare_capture_at_eof_triggers_sync() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: capture '@' must follow an expression to capture
       |
     1 | @
@@ -219,7 +219,7 @@ fn bare_capture_at_root() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: capture '@' must follow an expression to capture
       |
     1 | @name
@@ -239,7 +239,7 @@ fn capture_at_start_of_alternation() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [@x (a)]
@@ -259,7 +259,7 @@ fn mixed_valid_invalid_captures() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: capture '@' must follow an expression to capture
       |
     1 | (a) @ok @ @name
@@ -283,7 +283,7 @@ fn field_equals_typo_missing_value() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: '=' is not valid for field constraints
       |
     1 | (call name = )
@@ -307,7 +307,7 @@ fn lowercase_branch_label_missing_expression() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [label:]

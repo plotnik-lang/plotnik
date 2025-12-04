@@ -48,7 +48,7 @@ fn undefined_reference() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `Undefined`
       |
     1 | Call = (call_expression function: (Undefined))
@@ -77,7 +77,7 @@ fn mutual_recursion() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo (B))
@@ -99,7 +99,7 @@ fn duplicate_definition() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: duplicate definition: `Expr`
       |
     2 | Expr = (other)
@@ -189,7 +189,7 @@ fn entry_point_undefined_reference() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `Unknown`
       |
     1 | (call function: (Unknown))
@@ -237,7 +237,7 @@ fn multiple_undefined() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `X`
       |
     1 | (foo (X) (Y) (Z))

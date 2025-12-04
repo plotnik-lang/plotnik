@@ -136,7 +136,7 @@ fn named_def_missing_equals_with_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr ^^^ (identifier)
@@ -161,7 +161,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Broken ^^^

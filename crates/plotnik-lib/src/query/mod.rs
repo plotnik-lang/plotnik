@@ -1,7 +1,6 @@
 //! Query processing: parsing, analysis, and validation pipeline.
 
 mod dump;
-mod errors;
 mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
@@ -13,8 +12,6 @@ pub mod shape_cardinalities;
 
 #[cfg(test)]
 mod alt_kind_tests;
-#[cfg(test)]
-mod errors_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
@@ -29,9 +26,9 @@ mod shape_cardinalities_tests;
 use std::collections::HashMap;
 
 use crate::Result;
+use crate::diagnostics::Diagnostics;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parser};
-use crate::parser::{Diagnostic, Parse, Root, SyntaxNode};
+use crate::parser::{self, Parse, Parser, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
@@ -85,30 +82,35 @@ impl<'a> QueryBuilder<'a> {
             parser = parser.with_recursion_fuel(limit);
         }
 
-        let parse = parser::parse_with_parser(parser)?;
-        Ok(Query::from_parse(self.source, parse))
+        let (parse, parse_diagnostics) = parser::parse_with_parser(parser)?;
+        Ok(Query::from_parse(self.source, parse, parse_diagnostics))
     }
 }
 
 /// A parsed and analyzed query.
 ///
 /// Construction succeeds unless fuel limits are exceeded.
-/// Check [`is_valid`](Self::is_valid) or [`errors`](Self::errors)
-/// to determine if the query has syntax/semantic errors.
+/// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
+/// to determine if the query has syntax/semantic issues.
 #[derive(Debug, Clone)]
 pub struct Query<'a> {
     source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
-    errors: Vec<Diagnostic>,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
+    // Diagnostics per pass
+    parse_diagnostics: Diagnostics,
+    alt_kind_diagnostics: Diagnostics,
+    resolve_diagnostics: Diagnostics,
+    ref_cycle_diagnostics: Diagnostics,
+    shape_diagnostics: Diagnostics,
 }
 
 impl<'a> Query<'a> {
     /// Parse and analyze a query from source text.
     ///
     /// Returns `Err` if fuel limits are exceeded.
-    /// Syntax/semantic errors are collected and accessible via [`errors`](Self::errors).
+    /// Syntax/semantic diagnostics are collected and accessible via [`diagnostics`](Self::diagnostics).
     pub fn new(source: &'a str) -> Result<Self> {
         QueryBuilder::new(source).build()
     }
@@ -118,37 +120,32 @@ impl<'a> Query<'a> {
         QueryBuilder::new(source)
     }
 
-    /// Internal: create Query from already-parsed input.
-    fn from_parse(source: &'a str, parse: Parse) -> Self {
+    fn from_parse(source: &'a str, parse: Parse, parse_diagnostics: Diagnostics) -> Self {
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
 
-        let mut errors = parse.errors().to_vec();
+        let ((), alt_kind_diagnostics) =
+            alt_kind::validate(&root).expect("alt_kind::validate is infallible");
 
-        let alt_kind_errors = alt_kind::validate(&root);
-        errors.extend(alt_kind_errors);
+        let (symbols, resolve_diagnostics) =
+            named_defs::resolve(&root).expect("named_defs::resolve is infallible");
 
-        let resolve_result = named_defs::resolve(&root);
-        errors.extend(resolve_result.errors);
+        let ((), ref_cycle_diagnostics) =
+            ref_cycles::validate(&root, &symbols).expect("ref_cycles::validate is infallible");
 
-        let ref_cycle_errors = ref_cycles::validate(&root, &resolve_result.symbols);
-        errors.extend(ref_cycle_errors);
-
-        let shape_cardinalities = if errors.is_empty() {
-            let cards = shape_cardinalities::infer(&root, &resolve_result.symbols);
-            let shape_errors =
-                shape_cardinalities::validate(&root, &resolve_result.symbols, &cards);
-            errors.extend(shape_errors);
-            cards
-        } else {
-            HashMap::new()
-        };
+        let (shape_cardinalities, shape_diagnostics) =
+            shape_cardinalities::analyze(&root, &symbols)
+                .expect("shape_cardinalities::analyze is infallible");
 
         Self {
             source,
             parse,
-            symbols: resolve_result.symbols,
-            errors,
+            symbols,
             shape_cardinalities,
+            parse_diagnostics,
+            alt_kind_diagnostics,
+            resolve_diagnostics,
+            ref_cycle_diagnostics,
+            shape_diagnostics,
         }
     }
 
@@ -174,5 +171,60 @@ impl<'a> Query<'a> {
             .get(node)
             .copied()
             .unwrap_or(ShapeCardinality::One)
+    }
+
+    /// All diagnostics combined from all passes.
+    pub fn all_diagnostics(&self) -> Diagnostics {
+        let mut all = Diagnostics::new();
+        all.extend(self.parse_diagnostics.clone());
+        all.extend(self.alt_kind_diagnostics.clone());
+        all.extend(self.resolve_diagnostics.clone());
+        all.extend(self.ref_cycle_diagnostics.clone());
+        all.extend(self.shape_diagnostics.clone());
+        all
+    }
+
+    pub fn parse_diagnostics(&self) -> &Diagnostics {
+        &self.parse_diagnostics
+    }
+
+    pub fn alt_kind_diagnostics(&self) -> &Diagnostics {
+        &self.alt_kind_diagnostics
+    }
+
+    pub fn resolve_diagnostics(&self) -> &Diagnostics {
+        &self.resolve_diagnostics
+    }
+
+    pub fn ref_cycle_diagnostics(&self) -> &Diagnostics {
+        &self.ref_cycle_diagnostics
+    }
+
+    pub fn shape_diagnostics(&self) -> &Diagnostics {
+        &self.shape_diagnostics
+    }
+
+    pub fn diagnostics(&self) -> Diagnostics {
+        self.all_diagnostics()
+    }
+
+    /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
+    pub fn is_valid(&self) -> bool {
+        !self.parse_diagnostics.has_errors()
+            && !self.alt_kind_diagnostics.has_errors()
+            && !self.resolve_diagnostics.has_errors()
+            && !self.ref_cycle_diagnostics.has_errors()
+            && !self.shape_diagnostics.has_errors()
+    }
+
+    pub fn render_diagnostics(&self) -> String {
+        self.all_diagnostics().printer(self.source).render()
+    }
+
+    pub fn render_diagnostics_colored(&self, colored: bool) -> String {
+        self.all_diagnostics()
+            .printer(self.source)
+            .colored(colored)
+            .render()
     }
 }

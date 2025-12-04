@@ -9,7 +9,7 @@ fn missing_paren() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree; expected ')'
       |
     1 | (identifier
@@ -27,7 +27,7 @@ fn missing_bracket() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
@@ -45,7 +45,7 @@ fn missing_brace() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
@@ -63,7 +63,7 @@ fn nested_unclosed() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree; expected ')'
       |
     1 | (a (b (c)
@@ -81,7 +81,7 @@ fn deeply_nested_unclosed() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
@@ -99,7 +99,7 @@ fn unclosed_alternation_nested() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree; expected ')'
       |
     1 | [(a) (b
@@ -117,7 +117,7 @@ fn empty_parens() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: empty tree expression - expected node type or children
       |
     1 | ()
@@ -134,7 +134,7 @@ fn unclosed_tree_shows_open_location() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree; expected ')'
       |
     1 | (call
@@ -154,7 +154,7 @@ fn unclosed_alternation_shows_open_location() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed alternation; expected ']'
       |
     1 | [
@@ -175,7 +175,7 @@ fn unclosed_sequence_shows_open_location() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed sequence; expected '}'
       |
     1 | {
@@ -192,7 +192,7 @@ fn unclosed_double_quote_string() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call "foo)
@@ -212,7 +212,7 @@ fn unclosed_single_quote_string() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call 'foo)

@@ -7,7 +7,8 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use crate::parser::{Diagnostic, ErrorStage};
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Expr, Ref, Root};
 
 #[derive(Debug, Clone)]
@@ -20,12 +21,6 @@ pub struct DefInfo {
     pub name: String,
     pub range: TextRange,
     pub refs: IndexSet<String>,
-}
-
-#[derive(Debug)]
-pub struct ResolveResult {
-    pub symbols: SymbolTable,
-    pub errors: Vec<Diagnostic>,
 }
 
 impl SymbolTable {
@@ -50,9 +45,9 @@ impl SymbolTable {
     }
 }
 
-pub fn resolve(root: &Root) -> ResolveResult {
+pub fn resolve(root: &Root) -> PassResult<SymbolTable> {
     let mut defs = IndexMap::new();
-    let mut errors = Vec::new();
+    let mut diagnostics = Diagnostics::new();
 
     // Pass 1: collect definitions
     for def in root.defs() {
@@ -64,10 +59,9 @@ pub fn resolve(root: &Root) -> ResolveResult {
         let range = name_token.text_range();
 
         if defs.contains_key(&name) {
-            errors.push(
-                Diagnostic::error(range, format!("duplicate definition: `{}`", name))
-                    .with_stage(ErrorStage::Resolve),
-            );
+            diagnostics
+                .error(format!("duplicate definition: `{}`", name), range)
+                .emit();
             continue;
         }
 
@@ -83,7 +77,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
     // Pass 2: check references
     for def in root.defs() {
         let Some(body) = def.body() else { continue };
-        collect_reference_errors(&body, &symbols, &mut errors);
+        collect_reference_diagnostics(&body, &symbols, &mut diagnostics);
     }
 
     // Parser wraps all top-level exprs in Def nodes, so this should be empty
@@ -92,7 +86,7 @@ pub fn resolve(root: &Root) -> ResolveResult {
         "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
     );
 
-    ResolveResult { symbols, errors }
+    Ok((symbols, diagnostics))
 }
 
 fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
@@ -138,20 +132,24 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
     }
 }
 
-fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
+fn collect_reference_diagnostics(
+    expr: &Expr,
+    symbols: &SymbolTable,
+    diagnostics: &mut Diagnostics,
+) {
     match expr {
         Expr::Ref(r) => {
-            check_ref_reference(r, symbols, errors);
+            check_ref_diagnostic(r, symbols, diagnostics);
         }
         Expr::Tree(tree) => {
             for child in tree.children() {
-                collect_reference_errors(&child, symbols, errors);
+                collect_reference_diagnostics(&child, symbols, diagnostics);
             }
         }
         Expr::Alt(alt) => {
             for branch in alt.branches() {
                 let Some(body) = branch.body() else { continue };
-                collect_reference_errors(&body, symbols, errors);
+                collect_reference_diagnostics(&body, symbols, diagnostics);
             }
             // Parser wraps all alt children in Branch nodes
             assert!(
@@ -161,26 +159,26 @@ fn collect_reference_errors(expr: &Expr, symbols: &SymbolTable, errors: &mut Vec
         }
         Expr::Seq(seq) => {
             for child in seq.children() {
-                collect_reference_errors(&child, symbols, errors);
+                collect_reference_diagnostics(&child, symbols, diagnostics);
             }
         }
         Expr::Capture(cap) => {
             let Some(inner) = cap.inner() else { return };
-            collect_reference_errors(&inner, symbols, errors);
+            collect_reference_diagnostics(&inner, symbols, diagnostics);
         }
         Expr::Quantifier(q) => {
             let Some(inner) = q.inner() else { return };
-            collect_reference_errors(&inner, symbols, errors);
+            collect_reference_diagnostics(&inner, symbols, diagnostics);
         }
         Expr::Field(f) => {
             let Some(value) = f.value() else { return };
-            collect_reference_errors(&value, symbols, errors);
+            collect_reference_diagnostics(&value, symbols, diagnostics);
         }
         Expr::Str(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
     }
 }
 
-fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<Diagnostic>) {
+fn check_ref_diagnostic(r: &Ref, symbols: &SymbolTable, diagnostics: &mut Diagnostics) {
     let Some(name_token) = r.name() else { return };
     let name = name_token.text();
 
@@ -188,11 +186,10 @@ fn check_ref_reference(r: &Ref, symbols: &SymbolTable, errors: &mut Vec<Diagnost
         return;
     }
 
-    errors.push(
-        Diagnostic::error(
-            name_token.text_range(),
+    diagnostics
+        .error(
             format!("undefined reference: `{}`", name),
+            name_token.text_range(),
         )
-        .with_stage(ErrorStage::Resolve),
-    );
+        .emit();
 }

@@ -4,7 +4,6 @@ use std::fs;
 use std::io::{self, Read};
 
 use plotnik_lib::Query;
-use plotnik_lib::RenderOptions;
 
 use source::{dump_source, load_source, parse_tree, resolve_lang};
 
@@ -97,12 +96,7 @@ pub fn run(args: DebugArgs) {
     if let Some(ref q) = query
         && !q.is_valid()
     {
-        let options = if args.color {
-            RenderOptions::colored()
-        } else {
-            RenderOptions::plain()
-        };
-        eprint!("{}", q.render_diagnostics(options));
+        eprint!("{}", q.render_diagnostics_colored(args.color));
     }
 }
 

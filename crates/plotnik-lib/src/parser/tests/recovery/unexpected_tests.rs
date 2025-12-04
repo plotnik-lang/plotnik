@@ -9,7 +9,7 @@ fn unexpected_token() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (identifier) ^^^ (string)
@@ -29,7 +29,7 @@ fn multiple_consecutive_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$ %%% (ok)
@@ -45,7 +45,7 @@ fn garbage_at_start() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ (a)
@@ -61,7 +61,7 @@ fn only_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | ^^^ $$$
@@ -77,7 +77,7 @@ fn garbage_inside_alternation() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) ^^^ (b)]
@@ -93,7 +93,7 @@ fn garbage_inside_node() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: expected capture name after '@'
       |
     1 | (a (b) @@@ (c)) (d)
@@ -117,7 +117,7 @@ fn xml_tag_garbage() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
@@ -137,7 +137,7 @@ fn xml_self_closing() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <br/> (a)
@@ -153,7 +153,7 @@ fn predicate_unsupported() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (a (#eq? @x "foo") b)
@@ -181,7 +181,7 @@ fn predicate_match() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (identifier) #match? @name "test"
@@ -207,7 +207,7 @@ fn predicate_in_tree() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | (function #eq? @name "test")
@@ -231,7 +231,7 @@ fn predicate_in_alternation() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [(a) #eq? (b)]
@@ -247,7 +247,7 @@ fn predicate_in_sequence() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported
       |
     1 | {(a) #set! (b)}
@@ -265,7 +265,7 @@ fn multiline_garbage_recovery() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     2 | ^^^
@@ -285,7 +285,7 @@ fn top_level_garbage_recovery() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr = (a) ^^^ Expr2 = (b)
@@ -305,7 +305,7 @@ fn multiple_definitions_with_garbage_between() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     2 | ^^^
@@ -325,7 +325,7 @@ fn alternation_recovery_to_capture() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
@@ -349,7 +349,7 @@ fn comma_between_defs() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | A = (a), B = (b)
@@ -363,7 +363,7 @@ fn bare_colon_in_tree() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a : (b))
@@ -377,7 +377,7 @@ fn paren_close_inside_alternation() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: expected closing ']' for alternation
       |
     1 | [(a) ) (b)]
@@ -399,7 +399,7 @@ fn bracket_close_inside_sequence() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: expected closing '}' for sequence
       |
     1 | {(a) ] (b)}
@@ -421,7 +421,7 @@ fn paren_close_inside_sequence() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: expected closing '}' for sequence
       |
     1 | {(a) ) (b)}
@@ -443,7 +443,7 @@ fn single_colon_type_annotation_followed_by_non_id() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (a) @x : (b)
@@ -461,7 +461,7 @@ fn single_colon_type_annotation_at_eof() {
 
     let query = Query::new(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | (a) @x :

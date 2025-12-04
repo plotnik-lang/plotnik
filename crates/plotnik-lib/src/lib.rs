@@ -3,7 +3,7 @@
 //! # Example
 //!
 //! ```
-//! use plotnik_lib::{Query, RenderOptions};
+//! use plotnik_lib::Query;
 //!
 //! let query = Query::new(r#"
 //!     Expr = [(identifier) (number)]
@@ -11,16 +11,23 @@
 //! "#).expect("valid query");
 //!
 //! if !query.is_valid() {
-//!     eprintln!("{}", query.render_diagnostics(RenderOptions::plain()));
+//!     eprintln!("{}", query.render_diagnostics());
 //! }
 //! ```
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub mod diagnostics;
 pub mod parser;
 pub mod query;
 
-pub use parser::{Diagnostic, RenderOptions, Severity};
+/// Result type for analysis passes that produce both output and diagnostics.
+///
+/// Each pass returns its typed output alongside any diagnostics it collected.
+/// Fatal errors (like fuel exhaustion) use the outer `Result`.
+pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
+
+pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity};
 pub use query::{Query, QueryBuilder};
 
 /// Errors that can occur during query parsing.

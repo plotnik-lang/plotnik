@@ -167,7 +167,7 @@ fn field_with_seq_error() {
               Tree¹ a
               Tree¹ b
     ");
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
       |
     1 | (call name: {(a) (b)})
@@ -194,7 +194,7 @@ fn field_with_ref_to_seq_error() {
           Field¹ name:
             Ref⁺ X
     ");
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
       |
     2 | (call name: (X))
@@ -356,4 +356,60 @@ fn literal_is_one() {
       Def¹
         Str¹ "if"
     "#);
+}
+
+#[test]
+fn invalid_error_node() {
+    let query = Query::new("(foo %)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_cst_with_cardinalities(), @r#"
+    Root¹
+      Def¹
+        Tree¹
+          ParenOpen "("
+          Id "foo"
+          Error⁻
+            Garbage "%"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn invalid_undefined_ref() {
+    let query = Query::new("(Undefined)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def⁻
+        Ref⁻ Undefined
+    ");
+}
+
+#[test]
+fn invalid_branch_without_body() {
+    let query = Query::new("[A:]").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def¹
+        Alt¹
+          Branch⁻ A:
+    ");
+}
+
+#[test]
+fn invalid_ref_to_bodyless_def() {
+    let input = indoc! {r#"
+    X = %
+    (X)
+    "#};
+    let query = Query::new(input).unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root⁺
+      Def⁻ X
+      Def⁻
+      Def⁻
+        Ref⁻ X
+    ");
 }

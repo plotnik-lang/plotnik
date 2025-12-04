@@ -6,7 +6,6 @@
 use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
-use super::error::{Fix, RelatedInfo};
 use super::invariants::assert_nonempty;
 
 use super::cst::token_sets::{
@@ -48,13 +47,15 @@ impl Parser<'_> {
         if unnamed_def_spans.len() > 1 {
             for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
-                self.errors.push(super::error::Diagnostic::error(
-                    *span,
-                    format!(
-                        "unnamed definition must be last in file; add a name: `Name = {}`",
-                        def_text.trim()
-                    ),
-                ));
+                self.diagnostics
+                    .error(
+                        format!(
+                            "unnamed definition must be last in file; add a name: `Name = {}`",
+                            def_text.trim()
+                        ),
+                        *span,
+                    )
+                    .emit();
             }
         }
 
@@ -267,10 +268,12 @@ impl Parser<'_> {
             let children_span = TextRange::new(children_start, children_end);
 
             if let Some(name) = &ref_name {
-                self.errors.push(super::error::Diagnostic::error(
-                    children_span,
-                    format!("reference `{}` cannot contain children", name),
-                ));
+                self.diagnostics
+                    .error(
+                        format!("reference `{}` cannot contain children", name),
+                        children_span,
+                    )
+                    .emit();
             }
         } else if is_ref {
             self.start_node_at(checkpoint, SyntaxKind::Ref);
@@ -309,8 +312,7 @@ impl Parser<'_> {
                          (caller must push delimiter before calling)"
                     )
                 });
-                let related = RelatedInfo::new(open.span, format!("{construct} started here"));
-                self.error_with_related(msg, related);
+                self.error_with_related(msg, format!("{construct} started here"), open.span);
                 break;
             }
             if self.has_fatal_error() {
@@ -367,8 +369,7 @@ impl Parser<'_> {
                          (caller must push delimiter before calling)"
                     )
                 });
-                let related = RelatedInfo::new(open.span, "alternation started here");
-                self.error_with_related(msg, related);
+                self.error_with_related(msg, "alternation started here", open.span);
                 break;
             }
             if self.has_fatal_error() {
@@ -438,14 +439,11 @@ impl Parser<'_> {
         let label_text = token_text(self.source, &self.tokens[self.pos]);
         let capitalized = capitalize_first(label_text);
 
-        let fix = Fix::new(
-            capitalized.clone(),
-            format!("capitalize as `{}`", capitalized),
-        );
         self.error_with_fix(
             span,
             "tagged alternation labels must be Capitalized (they map to enum variants)",
-            fix,
+            format!("capitalize as `{}`", capitalized),
+            capitalized,
         );
 
         self.bump();
@@ -555,8 +553,12 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Type);
 
         let span = self.current_span();
-        let fix = Fix::new("::", "use '::'");
-        self.error_with_fix(span, "single colon is not valid for type annotations", fix);
+        self.error_with_fix(
+            span,
+            "single colon is not valid for type annotations",
+            "use '::'",
+            "::",
+        );
 
         self.bump(); // colon
 
@@ -640,8 +642,12 @@ impl Parser<'_> {
         self.bump();
         self.peek();
         let span = self.current_span();
-        let fix = Fix::new(":", "use ':'");
-        self.error_with_fix(span, "'=' is not valid for field constraints", fix);
+        self.error_with_fix(
+            span,
+            "'=' is not valid for field constraints",
+            "use ':'",
+            ":",
+        );
         self.bump();
 
         if EXPR_FIRST.contains(self.peek()) {
@@ -666,14 +672,14 @@ impl Parser<'_> {
                 kind
             ),
         };
-        let fix = Fix::new("", "remove separator");
         self.error_with_fix(
             span,
             format!(
                 "'{}' is not valid syntax; plotnik uses whitespace for separation",
                 char_name
             ),
-            fix,
+            "remove separator",
+            "",
         );
         self.skip_token();
     }
@@ -701,35 +707,38 @@ impl Parser<'_> {
         if name.contains('.') {
             let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                suggested.clone(),
+            self.error_with_fix(
+                span,
+                "capture names cannot contain dots",
                 format!("captures become struct fields; use @{} instead", suggested),
+                suggested,
             );
-            self.error_with_fix(span, "capture names cannot contain dots", fix);
             return;
         }
 
         if name.contains('-') {
             let suggested = name.replace('-', "_");
             let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                suggested.clone(),
+            self.error_with_fix(
+                span,
+                "capture names cannot contain hyphens",
                 format!("captures become struct fields; use @{} instead", suggested),
+                suggested,
             );
-            self.error_with_fix(span, "capture names cannot contain hyphens", fix);
             return;
         }
 
         if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
-            let fix = Fix::new(
-                suggested.clone(),
+            self.error_with_fix(
+                span,
+                "capture names must start with lowercase",
                 format!(
                     "capture names must be snake_case; use @{} instead",
                     suggested
                 ),
+                suggested,
             );
-            self.error_with_fix(span, "capture names must start with lowercase", fix);
         }
     }
 
@@ -737,27 +746,29 @@ impl Parser<'_> {
     fn validate_def_name(&mut self, name: &str, span: TextRange) {
         if !name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_pascal_case(name);
-            let fix = Fix::new(
-                suggested.clone(),
+            self.error_with_fix(
+                span,
+                "definition names must start with uppercase",
                 format!(
                     "definition names must be PascalCase; use {} instead",
                     suggested
                 ),
+                suggested,
             );
-            self.error_with_fix(span, "definition names must start with uppercase", fix);
             return;
         }
 
         if name.contains('_') || name.contains('-') || name.contains('.') {
             let suggested = to_pascal_case(name);
-            let fix = Fix::new(
-                suggested.clone(),
+            self.error_with_fix(
+                span,
+                "definition names cannot contain separators",
                 format!(
                     "definition names must be PascalCase; use {} instead",
                     suggested
                 ),
+                suggested,
             );
-            self.error_with_fix(span, "definition names cannot contain separators", fix);
         }
     }
 
@@ -765,14 +776,15 @@ impl Parser<'_> {
     fn validate_branch_label(&mut self, name: &str, span: TextRange) {
         if name.contains('_') || name.contains('-') || name.contains('.') {
             let suggested = to_pascal_case(name);
-            let fix = Fix::new(
-                format!("{}:", suggested),
+            self.error_with_fix(
+                span,
+                "branch labels cannot contain separators",
                 format!(
                     "branch labels must be PascalCase; use {}: instead",
                     suggested
                 ),
+                format!("{}:", suggested),
             );
-            self.error_with_fix(span, "branch labels cannot contain separators", fix);
         }
     }
 
@@ -781,32 +793,35 @@ impl Parser<'_> {
         if name.contains('.') {
             let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                format!("{}:", suggested),
+            self.error_with_fix(
+                span,
+                "field names cannot contain dots",
                 format!("field names must be snake_case; use {}: instead", suggested),
+                format!("{}:", suggested),
             );
-            self.error_with_fix(span, "field names cannot contain dots", fix);
             return;
         }
 
         if name.contains('-') {
             let suggested = name.replace('-', "_");
             let suggested = to_snake_case(&suggested);
-            let fix = Fix::new(
-                format!("{}:", suggested),
+            self.error_with_fix(
+                span,
+                "field names cannot contain hyphens",
                 format!("field names must be snake_case; use {}: instead", suggested),
+                format!("{}:", suggested),
             );
-            self.error_with_fix(span, "field names cannot contain hyphens", fix);
             return;
         }
 
         if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
-            let fix = Fix::new(
-                format!("{}:", suggested),
+            self.error_with_fix(
+                span,
+                "field names must start with lowercase",
                 format!("field names must be snake_case; use {}: instead", suggested),
+                format!("{}:", suggested),
             );
-            self.error_with_fix(span, "field names must start with lowercase", fix);
         }
     }
 
@@ -814,14 +829,15 @@ impl Parser<'_> {
     fn validate_type_name(&mut self, name: &str, span: TextRange) {
         if name.contains('.') || name.contains('-') {
             let suggested = to_pascal_case(name);
-            let fix = Fix::new(
-                format!("::{}", suggested),
+            self.error_with_fix(
+                span,
+                "type names cannot contain dots or hyphens",
                 format!(
                     "type names cannot contain separators; use ::{} instead",
                     suggested
                 ),
+                format!("::{}", suggested),
             );
-            self.error_with_fix(span, "type names cannot contain dots or hyphens", fix);
         }
     }
 }

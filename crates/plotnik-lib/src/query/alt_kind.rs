@@ -8,11 +8,12 @@ use rowan::TextRange;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
+use crate::PassResult;
+use crate::diagnostics::Diagnostics;
 use crate::parser::{Alt, AltKind, Branch, Expr, Root};
-use crate::parser::{Diagnostic, ErrorStage, RelatedInfo};
 
-pub fn validate(root: &Root) -> Vec<Diagnostic> {
-    let mut errors = Vec::new();
+pub fn validate(root: &Root) -> PassResult<()> {
+    let mut errors = Diagnostics::new();
 
     for def in root.defs() {
         if let Some(body) = def.body() {
@@ -22,10 +23,10 @@ pub fn validate(root: &Root) -> Vec<Diagnostic> {
 
     assert_root_no_bare_exprs(root);
 
-    errors
+    Ok(((), errors))
 }
 
-fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
+fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
     match expr {
         Expr::Alt(alt) => {
             check_mixed_alternation(alt, errors);
@@ -69,7 +70,7 @@ fn validate_expr(expr: &Expr, errors: &mut Vec<Diagnostic>) {
     }
 }
 
-fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
+fn check_mixed_alternation(alt: &Alt, errors: &mut Diagnostics) {
     if alt.kind() != AltKind::Mixed {
         return;
     }
@@ -102,14 +103,13 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Vec<Diagnostic>) {
 
     let untagged_range = branch_range(untagged_branch);
 
-    let error = Diagnostic::error(
-        untagged_range,
-        "mixed tagged and untagged branches in alternation",
-    )
-    .with_related(RelatedInfo::new(tagged_range, "tagged branch here"))
-    .with_stage(ErrorStage::Validate);
-
-    errors.push(error);
+    errors
+        .error(
+            "mixed tagged and untagged branches in alternation",
+            untagged_range,
+        )
+        .related_to("tagged branch here", tagged_range)
+        .emit();
 }
 
 fn branch_range(branch: &Branch) -> TextRange {
