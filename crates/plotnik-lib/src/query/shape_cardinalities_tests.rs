@@ -386,6 +386,18 @@ fn invalid_undefined_ref() {
 }
 
 #[test]
+fn invalid_branch_without_body() {
+    let query = Query::new("[A:]").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def¹
+        Alt¹
+          Branch⁻ A:
+    ");
+}
+
+#[test]
 fn invalid_ref_to_bodyless_def() {
     let input = indoc! {r#"
     X = %
@@ -395,8 +407,8 @@ fn invalid_ref_to_bodyless_def() {
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
-      Def¹ X
-      Def¹
+      Def⁻ X
+      Def⁻
       Def⁻
         Ref⁻ X
     ");

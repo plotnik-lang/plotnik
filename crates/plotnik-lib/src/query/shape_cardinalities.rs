@@ -10,6 +10,9 @@
 //! Root node cardinality indicates definition count (one vs multiple subqueries),
 //! not node matching semantics.
 
+use super::invariants::{
+    ensure_capture_has_inner, ensure_quantifier_has_inner, ensure_ref_has_name,
+};
 use super::named_defs::SymbolTable;
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
@@ -76,14 +79,14 @@ fn compute_single(
         return def
             .body()
             .map(|b| get_or_compute(b.syntax(), symbols, def_bodies, cache))
-            .unwrap_or(ShapeCardinality::One);
+            .unwrap_or(ShapeCardinality::Invalid);
     }
 
     if let Some(branch) = Branch::cast(node.clone()) {
         return branch
             .body()
             .map(|b| get_or_compute(b.syntax(), symbols, def_bodies, cache))
-            .unwrap_or(ShapeCardinality::One);
+            .unwrap_or(ShapeCardinality::Invalid);
     }
 
     // Type annotations are metadata, not matching expressions
@@ -107,15 +110,15 @@ fn compute_single(
 
         Expr::Seq(ref seq) => seq_cardinality(seq, symbols, def_bodies, cache),
 
-        Expr::Capture(ref cap) => cap
-            .inner()
-            .map(|inner| get_or_compute(inner.syntax(), symbols, def_bodies, cache))
-            .unwrap_or(ShapeCardinality::One),
+        Expr::Capture(ref cap) => {
+            let inner = ensure_capture_has_inner(cap.inner());
+            get_or_compute(inner.syntax(), symbols, def_bodies, cache)
+        }
 
-        Expr::Quantifier(ref q) => q
-            .inner()
-            .map(|inner| get_or_compute(inner.syntax(), symbols, def_bodies, cache))
-            .unwrap_or(ShapeCardinality::One),
+        Expr::Quantifier(ref q) => {
+            let inner = ensure_quantifier_has_inner(q.inner());
+            get_or_compute(inner.syntax(), symbols, def_bodies, cache)
+        }
 
         Expr::Ref(ref r) => ref_cardinality(r, symbols, def_bodies, cache),
     }
@@ -156,9 +159,7 @@ fn ref_cardinality(
     def_bodies: &HashMap<String, SyntaxNode>,
     cache: &mut HashMap<SyntaxNode, ShapeCardinality>,
 ) -> ShapeCardinality {
-    let Some(name_tok) = r.name() else {
-        return ShapeCardinality::Invalid;
-    };
+    let name_tok = ensure_ref_has_name(r.name());
     let name = name_tok.text();
 
     if symbols.get(name).is_none() {
