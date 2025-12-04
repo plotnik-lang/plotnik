@@ -80,7 +80,6 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
         let defined: IndexSet<&str> = symbols.names().collect();
 
-        // Build map from name to body syntax node for cardinality lookup
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
         for def in self.query.root().defs() {
             if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
@@ -88,7 +87,6 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             }
         }
 
-        // Print all definitions in definition order
         for name in symbols.names() {
             let mut visited = IndexSet::new();
             self.format_symbol_tree(name, 0, &defined, &body_nodes, &mut visited, w)?;

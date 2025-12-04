@@ -1,8 +1,5 @@
-//! Diagnostic message types and related structures.
-
 use rowan::TextRange;
 
-/// Severity level of a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Severity {
     #[default]
@@ -19,7 +16,6 @@ impl std::fmt::Display for Severity {
     }
 }
 
-/// A suggested fix for a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fix {
     pub(crate) replacement: String,
@@ -35,7 +31,6 @@ impl Fix {
     }
 }
 
-/// Related location information for a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelatedInfo {
     pub(crate) range: TextRange,
@@ -51,7 +46,6 @@ impl RelatedInfo {
     }
 }
 
-/// A diagnostic message with location, message, severity, and optional fix.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DiagnosticMessage {
     pub(crate) severity: Severity,

@@ -18,7 +18,6 @@ impl Parser<'_> {
     pub fn parse_root(&mut self) {
         self.start_node(SyntaxKind::Root);
 
-        // Track spans of unnamed defs to emit errors for non-last ones
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
         while !self.has_fatal_error() && (self.peek() != SyntaxKind::Error || !self.eof()) {
@@ -26,16 +25,13 @@ impl Parser<'_> {
             if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
             } else {
-                // Anonymous def: wrap expression in Def node
                 let start = self.current_span().start();
                 self.start_node(SyntaxKind::Def);
                 let success = self.parse_expr_or_error();
                 if !success {
-                    // Synchronize: consume remaining garbage until next def boundary
                     self.synchronize_to_def_start();
                 }
                 self.finish_node();
-                // Only track successfully parsed defs for validation
                 if success {
                     let end = self.last_non_trivia_end().unwrap_or(start);
                     unnamed_def_spans.push(TextRange::new(start, end));
@@ -43,7 +39,6 @@ impl Parser<'_> {
             }
         }
 
-        // Emit errors for all unnamed defs except the last one
         if unnamed_def_spans.len() > 1 {
             for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
@@ -164,12 +159,10 @@ impl Parser<'_> {
     /// PascalCase identifiers without children become `Ref` nodes.
     /// PascalCase identifiers with children emit an error but parse as `Tree`.
     fn parse_tree(&mut self) {
-        // Use checkpoint so we can decide Tree vs Ref after seeing the full content
         let checkpoint = self.checkpoint();
         self.push_delimiter(SyntaxKind::ParenOpen);
         self.bump(); // consume '('
 
-        // Track if this is a reference (PascalCase identifier)
         let mut is_ref = false;
         let mut ref_name: Option<String> = None;
 
@@ -199,7 +192,6 @@ impl Parser<'_> {
                 }
 
                 if self.peek() == SyntaxKind::Slash {
-                    // Supertype syntax - commit to Tree
                     if is_ref {
                         self.start_node_at(checkpoint, SyntaxKind::Tree);
                         self.error("references cannot use supertype syntax (/)");
