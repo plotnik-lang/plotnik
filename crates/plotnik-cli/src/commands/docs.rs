@@ -8,7 +8,7 @@ pub fn run(topic: Option<&str>) {
             println!("Usage: plotnik docs <topic>");
         }
         Some("reference") => {
-            println!("{}", include_str!("../../../../docs/REFERENCE.md"));
+            println!("{}", include_str!("../../docs/REFERENCE.md"));
         }
         Some("examples") => {
             println!("(examples not yet written)");
