@@ -2,6 +2,13 @@
 name = "plotnik-cli"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "CLI for plotnik - typed query language for tree-sitter AST"
+repository = "https://github.com/plotnik-lang/plotnik"
+documentation = "https://docs.rs/plotnik-cli"
+keywords = ["tree-sitter", "query", "ast", "parser", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "../../README.md"
 
 [features]
 default = [
@@ -58,7 +65,7 @@ typescript = ["plotnik-langs/typescript"]
 yaml = ["plotnik-langs/yaml"]
 
 [dependencies]
-clap = { version = "=4.5.53", features = ["derive"] }
-plotnik-langs = { path = "../plotnik-langs", default-features = false }
-plotnik-lib = { path = "../plotnik-lib" }
-tree-sitter = "=0.25.10"
+clap = { version = "4.5", features = ["derive"] }
+plotnik-langs = { version = "0.1.0", path = "../plotnik-langs", default-features = false }
+plotnik-lib = { version = "0.1.0", path = "../plotnik-lib" }
+tree-sitter = "0.25"

@@ -44,3 +44,9 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      - name: Check publishable
+        uses: katyo/publish-crates@v2
+        with:
+          dry-run: true
+          check-repo: false
