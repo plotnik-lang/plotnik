@@ -10,25 +10,31 @@ Lexer (logos) + parser (rowan) are resilient: collect errors, don't fail-fast.
 crates/
   plotnik-lib/         # Core library
     src/
+      diagnostics/     # Diagnostic infrastructure
+        mod.rs         # Diagnostics struct, DiagnosticBuilder
+        message.rs     # DiagnosticMessage, Severity, Fix
+        printer.rs     # DiagnosticsPrinter for rendering
       parser/          # Syntax infrastructure
         lexer.rs       # Token definitions (logos)
         cst.rs         # SyntaxKind enum
         ast.rs         # Typed AST wrappers over CST
         core.rs        # Parser infrastructure
         grammar.rs     # Grammar rules
-        error.rs       # Parse errors
         invariants.rs  # Parser invariant checks
         mod.rs         # Re-exports, Parse struct, parse()
         tests/         # Parser tests (snapshots)
+        *_tests.rs     # Test files (lexer_tests, ast_tests, cst_tests)
       query/           # Query processing
         mod.rs         # Query struct, new(), pipeline
-        dump.rs        # dump_* debug output methods
-        errors.rs      # Error access methods
+        dump.rs        # dump_* debug output methods (test-only)
+        printer.rs     # QueryPrinter for AST output
+        invariants.rs  # Query invariant checks
         alt_kind.rs    # Alternation validation
         named_defs.rs  # Name resolution, symbol table
         ref_cycles.rs  # Escape analysis (recursion validation)
         shape_cardinalities.rs  # Shape inference
-      lib.rs           # Re-exports Query
+        *_tests.rs     # Test files per module
+      lib.rs           # Re-exports Query, Diagnostics, Error
   plotnik-cli/         # CLI tool
     src/commands/      # Subcommands (debug, docs, langs)
   plotnik-langs/       # Tree-sitter language bindings
@@ -43,8 +49,7 @@ parser::parse()                   // Parse → CST
 alt_kind::validate()              // Validate alternation kinds
 named_defs::resolve()             // Resolve names → SymbolTable
 ref_cycles::validate()            // Validate recursion termination
-shape_cardinalities::infer()      // Infer shape cardinalities
-shape_cardinalities::validate()   // Validate field constraints
+shape_cardinalities::analyze()    // Infer and validate shape cardinalities
 ```
 
 Module = "what", function = "action".
@@ -61,14 +66,14 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output: `--show-query`, `--show-source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
+Output: `--query`, `--source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
 
 ```sh
-cargo run -p plotnik-cli -- debug -q '(identifier) @id' --show-query
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --query
 cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
-cargo run -p plotnik-cli -- debug -s app.ts --show-source
-cargo run -p plotnik-cli -- debug -s app.ts --show-source --raw
-cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query
+cargo run -p plotnik-cli -- debug -s app.ts --source
+cargo run -p plotnik-cli -- debug -s app.ts --source --raw
+cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --query
 ```
 
 ## Syntax
@@ -79,9 +84,23 @@ SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifie
 
 Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | NegatedField | Wildcard | Anchor`. Quantifier/Capture wrap their target.
 
-## Errors
+## Diagnostics
 
-Stages: `Parse` → `Validate` → `Resolve` → `Escape`. Use `Query::errors_for_stage()`.
+`Diagnostics` struct collects errors/warnings across passes. Access per-pass or combined:
+
+```rust
+query.parse_diagnostics()      // Parse errors
+query.alt_kind_diagnostics()   // Alternation validation
+query.resolve_diagnostics()    // Name resolution
+query.ref_cycle_diagnostics()  // Recursion validation
+query.shape_diagnostics()      // Shape cardinality validation
+query.all_diagnostics()        // All combined
+query.diagnostics()            // Alias for all_diagnostics()
+```
+
+Render: `query.render_diagnostics()` or `query.render_diagnostics_colored(bool)`.
+
+Check validity: `query.is_valid()` returns false if any pass has errors (warnings allowed).
 
 ## Constraints
 
@@ -120,7 +139,7 @@ fn my_test() {
         name: (identifier) @name)
     "#};
 
-    let query = Query::new(input);
+    let query = Query::new(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @""); // <-- empty string, always
 }
@@ -138,7 +157,7 @@ Never write snapshot content manually. Let insta generate it.
 **Test patterns:**
 
 - Valid parsing: `assert!(query.is_valid())` + snapshot `dump_*()` output
-- Error recovery: `assert!(!query.is_valid())` + snapshot `dump_errors()` only
+- Error recovery: `assert!(!query.is_valid())` + snapshot `dump_diagnostics()` only
 
 ## Coverage
 
@@ -162,9 +181,10 @@ They are excluded from test coverage because they're unreachable.
 They usually wrap a specific assert.
 It was done due to limitation of inline coverage exclusion in Rust.
 But it seems to be useful to extract such invariant check helpers anyways:
+
 - if it just performs assertion and doesn't return value, it starts with `assert_`
 - if it returns value, it's name consists of' `ensure_` and some statement about return value
-Find any of such files for more examples.
+  Find any of such files for more examples.
 
 ## Not implemented
 
