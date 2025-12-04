@@ -2,6 +2,13 @@
 name = "plotnik-langs"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Tree-sitter language bindings for Plotnik query language"
+repository = "https://github.com/plotnik-lang/plotnik"
+documentation = "https://docs.rs/plotnik-langs"
+keywords = ["tree-sitter", "parser", "languages"]
+categories = ["parsing", "development-tools"]
+readme = "../../README.md"
 
 [features]
 default = [

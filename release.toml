@@ -1,0 +1,8 @@
+allow-branch = ["master"]
+shared-version = true
+consolidate-commits = true
+
+pre-release-commit-message = "chore: release v{{version}}"
+tag-prefix = ""
+tag-name = "v{{version}}"
+tag-message = "v{{version}}"
