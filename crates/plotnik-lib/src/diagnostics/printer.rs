@@ -1,4 +1,3 @@
-
 //! Builder-pattern printer for rendering diagnostics.
 
 use std::fmt::Write;
@@ -6,19 +5,20 @@ use std::fmt::Write;
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 use rowan::TextRange;
 
-use super::collection::Diagnostics;
-use super::message::Severity;
+use super::message::{DiagnosticMessage, Severity};
 
-/// Builder for rendering diagnostics with various options.
-pub struct DiagnosticsPrinter<'d, 's> {
-    diagnostics: &'d Diagnostics,
-    source: Option<&'s str>,
-    path: Option<&'s str>,
+pub struct DiagnosticsPrinter<'a, I> {
+    diagnostics: I,
+    source: Option<&'a str>,
+    path: Option<&'a str>,
     colored: bool,
 }
 
-impl<'d, 's> DiagnosticsPrinter<'d, 's> {
-    pub fn new(diagnostics: &'d Diagnostics) -> Self {
+impl<'a, I> DiagnosticsPrinter<'a, I>
+where
+    I: Iterator<Item = &'a DiagnosticMessage> + Clone,
+{
+    pub fn new(diagnostics: I) -> Self {
         Self {
             diagnostics,
             source: None,
@@ -27,12 +27,12 @@ impl<'d, 's> DiagnosticsPrinter<'d, 's> {
         }
     }
 
-    pub fn source(mut self, source: &'s str) -> Self {
+    pub fn source(mut self, source: &'a str) -> Self {
         self.source = Some(source);
         self
     }
 
-    pub fn path(mut self, path: &'s str) -> Self {
+    pub fn path(mut self, path: &'a str) -> Self {
         self.path = Some(path);
         self
     }
@@ -53,17 +53,13 @@ impl<'d, 's> DiagnosticsPrinter<'d, 's> {
             return self.format_plain(w);
         };
 
-        if self.diagnostics.is_empty() {
-            return Ok(());
-        }
-
         let renderer = if self.colored {
             Renderer::styled()
         } else {
             Renderer::plain()
         };
 
-        for (i, diag) in self.diagnostics.iter().enumerate() {
+        for (i, diag) in self.diagnostics.clone().enumerate() {
             let range = adjust_range(diag.range, source.len());
 
             let mut snippet = Snippet::source(source).line_start(1).annotation(
@@ -109,7 +105,7 @@ impl<'d, 's> DiagnosticsPrinter<'d, 's> {
     }
 
     fn format_plain(&self, w: &mut impl Write) -> std::fmt::Result {
-        for (i, diag) in self.diagnostics.iter().enumerate() {
+        for (i, diag) in self.diagnostics.clone().enumerate() {
             if i > 0 {
                 w.write_char('\n')?;
             }
@@ -135,10 +131,4 @@ fn adjust_range(range: TextRange, limit: usize) -> std::ops::Range<usize> {
     }
 
     start..end
-}
-
-impl Diagnostics {
-    pub fn printer(&self) -> DiagnosticsPrinter<'_, '_> {
-        DiagnosticsPrinter::new(self)
-    }
 }
