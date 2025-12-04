@@ -1,6 +1,5 @@
-//! Diagnostic types and rendering utilities.
+//! Diagnostic message types and related structures.
 
-use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 use rowan::{TextRange, TextSize};
 use serde::{Serialize, Serializer};
 
@@ -13,15 +12,6 @@ pub enum Severity {
     Warning,
 }
 
-impl Severity {
-    fn to_level(self) -> Level<'static> {
-        match self {
-            Severity::Error => Level::ERROR,
-            Severity::Warning => Level::WARNING,
-        }
-    }
-}
-
 impl std::fmt::Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -31,28 +21,28 @@ impl std::fmt::Display for Severity {
     }
 }
 
-/// The stage at which a diagnostic occurred (internal implementation detail).
+/// The stage at which a diagnostic occurred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum ErrorStage {
-    /// Lexing/parsing errors (syntax structure)
+pub enum DiagnosticStage {
+    /// Lexing/parsing diagnostics (syntax structure)
     #[default]
     Parse,
-    /// Semantic validation errors (mixed alternations, etc.)
+    /// Semantic validation diagnostics (mixed alternations, etc.)
     Validate,
-    /// Name resolution errors (undefined/duplicate references)
+    /// Name resolution diagnostics (undefined/duplicate references)
     Resolve,
-    /// Escape analysis errors (infinite recursion)
+    /// Escape analysis diagnostics (infinite recursion)
     Escape,
 }
 
-impl std::fmt::Display for ErrorStage {
+impl std::fmt::Display for DiagnosticStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorStage::Parse => write!(f, "parse"),
-            ErrorStage::Validate => write!(f, "validate"),
-            ErrorStage::Resolve => write!(f, "resolve"),
-            ErrorStage::Escape => write!(f, "escape"),
+            DiagnosticStage::Parse => write!(f, "parse"),
+            DiagnosticStage::Validate => write!(f, "validate"),
+            DiagnosticStage::Resolve => write!(f, "resolve"),
+            DiagnosticStage::Escape => write!(f, "escape"),
         }
     }
 }
@@ -90,11 +80,19 @@ impl RelatedInfo {
     }
 }
 
-/// A diagnostic with location, message, severity, and optional fix.
+fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok, S::Error> {
+    use serde::ser::SerializeStruct;
+    let mut state = s.serialize_struct("TextRange", 2)?;
+    state.serialize_field("start", &u32::from(range.start()))?;
+    state.serialize_field("end", &u32::from(range.end()))?;
+    state.end()
+}
+
+/// A diagnostic message with location, message, severity, and optional fix.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Diagnostic {
+pub struct DiagnosticMessage {
     pub severity: Severity,
-    pub stage: ErrorStage,
+    pub stage: DiagnosticStage,
     #[serde(serialize_with = "serialize_text_range")]
     pub range: TextRange,
     pub message: String,
@@ -104,20 +102,12 @@ pub struct Diagnostic {
     pub related: Vec<RelatedInfo>,
 }
 
-fn serialize_text_range<S: Serializer>(range: &TextRange, s: S) -> Result<S::Ok, S::Error> {
-    use serde::ser::SerializeStruct;
-    let mut state = s.serialize_struct("TextRange", 2)?;
-    state.serialize_field("start", &u32::from(range.start()))?;
-    state.serialize_field("end", &u32::from(range.end()))?;
-    state.end()
-}
-
-impl Diagnostic {
+impl DiagnosticMessage {
     /// Create an error diagnostic.
     pub fn error(range: TextRange, message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Error,
-            stage: ErrorStage::default(),
+            stage: DiagnosticStage::default(),
             range,
             message: message.into(),
             fix: None,
@@ -129,7 +119,7 @@ impl Diagnostic {
     pub fn warning(range: TextRange, message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Warning,
-            stage: ErrorStage::default(),
+            stage: DiagnosticStage::default(),
             range,
             message: message.into(),
             fix: None,
@@ -148,7 +138,7 @@ impl Diagnostic {
     }
 
     /// Set the pipeline stage.
-    pub fn with_stage(mut self, stage: ErrorStage) -> Self {
+    pub fn with_stage(mut self, stage: DiagnosticStage) -> Self {
         self.stage = stage;
         self
     }
@@ -180,7 +170,7 @@ impl Diagnostic {
     }
 }
 
-impl std::fmt::Display for Diagnostic {
+impl std::fmt::Display for DiagnosticMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -206,108 +196,4 @@ impl std::fmt::Display for Diagnostic {
     }
 }
 
-impl std::error::Error for Diagnostic {}
-
-/// Options for rendering diagnostics.
-#[derive(Debug, Clone, Copy)]
-pub struct RenderOptions {
-    pub colored: bool,
-}
-
-impl Default for RenderOptions {
-    fn default() -> Self {
-        Self { colored: true }
-    }
-}
-
-impl RenderOptions {
-    pub fn plain() -> Self {
-        Self { colored: false }
-    }
-
-    pub fn colored() -> Self {
-        Self { colored: true }
-    }
-}
-
-fn adjust_range(range: TextRange, limit: usize) -> std::ops::Range<usize> {
-    let start: usize = range.start().into();
-    let end: usize = range.end().into();
-
-    if start == end {
-        return start..(start + 1).min(limit);
-    }
-
-    start..end
-}
-
-/// Render diagnostics using annotate-snippets.
-pub fn render_diagnostics(
-    source: &str,
-    diagnostics: &[Diagnostic],
-    path: Option<&str>,
-    options: RenderOptions,
-) -> String {
-    if diagnostics.is_empty() {
-        return String::new();
-    }
-
-    let renderer = if options.colored {
-        Renderer::styled()
-    } else {
-        Renderer::plain()
-    };
-
-    let mut output = String::new();
-
-    for (i, diag) in diagnostics.iter().enumerate() {
-        let range = adjust_range(diag.range, source.len());
-
-        let mut snippet = Snippet::source(source).line_start(1).annotation(
-            AnnotationKind::Primary
-                .span(range.clone())
-                .label(&diag.message),
-        );
-
-        if let Some(p) = path {
-            snippet = snippet.path(p);
-        }
-
-        for related in &diag.related {
-            snippet = snippet.annotation(
-                AnnotationKind::Context
-                    .span(adjust_range(related.range, source.len()))
-                    .label(&related.message),
-            );
-        }
-
-        let level = diag.severity.to_level();
-        let title_group = level.primary_title(&diag.message).element(snippet);
-
-        let mut report: Vec<Group> = vec![title_group];
-
-        if let Some(fix) = &diag.fix {
-            report.push(
-                Level::HELP.secondary_title(&fix.description).element(
-                    Snippet::source(source)
-                        .line_start(1)
-                        .patch(Patch::new(range, &fix.replacement)),
-                ),
-            );
-        }
-
-        if i > 0 {
-            output.push('\n');
-        }
-        output.push_str(&renderer.render(&report).to_string());
-    }
-
-    output
-}
-
-// Backwards compatibility aliases
-pub type SyntaxError = Diagnostic;
-
-pub fn render_errors(source: &str, errors: &[Diagnostic], path: Option<&str>) -> String {
-    render_diagnostics(source, errors, path, RenderOptions::plain())
-}
+impl std::error::Error for DiagnosticMessage {}

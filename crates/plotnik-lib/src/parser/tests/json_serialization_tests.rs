@@ -4,10 +4,10 @@ use crate::parser::parse;
 fn error_json_serialization() {
     let input = "(identifier) @foo.bar";
     let result = parse(input).unwrap();
-    let errors = result.errors();
+    let errors = result.diagnostics();
 
     assert_eq!(errors.len(), 1);
-    let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+    let json = serde_json::to_string_pretty(errors.iter().next().unwrap()).unwrap();
 
     insta::assert_snapshot!(json, @r#"
     {
@@ -30,10 +30,10 @@ fn error_json_serialization() {
 fn error_json_serialization_no_fix() {
     let input = "(identifier) @";
     let result = parse(input).unwrap();
-    let errors = result.errors();
+    let errors = result.diagnostics();
 
     assert_eq!(errors.len(), 1);
-    let json = serde_json::to_string_pretty(&errors[0]).unwrap();
+    let json = serde_json::to_string_pretty(errors.iter().next().unwrap()).unwrap();
 
     insta::assert_snapshot!(json, @r#"
     {

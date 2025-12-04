@@ -6,8 +6,8 @@
 use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
-use super::error::{Fix, RelatedInfo};
 use super::invariants::assert_nonempty;
+use crate::diagnostics::{Fix, RelatedInfo};
 
 use super::cst::token_sets::{
     ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
@@ -48,13 +48,14 @@ impl Parser<'_> {
         if unnamed_def_spans.len() > 1 {
             for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
-                self.errors.push(super::error::Diagnostic::error(
-                    *span,
-                    format!(
-                        "unnamed definition must be last in file; add a name: `Name = {}`",
-                        def_text.trim()
-                    ),
-                ));
+                self.diagnostics
+                    .push(crate::diagnostics::DiagnosticMessage::error(
+                        *span,
+                        format!(
+                            "unnamed definition must be last in file; add a name: `Name = {}`",
+                            def_text.trim()
+                        ),
+                    ));
             }
         }
 
@@ -267,10 +268,11 @@ impl Parser<'_> {
             let children_span = TextRange::new(children_start, children_end);
 
             if let Some(name) = &ref_name {
-                self.errors.push(super::error::Diagnostic::error(
-                    children_span,
-                    format!("reference `{}` cannot contain children", name),
-                ));
+                self.diagnostics
+                    .push(crate::diagnostics::DiagnosticMessage::error(
+                        children_span,
+                        format!("reference `{}` cannot contain children", name),
+                    ));
             }
         } else if is_ref {
             self.start_node_at(checkpoint, SyntaxKind::Ref);

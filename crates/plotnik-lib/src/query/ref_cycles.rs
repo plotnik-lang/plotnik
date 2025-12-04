@@ -7,12 +7,12 @@ use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use super::named_defs::SymbolTable;
+use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics, RelatedInfo};
 use crate::parser::{Def, Expr, Root, SyntaxKind};
-use crate::parser::{Diagnostic, ErrorStage, RelatedInfo};
 
-pub fn validate(root: &Root, symbols: &SymbolTable) -> Vec<Diagnostic> {
+pub fn validate(root: &Root, symbols: &SymbolTable) -> Diagnostics {
     let sccs = find_sccs(symbols);
-    let mut errors = Vec::new();
+    let mut errors = Diagnostics::new();
 
     for scc in sccs {
         if scc.len() == 1 {
@@ -293,7 +293,7 @@ fn build_cycle_chain(root: &Root, symbols: &SymbolTable, scc: &[String]) -> Vec<
         .collect()
 }
 
-fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> Diagnostic {
+fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> DiagnosticMessage {
     let cycle_str = if scc.len() == 1 {
         format!("`{}` → `{}`", primary_name, primary_name)
     } else {
@@ -307,7 +307,7 @@ fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> 
         .map(|r| r.range)
         .unwrap_or_else(|| TextRange::empty(0.into()));
 
-    Diagnostic::error(
+    DiagnosticMessage::error(
         range,
         format!(
             "recursive pattern can never match: cycle {} has no escape path",
@@ -315,5 +315,5 @@ fn make_error(primary_name: &str, scc: &[String], related: Vec<RelatedInfo>) -> 
         ),
     )
     .with_related_many(related)
-    .with_stage(ErrorStage::Escape)
+    .with_stage(DiagnosticStage::Escape)
 }

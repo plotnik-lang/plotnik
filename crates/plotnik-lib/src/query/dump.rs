@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test_helpers {
     use crate::Query;
-    use crate::parser::{RenderOptions, render_diagnostics};
 
     impl Query<'_> {
         pub fn dump_cst(&self) -> String {
@@ -24,8 +23,8 @@ mod test_helpers {
             self.printer().only_symbols(true).dump()
         }
 
-        pub fn dump_errors(&self) -> String {
-            render_diagnostics(self.source, &self.errors, None, RenderOptions::plain())
+        pub fn dump_diagnostics(&self) -> String {
+            self.diagnostics_printer().render()
         }
     }
 }

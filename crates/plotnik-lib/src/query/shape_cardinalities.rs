@@ -11,8 +11,8 @@ use super::invariants::{
     assert_ref_in_symbols, ensure_ref_body, ensure_ref_name, panic_unexpected_node,
 };
 use super::named_defs::SymbolTable;
+use crate::diagnostics::{DiagnosticMessage, DiagnosticStage, Diagnostics};
 use crate::parser::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
-use crate::parser::{Diagnostic, ErrorStage};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -162,8 +162,8 @@ pub fn validate(
     root: &Root,
     _symbols: &SymbolTable,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-) -> Vec<Diagnostic> {
-    let mut errors = Vec::new();
+) -> Diagnostics {
+    let mut errors = Diagnostics::new();
     validate_node(&root.syntax().clone(), cardinalities, &mut errors);
     errors
 }
@@ -171,7 +171,7 @@ pub fn validate(
 fn validate_node(
     node: &SyntaxNode,
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
-    errors: &mut Vec<Diagnostic>,
+    errors: &mut Diagnostics,
 ) {
     if let Some(field) = Field::cast(node.clone())
         && let Some(value) = field.value()
@@ -188,14 +188,14 @@ fn validate_node(
                 .unwrap_or_else(|| "field".to_string());
 
             errors.push(
-                Diagnostic::error(
+                DiagnosticMessage::error(
                     value.syntax().text_range(),
                     format!(
                         "field `{}` value must match a single node, not a sequence",
                         field_name
                     ),
                 )
-                .with_stage(ErrorStage::Validate),
+                .with_stage(DiagnosticStage::Validate),
             );
         }
     }

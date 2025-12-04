@@ -167,7 +167,7 @@ fn field_with_seq_error() {
               Tree¹ a
               Tree¹ b
     ");
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
       |
     1 | (call name: {(a) (b)})
@@ -194,7 +194,7 @@ fn field_with_ref_to_seq_error() {
           Field¹ name:
             Ref⁺ X
     ");
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
       |
     2 | (call name: (X))

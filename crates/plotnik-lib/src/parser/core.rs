@@ -4,29 +4,29 @@
 //! - Token access and lookahead
 //! - Trivia buffering and attachment
 //! - Tree construction via Rowan
-//! - Error recording and recovery
+//! - Diagnostic recording and recovery
 //! - Fuel-based limits (debug, execution, recursion)
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, TokenSet};
-use super::error::{Diagnostic, Fix, RelatedInfo};
 use super::lexer::{Token, token_text};
+use crate::diagnostics::{DiagnosticMessage, Diagnostics, Fix, RelatedInfo};
 
 use crate::Error;
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;
 
-/// Parse result containing the green tree and any errors.
+/// Parse result containing the green tree and any diagnostics.
 ///
-/// The tree is always complete—errors are recorded separately and also
+/// The tree is always complete—diagnostics are recorded separately and also
 /// represented as `SyntaxKind::Error` nodes in the tree itself.
 #[derive(Debug, Clone)]
 pub struct Parse {
     pub(super) cst: GreenNode,
-    pub(super) errors: Vec<Diagnostic>,
+    pub(super) diagnostics: Diagnostics,
 }
 
 /// Tracks an open delimiter for better error messages on unclosed constructs.
@@ -51,12 +51,12 @@ pub struct Parser<'src> {
     /// Drained into tree at `start_node()` / `checkpoint()`.
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
-    pub(super) errors: Vec<Diagnostic>,
+    pub(super) diagnostics: Diagnostics,
     /// Current recursion depth.
     pub(super) depth: u32,
-    /// Last error position - used to suppress cascading errors at same span
-    pub(super) last_error_pos: Option<TextSize>,
-    /// Stack of open delimiters for "unclosed X started here" errors.
+    /// Last diagnostic position - used to suppress cascading diagnostics at same span
+    pub(super) last_diagnostic_pos: Option<TextSize>,
+    /// Stack of open delimiters for "unclosed X started here" messages.
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
 
     // Fuel limits
@@ -81,9 +81,9 @@ impl<'src> Parser<'src> {
             pos: 0,
             trivia_buffer: Vec::with_capacity(4),
             builder: GreenNodeBuilder::new(),
-            errors: Vec::new(),
+            diagnostics: Diagnostics::new(),
             depth: 0,
-            last_error_pos: None,
+            last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             debug_fuel: std::cell::Cell::new(256),
             exec_fuel_remaining: Some(DEFAULT_EXEC_FUEL),
@@ -111,7 +111,7 @@ impl<'src> Parser<'src> {
         }
         Ok(Parse {
             cst: self.builder.finish(),
-            errors: self.errors,
+            diagnostics: self.diagnostics,
         })
     }
 
@@ -277,7 +277,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Expect token. On mismatch: emit error but don't consume (allows parent recovery).
+    /// Expect token. On mismatch: emit diagnostic but don't consume (allows parent recovery).
     pub(super) fn expect(&mut self, kind: SyntaxKind, what: &str) -> bool {
         if self.eat(kind) {
             return true;
@@ -289,11 +289,12 @@ impl<'src> Parser<'src> {
     pub(super) fn error(&mut self, message: impl Into<String>) {
         let range = self.current_span();
         let pos = range.start();
-        if self.last_error_pos == Some(pos) {
+        if self.last_diagnostic_pos == Some(pos) {
             return;
         }
-        self.last_error_pos = Some(pos);
-        self.errors.push(Diagnostic::error(range, message));
+        self.last_diagnostic_pos = Some(pos);
+        self.diagnostics
+            .push(DiagnosticMessage::error(range, message));
     }
 
     /// Wrap unexpected token in Error node and consume it.
@@ -308,7 +309,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Skip tokens until we hit a recovery point. Wraps skipped tokens in Error node.
-    /// If already at recovery token, just emits error without consuming.
+    /// If already at recovery token, just emits diagnostic without consuming.
     #[allow(dead_code)] // Used by future grammar rules (named expressions)
     pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
         if self.at_set(recovery) || self.should_stop() {
@@ -395,16 +396,16 @@ impl<'src> Parser<'src> {
         self.delimiter_stack.pop()
     }
 
-    /// Record an error with a related location (e.g., where an unclosed delimiter started).
+    /// Record a diagnostic with a related location (e.g., where an unclosed delimiter started).
     pub(super) fn error_with_related(&mut self, message: impl Into<String>, related: RelatedInfo) {
         let range = self.current_span();
         let pos = range.start();
-        if self.last_error_pos == Some(pos) {
+        if self.last_diagnostic_pos == Some(pos) {
             return;
         }
-        self.last_error_pos = Some(pos);
-        self.errors
-            .push(Diagnostic::error(range, message).with_related(related));
+        self.last_diagnostic_pos = Some(pos);
+        self.diagnostics
+            .push(DiagnosticMessage::error(range, message).with_related(related));
     }
 
     /// Get the end position of the last non-trivia token before current position.
@@ -418,7 +419,7 @@ impl<'src> Parser<'src> {
         None
     }
 
-    /// Record an error with an associated fix suggestion.
+    /// Record a diagnostic with an associated fix suggestion.
     pub(super) fn error_with_fix(
         &mut self,
         range: TextRange,
@@ -426,11 +427,11 @@ impl<'src> Parser<'src> {
         fix: Fix,
     ) {
         let pos = range.start();
-        if self.last_error_pos == Some(pos) {
+        if self.last_diagnostic_pos == Some(pos) {
             return;
         }
-        self.last_error_pos = Some(pos);
-        self.errors
-            .push(Diagnostic::error(range, message).with_fix(fix));
+        self.last_diagnostic_pos = Some(pos);
+        self.diagnostics
+            .push(DiagnosticMessage::error(range, message).with_fix(fix));
     }
 }

@@ -14,8 +14,6 @@ pub mod shape_cardinalities;
 #[cfg(test)]
 mod alt_kind_tests;
 #[cfg(test)]
-mod errors_tests;
-#[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
 mod named_defs_tests;
@@ -29,9 +27,9 @@ mod shape_cardinalities_tests;
 use std::collections::HashMap;
 
 use crate::Result;
+use crate::diagnostics::Diagnostics;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parser};
-use crate::parser::{Diagnostic, Parse, Root, SyntaxNode};
+use crate::parser::{self, Parse, Parser, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
@@ -93,14 +91,14 @@ impl<'a> QueryBuilder<'a> {
 /// A parsed and analyzed query.
 ///
 /// Construction succeeds unless fuel limits are exceeded.
-/// Check [`is_valid`](Self::is_valid) or [`errors`](Self::errors)
-/// to determine if the query has syntax/semantic errors.
+/// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
+/// to determine if the query has syntax/semantic issues.
 #[derive(Debug, Clone)]
 pub struct Query<'a> {
     source: &'a str,
     parse: Parse,
     symbols: SymbolTable,
-    errors: Vec<Diagnostic>,
+    diagnostics: Diagnostics,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
 }
 
@@ -108,7 +106,7 @@ impl<'a> Query<'a> {
     /// Parse and analyze a query from source text.
     ///
     /// Returns `Err` if fuel limits are exceeded.
-    /// Syntax/semantic errors are collected and accessible via [`errors`](Self::errors).
+    /// Syntax/semantic diagnostics are collected and accessible via [`diagnostics`](Self::diagnostics).
     pub fn new(source: &'a str) -> Result<Self> {
         QueryBuilder::new(source).build()
     }
@@ -122,22 +120,21 @@ impl<'a> Query<'a> {
     fn from_parse(source: &'a str, parse: Parse) -> Self {
         let root = Root::cast(parse.syntax()).expect("parser always produces Root");
 
-        let mut errors = parse.errors().to_vec();
+        let mut diagnostics = parse.diagnostics().clone();
 
-        let alt_kind_errors = alt_kind::validate(&root);
-        errors.extend(alt_kind_errors);
+        let alt_kind_diags = alt_kind::validate(&root);
+        diagnostics.extend(alt_kind_diags);
 
         let resolve_result = named_defs::resolve(&root);
-        errors.extend(resolve_result.errors);
+        diagnostics.extend(resolve_result.diagnostics);
 
-        let ref_cycle_errors = ref_cycles::validate(&root, &resolve_result.symbols);
-        errors.extend(ref_cycle_errors);
+        let ref_cycle_diags = ref_cycles::validate(&root, &resolve_result.symbols);
+        diagnostics.extend(ref_cycle_diags);
 
-        let shape_cardinalities = if errors.is_empty() {
+        let shape_cardinalities = if diagnostics.is_empty() {
             let cards = shape_cardinalities::infer(&root, &resolve_result.symbols);
-            let shape_errors =
-                shape_cardinalities::validate(&root, &resolve_result.symbols, &cards);
-            errors.extend(shape_errors);
+            let shape_diags = shape_cardinalities::validate(&root, &resolve_result.symbols, &cards);
+            diagnostics.extend(shape_diags);
             cards
         } else {
             HashMap::new()
@@ -147,7 +144,7 @@ impl<'a> Query<'a> {
             source,
             parse,
             symbols: resolve_result.symbols,
-            errors,
+            diagnostics,
             shape_cardinalities,
         }
     }

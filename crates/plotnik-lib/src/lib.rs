@@ -3,7 +3,7 @@
 //! # Example
 //!
 //! ```
-//! use plotnik_lib::{Query, RenderOptions};
+//! use plotnik_lib::Query;
 //!
 //! let query = Query::new(r#"
 //!     Expr = [(identifier) (number)]
@@ -11,16 +11,19 @@
 //! "#).expect("valid query");
 //!
 //! if !query.is_valid() {
-//!     eprintln!("{}", query.render_diagnostics(RenderOptions::plain()));
+//!     eprintln!("{}", query.diagnostics_printer().render());
 //! }
 //! ```
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub mod diagnostics;
 pub mod parser;
 pub mod query;
 
-pub use parser::{Diagnostic, RenderOptions, Severity};
+pub use diagnostics::{
+    DiagnosticMessage, DiagnosticStage, Diagnostics, DiagnosticsPrinter, Fix, RelatedInfo, Severity,
+};
 pub use query::{Query, QueryBuilder};
 
 /// Errors that can occur during query parsing.

@@ -8,25 +8,24 @@
 //! - Zero-copy parsing: tokens carry spans, text sliced only when building tree nodes
 //! - Trivia buffering: whitespace/comments collected, then attached as leading trivia
 //! - Checkpoint-based wrapping: retroactively wrap nodes for quantifiers `*+?`
-//! - Explicit recovery sets: per-production sets determine when to bail vs consume errors
+//! - Explicit recovery sets: per-production sets determine when to bail vs consume diagnostics
 //!
-//! # Error Recovery Strategy
+//! # Recovery Strategy
 //!
-//! The parser never fails on syntax errors—it always produces a tree. Recovery follows these rules:
+//! The parser is resilient—it always produces a tree. Recovery follows these rules:
 //!
 //! 1. Unknown tokens get wrapped in `SyntaxKind::Error` nodes and consumed
-//! 2. Missing expected tokens emit an error but don't consume (parent may handle)
+//! 2. Missing expected tokens emit a diagnostic but don't consume (parent may handle)
 //! 3. Recovery sets define "synchronization points" per production
 //! 4. On recursion limit, remaining input goes into single Error node
 //!
-//! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an error immediately.
+//! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an actual error immediately.
 
 pub mod ast;
 pub mod cst;
 pub mod lexer;
 
 mod core;
-mod error;
 mod grammar;
 mod invariants;
 
@@ -34,8 +33,6 @@ mod invariants;
 mod ast_tests;
 #[cfg(test)]
 mod cst_tests;
-#[cfg(test)]
-mod error_tests;
 #[cfg(test)]
 mod lexer_tests;
 #[cfg(test)]
@@ -50,21 +47,14 @@ pub use ast::{
     Seq, Str, Tree, Type, Wildcard,
 };
 
-// Re-exports from error
-pub use error::{
-    Diagnostic, ErrorStage, Fix, RelatedInfo, RenderOptions, Severity, SyntaxError,
-    render_diagnostics, render_errors,
-};
+pub use core::Parser;
 
-// Internal use
-pub(crate) use core::Parser;
-
-use crate::Result;
+use crate::{Diagnostics, Result};
 use lexer::lex;
 
-/// Parse result containing the green tree and any errors.
+/// Parse result containing the green tree and any diagnostics.
 ///
-/// The tree is always complete—errors are recorded separately and also
+/// The tree is always complete—diagnostics are recorded separately and also
 /// represented as `SyntaxKind::Error` nodes in the tree itself.
 #[derive(Debug, Clone)]
 pub struct Parse {
@@ -83,18 +73,18 @@ impl Parse {
         SyntaxNode::new_root(self.inner.cst.clone())
     }
 
-    pub fn errors(&self) -> &[Diagnostic] {
-        &self.inner.errors
+    pub fn diagnostics(&self) -> &Diagnostics {
+        &self.inner.diagnostics
     }
 
     #[allow(dead_code)]
     pub fn is_valid(&self) -> bool {
-        self.inner.errors.is_empty()
+        self.inner.diagnostics.is_empty()
     }
 
-    /// Render errors as a human-readable string using annotate-snippets.
-    pub fn render_errors(&self, source: &str) -> String {
-        render_errors(source, &self.inner.errors, None)
+    /// Render diagnostics as a human-readable string using annotate-snippets.
+    pub fn render_diagnostics(&self, source: &str) -> String {
+        self.inner.diagnostics.printer().source(source).render()
     }
 }
 

@@ -34,7 +34,7 @@ fn untagged_alternation_valid() {
 fn mixed_alternation_tagged_first() {
     let query = Query::new("[A: (a) (b)]").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
       |
     1 | [A: (a) (b)]
@@ -56,7 +56,7 @@ fn mixed_alternation_untagged_first() {
     )
     .unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
       |
     3 |       (a)
@@ -70,7 +70,7 @@ fn mixed_alternation_untagged_first() {
 fn nested_mixed_alternation() {
     let query = Query::new("(call [A: (a) (b)])").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
       |
     1 | (call [A: (a) (b)])
@@ -84,7 +84,7 @@ fn nested_mixed_alternation() {
 fn multiple_mixed_alternations() {
     let query = Query::new("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])

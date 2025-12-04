@@ -261,7 +261,7 @@ fn complex_example() {
 fn ast_with_errors() {
     let query = Query::new("(call (Undefined))").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_errors(), @r#"
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: undefined reference: `Undefined`
       |
     1 | (call (Undefined))
