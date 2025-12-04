@@ -92,13 +92,11 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
     let start = span.start;
     let end = span.end;
 
-    // Opening quote
     tokens.push(Token::new(
         quote_kind,
         range_to_text_range(start..start + 1),
     ));
 
-    // Content (may be empty)
     if end - start > 2 {
         tokens.push(Token::new(
             SyntaxKind::StrVal,
@@ -106,7 +104,6 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
         ));
     }
 
-    // Closing quote
     tokens.push(Token::new(quote_kind, range_to_text_range(end - 1..end)));
 }
 

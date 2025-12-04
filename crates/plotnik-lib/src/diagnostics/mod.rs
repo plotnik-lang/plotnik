@@ -1,7 +1,3 @@
-//! Compiler diagnostics infrastructure.
-//!
-//! This module provides types for collecting and rendering diagnostic messages.
-
 mod message;
 mod printer;
 
@@ -15,13 +11,11 @@ pub use printer::DiagnosticsPrinter;
 
 use message::{DiagnosticMessage, Fix, RelatedInfo};
 
-/// Collection of diagnostic messages from parsing and analysis.
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
     messages: Vec<DiagnosticMessage>,
 }
 
-/// Builder for constructing a diagnostic message.
 #[must_use = "diagnostic not emitted, call .emit()"]
 pub struct DiagnosticBuilder<'a> {
     diagnostics: &'a mut Diagnostics,
