@@ -1,23 +1,15 @@
 <br/>
 <br/>
 
-<div id="user-content-toc" align="center">
-  <ul>
-  <summary>
-    <p align="center">
-      <img width="400" alt="Plotnik banner" src=".github/plotnik_banner.png" />
-    </p>
-    <h1><p>Plotnik</p></h1>  
-  </summary>
-  </ul>
-</div>
+<p align="center">
+  <img width="400" alt="[banner]" src="https://github.com/user-attachments/assets/1fcef0a9-20f8-4500-960b-f31db3e9fd94" />
+</p>
+
+<h1><p align="center">Plotnik</p></h1>  
 
 <p align="center">
   Typed query language for <a href="https://tree-sitter.github.io/">tree-sitter</a>
 </p>
-
-<br/>
-<br/>
 
 <p align="center">
   <a href="https://github.com/plotnik-lang/plotnik/actions/workflows/stable.yml"><img src="https://github.com/plotnik-lang/plotnik/actions/workflows/stable.yml/badge.svg" alt="stable"></a>
@@ -27,7 +19,6 @@
 </p>
 
 <br/>
-<hr/>
 <br/>
 
 ## Roadmap 🚀
