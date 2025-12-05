@@ -20,7 +20,8 @@ pub trait LangImpl: Send + Sync {
     /// Parse source code into a tree-sitter tree.
     fn parse(&self, source: &str) -> tree_sitter::Tree;
 
-    fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId>;
+    fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId>;
+    fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId>;
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId>;
 
     fn is_supertype(&self, node_type_id: NodeTypeId) -> bool;
@@ -90,16 +91,20 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
         parser.parse(source, None).expect("failed to parse source")
     }
 
-    fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId> {
-        let id = self.ts_lang.id_for_node_kind(kind, named);
-
-        // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
-        // For named nodes, 0 always means "not found". For anonymous, we disambiguate
-        // via reverse lookup.
+    fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
+        let id = self.ts_lang.id_for_node_kind(kind, true);
+        // For named nodes, 0 always means "not found"
         if id == 0 {
-            if named {
-                return None;
-            }
+            return None;
+        }
+        Some(id)
+    }
+
+    fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
+        let id = self.ts_lang.id_for_node_kind(kind, false);
+        // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
+        // We disambiguate via reverse lookup.
+        if id == 0 {
             if self.ts_lang.node_kind_for_id(0) == Some(kind) {
                 return Some(0);
             }
@@ -223,10 +228,10 @@ mod tests {
     fn resolve_node_and_field() {
         let lang = javascript();
 
-        let func_id = lang.resolve_node("function_declaration", true);
+        let func_id = lang.resolve_named_node("function_declaration");
         assert!(func_id.is_some());
 
-        let unknown = lang.resolve_node("nonexistent_node_type", true);
+        let unknown = lang.resolve_named_node("nonexistent_node_type");
         assert!(unknown.is_none());
 
         let name_field = lang.resolve_field("name");
@@ -241,13 +246,13 @@ mod tests {
     fn supertype_via_lang_trait() {
         let lang = javascript();
 
-        let expr_id = lang.resolve_node("expression", true).unwrap();
+        let expr_id = lang.resolve_named_node("expression").unwrap();
         assert!(lang.is_supertype(expr_id));
 
         let subtypes = lang.subtypes(expr_id);
         assert!(!subtypes.is_empty());
 
-        let func_id = lang.resolve_node("function_declaration", true).unwrap();
+        let func_id = lang.resolve_named_node("function_declaration").unwrap();
         assert!(!lang.is_supertype(func_id));
     }
 
@@ -256,17 +261,17 @@ mod tests {
     fn field_validation_via_trait() {
         let lang = javascript();
 
-        let func_id = lang.resolve_node("function_declaration", true).unwrap();
+        let func_id = lang.resolve_named_node("function_declaration").unwrap();
         let name_field = lang.resolve_field("name").unwrap();
         let body_field = lang.resolve_field("body").unwrap();
 
         assert!(lang.has_field(func_id, name_field));
         assert!(lang.has_field(func_id, body_field));
 
-        let identifier_id = lang.resolve_node("identifier", true).unwrap();
+        let identifier_id = lang.resolve_named_node("identifier").unwrap();
         assert!(lang.is_valid_field_type(func_id, name_field, identifier_id));
 
-        let statement_block_id = lang.resolve_node("statement_block", true).unwrap();
+        let statement_block_id = lang.resolve_named_node("statement_block").unwrap();
         assert!(lang.is_valid_field_type(func_id, body_field, statement_block_id));
     }
 
@@ -277,7 +282,7 @@ mod tests {
         let root_id = lang.root();
         assert!(root_id.is_some());
 
-        let program_id = lang.resolve_node("program", true);
+        let program_id = lang.resolve_named_node("program");
         assert_eq!(root_id, program_id);
     }
 
@@ -286,7 +291,7 @@ mod tests {
     fn unresolved_returns_none() {
         let lang = javascript();
 
-        assert!(lang.resolve_node("nonexistent_node_type", true).is_none());
+        assert!(lang.resolve_named_node("nonexistent_node_type").is_none());
         assert!(lang.resolve_field("nonexistent_field").is_none());
     }
 
@@ -294,7 +299,7 @@ mod tests {
     #[cfg(feature = "rust")]
     fn rust_lang_works() {
         let lang = rust();
-        let func_id = lang.resolve_node("function_item", true);
+        let func_id = lang.resolve_named_node("function_item");
         assert!(func_id.is_some());
     }
 
@@ -304,11 +309,11 @@ mod tests {
         let lang = javascript();
 
         // For named nodes: 0 unambiguously means "not found"
-        assert!(lang.resolve_node("fake_named", true).is_none());
+        assert!(lang.resolve_named_node("fake_named").is_none());
 
         // For anonymous nodes: we disambiguate via reverse lookup
-        let end_resolved = lang.resolve_node("end", false);
-        let fake_resolved = lang.resolve_node("totally_fake_node", false);
+        let end_resolved = lang.resolve_anonymous_node("end");
+        let fake_resolved = lang.resolve_anonymous_node("totally_fake_node");
 
         assert!(end_resolved.is_some(), "Valid 'end' node should resolve");
         assert_eq!(end_resolved, Some(0), "'end' should have ID 0");
