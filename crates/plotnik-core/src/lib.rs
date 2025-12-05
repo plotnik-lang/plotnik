@@ -11,6 +11,8 @@
 use std::collections::HashMap;
 use std::num::NonZeroU16;
 
+mod invariants;
+
 // ============================================================================
 // Deserialization Layer
 // ============================================================================
@@ -227,10 +229,10 @@ impl StaticNodeTypes {
     /// Get field info for a node type (binary search for node, then field).
     pub fn field(
         &self,
-        node_id: NodeTypeId,
+        node_type_id: NodeTypeId,
         field_id: NodeFieldId,
     ) -> Option<&'static StaticFieldInfo> {
-        let info = self.get(node_id)?;
+        let info = self.ensure_node(node_type_id);
         info.fields
             .binary_search_by_key(&field_id, |(fid, _)| *fid)
             .ok()
@@ -238,8 +240,8 @@ impl StaticNodeTypes {
     }
 
     /// Get children info for a node type.
-    pub fn children(&self, node_id: NodeTypeId) -> Option<StaticChildrenInfo> {
-        self.get(node_id)?.children
+    pub fn children(&self, node_type_id: NodeTypeId) -> Option<StaticChildrenInfo> {
+        self.ensure_node(node_type_id).children
     }
 
     /// Get all extra node type IDs.
@@ -463,12 +465,12 @@ impl DynamicNodeTypes {
         self.nodes.contains_key(&node_type_id)
     }
 
-    pub fn field(&self, node_id: NodeTypeId, field_id: NodeFieldId) -> Option<&FieldInfo> {
-        self.nodes.get(&node_id)?.fields.get(&field_id)
+    pub fn field(&self, node_type_id: NodeTypeId, field_id: NodeFieldId) -> Option<&FieldInfo> {
+        self.ensure_node(node_type_id).fields.get(&field_id)
     }
 
-    pub fn children(&self, node_id: NodeTypeId) -> Option<&ChildrenInfo> {
-        self.nodes.get(&node_id)?.children.as_ref()
+    pub fn children(&self, node_type_id: NodeTypeId) -> Option<&ChildrenInfo> {
+        self.ensure_node(node_type_id).children.as_ref()
     }
 
     pub fn extras(&self) -> &[NodeTypeId] {
