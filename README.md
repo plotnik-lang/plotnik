@@ -22,6 +22,12 @@
 </p>
 
 <br/>
+
+<p align="center">
+  <i><strong>⚠️ DISCLAIMER: THE PROJECT IS IN <a href="https://github.com/plotnik-lang/plotnik/edit/master/README.md#roadmap">EARLY STAGE</a> ⚠️</strong></i><br/>
+</p>
+
+<br/>
 <br/>
 
 ## The problem
