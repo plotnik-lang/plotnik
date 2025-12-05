@@ -349,11 +349,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "plotnik-langs"
 version = "0.1.0"
 dependencies = [
  "cargo_metadata",
  "paste",
+ "plotnik-core",
  "plotnik-macros",
  "tree-sitter",
  "tree-sitter-bash",
@@ -402,9 +411,37 @@ dependencies = [
 name = "plotnik-macros"
 version = "0.1.0"
 dependencies = [
+ "plotnik-core",
  "proc-macro2",
  "quote",
+ "serde_json",
  "syn",
+ "tree-sitter",
+ "tree-sitter-bash",
+ "tree-sitter-c",
+ "tree-sitter-c-sharp",
+ "tree-sitter-cpp",
+ "tree-sitter-css",
+ "tree-sitter-elixir",
+ "tree-sitter-go",
+ "tree-sitter-haskell",
+ "tree-sitter-hcl",
+ "tree-sitter-html",
+ "tree-sitter-java",
+ "tree-sitter-javascript",
+ "tree-sitter-json",
+ "tree-sitter-kotlin-sg",
+ "tree-sitter-lua",
+ "tree-sitter-nix",
+ "tree-sitter-php",
+ "tree-sitter-python",
+ "tree-sitter-ruby",
+ "tree-sitter-rust",
+ "tree-sitter-scala",
+ "tree-sitter-solidity",
+ "tree-sitter-swift",
+ "tree-sitter-typescript",
+ "tree-sitter-yaml",
 ]
 
 [[package]]

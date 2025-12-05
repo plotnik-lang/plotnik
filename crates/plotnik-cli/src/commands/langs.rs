@@ -2,15 +2,17 @@ pub fn run() {
     let langs = plotnik_langs::all();
     println!("Supported languages ({}):", langs.len());
     for lang in langs {
-        println!("  {}", lang.name);
+        println!("  {}", lang.name());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    fn smoke_test(lang: &plotnik_langs::Lang, source: &str, expected_root: &str) {
+    use plotnik_langs::Lang;
+
+    fn smoke_test(lang: &dyn Lang, source: &str, expected_root: &str) {
         let mut parser = tree_sitter::Parser::new();
-        parser.set_language(&lang.ts_lang).unwrap();
+        parser.set_language(lang.get_inner()).unwrap();
         let tree = parser.parse(source, None).unwrap();
         let root = tree.root_node();
         assert_eq!(root.kind(), expected_root);
@@ -204,9 +206,9 @@ mod tests {
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_name() {
-        assert_eq!(plotnik_langs::from_name("js").unwrap().name, "javascript");
+        assert_eq!(plotnik_langs::from_name("js").unwrap().name(), "javascript");
         assert_eq!(
-            plotnik_langs::from_name("JavaScript").unwrap().name,
+            plotnik_langs::from_name("JavaScript").unwrap().name(),
             "javascript"
         );
         assert!(plotnik_langs::from_name("unknown").is_none());
@@ -215,7 +217,7 @@ mod tests {
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_extension() {
-        assert_eq!(plotnik_langs::from_ext("js").unwrap().name, "javascript");
-        assert_eq!(plotnik_langs::from_ext("mjs").unwrap().name, "javascript");
+        assert_eq!(plotnik_langs::from_ext("js").unwrap().name(), "javascript");
+        assert_eq!(plotnik_langs::from_ext("mjs").unwrap().name(), "javascript");
     }
 }

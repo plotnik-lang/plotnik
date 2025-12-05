@@ -25,7 +25,7 @@ pub fn resolve_lang(
     lang: &Option<String>,
     _source_text: &Option<String>,
     source_file: &Option<PathBuf>,
-) -> &'static Lang {
+) -> &'static dyn Lang {
     if let Some(name) = lang {
         return plotnik_langs::from_name(name).unwrap_or_else(|| {
             eprintln!("error: unknown language: {}", name);
@@ -50,10 +50,10 @@ pub fn resolve_lang(
     std::process::exit(1);
 }
 
-pub fn parse_tree(source: &str, lang: &Lang) -> tree_sitter::Tree {
+pub fn parse_tree(source: &str, lang: &dyn Lang) -> tree_sitter::Tree {
     let mut parser = tree_sitter::Parser::new();
     parser
-        .set_language(&lang.ts_lang)
+        .set_language(lang.get_inner())
         .expect("failed to set language");
     parser.parse(source, None).expect("failed to parse source")
 }
