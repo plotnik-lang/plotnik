@@ -28,7 +28,7 @@ mod test_helpers {
         }
 
         pub fn dump_diagnostics(&self) -> String {
-            self.render_diagnostics()
+            self.diagnostics().render(self.source)
         }
     }
 }

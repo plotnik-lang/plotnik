@@ -5,13 +5,15 @@
 //! ```
 //! use plotnik_lib::Query;
 //!
-//! let query = Query::new(r#"
+//! let source = r#"
 //!     Expr = [(identifier) (number)]
 //!     (assignment left: (Expr) @lhs right: (Expr) @rhs)
-//! "#).expect("valid query");
+//! "#;
+//!
+//! let query = Query::new(source).expect("valid query");
 //!
 //! if !query.is_valid() {
-//!     eprintln!("{}", query.render_diagnostics());
+//!     eprintln!("{}", query.diagnostics().render(source));
 //! }
 //! ```
 

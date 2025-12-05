@@ -161,20 +161,15 @@ impl<'a> Query<'a> {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn source(&self) -> &str {
-        self.source
-    }
-
-    pub fn as_cst(&self) -> &SyntaxNode {
+    pub(crate) fn as_cst(&self) -> &SyntaxNode {
         self.ast.as_cst()
     }
 
-    pub fn root(&self) -> &Root {
+    pub(crate) fn root(&self) -> &Root {
         &self.ast
     }
 
-    pub fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
+    pub(crate) fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
         // Error nodes are invalid
         if node.kind() == SyntaxKind::Error {
             return ShapeCardinality::Invalid;
@@ -212,7 +207,7 @@ impl<'a> Query<'a> {
     }
 
     /// All diagnostics combined from all passes.
-    pub fn all_diagnostics(&self) -> Diagnostics {
+    pub fn diagnostics(&self) -> Diagnostics {
         let mut all = Diagnostics::new();
         all.extend(self.parse_diagnostics.clone());
         all.extend(self.alt_kind_diagnostics.clone());
@@ -222,30 +217,6 @@ impl<'a> Query<'a> {
         all
     }
 
-    pub fn parse_diagnostics(&self) -> &Diagnostics {
-        &self.parse_diagnostics
-    }
-
-    pub fn alt_kind_diagnostics(&self) -> &Diagnostics {
-        &self.alt_kind_diagnostics
-    }
-
-    pub fn resolve_diagnostics(&self) -> &Diagnostics {
-        &self.resolve_diagnostics
-    }
-
-    pub fn ref_cycle_diagnostics(&self) -> &Diagnostics {
-        &self.ref_cycle_diagnostics
-    }
-
-    pub fn shape_diagnostics(&self) -> &Diagnostics {
-        &self.shape_diagnostics
-    }
-
-    pub fn diagnostics(&self) -> Diagnostics {
-        self.all_diagnostics()
-    }
-
     /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
     pub fn is_valid(&self) -> bool {
         !self.parse_diagnostics.has_errors()
@@ -253,16 +224,5 @@ impl<'a> Query<'a> {
             && !self.resolve_diagnostics.has_errors()
             && !self.ref_cycle_diagnostics.has_errors()
             && !self.shape_diagnostics.has_errors()
-    }
-
-    pub fn render_diagnostics(&self) -> String {
-        self.all_diagnostics().printer(self.source).render()
-    }
-
-    pub fn render_diagnostics_colored(&self, colored: bool) -> String {
-        self.all_diagnostics()
-            .printer(self.source)
-            .colored(colored)
-            .render()
     }
 }
