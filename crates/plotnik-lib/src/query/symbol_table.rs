@@ -6,13 +6,22 @@
 
 use indexmap::IndexMap;
 
-use crate::PassResult;
 use crate::diagnostics::Diagnostics;
 use crate::parser::{Expr, Ref, Root, ast};
 
+use super::Query;
+
 pub type SymbolTable<'src> = IndexMap<&'src str, ast::Expr>;
 
-pub fn resolve<'src>(root: &Root, source: &'src str) -> PassResult<SymbolTable<'src>> {
+impl<'a> Query<'a> {
+    pub(super) fn resolve_symbols(&mut self) {
+        let (symbols, diagnostics) = resolve(&self.ast, self.source);
+        self.symbol_table = symbols;
+        self.resolve_diagnostics = diagnostics;
+    }
+}
+
+fn resolve<'src>(root: &Root, source: &'src str) -> (SymbolTable<'src>, Diagnostics) {
     let mut symbols: SymbolTable<'src> = IndexMap::new();
     let mut diagnostics = Diagnostics::new();
 
@@ -49,7 +58,7 @@ pub fn resolve<'src>(root: &Root, source: &'src str) -> PassResult<SymbolTable<'
         "symbol_table: unexpected bare Expr in Root (parser should wrap in Def)"
     );
 
-    Ok((symbols, diagnostics))
+    (symbols, diagnostics)
 }
 
 fn collect_reference_diagnostics(

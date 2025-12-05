@@ -5,25 +5,23 @@
 
 use rowan::TextRange;
 
+use super::Query;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
-use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{AltExpr, AltKind, Branch, Expr, Root};
+use crate::parser::{AltExpr, AltKind, Branch, Expr};
 
-pub fn validate(root: &Root) -> PassResult<()> {
-    let mut errors = Diagnostics::new();
-
-    for def in root.defs() {
-        if let Some(body) = def.body() {
-            validate_expr(&body, &mut errors);
+impl Query<'_> {
+    pub(super) fn validate_alt_kinds(&mut self) {
+        for def in self.ast.defs() {
+            if let Some(body) = def.body() {
+                validate_expr(&body, &mut self.alt_kind_diagnostics);
+            }
         }
+
+        assert_root_no_bare_exprs(&self.ast);
     }
-
-    assert_root_no_bare_exprs(root);
-
-    Ok(((), errors))
 }
 
 fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {

@@ -6,14 +6,23 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
+use super::Query;
 use super::symbol_table::SymbolTable;
-use crate::PassResult;
 use crate::diagnostics::Diagnostics;
 use crate::parser::{Def, Expr, Root, SyntaxKind};
 
-pub fn validate(root: &Root, symbols: &SymbolTable<'_>) -> PassResult<()> {
+impl Query<'_> {
+    pub(super) fn validate_ref_cycles(&mut self) {
+        validate_into(
+            &self.ast,
+            &self.symbol_table,
+            &mut self.ref_cycle_diagnostics,
+        );
+    }
+}
+
+fn validate_into(root: &Root, symbols: &SymbolTable<'_>, errors: &mut Diagnostics) {
     let sccs = find_sccs(symbols);
-    let mut errors = Diagnostics::new();
 
     for scc in sccs {
         if scc.len() == 1 {
@@ -30,7 +39,7 @@ pub fn validate(root: &Root, symbols: &SymbolTable<'_>) -> PassResult<()> {
             let scc_set: IndexSet<&str> = std::iter::once(name.as_str()).collect();
             if !expr_has_escape(body, &scc_set) {
                 let chain = build_self_ref_chain(root, name);
-                emit_error(&mut errors, name, &scc, chain);
+                emit_error(errors, name, &scc, chain);
             }
             continue;
         }
@@ -50,11 +59,9 @@ pub fn validate(root: &Root, symbols: &SymbolTable<'_>) -> PassResult<()> {
 
         if !any_has_escape {
             let chain = build_cycle_chain(root, symbols, &scc);
-            emit_error(&mut errors, &scc[0], &scc, chain);
+            emit_error(errors, &scc[0], &scc, chain);
         }
     }
-
-    Ok(((), errors))
 }
 
 fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {

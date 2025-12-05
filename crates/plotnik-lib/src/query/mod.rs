@@ -122,30 +122,24 @@ impl<'a> Query<'a> {
     }
 
     fn from_parse(source: &'a str, ast: Root, parse_diagnostics: Diagnostics) -> Self {
-        let ((), alt_kind_diagnostics) =
-            alt_kind::validate(&ast).expect("alt_kind::validate is infallible");
-
-        let (symbol_table, resolve_diagnostics) =
-            symbol_table::resolve(&ast, source).expect("symbol_table::resolve is infallible");
-
-        let ((), ref_cycle_diagnostics) =
-            ref_cycles::validate(&ast, &symbol_table).expect("ref_cycles::validate is infallible");
-
-        let (shape_cardinalities, shape_diagnostics) =
-            shape_cardinalities::analyze(&ast, &symbol_table)
-                .expect("shape_cardinalities::analyze is infallible");
-
-        Self {
+        let mut query = Self {
             source,
             ast,
-            symbol_table,
-            shape_cardinality_table: shape_cardinalities,
+            symbol_table: SymbolTable::default(),
+            shape_cardinality_table: HashMap::new(),
             parse_diagnostics,
-            alt_kind_diagnostics,
-            resolve_diagnostics,
-            ref_cycle_diagnostics,
-            shape_diagnostics,
-        }
+            alt_kind_diagnostics: Diagnostics::new(),
+            resolve_diagnostics: Diagnostics::new(),
+            ref_cycle_diagnostics: Diagnostics::new(),
+            shape_diagnostics: Diagnostics::new(),
+        };
+
+        query.validate_alt_kinds();
+        query.resolve_symbols();
+        query.validate_ref_cycles();
+        query.analyze_shape_cardinalities();
+
+        query
     }
 
     #[allow(dead_code)]

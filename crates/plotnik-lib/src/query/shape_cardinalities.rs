@@ -7,13 +7,13 @@
 //! `Invalid` marks nodes where cardinality cannot be determined (error nodes,
 //! undefined refs, etc.).
 
+use super::Query;
 use super::invariants::{
     ensure_capture_has_inner, ensure_quantifier_has_inner, ensure_ref_has_name,
 };
 use super::symbol_table::SymbolTable;
-use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{Expr, FieldExpr, Ref, Root, SeqExpr, SyntaxNode, ast};
+use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxNode, ast};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -23,24 +23,28 @@ pub enum ShapeCardinality {
     Invalid,
 }
 
-pub fn analyze(
-    root: &Root,
-    symbols: &SymbolTable,
-) -> PassResult<HashMap<ast::Expr, ShapeCardinality>> {
-    let mut cache = HashMap::new();
-    let mut errors = Diagnostics::new();
-    let mut def_bodies: HashMap<String, ast::Expr> = HashMap::new();
+impl Query<'_> {
+    pub(super) fn analyze_shape_cardinalities(&mut self) {
+        let mut def_bodies: HashMap<String, ast::Expr> = HashMap::new();
 
-    for def in root.defs() {
-        if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
-            def_bodies.insert(name_tok.text().to_string(), body);
+        for def in self.ast.defs() {
+            if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
+                def_bodies.insert(name_tok.text().to_string(), body);
+            }
         }
+
+        compute_all_cardinalities(
+            self.ast.as_cst(),
+            &self.symbol_table,
+            &def_bodies,
+            &mut self.shape_cardinality_table,
+        );
+        validate_node(
+            self.ast.as_cst(),
+            &self.shape_cardinality_table,
+            &mut self.shape_diagnostics,
+        );
     }
-
-    compute_all_cardinalities(root.as_cst(), symbols, &def_bodies, &mut cache);
-    validate_node(root.as_cst(), &cache, &mut errors);
-
-    Ok((cache, errors))
 }
 
 fn compute_all_cardinalities(
