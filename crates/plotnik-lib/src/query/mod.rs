@@ -31,7 +31,7 @@ use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
-use crate::parser::{self, FuelState, Parser, Root, SyntaxNode, ast};
+use crate::parser::{FuelState, ParseResult, Parser, Root, SyntaxNode, ast};
 use shapes::ShapeCardinality;
 use symbol_table::SymbolTable;
 
@@ -143,18 +143,16 @@ impl<'a> Query<'a> {
 
     fn parse(&mut self, exec_fuel: Option<u32>, recursion_fuel: Option<u32>) -> Result<()> {
         let tokens = lex(self.source);
-        let mut parser = Parser::new(self.source, tokens);
+        let parser = Parser::new(self.source, tokens)
+            .with_exec_fuel(exec_fuel)
+            .with_recursion_fuel(recursion_fuel);
 
-        if let Some(limit) = exec_fuel {
-            parser = parser.with_exec_fuel(Some(limit));
-        }
-
-        if let Some(limit) = recursion_fuel {
-            parser = parser.with_recursion_fuel(Some(limit));
-        }
-
-        let (ast, diagnostics, fuel_state) = parser::parse_with_parser(parser)?;
-        self.ast = ast;
+        let ParseResult {
+            root,
+            diagnostics,
+            fuel_state,
+        } = parser.parse()?;
+        self.ast = root;
         self.parse_diagnostics = diagnostics;
         self.fuel_state = fuel_state;
         Ok(())

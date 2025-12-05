@@ -9,8 +9,9 @@
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
+use super::ast::Root;
 use super::cst::token_sets::ROOT_EXPR_FIRST;
-use super::cst::{SyntaxKind, TokenSet};
+use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
 use crate::diagnostics::Diagnostics;
 
@@ -26,6 +27,14 @@ pub struct FuelState {
     pub exec_remaining: Option<u32>,
     pub recursion_limit: Option<u32>,
     pub recursion_max_depth: u32,
+}
+
+/// Result of a successful parse operation.
+#[derive(Debug)]
+pub struct ParseResult {
+    pub root: Root,
+    pub diagnostics: Diagnostics,
+    pub fuel_state: FuelState,
 }
 
 /// Tracks an open delimiter for better error messages on unclosed constructs.
@@ -112,7 +121,19 @@ impl<'src> Parser<'src> {
         self
     }
 
-    pub fn finish(mut self) -> Result<(GreenNode, Diagnostics, FuelState), Error> {
+    /// Parse the input and return the result.
+    pub fn parse(mut self) -> Result<ParseResult, Error> {
+        self.parse_root();
+        let (cst, diagnostics, fuel_state) = self.finish()?;
+        let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
+        Ok(ParseResult {
+            root,
+            diagnostics,
+            fuel_state,
+        })
+    }
+
+    fn finish(mut self) -> Result<(GreenNode, Diagnostics, FuelState), Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
