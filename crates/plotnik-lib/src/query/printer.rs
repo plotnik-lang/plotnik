@@ -372,45 +372,10 @@ impl Query<'_> {
 }
 
 fn collect_refs(expr: &Expr) -> IndexSet<String> {
-    let mut refs = IndexSet::new();
-    collect_refs_into(expr, &mut refs);
-    refs
-}
-
-fn collect_refs_into(expr: &Expr, refs: &mut IndexSet<String>) {
-    match expr {
-        Expr::Ref(r) => {
-            let Some(name_token) = r.name() else { return };
-            refs.insert(name_token.text().to_string());
-        }
-        Expr::NamedNode(node) => {
-            for child in node.children() {
-                collect_refs_into(&child, refs);
-            }
-        }
-        Expr::AltExpr(alt) => {
-            for branch in alt.branches() {
-                let Some(body) = branch.body() else { continue };
-                collect_refs_into(&body, refs);
-            }
-        }
-        Expr::SeqExpr(seq) => {
-            for child in seq.children() {
-                collect_refs_into(&child, refs);
-            }
-        }
-        Expr::CapturedExpr(cap) => {
-            let Some(inner) = cap.inner() else { return };
-            collect_refs_into(&inner, refs);
-        }
-        Expr::QuantifiedExpr(q) => {
-            let Some(inner) = q.inner() else { return };
-            collect_refs_into(&inner, refs);
-        }
-        Expr::FieldExpr(f) => {
-            let Some(value) = f.value() else { return };
-            collect_refs_into(&value, refs);
-        }
-        Expr::AnonymousNode(_) => {}
-    }
+    expr.as_cst()
+        .descendants()
+        .filter_map(ast::Ref::cast)
+        .filter_map(|r| r.name())
+        .map(|tok| tok.text().to_string())
+        .collect()
 }
