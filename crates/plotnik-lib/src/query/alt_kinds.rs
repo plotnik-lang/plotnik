@@ -9,101 +9,82 @@ use super::Query;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
-use crate::diagnostics::Diagnostics;
 use crate::parser::{AltExpr, AltKind, Branch, Expr};
 
 impl Query<'_> {
     pub(super) fn validate_alt_kinds(&mut self) {
-        for def in self.ast.defs() {
-            if let Some(body) = def.body() {
-                validate_expr(&body, &mut self.alt_kind_diagnostics);
-            }
+        let defs: Vec<_> = self.ast.defs().collect();
+        for def in defs {
+            let Some(body) = def.body() else { continue };
+            self.validate_alt_expr(&body);
         }
 
         assert_root_no_bare_exprs(&self.ast);
     }
-}
 
-fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
-    match expr {
-        Expr::AltExpr(alt) => {
-            check_mixed_alternation(alt, errors);
-            for branch in alt.branches() {
-                if let Some(body) = branch.body() {
-                    validate_expr(&body, errors);
+    fn validate_alt_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::AltExpr(alt) => {
+                self.check_mixed_alternation(alt);
+                for branch in alt.branches() {
+                    let Some(body) = branch.body() else { continue };
+                    self.validate_alt_expr(&body);
+                }
+                assert_alt_no_bare_exprs(alt);
+            }
+            Expr::NamedNode(node) => {
+                for child in node.children() {
+                    self.validate_alt_expr(&child);
                 }
             }
-            assert_alt_no_bare_exprs(alt);
-        }
-        Expr::NamedNode(node) => {
-            for child in node.children() {
-                validate_expr(&child, errors);
+            Expr::SeqExpr(seq) => {
+                for child in seq.children() {
+                    self.validate_alt_expr(&child);
+                }
             }
-        }
-        Expr::SeqExpr(seq) => {
-            for child in seq.children() {
-                validate_expr(&child, errors);
+            Expr::CapturedExpr(cap) => {
+                let Some(inner) = cap.inner() else { return };
+                self.validate_alt_expr(&inner);
             }
-        }
-        Expr::CapturedExpr(cap) => {
-            if let Some(inner) = cap.inner() {
-                validate_expr(&inner, errors);
+            Expr::QuantifiedExpr(q) => {
+                let Some(inner) = q.inner() else { return };
+                self.validate_alt_expr(&inner);
             }
-        }
-        Expr::QuantifiedExpr(q) => {
-            if let Some(inner) = q.inner() {
-                validate_expr(&inner, errors);
+            Expr::FieldExpr(f) => {
+                let Some(value) = f.value() else { return };
+                self.validate_alt_expr(&value);
             }
-        }
-        Expr::FieldExpr(f) => {
-            if let Some(value) = f.value() {
-                validate_expr(&value, errors);
-            }
-        }
-        Expr::Ref(_) | Expr::AnonymousNode(_) => {}
-    }
-}
-
-fn check_mixed_alternation(alt: &AltExpr, errors: &mut Diagnostics) {
-    if alt.kind() != AltKind::Mixed {
-        return;
-    }
-
-    let branches: Vec<Branch> = alt.branches().collect();
-
-    let mut first_tagged: Option<&Branch> = None;
-    let mut first_untagged: Option<&Branch> = None;
-
-    for branch in &branches {
-        if branch.label().is_some() {
-            if first_tagged.is_none() {
-                first_tagged = Some(branch);
-            }
-        } else if first_untagged.is_none() {
-            first_untagged = Some(branch);
-        }
-
-        if first_tagged.is_some() && first_untagged.is_some() {
-            break;
+            Expr::Ref(_) | Expr::AnonymousNode(_) => {}
         }
     }
 
-    let (tagged_branch, untagged_branch) = ensure_both_branch_kinds(first_tagged, first_untagged);
+    fn check_mixed_alternation(&mut self, alt: &AltExpr) {
+        if alt.kind() != AltKind::Mixed {
+            return;
+        }
 
-    let tagged_range = tagged_branch
-        .label()
-        .map(|t| t.text_range())
-        .unwrap_or_else(|| branch_range(tagged_branch));
+        let branches: Vec<Branch> = alt.branches().collect();
+        let first_tagged = branches.iter().find(|b| b.label().is_some());
+        let first_untagged = branches.iter().find(|b| b.label().is_none());
 
-    let untagged_range = branch_range(untagged_branch);
+        let (tagged_branch, untagged_branch) =
+            ensure_both_branch_kinds(first_tagged, first_untagged);
 
-    errors
-        .error(
-            "mixed tagged and untagged branches in alternation",
-            untagged_range,
-        )
-        .related_to("tagged branch here", tagged_range)
-        .emit();
+        let tagged_range = tagged_branch
+            .label()
+            .map(|t| t.text_range())
+            .unwrap_or_else(|| branch_range(tagged_branch));
+
+        let untagged_range = branch_range(untagged_branch);
+
+        self.alt_kind_diagnostics
+            .error(
+                "mixed tagged and untagged branches in alternation",
+                untagged_range,
+            )
+            .related_to("tagged branch here", tagged_range)
+            .emit();
+    }
 }
 
 fn branch_range(branch: &Branch) -> TextRange {
