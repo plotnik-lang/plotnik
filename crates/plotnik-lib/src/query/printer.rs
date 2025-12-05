@@ -210,9 +210,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                     Some(ty) => writeln!(w, "{}Tree{}{} {}", prefix, card, span, ty)?,
                     None => writeln!(w, "{}Tree{}{}", prefix, card, span)?,
                 }
-                for child in t.children() {
-                    self.format_expr(&child, indent + 1, w)?;
-                }
+                self.format_tree_children(t.as_cst(), indent + 1, w)?;
             }
             ast::Expr::Ref(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
@@ -233,9 +231,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             }
             ast::Expr::Seq(s) => {
                 writeln!(w, "{}Seq{}{}", prefix, card, span)?;
-                for child in s.children() {
-                    self.format_expr(&child, indent + 1, w)?;
-                }
+                self.format_tree_children(s.as_cst(), indent + 1, w)?;
             }
             ast::Expr::Capture(c) => {
                 let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
@@ -280,11 +276,36 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             ast::Expr::Wildcard(_) => {
                 writeln!(w, "{}Wildcard{}{}", prefix, card, span)?;
             }
-            ast::Expr::Anchor(_) => {
-                writeln!(w, "{}Anchor{}{}", prefix, card, span)?;
+        }
+        Ok(())
+    }
+
+    fn format_tree_children(
+        &self,
+        node: &SyntaxNode,
+        indent: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        use crate::parser::cst::SyntaxKind;
+        for child in node.children() {
+            if child.kind() == SyntaxKind::Anchor {
+                self.format_anchor(&ast::Anchor::cast(child).unwrap(), indent, w)?;
+            } else if let Some(expr) = ast::Expr::cast(child) {
+                self.format_expr(&expr, indent, w)?;
             }
         }
         Ok(())
+    }
+
+    fn format_anchor(
+        &self,
+        anchor: &ast::Anchor,
+        indent: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        let prefix = "  ".repeat(indent);
+        let span = self.span_str(anchor.text_range());
+        writeln!(w, "{}Anchor{}", prefix, span)
     }
 
     fn format_branch(

@@ -128,7 +128,7 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
             let Some(value) = f.value() else { return };
             collect_refs(&value, refs);
         }
-        Expr::Str(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+        Expr::Str(_) | Expr::Wildcard(_) | Expr::NegatedField(_) => {}
     }
 }
 
@@ -174,7 +174,7 @@ fn collect_reference_diagnostics(
             let Some(value) = f.value() else { return };
             collect_reference_diagnostics(&value, symbols, diagnostics);
         }
-        Expr::Str(_) | Expr::Wildcard(_) | Expr::Anchor(_) | Expr::NegatedField(_) => {}
+        Expr::Str(_) | Expr::Wildcard(_) | Expr::NegatedField(_) => {}
     }
 }
 

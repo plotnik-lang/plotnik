@@ -290,14 +290,14 @@ fn tagged_alt_shapes() {
 }
 
 #[test]
-fn anchor_is_one() {
+fn anchor_has_no_cardinality() {
     let query = Query::new("(block . (statement))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ block
-          Anchor¹
+          Anchor
           Tree¹ statement
     ");
 }

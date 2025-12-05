@@ -27,6 +27,31 @@ macro_rules! ast_node {
     };
 }
 
+macro_rules! define_expr {
+    ($($variant:ident),+ $(,)?) => {
+        /// Expression: any pattern that can appear in the tree.
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum Expr {
+            $($variant($variant)),+
+        }
+
+        impl Expr {
+            pub fn cast(node: SyntaxNode) -> Option<Self> {
+                $(if let Some(n) = $variant::cast(node.clone()) { return Some(Expr::$variant(n)); })+
+                None
+            }
+
+            pub fn as_cst(&self) -> &SyntaxNode {
+                match self { $(Expr::$variant(n) => n.as_cst()),+ }
+            }
+
+            pub fn text_range(&self) -> TextRange {
+                match self { $(Expr::$variant(n) => n.text_range()),+ }
+            }
+        }
+    };
+}
+
 ast_node!(Root, Root);
 ast_node!(Def, Def);
 ast_node!(Tree, Tree);
@@ -54,72 +79,18 @@ pub enum AltKind {
     Mixed,
 }
 
-/// Expression: any pattern that can appear in the tree.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Expr {
-    Tree(Tree),
-    Ref(Ref),
-    Str(Str),
-    Alt(Alt),
-    Seq(Seq),
-    Capture(Capture),
-    Quantifier(Quantifier),
-    Field(Field),
-    NegatedField(NegatedField),
-    Wildcard(Wildcard),
-    Anchor(Anchor),
-}
-
-impl Expr {
-    pub fn cast(node: SyntaxNode) -> Option<Self> {
-        match node.kind() {
-            SyntaxKind::Tree => Tree::cast(node).map(Expr::Tree),
-            SyntaxKind::Ref => Ref::cast(node).map(Expr::Ref),
-            SyntaxKind::Str => Str::cast(node).map(Expr::Str),
-            SyntaxKind::Alt => Alt::cast(node).map(Expr::Alt),
-            SyntaxKind::Seq => Seq::cast(node).map(Expr::Seq),
-            SyntaxKind::Capture => Capture::cast(node).map(Expr::Capture),
-            SyntaxKind::Quantifier => Quantifier::cast(node).map(Expr::Quantifier),
-            SyntaxKind::Field => Field::cast(node).map(Expr::Field),
-            SyntaxKind::NegatedField => NegatedField::cast(node).map(Expr::NegatedField),
-            SyntaxKind::Wildcard => Wildcard::cast(node).map(Expr::Wildcard),
-            SyntaxKind::Anchor => Anchor::cast(node).map(Expr::Anchor),
-            _ => None,
-        }
-    }
-
-    pub fn as_cst(&self) -> &SyntaxNode {
-        match self {
-            Expr::Tree(n) => n.as_cst(),
-            Expr::Ref(n) => n.as_cst(),
-            Expr::Str(n) => n.as_cst(),
-            Expr::Alt(n) => n.as_cst(),
-            Expr::Seq(n) => n.as_cst(),
-            Expr::Capture(n) => n.as_cst(),
-            Expr::Quantifier(n) => n.as_cst(),
-            Expr::Field(n) => n.as_cst(),
-            Expr::NegatedField(n) => n.as_cst(),
-            Expr::Wildcard(n) => n.as_cst(),
-            Expr::Anchor(n) => n.as_cst(),
-        }
-    }
-
-    pub fn text_range(&self) -> TextRange {
-        match self {
-            Expr::Tree(n) => n.text_range(),
-            Expr::Ref(n) => n.text_range(),
-            Expr::Str(n) => n.text_range(),
-            Expr::Alt(n) => n.text_range(),
-            Expr::Seq(n) => n.text_range(),
-            Expr::Capture(n) => n.text_range(),
-            Expr::Quantifier(n) => n.text_range(),
-            Expr::Field(n) => n.text_range(),
-            Expr::NegatedField(n) => n.text_range(),
-            Expr::Wildcard(n) => n.text_range(),
-            Expr::Anchor(n) => n.text_range(),
-        }
-    }
-}
+define_expr!(
+    Tree,
+    Ref,
+    Str,
+    Alt,
+    Seq,
+    Capture,
+    Quantifier,
+    Field,
+    NegatedField,
+    Wildcard,
+);
 
 impl Root {
     pub fn defs(&self) -> impl Iterator<Item = Def> + '_ {

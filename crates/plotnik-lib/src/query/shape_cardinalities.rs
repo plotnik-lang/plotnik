@@ -103,7 +103,6 @@ fn compute_single(
         Expr::Tree(_)
         | Expr::Str(_)
         | Expr::Wildcard(_)
-        | Expr::Anchor(_)
         | Expr::Field(_)
         | Expr::NegatedField(_)
         | Expr::Alt(_) => ShapeCardinality::One,
