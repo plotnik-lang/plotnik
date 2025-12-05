@@ -31,7 +31,7 @@ pub trait LangImpl: Send + Sync {
     // Supertype info                                            [Language API]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn is_supertype(&self, id: NodeTypeId) -> bool;
+    fn is_supertype(&self, node_type_id: NodeTypeId) -> bool;
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16];
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -39,24 +39,37 @@ pub trait LangImpl: Send + Sync {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn root(&self) -> Option<NodeTypeId>;
-    fn is_extra(&self, id: NodeTypeId) -> bool;
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Field constraints                                           [node_types]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool;
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality>;
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId];
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool;
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool;
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality>;
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId];
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Children constraints                                        [node_types]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality>;
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId];
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool;
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality>;
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId];
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
 /// Generic language implementation parameterized by node types.
@@ -128,8 +141,8 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
         self.ts_lang.field_id_for_name(name)
     }
 
-    fn is_supertype(&self, id: NodeTypeId) -> bool {
-        self.ts_lang.node_kind_is_supertype(id)
+    fn is_supertype(&self, node_type_id: NodeTypeId) -> bool {
+        self.ts_lang.node_kind_is_supertype(node_type_id)
     }
 
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16] {
@@ -140,36 +153,52 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
         self.node_types.root()
     }
 
-    fn is_extra(&self, id: NodeTypeId) -> bool {
-        self.node_types.is_extra(id)
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
+        self.node_types.is_extra(node_type_id)
     }
 
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
-        self.node_types.has_field(node, field)
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
+        self.node_types.has_field(node_type_id, node_field_id)
     }
 
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
-        self.node_types.field_cardinality(node, field)
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        self.node_types
+            .field_cardinality(node_type_id, node_field_id)
     }
 
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
-        self.node_types.valid_field_types(node, field)
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId] {
+        self.node_types
+            .valid_field_types(node_type_id, node_field_id)
     }
 
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
-        self.node_types.is_valid_field_type(node, field, child)
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool {
+        self.node_types
+            .is_valid_field_type(node_type_id, node_field_id, child)
     }
 
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
-        self.node_types.children_cardinality(node)
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
+        self.node_types.children_cardinality(node_type_id)
     }
 
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
-        self.node_types.valid_child_types(node)
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
+        self.node_types.valid_child_types(node_type_id)
     }
 
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
-        self.node_types.is_valid_child_type(node, child)
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
+        self.node_types.is_valid_child_type(node_type_id, child)
     }
 }
 

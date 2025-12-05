@@ -84,45 +84,71 @@ pub struct Cardinality {
 /// For name↔ID resolution and supertype info, use `Language` directly.
 pub trait NodeTypes {
     fn root(&self) -> Option<NodeTypeId>;
-    fn is_extra(&self, id: NodeTypeId) -> bool;
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool;
 
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool;
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality>;
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId];
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool;
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool;
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality>;
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId];
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool;
 
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality>;
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId];
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool;
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality>;
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId];
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
 impl<T: NodeTypes + ?Sized> NodeTypes for &T {
     fn root(&self) -> Option<NodeTypeId> {
         (*self).root()
     }
-    fn is_extra(&self, id: NodeTypeId) -> bool {
-        (*self).is_extra(id)
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
+        (*self).is_extra(node_type_id)
     }
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
-        (*self).has_field(node, field)
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
+        (*self).has_field(node_type_id, node_field_id)
     }
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
-        (*self).field_cardinality(node, field)
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        (*self).field_cardinality(node_type_id, node_field_id)
     }
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
-        (*self).valid_field_types(node, field)
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId] {
+        (*self).valid_field_types(node_type_id, node_field_id)
     }
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
-        (*self).is_valid_field_type(node, field, child)
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool {
+        (*self).is_valid_field_type(node_type_id, node_field_id, child)
     }
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
-        (*self).children_cardinality(node)
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
+        (*self).children_cardinality(node_type_id)
     }
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
-        (*self).valid_child_types(node)
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
+        (*self).valid_child_types(node_type_id)
     }
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
-        (*self).is_valid_child_type(node, child)
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
+        (*self).is_valid_child_type(node_type_id, child)
     }
 }
 
@@ -184,17 +210,17 @@ impl StaticNodeTypes {
     }
 
     /// Get info for a node type by ID (binary search).
-    pub fn get(&self, id: NodeTypeId) -> Option<&'static StaticNodeTypeInfo> {
+    pub fn get(&self, node_type_id: NodeTypeId) -> Option<&'static StaticNodeTypeInfo> {
         self.nodes
-            .binary_search_by_key(&id, |(node_id, _)| *node_id)
+            .binary_search_by_key(&node_type_id, |(node_id, _)| *node_id)
             .ok()
             .map(|idx| &self.nodes[idx].1)
     }
 
     /// Check if node type exists.
-    pub fn contains(&self, id: NodeTypeId) -> bool {
+    pub fn contains(&self, node_type_id: NodeTypeId) -> bool {
         self.nodes
-            .binary_search_by_key(&id, |(node_id, _)| *node_id)
+            .binary_search_by_key(&node_type_id, |(node_id, _)| *node_id)
             .is_ok()
     }
 
@@ -239,42 +265,59 @@ impl NodeTypes for StaticNodeTypes {
         self.root
     }
 
-    fn is_extra(&self, id: NodeTypeId) -> bool {
-        self.extras.contains(&id)
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
+        self.extras.contains(&node_type_id)
     }
 
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
-        self.get(node).is_some_and(|info| {
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
+        self.get(node_type_id).is_some_and(|info| {
             info.fields
-                .binary_search_by_key(&field, |(fid, _)| *fid)
+                .binary_search_by_key(&node_field_id, |(fid, _)| *fid)
                 .is_ok()
         })
     }
 
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
-        self.field(node, field).map(|f| f.cardinality)
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        self.field(node_type_id, node_field_id)
+            .map(|f| f.cardinality)
     }
 
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
-        self.field(node, field)
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId] {
+        self.field(node_type_id, node_field_id)
             .map(|f| f.valid_types)
             .unwrap_or(&[])
     }
 
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
-        self.valid_field_types(node, field).contains(&child)
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool {
+        self.valid_field_types(node_type_id, node_field_id)
+            .contains(&child)
     }
 
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
-        self.children(node).map(|c| c.cardinality)
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
+        self.children(node_type_id).map(|c| c.cardinality)
     }
 
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
-        self.children(node).map(|c| c.valid_types).unwrap_or(&[])
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
+        self.children(node_type_id)
+            .map(|c| c.valid_types)
+            .unwrap_or(&[])
     }
 
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
-        self.valid_child_types(node).contains(&child)
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
+        self.valid_child_types(node_type_id).contains(&child)
     }
 }
 
@@ -412,12 +455,12 @@ impl DynamicNodeTypes {
         }
     }
 
-    pub fn get(&self, id: NodeTypeId) -> Option<&NodeTypeInfo> {
-        self.nodes.get(&id)
+    pub fn get(&self, node_type_id: NodeTypeId) -> Option<&NodeTypeInfo> {
+        self.nodes.get(&node_type_id)
     }
 
-    pub fn contains(&self, id: NodeTypeId) -> bool {
-        self.nodes.contains_key(&id)
+    pub fn contains(&self, node_type_id: NodeTypeId) -> bool {
+        self.nodes.contains_key(&node_type_id)
     }
 
     pub fn field(&self, node_id: NodeTypeId, field_id: NodeFieldId) -> Option<&FieldInfo> {
@@ -464,42 +507,57 @@ impl NodeTypes for DynamicNodeTypes {
         self.root
     }
 
-    fn is_extra(&self, id: NodeTypeId) -> bool {
-        self.extras.contains(&id)
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
+        self.extras.contains(&node_type_id)
     }
 
-    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
         self.nodes
-            .get(&node)
-            .is_some_and(|n| n.fields.contains_key(&field))
+            .get(&node_type_id)
+            .is_some_and(|n| n.fields.contains_key(&node_field_id))
     }
 
-    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
-        self.field(node, field).map(|f| f.cardinality)
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        self.field(node_type_id, node_field_id)
+            .map(|f| f.cardinality)
     }
 
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
-        self.field(node, field)
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId] {
+        self.field(node_type_id, node_field_id)
             .map(|f| f.valid_types.as_slice())
             .unwrap_or(&[])
     }
 
-    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
-        self.valid_field_types(node, field).contains(&child)
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool {
+        self.valid_field_types(node_type_id, node_field_id)
+            .contains(&child)
     }
 
-    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
-        self.children(node).map(|c| c.cardinality)
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
+        self.children(node_type_id).map(|c| c.cardinality)
     }
 
-    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
-        self.children(node)
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
+        self.children(node_type_id)
             .map(|c| c.valid_types.as_slice())
             .unwrap_or(&[])
     }
 
-    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
-        self.valid_child_types(node).contains(&child)
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
+        self.valid_child_types(node_type_id).contains(&child)
     }
 }
 
