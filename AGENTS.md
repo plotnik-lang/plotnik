@@ -66,14 +66,14 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output: `--query`, `--source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
+Output: `--show-query`, `--show-source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
 
 ```sh
-cargo run -p plotnik-cli -- debug -q '(identifier) @id' --query
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --show-query
 cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
-cargo run -p plotnik-cli -- debug -s app.ts --source
-cargo run -p plotnik-cli -- debug -s app.ts --source --raw
-cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --query
+cargo run -p plotnik-cli -- debug -s app.ts --show-source
+cargo run -p plotnik-cli -- debug -s app.ts --show-source --raw
+cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query
 ```
 
 ## Syntax
