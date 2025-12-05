@@ -39,7 +39,7 @@ pub fn run(args: DebugArgs) {
     };
 
     let query = query_source.as_ref().map(|src| {
-        Query::new(src).unwrap_or_else(|e| {
+        Query::try_from(src).unwrap_or_else(|e| {
             eprintln!("error: {}", e);
             std::process::exit(1);
         })
@@ -98,6 +98,7 @@ pub fn run(args: DebugArgs) {
     {
         let src = query_source.as_ref().unwrap();
         eprint!("{}", q.diagnostics().render_colored(src, args.color));
+        std::process::exit(1);
     }
 }
 

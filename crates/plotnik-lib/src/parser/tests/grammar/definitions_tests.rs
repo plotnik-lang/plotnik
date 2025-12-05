@@ -7,7 +7,7 @@ fn simple_named_def() {
     Expr = (identifier)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -27,7 +27,7 @@ fn named_def_with_alternation() {
     Value = [(identifier) (number) (string)]
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -61,7 +61,7 @@ fn named_def_with_sequence() {
     Pair = {(identifier) (expression)}
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -91,7 +91,7 @@ fn named_def_with_captures() {
         right: (_) @right)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -140,7 +140,7 @@ fn multiple_named_defs() {
     Stmt = (statement)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -168,7 +168,7 @@ fn named_def_then_expression() {
     (program (Expr) @value)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -210,7 +210,7 @@ fn named_def_referencing_another() {
     Expr = [(identifier) (Literal)]
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -255,7 +255,7 @@ fn named_def_with_quantifier() {
     Statements = (statement)+
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -279,7 +279,7 @@ fn named_def_complex_recursive() {
         arguments: (arguments))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -330,7 +330,7 @@ fn named_def_with_type_annotation() {
         body: (_) @body)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -374,7 +374,7 @@ fn unnamed_def_allowed_as_last() {
     (program (Expr) @value)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

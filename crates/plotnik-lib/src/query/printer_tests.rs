@@ -3,7 +3,7 @@ use indoc::indoc;
 
 #[test]
 fn printer_with_spans() {
-    let q = Query::new("(call)").unwrap();
+    let q = Query::try_from("(call)").unwrap();
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..6]
       Def [0..6]
@@ -13,7 +13,7 @@ fn printer_with_spans() {
 
 #[test]
 fn printer_with_cardinalities() {
-    let q = Query::new("(call)").unwrap();
+    let q = Query::try_from("(call)").unwrap();
     insta::assert_snapshot!(q.printer().with_cardinalities(true).dump(), @r"
     Root¹
       Def¹
@@ -23,7 +23,7 @@ fn printer_with_cardinalities() {
 
 #[test]
 fn printer_cst_with_trivia() {
-    let q = Query::new("(a) (b)").unwrap();
+    let q = Query::try_from("(a) (b)").unwrap();
     insta::assert_snapshot!(q.printer().raw(true).with_trivia(true).dump(), @r#"
     Root
       Def
@@ -45,7 +45,7 @@ fn printer_alt_branches() {
     let input = indoc! {r#"
         [A: (a) B: (b)]
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -59,7 +59,7 @@ fn printer_alt_branches() {
 
 #[test]
 fn printer_capture_with_type() {
-    let q = Query::new("(call)@x :: T").unwrap();
+    let q = Query::try_from("(call)@x :: T").unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -70,7 +70,7 @@ fn printer_capture_with_type() {
 
 #[test]
 fn printer_quantifiers() {
-    let q = Query::new("(a)* (b)+ (c)?").unwrap();
+    let q = Query::try_from("(a)* (b)+ (c)?").unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -87,7 +87,7 @@ fn printer_quantifiers() {
 
 #[test]
 fn printer_field() {
-    let q = Query::new("(call name: (id))").unwrap();
+    let q = Query::try_from("(call name: (id))").unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -99,7 +99,7 @@ fn printer_field() {
 
 #[test]
 fn printer_negated_field() {
-    let q = Query::new("(call !name)").unwrap();
+    let q = Query::try_from("(call !name)").unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -110,7 +110,7 @@ fn printer_negated_field() {
 
 #[test]
 fn printer_wildcard_and_anchor() {
-    let q = Query::new("(call _ . (arg))").unwrap();
+    let q = Query::try_from("(call _ . (arg))").unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
@@ -123,7 +123,7 @@ fn printer_wildcard_and_anchor() {
 
 #[test]
 fn printer_string_literal() {
-    let q = Query::new(r#"(call "foo")"#).unwrap();
+    let q = Query::try_from(r#"(call "foo")"#).unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r#"
     Root
       Def
@@ -138,7 +138,7 @@ fn printer_ref() {
         Expr = (call)
         (func (Expr))
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def Expr
@@ -156,7 +156,7 @@ fn printer_symbols_with_cardinalities() {
         B = {(b) (c)}
         (entry (A) (B))
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().only_symbols(true).with_cardinalities(true).dump(), @r"
     A¹
     B⁺
@@ -170,7 +170,7 @@ fn printer_symbols_with_refs() {
         B = (b (A))
         (entry (B))
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @r"
     A
     B
@@ -185,7 +185,7 @@ fn printer_symbols_cycle() {
         B = [(b) (A)]
         (entry (A))
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @r"
     A
       B
@@ -199,14 +199,14 @@ fn printer_symbols_cycle() {
 #[test]
 fn printer_symbols_undefined_ref() {
     let input = "(call (Undefined))";
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @"");
 }
 
 #[test]
 fn printer_symbols_broken_ref() {
     let input = "A = (foo (Undefined))";
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @r"
     A
       Undefined?
@@ -219,7 +219,7 @@ fn printer_spans_comprehensive() {
         Foo = (call name: (id) !bar)
         [(a) (b)]
     "#};
-    let q = Query::new(input).unwrap();
+    let q = Query::try_from(input).unwrap();
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..39]
       Def [0..28] Foo
@@ -238,7 +238,7 @@ fn printer_spans_comprehensive() {
 
 #[test]
 fn printer_spans_seq() {
-    let q = Query::new("{(a) (b)}").unwrap();
+    let q = Query::try_from("{(a) (b)}").unwrap();
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..9]
       Def [0..9]
@@ -250,7 +250,7 @@ fn printer_spans_seq() {
 
 #[test]
 fn printer_spans_quantifiers() {
-    let q = Query::new("(a)* (b)+").unwrap();
+    let q = Query::try_from("(a)* (b)+").unwrap();
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..9]
       Def [0..4]
@@ -264,7 +264,7 @@ fn printer_spans_quantifiers() {
 
 #[test]
 fn printer_spans_alt_branches() {
-    let q = Query::new("[A: (a) B: (b)]").unwrap();
+    let q = Query::try_from("[A: (a) B: (b)]").unwrap();
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..15]
       Def [0..15]

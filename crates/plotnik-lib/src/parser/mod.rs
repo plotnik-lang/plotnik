@@ -45,4 +45,4 @@ pub use ast::{
     NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, Type,
 };
 
-pub use core::{DEFAULT_EXEC_FUEL, DEFAULT_RECURSION_FUEL, FuelState, ParseResult, Parser};
+pub use core::{ParseResult, Parser};

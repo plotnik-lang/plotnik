@@ -10,22 +10,11 @@ use crate::diagnostics::Diagnostics;
 
 use crate::Error;
 
-pub const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
-pub const DEFAULT_RECURSION_FUEL: u32 = 4096;
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct FuelState {
-    pub exec_initial: Option<u32>,
-    pub exec_remaining: Option<u32>,
-    pub recursion_limit: Option<u32>,
-    pub recursion_max_depth: u32,
-}
-
 #[derive(Debug)]
 pub struct ParseResult {
     pub root: Root,
     pub diagnostics: Diagnostics,
-    pub fuel_state: FuelState,
+    pub exec_fuel_consumed: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +40,6 @@ pub struct Parser<'src> {
     exec_fuel_initial: Option<u32>,
     exec_fuel_remaining: Option<u32>,
     recursion_fuel_limit: Option<u32>,
-    max_depth: u32,
     fatal_error: Option<Error>,
 }
 
@@ -68,10 +56,9 @@ impl<'src> Parser<'src> {
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             debug_fuel: std::cell::Cell::new(256),
-            exec_fuel_initial: Some(DEFAULT_EXEC_FUEL),
-            exec_fuel_remaining: Some(DEFAULT_EXEC_FUEL),
-            recursion_fuel_limit: Some(DEFAULT_RECURSION_FUEL),
-            max_depth: 0,
+            exec_fuel_initial: None,
+            exec_fuel_remaining: None,
+            recursion_fuel_limit: None,
             fatal_error: None,
         }
     }
@@ -89,27 +76,25 @@ impl<'src> Parser<'src> {
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
         self.parse_root();
-        let (cst, diagnostics, fuel_state) = self.finish()?;
+        let (cst, diagnostics, exec_fuel_consumed) = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
         Ok(ParseResult {
             root,
             diagnostics,
-            fuel_state,
+            exec_fuel_consumed,
         })
     }
 
-    fn finish(mut self) -> Result<(GreenNode, Diagnostics, FuelState), Error> {
+    fn finish(mut self) -> Result<(GreenNode, Diagnostics, u32), Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
-        let fuel_state = FuelState {
-            exec_initial: self.exec_fuel_initial,
-            exec_remaining: self.exec_fuel_remaining,
-            recursion_limit: self.recursion_fuel_limit,
-            recursion_max_depth: self.max_depth,
+        let exec_fuel_consumed = match (self.exec_fuel_initial, self.exec_fuel_remaining) {
+            (Some(initial), Some(remaining)) => initial.saturating_sub(remaining),
+            _ => 0,
         };
-        Ok((self.builder.finish(), self.diagnostics, fuel_state))
+        Ok((self.builder.finish(), self.diagnostics, exec_fuel_consumed))
     }
 
     pub(super) fn has_fatal_error(&self) -> bool {
@@ -347,9 +332,6 @@ impl<'src> Parser<'src> {
             return false;
         }
         self.depth += 1;
-        if self.depth > self.max_depth {
-            self.max_depth = self.depth;
-        }
         self.reset_debug_fuel();
         true
     }

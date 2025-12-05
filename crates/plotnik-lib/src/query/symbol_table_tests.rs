@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn single_definition() {
     let input = "Expr = (expression)";
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @"Expr");
 }
@@ -17,7 +17,7 @@ fn multiple_definitions() {
     Decl = (declaration)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -33,7 +33,7 @@ fn valid_reference() {
     Call = (call_expression function: (Expr))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -46,7 +46,7 @@ fn valid_reference() {
 fn undefined_reference() {
     let input = "Call = (call_expression function: (Undefined))";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `Undefined`
@@ -60,7 +60,7 @@ fn undefined_reference() {
 fn self_reference() {
     let input = "Expr = [(identifier) (call (Expr))]";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -75,7 +75,7 @@ fn mutual_recursion() {
     B = (bar (A))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
@@ -97,7 +97,7 @@ fn duplicate_definition() {
     Expr = (other)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: duplicate definition: `Expr`
@@ -114,7 +114,7 @@ fn reference_in_alternation() {
     Value = [(Expr) (literal)]
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -130,7 +130,7 @@ fn reference_in_sequence() {
     Pair = {(Expr) (Expr)}
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -146,7 +146,7 @@ fn reference_in_quantifier() {
     List = (Expr)*
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -162,7 +162,7 @@ fn reference_in_capture() {
     Named = (Expr) @e
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
@@ -178,7 +178,7 @@ fn entry_point_reference() {
     (call function: (Expr))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @"Expr");
 }
@@ -187,7 +187,7 @@ fn entry_point_reference() {
 fn entry_point_undefined_reference() {
     let input = "(call function: (Unknown))";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `Unknown`
@@ -200,7 +200,7 @@ fn entry_point_undefined_reference() {
 #[test]
 fn no_definitions() {
     let input = "(identifier)";
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @"");
 }
@@ -214,7 +214,7 @@ fn nested_references() {
     D = (d (C) (A))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     A
@@ -235,7 +235,7 @@ fn nested_references() {
 fn multiple_undefined() {
     let input = "(foo (X) (Y) (Z))";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: undefined reference: `X`
@@ -260,7 +260,7 @@ fn reference_inside_tree_child() {
         B = (b (A))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     A
@@ -276,7 +276,7 @@ fn reference_inside_capture() {
         B = (A)@x
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     A

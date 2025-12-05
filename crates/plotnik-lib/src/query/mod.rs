@@ -35,62 +35,19 @@ use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
-use crate::parser::{FuelState, ParseResult, Parser, Root, SyntaxNode, ast};
+use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
+
+const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
+const DEFAULT_RECURSION_FUEL: u32 = 4096;
+
 use shapes::ShapeCardinality;
 use symbol_table::SymbolTable;
 
-/// Builder for configuring and creating a [`Query`].
-pub struct QueryBuilder<'a> {
-    source: &'a str,
-    exec_fuel: Option<u32>,
-    recursion_fuel: Option<u32>,
-}
-
-impl<'a> QueryBuilder<'a> {
-    /// Create a new builder for the given source.
-    pub fn new(source: &'a str) -> Self {
-        Self {
-            source,
-            exec_fuel: None,
-            recursion_fuel: None,
-        }
-    }
-
-    /// Set execution fuel limit. None = infinite.
-    ///
-    /// Execution fuel never replenishes. It protects against large inputs.
-    /// Returns error when exhausted.
-    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
-        self.exec_fuel = limit;
-        self
-    }
-
-    /// Set recursion depth limit. None = infinite.
-    ///
-    /// Recursion fuel restores when exiting recursion. It protects against
-    /// deeply nested input. Returns error when exhausted.
-    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
-        self.recursion_fuel = limit;
-        self
-    }
-
-    /// Build the query, running all analysis passes.
-    ///
-    /// Returns `Err` if fuel limits are exceeded.
-    pub fn build(self) -> Result<Query<'a>> {
-        let mut query = Query::empty(self.source);
-        query.parse(self.exec_fuel, self.recursion_fuel)?;
-        query.validate_alt_kinds();
-        query.resolve_names();
-        query.validate_recursion();
-        query.infer_shapes();
-        Ok(query)
-    }
-}
-
 /// A parsed and analyzed query.
 ///
-/// Construction succeeds unless fuel limits are exceeded.
+/// Create with [`new`](Self::new), optionally configure fuel limits,
+/// then call [`exec`](Self::exec) to run analysis.
+///
 /// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
 /// to determine if the query has syntax/semantic issues.
 #[derive(Debug, Clone)]
@@ -99,8 +56,9 @@ pub struct Query<'a> {
     ast: Root,
     symbol_table: SymbolTable<'a>,
     shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
-    fuel_state: FuelState,
-    // Diagnostics per pass
+    exec_fuel: Option<u32>,
+    recursion_fuel: Option<u32>,
+    exec_fuel_consumed: u32,
     parse_diagnostics: Diagnostics,
     alt_kind_diagnostics: Diagnostics,
     resolve_diagnostics: Diagnostics,
@@ -117,26 +75,18 @@ fn empty_root() -> Root {
 }
 
 impl<'a> Query<'a> {
-    /// Parse and analyze a query from source text.
+    /// Create a new query from source text.
     ///
-    /// Returns `Err` if fuel limits are exceeded.
-    /// Syntax/semantic diagnostics are collected and accessible via [`diagnostics`](Self::diagnostics).
-    pub fn new(source: &'a str) -> Result<Self> {
-        QueryBuilder::new(source).build()
-    }
-
-    /// Create a builder for configuring parser limits.
-    pub fn builder(source: &'a str) -> QueryBuilder<'a> {
-        QueryBuilder::new(source)
-    }
-
-    fn empty(source: &'a str) -> Self {
+    /// Call [`exec`](Self::exec) to run analysis passes.
+    pub fn new(source: &'a str) -> Self {
         Self {
             source,
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
             shape_cardinality_table: HashMap::new(),
-            fuel_state: FuelState::default(),
+            exec_fuel: Some(DEFAULT_EXEC_FUEL),
+            recursion_fuel: Some(DEFAULT_RECURSION_FUEL),
+            exec_fuel_consumed: 0,
             parse_diagnostics: Diagnostics::new(),
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
@@ -145,20 +95,51 @@ impl<'a> Query<'a> {
         }
     }
 
-    fn parse(&mut self, exec_fuel: Option<u32>, recursion_fuel: Option<u32>) -> Result<()> {
+    /// Set execution fuel limit. None = infinite.
+    ///
+    /// Execution fuel never replenishes. It protects against large inputs.
+    /// Returns error from [`exec`](Self::exec) when exhausted.
+    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
+        self.exec_fuel = limit;
+        self
+    }
+
+    /// Set recursion depth limit. None = infinite.
+    ///
+    /// Recursion fuel restores when exiting recursion. It protects against
+    /// deeply nested input. Returns error from [`exec`](Self::exec) when exhausted.
+    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
+        self.recursion_fuel = limit;
+        self
+    }
+
+    /// Run all analysis passes.
+    ///
+    /// Returns `Err` if fuel limits are exceeded.
+    /// Syntax/semantic diagnostics are collected and accessible via [`diagnostics`](Self::diagnostics).
+    pub fn exec(mut self) -> Result<Self> {
+        self.try_parse()?;
+        self.validate_alt_kinds();
+        self.resolve_names();
+        self.validate_recursion();
+        self.infer_shapes();
+        Ok(self)
+    }
+
+    fn try_parse(&mut self) -> Result<()> {
         let tokens = lex(self.source);
         let parser = Parser::new(self.source, tokens)
-            .with_exec_fuel(exec_fuel)
-            .with_recursion_fuel(recursion_fuel);
+            .with_exec_fuel(self.exec_fuel)
+            .with_recursion_fuel(self.recursion_fuel);
 
         let ParseResult {
             root,
             diagnostics,
-            fuel_state,
+            exec_fuel_consumed,
         } = parser.parse()?;
         self.ast = root;
         self.parse_diagnostics = diagnostics;
-        self.fuel_state = fuel_state;
+        self.exec_fuel_consumed = exec_fuel_consumed;
         Ok(())
     }
 
@@ -225,5 +206,21 @@ impl<'a> Query<'a> {
             && !self.resolve_diagnostics.has_errors()
             && !self.recursion_diagnostics.has_errors()
             && !self.shapes_diagnostics.has_errors()
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Query<'a> {
+    type Error = crate::Error;
+
+    fn try_from(source: &'a str) -> Result<Self> {
+        Self::new(source).exec()
+    }
+}
+
+impl<'a> TryFrom<&'a String> for Query<'a> {
+    type Error = crate::Error;
+
+    fn try_from(source: &'a String) -> Result<Self> {
+        Self::new(source.as_str()).exec()
     }
 }
