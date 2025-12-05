@@ -1,287 +1,175 @@
-use std::sync::LazyLock;
+use std::sync::Arc;
+
 use tree_sitter::Language;
 
-#[derive(Debug, Clone)]
-pub struct Lang {
-    pub name: &'static str,
-    pub ts_lang: Language,
-    pub node_types_size: usize,
+pub use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
+
+pub mod builtin;
+pub mod dynamic;
+
+pub use builtin::*;
+
+/// User-facing language type. Works with any language (static or dynamic).
+pub type Lang = Arc<dyn LangImpl>;
+
+/// Trait providing a unified facade for tree-sitter's Language API
+/// combined with our node type constraints.
+pub trait LangImpl: Send + Sync {
+    fn name(&self) -> &str;
+
+    /// Parse source code into a tree-sitter tree.
+    fn parse(&self, source: &str) -> tree_sitter::Tree;
+
+    fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId>;
+    fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId>;
+    fn resolve_field(&self, name: &str) -> Option<NodeFieldId>;
+
+    fn is_supertype(&self, node_type_id: NodeTypeId) -> bool;
+    fn subtypes(&self, supertype: NodeTypeId) -> &[u16];
+
+    fn root(&self) -> Option<NodeTypeId>;
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool;
+
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool;
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality>;
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId];
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool;
+
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality>;
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId];
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
-macro_rules! define_langs {
-    (
-        $(
-            $fn_name:ident => {
-                feature: $feature:literal,
-                name: $name:literal,
-                ts_lang: $ts_lang:expr,
-                node_types_key: $node_types_key:literal,
-                names: [$($alias:literal),* $(,)?],
-                extensions: [$($ext:literal),* $(,)?] $(,)?
-            }
-        ),* $(,)?
-    ) => {
-        // Generate node_types_size constants via proc macro
-        $(
-            #[cfg(feature = $feature)]
-            plotnik_macros::generate_node_types_size!($node_types_key);
-        )*
-
-        // Generate lazy accessor functions
-        $(
-            #[cfg(feature = $feature)]
-            pub fn $fn_name() -> &'static Lang {
-                paste::paste! {
-                    static LANG: LazyLock<Lang> = LazyLock::new(|| Lang {
-                        name: $name,
-                        ts_lang: $ts_lang.into(),
-                        node_types_size: [<$node_types_key:upper _NODE_TYPES_SIZE>],
-                    });
-                }
-                &LANG
-            }
-        )*
-
-        pub fn from_name(s: &str) -> Option<&'static Lang> {
-            match s.to_ascii_lowercase().as_str() {
-                $(
-                    #[cfg(feature = $feature)]
-                    $($alias)|* => Some($fn_name()),
-                )*
-                _ => None,
-            }
-        }
-
-        pub fn from_ext(ext: &str) -> Option<&'static Lang> {
-            match ext.to_ascii_lowercase().as_str() {
-                $(
-                    #[cfg(feature = $feature)]
-                    $($ext)|* => Some($fn_name()),
-                )*
-                _ => None,
-            }
-        }
-
-        pub fn all() -> Vec<&'static Lang> {
-            vec![
-                $(
-                    #[cfg(feature = $feature)]
-                    $fn_name(),
-                )*
-            ]
-        }
-    };
+/// Generic language implementation parameterized by node types.
+///
+/// This struct provides a single implementation of `LangImpl` that works with
+/// any `NodeTypes` implementation (static or dynamic).
+#[derive(Debug)]
+pub struct LangInner<N: NodeTypes> {
+    name: String,
+    ts_lang: Language,
+    node_types: N,
 }
 
-define_langs! {
-    bash => {
-        feature: "bash",
-        name: "bash",
-        ts_lang: tree_sitter_bash::LANGUAGE,
-        node_types_key: "bash",
-        names: ["bash", "sh", "shell"],
-        extensions: ["sh", "bash", "zsh"],
-    },
-    c => {
-        feature: "c",
-        name: "c",
-        ts_lang: tree_sitter_c::LANGUAGE,
-        node_types_key: "c",
-        names: ["c"],
-        extensions: ["c", "h"],
-    },
-    cpp => {
-        feature: "cpp",
-        name: "cpp",
-        ts_lang: tree_sitter_cpp::LANGUAGE,
-        node_types_key: "cpp",
-        names: ["cpp", "c++", "cxx", "cc"],
-        extensions: ["cpp", "cc", "cxx", "hpp", "hh", "hxx", "h++", "c++"],
-    },
-    csharp => {
-        feature: "csharp",
-        name: "c_sharp",
-        ts_lang: tree_sitter_c_sharp::LANGUAGE,
-        node_types_key: "csharp",
-        names: ["csharp", "c#", "cs", "c_sharp"],
-        extensions: ["cs"],
-    },
-    css => {
-        feature: "css",
-        name: "css",
-        ts_lang: tree_sitter_css::LANGUAGE,
-        node_types_key: "css",
-        names: ["css"],
-        extensions: ["css"],
-    },
-    elixir => {
-        feature: "elixir",
-        name: "elixir",
-        ts_lang: tree_sitter_elixir::LANGUAGE,
-        node_types_key: "elixir",
-        names: ["elixir", "ex"],
-        extensions: ["ex", "exs"],
-    },
-    go => {
-        feature: "go",
-        name: "go",
-        ts_lang: tree_sitter_go::LANGUAGE,
-        node_types_key: "go",
-        names: ["go", "golang"],
-        extensions: ["go"],
-    },
-    haskell => {
-        feature: "haskell",
-        name: "haskell",
-        ts_lang: tree_sitter_haskell::LANGUAGE,
-        node_types_key: "haskell",
-        names: ["haskell", "hs"],
-        extensions: ["hs", "lhs"],
-    },
-    hcl => {
-        feature: "hcl",
-        name: "hcl",
-        ts_lang: tree_sitter_hcl::LANGUAGE,
-        node_types_key: "hcl",
-        names: ["hcl", "terraform", "tf"],
-        extensions: ["hcl", "tf", "tfvars"],
-    },
-    html => {
-        feature: "html",
-        name: "html",
-        ts_lang: tree_sitter_html::LANGUAGE,
-        node_types_key: "html",
-        names: ["html", "htm"],
-        extensions: ["html", "htm"],
-    },
-    java => {
-        feature: "java",
-        name: "java",
-        ts_lang: tree_sitter_java::LANGUAGE,
-        node_types_key: "java",
-        names: ["java"],
-        extensions: ["java"],
-    },
-    javascript => {
-        feature: "javascript",
-        name: "javascript",
-        ts_lang: tree_sitter_javascript::LANGUAGE,
-        node_types_key: "javascript",
-        names: ["javascript", "js", "jsx", "ecmascript", "es"],
-        extensions: ["js", "mjs", "cjs", "jsx"],
-    },
-    json => {
-        feature: "json",
-        name: "json",
-        ts_lang: tree_sitter_json::LANGUAGE,
-        node_types_key: "json",
-        names: ["json"],
-        extensions: ["json"],
-    },
-    kotlin => {
-        feature: "kotlin",
-        name: "kotlin",
-        ts_lang: tree_sitter_kotlin::LANGUAGE,
-        node_types_key: "kotlin",
-        names: ["kotlin", "kt"],
-        extensions: ["kt", "kts"],
-    },
-    lua => {
-        feature: "lua",
-        name: "lua",
-        ts_lang: tree_sitter_lua::LANGUAGE,
-        node_types_key: "lua",
-        names: ["lua"],
-        extensions: ["lua"],
-    },
-    nix => {
-        feature: "nix",
-        name: "nix",
-        ts_lang: tree_sitter_nix::LANGUAGE,
-        node_types_key: "nix",
-        names: ["nix"],
-        extensions: ["nix"],
-    },
-    php => {
-        feature: "php",
-        name: "php",
-        ts_lang: tree_sitter_php::LANGUAGE_PHP,
-        node_types_key: "php",
-        names: ["php"],
-        extensions: ["php"],
-    },
-    python => {
-        feature: "python",
-        name: "python",
-        ts_lang: tree_sitter_python::LANGUAGE,
-        node_types_key: "python",
-        names: ["python", "py"],
-        extensions: ["py", "pyi", "pyw"],
-    },
-    ruby => {
-        feature: "ruby",
-        name: "ruby",
-        ts_lang: tree_sitter_ruby::LANGUAGE,
-        node_types_key: "ruby",
-        names: ["ruby", "rb"],
-        extensions: ["rb", "rake", "gemspec"],
-    },
-    rust => {
-        feature: "rust",
-        name: "rust",
-        ts_lang: tree_sitter_rust::LANGUAGE,
-        node_types_key: "rust",
-        names: ["rust", "rs"],
-        extensions: ["rs"],
-    },
-    scala => {
-        feature: "scala",
-        name: "scala",
-        ts_lang: tree_sitter_scala::LANGUAGE,
-        node_types_key: "scala",
-        names: ["scala"],
-        extensions: ["scala", "sc"],
-    },
-    solidity => {
-        feature: "solidity",
-        name: "solidity",
-        ts_lang: tree_sitter_solidity::LANGUAGE,
-        node_types_key: "solidity",
-        names: ["solidity", "sol"],
-        extensions: ["sol"],
-    },
-    swift => {
-        feature: "swift",
-        name: "swift",
-        ts_lang: tree_sitter_swift::LANGUAGE,
-        node_types_key: "swift",
-        names: ["swift"],
-        extensions: ["swift"],
-    },
-    typescript => {
-        feature: "typescript",
-        name: "typescript",
-        ts_lang: tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
-        node_types_key: "typescript",
-        names: ["typescript", "ts"],
-        extensions: ["ts", "mts", "cts"],
-    },
-    tsx => {
-        feature: "typescript",
-        name: "tsx",
-        ts_lang: tree_sitter_typescript::LANGUAGE_TSX,
-        node_types_key: "typescript_tsx",
-        names: ["tsx"],
-        extensions: ["tsx"],
-    },
-    yaml => {
-        feature: "yaml",
-        name: "yaml",
-        ts_lang: tree_sitter_yaml::LANGUAGE,
-        node_types_key: "yaml",
-        names: ["yaml", "yml"],
-        extensions: ["yaml", "yml"],
-    },
+impl LangInner<&'static StaticNodeTypes> {
+    pub fn new_static(name: &str, ts_lang: Language, node_types: &'static StaticNodeTypes) -> Self {
+        Self {
+            name: name.to_owned(),
+            ts_lang,
+            node_types,
+        }
+    }
+
+    pub fn node_types(&self) -> &'static StaticNodeTypes {
+        self.node_types
+    }
+}
+
+impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn parse(&self, source: &str) -> tree_sitter::Tree {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&self.ts_lang)
+            .expect("failed to set language");
+        parser.parse(source, None).expect("failed to parse source")
+    }
+
+    fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
+        let id = self.ts_lang.id_for_node_kind(kind, true);
+        // For named nodes, 0 always means "not found"
+        (id != 0).then_some(id)
+    }
+
+    fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
+        let id = self.ts_lang.id_for_node_kind(kind, false);
+        // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
+        // We disambiguate via reverse lookup.
+        if id != 0 {
+            return Some(id);
+        }
+        (self.ts_lang.node_kind_for_id(0) == Some(kind)).then_some(0)
+    }
+
+    fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {
+        self.ts_lang.field_id_for_name(name)
+    }
+
+    fn is_supertype(&self, node_type_id: NodeTypeId) -> bool {
+        self.ts_lang.node_kind_is_supertype(node_type_id)
+    }
+
+    fn subtypes(&self, supertype: NodeTypeId) -> &[u16] {
+        self.ts_lang.subtypes_for_supertype(supertype)
+    }
+
+    fn root(&self) -> Option<NodeTypeId> {
+        self.node_types.root()
+    }
+
+    fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
+        self.node_types.is_extra(node_type_id)
+    }
+
+    fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
+        self.node_types.has_field(node_type_id, node_field_id)
+    }
+
+    fn field_cardinality(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        self.node_types
+            .field_cardinality(node_type_id, node_field_id)
+    }
+
+    fn valid_field_types(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeTypeId] {
+        self.node_types
+            .valid_field_types(node_type_id, node_field_id)
+    }
+
+    fn is_valid_field_type(
+        &self,
+        node_type_id: NodeTypeId,
+        node_field_id: NodeFieldId,
+        child: NodeTypeId,
+    ) -> bool {
+        self.node_types
+            .is_valid_field_type(node_type_id, node_field_id, child)
+    }
+
+    fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
+        self.node_types.children_cardinality(node_type_id)
+    }
+
+    fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
+        self.node_types.valid_child_types(node_type_id)
+    }
+
+    fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
+        self.node_types.is_valid_child_type(node_type_id, child)
+    }
 }
 
 #[cfg(test)]
@@ -291,42 +179,33 @@ mod tests {
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_name() {
-        assert_eq!(from_name("js").unwrap().name, "javascript");
-        assert_eq!(from_name("JavaScript").unwrap().name, "javascript");
+        assert_eq!(from_name("js").unwrap().name(), "javascript");
+        assert_eq!(from_name("JavaScript").unwrap().name(), "javascript");
         assert!(from_name("unknown").is_none());
     }
 
     #[test]
     #[cfg(feature = "go")]
     fn lang_from_name_golang() {
-        assert_eq!(from_name("go").unwrap().name, "go");
-        assert_eq!(from_name("golang").unwrap().name, "go");
-        assert_eq!(from_name("GOLANG").unwrap().name, "go");
+        assert_eq!(from_name("go").unwrap().name(), "go");
+        assert_eq!(from_name("golang").unwrap().name(), "go");
+        assert_eq!(from_name("GOLANG").unwrap().name(), "go");
     }
 
     #[test]
     #[cfg(feature = "javascript")]
     fn lang_from_extension() {
-        assert_eq!(from_ext("js").unwrap().name, "javascript");
-        assert_eq!(from_ext("mjs").unwrap().name, "javascript");
+        assert_eq!(from_ext("js").unwrap().name(), "javascript");
+        assert_eq!(from_ext("mjs").unwrap().name(), "javascript");
     }
 
     #[test]
     #[cfg(feature = "typescript")]
     fn typescript_and_tsx() {
-        assert_eq!(typescript().name, "typescript");
-        assert_eq!(tsx().name, "tsx");
-        assert_eq!(from_ext("ts").unwrap().name, "typescript");
-        assert_eq!(from_ext("tsx").unwrap().name, "tsx");
-    }
-
-    #[test]
-    #[cfg(feature = "javascript")]
-    fn node_types_size_matches_runtime() {
-        let runtime = std::fs::read_to_string(env!("PLOTNIK_NODE_TYPES_JAVASCRIPT"))
-            .unwrap()
-            .len();
-        assert_eq!(javascript().node_types_size, runtime);
+        assert_eq!(typescript().name(), "typescript");
+        assert_eq!(tsx().name(), "tsx");
+        assert_eq!(from_ext("ts").unwrap().name(), "typescript");
+        assert_eq!(from_ext("tsx").unwrap().name(), "tsx");
     }
 
     #[test]
@@ -334,7 +213,109 @@ mod tests {
         let langs = all();
         assert!(!langs.is_empty());
         for lang in &langs {
-            assert!(!lang.name.is_empty());
+            assert!(!lang.name().is_empty());
         }
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn resolve_node_and_field() {
+        let lang = javascript();
+
+        let func_id = lang.resolve_named_node("function_declaration");
+        assert!(func_id.is_some());
+
+        let unknown = lang.resolve_named_node("nonexistent_node_type");
+        assert!(unknown.is_none());
+
+        let name_field = lang.resolve_field("name");
+        assert!(name_field.is_some());
+
+        let unknown_field = lang.resolve_field("nonexistent_field");
+        assert!(unknown_field.is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn supertype_via_lang_trait() {
+        let lang = javascript();
+
+        let expr_id = lang.resolve_named_node("expression").unwrap();
+        assert!(lang.is_supertype(expr_id));
+
+        let subtypes = lang.subtypes(expr_id);
+        assert!(!subtypes.is_empty());
+
+        let func_id = lang.resolve_named_node("function_declaration").unwrap();
+        assert!(!lang.is_supertype(func_id));
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn field_validation_via_trait() {
+        let lang = javascript();
+
+        let func_id = lang.resolve_named_node("function_declaration").unwrap();
+        let name_field = lang.resolve_field("name").unwrap();
+        let body_field = lang.resolve_field("body").unwrap();
+
+        assert!(lang.has_field(func_id, name_field));
+        assert!(lang.has_field(func_id, body_field));
+
+        let identifier_id = lang.resolve_named_node("identifier").unwrap();
+        assert!(lang.is_valid_field_type(func_id, name_field, identifier_id));
+
+        let statement_block_id = lang.resolve_named_node("statement_block").unwrap();
+        assert!(lang.is_valid_field_type(func_id, body_field, statement_block_id));
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn root_via_trait() {
+        let lang = javascript();
+        let root_id = lang.root();
+        assert!(root_id.is_some());
+
+        let program_id = lang.resolve_named_node("program");
+        assert_eq!(root_id, program_id);
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn unresolved_returns_none() {
+        let lang = javascript();
+
+        assert!(lang.resolve_named_node("nonexistent_node_type").is_none());
+        assert!(lang.resolve_field("nonexistent_field").is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "rust")]
+    fn rust_lang_works() {
+        let lang = rust();
+        let func_id = lang.resolve_named_node("function_item");
+        assert!(func_id.is_some());
+    }
+
+    #[test]
+    #[cfg(feature = "javascript")]
+    fn tree_sitter_id_zero_disambiguation() {
+        let lang = javascript();
+
+        // For named nodes: 0 unambiguously means "not found"
+        assert!(lang.resolve_named_node("fake_named").is_none());
+
+        // For anonymous nodes: we disambiguate via reverse lookup
+        let end_resolved = lang.resolve_anonymous_node("end");
+        let fake_resolved = lang.resolve_anonymous_node("totally_fake_node");
+
+        assert!(end_resolved.is_some(), "Valid 'end' node should resolve");
+        assert_eq!(end_resolved, Some(0), "'end' should have ID 0");
+
+        assert!(fake_resolved.is_none(), "Non-existent node should be None");
+
+        // Our wrapper preserves field cleanliness
+        assert!(lang.resolve_field("name").is_some());
+        assert!(lang.resolve_field("fake_field").is_none());
     }
 }
