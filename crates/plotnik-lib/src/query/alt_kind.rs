@@ -113,5 +113,5 @@ fn check_mixed_alternation(alt: &Alt, errors: &mut Diagnostics) {
 }
 
 fn branch_range(branch: &Branch) -> TextRange {
-    branch.as_cst().text_range()
+    branch.text_range()
 }

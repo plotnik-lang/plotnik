@@ -198,7 +198,7 @@ fn validate_node(
                         "field `{}` value must match a single node, not a sequence",
                         field_name
                     ),
-                    value.as_cst().text_range(),
+                    value.text_range(),
                 )
                 .emit();
         }

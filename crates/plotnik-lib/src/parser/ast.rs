@@ -4,6 +4,7 @@
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
 
 use super::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use rowan::TextRange;
 
 macro_rules! ast_node {
     ($name:ident, $kind:ident) => {
@@ -17,6 +18,10 @@ macro_rules! ast_node {
 
             pub fn as_cst(&self) -> &SyntaxNode {
                 &self.0
+            }
+
+            pub fn text_range(&self) -> TextRange {
+                self.0.text_range()
             }
         }
     };
@@ -96,6 +101,22 @@ impl Expr {
             Expr::NegatedField(n) => n.as_cst(),
             Expr::Wildcard(n) => n.as_cst(),
             Expr::Anchor(n) => n.as_cst(),
+        }
+    }
+
+    pub fn text_range(&self) -> TextRange {
+        match self {
+            Expr::Tree(n) => n.text_range(),
+            Expr::Ref(n) => n.text_range(),
+            Expr::Str(n) => n.text_range(),
+            Expr::Alt(n) => n.text_range(),
+            Expr::Seq(n) => n.text_range(),
+            Expr::Capture(n) => n.text_range(),
+            Expr::Quantifier(n) => n.text_range(),
+            Expr::Field(n) => n.text_range(),
+            Expr::NegatedField(n) => n.text_range(),
+            Expr::Wildcard(n) => n.text_range(),
+            Expr::Anchor(n) => n.text_range(),
         }
     }
 }

@@ -167,7 +167,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_root(&self, root: &ast::Root, w: &mut impl Write) -> std::fmt::Result {
         let card = self.cardinality_mark(root.as_cst());
-        let span = self.span_str(root.as_cst().text_range());
+        let span = self.span_str(root.text_range());
         writeln!(w, "Root{}{}", card, span)?;
 
         for def in root.defs() {
@@ -184,7 +184,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     fn format_def(&self, def: &ast::Def, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
         let card = self.cardinality_mark(def.as_cst());
-        let span = self.span_str(def.as_cst().text_range());
+        let span = self.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
 
         match name {
@@ -201,7 +201,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     fn format_expr(&self, expr: &ast::Expr, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
         let card = self.cardinality_mark(expr.as_cst());
-        let span = self.span_str(expr.as_cst().text_range());
+        let span = self.span_str(expr.text_range());
 
         match expr {
             ast::Expr::Tree(t) => {
@@ -295,7 +295,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     ) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
         let card = self.cardinality_mark(branch.as_cst());
-        let span = self.span_str(branch.as_cst().text_range());
+        let span = self.span_str(branch.text_range());
         let label = branch.label().map(|t| t.text().to_string());
 
         match label {
