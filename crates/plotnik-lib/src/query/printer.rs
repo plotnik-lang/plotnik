@@ -269,10 +269,6 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                 };
                 self.format_expr(&value, indent + 1, w)?;
             }
-            ast::Expr::NegatedField(f) => {
-                let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}NegatedField{}{} !{}", prefix, card, span, name)?;
-            }
             ast::Expr::Wildcard(_) => {
                 writeln!(w, "{}Wildcard{}{}", prefix, card, span)?;
             }
@@ -290,6 +286,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
                 self.format_anchor(&ast::Anchor::cast(child).unwrap(), indent, w)?;
+            } else if child.kind() == SyntaxKind::NegatedField {
+                self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), indent, w)?;
             } else if let Some(expr) = ast::Expr::cast(child) {
                 self.format_expr(&expr, indent, w)?;
             }
@@ -306,6 +304,18 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         let prefix = "  ".repeat(indent);
         let span = self.span_str(anchor.text_range());
         writeln!(w, "{}Anchor{}", prefix, span)
+    }
+
+    fn format_negated_field(
+        &self,
+        nf: &ast::NegatedField,
+        indent: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        let prefix = "  ".repeat(indent);
+        let span = self.span_str(nf.text_range());
+        let name = nf.name().map(|t| t.text().to_string()).unwrap_or_default();
+        writeln!(w, "{}NegatedField{} !{}", prefix, span, name)
     }
 
     fn format_branch(

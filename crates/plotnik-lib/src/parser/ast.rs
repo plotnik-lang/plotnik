@@ -80,16 +80,7 @@ pub enum AltKind {
 }
 
 define_expr!(
-    Tree,
-    Ref,
-    Str,
-    Alt,
-    Seq,
-    Capture,
-    Quantifier,
-    Field,
-    NegatedField,
-    Wildcard,
+    Tree, Ref, Str, Alt, Seq, Capture, Quantifier, Field, Wildcard,
 );
 
 impl Root {

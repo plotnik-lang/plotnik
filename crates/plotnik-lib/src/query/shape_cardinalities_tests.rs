@@ -303,14 +303,14 @@ fn anchor_has_no_cardinality() {
 }
 
 #[test]
-fn negated_field_is_one() {
+fn negated_field_has_no_cardinality() {
     let query = Query::new("(function !async)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Tree¹ function
-          NegatedField¹ !async
+          NegatedField !async
     ");
 }
 

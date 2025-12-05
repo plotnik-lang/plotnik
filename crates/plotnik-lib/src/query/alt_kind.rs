@@ -62,7 +62,7 @@ fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
                 validate_expr(&value, errors);
             }
         }
-        Expr::Ref(_) | Expr::Str(_) | Expr::Wildcard(_) | Expr::NegatedField(_) => {}
+        Expr::Ref(_) | Expr::Str(_) | Expr::Wildcard(_) => {}
     }
 }
 

@@ -82,7 +82,7 @@ Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Typ
 
 SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifier`, `Seq`, `Alt`, `Branch`, `Wildcard`, `Anchor`, `NegatedField`, `Def`
 
-Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | NegatedField | Wildcard | Anchor`. Quantifier/Capture wrap their target.
+Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | Wildcard`. Quantifier/Capture wrap their target. `Anchor` and `NegatedField` are predicates (not expressions).
 
 ## Diagnostics
 

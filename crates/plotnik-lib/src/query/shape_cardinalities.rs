@@ -100,12 +100,9 @@ fn compute_single(
     };
 
     match expr {
-        Expr::Tree(_)
-        | Expr::Str(_)
-        | Expr::Wildcard(_)
-        | Expr::Field(_)
-        | Expr::NegatedField(_)
-        | Expr::Alt(_) => ShapeCardinality::One,
+        Expr::Tree(_) | Expr::Str(_) | Expr::Wildcard(_) | Expr::Field(_) | Expr::Alt(_) => {
+            ShapeCardinality::One
+        }
 
         Expr::Seq(ref seq) => seq_cardinality(seq, symbols, def_bodies, cache),
 
