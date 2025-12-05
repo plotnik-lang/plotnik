@@ -9,9 +9,9 @@ fn tagged_alternation_valid() {
       Def
         Alt
           Branch A:
-            Tree a
+            NamedNode a
           Branch B:
-            Tree b
+            NamedNode b
     ");
 }
 
@@ -24,9 +24,9 @@ fn untagged_alternation_valid() {
       Def
         Alt
           Branch
-            Tree a
+            NamedNode a
           Branch
-            Tree b
+            NamedNode b
     ");
 }
 
@@ -109,6 +109,6 @@ fn single_branch_no_error() {
       Def
         Alt
           Branch A:
-            Tree a
+            NamedNode a
     ");
 }

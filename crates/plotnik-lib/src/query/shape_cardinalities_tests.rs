@@ -8,7 +8,7 @@ fn tree_is_one() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ identifier
+        NamedNode¹ identifier
     ");
 }
 
@@ -20,7 +20,7 @@ fn singleton_seq_is_one() {
     Root¹
       Def¹
         Seq¹
-          Tree¹ identifier
+          NamedNode¹ identifier
     ");
 }
 
@@ -34,7 +34,7 @@ fn nested_singleton_seq_is_one() {
         Seq¹
           Seq¹
             Seq¹
-              Tree¹ identifier
+              NamedNode¹ identifier
     ");
 }
 
@@ -46,8 +46,8 @@ fn multi_seq_is_many() {
     Root¹
       Def⁺
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
     ");
 }
 
@@ -60,9 +60,9 @@ fn alt_is_one() {
       Def¹
         Alt¹
           Branch¹
-            Tree¹ a
+            NamedNode¹ a
           Branch¹
-            Tree¹ b
+            NamedNode¹ b
     ");
 }
 
@@ -79,10 +79,10 @@ fn alt_with_seq_branches() {
         Alt¹
           Branch⁺
             Seq⁺
-              Tree¹ a
-              Tree¹ b
+              NamedNode¹ a
+              NamedNode¹ b
           Branch¹
-            Tree¹ c
+            NamedNode¹ c
     ");
 }
 
@@ -97,9 +97,9 @@ fn ref_to_tree_is_one() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def¹ X
-        Tree¹ identifier
+        NamedNode¹ identifier
       Def¹
-        Tree¹ call
+        NamedNode¹ call
           Ref¹ X
     ");
 }
@@ -116,10 +116,10 @@ fn ref_to_seq_is_many() {
     Root⁺
       Def⁺ X
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
       Def¹
-        Tree¹ call
+        NamedNode¹ call
           Ref⁺ X
     ");
 }
@@ -131,9 +131,9 @@ fn field_with_tree() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
-            Tree¹ identifier
+        NamedNode¹ call
+          FieldExpr¹ name:
+            NamedNode¹ identifier
     ");
 }
 
@@ -144,13 +144,13 @@ fn field_with_alt() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Alt¹
               Branch¹
-                Tree¹ identifier
+                NamedNode¹ identifier
               Branch¹
-                Tree¹ string
+                NamedNode¹ string
     ");
 }
 
@@ -161,11 +161,11 @@ fn field_with_seq_error() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Seq⁺
-              Tree¹ a
-              Tree¹ b
+              NamedNode¹ a
+              NamedNode¹ b
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
@@ -187,11 +187,11 @@ fn field_with_ref_to_seq_error() {
     Root⁺
       Def⁺ X
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Ref⁺ X
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -209,8 +209,8 @@ fn quantifier_preserves_inner_shape() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Quantifier¹ *
-          Tree¹ identifier
+        QuantifiedExpr¹ *
+          NamedNode¹ identifier
     ");
 }
 
@@ -221,8 +221,8 @@ fn capture_preserves_inner_shape() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Capture¹ @name
-          Tree¹ identifier
+        CapturedExpr¹ @name
+          NamedNode¹ identifier
     ");
 }
 
@@ -233,10 +233,10 @@ fn capture_on_seq() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def⁺
-        Capture⁺ @items
+        CapturedExpr⁺ @items
           Seq⁺
-            Tree¹ a
-            Tree¹ b
+            NamedNode¹ a
+            NamedNode¹ b
     ");
 }
 
@@ -255,18 +255,18 @@ fn complex_nested_shapes() {
       Def¹ Stmt
         Alt¹
           Branch¹
-            Tree¹ expr_stmt
+            NamedNode¹ expr_stmt
           Branch¹
-            Tree¹ return_stmt
+            NamedNode¹ return_stmt
       Def¹
-        Tree¹ function_definition
-          Capture¹ @name
-            Field¹ name:
-              Tree¹ identifier
-          Field¹ body:
-            Tree¹ block
-              Capture¹ @stmts
-                Quantifier¹ *
+        NamedNode¹ function_definition
+          CapturedExpr¹ @name
+            FieldExpr¹ name:
+              NamedNode¹ identifier
+          FieldExpr¹ body:
+            NamedNode¹ block
+              CapturedExpr¹ @stmts
+                QuantifiedExpr¹ *
                   Ref¹ Stmt
     ");
 }
@@ -283,9 +283,9 @@ fn tagged_alt_shapes() {
       Def¹
         Alt¹
           Branch¹ Ident:
-            Tree¹ identifier
+            NamedNode¹ identifier
           Branch¹ Num:
-            Tree¹ number
+            NamedNode¹ number
     ");
 }
 
@@ -296,9 +296,9 @@ fn anchor_has_no_cardinality() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ block
+        NamedNode¹ block
           .
-          Tree¹ statement
+          NamedNode¹ statement
     ");
 }
 
@@ -309,7 +309,7 @@ fn negated_field_has_no_cardinality() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ function
+        NamedNode¹ function
           NegatedField !async
     ");
 }
@@ -321,7 +321,7 @@ fn tree_with_wildcard_type() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ _
+        NamedNode¹ (any)
     ");
 }
 
@@ -332,7 +332,7 @@ fn bare_wildcard_is_one() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Wildcard¹
+        AnonymousNode¹ (any)
     ");
 }
 
@@ -354,7 +354,7 @@ fn literal_is_one() {
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r#"
     Root¹
       Def¹
-        Str¹ "if"
+        AnonymousNode¹ "if"
     "#);
 }
 

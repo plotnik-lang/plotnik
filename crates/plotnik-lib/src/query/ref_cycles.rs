@@ -74,8 +74,8 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
             };
             !scc.contains(name_token.text())
         }
-        Expr::Tree(tree) => {
-            let children: Vec<_> = tree.children().collect();
+        Expr::NamedNode(node) => {
+            let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc))
         }
 
@@ -89,7 +89,7 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
 
         Expr::Seq(seq) => seq.children().all(|c| expr_has_escape(&c, scc)),
 
-        Expr::Quantifier(q) => match q.operator().map(|op| op.kind()) {
+        Expr::QuantifiedExpr(q) => match q.operator().map(|op| op.kind()) {
             Some(
                 SyntaxKind::Question
                 | SyntaxKind::Star
@@ -103,14 +103,14 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
             _ => true,
         },
 
-        Expr::Capture(cap) => cap
+        Expr::CapturedExpr(cap) => cap
             .inner()
             .map(|inner| expr_has_escape(&inner, scc))
             .unwrap_or(true),
 
-        Expr::Field(f) => f.value().map(|v| expr_has_escape(&v, scc)).unwrap_or(true),
+        Expr::FieldExpr(f) => f.value().map(|v| expr_has_escape(&v, scc)).unwrap_or(true),
 
-        Expr::Str(_) | Expr::Wildcard(_) => true,
+        Expr::AnonymousNode(_) => true,
     }
 }
 
@@ -214,7 +214,7 @@ fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
                 None
             }
         }
-        Expr::Tree(tree) => tree
+        Expr::NamedNode(node) => node
             .children()
             .find_map(|child| find_ref_in_expr(&child, target)),
         Expr::Alt(alt) => alt
@@ -222,11 +222,11 @@ fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
             .find_map(|b| b.body().and_then(|body| find_ref_in_expr(&body, target)))
             .or_else(|| alt.exprs().find_map(|e| find_ref_in_expr(&e, target))),
         Expr::Seq(seq) => seq.children().find_map(|c| find_ref_in_expr(&c, target)),
-        Expr::Capture(cap) => cap
+        Expr::CapturedExpr(cap) => cap
             .inner()
             .and_then(|inner| find_ref_in_expr(&inner, target)),
-        Expr::Quantifier(q) => q.inner().and_then(|inner| find_ref_in_expr(&inner, target)),
-        Expr::Field(f) => f.value().and_then(|v| find_ref_in_expr(&v, target)),
+        Expr::QuantifiedExpr(q) => q.inner().and_then(|inner| find_ref_in_expr(&inner, target)),
+        Expr::FieldExpr(f) => f.value().and_then(|v| find_ref_in_expr(&v, target)),
         _ => None,
     }
 }

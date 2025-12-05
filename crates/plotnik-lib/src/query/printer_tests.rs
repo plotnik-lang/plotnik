@@ -7,7 +7,7 @@ fn printer_with_spans() {
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..6]
       Def [0..6]
-        Tree [0..6] call
+        NamedNode [0..6] call
     ");
 }
 
@@ -17,7 +17,7 @@ fn printer_with_cardinalities() {
     insta::assert_snapshot!(q.printer().with_cardinalities(true).dump(), @r"
     Root¹
       Def¹
-        Tree¹ call
+        NamedNode¹ call
     ");
 }
 
@@ -51,9 +51,9 @@ fn printer_alt_branches() {
       Def
         Alt
           Branch A:
-            Tree a
+            NamedNode a
           Branch B:
-            Tree b
+            NamedNode b
     ");
 }
 
@@ -63,8 +63,8 @@ fn printer_capture_with_type() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
-        Capture @x :: T
-          Tree call
+        CapturedExpr @x :: T
+          NamedNode call
     ");
 }
 
@@ -74,14 +74,14 @@ fn printer_quantifiers() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
-        Quantifier *
-          Tree a
+        QuantifiedExpr *
+          NamedNode a
       Def
-        Quantifier +
-          Tree b
+        QuantifiedExpr +
+          NamedNode b
       Def
-        Quantifier ?
-          Tree c
+        QuantifiedExpr ?
+          NamedNode c
     ");
 }
 
@@ -91,9 +91,9 @@ fn printer_field() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
-        Tree call
-          Field name:
-            Tree id
+        NamedNode call
+          FieldExpr name:
+            NamedNode id
     ");
 }
 
@@ -103,7 +103,7 @@ fn printer_negated_field() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
-        Tree call
+        NamedNode call
           NegatedField !name
     ");
 }
@@ -114,10 +114,10 @@ fn printer_wildcard_and_anchor() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def
-        Tree call
-          Wildcard
+        NamedNode call
+          AnonymousNode (any)
           .
-          Tree arg
+          NamedNode arg
     ");
 }
 
@@ -127,8 +127,8 @@ fn printer_string_literal() {
     insta::assert_snapshot!(q.printer().dump(), @r#"
     Root
       Def
-        Tree call
-          Str "foo"
+        NamedNode call
+          AnonymousNode "foo"
     "#);
 }
 
@@ -142,9 +142,9 @@ fn printer_ref() {
     insta::assert_snapshot!(q.printer().dump(), @r"
     Root
       Def Expr
-        Tree call
+        NamedNode call
       Def
-        Tree func
+        NamedNode func
           Ref Expr
     ");
 }
@@ -223,16 +223,16 @@ fn printer_spans_comprehensive() {
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..39]
       Def [0..28] Foo
-        Tree [6..28] call
-          Field [12..22] name:
-            Tree [18..22] id
+        NamedNode [6..28] call
+          FieldExpr [12..22] name:
+            NamedNode [18..22] id
           NegatedField [23..27] !bar
       Def [29..38]
         Alt [29..38]
           Branch [30..33]
-            Tree [30..33] a
+            NamedNode [30..33] a
           Branch [34..37]
-            Tree [34..37] b
+            NamedNode [34..37] b
     ");
 }
 
@@ -243,8 +243,8 @@ fn printer_spans_seq() {
     Root [0..9]
       Def [0..9]
         Seq [0..9]
-          Tree [1..4] a
-          Tree [5..8] b
+          NamedNode [1..4] a
+          NamedNode [5..8] b
     ");
 }
 
@@ -254,11 +254,11 @@ fn printer_spans_quantifiers() {
     insta::assert_snapshot!(q.printer().with_spans(true).dump(), @r"
     Root [0..9]
       Def [0..4]
-        Quantifier [0..4] *
-          Tree [0..3] a
+        QuantifiedExpr [0..4] *
+          NamedNode [0..3] a
       Def [5..9]
-        Quantifier [5..9] +
-          Tree [5..8] b
+        QuantifiedExpr [5..9] +
+          NamedNode [5..8] b
     ");
 }
 
@@ -270,8 +270,8 @@ fn printer_spans_alt_branches() {
       Def [0..15]
         Alt [0..15]
           Branch [1..7] A:
-            Tree [4..7] a
+            NamedNode [4..7] a
           Branch [8..14] B:
-            Tree [11..14] b
+            NamedNode [11..14] b
     ");
 }

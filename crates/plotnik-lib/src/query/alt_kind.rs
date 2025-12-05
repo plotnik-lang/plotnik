@@ -37,8 +37,8 @@ fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
             }
             assert_alt_no_bare_exprs(alt);
         }
-        Expr::Tree(tree) => {
-            for child in tree.children() {
+        Expr::NamedNode(node) => {
+            for child in node.children() {
                 validate_expr(&child, errors);
             }
         }
@@ -47,22 +47,22 @@ fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
                 validate_expr(&child, errors);
             }
         }
-        Expr::Capture(cap) => {
+        Expr::CapturedExpr(cap) => {
             if let Some(inner) = cap.inner() {
                 validate_expr(&inner, errors);
             }
         }
-        Expr::Quantifier(q) => {
+        Expr::QuantifiedExpr(q) => {
             if let Some(inner) = q.inner() {
                 validate_expr(&inner, errors);
             }
         }
-        Expr::Field(f) => {
+        Expr::FieldExpr(f) => {
             if let Some(value) = f.value() {
                 validate_expr(&value, errors);
             }
         }
-        Expr::Ref(_) | Expr::Str(_) | Expr::Wildcard(_) => {}
+        Expr::Ref(_) | Expr::AnonymousNode(_) => {}
     }
 }
 

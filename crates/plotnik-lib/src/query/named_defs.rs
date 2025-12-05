@@ -95,8 +95,8 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
             let Some(name_token) = r.name() else { return };
             refs.insert(name_token.text().to_string());
         }
-        Expr::Tree(tree) => {
-            for child in tree.children() {
+        Expr::NamedNode(node) => {
+            for child in node.children() {
                 collect_refs(&child, refs);
             }
         }
@@ -116,19 +116,19 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                 collect_refs(&child, refs);
             }
         }
-        Expr::Capture(cap) => {
+        Expr::CapturedExpr(cap) => {
             let Some(inner) = cap.inner() else { return };
             collect_refs(&inner, refs);
         }
-        Expr::Quantifier(q) => {
+        Expr::QuantifiedExpr(q) => {
             let Some(inner) = q.inner() else { return };
             collect_refs(&inner, refs);
         }
-        Expr::Field(f) => {
+        Expr::FieldExpr(f) => {
             let Some(value) = f.value() else { return };
             collect_refs(&value, refs);
         }
-        Expr::Str(_) | Expr::Wildcard(_) => {}
+        Expr::AnonymousNode(_) => {}
     }
 }
 
@@ -141,8 +141,8 @@ fn collect_reference_diagnostics(
         Expr::Ref(r) => {
             check_ref_diagnostic(r, symbols, diagnostics);
         }
-        Expr::Tree(tree) => {
-            for child in tree.children() {
+        Expr::NamedNode(node) => {
+            for child in node.children() {
                 collect_reference_diagnostics(&child, symbols, diagnostics);
             }
         }
@@ -162,19 +162,19 @@ fn collect_reference_diagnostics(
                 collect_reference_diagnostics(&child, symbols, diagnostics);
             }
         }
-        Expr::Capture(cap) => {
+        Expr::CapturedExpr(cap) => {
             let Some(inner) = cap.inner() else { return };
             collect_reference_diagnostics(&inner, symbols, diagnostics);
         }
-        Expr::Quantifier(q) => {
+        Expr::QuantifiedExpr(q) => {
             let Some(inner) = q.inner() else { return };
             collect_reference_diagnostics(&inner, symbols, diagnostics);
         }
-        Expr::Field(f) => {
+        Expr::FieldExpr(f) => {
             let Some(value) = f.value() else { return };
             collect_reference_diagnostics(&value, symbols, diagnostics);
         }
-        Expr::Str(_) | Expr::Wildcard(_) => {}
+        Expr::AnonymousNode(_) => {}
     }
 }
 

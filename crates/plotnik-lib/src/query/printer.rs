@@ -204,21 +204,29 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         let span = self.span_str(expr.text_range());
 
         match expr {
-            ast::Expr::Tree(t) => {
-                let node_type = t.node_type().map(|tok| tok.text().to_string());
-                match node_type {
-                    Some(ty) => writeln!(w, "{}Tree{}{} {}", prefix, card, span, ty)?,
-                    None => writeln!(w, "{}Tree{}{}", prefix, card, span)?,
+            ast::Expr::NamedNode(n) => {
+                if n.is_any() {
+                    writeln!(w, "{}NamedNode{}{} (any)", prefix, card, span)?;
+                } else {
+                    let node_type = n.node_type().map(|tok| tok.text().to_string());
+                    match node_type {
+                        Some(ty) => writeln!(w, "{}NamedNode{}{} {}", prefix, card, span, ty)?,
+                        None => writeln!(w, "{}NamedNode{}{}", prefix, card, span)?,
+                    }
                 }
-                self.format_tree_children(t.as_cst(), indent + 1, w)?;
+                self.format_tree_children(n.as_cst(), indent + 1, w)?;
             }
             ast::Expr::Ref(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(w, "{}Ref{}{} {}", prefix, card, span, name)?;
             }
-            ast::Expr::Str(s) => {
-                let value = s.value().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}Str{}{} \"{}\"", prefix, card, span, value)?;
+            ast::Expr::AnonymousNode(a) => {
+                if a.is_any() {
+                    writeln!(w, "{}AnonymousNode{}{} (any)", prefix, card, span)?;
+                } else {
+                    let value = a.value().map(|t| t.text().to_string()).unwrap_or_default();
+                    writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, card, span, value)?;
+                }
             }
             ast::Expr::Alt(a) => {
                 writeln!(w, "{}Alt{}{}", prefix, card, span)?;
@@ -233,44 +241,43 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                 writeln!(w, "{}Seq{}{}", prefix, card, span)?;
                 self.format_tree_children(s.as_cst(), indent + 1, w)?;
             }
-            ast::Expr::Capture(c) => {
+            ast::Expr::CapturedExpr(c) => {
                 let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
                 let type_ann = c
                     .type_annotation()
                     .and_then(|t| t.name())
                     .map(|t| t.text().to_string());
                 match type_ann {
-                    Some(ty) => {
-                        writeln!(w, "{}Capture{}{} @{} :: {}", prefix, card, span, name, ty)?
-                    }
-                    None => writeln!(w, "{}Capture{}{} @{}", prefix, card, span, name)?,
+                    Some(ty) => writeln!(
+                        w,
+                        "{}CapturedExpr{}{} @{} :: {}",
+                        prefix, card, span, name, ty
+                    )?,
+                    None => writeln!(w, "{}CapturedExpr{}{} @{}", prefix, card, span, name)?,
                 }
                 let Some(inner) = c.inner() else {
                     return Ok(());
                 };
                 self.format_expr(&inner, indent + 1, w)?;
             }
-            ast::Expr::Quantifier(q) => {
+            ast::Expr::QuantifiedExpr(q) => {
                 let op = q
                     .operator()
                     .map(|t| t.text().to_string())
                     .unwrap_or_default();
-                writeln!(w, "{}Quantifier{}{} {}", prefix, card, span, op)?;
+                writeln!(w, "{}QuantifiedExpr{}{} {}", prefix, card, span, op)?;
                 let Some(inner) = q.inner() else {
                     return Ok(());
                 };
                 self.format_expr(&inner, indent + 1, w)?;
             }
-            ast::Expr::Field(f) => {
+            ast::Expr::FieldExpr(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}Field{}{} {}:", prefix, card, span, name)?;
+                writeln!(w, "{}FieldExpr{}{} {}:", prefix, card, span, name)?;
                 let Some(value) = f.value() else {
                     return Ok(());
                 };
                 self.format_expr(&value, indent + 1, w)?;
-            }
-            ast::Expr::Wildcard(_) => {
-                writeln!(w, "{}Wildcard{}{}", prefix, card, span)?;
             }
         }
         Ok(())

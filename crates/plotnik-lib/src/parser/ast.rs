@@ -54,19 +54,52 @@ macro_rules! define_expr {
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
-ast_node!(Tree, Tree);
+ast_node!(NamedNode, Tree);
 ast_node!(Ref, Ref);
-ast_node!(Str, Str);
 ast_node!(Alt, Alt);
 ast_node!(Branch, Branch);
 ast_node!(Seq, Seq);
-ast_node!(Capture, Capture);
+ast_node!(CapturedExpr, Capture);
 ast_node!(Type, Type);
-ast_node!(Quantifier, Quantifier);
-ast_node!(Field, Field);
+ast_node!(QuantifiedExpr, Quantifier);
+ast_node!(FieldExpr, Field);
 ast_node!(NegatedField, NegatedField);
-ast_node!(Wildcard, Wildcard);
 ast_node!(Anchor, Anchor);
+
+/// Anonymous node: string literal (`"+"`) or wildcard (`_`).
+/// Maps from CST `Str` or `Wildcard`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AnonymousNode(SyntaxNode);
+
+impl AnonymousNode {
+    pub fn cast(node: SyntaxNode) -> Option<Self> {
+        matches!(node.kind(), SyntaxKind::Str | SyntaxKind::Wildcard).then(|| Self(node))
+    }
+
+    pub fn as_cst(&self) -> &SyntaxNode {
+        &self.0
+    }
+
+    pub fn text_range(&self) -> TextRange {
+        self.0.text_range()
+    }
+
+    /// Returns the string value if this is a literal, `None` if wildcard.
+    pub fn value(&self) -> Option<SyntaxToken> {
+        if self.0.kind() == SyntaxKind::Wildcard {
+            return None;
+        }
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::StrVal)
+    }
+
+    /// Returns true if this is the "any" wildcard (`_`).
+    pub fn is_any(&self) -> bool {
+        self.0.kind() == SyntaxKind::Wildcard
+    }
+}
 
 /// Whether an alternation uses tagged or untagged branches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,7 +113,14 @@ pub enum AltKind {
 }
 
 define_expr!(
-    Tree, Ref, Str, Alt, Seq, Capture, Quantifier, Field, Wildcard,
+    NamedNode,
+    Ref,
+    AnonymousNode,
+    Alt,
+    Seq,
+    CapturedExpr,
+    QuantifiedExpr,
+    FieldExpr,
 );
 
 impl Root {
@@ -106,7 +146,7 @@ impl Def {
     }
 }
 
-impl Tree {
+impl NamedNode {
     pub fn node_type(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -120,6 +160,13 @@ impl Tree {
                         | SyntaxKind::KwMissing
                 )
             })
+    }
+
+    /// Returns true if the node type is wildcard (`_`), matching any named node.
+    pub fn is_any(&self) -> bool {
+        self.node_type()
+            .map(|t| t.kind() == SyntaxKind::Underscore)
+            .unwrap_or(false)
     }
 
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
@@ -189,7 +236,7 @@ impl Seq {
     }
 }
 
-impl Capture {
+impl CapturedExpr {
     pub fn name(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -215,7 +262,7 @@ impl Type {
     }
 }
 
-impl Quantifier {
+impl QuantifiedExpr {
     pub fn inner(&self) -> Option<Expr> {
         self.0.children().find_map(Expr::cast)
     }
@@ -238,7 +285,7 @@ impl Quantifier {
     }
 }
 
-impl Field {
+impl FieldExpr {
     pub fn name(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -257,14 +304,5 @@ impl NegatedField {
             .children_with_tokens()
             .filter_map(|it| it.into_token())
             .find(|t| t.kind() == SyntaxKind::Id)
-    }
-}
-
-impl Str {
-    pub fn value(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StrVal)
     }
 }

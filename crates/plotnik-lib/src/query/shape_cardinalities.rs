@@ -16,7 +16,7 @@ use super::invariants::{
 use super::named_defs::SymbolTable;
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{Branch, Def, Expr, Field, Ref, Root, Seq, SyntaxNode, Type};
+use crate::parser::{Branch, Def, Expr, FieldExpr, Ref, Root, Seq, SyntaxNode, Type};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -100,18 +100,18 @@ fn compute_single(
     };
 
     match expr {
-        Expr::Tree(_) | Expr::Str(_) | Expr::Wildcard(_) | Expr::Field(_) | Expr::Alt(_) => {
+        Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::FieldExpr(_) | Expr::Alt(_) => {
             ShapeCardinality::One
         }
 
         Expr::Seq(ref seq) => seq_cardinality(seq, symbols, def_bodies, cache),
 
-        Expr::Capture(ref cap) => {
+        Expr::CapturedExpr(ref cap) => {
             let inner = ensure_capture_has_inner(cap.inner());
             get_or_compute(inner.as_cst(), symbols, def_bodies, cache)
         }
 
-        Expr::Quantifier(ref q) => {
+        Expr::QuantifiedExpr(ref q) => {
             let inner = ensure_quantifier_has_inner(q.inner());
             get_or_compute(inner.as_cst(), symbols, def_bodies, cache)
         }
@@ -174,7 +174,7 @@ fn validate_node(
     cardinalities: &HashMap<SyntaxNode, ShapeCardinality>,
     errors: &mut Diagnostics,
 ) {
-    if let Some(field) = Field::cast(node.clone())
+    if let Some(field) = FieldExpr::cast(node.clone())
         && let Some(value) = field.value()
     {
         let card = cardinalities
