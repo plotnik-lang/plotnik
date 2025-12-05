@@ -2,37 +2,37 @@ use crate::Query;
 
 #[test]
 fn tagged_alternation_valid() {
-    let query = Query::new("[A: (a) B: (b)]").unwrap();
+    let query = Query::try_from("[A: (a) B: (b)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Alt
           Branch A:
-            Tree a
+            NamedNode a
           Branch B:
-            Tree b
+            NamedNode b
     ");
 }
 
 #[test]
 fn untagged_alternation_valid() {
-    let query = Query::new("[(a) (b)]").unwrap();
+    let query = Query::try_from("[(a) (b)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Alt
           Branch
-            Tree a
+            NamedNode a
           Branch
-            Tree b
+            NamedNode b
     ");
 }
 
 #[test]
 fn mixed_alternation_tagged_first() {
-    let query = Query::new("[A: (a) (b)]").unwrap();
+    let query = Query::try_from("[A: (a) (b)]").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
@@ -46,7 +46,7 @@ fn mixed_alternation_tagged_first() {
 
 #[test]
 fn mixed_alternation_untagged_first() {
-    let query = Query::new(
+    let query = Query::try_from(
         r#"
     [
       (a)
@@ -68,7 +68,7 @@ fn mixed_alternation_untagged_first() {
 
 #[test]
 fn nested_mixed_alternation() {
-    let query = Query::new("(call [A: (a) (b)])").unwrap();
+    let query = Query::try_from("(call [A: (a) (b)])").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
@@ -82,7 +82,7 @@ fn nested_mixed_alternation() {
 
 #[test]
 fn multiple_mixed_alternations() {
-    let query = Query::new("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
+    let query = Query::try_from("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: mixed tagged and untagged branches in alternation
@@ -102,13 +102,13 @@ fn multiple_mixed_alternations() {
 
 #[test]
 fn single_branch_no_error() {
-    let query = Query::new("[A: (a)]").unwrap();
+    let query = Query::try_from("[A: (a)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Alt
           Branch A:
-            Tree a
+            NamedNode a
     ");
 }

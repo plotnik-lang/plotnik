@@ -12,9 +12,7 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    let result = Query::builder(&input)
-        .with_recursion_fuel(Some(depth))
-        .build();
+    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -34,9 +32,7 @@ fn deeply_nested_sequences_hit_recursion_limit() {
         input.push('}');
     }
 
-    let result = Query::builder(&input)
-        .with_recursion_fuel(Some(depth))
-        .build();
+    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -56,9 +52,7 @@ fn deeply_nested_alternations_hit_recursion_limit() {
         input.push(']');
     }
 
-    let result = Query::builder(&input)
-        .with_recursion_fuel(Some(depth))
-        .build();
+    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -75,7 +69,7 @@ fn many_trees_exhaust_exec_fuel() {
         input.push_str("(a) ");
     }
 
-    let result = Query::builder(&input).with_exec_fuel(Some(100)).build();
+    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -97,7 +91,7 @@ fn many_branches_exhaust_exec_fuel() {
     }
     input.push(']');
 
-    let result = Query::builder(&input).with_exec_fuel(Some(100)).build();
+    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -119,7 +113,7 @@ fn many_fields_exhaust_exec_fuel() {
     }
     input.push(')');
 
-    let result = Query::builder(&input).with_exec_fuel(Some(100)).build();
+    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -134,7 +128,7 @@ fn named_def_missing_equals_with_garbage() {
     Expr ^^^ (identifier)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -159,7 +153,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
     Valid = (ok)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
@@ -179,7 +173,7 @@ fn empty_double_quote_string() {
     (a "")
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -200,7 +194,7 @@ fn empty_single_quote_string() {
     (a '')
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -219,7 +213,7 @@ fn empty_single_quote_string() {
 fn single_quote_string_is_valid() {
     let input = "(node 'if')";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -239,7 +233,7 @@ fn single_quote_string_is_valid() {
 fn single_quote_in_alternation() {
     let input = "['public' 'private']";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -264,7 +258,7 @@ fn single_quote_in_alternation() {
 fn single_quote_with_escape() {
     let input = r"(node 'it\'s')";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -284,7 +278,7 @@ fn single_quote_with_escape() {
 fn missing_with_nested_tree_parses() {
     let input = "(MISSING (something))";
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root

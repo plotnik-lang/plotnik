@@ -1,11 +1,14 @@
+//! AST/CST pretty-printer for debugging and test snapshots.
+
 use std::fmt::Write;
 
+use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
-use crate::parser::{self as ast, SyntaxNode};
+use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
-use super::shape_cardinalities::ShapeCardinality;
+use super::shapes::ShapeCardinality;
 
 pub struct QueryPrinter<'q, 'src> {
     query: &'q Query<'src>,
@@ -64,30 +67,29 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             return self.format_symbols(w);
         }
         if self.raw {
-            return self.format_cst(&self.query.syntax(), 0, w);
+            return self.format_cst(self.query.as_cst(), 0, w);
         }
-        self.format_root(&self.query.root(), w)
+        self.format_root(self.query.root(), w)
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
-        use indexmap::IndexSet;
         use std::collections::HashMap;
 
-        let symbols = &self.query.symbols;
+        let symbols = &self.query.symbol_table;
         if symbols.is_empty() {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.names().collect();
+        let defined: IndexSet<&str> = symbols.keys().copied().collect();
 
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
         for def in self.query.root().defs() {
             if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
-                body_nodes.insert(name_tok.text().to_string(), body.syntax().clone());
+                body_nodes.insert(name_tok.text().to_string(), body.as_cst().clone());
             }
         }
 
-        for name in symbols.names() {
+        for name in symbols.keys() {
             let mut visited = IndexSet::new();
             self.format_symbol_tree(name, 0, &defined, &body_nodes, &mut visited, w)?;
         }
@@ -123,8 +125,9 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some(def) = self.query.symbols.get(name) {
-            let mut refs: Vec<_> = def.refs.iter().map(|s| s.as_str()).collect();
+        if let Some(body) = self.query.symbol_table.get(name) {
+            let refs_set = collect_refs(body);
+            let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
                 self.format_symbol_tree(r, indent + 1, defined, body_nodes, visited, w)?;
@@ -166,8 +169,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     }
 
     fn format_root(&self, root: &ast::Root, w: &mut impl Write) -> std::fmt::Result {
-        let card = self.cardinality_mark(root.syntax());
-        let span = self.span_str(root.syntax().text_range());
+        let card = self.cardinality_mark(root.as_cst());
+        let span = self.span_str(root.text_range());
         writeln!(w, "Root{}{}", card, span)?;
 
         for def in root.defs() {
@@ -183,8 +186,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_def(&self, def: &ast::Def, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(def.syntax());
-        let span = self.span_str(def.syntax().text_range());
+        let card = self.cardinality_mark(def.as_cst());
+        let span = self.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
 
         match name {
@@ -200,29 +203,35 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_expr(&self, expr: &ast::Expr, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(expr.syntax());
-        let span = self.span_str(expr.syntax().text_range());
+        let card = self.cardinality_mark(expr.as_cst());
+        let span = self.span_str(expr.text_range());
 
         match expr {
-            ast::Expr::Tree(t) => {
-                let node_type = t.node_type().map(|tok| tok.text().to_string());
-                match node_type {
-                    Some(ty) => writeln!(w, "{}Tree{}{} {}", prefix, card, span, ty)?,
-                    None => writeln!(w, "{}Tree{}{}", prefix, card, span)?,
+            ast::Expr::NamedNode(n) => {
+                if n.is_any() {
+                    writeln!(w, "{}NamedNode{}{} (any)", prefix, card, span)?;
+                } else {
+                    let node_type = n.node_type().map(|tok| tok.text().to_string());
+                    match node_type {
+                        Some(ty) => writeln!(w, "{}NamedNode{}{} {}", prefix, card, span, ty)?,
+                        None => writeln!(w, "{}NamedNode{}{}", prefix, card, span)?,
+                    }
                 }
-                for child in t.children() {
-                    self.format_expr(&child, indent + 1, w)?;
-                }
+                self.format_tree_children(n.as_cst(), indent + 1, w)?;
             }
             ast::Expr::Ref(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(w, "{}Ref{}{} {}", prefix, card, span, name)?;
             }
-            ast::Expr::Str(s) => {
-                let value = s.value().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}Str{}{} \"{}\"", prefix, card, span, value)?;
+            ast::Expr::AnonymousNode(a) => {
+                if a.is_any() {
+                    writeln!(w, "{}AnonymousNode{}{} (any)", prefix, card, span)?;
+                } else {
+                    let value = a.value().map(|t| t.text().to_string()).unwrap_or_default();
+                    writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, card, span, value)?;
+                }
             }
-            ast::Expr::Alt(a) => {
+            ast::Expr::AltExpr(a) => {
                 writeln!(w, "{}Alt{}{}", prefix, card, span)?;
                 for branch in a.branches() {
                     self.format_branch(&branch, indent + 1, w)?;
@@ -231,60 +240,86 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                     self.format_expr(&expr, indent + 1, w)?;
                 }
             }
-            ast::Expr::Seq(s) => {
+            ast::Expr::SeqExpr(s) => {
                 writeln!(w, "{}Seq{}{}", prefix, card, span)?;
-                for child in s.children() {
-                    self.format_expr(&child, indent + 1, w)?;
-                }
+                self.format_tree_children(s.as_cst(), indent + 1, w)?;
             }
-            ast::Expr::Capture(c) => {
+            ast::Expr::CapturedExpr(c) => {
                 let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
                 let type_ann = c
                     .type_annotation()
                     .and_then(|t| t.name())
                     .map(|t| t.text().to_string());
                 match type_ann {
-                    Some(ty) => {
-                        writeln!(w, "{}Capture{}{} @{} :: {}", prefix, card, span, name, ty)?
-                    }
-                    None => writeln!(w, "{}Capture{}{} @{}", prefix, card, span, name)?,
+                    Some(ty) => writeln!(
+                        w,
+                        "{}CapturedExpr{}{} @{} :: {}",
+                        prefix, card, span, name, ty
+                    )?,
+                    None => writeln!(w, "{}CapturedExpr{}{} @{}", prefix, card, span, name)?,
                 }
                 let Some(inner) = c.inner() else {
                     return Ok(());
                 };
                 self.format_expr(&inner, indent + 1, w)?;
             }
-            ast::Expr::Quantifier(q) => {
+            ast::Expr::QuantifiedExpr(q) => {
                 let op = q
                     .operator()
                     .map(|t| t.text().to_string())
                     .unwrap_or_default();
-                writeln!(w, "{}Quantifier{}{} {}", prefix, card, span, op)?;
+                writeln!(w, "{}QuantifiedExpr{}{} {}", prefix, card, span, op)?;
                 let Some(inner) = q.inner() else {
                     return Ok(());
                 };
                 self.format_expr(&inner, indent + 1, w)?;
             }
-            ast::Expr::Field(f) => {
+            ast::Expr::FieldExpr(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}Field{}{} {}:", prefix, card, span, name)?;
+                writeln!(w, "{}FieldExpr{}{} {}:", prefix, card, span, name)?;
                 let Some(value) = f.value() else {
                     return Ok(());
                 };
                 self.format_expr(&value, indent + 1, w)?;
             }
-            ast::Expr::NegatedField(f) => {
-                let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}NegatedField{}{} !{}", prefix, card, span, name)?;
-            }
-            ast::Expr::Wildcard(_) => {
-                writeln!(w, "{}Wildcard{}{}", prefix, card, span)?;
-            }
-            ast::Expr::Anchor(_) => {
-                writeln!(w, "{}Anchor{}{}", prefix, card, span)?;
+        }
+        Ok(())
+    }
+
+    fn format_tree_children(
+        &self,
+        node: &SyntaxNode,
+        indent: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        use crate::parser::cst::SyntaxKind;
+        for child in node.children() {
+            if child.kind() == SyntaxKind::Anchor {
+                self.mark_anchor(indent, w)?;
+            } else if child.kind() == SyntaxKind::NegatedField {
+                self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), indent, w)?;
+            } else if let Some(expr) = ast::Expr::cast(child) {
+                self.format_expr(&expr, indent, w)?;
             }
         }
         Ok(())
+    }
+
+    fn mark_anchor(&self, indent: usize, w: &mut impl Write) -> std::fmt::Result {
+        let prefix = "  ".repeat(indent);
+        writeln!(w, "{}.", prefix)
+    }
+
+    fn format_negated_field(
+        &self,
+        nf: &ast::NegatedField,
+        indent: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        let prefix = "  ".repeat(indent);
+        let span = self.span_str(nf.text_range());
+        let name = nf.name().map(|t| t.text().to_string()).unwrap_or_default();
+        writeln!(w, "{}NegatedField{} !{}", prefix, span, name)
     }
 
     fn format_branch(
@@ -294,8 +329,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         w: &mut impl Write,
     ) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(branch.syntax());
-        let span = self.span_str(branch.syntax().text_range());
+        let card = self.cardinality_mark(branch.as_cst());
+        let span = self.span_str(branch.text_range());
         let label = branch.label().map(|t| t.text().to_string());
 
         match label {
@@ -336,4 +371,13 @@ impl Query<'_> {
     pub fn printer(&self) -> QueryPrinter<'_, '_> {
         QueryPrinter::new(self)
     }
+}
+
+fn collect_refs(expr: &Expr) -> IndexSet<String> {
+    expr.as_cst()
+        .descendants()
+        .filter_map(ast::Ref::cast)
+        .filter_map(|r| r.name())
+        .map(|tok| tok.text().to_string())
+        .collect()
 }

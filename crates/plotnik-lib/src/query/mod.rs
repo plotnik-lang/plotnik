@@ -1,211 +1,202 @@
-//! Query processing: parsing, analysis, and validation pipeline.
+//! Query processing pipeline.
+//!
+//! Stages: parse → alt_kinds → symbol_table → recursion → shapes.
+//! Each stage populates its own diagnostics. Use `is_valid()` to check
+//! if any stage produced errors.
 
 mod dump;
 mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
 
-pub mod alt_kind;
-pub mod named_defs;
-pub mod ref_cycles;
-pub mod shape_cardinalities;
+pub mod alt_kinds;
+pub mod recursion;
+pub mod shapes;
+pub mod symbol_table;
 
 #[cfg(test)]
-mod alt_kind_tests;
+mod alt_kinds_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
-mod named_defs_tests;
-#[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
-mod ref_cycles_tests;
+mod recursion_tests;
 #[cfg(test)]
-mod shape_cardinalities_tests;
+mod shapes_tests;
+#[cfg(test)]
+mod symbol_table_tests;
 
 use std::collections::HashMap;
 
+use rowan::GreenNodeBuilder;
+
 use crate::Result;
 use crate::diagnostics::Diagnostics;
+use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parse, Parser, Root, SyntaxNode};
-use named_defs::SymbolTable;
-use shape_cardinalities::ShapeCardinality;
+use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
 
-/// Builder for configuring and creating a [`Query`].
-pub struct QueryBuilder<'a> {
+const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
+const DEFAULT_RECURSION_FUEL: u32 = 4096;
+
+use shapes::ShapeCardinality;
+use symbol_table::SymbolTable;
+
+/// A parsed and analyzed query.
+///
+/// Create with [`new`](Self::new), optionally configure fuel limits,
+/// then call [`exec`](Self::exec) to run analysis.
+///
+/// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
+/// to determine if the query has syntax/semantic issues.
+#[derive(Debug, Clone)]
+pub struct Query<'a> {
     source: &'a str,
-    exec_fuel: Option<Option<u32>>,
-    recursion_fuel: Option<Option<u32>>,
+    ast: Root,
+    symbol_table: SymbolTable<'a>,
+    shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
+    exec_fuel: Option<u32>,
+    recursion_fuel: Option<u32>,
+    exec_fuel_consumed: u32,
+    parse_diagnostics: Diagnostics,
+    alt_kind_diagnostics: Diagnostics,
+    resolve_diagnostics: Diagnostics,
+    recursion_diagnostics: Diagnostics,
+    shapes_diagnostics: Diagnostics,
 }
 
-impl<'a> QueryBuilder<'a> {
-    /// Create a new builder for the given source.
+fn empty_root() -> Root {
+    let mut builder = GreenNodeBuilder::new();
+    builder.start_node(SyntaxKind::Root.into());
+    builder.finish_node();
+    let green = builder.finish();
+    Root::cast(SyntaxNode::new_root(green)).expect("we just built a Root node")
+}
+
+impl<'a> Query<'a> {
+    /// Create a new query from source text.
+    ///
+    /// Call [`exec`](Self::exec) to run analysis passes.
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            exec_fuel: None,
-            recursion_fuel: None,
+            ast: empty_root(),
+            symbol_table: SymbolTable::default(),
+            shape_cardinality_table: HashMap::new(),
+            exec_fuel: Some(DEFAULT_EXEC_FUEL),
+            recursion_fuel: Some(DEFAULT_RECURSION_FUEL),
+            exec_fuel_consumed: 0,
+            parse_diagnostics: Diagnostics::new(),
+            alt_kind_diagnostics: Diagnostics::new(),
+            resolve_diagnostics: Diagnostics::new(),
+            recursion_diagnostics: Diagnostics::new(),
+            shapes_diagnostics: Diagnostics::new(),
         }
     }
 
     /// Set execution fuel limit. None = infinite.
     ///
     /// Execution fuel never replenishes. It protects against large inputs.
-    /// Returns error when exhausted.
+    /// Returns error from [`exec`](Self::exec) when exhausted.
     pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
-        self.exec_fuel = Some(limit);
+        self.exec_fuel = limit;
         self
     }
 
     /// Set recursion depth limit. None = infinite.
     ///
     /// Recursion fuel restores when exiting recursion. It protects against
-    /// deeply nested input. Returns error when exhausted.
+    /// deeply nested input. Returns error from [`exec`](Self::exec) when exhausted.
     pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
-        self.recursion_fuel = Some(limit);
+        self.recursion_fuel = limit;
         self
     }
 
-    /// Build the query, running all analysis passes.
-    ///
-    /// Returns `Err` if fuel limits are exceeded.
-    pub fn build(self) -> Result<Query<'a>> {
-        let tokens = lex(self.source);
-        let mut parser = Parser::new(self.source, tokens);
-
-        if let Some(limit) = self.exec_fuel {
-            parser = parser.with_exec_fuel(limit);
-        }
-
-        if let Some(limit) = self.recursion_fuel {
-            parser = parser.with_recursion_fuel(limit);
-        }
-
-        let (parse, parse_diagnostics) = parser::parse_with_parser(parser)?;
-        Ok(Query::from_parse(self.source, parse, parse_diagnostics))
-    }
-}
-
-/// A parsed and analyzed query.
-///
-/// Construction succeeds unless fuel limits are exceeded.
-/// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
-/// to determine if the query has syntax/semantic issues.
-#[derive(Debug, Clone)]
-pub struct Query<'a> {
-    source: &'a str,
-    parse: Parse,
-    symbols: SymbolTable,
-    shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
-    // Diagnostics per pass
-    parse_diagnostics: Diagnostics,
-    alt_kind_diagnostics: Diagnostics,
-    resolve_diagnostics: Diagnostics,
-    ref_cycle_diagnostics: Diagnostics,
-    shape_diagnostics: Diagnostics,
-}
-
-impl<'a> Query<'a> {
-    /// Parse and analyze a query from source text.
+    /// Run all analysis passes.
     ///
     /// Returns `Err` if fuel limits are exceeded.
     /// Syntax/semantic diagnostics are collected and accessible via [`diagnostics`](Self::diagnostics).
-    pub fn new(source: &'a str) -> Result<Self> {
-        QueryBuilder::new(source).build()
+    pub fn exec(mut self) -> Result<Self> {
+        self.try_parse()?;
+        self.validate_alt_kinds();
+        self.resolve_names();
+        self.validate_recursion();
+        self.infer_shapes();
+        Ok(self)
     }
 
-    /// Create a builder for configuring parser limits.
-    pub fn builder(source: &'a str) -> QueryBuilder<'a> {
-        QueryBuilder::new(source)
+    fn try_parse(&mut self) -> Result<()> {
+        let tokens = lex(self.source);
+        let parser = Parser::new(self.source, tokens)
+            .with_exec_fuel(self.exec_fuel)
+            .with_recursion_fuel(self.recursion_fuel);
+
+        let ParseResult {
+            root,
+            diagnostics,
+            exec_fuel_consumed,
+        } = parser.parse()?;
+        self.ast = root;
+        self.parse_diagnostics = diagnostics;
+        self.exec_fuel_consumed = exec_fuel_consumed;
+        Ok(())
     }
 
-    fn from_parse(source: &'a str, parse: Parse, parse_diagnostics: Diagnostics) -> Self {
-        let root = Root::cast(parse.syntax()).expect("parser always produces Root");
+    pub(crate) fn as_cst(&self) -> &SyntaxNode {
+        self.ast.as_cst()
+    }
 
-        let ((), alt_kind_diagnostics) =
-            alt_kind::validate(&root).expect("alt_kind::validate is infallible");
+    pub(crate) fn root(&self) -> &Root {
+        &self.ast
+    }
 
-        let (symbols, resolve_diagnostics) =
-            named_defs::resolve(&root).expect("named_defs::resolve is infallible");
-
-        let ((), ref_cycle_diagnostics) =
-            ref_cycles::validate(&root, &symbols).expect("ref_cycles::validate is infallible");
-
-        let (shape_cardinalities, shape_diagnostics) =
-            shape_cardinalities::analyze(&root, &symbols)
-                .expect("shape_cardinalities::analyze is infallible");
-
-        Self {
-            source,
-            parse,
-            symbols,
-            shape_cardinalities,
-            parse_diagnostics,
-            alt_kind_diagnostics,
-            resolve_diagnostics,
-            ref_cycle_diagnostics,
-            shape_diagnostics,
+    pub(crate) fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
+        // Error nodes are invalid
+        if node.kind() == SyntaxKind::Error {
+            return ShapeCardinality::Invalid;
         }
-    }
 
-    #[allow(dead_code)]
-    pub fn source(&self) -> &str {
-        self.source
-    }
+        // Root: cardinality based on definition count
+        if let Some(root) = Root::cast(node.clone()) {
+            return if root.defs().count() > 1 {
+                ShapeCardinality::Many
+            } else {
+                ShapeCardinality::One
+            };
+        }
 
-    pub fn syntax(&self) -> SyntaxNode {
-        self.parse.syntax()
-    }
+        // Def: delegate to body's cardinality
+        if let Some(def) = ast::Def::cast(node.clone()) {
+            return def
+                .body()
+                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
+                .unwrap_or(ShapeCardinality::Invalid);
+        }
 
-    pub fn root(&self) -> Root {
-        Root::cast(self.parse.syntax()).expect("parser always produces Root")
-    }
+        // Branch: delegate to body's cardinality
+        if let Some(branch) = ast::Branch::cast(node.clone()) {
+            return branch
+                .body()
+                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
+                .unwrap_or(ShapeCardinality::Invalid);
+        }
 
-    pub fn symbols(&self) -> &SymbolTable {
-        &self.symbols
-    }
-
-    pub fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
-        self.shape_cardinalities
-            .get(node)
-            .copied()
+        // Expr: direct lookup
+        ast::Expr::cast(node.clone())
+            .and_then(|e| self.shape_cardinality_table.get(&e).copied())
             .unwrap_or(ShapeCardinality::One)
     }
 
     /// All diagnostics combined from all passes.
-    pub fn all_diagnostics(&self) -> Diagnostics {
+    pub fn diagnostics(&self) -> Diagnostics {
         let mut all = Diagnostics::new();
         all.extend(self.parse_diagnostics.clone());
         all.extend(self.alt_kind_diagnostics.clone());
         all.extend(self.resolve_diagnostics.clone());
-        all.extend(self.ref_cycle_diagnostics.clone());
-        all.extend(self.shape_diagnostics.clone());
+        all.extend(self.recursion_diagnostics.clone());
+        all.extend(self.shapes_diagnostics.clone());
         all
-    }
-
-    pub fn parse_diagnostics(&self) -> &Diagnostics {
-        &self.parse_diagnostics
-    }
-
-    pub fn alt_kind_diagnostics(&self) -> &Diagnostics {
-        &self.alt_kind_diagnostics
-    }
-
-    pub fn resolve_diagnostics(&self) -> &Diagnostics {
-        &self.resolve_diagnostics
-    }
-
-    pub fn ref_cycle_diagnostics(&self) -> &Diagnostics {
-        &self.ref_cycle_diagnostics
-    }
-
-    pub fn shape_diagnostics(&self) -> &Diagnostics {
-        &self.shape_diagnostics
-    }
-
-    pub fn diagnostics(&self) -> Diagnostics {
-        self.all_diagnostics()
     }
 
     /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
@@ -213,18 +204,23 @@ impl<'a> Query<'a> {
         !self.parse_diagnostics.has_errors()
             && !self.alt_kind_diagnostics.has_errors()
             && !self.resolve_diagnostics.has_errors()
-            && !self.ref_cycle_diagnostics.has_errors()
-            && !self.shape_diagnostics.has_errors()
+            && !self.recursion_diagnostics.has_errors()
+            && !self.shapes_diagnostics.has_errors()
     }
+}
 
-    pub fn render_diagnostics(&self) -> String {
-        self.all_diagnostics().printer(self.source).render()
+impl<'a> TryFrom<&'a str> for Query<'a> {
+    type Error = crate::Error;
+
+    fn try_from(source: &'a str) -> Result<Self> {
+        Self::new(source).exec()
     }
+}
 
-    pub fn render_diagnostics_colored(&self, colored: bool) -> String {
-        self.all_diagnostics()
-            .printer(self.source)
-            .colored(colored)
-            .render()
+impl<'a> TryFrom<&'a String> for Query<'a> {
+    type Error = crate::Error;
+
+    fn try_from(source: &'a String) -> Result<Self> {
+        Self::new(source.as_str()).exec()
     }
 }

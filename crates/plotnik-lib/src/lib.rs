@@ -5,14 +5,13 @@
 //! ```
 //! use plotnik_lib::Query;
 //!
-//! let query = Query::new(r#"
+//! let source = r#"
 //!     Expr = [(identifier) (number)]
 //!     (assignment left: (Expr) @lhs right: (Expr) @rhs)
-//! "#).expect("valid query");
+//! "#;
 //!
-//! if !query.is_valid() {
-//!     eprintln!("{}", query.render_diagnostics());
-//! }
+//! let query = Query::try_from(source).expect("out of fuel");
+//! eprintln!("{}", query.diagnostics().render(source));
 //! ```
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
@@ -28,7 +27,7 @@ pub mod query;
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
 
 pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity};
-pub use query::{Query, QueryBuilder};
+pub use query::Query;
 
 /// Errors that can occur during query parsing.
 #[derive(Debug, Clone, thiserror::Error)]

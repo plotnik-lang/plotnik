@@ -38,49 +38,11 @@ mod lexer_tests;
 #[cfg(test)]
 mod tests;
 
-// Re-exports from cst (was syntax_kind)
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
-// Re-exports from ast (was nodes)
 pub use ast::{
-    Alt, AltKind, Anchor, Branch, Capture, Def, Expr, Field, NegatedField, Quantifier, Ref, Root,
-    Seq, Str, Tree, Type, Wildcard,
+    AltExpr, AltKind, Anchor, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
+    NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, Type,
 };
 
-pub use core::Parser;
-
-use crate::PassResult;
-use lexer::lex;
-
-/// Parse result containing the green tree.
-///
-/// The tree is always complete—diagnostics are returned separately.
-/// Error nodes in the tree represent recovery points.
-#[derive(Debug, Clone)]
-pub struct Parse {
-    cst: rowan::GreenNode,
-}
-
-impl Parse {
-    pub fn as_cst(&self) -> &rowan::GreenNode {
-        &self.cst
-    }
-
-    /// Creates a typed view over the immutable green tree.
-    /// This is cheap—SyntaxNode is a thin wrapper with parent pointers.
-    pub fn syntax(&self) -> SyntaxNode {
-        SyntaxNode::new_root(self.cst.clone())
-    }
-}
-
-/// Main entry point. Returns Err on fuel exhaustion.
-pub fn parse(source: &str) -> PassResult<Parse> {
-    parse_with_parser(Parser::new(source, lex(source)))
-}
-
-/// Parse with a pre-configured parser (for custom fuel limits).
-pub(crate) fn parse_with_parser(mut parser: Parser) -> PassResult<Parse> {
-    parser.parse_root();
-    let (cst, diagnostics) = parser.finish()?;
-    Ok((Parse { cst }, diagnostics))
-}
+pub use core::{ParseResult, Parser};

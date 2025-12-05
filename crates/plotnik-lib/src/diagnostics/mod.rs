@@ -71,6 +71,14 @@ impl Diagnostics {
         DiagnosticsPrinter::new(&self.messages, source)
     }
 
+    pub fn render(&self, source: &str) -> String {
+        self.printer(source).render()
+    }
+
+    pub fn render_colored(&self, source: &str, colored: bool) -> String {
+        self.printer(source).colored(colored).render()
+    }
+
     pub fn extend(&mut self, other: Diagnostics) {
         self.messages.extend(other.messages);
     }

@@ -29,10 +29,10 @@ crates/
         dump.rs        # dump_* debug output methods (test-only)
         printer.rs     # QueryPrinter for AST output
         invariants.rs  # Query invariant checks
-        alt_kind.rs    # Alternation validation
-        named_defs.rs  # Name resolution, symbol table
-        ref_cycles.rs  # Escape analysis (recursion validation)
-        shape_cardinalities.rs  # Shape inference
+        alt_kinds.rs     # Alternation validation
+        symbol_table.rs  # Name resolution, symbol table
+        recursion.rs     # Escape analysis (recursion validation)
+        shapes.rs        # Shape inference
         *_tests.rs     # Test files per module
       lib.rs           # Re-exports Query, Diagnostics, Error
   plotnik-cli/         # CLI tool
@@ -45,11 +45,11 @@ docs/
 ## Pipeline
 
 ```rust
-parser::parse()                   // Parse → CST
-alt_kind::validate()              // Validate alternation kinds
-named_defs::resolve()             // Resolve names → SymbolTable
-ref_cycles::validate()            // Validate recursion termination
-shape_cardinalities::analyze()    // Infer and validate shape cardinalities
+parser::parse()           // Parse → CST
+alt_kinds::validate()     // Validate alternation kinds
+symbol_table::resolve()   // Resolve names → SymbolTable
+recursion::validate()     // Validate recursion termination
+shapes::infer()           // Infer and validate shape cardinalities
 ```
 
 Module = "what", function = "action".
@@ -66,14 +66,14 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output: `--query`, `--source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
+Output: `--show-query`, `--show-source`, `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
 
 ```sh
-cargo run -p plotnik-cli -- debug -q '(identifier) @id' --query
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --show-query
 cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
-cargo run -p plotnik-cli -- debug -s app.ts --source
-cargo run -p plotnik-cli -- debug -s app.ts --source --raw
-cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --query
+cargo run -p plotnik-cli -- debug -s app.ts --show-source
+cargo run -p plotnik-cli -- debug -s app.ts --show-source --raw
+cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query
 ```
 
 ## Syntax
@@ -82,7 +82,7 @@ Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Typ
 
 SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifier`, `Seq`, `Alt`, `Branch`, `Wildcard`, `Anchor`, `NegatedField`, `Def`
 
-Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | NegatedField | Wildcard | Anchor`. Quantifier/Capture wrap their target.
+Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | Wildcard`. Quantifier/Capture wrap their target. `Anchor` and `NegatedField` are predicates (not expressions).
 
 ## Diagnostics
 

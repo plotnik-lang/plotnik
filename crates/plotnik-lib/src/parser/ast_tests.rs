@@ -3,13 +3,13 @@ use indoc::indoc;
 
 #[test]
 fn simple_tree() {
-    let query = Query::new("(identifier)").unwrap();
+    let query = Query::try_from("(identifier)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree identifier
-    "#);
+        NamedNode identifier
+    ");
 }
 
 #[test]
@@ -18,72 +18,72 @@ fn nested_tree() {
     (function_definition name: (identifier))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree function_definition
-          Field name:
-            Tree identifier
-    "#);
+        NamedNode function_definition
+          FieldExpr name:
+            NamedNode identifier
+    ");
 }
 
 #[test]
 fn wildcard() {
-    let query = Query::new("(_)").unwrap();
+    let query = Query::try_from("(_)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree _
-    "#);
+        NamedNode (any)
+    ");
 }
 
 #[test]
 fn literal() {
-    let query = Query::new(r#""if""#).unwrap();
+    let query = Query::try_from(r#""if""#).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r#"
     Root
       Def
-        Str "if"
+        AnonymousNode "if"
     "#);
 }
 
 #[test]
 fn capture() {
-    let query = Query::new("(identifier) @name").unwrap();
+    let query = Query::try_from("(identifier) @name").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Capture @name
-          Tree identifier
-    "#);
+        CapturedExpr @name
+          NamedNode identifier
+    ");
 }
 
 #[test]
 fn capture_with_type() {
-    let query = Query::new("(identifier) @name :: string").unwrap();
+    let query = Query::try_from("(identifier) @name :: string").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Capture @name :: string
-          Tree identifier
-    "#);
+        CapturedExpr @name :: string
+          NamedNode identifier
+    ");
 }
 
 #[test]
 fn named_definition() {
-    let query = Query::new("Expr = (expression)").unwrap();
+    let query = Query::try_from("Expr = (expression)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def Expr
-        Tree expression
-    "#);
+        NamedNode expression
+    ");
 }
 
 #[test]
@@ -93,30 +93,30 @@ fn reference() {
     (call (Expr))
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def Expr
-        Tree identifier
+        NamedNode identifier
       Def
-        Tree call
+        NamedNode call
           Ref Expr
-    "#);
+    ");
 }
 
 #[test]
 fn alternation_unlabeled() {
-    let query = Query::new("[(identifier) (number)]").unwrap();
+    let query = Query::try_from("[(identifier) (number)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Alt
           Branch
-            Tree identifier
+            NamedNode identifier
           Branch
-            Tree number
+            NamedNode number
     ");
 }
 
@@ -126,104 +126,104 @@ fn alternation_tagged() {
     [Ident: (identifier) Num: (number)]
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Alt
           Branch Ident:
-            Tree identifier
+            NamedNode identifier
           Branch Num:
-            Tree number
+            NamedNode number
     ");
 }
 
 #[test]
 fn sequence() {
-    let query = Query::new("{(a) (b) (c)}").unwrap();
+    let query = Query::try_from("{(a) (b) (c)}").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Seq
-          Tree a
-          Tree b
-          Tree c
-    "#);
+          NamedNode a
+          NamedNode b
+          NamedNode c
+    ");
 }
 
 #[test]
 fn quantifier_star() {
-    let query = Query::new("(statement)*").unwrap();
+    let query = Query::try_from("(statement)*").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Quantifier *
-          Tree statement
-    "#);
+        QuantifiedExpr *
+          NamedNode statement
+    ");
 }
 
 #[test]
 fn quantifier_plus() {
-    let query = Query::new("(statement)+").unwrap();
+    let query = Query::try_from("(statement)+").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Quantifier +
-          Tree statement
-    "#);
+        QuantifiedExpr +
+          NamedNode statement
+    ");
 }
 
 #[test]
 fn quantifier_optional() {
-    let query = Query::new("(statement)?").unwrap();
+    let query = Query::try_from("(statement)?").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Quantifier ?
-          Tree statement
-    "#);
+        QuantifiedExpr ?
+          NamedNode statement
+    ");
 }
 
 #[test]
 fn quantifier_non_greedy() {
-    let query = Query::new("(statement)*?").unwrap();
+    let query = Query::try_from("(statement)*?").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Quantifier *?
-          Tree statement
-    "#);
+        QuantifiedExpr *?
+          NamedNode statement
+    ");
 }
 
 #[test]
 fn anchor() {
-    let query = Query::new("(block . (statement))").unwrap();
+    let query = Query::try_from("(block . (statement))").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree block
-          Anchor
-          Tree statement
-    "#);
+        NamedNode block
+          .
+          NamedNode statement
+    ");
 }
 
 #[test]
 fn negated_field() {
-    let query = Query::new("(function !async)").unwrap();
+    let query = Query::try_from("(function !async)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree function
+        NamedNode function
           NegatedField !async
-    "#);
+    ");
 }
 
 #[test]
@@ -237,29 +237,29 @@ fn complex_example() {
     ]
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def Expression
         Alt
           Branch Ident:
-            Capture @name :: string
-              Tree identifier
+            CapturedExpr @name :: string
+              NamedNode identifier
           Branch Binary:
-            Tree binary_expression
-              Capture @left
-                Field left:
+            NamedNode binary_expression
+              CapturedExpr @left
+                FieldExpr left:
                   Ref Expression
-              Capture @right
-                Field right:
+              CapturedExpr @right
+                FieldExpr right:
                   Ref Expression
     ");
 }
 
 #[test]
 fn ast_with_errors() {
-    let query = Query::new("(call (Undefined))").unwrap();
+    let query = Query::try_from("(call (Undefined))").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: undefined reference: `Undefined`
@@ -271,13 +271,13 @@ fn ast_with_errors() {
 
 #[test]
 fn supertype() {
-    let query = Query::new("(expression/binary_expression)").unwrap();
+    let query = Query::try_from("(expression/binary_expression)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Tree expression
-    "#);
+        NamedNode expression
+    ");
 }
 
 #[test]
@@ -289,21 +289,21 @@ fn multiple_fields() {
         right: (_) @right) @expr
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        Capture @expr
-          Tree binary_expression
-            Capture @left
-              Field left:
-                Tree _
-            Capture @op
-              Field operator:
-                Wildcard
-            Capture @right
-              Field right:
-                Tree _
+        CapturedExpr @expr
+          NamedNode binary_expression
+            CapturedExpr @left
+              FieldExpr left:
+                NamedNode (any)
+            CapturedExpr @op
+              FieldExpr operator:
+                AnonymousNode (any)
+            CapturedExpr @right
+              FieldExpr right:
+                NamedNode (any)
     ");
 }

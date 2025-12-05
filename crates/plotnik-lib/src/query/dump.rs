@@ -1,3 +1,5 @@
+//! Test-only dump methods for query inspection.
+
 #[cfg(test)]
 mod test_helpers {
     use crate::Query;
@@ -28,7 +30,7 @@ mod test_helpers {
         }
 
         pub fn dump_diagnostics(&self) -> String {
-            self.render_diagnostics()
+            self.diagnostics().render(self.source)
         }
     }
 }

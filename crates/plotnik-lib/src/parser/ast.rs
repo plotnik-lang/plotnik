@@ -4,6 +4,7 @@
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
 
 use super::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use rowan::TextRange;
 
 macro_rules! ast_node {
     ($name:ident, $kind:ident) => {
@@ -15,8 +16,37 @@ macro_rules! ast_node {
                 (node.kind() == SyntaxKind::$kind).then(|| Self(node))
             }
 
-            pub fn syntax(&self) -> &SyntaxNode {
+            pub fn as_cst(&self) -> &SyntaxNode {
                 &self.0
+            }
+
+            pub fn text_range(&self) -> TextRange {
+                self.0.text_range()
+            }
+        }
+    };
+}
+
+macro_rules! define_expr {
+    ($($variant:ident),+ $(,)?) => {
+        /// Expression: any pattern that can appear in the tree.
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum Expr {
+            $($variant($variant)),+
+        }
+
+        impl Expr {
+            pub fn cast(node: SyntaxNode) -> Option<Self> {
+                $(if let Some(n) = $variant::cast(node.clone()) { return Some(Expr::$variant(n)); })+
+                None
+            }
+
+            pub fn as_cst(&self) -> &SyntaxNode {
+                match self { $(Expr::$variant(n) => n.as_cst()),+ }
+            }
+
+            pub fn text_range(&self) -> TextRange {
+                match self { $(Expr::$variant(n) => n.text_range()),+ }
             }
         }
     };
@@ -24,19 +54,52 @@ macro_rules! ast_node {
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
-ast_node!(Tree, Tree);
+ast_node!(NamedNode, Tree);
 ast_node!(Ref, Ref);
-ast_node!(Str, Str);
-ast_node!(Alt, Alt);
+ast_node!(AltExpr, Alt);
 ast_node!(Branch, Branch);
-ast_node!(Seq, Seq);
-ast_node!(Capture, Capture);
+ast_node!(SeqExpr, Seq);
+ast_node!(CapturedExpr, Capture);
 ast_node!(Type, Type);
-ast_node!(Quantifier, Quantifier);
-ast_node!(Field, Field);
+ast_node!(QuantifiedExpr, Quantifier);
+ast_node!(FieldExpr, Field);
 ast_node!(NegatedField, NegatedField);
-ast_node!(Wildcard, Wildcard);
 ast_node!(Anchor, Anchor);
+
+/// Anonymous node: string literal (`"+"`) or wildcard (`_`).
+/// Maps from CST `Str` or `Wildcard`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AnonymousNode(SyntaxNode);
+
+impl AnonymousNode {
+    pub fn cast(node: SyntaxNode) -> Option<Self> {
+        matches!(node.kind(), SyntaxKind::Str | SyntaxKind::Wildcard).then(|| Self(node))
+    }
+
+    pub fn as_cst(&self) -> &SyntaxNode {
+        &self.0
+    }
+
+    pub fn text_range(&self) -> TextRange {
+        self.0.text_range()
+    }
+
+    /// Returns the string value if this is a literal, `None` if wildcard.
+    pub fn value(&self) -> Option<SyntaxToken> {
+        if self.0.kind() == SyntaxKind::Wildcard {
+            return None;
+        }
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::StrVal)
+    }
+
+    /// Returns true if this is the "any" wildcard (`_`).
+    pub fn is_any(&self) -> bool {
+        self.0.kind() == SyntaxKind::Wildcard
+    }
+}
 
 /// Whether an alternation uses tagged or untagged branches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -49,58 +112,16 @@ pub enum AltKind {
     Mixed,
 }
 
-/// Expression: any pattern that can appear in the tree.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Expr {
-    Tree(Tree),
-    Ref(Ref),
-    Str(Str),
-    Alt(Alt),
-    Seq(Seq),
-    Capture(Capture),
-    Quantifier(Quantifier),
-    Field(Field),
-    NegatedField(NegatedField),
-    Wildcard(Wildcard),
-    Anchor(Anchor),
-}
-
-impl Expr {
-    pub fn cast(node: SyntaxNode) -> Option<Self> {
-        match node.kind() {
-            SyntaxKind::Tree => Tree::cast(node).map(Expr::Tree),
-            SyntaxKind::Ref => Ref::cast(node).map(Expr::Ref),
-            SyntaxKind::Str => Str::cast(node).map(Expr::Str),
-            SyntaxKind::Alt => Alt::cast(node).map(Expr::Alt),
-            SyntaxKind::Seq => Seq::cast(node).map(Expr::Seq),
-            SyntaxKind::Capture => Capture::cast(node).map(Expr::Capture),
-            SyntaxKind::Quantifier => Quantifier::cast(node).map(Expr::Quantifier),
-            SyntaxKind::Field => Field::cast(node).map(Expr::Field),
-            SyntaxKind::NegatedField => NegatedField::cast(node).map(Expr::NegatedField),
-            SyntaxKind::Wildcard => Wildcard::cast(node).map(Expr::Wildcard),
-            SyntaxKind::Anchor => Anchor::cast(node).map(Expr::Anchor),
-            _ => None,
-        }
-    }
-
-    pub fn syntax(&self) -> &SyntaxNode {
-        match self {
-            Expr::Tree(n) => n.syntax(),
-            Expr::Ref(n) => n.syntax(),
-            Expr::Str(n) => n.syntax(),
-            Expr::Alt(n) => n.syntax(),
-            Expr::Seq(n) => n.syntax(),
-            Expr::Capture(n) => n.syntax(),
-            Expr::Quantifier(n) => n.syntax(),
-            Expr::Field(n) => n.syntax(),
-            Expr::NegatedField(n) => n.syntax(),
-            Expr::Wildcard(n) => n.syntax(),
-            Expr::Anchor(n) => n.syntax(),
-        }
-    }
-}
-
-// --- Accessors ---
+define_expr!(
+    NamedNode,
+    Ref,
+    AnonymousNode,
+    AltExpr,
+    SeqExpr,
+    CapturedExpr,
+    QuantifiedExpr,
+    FieldExpr,
+);
 
 impl Root {
     pub fn defs(&self) -> impl Iterator<Item = Def> + '_ {
@@ -125,7 +146,7 @@ impl Def {
     }
 }
 
-impl Tree {
+impl NamedNode {
     pub fn node_type(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -139,6 +160,13 @@ impl Tree {
                         | SyntaxKind::KwMissing
                 )
             })
+    }
+
+    /// Returns true if the node type is wildcard (`_`), matching any named node.
+    pub fn is_any(&self) -> bool {
+        self.node_type()
+            .map(|t| t.kind() == SyntaxKind::Underscore)
+            .unwrap_or(false)
     }
 
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
@@ -155,7 +183,7 @@ impl Ref {
     }
 }
 
-impl Alt {
+impl AltExpr {
     pub fn kind(&self) -> AltKind {
         let mut tagged = false;
         let mut untagged = false;
@@ -202,13 +230,13 @@ impl Branch {
     }
 }
 
-impl Seq {
+impl SeqExpr {
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
     }
 }
 
-impl Capture {
+impl CapturedExpr {
     pub fn name(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -234,7 +262,7 @@ impl Type {
     }
 }
 
-impl Quantifier {
+impl QuantifiedExpr {
     pub fn inner(&self) -> Option<Expr> {
         self.0.children().find_map(Expr::cast)
     }
@@ -257,7 +285,7 @@ impl Quantifier {
     }
 }
 
-impl Field {
+impl FieldExpr {
     pub fn name(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -276,14 +304,5 @@ impl NegatedField {
             .children_with_tokens()
             .filter_map(|it| it.into_token())
             .find(|t| t.kind() == SyntaxKind::Id)
-    }
-}
-
-impl Str {
-    pub fn value(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StrVal)
     }
 }

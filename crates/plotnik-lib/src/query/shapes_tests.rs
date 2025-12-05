@@ -3,30 +3,30 @@ use indoc::indoc;
 
 #[test]
 fn tree_is_one() {
-    let query = Query::new("(identifier)").unwrap();
+    let query = Query::try_from("(identifier)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ identifier
+        NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn singleton_seq_is_one() {
-    let query = Query::new("{(identifier)}").unwrap();
+    let query = Query::try_from("{(identifier)}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Seq¹
-          Tree¹ identifier
+          NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn nested_singleton_seq_is_one() {
-    let query = Query::new("{{{(identifier)}}}").unwrap();
+    let query = Query::try_from("{{{(identifier)}}}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
@@ -34,35 +34,35 @@ fn nested_singleton_seq_is_one() {
         Seq¹
           Seq¹
             Seq¹
-              Tree¹ identifier
+              NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn multi_seq_is_many() {
-    let query = Query::new("{(a) (b)}").unwrap();
+    let query = Query::try_from("{(a) (b)}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def⁺
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
     ");
 }
 
 #[test]
 fn alt_is_one() {
-    let query = Query::new("[(a) (b)]").unwrap();
+    let query = Query::try_from("[(a) (b)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Alt¹
           Branch¹
-            Tree¹ a
+            NamedNode¹ a
           Branch¹
-            Tree¹ b
+            NamedNode¹ b
     ");
 }
 
@@ -71,7 +71,7 @@ fn alt_with_seq_branches() {
     let input = indoc! {r#"
     [{(a) (b)} (c)]
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
@@ -79,10 +79,10 @@ fn alt_with_seq_branches() {
         Alt¹
           Branch⁺
             Seq⁺
-              Tree¹ a
-              Tree¹ b
+              NamedNode¹ a
+              NamedNode¹ b
           Branch¹
-            Tree¹ c
+            NamedNode¹ c
     ");
 }
 
@@ -92,14 +92,14 @@ fn ref_to_tree_is_one() {
     X = (identifier)
     (call (X))
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def¹ X
-        Tree¹ identifier
+        NamedNode¹ identifier
       Def¹
-        Tree¹ call
+        NamedNode¹ call
           Ref¹ X
     ");
 }
@@ -110,62 +110,62 @@ fn ref_to_seq_is_many() {
     X = {(a) (b)}
     (call (X))
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
       Def¹
-        Tree¹ call
+        NamedNode¹ call
           Ref⁺ X
     ");
 }
 
 #[test]
 fn field_with_tree() {
-    let query = Query::new("(call name: (identifier))").unwrap();
+    let query = Query::try_from("(call name: (identifier))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
-            Tree¹ identifier
+        NamedNode¹ call
+          FieldExpr¹ name:
+            NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn field_with_alt() {
-    let query = Query::new("(call name: [(identifier) (string)])").unwrap();
+    let query = Query::try_from("(call name: [(identifier) (string)])").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Alt¹
               Branch¹
-                Tree¹ identifier
+                NamedNode¹ identifier
               Branch¹
-                Tree¹ string
+                NamedNode¹ string
     ");
 }
 
 #[test]
 fn field_with_seq_error() {
-    let query = Query::new("(call name: {(a) (b)})").unwrap();
+    let query = Query::try_from("(call name: {(a) (b)})").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Seq⁺
-              Tree¹ a
-              Tree¹ b
+              NamedNode¹ a
+              NamedNode¹ b
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` value must match a single node, not a sequence
@@ -181,17 +181,17 @@ fn field_with_ref_to_seq_error() {
     X = {(a) (b)}
     (call name: (X))
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
-          Tree¹ a
-          Tree¹ b
+          NamedNode¹ a
+          NamedNode¹ b
       Def¹
-        Tree¹ call
-          Field¹ name:
+        NamedNode¹ call
+          FieldExpr¹ name:
             Ref⁺ X
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -204,39 +204,39 @@ fn field_with_ref_to_seq_error() {
 
 #[test]
 fn quantifier_preserves_inner_shape() {
-    let query = Query::new("(identifier)*").unwrap();
+    let query = Query::try_from("(identifier)*").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Quantifier¹ *
-          Tree¹ identifier
+        QuantifiedExpr¹ *
+          NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn capture_preserves_inner_shape() {
-    let query = Query::new("(identifier) @name").unwrap();
+    let query = Query::try_from("(identifier) @name").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Capture¹ @name
-          Tree¹ identifier
+        CapturedExpr¹ @name
+          NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn capture_on_seq() {
-    let query = Query::new("{(a) (b)} @items").unwrap();
+    let query = Query::try_from("{(a) (b)} @items").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def⁺
-        Capture⁺ @items
+        CapturedExpr⁺ @items
           Seq⁺
-            Tree¹ a
-            Tree¹ b
+            NamedNode¹ a
+            NamedNode¹ b
     ");
 }
 
@@ -248,25 +248,25 @@ fn complex_nested_shapes() {
         name: (identifier) @name
         body: (block (Stmt)* @stmts))
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺
       Def¹ Stmt
         Alt¹
           Branch¹
-            Tree¹ expr_stmt
+            NamedNode¹ expr_stmt
           Branch¹
-            Tree¹ return_stmt
+            NamedNode¹ return_stmt
       Def¹
-        Tree¹ function_definition
-          Capture¹ @name
-            Field¹ name:
-              Tree¹ identifier
-          Field¹ body:
-            Tree¹ block
-              Capture¹ @stmts
-                Quantifier¹ *
+        NamedNode¹ function_definition
+          CapturedExpr¹ @name
+            FieldExpr¹ name:
+              NamedNode¹ identifier
+          FieldExpr¹ body:
+            NamedNode¹ block
+              CapturedExpr¹ @stmts
+                QuantifiedExpr¹ *
                   Ref¹ Stmt
     ");
 }
@@ -276,69 +276,69 @@ fn tagged_alt_shapes() {
     let input = indoc! {r#"
     [Ident: (identifier) Num: (number)]
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
         Alt¹
           Branch¹ Ident:
-            Tree¹ identifier
+            NamedNode¹ identifier
           Branch¹ Num:
-            Tree¹ number
+            NamedNode¹ number
     ");
 }
 
 #[test]
-fn anchor_is_one() {
-    let query = Query::new("(block . (statement))").unwrap();
+fn anchor_has_no_cardinality() {
+    let query = Query::try_from("(block . (statement))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ block
-          Anchor¹
-          Tree¹ statement
+        NamedNode¹ block
+          .
+          NamedNode¹ statement
     ");
 }
 
 #[test]
-fn negated_field_is_one() {
-    let query = Query::new("(function !async)").unwrap();
+fn negated_field_has_no_cardinality() {
+    let query = Query::try_from("(function !async)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ function
-          NegatedField¹ !async
+        NamedNode¹ function
+          NegatedField !async
     ");
 }
 
 #[test]
 fn tree_with_wildcard_type() {
-    let query = Query::new("(_)").unwrap();
+    let query = Query::try_from("(_)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Tree¹ _
+        NamedNode¹ (any)
     ");
 }
 
 #[test]
 fn bare_wildcard_is_one() {
-    let query = Query::new("_").unwrap();
+    let query = Query::try_from("_").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
       Def¹
-        Wildcard¹
+        AnonymousNode¹ (any)
     ");
 }
 
 #[test]
 fn empty_seq_is_one() {
-    let query = Query::new("{}").unwrap();
+    let query = Query::try_from("{}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
@@ -349,18 +349,18 @@ fn empty_seq_is_one() {
 
 #[test]
 fn literal_is_one() {
-    let query = Query::new(r#""if""#).unwrap();
+    let query = Query::try_from(r#""if""#).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r#"
     Root¹
       Def¹
-        Str¹ "if"
+        AnonymousNode¹ "if"
     "#);
 }
 
 #[test]
 fn invalid_error_node() {
-    let query = Query::new("(foo %)").unwrap();
+    let query = Query::try_from("(foo %)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_cst_with_cardinalities(), @r#"
     Root¹
@@ -376,7 +376,7 @@ fn invalid_error_node() {
 
 #[test]
 fn invalid_undefined_ref() {
-    let query = Query::new("(Undefined)").unwrap();
+    let query = Query::try_from("(Undefined)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
@@ -387,7 +387,7 @@ fn invalid_undefined_ref() {
 
 #[test]
 fn invalid_branch_without_body() {
-    let query = Query::new("[A:]").unwrap();
+    let query = Query::try_from("[A:]").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root¹
@@ -403,7 +403,7 @@ fn invalid_ref_to_bodyless_def() {
     X = %
     (X)
     "#};
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
     Root⁺

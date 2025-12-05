@@ -7,7 +7,7 @@ fn quantifier_star() {
     (statement)*
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -27,7 +27,7 @@ fn quantifier_plus() {
     (statement)+
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -47,7 +47,7 @@ fn quantifier_optional() {
     (statement)?
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -67,7 +67,7 @@ fn quantifier_with_capture() {
     (statement)* @statements
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
@@ -91,7 +91,7 @@ fn quantifier_inside_node() {
         (statement)*)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
