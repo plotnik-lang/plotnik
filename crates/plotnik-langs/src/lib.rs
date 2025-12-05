@@ -94,23 +94,17 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
     fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
         let id = self.ts_lang.id_for_node_kind(kind, true);
         // For named nodes, 0 always means "not found"
-        if id == 0 {
-            return None;
-        }
-        Some(id)
+        (id != 0).then_some(id)
     }
 
     fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
         let id = self.ts_lang.id_for_node_kind(kind, false);
         // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
         // We disambiguate via reverse lookup.
-        if id == 0 {
-            if self.ts_lang.node_kind_for_id(0) == Some(kind) {
-                return Some(0);
-            }
-            return None;
+        if id != 0 {
+            return Some(id);
         }
-        Some(id)
+        (self.ts_lang.node_kind_for_id(0) == Some(kind)).then_some(0)
     }
 
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {

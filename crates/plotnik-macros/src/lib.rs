@@ -102,6 +102,99 @@ fn get_language_for_key(key: &str) -> Language {
     }
 }
 
+struct FieldCodeGen {
+    array_defs: Vec<proc_macro2::TokenStream>,
+    entries: Vec<proc_macro2::TokenStream>,
+}
+
+fn generate_field_code(
+    prefix: &str,
+    node_id: u16,
+    field_id: &std::num::NonZeroU16,
+    field_info: &plotnik_core::FieldInfo,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+    let valid_types = field_info.valid_types.to_vec();
+    let valid_types_name = syn::Ident::new(
+        &format!("{}_N{}_F{}_TYPES", prefix, node_id, field_id),
+        Span::call_site(),
+    );
+
+    let multiple = field_info.cardinality.multiple;
+    let required = field_info.cardinality.required;
+    let types_len = valid_types.len();
+
+    let array_def = quote! {
+        static #valid_types_name: [u16; #types_len] = [#(#valid_types),*];
+    };
+
+    let field_id_raw = field_id.get();
+    let entry = quote! {
+        (std::num::NonZeroU16::new(#field_id_raw).unwrap(), plotnik_core::StaticFieldInfo {
+            cardinality: plotnik_core::Cardinality {
+                multiple: #multiple,
+                required: #required,
+            },
+            valid_types: &#valid_types_name,
+        })
+    };
+
+    (array_def, entry)
+}
+
+fn generate_fields_for_node(
+    prefix: &str,
+    node_id: u16,
+    fields: &std::collections::HashMap<std::num::NonZeroU16, plotnik_core::FieldInfo>,
+) -> FieldCodeGen {
+    let mut sorted_fields: Vec<_> = fields.iter().collect();
+    sorted_fields.sort_by_key(|(fid, _)| *fid);
+
+    let mut array_defs = Vec::new();
+    let mut entries = Vec::new();
+
+    for (field_id, field_info) in sorted_fields {
+        let (array_def, entry) = generate_field_code(prefix, node_id, field_id, field_info);
+        array_defs.push(array_def);
+        entries.push(entry);
+    }
+
+    FieldCodeGen {
+        array_defs,
+        entries,
+    }
+}
+
+fn generate_children_code(
+    prefix: &str,
+    node_id: u16,
+    children: &plotnik_core::ChildrenInfo,
+    static_defs: &mut Vec<proc_macro2::TokenStream>,
+) -> proc_macro2::TokenStream {
+    let valid_types = children.valid_types.to_vec();
+    let children_types_name = syn::Ident::new(
+        &format!("{}_N{}_CHILDREN_TYPES", prefix, node_id),
+        Span::call_site(),
+    );
+    let types_len = valid_types.len();
+
+    static_defs.push(quote! {
+        static #children_types_name: [u16; #types_len] = [#(#valid_types),*];
+    });
+
+    let multiple = children.cardinality.multiple;
+    let required = children.cardinality.required;
+
+    quote! {
+        Some(plotnik_core::StaticChildrenInfo {
+            cardinality: plotnik_core::Cardinality {
+                multiple: #multiple,
+                required: #required,
+            },
+            valid_types: &#children_types_name,
+        })
+    }
+}
+
 fn generate_static_node_types_code(
     raw_nodes: &[plotnik_core::RawNode],
     ts_lang: &Language,
@@ -118,107 +211,45 @@ fn generate_static_node_types_code(
     );
 
     let prefix = lang_key.to_uppercase();
-
     let mut static_defs = Vec::new();
     let mut node_entries = Vec::new();
 
     let extras = node_types.sorted_extras();
     let root = node_types.root();
-
-    // Process nodes in sorted order (for binary search on node lookup)
     let sorted_node_ids = node_types.sorted_node_ids();
 
-    for node_id in &sorted_node_ids {
-        let info = node_types.get(*node_id).unwrap();
+    for &node_id in &sorted_node_ids {
+        let info = node_types.get(node_id).unwrap();
 
-        let mut field_array_defs = Vec::new();
-        let mut field_entries = Vec::new();
+        let field_gen = generate_fields_for_node(&prefix, node_id, &info.fields);
+        static_defs.extend(field_gen.array_defs);
 
-        // Sort fields by field_id (for binary search on field lookup)
-        let mut sorted_fields: Vec<_> = info.fields.iter().collect();
-        sorted_fields.sort_by_key(|(fid, _)| *fid);
-
-        for (field_id, field_info) in &sorted_fields {
-            let valid_types = field_info.valid_types.to_vec();
-
-            let valid_types_name = syn::Ident::new(
-                &format!("{}_N{}_F{}_TYPES", prefix, node_id, field_id),
+        let fields_ref = if field_gen.entries.is_empty() {
+            quote! { &[] }
+        } else {
+            let fields_array_name = syn::Ident::new(
+                &format!("{}_N{}_FIELDS", prefix, node_id),
                 Span::call_site(),
             );
+            let fields_len = field_gen.entries.len();
+            let field_entries = &field_gen.entries;
 
-            let multiple = field_info.cardinality.multiple;
-            let required = field_info.cardinality.required;
-            let types_len = valid_types.len();
-
-            field_array_defs.push(quote! {
-                static #valid_types_name: [u16; #types_len] = [#(#valid_types),*];
-            });
-
-            let field_id_raw = field_id.get();
-            field_entries.push(quote! {
-                (std::num::NonZeroU16::new(#field_id_raw).unwrap(), plotnik_core::StaticFieldInfo {
-                    cardinality: plotnik_core::Cardinality {
-                        multiple: #multiple,
-                        required: #required,
-                    },
-                    valid_types: &#valid_types_name,
-                })
-            });
-        }
-
-        let fields_array_name = syn::Ident::new(
-            &format!("{}_N{}_FIELDS", prefix, node_id),
-            Span::call_site(),
-        );
-        let fields_len = sorted_fields.len();
-
-        static_defs.extend(field_array_defs);
-
-        if !sorted_fields.is_empty() {
             static_defs.push(quote! {
                 static #fields_array_name: [(std::num::NonZeroU16, plotnik_core::StaticFieldInfo); #fields_len] = [
                     #(#field_entries),*
                 ];
             });
-        }
 
-        let children_code = if let Some(children) = &info.children {
-            let valid_types = children.valid_types.to_vec();
+            quote! { &#fields_array_name }
+        };
 
-            let children_types_name = syn::Ident::new(
-                &format!("{}_N{}_CHILDREN_TYPES", prefix, node_id),
-                Span::call_site(),
-            );
-            let types_len = valid_types.len();
-
-            static_defs.push(quote! {
-                static #children_types_name: [u16; #types_len] = [#(#valid_types),*];
-            });
-
-            let multiple = children.cardinality.multiple;
-            let required = children.cardinality.required;
-
-            quote! {
-                Some(plotnik_core::StaticChildrenInfo {
-                    cardinality: plotnik_core::Cardinality {
-                        multiple: #multiple,
-                        required: #required,
-                    },
-                    valid_types: &#children_types_name,
-                })
-            }
-        } else {
-            quote! { None }
+        let children_code = match &info.children {
+            Some(children) => generate_children_code(&prefix, node_id, children, &mut static_defs),
+            None => quote! { None },
         };
 
         let name = &info.name;
         let named = info.named;
-
-        let fields_ref = if sorted_fields.is_empty() {
-            quote! { &[] }
-        } else {
-            quote! { &#fields_array_name }
-        };
 
         node_entries.push(quote! {
             (#node_id, plotnik_core::StaticNodeTypeInfo {
