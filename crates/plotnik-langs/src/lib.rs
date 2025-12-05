@@ -6,8 +6,6 @@ pub use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNo
 
 /// Trait providing a unified facade for tree-sitter's Language API
 /// combined with our node type constraints.
-///
-/// Methods that return Option types handle resolution failures gracefully.
 pub trait Lang: Send + Sync {
     fn name(&self) -> &str;
 
@@ -25,45 +23,32 @@ pub trait Lang: Send + Sync {
     // Supertype info                                            [Language API]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn is_supertype(&self, id: Option<NodeTypeId>) -> bool;
-    fn subtypes(&self, supertype: Option<NodeTypeId>) -> &[u16];
+    fn is_supertype(&self, id: NodeTypeId) -> bool;
+    fn subtypes(&self, supertype: NodeTypeId) -> &[u16];
 
     // ═══════════════════════════════════════════════════════════════════════
     // Root & Extras                                               [node_types]
     // ═══════════════════════════════════════════════════════════════════════
 
     fn root(&self) -> Option<NodeTypeId>;
-    fn is_extra(&self, id: Option<NodeTypeId>) -> bool;
+    fn is_extra(&self, id: NodeTypeId) -> bool;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Field constraints                                           [node_types]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn has_field(&self, node: Option<NodeTypeId>, field: Option<NodeFieldId>) -> bool;
-    fn field_cardinality(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-    ) -> Option<Cardinality>;
-    fn valid_field_types(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-    ) -> &'static [u16];
-    fn is_valid_field_type(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-        child: Option<NodeTypeId>,
-    ) -> bool;
+    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool;
+    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality>;
+    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &'static [u16];
+    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Children constraints                                        [node_types]
     // ═══════════════════════════════════════════════════════════════════════
 
-    fn children_cardinality(&self, node: Option<NodeTypeId>) -> Option<Cardinality>;
-    fn valid_child_types(&self, node: Option<NodeTypeId>) -> &'static [u16];
-    fn is_valid_child_type(&self, node: Option<NodeTypeId>, child: Option<NodeTypeId>) -> bool;
+    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality>;
+    fn valid_child_types(&self, node: NodeTypeId) -> &'static [u16];
+    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
 /// Static implementation of `Lang` with compile-time generated node types.
@@ -138,81 +123,48 @@ impl Lang for StaticLang {
         self.inner.field_id_for_name(name)
     }
 
-    fn is_supertype(&self, id: Option<NodeTypeId>) -> bool {
-        let Some(raw) = id else { return false };
-        self.inner.node_kind_is_supertype(raw)
+    fn is_supertype(&self, id: NodeTypeId) -> bool {
+        self.inner.node_kind_is_supertype(id)
     }
 
-    fn subtypes(&self, supertype: Option<NodeTypeId>) -> &[u16] {
-        let Some(raw) = supertype else {
-            return &[];
-        };
-        self.inner.subtypes_for_supertype(raw)
+    fn subtypes(&self, supertype: NodeTypeId) -> &[u16] {
+        self.inner.subtypes_for_supertype(supertype)
     }
 
     fn root(&self) -> Option<NodeTypeId> {
         self.node_types.root()
     }
 
-    fn is_extra(&self, id: Option<NodeTypeId>) -> bool {
-        let Some(id) = id else { return false };
+    fn is_extra(&self, id: NodeTypeId) -> bool {
         self.node_types.is_extra(id)
     }
 
-    fn has_field(&self, node: Option<NodeTypeId>, field: Option<NodeFieldId>) -> bool {
-        let (Some(n), Some(f)) = (node, field) else {
-            return false;
-        };
-        self.node_types.has_field(n, f)
+    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
+        self.node_types.has_field(node, field)
     }
 
-    fn field_cardinality(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-    ) -> Option<Cardinality> {
-        let (n, f) = (node?, field?);
-        self.node_types.field_cardinality(n, f)
+    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
+        self.node_types.field_cardinality(node, field)
     }
 
-    fn valid_field_types(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-    ) -> &'static [u16] {
-        let (Some(n), Some(f)) = (node, field) else {
-            return &[];
-        };
-        self.node_types.valid_field_types(n, f)
+    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &'static [u16] {
+        self.node_types.valid_field_types(node, field)
     }
 
-    fn is_valid_field_type(
-        &self,
-        node: Option<NodeTypeId>,
-        field: Option<NodeFieldId>,
-        child: Option<NodeTypeId>,
-    ) -> bool {
-        let (Some(n), Some(f), Some(c)) = (node, field, child) else {
-            return false;
-        };
-        self.node_types.is_valid_field_type(n, f, c)
+    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
+        self.node_types.is_valid_field_type(node, field, child)
     }
 
-    fn children_cardinality(&self, node: Option<NodeTypeId>) -> Option<Cardinality> {
-        let n = node?;
-        self.node_types.children_cardinality(n)
+    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
+        self.node_types.children_cardinality(node)
     }
 
-    fn valid_child_types(&self, node: Option<NodeTypeId>) -> &'static [u16] {
-        let Some(n) = node else { return &[] };
-        self.node_types.valid_child_types(n)
+    fn valid_child_types(&self, node: NodeTypeId) -> &'static [u16] {
+        self.node_types.valid_child_types(node)
     }
 
-    fn is_valid_child_type(&self, node: Option<NodeTypeId>, child: Option<NodeTypeId>) -> bool {
-        let (Some(n), Some(c)) = (node, child) else {
-            return false;
-        };
-        self.node_types.is_valid_child_type(n, c)
+    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
+        self.node_types.is_valid_child_type(node, child)
     }
 }
 
@@ -562,13 +514,13 @@ mod tests {
     fn supertype_via_lang_trait() {
         let lang = javascript();
 
-        let expr_id = lang.resolve_node("expression", true);
+        let expr_id = lang.resolve_node("expression", true).unwrap();
         assert!(lang.is_supertype(expr_id));
 
         let subtypes = lang.subtypes(expr_id);
         assert!(!subtypes.is_empty());
 
-        let func_id = lang.resolve_node("function_declaration", true);
+        let func_id = lang.resolve_node("function_declaration", true).unwrap();
         assert!(!lang.is_supertype(func_id));
     }
 
@@ -577,17 +529,17 @@ mod tests {
     fn field_validation_via_trait() {
         let lang = javascript();
 
-        let func_id = lang.resolve_node("function_declaration", true);
-        let name_field = lang.resolve_field("name");
-        let body_field = lang.resolve_field("body");
+        let func_id = lang.resolve_node("function_declaration", true).unwrap();
+        let name_field = lang.resolve_field("name").unwrap();
+        let body_field = lang.resolve_field("body").unwrap();
 
         assert!(lang.has_field(func_id, name_field));
         assert!(lang.has_field(func_id, body_field));
 
-        let identifier_id = lang.resolve_node("identifier", true);
+        let identifier_id = lang.resolve_node("identifier", true).unwrap();
         assert!(lang.is_valid_field_type(func_id, name_field, identifier_id));
 
-        let statement_block_id = lang.resolve_node("statement_block", true);
+        let statement_block_id = lang.resolve_node("statement_block", true).unwrap();
         assert!(lang.is_valid_field_type(func_id, body_field, statement_block_id));
     }
 
@@ -604,23 +556,11 @@ mod tests {
 
     #[test]
     #[cfg(feature = "javascript")]
-    fn unresolved_returns_sensible_defaults() {
+    fn unresolved_returns_none() {
         let lang = javascript();
 
-        let unresolved_node: Option<NodeTypeId> = None;
-        let unresolved_field: Option<NodeFieldId> = None;
-
-        assert!(!lang.is_supertype(unresolved_node));
-        assert!(!lang.is_extra(unresolved_node));
-        assert!(!lang.has_field(unresolved_node, unresolved_field));
-        assert!(lang.subtypes(unresolved_node).is_empty());
-        assert!(
-            lang.valid_field_types(unresolved_node, unresolved_field)
-                .is_empty()
-        );
-        assert!(lang.valid_child_types(unresolved_node).is_empty());
-        assert!(!lang.is_valid_field_type(unresolved_node, unresolved_field, unresolved_node));
-        assert!(!lang.is_valid_child_type(unresolved_node, unresolved_node));
+        assert!(lang.resolve_node("nonexistent_node_type", true).is_none());
+        assert!(lang.resolve_field("nonexistent_field").is_none());
     }
 
     #[test]
