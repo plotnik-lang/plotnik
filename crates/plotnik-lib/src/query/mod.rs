@@ -31,15 +31,15 @@ use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parser, Root, SyntaxNode, ast};
+use crate::parser::{self, FuelState, Parser, Root, SyntaxNode, ast};
 use shapes::ShapeCardinality;
 use symbol_table::SymbolTable;
 
 /// Builder for configuring and creating a [`Query`].
 pub struct QueryBuilder<'a> {
     source: &'a str,
-    exec_fuel: Option<Option<u32>>,
-    recursion_fuel: Option<Option<u32>>,
+    exec_fuel: Option<u32>,
+    recursion_fuel: Option<u32>,
 }
 
 impl<'a> QueryBuilder<'a> {
@@ -57,7 +57,7 @@ impl<'a> QueryBuilder<'a> {
     /// Execution fuel never replenishes. It protects against large inputs.
     /// Returns error when exhausted.
     pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
-        self.exec_fuel = Some(limit);
+        self.exec_fuel = limit;
         self
     }
 
@@ -66,7 +66,7 @@ impl<'a> QueryBuilder<'a> {
     /// Recursion fuel restores when exiting recursion. It protects against
     /// deeply nested input. Returns error when exhausted.
     pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
-        self.recursion_fuel = Some(limit);
+        self.recursion_fuel = limit;
         self
     }
 
@@ -95,6 +95,7 @@ pub struct Query<'a> {
     ast: Root,
     symbol_table: SymbolTable<'a>,
     shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
+    fuel_state: FuelState,
     // Diagnostics per pass
     parse_diagnostics: Diagnostics,
     alt_kind_diagnostics: Diagnostics,
@@ -131,6 +132,7 @@ impl<'a> Query<'a> {
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
             shape_cardinality_table: HashMap::new(),
+            fuel_state: FuelState::default(),
             parse_diagnostics: Diagnostics::new(),
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
@@ -139,25 +141,22 @@ impl<'a> Query<'a> {
         }
     }
 
-    fn parse(
-        &mut self,
-        exec_fuel: Option<Option<u32>>,
-        recursion_fuel: Option<Option<u32>>,
-    ) -> Result<()> {
+    fn parse(&mut self, exec_fuel: Option<u32>, recursion_fuel: Option<u32>) -> Result<()> {
         let tokens = lex(self.source);
         let mut parser = Parser::new(self.source, tokens);
 
         if let Some(limit) = exec_fuel {
-            parser = parser.with_exec_fuel(limit);
+            parser = parser.with_exec_fuel(Some(limit));
         }
 
         if let Some(limit) = recursion_fuel {
-            parser = parser.with_recursion_fuel(limit);
+            parser = parser.with_recursion_fuel(Some(limit));
         }
 
-        let (ast, diagnostics) = parser::parse_with_parser(parser)?;
+        let (ast, diagnostics, fuel_state) = parser::parse_with_parser(parser)?;
         self.ast = ast;
         self.parse_diagnostics = diagnostics;
+        self.fuel_state = fuel_state;
         Ok(())
     }
 

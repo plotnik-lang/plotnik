@@ -16,8 +16,17 @@ use crate::diagnostics::Diagnostics;
 
 use crate::Error;
 
-const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
-const DEFAULT_RECURSION_FUEL: u32 = 4096;
+pub const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
+pub const DEFAULT_RECURSION_FUEL: u32 = 4096;
+
+/// Fuel consumption state returned after parsing.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FuelState {
+    pub exec_initial: Option<u32>,
+    pub exec_remaining: Option<u32>,
+    pub recursion_limit: Option<u32>,
+    pub recursion_max_depth: u32,
+}
 
 /// Tracks an open delimiter for better error messages on unclosed constructs.
 #[derive(Debug, Clone, Copy)]
@@ -53,11 +62,17 @@ pub struct Parser<'src> {
     /// Loop detection fuel. Resets on bump(). Panics when exhausted.
     pub(super) debug_fuel: std::cell::Cell<u32>,
 
-    /// Execution fuel. Never replenishes.
+    /// Execution fuel initial value. None = infinite.
+    exec_fuel_initial: Option<u32>,
+
+    /// Execution fuel remaining. Never replenishes.
     exec_fuel_remaining: Option<u32>,
 
-    /// Recursion depth limit.
+    /// Recursion depth limit. None = infinite.
     recursion_fuel_limit: Option<u32>,
+
+    /// Maximum recursion depth reached during parsing.
+    max_depth: u32,
 
     /// Fatal error that stops parsing (fuel exhaustion).
     fatal_error: Option<Error>,
@@ -76,14 +91,17 @@ impl<'src> Parser<'src> {
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             debug_fuel: std::cell::Cell::new(256),
+            exec_fuel_initial: Some(DEFAULT_EXEC_FUEL),
             exec_fuel_remaining: Some(DEFAULT_EXEC_FUEL),
             recursion_fuel_limit: Some(DEFAULT_RECURSION_FUEL),
+            max_depth: 0,
             fatal_error: None,
         }
     }
 
     /// Set execution fuel limit. None = infinite.
     pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
+        self.exec_fuel_initial = limit;
         self.exec_fuel_remaining = limit;
         self
     }
@@ -94,12 +112,18 @@ impl<'src> Parser<'src> {
         self
     }
 
-    pub fn finish(mut self) -> Result<(GreenNode, Diagnostics), Error> {
+    pub fn finish(mut self) -> Result<(GreenNode, Diagnostics, FuelState), Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
-        Ok((self.builder.finish(), self.diagnostics))
+        let fuel_state = FuelState {
+            exec_initial: self.exec_fuel_initial,
+            exec_remaining: self.exec_fuel_remaining,
+            recursion_limit: self.recursion_fuel_limit,
+            recursion_max_depth: self.max_depth,
+        };
+        Ok((self.builder.finish(), self.diagnostics, fuel_state))
     }
 
     /// Check if a fatal error has occurred.
@@ -360,6 +384,9 @@ impl<'src> Parser<'src> {
             return false;
         }
         self.depth += 1;
+        if self.depth > self.max_depth {
+            self.max_depth = self.depth;
+        }
         self.reset_debug_fuel();
         true
     }

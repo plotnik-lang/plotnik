@@ -47,20 +47,24 @@ pub use ast::{
     NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, Type,
 };
 
-pub use core::Parser;
+pub use core::{DEFAULT_EXEC_FUEL, DEFAULT_RECURSION_FUEL, FuelState, Parser};
 
-use crate::PassResult;
+use crate::Error;
+use crate::diagnostics::Diagnostics;
 use lexer::lex;
 
+/// Result of parsing: AST, diagnostics, and fuel state.
+pub type ParseResult<T> = Result<(T, Diagnostics, FuelState), Error>;
+
 /// Main entry point. Returns Err on fuel exhaustion.
-pub fn parse(source: &str) -> PassResult<Root> {
+pub fn parse(source: &str) -> ParseResult<Root> {
     parse_with_parser(Parser::new(source, lex(source)))
 }
 
 /// Parse with a pre-configured parser (for custom fuel limits).
-pub(crate) fn parse_with_parser(mut parser: Parser) -> PassResult<Root> {
+pub(crate) fn parse_with_parser(mut parser: Parser) -> ParseResult<Root> {
     parser.parse_root();
-    let (cst, diagnostics) = parser.finish()?;
+    let (cst, diagnostics, fuel_state) = parser.finish()?;
     let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
-    Ok((root, diagnostics))
+    Ok((root, diagnostics, fuel_state))
 }
