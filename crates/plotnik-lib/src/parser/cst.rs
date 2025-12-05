@@ -1,35 +1,16 @@
 //! Syntax kinds for the query language.
 //!
-//! This module defines all token and node kinds used in the syntax tree,
-//! along with a `TokenSet` bitset for efficient membership testing in the parser.
-//!
-//! ## Architecture
-//!
-//! The `SyntaxKind` enum has a dual role:
-//! - Token kinds (terminals): produced by the lexer, represent atomic text spans
-//! - Node kinds (non-terminals): created by the parser, represent composite structures
-//!
-//! Rowan requires a `Language` trait implementation to convert between our `SyntaxKind`
-//! and its internal `rowan::SyntaxKind` (a newtype over `u16`). That's what `QLang` provides.
-//!
-//! Logos is derived directly on this enum; node kinds simply lack token/regex attributes.
+//! `SyntaxKind` serves dual roles: token kinds (from lexer) and node kinds (from parser).
+//! Logos derives token recognition; node kinds lack token/regex attributes.
+//! `QLang` implements Rowan's `Language` trait for tree construction.
 
 #![allow(dead_code)] // Some items are for future use
 
 use logos::Logos;
 use rowan::Language;
 
-/// All kinds of tokens and nodes in the syntax tree.
-///
-/// ## Layout
-///
-/// Variants are ordered: tokens first, then nodes, then `__LAST` sentinel.
-/// The `#[repr(u16)]` ensures we can safely transmute from the discriminant.
-///
-/// ## Token vs Node distinction
-///
-/// The parser only ever builds nodes; tokens come from the lexer.
-/// A token's text is sliced from source on demand via its span.
+/// All token and node kinds. Tokens first, then nodes, then `__LAST` sentinel.
+/// `#[repr(u16)]` enables safe transmute in `kind_from_raw`.
 #[derive(Logos, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum SyntaxKind {
@@ -51,8 +32,7 @@ pub enum SyntaxKind {
     #[token("}")]
     BraceClose,
 
-    /// Double colon for type annotations: `@name :: Type`
-    /// Must be defined before single Colon for correct precedence
+    /// `::` for type annotations. Defined before `Colon` for correct precedence.
     #[token("::")]
     DoubleColon,
 
@@ -80,7 +60,7 @@ pub enum SyntaxKind {
     #[token("?")]
     Question,
 
-    /// Non-greedy `*?` quantifier (matches minimum repetitions)
+    /// Non-greedy `*?` quantifier
     #[token("*?")]
     StarQuestion,
 
@@ -104,42 +84,33 @@ pub enum SyntaxKind {
     #[token("|")]
     Pipe,
 
-    /// String literal (double or single quoted) - split by lexer post-processing
+    /// String literal (split by lexer into quote + content + quote)
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     #[regex(r"'(?:[^'\\]|\\.)*'")]
     StringLiteral,
 
-    /// Double quote character (from string literal splitting)
     DoubleQuote,
-
-    /// Single quote character (from string literal splitting)
     SingleQuote,
-
-    /// String content between quotes (from string literal splitting)
+    /// String content between quotes
     StrVal,
 
-    /// ERROR keyword for matching parser error nodes
     #[token("ERROR")]
     KwError,
 
-    /// MISSING keyword for matching error recovery nodes
     #[token("MISSING")]
     KwMissing,
 
-    /// Loose identifier for all naming contexts (definitions, fields, node types, etc.)
-    /// Accepts dots and hyphens for tree-sitter compatibility; parser validates per context.
-    /// Defined after KwError/KwMissing so keywords take precedence.
+    /// Identifier. Accepts dots/hyphens for tree-sitter compat; parser validates per context.
+    /// Defined after keywords so they take precedence.
     #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]
     Id,
 
     #[token(".")]
     Dot,
 
-    /// At sign for captures: `@`
     #[token("@")]
     At,
 
-    /// Horizontal whitespace (spaces, tabs)
     #[regex(r"[ \t]+")]
     Whitespace,
 
@@ -153,49 +124,33 @@ pub enum SyntaxKind {
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
-    /// XML-like tags explicitly matched as errors (common LLM mistake)
+    /// XML-like tags matched as errors (common LLM output)
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
     XMLGarbage,
-    /// Tree-sitter predicate syntax (unsupported, for clear error messages)
-    /// Matches #eq?, #match?, #set!, #is?, etc.
+    /// Tree-sitter predicates (unsupported)
     #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*[?!]?")]
     Predicate,
-    /// Consecutive unrecognized characters coalesced into one token
+    /// Coalesced unrecognized characters
     Garbage,
-    /// Generic error token
     Error,
 
-    /// Root node containing the entire query
+    // --- Node kinds (non-terminals) ---
     Root,
-    /// Tree expression: `(type children...)`, `(_)`, `(ERROR)`, `(MISSING ...)`
     Tree,
-    /// Reference to user-defined expression: `(Expr)` where Expr is PascalCase
     Ref,
-    /// String literal node containing quote tokens and content
     Str,
-    /// Field specification: `name: expr`
     Field,
-    /// Capture wrapping an expression: `(expr) @name` or `(expr) @name :: Type`
     Capture,
-    /// Type annotation: `::Type` after a capture
     Type,
-    /// Quantifier wrapping an expression, e.g., `(expr)*` becomes `Quantifier { Tree, Star }`
     Quantifier,
-    /// Sibling sequence: `{expr1 expr2 ...}`
     Seq,
-    /// Choice between alternatives: `[a b c]`
     Alt,
-    /// Branch in a tagged alternation: `Label: expr`
     Branch,
-    /// Wildcard: `_` matches any node
     Wildcard,
-    /// Anchor: `.` constrains position relative to siblings
     Anchor,
-    /// Negated field assertion: `!field` asserts field is absent
     NegatedField,
-    /// Named expression definition: `Name = expr`
     Def,
 
     // Must be last - used for bounds checking in `kind_from_raw`
@@ -206,16 +161,11 @@ pub enum SyntaxKind {
 use SyntaxKind::*;
 
 impl SyntaxKind {
-    /// Returns `true` if this is a trivia token (whitespace or comment).
-    ///
-    /// Trivia tokens are buffered during parsing and attached to the next node
-    /// as leading trivia. This preserves formatting information in the CST.
     #[inline]
     pub fn is_trivia(self) -> bool {
         matches!(self, Whitespace | Newline | LineComment | BlockComment)
     }
 
-    /// Returns `true` if this is an error token.
     #[inline]
     pub fn is_error(self) -> bool {
         matches!(self, Error | XMLGarbage | Garbage | Predicate)
@@ -229,10 +179,7 @@ impl From<SyntaxKind> for rowan::SyntaxKind {
     }
 }
 
-/// Language tag for parameterizing Rowan's tree types.
-///
-/// This is a zero-sized enum (uninhabited) used purely as a type-level marker.
-/// Rowan uses it to associate syntax trees with our `SyntaxKind`.
+/// Language tag for Rowan's tree types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QLang {}
 
@@ -255,12 +202,7 @@ pub type SyntaxNode = rowan::SyntaxNode<QLang>;
 pub type SyntaxToken = rowan::SyntaxToken<QLang>;
 pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 
-/// A set of `SyntaxKind`s implemented as a 64-bit bitset.
-///
-/// ## Usage
-///
-/// Used throughout the parser for O(1) membership testing of FIRST/FOLLOW/RECOVERY sets.
-/// The limitation is 64 variants max, which is enforced by compile-time asserts in `new()`.
+/// 64-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TokenSet(u64);
 
@@ -268,8 +210,6 @@ impl TokenSet {
     /// Creates an empty token set.
     pub const EMPTY: TokenSet = TokenSet(0);
 
-    /// Creates a token set from a slice of kinds.
-    ///
     /// Panics at compile time if any kind's discriminant >= 64.
     #[inline]
     pub const fn new(kinds: &[SyntaxKind]) -> Self {
@@ -284,7 +224,6 @@ impl TokenSet {
         TokenSet(bits)
     }
 
-    /// Creates a token set containing exactly one kind.
     #[inline]
     pub const fn single(kind: SyntaxKind) -> Self {
         let kind = kind as u16;
@@ -292,7 +231,6 @@ impl TokenSet {
         TokenSet(1 << kind)
     }
 
-    /// Returns `true` if the set contains the given kind.
     #[inline]
     pub const fn contains(&self, kind: SyntaxKind) -> bool {
         let kind = kind as u16;
@@ -302,7 +240,6 @@ impl TokenSet {
         self.0 & (1 << kind) != 0
     }
 
-    /// Returns the union of two token sets.
     #[inline]
     pub const fn union(self, other: TokenSet) -> TokenSet {
         TokenSet(self.0 | other.0)
@@ -322,19 +259,11 @@ impl std::fmt::Debug for TokenSet {
     }
 }
 
-/// Pre-defined token sets used throughout the parser.
-///
-/// ## Recovery sets
-///
-/// Recovery sets follow matklad's resilient parsing approach: when the parser
-/// encounters an unexpected token, it consumes tokens until it finds one in
-/// the recovery set (typically the FOLLOW set of ancestor productions).
-/// This prevents cascading errors and allows parsing to continue.
+/// Pre-defined token sets for the parser.
 pub mod token_sets {
     use super::*;
 
-    /// Tokens that can start an expression (FIRST set of the expression production).
-    /// Note: At is not included because captures wrap expressions, they don't start them.
+    /// FIRST set of expr. `At` excluded (captures wrap, not start).
     pub const EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
@@ -349,9 +278,7 @@ pub mod token_sets {
         KwMissing,
     ]);
 
-    /// Tokens that can start a valid expression at root level (anonymous definition).
-    /// Excludes bare Id (only valid as node type inside parens), Dot (anchor),
-    /// and Negation (negated field) which only make sense inside tree context.
+    /// FIRST set for root-level expressions. Excludes `Dot`/`Negation` (tree-internal).
     pub const ROOT_EXPR_FIRST: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
@@ -364,7 +291,6 @@ pub mod token_sets {
         KwMissing,
     ]);
 
-    /// Quantifier tokens that can follow a pattern.
     pub const QUANTIFIERS: TokenSet = TokenSet::new(&[
         Star,
         Plus,
@@ -374,10 +300,7 @@ pub mod token_sets {
         QuestionQuestion,
     ]);
 
-    /// Trivia tokens.
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
-
-    /// Invalid separator tokens (comma, pipe) - for error recovery
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
     pub const TREE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
@@ -389,7 +312,6 @@ pub mod token_sets {
 
     pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);
 
-    /// Recovery set for named definitions (Name = ...)
     pub const DEF_RECOVERY: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id, Equals]);
 

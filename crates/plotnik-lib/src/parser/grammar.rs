@@ -153,11 +153,8 @@ impl Parser<'_> {
         self.exit_recursion();
     }
 
-    /// Tree expression: `(type ...)`, `(_ ...)`, `(ERROR)`, `(MISSING ...)`.
-    /// Also handles supertype/subtype: `(expression/binary_expression)`.
-    /// Parse a tree expression `(type ...)` or a reference `(RefName)`.
-    /// PascalCase identifiers without children become `Ref` nodes.
-    /// PascalCase identifiers with children emit an error but parse as `Tree`.
+    /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)` | `(expr/subtype)`
+    /// PascalCase without children → Ref; with children → error but parses as Tree.
     fn parse_tree(&mut self) {
         let checkpoint = self.checkpoint();
         self.push_delimiter(SyntaxKind::ParenOpen);
@@ -470,8 +467,7 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// String literal: `"if"`, `'+'`, etc.
-    /// Parses: quote + optional content + quote into a Str node
+    /// `"if"` | `'+'`
     fn parse_str(&mut self) {
         self.start_node(SyntaxKind::Str);
         self.bump_string_tokens();
@@ -493,9 +489,7 @@ impl Parser<'_> {
         self.bump();
     }
 
-    /// Parse capture suffix: `@name` or `@name :: Type`
-    /// Called after the expression to capture has already been parsed.
-    /// Expects current token to be `At`, followed by `Id`.
+    /// `@name` | `@name :: Type`
     fn parse_capture_suffix(&mut self) {
         self.bump(); // consume At
 
@@ -562,7 +556,7 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Anchor for anonymous nodes: `.`
+    /// `.` anchor
     fn parse_anchor(&mut self) {
         self.start_node(SyntaxKind::Anchor);
         self.expect(SyntaxKind::Dot, "'.' anchor");
@@ -834,7 +828,6 @@ impl Parser<'_> {
     }
 }
 
-/// Convert a name to snake_case.
 fn to_snake_case(s: &str) -> String {
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
@@ -850,7 +843,6 @@ fn to_snake_case(s: &str) -> String {
     result
 }
 
-/// Convert a name to PascalCase.
 fn to_pascal_case(s: &str) -> String {
     let mut result = String::new();
     let mut capitalize_next = true;
@@ -867,7 +859,6 @@ fn to_pascal_case(s: &str) -> String {
     result
 }
 
-/// Capitalize the first letter of a string.
 fn capitalize_first(s: &str) -> String {
     assert_nonempty(s);
     let mut chars = s.chars();

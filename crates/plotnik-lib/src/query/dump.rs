@@ -1,3 +1,5 @@
+//! Test-only dump methods for query inspection.
+
 #[cfg(test)]
 mod test_helpers {
     use crate::Query;

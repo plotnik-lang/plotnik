@@ -1,4 +1,8 @@
-//! Query processing: parsing, analysis, and validation pipeline.
+//! Query processing pipeline.
+//!
+//! Stages: parse → alt_kinds → symbol_table → recursion → shapes.
+//! Each stage populates its own diagnostics. Use `is_valid()` to check
+//! if any stage produced errors.
 
 mod dump;
 mod invariants;

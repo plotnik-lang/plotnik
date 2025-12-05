@@ -1,11 +1,4 @@
-//! Core parser state machine and low-level operations.
-//!
-//! This module contains the `Parser` struct and all foundational methods:
-//! - Token access and lookahead
-//! - Trivia buffering and attachment
-//! - Tree construction via Rowan
-//! - Diagnostic recording and recovery
-//! - Fuel-based limits (debug, execution, recursion)
+//! Parser state machine and low-level operations.
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
@@ -20,7 +13,6 @@ use crate::Error;
 pub const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 pub const DEFAULT_RECURSION_FUEL: u32 = 4096;
 
-/// Fuel consumption state returned after parsing.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FuelState {
     pub exec_initial: Option<u32>,
@@ -29,7 +21,6 @@ pub struct FuelState {
     pub recursion_max_depth: u32,
 }
 
-/// Result of a successful parse operation.
 #[derive(Debug)]
 pub struct ParseResult {
     pub root: Root,
@@ -37,53 +28,30 @@ pub struct ParseResult {
     pub fuel_state: FuelState,
 }
 
-/// Tracks an open delimiter for better error messages on unclosed constructs.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OpenDelimiter {
-    #[allow(dead_code)] // useful for future mismatch detection (e.g., `(]`)
+    #[allow(dead_code)] // for future mismatch detection (e.g., `(]`)
     pub kind: SyntaxKind,
     pub span: TextRange,
 }
 
-/// Parser state machine.
-///
-/// The token stream is processed left-to-right. Trivia tokens (whitespace, comments)
-/// are buffered separately and flushed as leading trivia when starting a new node.
-/// This gives predictable trivia attachment without backtracking.
+/// Trivia tokens (whitespace, comments) are buffered and flushed as leading trivia
+/// when starting a new node. This gives predictable trivia attachment without backtracking.
 pub struct Parser<'src> {
     pub(super) source: &'src str,
     pub(super) tokens: Vec<Token>,
-    /// Current position in `tokens`. Monotonically increases.
     pub(super) pos: usize,
-    /// Trivia accumulated since last non-trivia token.
-    /// Drained into tree at `start_node()` / `checkpoint()`.
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
     pub(super) diagnostics: Diagnostics,
-    /// Current recursion depth.
     pub(super) depth: u32,
-    /// Last diagnostic position - used to suppress cascading diagnostics at same span
     pub(super) last_diagnostic_pos: Option<TextSize>,
-    /// Stack of open delimiters for "unclosed X started here" messages.
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
-
-    // Fuel limits
-    /// Loop detection fuel. Resets on bump(). Panics when exhausted.
     pub(super) debug_fuel: std::cell::Cell<u32>,
-
-    /// Execution fuel initial value. None = infinite.
     exec_fuel_initial: Option<u32>,
-
-    /// Execution fuel remaining. Never replenishes.
     exec_fuel_remaining: Option<u32>,
-
-    /// Recursion depth limit. None = infinite.
     recursion_fuel_limit: Option<u32>,
-
-    /// Maximum recursion depth reached during parsing.
     max_depth: u32,
-
-    /// Fatal error that stops parsing (fuel exhaustion).
     fatal_error: Option<Error>,
 }
 
@@ -108,20 +76,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Set execution fuel limit. None = infinite.
     pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
         self.exec_fuel_initial = limit;
         self.exec_fuel_remaining = limit;
         self
     }
 
-    /// Set recursion depth limit. None = infinite.
     pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
         self.recursion_fuel_limit = limit;
         self
     }
 
-    /// Parse the input and return the result.
     pub fn parse(mut self) -> Result<ParseResult, Error> {
         self.parse_root();
         let (cst, diagnostics, fuel_state) = self.finish()?;
@@ -147,12 +112,11 @@ impl<'src> Parser<'src> {
         Ok((self.builder.finish(), self.diagnostics, fuel_state))
     }
 
-    /// Check if a fatal error has occurred.
     pub(super) fn has_fatal_error(&self) -> bool {
         self.fatal_error.is_some()
     }
 
-    /// Current token kind. Returns `Error` at EOF (acts as sentinel).
+    /// Returns `Error` at EOF (acts as sentinel).
     pub(super) fn current(&self) -> SyntaxKind {
         self.nth(0)
     }
@@ -161,7 +125,6 @@ impl<'src> Parser<'src> {
         self.debug_fuel.set(256);
     }
 
-    /// Lookahead by `n` tokens (0 = current). Consumes debug fuel (panics if stuck).
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
         self.ensure_progress();
 
@@ -170,7 +133,6 @@ impl<'src> Parser<'src> {
             .map_or(SyntaxKind::Error, |t| t.kind)
     }
 
-    /// Consume execution fuel. Sets fatal error if exhausted.
     fn consume_exec_fuel(&mut self) {
         if let Some(ref mut remaining) = self.exec_fuel_remaining {
             if *remaining == 0 {
@@ -197,7 +159,6 @@ impl<'src> Parser<'src> {
         self.pos >= self.tokens.len()
     }
 
-    /// Check if at EOF or fatal error occurred.
     pub(super) fn should_stop(&self) -> bool {
         self.eof() || self.has_fatal_error()
     }
@@ -210,13 +171,12 @@ impl<'src> Parser<'src> {
         set.contains(self.current())
     }
 
-    /// Peek past trivia. Buffers trivia tokens for later attachment.
     pub(super) fn peek(&mut self) -> SyntaxKind {
         self.skip_trivia_to_buffer();
         self.current()
     }
 
-    /// Lookahead `n` non-trivia tokens. Used for LL(k) decisions like `field:`.
+    /// LL(k) lookahead past trivia.
     pub(super) fn peek_nth(&mut self, n: usize) -> SyntaxKind {
         self.skip_trivia_to_buffer();
         let mut count = 0;
@@ -253,14 +213,12 @@ impl<'src> Parser<'src> {
         self.drain_trivia();
     }
 
-    /// Start node, attaching any buffered trivia first.
     pub(super) fn start_node(&mut self, kind: SyntaxKind) {
         self.drain_trivia();
         self.builder.start_node(kind.into());
     }
 
-    /// Wrap previously-parsed content. Used for quantifiers: parse `(foo)`, then
-    /// see `*`, wrap retroactively into `Quantifier(NamedNode(...), Star)`.
+    /// Wrap previously-parsed content using checkpoint.
     pub(super) fn start_node_at(&mut self, checkpoint: Checkpoint, kind: SyntaxKind) {
         self.builder.start_node_at(checkpoint, kind.into());
     }
@@ -269,13 +227,11 @@ impl<'src> Parser<'src> {
         self.builder.finish_node();
     }
 
-    /// Checkpoint before parsing. If we later need to wrap, use `start_node_at`.
     pub(super) fn checkpoint(&mut self) -> Checkpoint {
         self.drain_trivia();
         self.builder.checkpoint()
     }
 
-    /// Consume current token into tree. Resets debug fuel, consumes exec fuel.
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
 
@@ -289,7 +245,6 @@ impl<'src> Parser<'src> {
         self.pos += 1;
     }
 
-    /// Skip current token without adding to tree. Used for invalid separators.
     pub(super) fn skip_token(&mut self) {
         assert!(!self.eof(), "skip_token called at EOF");
 
@@ -309,7 +264,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Expect token. On mismatch: emit diagnostic but don't consume (allows parent recovery).
+    /// On mismatch: emit diagnostic but don't consume (allows parent recovery).
     pub(super) fn expect(&mut self, kind: SyntaxKind, what: &str) -> bool {
         if self.eat(kind) {
             return true;
@@ -328,8 +283,6 @@ impl<'src> Parser<'src> {
         self.diagnostics.error(message, range).emit();
     }
 
-    /// Wrap unexpected token in Error node and consume it.
-    /// Ensures progress even on garbage input.
     pub(super) fn error_and_bump(&mut self, message: &str) {
         self.error(message);
         if !self.eof() {
@@ -339,9 +292,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Skip tokens until we hit a recovery point. Wraps skipped tokens in Error node.
-    /// If already at recovery token, just emits diagnostic without consuming.
-    #[allow(dead_code)] // Used by future grammar rules (named expressions)
+    #[allow(dead_code)]
     pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
         if self.at_set(recovery) || self.should_stop() {
             self.error(message);
@@ -356,13 +307,6 @@ impl<'src> Parser<'src> {
         self.finish_node();
     }
 
-    /// Synchronize to a token that can start a new definition at root level.
-    /// Consumes tokens into an Error node until we see:
-    /// - `UpperIdent` followed by `=` (named definition)
-    /// - A token in EXPR_FIRST (potential anonymous definition)
-    /// - EOF
-    ///
-    /// Returns true if any tokens were consumed.
     pub(super) fn synchronize_to_def_start(&mut self) -> bool {
         if self.should_stop() {
             return false;
@@ -382,8 +326,6 @@ impl<'src> Parser<'src> {
         true
     }
 
-    /// Check if current position looks like the start of a definition.
-    /// Uses peek() to skip trivia before checking.
     fn at_def_start(&mut self) -> bool {
         let kind = self.peek();
         // Named def: UpperIdent followed by =
@@ -417,7 +359,6 @@ impl<'src> Parser<'src> {
         self.reset_debug_fuel();
     }
 
-    /// Push an opening delimiter onto the stack for tracking unclosed constructs.
     pub(super) fn push_delimiter(&mut self, kind: SyntaxKind) {
         self.delimiter_stack.push(OpenDelimiter {
             kind,
@@ -425,12 +366,10 @@ impl<'src> Parser<'src> {
         });
     }
 
-    /// Pop the most recent opening delimiter from the stack.
     pub(super) fn pop_delimiter(&mut self) -> Option<OpenDelimiter> {
         self.delimiter_stack.pop()
     }
 
-    /// Record a diagnostic with a related location (e.g., where an unclosed delimiter started).
     pub(super) fn error_with_related(
         &mut self,
         message: impl Into<String>,
@@ -449,8 +388,6 @@ impl<'src> Parser<'src> {
             .emit();
     }
 
-    /// Get the end position of the last non-trivia token before current position.
-    /// Used when trivia may have been buffered ahead but we need the expression's end.
     pub(super) fn last_non_trivia_end(&self) -> Option<TextSize> {
         for i in (0..self.pos).rev() {
             if !self.tokens[i].kind.is_trivia() {
@@ -460,7 +397,6 @@ impl<'src> Parser<'src> {
         None
     }
 
-    /// Record a diagnostic with an associated fix suggestion.
     pub(super) fn error_with_fix(
         &mut self,
         range: TextRange,

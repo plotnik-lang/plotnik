@@ -1,3 +1,5 @@
+//! AST/CST pretty-printer for debugging and test snapshots.
+
 use std::fmt::Write;
 
 use indexmap::IndexSet;
