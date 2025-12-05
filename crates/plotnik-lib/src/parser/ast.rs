@@ -15,7 +15,7 @@ macro_rules! ast_node {
                 (node.kind() == SyntaxKind::$kind).then(|| Self(node))
             }
 
-            pub fn syntax(&self) -> &SyntaxNode {
+            pub fn as_cst(&self) -> &SyntaxNode {
                 &self.0
             }
         }
@@ -83,24 +83,22 @@ impl Expr {
         }
     }
 
-    pub fn syntax(&self) -> &SyntaxNode {
+    pub fn as_cst(&self) -> &SyntaxNode {
         match self {
-            Expr::Tree(n) => n.syntax(),
-            Expr::Ref(n) => n.syntax(),
-            Expr::Str(n) => n.syntax(),
-            Expr::Alt(n) => n.syntax(),
-            Expr::Seq(n) => n.syntax(),
-            Expr::Capture(n) => n.syntax(),
-            Expr::Quantifier(n) => n.syntax(),
-            Expr::Field(n) => n.syntax(),
-            Expr::NegatedField(n) => n.syntax(),
-            Expr::Wildcard(n) => n.syntax(),
-            Expr::Anchor(n) => n.syntax(),
+            Expr::Tree(n) => n.as_cst(),
+            Expr::Ref(n) => n.as_cst(),
+            Expr::Str(n) => n.as_cst(),
+            Expr::Alt(n) => n.as_cst(),
+            Expr::Seq(n) => n.as_cst(),
+            Expr::Capture(n) => n.as_cst(),
+            Expr::Quantifier(n) => n.as_cst(),
+            Expr::Field(n) => n.as_cst(),
+            Expr::NegatedField(n) => n.as_cst(),
+            Expr::Wildcard(n) => n.as_cst(),
+            Expr::Anchor(n) => n.as_cst(),
         }
     }
 }
-
-// --- Accessors ---
 
 impl Root {
     pub fn defs(&self) -> impl Iterator<Item = Def> + '_ {

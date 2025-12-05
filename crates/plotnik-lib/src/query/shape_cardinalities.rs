@@ -36,12 +36,12 @@ pub fn analyze(
 
     for def in root.defs() {
         if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
-            def_bodies.insert(name_tok.text().to_string(), body.syntax().clone());
+            def_bodies.insert(name_tok.text().to_string(), body.as_cst().clone());
         }
     }
 
-    compute_node_cardinality(&root.syntax().clone(), symbols, &def_bodies, &mut result);
-    validate_node(&root.syntax().clone(), &result, &mut errors);
+    compute_node_cardinality(&root.as_cst().clone(), symbols, &def_bodies, &mut result);
+    validate_node(&root.as_cst().clone(), &result, &mut errors);
 
     Ok((result, errors))
 }
@@ -78,14 +78,14 @@ fn compute_single(
     if let Some(def) = Def::cast(node.clone()) {
         return def
             .body()
-            .map(|b| get_or_compute(b.syntax(), symbols, def_bodies, cache))
+            .map(|b| get_or_compute(b.as_cst(), symbols, def_bodies, cache))
             .unwrap_or(ShapeCardinality::Invalid);
     }
 
     if let Some(branch) = Branch::cast(node.clone()) {
         return branch
             .body()
-            .map(|b| get_or_compute(b.syntax(), symbols, def_bodies, cache))
+            .map(|b| get_or_compute(b.as_cst(), symbols, def_bodies, cache))
             .unwrap_or(ShapeCardinality::Invalid);
     }
 
@@ -112,12 +112,12 @@ fn compute_single(
 
         Expr::Capture(ref cap) => {
             let inner = ensure_capture_has_inner(cap.inner());
-            get_or_compute(inner.syntax(), symbols, def_bodies, cache)
+            get_or_compute(inner.as_cst(), symbols, def_bodies, cache)
         }
 
         Expr::Quantifier(ref q) => {
             let inner = ensure_quantifier_has_inner(q.inner());
-            get_or_compute(inner.syntax(), symbols, def_bodies, cache)
+            get_or_compute(inner.as_cst(), symbols, def_bodies, cache)
         }
 
         Expr::Ref(ref r) => ref_cardinality(r, symbols, def_bodies, cache),
@@ -148,7 +148,7 @@ fn seq_cardinality(
 
     match children.len() {
         0 => ShapeCardinality::One,
-        1 => get_or_compute(children[0].syntax(), symbols, def_bodies, cache),
+        1 => get_or_compute(children[0].as_cst(), symbols, def_bodies, cache),
         _ => ShapeCardinality::Many,
     }
 }
@@ -182,7 +182,7 @@ fn validate_node(
         && let Some(value) = field.value()
     {
         let card = cardinalities
-            .get(value.syntax())
+            .get(value.as_cst())
             .copied()
             .unwrap_or(ShapeCardinality::One);
 
@@ -198,7 +198,7 @@ fn validate_node(
                         "field `{}` value must match a single node, not a sequence",
                         field_name
                     ),
-                    value.syntax().text_range(),
+                    value.as_cst().text_range(),
                 )
                 .emit();
         }

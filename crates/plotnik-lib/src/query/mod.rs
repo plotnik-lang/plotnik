@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parse, Parser, Root, SyntaxNode};
+use crate::parser::{self, Parser, Root, SyntaxNode};
 use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
 
@@ -95,7 +95,7 @@ impl<'a> QueryBuilder<'a> {
 #[derive(Debug, Clone)]
 pub struct Query<'a> {
     source: &'a str,
-    parse: Parse,
+    ast: Root,
     symbols: SymbolTable,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
     // Diagnostics per pass
@@ -120,25 +120,22 @@ impl<'a> Query<'a> {
         QueryBuilder::new(source)
     }
 
-    fn from_parse(source: &'a str, parse: Parse, parse_diagnostics: Diagnostics) -> Self {
-        let root = Root::cast(parse.syntax()).expect("parser always produces Root");
-
+    fn from_parse(source: &'a str, ast: Root, parse_diagnostics: Diagnostics) -> Self {
         let ((), alt_kind_diagnostics) =
-            alt_kind::validate(&root).expect("alt_kind::validate is infallible");
+            alt_kind::validate(&ast).expect("alt_kind::validate is infallible");
 
         let (symbols, resolve_diagnostics) =
-            named_defs::resolve(&root).expect("named_defs::resolve is infallible");
+            named_defs::resolve(&ast).expect("named_defs::resolve is infallible");
 
         let ((), ref_cycle_diagnostics) =
-            ref_cycles::validate(&root, &symbols).expect("ref_cycles::validate is infallible");
+            ref_cycles::validate(&ast, &symbols).expect("ref_cycles::validate is infallible");
 
-        let (shape_cardinalities, shape_diagnostics) =
-            shape_cardinalities::analyze(&root, &symbols)
-                .expect("shape_cardinalities::analyze is infallible");
+        let (shape_cardinalities, shape_diagnostics) = shape_cardinalities::analyze(&ast, &symbols)
+            .expect("shape_cardinalities::analyze is infallible");
 
         Self {
             source,
-            parse,
+            ast,
             symbols,
             shape_cardinalities,
             parse_diagnostics,
@@ -154,12 +151,12 @@ impl<'a> Query<'a> {
         self.source
     }
 
-    pub fn syntax(&self) -> SyntaxNode {
-        self.parse.syntax()
+    pub fn as_cst(&self) -> &SyntaxNode {
+        self.ast.as_cst()
     }
 
-    pub fn root(&self) -> Root {
-        Root::cast(self.parse.syntax()).expect("parser always produces Root")
+    pub fn root(&self) -> &Root {
+        &self.ast
     }
 
     pub fn symbols(&self) -> &SymbolTable {

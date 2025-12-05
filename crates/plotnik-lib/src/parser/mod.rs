@@ -52,35 +52,15 @@ pub use core::Parser;
 use crate::PassResult;
 use lexer::lex;
 
-/// Parse result containing the green tree.
-///
-/// The tree is always complete—diagnostics are returned separately.
-/// Error nodes in the tree represent recovery points.
-#[derive(Debug, Clone)]
-pub struct Parse {
-    cst: rowan::GreenNode,
-}
-
-impl Parse {
-    pub fn as_cst(&self) -> &rowan::GreenNode {
-        &self.cst
-    }
-
-    /// Creates a typed view over the immutable green tree.
-    /// This is cheap—SyntaxNode is a thin wrapper with parent pointers.
-    pub fn syntax(&self) -> SyntaxNode {
-        SyntaxNode::new_root(self.cst.clone())
-    }
-}
-
 /// Main entry point. Returns Err on fuel exhaustion.
-pub fn parse(source: &str) -> PassResult<Parse> {
+pub fn parse(source: &str) -> PassResult<Root> {
     parse_with_parser(Parser::new(source, lex(source)))
 }
 
 /// Parse with a pre-configured parser (for custom fuel limits).
-pub(crate) fn parse_with_parser(mut parser: Parser) -> PassResult<Parse> {
+pub(crate) fn parse_with_parser(mut parser: Parser) -> PassResult<Root> {
     parser.parse_root();
     let (cst, diagnostics) = parser.finish()?;
-    Ok((Parse { cst }, diagnostics))
+    let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
+    Ok((root, diagnostics))
 }
