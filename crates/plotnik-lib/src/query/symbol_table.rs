@@ -14,7 +14,7 @@ use super::Query;
 pub type SymbolTable<'src> = IndexMap<&'src str, ast::Expr>;
 
 impl<'a> Query<'a> {
-    pub(super) fn resolve_symbols(&mut self) {
+    pub(super) fn resolve_names(&mut self) {
         let (symbols, diagnostics) = resolve(&self.ast, self.source);
         self.symbol_table = symbols;
         self.resolve_diagnostics = diagnostics;

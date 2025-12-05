@@ -5,21 +5,21 @@ mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
 
-pub mod alt_kind;
-pub mod ref_cycles;
-pub mod shape_cardinalities;
+pub mod alt_kinds;
+pub mod recursion;
+pub mod shapes;
 pub mod symbol_table;
 
 #[cfg(test)]
-mod alt_kind_tests;
+mod alt_kinds_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
-mod ref_cycles_tests;
+mod recursion_tests;
 #[cfg(test)]
-mod shape_cardinalities_tests;
+mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
 
@@ -32,7 +32,7 @@ use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
 use crate::parser::{self, Parser, Root, SyntaxNode, ast};
-use shape_cardinalities::ShapeCardinality;
+use shapes::ShapeCardinality;
 use symbol_table::SymbolTable;
 
 /// Builder for configuring and creating a [`Query`].
@@ -77,9 +77,9 @@ impl<'a> QueryBuilder<'a> {
         let mut query = Query::empty(self.source);
         query.parse(self.exec_fuel, self.recursion_fuel)?;
         query.validate_alt_kinds();
-        query.resolve_symbols();
-        query.validate_ref_cycles();
-        query.analyze_shape_cardinalities();
+        query.resolve_names();
+        query.validate_recursion();
+        query.infer_shapes();
         Ok(query)
     }
 }
@@ -99,8 +99,8 @@ pub struct Query<'a> {
     parse_diagnostics: Diagnostics,
     alt_kind_diagnostics: Diagnostics,
     resolve_diagnostics: Diagnostics,
-    ref_cycle_diagnostics: Diagnostics,
-    shape_diagnostics: Diagnostics,
+    recursion_diagnostics: Diagnostics,
+    shapes_diagnostics: Diagnostics,
 }
 
 fn empty_root() -> Root {
@@ -134,8 +134,8 @@ impl<'a> Query<'a> {
             parse_diagnostics: Diagnostics::new(),
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
-            ref_cycle_diagnostics: Diagnostics::new(),
-            shape_diagnostics: Diagnostics::new(),
+            recursion_diagnostics: Diagnostics::new(),
+            shapes_diagnostics: Diagnostics::new(),
         }
     }
 
@@ -212,8 +212,8 @@ impl<'a> Query<'a> {
         all.extend(self.parse_diagnostics.clone());
         all.extend(self.alt_kind_diagnostics.clone());
         all.extend(self.resolve_diagnostics.clone());
-        all.extend(self.ref_cycle_diagnostics.clone());
-        all.extend(self.shape_diagnostics.clone());
+        all.extend(self.recursion_diagnostics.clone());
+        all.extend(self.shapes_diagnostics.clone());
         all
     }
 
@@ -222,7 +222,7 @@ impl<'a> Query<'a> {
         !self.parse_diagnostics.has_errors()
             && !self.alt_kind_diagnostics.has_errors()
             && !self.resolve_diagnostics.has_errors()
-            && !self.ref_cycle_diagnostics.has_errors()
-            && !self.shape_diagnostics.has_errors()
+            && !self.recursion_diagnostics.has_errors()
+            && !self.shapes_diagnostics.has_errors()
     }
 }

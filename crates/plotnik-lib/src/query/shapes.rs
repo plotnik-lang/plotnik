@@ -24,7 +24,7 @@ pub enum ShapeCardinality {
 }
 
 impl Query<'_> {
-    pub(super) fn analyze_shape_cardinalities(&mut self) {
+    pub(super) fn infer_shapes(&mut self) {
         let mut def_bodies: HashMap<String, ast::Expr> = HashMap::new();
 
         for def in self.ast.defs() {
@@ -42,7 +42,7 @@ impl Query<'_> {
         validate_node(
             self.ast.as_cst(),
             &self.shape_cardinality_table,
-            &mut self.shape_diagnostics,
+            &mut self.shapes_diagnostics,
         );
     }
 }

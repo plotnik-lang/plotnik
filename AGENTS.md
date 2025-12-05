@@ -29,10 +29,10 @@ crates/
         dump.rs        # dump_* debug output methods (test-only)
         printer.rs     # QueryPrinter for AST output
         invariants.rs  # Query invariant checks
-        alt_kind.rs    # Alternation validation
+        alt_kinds.rs     # Alternation validation
         symbol_table.rs  # Name resolution, symbol table
-        ref_cycles.rs  # Escape analysis (recursion validation)
-        shape_cardinalities.rs  # Shape inference
+        recursion.rs     # Escape analysis (recursion validation)
+        shapes.rs        # Shape inference
         *_tests.rs     # Test files per module
       lib.rs           # Re-exports Query, Diagnostics, Error
   plotnik-cli/         # CLI tool
@@ -45,11 +45,11 @@ docs/
 ## Pipeline
 
 ```rust
-parser::parse()                   // Parse → CST
-alt_kind::validate()              // Validate alternation kinds
-symbol_table::resolve()           // Resolve names → SymbolTable
-ref_cycles::validate()            // Validate recursion termination
-shape_cardinalities::analyze()    // Infer and validate shape cardinalities
+parser::parse()           // Parse → CST
+alt_kinds::validate()     // Validate alternation kinds
+symbol_table::resolve()   // Resolve names → SymbolTable
+recursion::validate()     // Validate recursion termination
+shapes::infer()           // Infer and validate shape cardinalities
 ```
 
 Module = "what", function = "action".

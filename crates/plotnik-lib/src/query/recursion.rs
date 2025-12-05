@@ -12,11 +12,11 @@ use crate::diagnostics::Diagnostics;
 use crate::parser::{Def, Expr, Root, SyntaxKind};
 
 impl Query<'_> {
-    pub(super) fn validate_ref_cycles(&mut self) {
+    pub(super) fn validate_recursion(&mut self) {
         validate_into(
             &self.ast,
             &self.symbol_table,
-            &mut self.ref_cycle_diagnostics,
+            &mut self.recursion_diagnostics,
         );
     }
 }

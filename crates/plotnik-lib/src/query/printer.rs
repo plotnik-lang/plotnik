@@ -6,7 +6,7 @@ use rowan::NodeOrToken;
 use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
-use super::shape_cardinalities::ShapeCardinality;
+use super::shapes::ShapeCardinality;
 
 pub struct QueryPrinter<'q, 'src> {
     query: &'q Query<'src>,
