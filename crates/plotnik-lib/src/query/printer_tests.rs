@@ -116,7 +116,7 @@ fn printer_wildcard_and_anchor() {
       Def
         Tree call
           Wildcard
-          Anchor
+          .
           Tree arg
     ");
 }

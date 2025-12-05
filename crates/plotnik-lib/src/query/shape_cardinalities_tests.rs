@@ -297,7 +297,7 @@ fn anchor_has_no_cardinality() {
     Root¹
       Def¹
         Tree¹ block
-          Anchor
+          .
           Tree¹ statement
     ");
 }

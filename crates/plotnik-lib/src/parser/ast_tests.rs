@@ -205,13 +205,13 @@ fn quantifier_non_greedy() {
 fn anchor() {
     let query = Query::new("(block . (statement))").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
         Tree block
-          Anchor
+          .
           Tree statement
-    "#);
+    ");
 }
 
 #[test]

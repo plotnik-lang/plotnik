@@ -285,7 +285,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         use crate::parser::cst::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
-                self.format_anchor(&ast::Anchor::cast(child).unwrap(), indent, w)?;
+                self.mark_anchor(indent, w)?;
             } else if child.kind() == SyntaxKind::NegatedField {
                 self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), indent, w)?;
             } else if let Some(expr) = ast::Expr::cast(child) {
@@ -295,15 +295,9 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         Ok(())
     }
 
-    fn format_anchor(
-        &self,
-        anchor: &ast::Anchor,
-        indent: usize,
-        w: &mut impl Write,
-    ) -> std::fmt::Result {
+    fn mark_anchor(&self, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let span = self.span_str(anchor.text_range());
-        writeln!(w, "{}Anchor{}", prefix, span)
+        writeln!(w, "{}.", prefix)
     }
 
     fn format_negated_field(
