@@ -6,7 +6,7 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use super::named_defs::SymbolTable;
+use super::symbol_table::SymbolTable;
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
 use crate::parser::{Def, Expr, Root, SyntaxKind};

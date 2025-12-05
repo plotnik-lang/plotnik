@@ -1,4 +1,4 @@
-//! Name resolution: builds symbol table and checks references.
+//! Symbol table: name resolution and reference checking.
 //!
 //! Two-pass approach:
 //! 1. Collect all `Name = expr` definitions
@@ -46,7 +46,7 @@ pub fn resolve<'src>(root: &Root, source: &'src str) -> PassResult<SymbolTable<'
     // Parser wraps all top-level exprs in Def nodes, so this should be empty
     assert!(
         root.exprs().next().is_none(),
-        "named_defs: unexpected bare Expr in Root (parser should wrap in Def)"
+        "symbol_table: unexpected bare Expr in Root (parser should wrap in Def)"
     );
 
     Ok((symbols, diagnostics))
@@ -74,7 +74,7 @@ fn collect_reference_diagnostics(
             // Parser wraps all alt children in Branch nodes
             assert!(
                 alt.exprs().next().is_none(),
-                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
+                "symbol_table: unexpected bare Expr in Alt (parser should wrap in Branch)"
             );
         }
         Expr::SeqExpr(seq) => {

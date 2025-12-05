@@ -30,7 +30,7 @@ crates/
         printer.rs     # QueryPrinter for AST output
         invariants.rs  # Query invariant checks
         alt_kind.rs    # Alternation validation
-        named_defs.rs  # Name resolution, symbol table
+        symbol_table.rs  # Name resolution, symbol table
         ref_cycles.rs  # Escape analysis (recursion validation)
         shape_cardinalities.rs  # Shape inference
         *_tests.rs     # Test files per module
@@ -47,7 +47,7 @@ docs/
 ```rust
 parser::parse()                   // Parse → CST
 alt_kind::validate()              // Validate alternation kinds
-named_defs::resolve()             // Resolve names → SymbolTable
+symbol_table::resolve()           // Resolve names → SymbolTable
 ref_cycles::validate()            // Validate recursion termination
 shape_cardinalities::analyze()    // Infer and validate shape cardinalities
 ```

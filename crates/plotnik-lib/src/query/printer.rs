@@ -73,7 +73,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
         use std::collections::HashMap;
 
-        let symbols = &self.query.symbols;
+        let symbols = &self.query.symbol_table;
         if symbols.is_empty() {
             return Ok(());
         }
@@ -123,7 +123,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some(body) = self.query.symbols.get(name) {
+        if let Some(body) = self.query.symbol_table.get(name) {
             let refs_set = collect_refs(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();

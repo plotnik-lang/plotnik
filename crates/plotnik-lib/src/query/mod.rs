@@ -6,22 +6,22 @@ mod printer;
 pub use printer::QueryPrinter;
 
 pub mod alt_kind;
-pub mod named_defs;
 pub mod ref_cycles;
 pub mod shape_cardinalities;
+pub mod symbol_table;
 
 #[cfg(test)]
 mod alt_kind_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
-mod named_defs_tests;
-#[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
 mod ref_cycles_tests;
 #[cfg(test)]
 mod shape_cardinalities_tests;
+#[cfg(test)]
+mod symbol_table_tests;
 
 use std::collections::HashMap;
 
@@ -29,8 +29,8 @@ use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::lexer::lex;
 use crate::parser::{self, Parser, Root, SyntaxNode};
-use named_defs::SymbolTable;
 use shape_cardinalities::ShapeCardinality;
+use symbol_table::SymbolTable;
 
 /// Builder for configuring and creating a [`Query`].
 pub struct QueryBuilder<'a> {
@@ -96,7 +96,7 @@ impl<'a> QueryBuilder<'a> {
 pub struct Query<'a> {
     source: &'a str,
     ast: Root,
-    symbols: SymbolTable<'a>,
+    symbol_table: SymbolTable<'a>,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
     // Diagnostics per pass
     parse_diagnostics: Diagnostics,
@@ -124,19 +124,20 @@ impl<'a> Query<'a> {
         let ((), alt_kind_diagnostics) =
             alt_kind::validate(&ast).expect("alt_kind::validate is infallible");
 
-        let (symbols, resolve_diagnostics) =
-            named_defs::resolve(&ast, source).expect("named_defs::resolve is infallible");
+        let (symbol_table, resolve_diagnostics) =
+            symbol_table::resolve(&ast, source).expect("symbol_table::resolve is infallible");
 
         let ((), ref_cycle_diagnostics) =
-            ref_cycles::validate(&ast, &symbols).expect("ref_cycles::validate is infallible");
+            ref_cycles::validate(&ast, &symbol_table).expect("ref_cycles::validate is infallible");
 
-        let (shape_cardinalities, shape_diagnostics) = shape_cardinalities::analyze(&ast, &symbols)
-            .expect("shape_cardinalities::analyze is infallible");
+        let (shape_cardinalities, shape_diagnostics) =
+            shape_cardinalities::analyze(&ast, &symbol_table)
+                .expect("shape_cardinalities::analyze is infallible");
 
         Self {
             source,
             ast,
-            symbols,
+            symbol_table,
             shape_cardinalities,
             parse_diagnostics,
             alt_kind_diagnostics,
@@ -157,10 +158,6 @@ impl<'a> Query<'a> {
 
     pub fn root(&self) -> &Root {
         &self.ast
-    }
-
-    pub fn symbols(&self) -> &SymbolTable<'a> {
-        &self.symbols
     }
 
     pub fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {

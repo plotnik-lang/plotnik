@@ -13,7 +13,7 @@
 use super::invariants::{
     ensure_capture_has_inner, ensure_quantifier_has_inner, ensure_ref_has_name,
 };
-use super::named_defs::SymbolTable;
+use super::symbol_table::SymbolTable;
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
 use crate::parser::{Branch, Def, Expr, FieldExpr, Ref, Root, SeqExpr, SyntaxNode, Type};
