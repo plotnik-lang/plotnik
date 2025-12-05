@@ -27,8 +27,9 @@ use std::collections::HashMap;
 
 use crate::Result;
 use crate::diagnostics::Diagnostics;
+use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
-use crate::parser::{self, Parser, Root, SyntaxNode};
+use crate::parser::{self, Parser, Root, SyntaxNode, ast};
 use shape_cardinalities::ShapeCardinality;
 use symbol_table::SymbolTable;
 
@@ -97,7 +98,7 @@ pub struct Query<'a> {
     source: &'a str,
     ast: Root,
     symbol_table: SymbolTable<'a>,
-    shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
+    shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
     // Diagnostics per pass
     parse_diagnostics: Diagnostics,
     alt_kind_diagnostics: Diagnostics,
@@ -138,7 +139,7 @@ impl<'a> Query<'a> {
             source,
             ast,
             symbol_table,
-            shape_cardinalities,
+            shape_cardinality_table: shape_cardinalities,
             parse_diagnostics,
             alt_kind_diagnostics,
             resolve_diagnostics,
@@ -161,9 +162,39 @@ impl<'a> Query<'a> {
     }
 
     pub fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
-        self.shape_cardinalities
-            .get(node)
-            .copied()
+        // Error nodes are invalid
+        if node.kind() == SyntaxKind::Error {
+            return ShapeCardinality::Invalid;
+        }
+
+        // Root: cardinality based on definition count
+        if let Some(root) = Root::cast(node.clone()) {
+            return if root.defs().count() > 1 {
+                ShapeCardinality::Many
+            } else {
+                ShapeCardinality::One
+            };
+        }
+
+        // Def: delegate to body's cardinality
+        if let Some(def) = ast::Def::cast(node.clone()) {
+            return def
+                .body()
+                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
+                .unwrap_or(ShapeCardinality::Invalid);
+        }
+
+        // Branch: delegate to body's cardinality
+        if let Some(branch) = ast::Branch::cast(node.clone()) {
+            return branch
+                .body()
+                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
+                .unwrap_or(ShapeCardinality::Invalid);
+        }
+
+        // Expr: direct lookup
+        ast::Expr::cast(node.clone())
+            .and_then(|e| self.shape_cardinality_table.get(&e).copied())
             .unwrap_or(ShapeCardinality::One)
     }
 
