@@ -79,7 +79,7 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc))
         }
 
-        Expr::Alt(alt) => {
+        Expr::AltExpr(alt) => {
             alt.branches().any(|b| {
                 b.body()
                     .map(|body| expr_has_escape(&body, scc))
@@ -87,7 +87,7 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
             }) || alt.exprs().any(|e| expr_has_escape(&e, scc))
         }
 
-        Expr::Seq(seq) => seq.children().all(|c| expr_has_escape(&c, scc)),
+        Expr::SeqExpr(seq) => seq.children().all(|c| expr_has_escape(&c, scc)),
 
         Expr::QuantifiedExpr(q) => match q.operator().map(|op| op.kind()) {
             Some(
@@ -217,11 +217,11 @@ fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
         Expr::NamedNode(node) => node
             .children()
             .find_map(|child| find_ref_in_expr(&child, target)),
-        Expr::Alt(alt) => alt
+        Expr::AltExpr(alt) => alt
             .branches()
             .find_map(|b| b.body().and_then(|body| find_ref_in_expr(&body, target)))
             .or_else(|| alt.exprs().find_map(|e| find_ref_in_expr(&e, target))),
-        Expr::Seq(seq) => seq.children().find_map(|c| find_ref_in_expr(&c, target)),
+        Expr::SeqExpr(seq) => seq.children().find_map(|c| find_ref_in_expr(&c, target)),
         Expr::CapturedExpr(cap) => cap
             .inner()
             .and_then(|inner| find_ref_in_expr(&inner, target)),

@@ -43,8 +43,8 @@ pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 // Re-exports from ast (was nodes)
 pub use ast::{
-    Alt, AltKind, Anchor, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
-    NegatedField, QuantifiedExpr, Ref, Root, Seq, Type,
+    AltExpr, AltKind, Anchor, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
+    NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, Type,
 };
 
 pub use core::Parser;

@@ -228,7 +228,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                     writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, card, span, value)?;
                 }
             }
-            ast::Expr::Alt(a) => {
+            ast::Expr::AltExpr(a) => {
                 writeln!(w, "{}Alt{}{}", prefix, card, span)?;
                 for branch in a.branches() {
                     self.format_branch(&branch, indent + 1, w)?;
@@ -237,7 +237,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
                     self.format_expr(&expr, indent + 1, w)?;
                 }
             }
-            ast::Expr::Seq(s) => {
+            ast::Expr::SeqExpr(s) => {
                 writeln!(w, "{}Seq{}{}", prefix, card, span)?;
                 self.format_tree_children(s.as_cst(), indent + 1, w)?;
             }

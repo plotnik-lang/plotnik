@@ -2,7 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::parser::{Alt, Branch, Root};
+use crate::parser::{AltExpr, Branch, Root};
 
 #[inline]
 pub fn assert_root_no_bare_exprs(root: &Root) {
@@ -13,7 +13,7 @@ pub fn assert_root_no_bare_exprs(root: &Root) {
 }
 
 #[inline]
-pub fn assert_alt_no_bare_exprs(alt: &Alt) {
+pub fn assert_alt_no_bare_exprs(alt: &AltExpr) {
     assert!(
         alt.exprs().next().is_none(),
         "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"

@@ -16,7 +16,7 @@ use super::invariants::{
 use super::named_defs::SymbolTable;
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{Branch, Def, Expr, FieldExpr, Ref, Root, Seq, SyntaxNode, Type};
+use crate::parser::{Branch, Def, Expr, FieldExpr, Ref, Root, SeqExpr, SyntaxNode, Type};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -100,11 +100,11 @@ fn compute_single(
     };
 
     match expr {
-        Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::FieldExpr(_) | Expr::Alt(_) => {
+        Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::FieldExpr(_) | Expr::AltExpr(_) => {
             ShapeCardinality::One
         }
 
-        Expr::Seq(ref seq) => seq_cardinality(seq, symbols, def_bodies, cache),
+        Expr::SeqExpr(ref seq) => seq_cardinality(seq, symbols, def_bodies, cache),
 
         Expr::CapturedExpr(ref cap) => {
             let inner = ensure_capture_has_inner(cap.inner());
@@ -135,7 +135,7 @@ fn get_or_compute(
 }
 
 fn seq_cardinality(
-    seq: &Seq,
+    seq: &SeqExpr,
     symbols: &SymbolTable,
     def_bodies: &HashMap<String, SyntaxNode>,
     cache: &mut HashMap<SyntaxNode, ShapeCardinality>,

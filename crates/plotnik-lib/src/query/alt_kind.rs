@@ -10,7 +10,7 @@ use super::invariants::{
 };
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{Alt, AltKind, Branch, Expr, Root};
+use crate::parser::{AltExpr, AltKind, Branch, Expr, Root};
 
 pub fn validate(root: &Root) -> PassResult<()> {
     let mut errors = Diagnostics::new();
@@ -28,7 +28,7 @@ pub fn validate(root: &Root) -> PassResult<()> {
 
 fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
     match expr {
-        Expr::Alt(alt) => {
+        Expr::AltExpr(alt) => {
             check_mixed_alternation(alt, errors);
             for branch in alt.branches() {
                 if let Some(body) = branch.body() {
@@ -42,7 +42,7 @@ fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
                 validate_expr(&child, errors);
             }
         }
-        Expr::Seq(seq) => {
+        Expr::SeqExpr(seq) => {
             for child in seq.children() {
                 validate_expr(&child, errors);
             }
@@ -66,7 +66,7 @@ fn validate_expr(expr: &Expr, errors: &mut Diagnostics) {
     }
 }
 
-fn check_mixed_alternation(alt: &Alt, errors: &mut Diagnostics) {
+fn check_mixed_alternation(alt: &AltExpr, errors: &mut Diagnostics) {
     if alt.kind() != AltKind::Mixed {
         return;
     }

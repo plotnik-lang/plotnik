@@ -100,7 +100,7 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                 collect_refs(&child, refs);
             }
         }
-        Expr::Alt(alt) => {
+        Expr::AltExpr(alt) => {
             for branch in alt.branches() {
                 let Some(body) = branch.body() else { continue };
                 collect_refs(&body, refs);
@@ -111,7 +111,7 @@ fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
                 "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
             );
         }
-        Expr::Seq(seq) => {
+        Expr::SeqExpr(seq) => {
             for child in seq.children() {
                 collect_refs(&child, refs);
             }
@@ -146,7 +146,7 @@ fn collect_reference_diagnostics(
                 collect_reference_diagnostics(&child, symbols, diagnostics);
             }
         }
-        Expr::Alt(alt) => {
+        Expr::AltExpr(alt) => {
             for branch in alt.branches() {
                 let Some(body) = branch.body() else { continue };
                 collect_reference_diagnostics(&body, symbols, diagnostics);
@@ -157,7 +157,7 @@ fn collect_reference_diagnostics(
                 "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
             );
         }
-        Expr::Seq(seq) => {
+        Expr::SeqExpr(seq) => {
             for child in seq.children() {
                 collect_reference_diagnostics(&child, symbols, diagnostics);
             }

@@ -56,9 +56,9 @@ ast_node!(Root, Root);
 ast_node!(Def, Def);
 ast_node!(NamedNode, Tree);
 ast_node!(Ref, Ref);
-ast_node!(Alt, Alt);
+ast_node!(AltExpr, Alt);
 ast_node!(Branch, Branch);
-ast_node!(Seq, Seq);
+ast_node!(SeqExpr, Seq);
 ast_node!(CapturedExpr, Capture);
 ast_node!(Type, Type);
 ast_node!(QuantifiedExpr, Quantifier);
@@ -116,8 +116,8 @@ define_expr!(
     NamedNode,
     Ref,
     AnonymousNode,
-    Alt,
-    Seq,
+    AltExpr,
+    SeqExpr,
     CapturedExpr,
     QuantifiedExpr,
     FieldExpr,
@@ -183,7 +183,7 @@ impl Ref {
     }
 }
 
-impl Alt {
+impl AltExpr {
     pub fn kind(&self) -> AltKind {
         let mut tagged = false;
         let mut untagged = false;
@@ -230,7 +230,7 @@ impl Branch {
     }
 }
 
-impl Seq {
+impl SeqExpr {
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
     }
