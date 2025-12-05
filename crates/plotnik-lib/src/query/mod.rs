@@ -25,6 +25,8 @@ mod symbol_table_tests;
 
 use std::collections::HashMap;
 
+use rowan::GreenNodeBuilder;
+
 use crate::Result;
 use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
@@ -72,19 +74,13 @@ impl<'a> QueryBuilder<'a> {
     ///
     /// Returns `Err` if fuel limits are exceeded.
     pub fn build(self) -> Result<Query<'a>> {
-        let tokens = lex(self.source);
-        let mut parser = Parser::new(self.source, tokens);
-
-        if let Some(limit) = self.exec_fuel {
-            parser = parser.with_exec_fuel(limit);
-        }
-
-        if let Some(limit) = self.recursion_fuel {
-            parser = parser.with_recursion_fuel(limit);
-        }
-
-        let (parse, parse_diagnostics) = parser::parse_with_parser(parser)?;
-        Ok(Query::from_parse(self.source, parse, parse_diagnostics))
+        let mut query = Query::empty(self.source);
+        query.parse(self.exec_fuel, self.recursion_fuel)?;
+        query.validate_alt_kinds();
+        query.resolve_symbols();
+        query.validate_ref_cycles();
+        query.analyze_shape_cardinalities();
+        Ok(query)
     }
 }
 
@@ -107,6 +103,14 @@ pub struct Query<'a> {
     shape_diagnostics: Diagnostics,
 }
 
+fn empty_root() -> Root {
+    let mut builder = GreenNodeBuilder::new();
+    builder.start_node(SyntaxKind::Root.into());
+    builder.finish_node();
+    let green = builder.finish();
+    Root::cast(SyntaxNode::new_root(green)).expect("we just built a Root node")
+}
+
 impl<'a> Query<'a> {
     /// Parse and analyze a query from source text.
     ///
@@ -121,25 +125,40 @@ impl<'a> Query<'a> {
         QueryBuilder::new(source)
     }
 
-    fn from_parse(source: &'a str, ast: Root, parse_diagnostics: Diagnostics) -> Self {
-        let mut query = Self {
+    fn empty(source: &'a str) -> Self {
+        Self {
             source,
-            ast,
+            ast: empty_root(),
             symbol_table: SymbolTable::default(),
             shape_cardinality_table: HashMap::new(),
-            parse_diagnostics,
+            parse_diagnostics: Diagnostics::new(),
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
             ref_cycle_diagnostics: Diagnostics::new(),
             shape_diagnostics: Diagnostics::new(),
-        };
+        }
+    }
 
-        query.validate_alt_kinds();
-        query.resolve_symbols();
-        query.validate_ref_cycles();
-        query.analyze_shape_cardinalities();
+    fn parse(
+        &mut self,
+        exec_fuel: Option<Option<u32>>,
+        recursion_fuel: Option<Option<u32>>,
+    ) -> Result<()> {
+        let tokens = lex(self.source);
+        let mut parser = Parser::new(self.source, tokens);
 
-        query
+        if let Some(limit) = exec_fuel {
+            parser = parser.with_exec_fuel(limit);
+        }
+
+        if let Some(limit) = recursion_fuel {
+            parser = parser.with_recursion_fuel(limit);
+        }
+
+        let (ast, diagnostics) = parser::parse_with_parser(parser)?;
+        self.ast = ast;
+        self.parse_diagnostics = diagnostics;
+        Ok(())
     }
 
     #[allow(dead_code)]
