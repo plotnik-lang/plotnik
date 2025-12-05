@@ -1,8 +1,9 @@
 use std::fmt::Write;
 
+use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
-use crate::parser::{self as ast, SyntaxNode};
+use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
 use super::shape_cardinalities::ShapeCardinality;
@@ -70,7 +71,6 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
-        use indexmap::IndexSet;
         use std::collections::HashMap;
 
         let symbols = &self.query.symbols;
@@ -78,7 +78,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.names().collect();
+        let defined: IndexSet<&str> = symbols.keys().copied().collect();
 
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
         for def in self.query.root().defs() {
@@ -87,7 +87,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             }
         }
 
-        for name in symbols.names() {
+        for name in symbols.keys() {
             let mut visited = IndexSet::new();
             self.format_symbol_tree(name, 0, &defined, &body_nodes, &mut visited, w)?;
         }
@@ -123,8 +123,9 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some(def) = self.query.symbols.get(name) {
-            let mut refs: Vec<_> = def.refs.iter().map(|s| s.as_str()).collect();
+        if let Some(body) = self.query.symbols.get(name) {
+            let refs_set = collect_refs(body);
+            let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
                 self.format_symbol_tree(r, indent + 1, defined, body_nodes, visited, w)?;
@@ -367,5 +368,49 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 impl Query<'_> {
     pub fn printer(&self) -> QueryPrinter<'_, '_> {
         QueryPrinter::new(self)
+    }
+}
+
+fn collect_refs(expr: &Expr) -> IndexSet<String> {
+    let mut refs = IndexSet::new();
+    collect_refs_into(expr, &mut refs);
+    refs
+}
+
+fn collect_refs_into(expr: &Expr, refs: &mut IndexSet<String>) {
+    match expr {
+        Expr::Ref(r) => {
+            let Some(name_token) = r.name() else { return };
+            refs.insert(name_token.text().to_string());
+        }
+        Expr::NamedNode(node) => {
+            for child in node.children() {
+                collect_refs_into(&child, refs);
+            }
+        }
+        Expr::AltExpr(alt) => {
+            for branch in alt.branches() {
+                let Some(body) = branch.body() else { continue };
+                collect_refs_into(&body, refs);
+            }
+        }
+        Expr::SeqExpr(seq) => {
+            for child in seq.children() {
+                collect_refs_into(&child, refs);
+            }
+        }
+        Expr::CapturedExpr(cap) => {
+            let Some(inner) = cap.inner() else { return };
+            collect_refs_into(&inner, refs);
+        }
+        Expr::QuantifiedExpr(q) => {
+            let Some(inner) = q.inner() else { return };
+            collect_refs_into(&inner, refs);
+        }
+        Expr::FieldExpr(f) => {
+            let Some(value) = f.value() else { return };
+            collect_refs_into(&value, refs);
+        }
+        Expr::AnonymousNode(_) => {}
     }
 }

@@ -11,31 +11,24 @@ use crate::PassResult;
 use crate::diagnostics::Diagnostics;
 use crate::parser::{Def, Expr, Root, SyntaxKind};
 
-pub fn validate(root: &Root, symbols: &SymbolTable) -> PassResult<()> {
+pub fn validate(root: &Root, symbols: &SymbolTable<'_>) -> PassResult<()> {
     let sccs = find_sccs(symbols);
     let mut errors = Diagnostics::new();
 
     for scc in sccs {
         if scc.len() == 1 {
             let name = &scc[0];
-            let Some(def_info) = symbols.get(name) else {
+            let Some(body) = symbols.get(name.as_str()) else {
                 continue;
             };
 
-            if !def_info.refs.contains(name) {
+            let refs = collect_refs(body);
+            if !refs.contains(name) {
                 continue;
             }
 
-            let Some(def) = find_def_by_name(root, name) else {
-                continue;
-            };
-
-            let Some(body) = def.body() else {
-                continue;
-            };
-
             let scc_set: IndexSet<&str> = std::iter::once(name.as_str()).collect();
-            if !expr_has_escape(&body, &scc_set) {
+            if !expr_has_escape(body, &scc_set) {
                 let chain = build_self_ref_chain(root, name);
                 emit_error(&mut errors, name, &scc, chain);
             }
@@ -114,9 +107,53 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
     }
 }
 
-fn find_sccs(symbols: &SymbolTable) -> Vec<Vec<String>> {
+fn collect_refs(expr: &Expr) -> IndexSet<String> {
+    let mut refs = IndexSet::new();
+    collect_refs_into(expr, &mut refs);
+    refs
+}
+
+fn collect_refs_into(expr: &Expr, refs: &mut IndexSet<String>) {
+    match expr {
+        Expr::Ref(r) => {
+            let Some(name_token) = r.name() else { return };
+            refs.insert(name_token.text().to_string());
+        }
+        Expr::NamedNode(node) => {
+            for child in node.children() {
+                collect_refs_into(&child, refs);
+            }
+        }
+        Expr::AltExpr(alt) => {
+            for branch in alt.branches() {
+                let Some(body) = branch.body() else { continue };
+                collect_refs_into(&body, refs);
+            }
+        }
+        Expr::SeqExpr(seq) => {
+            for child in seq.children() {
+                collect_refs_into(&child, refs);
+            }
+        }
+        Expr::CapturedExpr(cap) => {
+            let Some(inner) = cap.inner() else { return };
+            collect_refs_into(&inner, refs);
+        }
+        Expr::QuantifiedExpr(q) => {
+            let Some(inner) = q.inner() else { return };
+            collect_refs_into(&inner, refs);
+        }
+        Expr::FieldExpr(f) => {
+            let Some(value) = f.value() else { return };
+            collect_refs_into(&value, refs);
+        }
+        Expr::AnonymousNode(_) => {}
+    }
+}
+
+fn find_sccs(symbols: &SymbolTable<'_>) -> Vec<Vec<String>> {
     struct State<'a> {
-        symbols: &'a SymbolTable,
+        symbols: &'a SymbolTable<'a>,
         index: usize,
         stack: Vec<String>,
         on_stack: IndexSet<String>,
@@ -132,18 +169,19 @@ fn find_sccs(symbols: &SymbolTable) -> Vec<Vec<String>> {
         state.stack.push(name.to_string());
         state.on_stack.insert(name.to_string());
 
-        if let Some(def_info) = state.symbols.get(name) {
-            for ref_name in &def_info.refs {
-                if state.symbols.get(ref_name).is_none() {
+        if let Some(body) = state.symbols.get(name) {
+            let refs = collect_refs(body);
+            for ref_name in &refs {
+                if state.symbols.get(ref_name.as_str()).is_none() {
                     continue;
                 }
-                if !state.indices.contains_key(ref_name) {
+                if !state.indices.contains_key(ref_name.as_str()) {
                     strongconnect(ref_name, state);
-                    let ref_lowlink = state.lowlinks[ref_name];
+                    let ref_lowlink = state.lowlinks[ref_name.as_str()];
                     let my_lowlink = state.lowlinks.get_mut(name).unwrap();
                     *my_lowlink = (*my_lowlink).min(ref_lowlink);
-                } else if state.on_stack.contains(ref_name) {
-                    let ref_index = state.indices[ref_name];
+                } else if state.on_stack.contains(ref_name.as_str()) {
+                    let ref_index = state.indices[ref_name.as_str()];
                     let my_lowlink = state.lowlinks.get_mut(name).unwrap();
                     *my_lowlink = (*my_lowlink).min(ref_index);
                 }
@@ -174,8 +212,8 @@ fn find_sccs(symbols: &SymbolTable) -> Vec<Vec<String>> {
         sccs: Vec::new(),
     };
 
-    for name in symbols.names() {
-        if !state.indices.contains_key(name) {
+    for name in symbols.keys() {
+        if !state.indices.contains_key(*name) {
             strongconnect(name, &mut state);
         }
     }
@@ -186,8 +224,8 @@ fn find_sccs(symbols: &SymbolTable) -> Vec<Vec<String>> {
         .filter(|scc| {
             scc.len() > 1
                 || symbols
-                    .get(&scc[0])
-                    .map(|d| d.refs.contains(&scc[0]))
+                    .get(scc[0].as_str())
+                    .map(|body| collect_refs(body).contains(scc[0].as_str()))
                     .unwrap_or(false)
         })
         .collect()
@@ -239,7 +277,7 @@ fn build_self_ref_chain(root: &Root, name: &str) -> Vec<(TextRange, String)> {
 
 fn build_cycle_chain(
     root: &Root,
-    symbols: &SymbolTable,
+    symbols: &SymbolTable<'_>,
     scc: &[String],
 ) -> Vec<(TextRange, String)> {
     let scc_set: IndexSet<&str> = scc.iter().map(|s| s.as_str()).collect();
@@ -251,7 +289,7 @@ fn build_cycle_chain(
         current: &str,
         start: &str,
         scc_set: &IndexSet<&str>,
-        symbols: &SymbolTable,
+        symbols: &SymbolTable<'_>,
         visited: &mut IndexSet<String>,
         path: &mut Vec<String>,
     ) -> bool {
@@ -261,8 +299,9 @@ fn build_cycle_chain(
         visited.insert(current.to_string());
         path.push(current.to_string());
 
-        if let Some(def_info) = symbols.get(current) {
-            for ref_name in &def_info.refs {
+        if let Some(body) = symbols.get(current) {
+            let refs = collect_refs(body);
+            for ref_name in &refs {
                 if scc_set.contains(ref_name.as_str())
                     && find_path(ref_name, start, scc_set, symbols, visited, path)
                 {

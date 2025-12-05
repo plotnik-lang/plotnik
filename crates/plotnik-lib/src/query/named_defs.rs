@@ -4,49 +4,16 @@
 //! 1. Collect all `Name = expr` definitions
 //! 2. Check that all `(UpperIdent)` references are defined
 
-use indexmap::{IndexMap, IndexSet};
-use rowan::TextRange;
+use indexmap::IndexMap;
 
 use crate::PassResult;
 use crate::diagnostics::Diagnostics;
-use crate::parser::{Expr, Ref, Root};
+use crate::parser::{Expr, Ref, Root, ast};
 
-#[derive(Debug, Clone)]
-pub struct SymbolTable {
-    defs: IndexMap<String, DefInfo>,
-}
+pub type SymbolTable<'src> = IndexMap<&'src str, ast::Expr>;
 
-#[derive(Debug, Clone)]
-pub struct DefInfo {
-    pub name: String,
-    pub range: TextRange,
-    pub refs: IndexSet<String>,
-}
-
-impl SymbolTable {
-    pub fn get(&self, name: &str) -> Option<&DefInfo> {
-        self.defs.get(name)
-    }
-
-    pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.defs.keys().map(|s| s.as_str())
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &DefInfo> {
-        self.defs.values()
-    }
-
-    pub fn len(&self) -> usize {
-        self.defs.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.defs.is_empty()
-    }
-}
-
-pub fn resolve(root: &Root) -> PassResult<SymbolTable> {
-    let mut defs = IndexMap::new();
+pub fn resolve<'src>(root: &Root, source: &'src str) -> PassResult<SymbolTable<'src>> {
+    let mut symbols: SymbolTable<'src> = IndexMap::new();
     let mut diagnostics = Diagnostics::new();
 
     // Pass 1: collect definitions
@@ -55,24 +22,20 @@ pub fn resolve(root: &Root) -> PassResult<SymbolTable> {
             continue;
         };
 
-        let name = name_token.text().to_string();
         let range = name_token.text_range();
+        let name = &source[range.start().into()..range.end().into()];
 
-        if defs.contains_key(&name) {
+        if symbols.contains_key(name) {
             diagnostics
                 .error(format!("duplicate definition: `{}`", name), range)
                 .emit();
             continue;
         }
 
-        let mut refs = IndexSet::new();
         if let Some(body) = def.body() {
-            collect_refs(&body, &mut refs);
+            symbols.insert(name, body);
         }
-        defs.insert(name.clone(), DefInfo { name, range, refs });
     }
-
-    let symbols = SymbolTable { defs };
 
     // Pass 2: check references
     for def in root.defs() {
@@ -89,52 +52,9 @@ pub fn resolve(root: &Root) -> PassResult<SymbolTable> {
     Ok((symbols, diagnostics))
 }
 
-fn collect_refs(expr: &Expr, refs: &mut IndexSet<String>) {
-    match expr {
-        Expr::Ref(r) => {
-            let Some(name_token) = r.name() else { return };
-            refs.insert(name_token.text().to_string());
-        }
-        Expr::NamedNode(node) => {
-            for child in node.children() {
-                collect_refs(&child, refs);
-            }
-        }
-        Expr::AltExpr(alt) => {
-            for branch in alt.branches() {
-                let Some(body) = branch.body() else { continue };
-                collect_refs(&body, refs);
-            }
-            // Parser wraps all alt children in Branch nodes
-            assert!(
-                alt.exprs().next().is_none(),
-                "named_defs: unexpected bare Expr in Alt (parser should wrap in Branch)"
-            );
-        }
-        Expr::SeqExpr(seq) => {
-            for child in seq.children() {
-                collect_refs(&child, refs);
-            }
-        }
-        Expr::CapturedExpr(cap) => {
-            let Some(inner) = cap.inner() else { return };
-            collect_refs(&inner, refs);
-        }
-        Expr::QuantifiedExpr(q) => {
-            let Some(inner) = q.inner() else { return };
-            collect_refs(&inner, refs);
-        }
-        Expr::FieldExpr(f) => {
-            let Some(value) = f.value() else { return };
-            collect_refs(&value, refs);
-        }
-        Expr::AnonymousNode(_) => {}
-    }
-}
-
 fn collect_reference_diagnostics(
     expr: &Expr,
-    symbols: &SymbolTable,
+    symbols: &SymbolTable<'_>,
     diagnostics: &mut Diagnostics,
 ) {
     match expr {
@@ -178,11 +98,11 @@ fn collect_reference_diagnostics(
     }
 }
 
-fn check_ref_diagnostic(r: &Ref, symbols: &SymbolTable, diagnostics: &mut Diagnostics) {
+fn check_ref_diagnostic(r: &Ref, symbols: &SymbolTable<'_>, diagnostics: &mut Diagnostics) {
     let Some(name_token) = r.name() else { return };
     let name = name_token.text();
 
-    if symbols.get(name).is_some() {
+    if symbols.contains_key(name) {
         return;
     }
 

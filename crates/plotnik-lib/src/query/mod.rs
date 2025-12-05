@@ -96,7 +96,7 @@ impl<'a> QueryBuilder<'a> {
 pub struct Query<'a> {
     source: &'a str,
     ast: Root,
-    symbols: SymbolTable,
+    symbols: SymbolTable<'a>,
     shape_cardinalities: HashMap<SyntaxNode, ShapeCardinality>,
     // Diagnostics per pass
     parse_diagnostics: Diagnostics,
@@ -125,7 +125,7 @@ impl<'a> Query<'a> {
             alt_kind::validate(&ast).expect("alt_kind::validate is infallible");
 
         let (symbols, resolve_diagnostics) =
-            named_defs::resolve(&ast).expect("named_defs::resolve is infallible");
+            named_defs::resolve(&ast, source).expect("named_defs::resolve is infallible");
 
         let ((), ref_cycle_diagnostics) =
             ref_cycles::validate(&ast, &symbols).expect("ref_cycles::validate is infallible");
@@ -159,7 +159,7 @@ impl<'a> Query<'a> {
         &self.ast
     }
 
-    pub fn symbols(&self) -> &SymbolTable {
+    pub fn symbols(&self) -> &SymbolTable<'a> {
         &self.symbols
     }
 
