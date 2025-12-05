@@ -51,11 +51,7 @@ pub fn resolve_lang(
 }
 
 pub fn parse_tree(source: &str, lang: Lang) -> tree_sitter::Tree {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(lang.inner())
-        .expect("failed to set language");
-    parser.parse(source, None).expect("failed to parse source")
+    lang.parse(source)
 }
 
 pub fn dump_source(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {

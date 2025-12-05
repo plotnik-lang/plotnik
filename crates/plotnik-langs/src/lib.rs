@@ -17,8 +17,8 @@ pub type Lang = Arc<dyn LangImpl>;
 pub trait LangImpl: Send + Sync {
     fn name(&self) -> &str;
 
-    /// Raw tree-sitter Language. You probably don't need this.
-    fn inner(&self) -> &Language;
+    /// Parse source code into a tree-sitter tree.
+    fn parse(&self, source: &str) -> tree_sitter::Tree;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Resolution                                                [Language API]
@@ -89,8 +89,12 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
         &self.name
     }
 
-    fn inner(&self) -> &Language {
-        &self.ts_lang
+    fn parse(&self, source: &str) -> tree_sitter::Tree {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&self.ts_lang)
+            .expect("failed to set language");
+        parser.parse(source, None).expect("failed to parse source")
     }
 
     fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId> {
@@ -300,34 +304,11 @@ mod tests {
     /// 1. The valid "end" sentinel node (anonymous, ID 0)
     /// 2. Any non-existent node
     ///
-    /// This test shows:
-    /// - The ambiguity in the raw tree-sitter API
-    /// - How our wrapper resolves it correctly
+    /// Our wrapper resolves this correctly.
     #[test]
     #[cfg(feature = "javascript")]
     fn tree_sitter_id_zero_ambiguity() {
         let lang = javascript();
-        let raw_lang = lang.inner();
-
-        // === Part 1: Understanding the problem ===
-
-        // ID 0 is the "end" sentinel node (anonymous)
-        assert_eq!(raw_lang.node_kind_for_id(0), Some("end"));
-        assert!(!raw_lang.node_kind_is_named(0));
-
-        // Tree-sitter returns 0 for BOTH valid "end" and non-existent nodes
-        let end_id = raw_lang.id_for_node_kind("end", false);
-        let fake_id = raw_lang.id_for_node_kind("totally_fake_node", false);
-        assert_eq!(end_id, 0, "Valid 'end' node returns 0");
-        assert_eq!(fake_id, 0, "Non-existent node also returns 0!");
-
-        // This ambiguity doesn't exist for named nodes (0 always = not found)
-        let fake_named = raw_lang.id_for_node_kind("fake_named", true);
-        assert_eq!(fake_named, 0, "Non-existent named node returns 0");
-        // And no named node has ID 0
-        assert!(!raw_lang.node_kind_is_named(0));
-
-        // === Part 2: Our wrapper's solution ===
 
         // For named nodes: 0 unambiguously means "not found"
         assert!(lang.resolve_node("fake_named", true).is_none());
@@ -344,59 +325,8 @@ mod tests {
             "Non-existent node should be Unresolved"
         );
 
-        // === Part 3: Field IDs don't have this problem ===
-
-        // Tree-sitter uses Option<NonZeroU16> for fields - clean API!
-        let name_field_id = raw_lang.field_id_for_name("name");
-        assert!(name_field_id.is_some(), "Field 'name' should exist");
-        assert!(name_field_id.unwrap().get() > 0, "Field IDs start at 1");
-        assert_eq!(raw_lang.field_id_for_name("fake_field"), None);
-
-        // Our wrapper preserves this cleanliness
+        // Our wrapper preserves field cleanliness
         assert!(lang.resolve_field("name").is_some());
         assert!(lang.resolve_field("fake_field").is_none());
-    }
-
-    /// Additional test showing the tree-sitter oddities in detail
-    #[test]
-    #[cfg(feature = "javascript")]
-    fn tree_sitter_api_roundtrip_quirks() {
-        let lang = javascript();
-        let raw_lang = lang.inner();
-
-        // Some nodes appear at multiple IDs!
-        // This happens when the same node type is used in different contexts
-        let mut id_to_names = std::collections::HashMap::<u16, Vec<(&str, bool)>>::new();
-
-        for id in 0..raw_lang.node_kind_count() as u16 {
-            if let Some(name) = raw_lang.node_kind_for_id(id) {
-                let is_named = raw_lang.node_kind_is_named(id);
-                id_to_names.entry(id).or_default().push((name, is_named));
-
-                // The roundtrip might NOT preserve the ID!
-                let resolved_id = raw_lang.id_for_node_kind(name, is_named);
-
-                // For example, "identifier" might be at both ID 1 and ID 46,
-                // but id_for_node_kind("identifier", true) returns only one of them
-                if resolved_id != id && name != "ERROR" {
-                    // This is normal - tree-sitter returns the first matching ID
-                    // when multiple IDs have the same (name, is_named) combination
-                }
-            }
-        }
-
-        // Verify our assumptions about ID 0
-        assert_eq!(id_to_names[&0], vec![("end", false)]);
-
-        // Field IDs are cleaner - they start at 1 (NonZeroU16)
-        assert!(raw_lang.field_name_for_id(0).is_none());
-
-        for fid in 1..=raw_lang.field_count() as u16 {
-            if let Some(name) = raw_lang.field_name_for_id(fid) {
-                // Field roundtrip is reliable
-                let resolved = raw_lang.field_id_for_name(name);
-                assert_eq!(resolved, std::num::NonZeroU16::new(fid));
-            }
-        }
     }
 }
