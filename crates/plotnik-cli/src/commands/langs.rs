@@ -10,9 +10,9 @@ pub fn run() {
 mod tests {
     use plotnik_langs::Lang;
 
-    fn smoke_test(lang: &dyn Lang, source: &str, expected_root: &str) {
+    fn smoke_test(lang: Lang, source: &str, expected_root: &str) {
         let mut parser = tree_sitter::Parser::new();
-        parser.set_language(lang.get_inner()).unwrap();
+        parser.set_language(lang.inner()).unwrap();
         let tree = parser.parse(source, None).unwrap();
         let root = tree.root_node();
         assert_eq!(root.kind(), expected_root);

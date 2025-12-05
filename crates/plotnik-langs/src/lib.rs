@@ -1,16 +1,24 @@
-use std::sync::LazyLock;
+use std::sync::Arc;
 
 use tree_sitter::Language;
 
 pub use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
 
+pub mod builtin;
+pub mod dynamic;
+
+pub use builtin::*;
+
+/// User-facing language type. Works with any language (static or dynamic).
+pub type Lang = Arc<dyn LangImpl>;
+
 /// Trait providing a unified facade for tree-sitter's Language API
 /// combined with our node type constraints.
-pub trait Lang: Send + Sync {
+pub trait LangImpl: Send + Sync {
     fn name(&self) -> &str;
 
     /// Raw tree-sitter Language. You probably don't need this.
-    fn get_inner(&self) -> &Language;
+    fn inner(&self) -> &Language;
 
     // ═══════════════════════════════════════════════════════════════════════
     // Resolution                                                [Language API]
@@ -39,7 +47,7 @@ pub trait Lang: Send + Sync {
 
     fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool;
     fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality>;
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &'static [u16];
+    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId];
     fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -47,27 +55,26 @@ pub trait Lang: Send + Sync {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality>;
-    fn valid_child_types(&self, node: NodeTypeId) -> &'static [u16];
+    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId];
     fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
-/// Static implementation of `Lang` with compile-time generated node types.
+/// Generic language implementation parameterized by node types.
+///
+/// This struct provides a single implementation of `LangImpl` that works with
+/// any `NodeTypes` implementation (static or dynamic).
 #[derive(Debug)]
-pub struct StaticLang {
-    pub name: &'static str,
-    inner: Language,
-    node_types: &'static StaticNodeTypes,
+pub struct LangInner<N: NodeTypes> {
+    name: String,
+    ts_lang: Language,
+    node_types: N,
 }
 
-impl StaticLang {
-    pub const fn new(
-        name: &'static str,
-        inner: Language,
-        node_types: &'static StaticNodeTypes,
-    ) -> Self {
+impl LangInner<&'static StaticNodeTypes> {
+    pub fn new_static(name: &str, ts_lang: Language, node_types: &'static StaticNodeTypes) -> Self {
         Self {
-            name,
-            inner,
+            name: name.to_owned(),
+            ts_lang,
             node_types,
         }
     }
@@ -77,17 +84,17 @@ impl StaticLang {
     }
 }
 
-impl Lang for StaticLang {
+impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
     fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
-    fn get_inner(&self) -> &Language {
-        &self.inner
+    fn inner(&self) -> &Language {
+        &self.ts_lang
     }
 
     fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId> {
-        let id = self.inner.id_for_node_kind(kind, named);
+        let id = self.ts_lang.id_for_node_kind(kind, named);
 
         // FIX: Disambiguate tree-sitter's ID 0 (could be "end" node or "not found")
         //
@@ -103,32 +110,26 @@ impl Lang for StaticLang {
         // For anonymous nodes, we must verify via reverse lookup.
         if id == 0 {
             if named {
-                // Named node with ID 0 = definitely not found
-                None
-            } else {
-                // Anonymous node with ID 0 = could be "end" or not found
-                // Check via reverse lookup
-                if self.inner.node_kind_for_id(0) == Some(kind) {
-                    Some(0) // It's the "end" node
-                } else {
-                    None // Not found
-                }
+                return None;
             }
-        } else {
-            Some(id)
+            if self.ts_lang.node_kind_for_id(0) == Some(kind) {
+                return Some(0);
+            }
+            return None;
         }
+        Some(id)
     }
 
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {
-        self.inner.field_id_for_name(name)
+        self.ts_lang.field_id_for_name(name)
     }
 
     fn is_supertype(&self, id: NodeTypeId) -> bool {
-        self.inner.node_kind_is_supertype(id)
+        self.ts_lang.node_kind_is_supertype(id)
     }
 
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16] {
-        self.inner.subtypes_for_supertype(supertype)
+        self.ts_lang.subtypes_for_supertype(supertype)
     }
 
     fn root(&self) -> Option<NodeTypeId> {
@@ -147,7 +148,7 @@ impl Lang for StaticLang {
         self.node_types.field_cardinality(node, field)
     }
 
-    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &'static [u16] {
+    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
         self.node_types.valid_field_types(node, field)
     }
 
@@ -159,291 +160,13 @@ impl Lang for StaticLang {
         self.node_types.children_cardinality(node)
     }
 
-    fn valid_child_types(&self, node: NodeTypeId) -> &'static [u16] {
+    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
         self.node_types.valid_child_types(node)
     }
 
     fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
         self.node_types.is_valid_child_type(node, child)
     }
-}
-
-macro_rules! define_langs {
-    (
-        $(
-            $fn_name:ident => {
-                feature: $feature:literal,
-                name: $name:literal,
-                ts_lang: $ts_lang:expr,
-                node_types_key: $node_types_key:literal,
-                names: [$($alias:literal),* $(,)?],
-                extensions: [$($ext:literal),* $(,)?] $(,)?
-            }
-        ),* $(,)?
-    ) => {
-        // Generate NodeTypes statics via proc macro
-        $(
-            #[cfg(feature = $feature)]
-            plotnik_macros::generate_node_types!($node_types_key);
-        )*
-
-        // Generate static Lang definitions with LazyLock
-        $(
-            #[cfg(feature = $feature)]
-            pub fn $fn_name() -> &'static dyn Lang {
-                paste::paste! {
-                    static LANG: LazyLock<StaticLang> = LazyLock::new(|| {
-                        StaticLang::new(
-                            $name,
-                            $ts_lang.into(),
-                            &[<$node_types_key:upper _NODE_TYPES>],
-                        )
-                    });
-                }
-                &*LANG
-            }
-        )*
-
-        pub fn from_name(s: &str) -> Option<&'static dyn Lang> {
-            match s.to_ascii_lowercase().as_str() {
-                $(
-                    #[cfg(feature = $feature)]
-                    $($alias)|* => Some($fn_name()),
-                )*
-                _ => None,
-            }
-        }
-
-        pub fn from_ext(ext: &str) -> Option<&'static dyn Lang> {
-            match ext.to_ascii_lowercase().as_str() {
-                $(
-                    #[cfg(feature = $feature)]
-                    $($ext)|* => Some($fn_name()),
-                )*
-                _ => None,
-            }
-        }
-
-        pub fn all() -> Vec<&'static dyn Lang> {
-            vec![
-                $(
-                    #[cfg(feature = $feature)]
-                    $fn_name(),
-                )*
-            ]
-        }
-    };
-}
-
-define_langs! {
-    bash => {
-        feature: "bash",
-        name: "bash",
-        ts_lang: tree_sitter_bash::LANGUAGE,
-        node_types_key: "bash",
-        names: ["bash", "sh", "shell"],
-        extensions: ["sh", "bash", "zsh"],
-    },
-    c => {
-        feature: "c",
-        name: "c",
-        ts_lang: tree_sitter_c::LANGUAGE,
-        node_types_key: "c",
-        names: ["c"],
-        extensions: ["c", "h"],
-    },
-    cpp => {
-        feature: "cpp",
-        name: "cpp",
-        ts_lang: tree_sitter_cpp::LANGUAGE,
-        node_types_key: "cpp",
-        names: ["cpp", "c++", "cxx", "cc"],
-        extensions: ["cpp", "cc", "cxx", "hpp", "hh", "hxx", "h++", "c++"],
-    },
-    csharp => {
-        feature: "csharp",
-        name: "c_sharp",
-        ts_lang: tree_sitter_c_sharp::LANGUAGE,
-        node_types_key: "csharp",
-        names: ["csharp", "c#", "cs", "c_sharp"],
-        extensions: ["cs"],
-    },
-    css => {
-        feature: "css",
-        name: "css",
-        ts_lang: tree_sitter_css::LANGUAGE,
-        node_types_key: "css",
-        names: ["css"],
-        extensions: ["css"],
-    },
-    elixir => {
-        feature: "elixir",
-        name: "elixir",
-        ts_lang: tree_sitter_elixir::LANGUAGE,
-        node_types_key: "elixir",
-        names: ["elixir", "ex"],
-        extensions: ["ex", "exs"],
-    },
-    go => {
-        feature: "go",
-        name: "go",
-        ts_lang: tree_sitter_go::LANGUAGE,
-        node_types_key: "go",
-        names: ["go", "golang"],
-        extensions: ["go"],
-    },
-    haskell => {
-        feature: "haskell",
-        name: "haskell",
-        ts_lang: tree_sitter_haskell::LANGUAGE,
-        node_types_key: "haskell",
-        names: ["haskell", "hs"],
-        extensions: ["hs", "lhs"],
-    },
-    hcl => {
-        feature: "hcl",
-        name: "hcl",
-        ts_lang: tree_sitter_hcl::LANGUAGE,
-        node_types_key: "hcl",
-        names: ["hcl", "terraform", "tf"],
-        extensions: ["hcl", "tf", "tfvars"],
-    },
-    html => {
-        feature: "html",
-        name: "html",
-        ts_lang: tree_sitter_html::LANGUAGE,
-        node_types_key: "html",
-        names: ["html", "htm"],
-        extensions: ["html", "htm"],
-    },
-    java => {
-        feature: "java",
-        name: "java",
-        ts_lang: tree_sitter_java::LANGUAGE,
-        node_types_key: "java",
-        names: ["java"],
-        extensions: ["java"],
-    },
-    javascript => {
-        feature: "javascript",
-        name: "javascript",
-        ts_lang: tree_sitter_javascript::LANGUAGE,
-        node_types_key: "javascript",
-        names: ["javascript", "js", "jsx", "ecmascript", "es"],
-        extensions: ["js", "mjs", "cjs", "jsx"],
-    },
-    json => {
-        feature: "json",
-        name: "json",
-        ts_lang: tree_sitter_json::LANGUAGE,
-        node_types_key: "json",
-        names: ["json"],
-        extensions: ["json"],
-    },
-    kotlin => {
-        feature: "kotlin",
-        name: "kotlin",
-        ts_lang: tree_sitter_kotlin::LANGUAGE,
-        node_types_key: "kotlin",
-        names: ["kotlin", "kt"],
-        extensions: ["kt", "kts"],
-    },
-    lua => {
-        feature: "lua",
-        name: "lua",
-        ts_lang: tree_sitter_lua::LANGUAGE,
-        node_types_key: "lua",
-        names: ["lua"],
-        extensions: ["lua"],
-    },
-    nix => {
-        feature: "nix",
-        name: "nix",
-        ts_lang: tree_sitter_nix::LANGUAGE,
-        node_types_key: "nix",
-        names: ["nix"],
-        extensions: ["nix"],
-    },
-    php => {
-        feature: "php",
-        name: "php",
-        ts_lang: tree_sitter_php::LANGUAGE_PHP,
-        node_types_key: "php",
-        names: ["php"],
-        extensions: ["php"],
-    },
-    python => {
-        feature: "python",
-        name: "python",
-        ts_lang: tree_sitter_python::LANGUAGE,
-        node_types_key: "python",
-        names: ["python", "py"],
-        extensions: ["py", "pyi", "pyw"],
-    },
-    ruby => {
-        feature: "ruby",
-        name: "ruby",
-        ts_lang: tree_sitter_ruby::LANGUAGE,
-        node_types_key: "ruby",
-        names: ["ruby", "rb"],
-        extensions: ["rb", "rake", "gemspec"],
-    },
-    rust => {
-        feature: "rust",
-        name: "rust",
-        ts_lang: tree_sitter_rust::LANGUAGE,
-        node_types_key: "rust",
-        names: ["rust", "rs"],
-        extensions: ["rs"],
-    },
-    scala => {
-        feature: "scala",
-        name: "scala",
-        ts_lang: tree_sitter_scala::LANGUAGE,
-        node_types_key: "scala",
-        names: ["scala"],
-        extensions: ["scala", "sc"],
-    },
-    solidity => {
-        feature: "solidity",
-        name: "solidity",
-        ts_lang: tree_sitter_solidity::LANGUAGE,
-        node_types_key: "solidity",
-        names: ["solidity", "sol"],
-        extensions: ["sol"],
-    },
-    swift => {
-        feature: "swift",
-        name: "swift",
-        ts_lang: tree_sitter_swift::LANGUAGE,
-        node_types_key: "swift",
-        names: ["swift"],
-        extensions: ["swift"],
-    },
-    typescript => {
-        feature: "typescript",
-        name: "typescript",
-        ts_lang: tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
-        node_types_key: "typescript",
-        names: ["typescript", "ts"],
-        extensions: ["ts", "mts", "cts"],
-    },
-    tsx => {
-        feature: "typescript",
-        name: "tsx",
-        ts_lang: tree_sitter_typescript::LANGUAGE_TSX,
-        node_types_key: "typescript_tsx",
-        names: ["tsx"],
-        extensions: ["tsx"],
-    },
-    yaml => {
-        feature: "yaml",
-        name: "yaml",
-        ts_lang: tree_sitter_yaml::LANGUAGE,
-        node_types_key: "yaml",
-        names: ["yaml", "yml"],
-        extensions: ["yaml", "yml"],
-    },
 }
 
 #[cfg(test)]
@@ -584,7 +307,7 @@ mod tests {
     #[cfg(feature = "javascript")]
     fn tree_sitter_id_zero_ambiguity() {
         let lang = javascript();
-        let raw_lang = lang.get_inner();
+        let raw_lang = lang.inner();
 
         // === Part 1: Understanding the problem ===
 
@@ -639,7 +362,7 @@ mod tests {
     #[cfg(feature = "javascript")]
     fn tree_sitter_api_roundtrip_quirks() {
         let lang = javascript();
-        let raw_lang = lang.get_inner();
+        let raw_lang = lang.inner();
 
         // Some nodes appear at multiple IDs!
         // This happens when the same node type is used in different contexts

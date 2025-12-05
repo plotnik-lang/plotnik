@@ -96,6 +96,36 @@ pub trait NodeTypes {
     fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool;
 }
 
+impl<T: NodeTypes + ?Sized> NodeTypes for &T {
+    fn root(&self) -> Option<NodeTypeId> {
+        (*self).root()
+    }
+    fn is_extra(&self, id: NodeTypeId) -> bool {
+        (*self).is_extra(id)
+    }
+    fn has_field(&self, node: NodeTypeId, field: NodeFieldId) -> bool {
+        (*self).has_field(node, field)
+    }
+    fn field_cardinality(&self, node: NodeTypeId, field: NodeFieldId) -> Option<Cardinality> {
+        (*self).field_cardinality(node, field)
+    }
+    fn valid_field_types(&self, node: NodeTypeId, field: NodeFieldId) -> &[NodeTypeId] {
+        (*self).valid_field_types(node, field)
+    }
+    fn is_valid_field_type(&self, node: NodeTypeId, field: NodeFieldId, child: NodeTypeId) -> bool {
+        (*self).is_valid_field_type(node, field, child)
+    }
+    fn children_cardinality(&self, node: NodeTypeId) -> Option<Cardinality> {
+        (*self).children_cardinality(node)
+    }
+    fn valid_child_types(&self, node: NodeTypeId) -> &[NodeTypeId] {
+        (*self).valid_child_types(node)
+    }
+    fn is_valid_child_type(&self, node: NodeTypeId, child: NodeTypeId) -> bool {
+        (*self).is_valid_child_type(node, child)
+    }
+}
+
 // ============================================================================
 // Static Analysis Layer (zero runtime init)
 // ============================================================================
