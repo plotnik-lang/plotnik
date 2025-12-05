@@ -20,30 +20,14 @@ pub trait LangImpl: Send + Sync {
     /// Parse source code into a tree-sitter tree.
     fn parse(&self, source: &str) -> tree_sitter::Tree;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Resolution                                                [Language API]
-    // ═══════════════════════════════════════════════════════════════════════
-
     fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId>;
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId>;
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Supertype info                                            [Language API]
-    // ═══════════════════════════════════════════════════════════════════════
 
     fn is_supertype(&self, node_type_id: NodeTypeId) -> bool;
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16];
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Root & Extras                                               [node_types]
-    // ═══════════════════════════════════════════════════════════════════════
-
     fn root(&self) -> Option<NodeTypeId>;
     fn is_extra(&self, node_type_id: NodeTypeId) -> bool;
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Field constraints                                           [node_types]
-    // ═══════════════════════════════════════════════════════════════════════
 
     fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool;
     fn field_cardinality(
@@ -62,10 +46,6 @@ pub trait LangImpl: Send + Sync {
         node_field_id: NodeFieldId,
         child: NodeTypeId,
     ) -> bool;
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Children constraints                                        [node_types]
-    // ═══════════════════════════════════════════════════════════════════════
 
     fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality>;
     fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId];
@@ -113,18 +93,9 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
     fn resolve_node(&self, kind: &str, named: bool) -> Option<NodeTypeId> {
         let id = self.ts_lang.id_for_node_kind(kind, named);
 
-        // FIX: Disambiguate tree-sitter's ID 0 (could be "end" node or "not found")
-        //
-        // Tree-sitter's id_for_node_kind has odd semantics:
-        // - Returns 0 for "not found"
-        // - BUT: ID 0 is also a valid ID for the anonymous "end" sentinel node
-        //
-        // This creates an ambiguity for anonymous nodes:
-        // - id_for_node_kind("end", false) -> 0 (valid)
-        // - id_for_node_kind("fake", false) -> 0 (not found)
-        //
-        // For named nodes, 0 is unambiguous since no named node has ID 0.
-        // For anonymous nodes, we must verify via reverse lookup.
+        // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
+        // For named nodes, 0 always means "not found". For anonymous, we disambiguate
+        // via reverse lookup.
         if id == 0 {
             if named {
                 return None;
@@ -327,16 +298,9 @@ mod tests {
         assert!(func_id.is_some());
     }
 
-    /// Demonstrates tree-sitter's odd ID semantics and how our wrapper fixes them.
-    ///
-    /// Tree-sitter's `id_for_node_kind` returns 0 for both:
-    /// 1. The valid "end" sentinel node (anonymous, ID 0)
-    /// 2. Any non-existent node
-    ///
-    /// Our wrapper resolves this correctly.
     #[test]
     #[cfg(feature = "javascript")]
-    fn tree_sitter_id_zero_ambiguity() {
+    fn tree_sitter_id_zero_disambiguation() {
         let lang = javascript();
 
         // For named nodes: 0 unambiguously means "not found"
@@ -349,10 +313,7 @@ mod tests {
         assert!(end_resolved.is_some(), "Valid 'end' node should resolve");
         assert_eq!(end_resolved, Some(0), "'end' should have ID 0");
 
-        assert!(
-            fake_resolved.is_none(),
-            "Non-existent node should be Unresolved"
-        );
+        assert!(fake_resolved.is_none(), "Non-existent node should be None");
 
         // Our wrapper preserves field cleanliness
         assert!(lang.resolve_field("name").is_some());
