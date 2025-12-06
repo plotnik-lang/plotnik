@@ -241,10 +241,12 @@ fn multiple_undefined() {
       |
     1 | (foo (X) (Y) (Z))
       |       ^
+
     error: undefined reference: `Y`
       |
     1 | (foo (X) (Y) (Z))
       |           ^
+
     error: undefined reference: `Z`
       |
     1 | (foo (X) (Y) (Z))

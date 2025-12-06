@@ -14,6 +14,7 @@ fn unexpected_token() {
       |
     1 | (identifier) ^^^ (string)
       |              ^^^
+
     error: unnamed definition must be last: add a name: `Name = (identifier)`
       |
     1 | (identifier) ^^^ (string)
@@ -98,10 +99,12 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       |         ^
+
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
+
     error: unnamed definition must be last: add a name: `Name = (a (b) @@@ (c))`
       |
     1 | (a (b) @@@ (c)) (d)
@@ -122,6 +125,7 @@ fn xml_tag_garbage() {
       |
     1 | <div>(identifier)</div>
       | ^^^^^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | <div>(identifier)</div>
@@ -158,14 +162,17 @@ fn predicate_unsupported() {
       |
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
+
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (a (#eq? @x "foo") b)
       |          ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a (#eq? @x "foo") b)
       |           ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a (#eq? @x "foo") b)
@@ -186,10 +193,12 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (identifier) #match? @name "test"
       |                       ^^^^
+
     error: unnamed definition must be last: add a name: `Name = (identifier)`
       |
     1 | (identifier) #match? @name "test"
@@ -208,10 +217,12 @@ fn predicate_in_tree() {
       |
     1 | (function #eq? @name "test")
       |           ^^^^
+
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (function #eq? @name "test")
       |                ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (function #eq? @name "test")
@@ -266,6 +277,7 @@ fn multiline_garbage_recovery() {
       |
     2 | ^^^
       | ^^^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     3 | b)
@@ -306,6 +318,7 @@ fn multiple_definitions_with_garbage_between() {
       |
     2 | ^^^
       | ^^^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     4 | $$$
@@ -326,10 +339,12 @@ fn alternation_recovery_to_capture() {
       |
     1 | [^^^ @name]
       |  ^^^
+
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | [^^^ @name]
       |      ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | [^^^ @name]
@@ -378,10 +393,12 @@ fn paren_close_inside_alternation() {
       |
     1 | [(a) ) (b)]
       |      ^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | [(a) ) (b)]
       |           ^
+
     error: unnamed definition must be last: add a name: `Name = [(a)`
       |
     1 | [(a) ) (b)]
@@ -400,10 +417,12 @@ fn bracket_close_inside_sequence() {
       |
     1 | {(a) ] (b)}
       |      ^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | {(a) ] (b)}
       |           ^
+
     error: unnamed definition must be last: add a name: `Name = {(a)`
       |
     1 | {(a) ] (b)}
@@ -422,10 +441,12 @@ fn paren_close_inside_sequence() {
       |
     1 | {(a) ) (b)}
       |      ^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | {(a) ) (b)}
       |           ^
+
     error: unnamed definition must be last: add a name: `Name = {(a)`
       |
     1 | {(a) ) (b)}
@@ -444,6 +465,7 @@ fn single_colon_type_annotation_followed_by_non_id() {
       |
     1 | (a) @x : (b)
       |        ^
+
     error: unnamed definition must be last: add a name: `Name = (a) @x`
       |
     1 | (a) @x : (b)

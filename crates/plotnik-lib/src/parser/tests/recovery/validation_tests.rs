@@ -145,6 +145,7 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
       |
     1 | [(Expr) (Statement)]
       |   ^^^^
+
     error: undefined reference: `Statement`
       |
     1 | [(Expr) (Statement)]
@@ -233,6 +234,7 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
       |
     1 | (first)
       | ^^^^^^^
+
     error: unnamed definition must be last: add a name: `Name = (second)`
       |
     2 | (second)
@@ -253,6 +255,7 @@ fn capture_space_after_dot_is_anchor() {
       |
     1 | (identifier) @foo . (other)
       | ^^^^^^^^^^^^^^^^^
+
     error: unnamed definition must be last: add a name: `Name = .`
       |
     1 | (identifier) @foo . (other)
@@ -515,6 +518,7 @@ fn capture_dotted_followed_by_field() {
     1 - (node) @foo.bar name: (other)
     1 + (node) @foo_bar name: (other)
       |
+
     error: unnamed definition must be last: add a name: `Name = (node) @foo.bar`
       |
     1 | (node) @foo.bar name: (other)
@@ -541,10 +545,12 @@ fn capture_space_after_dot_breaks_chain() {
     1 - (identifier) @foo. bar
     1 + (identifier) @foo_ bar
       |
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (identifier) @foo. bar
       |                    ^^^
+
     error: unnamed definition must be last: add a name: `Name = (identifier) @foo.`
       |
     1 | (identifier) @foo. bar
@@ -830,6 +836,7 @@ fn lowercase_branch_label() {
     2 -   left: (a)
     2 +   Left: (a)
       |
+
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     3 |   right: (b)
@@ -1006,6 +1013,7 @@ fn comma_in_alternation() {
     1 - [(a), (b), (c)]
     1 + [(a) (b), (c)]
       |
+
     error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
@@ -1056,6 +1064,7 @@ fn pipe_in_alternation() {
     1 - [(a) | (b) | (c)]
     1 + [(a)  (b) | (c)]
       |
+
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
@@ -1108,6 +1117,7 @@ fn pipe_in_tree() {
     1 - (a | b)
     1 + (a  b)
       |
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a | b)
@@ -1192,6 +1202,7 @@ fn field_equals_typo_no_expression() {
     1 - (call name=)
     1 + (call name:)
       |
+
     error: expected expression: expected expression after field name
       |
     1 | (call name=)
@@ -1291,18 +1302,22 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       | ^
+
     error: unexpected token: expected ':' to separate field name from its value
       |
     1 | @val : string
       |     ^
+
     error: expected expression: expected expression after field name
       |
     1 | @val : string
       |      ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @val : string
       |        ^^^^^^
+
     error: unnamed definition must be last: add a name: `Name = val`
       |
     1 | @val : string

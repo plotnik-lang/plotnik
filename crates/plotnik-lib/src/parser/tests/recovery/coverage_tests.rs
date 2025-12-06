@@ -135,6 +135,7 @@ fn named_def_missing_equals_with_garbage() {
       |
     1 | Expr ^^^ (identifier)
       | ^^^^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr ^^^ (identifier)
@@ -156,6 +157,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
       |
     1 | Broken ^^^
       | ^^^^^^
+
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Broken ^^^

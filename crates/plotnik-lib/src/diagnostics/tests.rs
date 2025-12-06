@@ -237,6 +237,7 @@ fn printer_multiple_diagnostics() {
       |
     1 | hello world!
       | ^^^^^
+
     error: undefined reference: `second error`
       |
     1 | hello world!

@@ -152,12 +152,14 @@ fn type_annotation_invalid_token_after() {
       |
     1 | (identifier) @name :: (
       |                       ^
+
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (identifier) @name :: (
       |                       -^
       |                       |
       |                       tree started here
+
     error: unnamed definition must be last: add a name: `Name = (identifier) @name ::`
       |
     1 | (identifier) @name :: (
@@ -224,6 +226,7 @@ fn bare_capture_at_root() {
       |
     1 | @name
       | ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @name
@@ -244,6 +247,7 @@ fn capture_at_start_of_alternation() {
       |
     1 | [@x (a)]
       |  ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | [@x (a)]
@@ -264,10 +268,12 @@ fn mixed_valid_invalid_captures() {
       |
     1 | (a) @ok @ @name
       |         ^
+
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a) @ok @ @name
       |            ^^^^
+
     error: unnamed definition must be last: add a name: `Name = (a) @ok`
       |
     1 | (a) @ok @ @name
@@ -294,6 +300,7 @@ fn field_equals_typo_missing_value() {
     1 - (call name = )
     1 + (call name : )
       |
+
     error: expected expression: expected expression after field name
       |
     1 | (call name = )
@@ -318,6 +325,7 @@ fn lowercase_branch_label_missing_expression() {
     1 - [label:]
     1 + [Label:]
       |
+
     error: expected expression: expected expression after branch label
       |
     1 | [label:]

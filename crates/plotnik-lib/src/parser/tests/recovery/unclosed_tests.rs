@@ -197,6 +197,7 @@ fn unclosed_double_quote_string() {
       |
     1 | (call "foo)
       |       ^^^^^
+
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call "foo)
@@ -217,6 +218,7 @@ fn unclosed_single_quote_string() {
       |
     1 | (call 'foo)
       |       ^^^^^
+
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call 'foo)

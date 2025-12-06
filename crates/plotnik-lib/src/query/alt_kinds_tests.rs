@@ -91,6 +91,7 @@ fn multiple_mixed_alternations() {
       |       -      ^^^
       |       |
       |       tagged branch here
+
     error: mixed tagged and untagged branches in alternation
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])

@@ -82,7 +82,7 @@ impl<'a> DiagnosticsPrinter<'a> {
             }
 
             if i > 0 {
-                w.write_char('\n')?;
+                w.write_str("\n\n")?;
             }
             write!(w, "{}", renderer.render(&report))?;
         }
