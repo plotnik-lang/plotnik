@@ -104,11 +104,6 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
-
-    error: unnamed definition must be last: add a name: `Name = (a (b) @@@ (c))`
-      |
-    1 | (a (b) @@@ (c)) (d)
-      | ^^^^^^^^^^^^^^^
     ");
 }
 

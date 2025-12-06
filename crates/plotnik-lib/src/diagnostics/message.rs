@@ -78,6 +78,34 @@ impl DiagnosticKind {
         self < other
     }
 
+    /// Structural errors are Unclosed* - they cause cascading errors but
+    /// should be suppressed by root-cause errors at the same position.
+    pub fn is_structural_error(&self) -> bool {
+        matches!(
+            self,
+            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation
+        )
+    }
+
+    /// Root cause errors - user omitted something required.
+    /// These suppress structural errors at the same position.
+    pub fn is_root_cause_error(&self) -> bool {
+        matches!(
+            self,
+            Self::ExpectedExpression
+                | Self::ExpectedTypeName
+                | Self::ExpectedCaptureName
+                | Self::ExpectedFieldName
+                | Self::ExpectedSubtype
+        )
+    }
+
+    /// Consequence errors - often caused by earlier parse errors.
+    /// These get suppressed when any root-cause or structural error exists.
+    pub fn is_consequence_error(&self) -> bool {
+        matches!(self, Self::UnnamedDefNotLast)
+    }
+
     /// Base message for this diagnostic kind, used when no custom message is provided.
     pub fn fallback_message(&self) -> &'static str {
         match self {

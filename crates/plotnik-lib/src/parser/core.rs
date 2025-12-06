@@ -370,23 +370,27 @@ impl<'src> Parser<'src> {
         self.delimiter_stack.pop()
     }
 
-    pub(super) fn error_with_related(
+    /// Error for unclosed delimiters - uses full span from opening to current position.
+    /// This enables proper cascading error suppression.
+    pub(super) fn error_unclosed_delimiter(
         &mut self,
         kind: DiagnosticKind,
         message: impl Into<String>,
         related_msg: impl Into<String>,
-        related_range: TextRange,
+        open_range: TextRange,
     ) {
-        let range = self.current_span();
-        let pos = range.start();
+        let current = self.current_span();
+        let pos = current.start();
         if self.last_diagnostic_pos == Some(pos) {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
+        // Full span from opening delimiter to current position for suppression
+        let full_range = TextRange::new(open_range.start(), current.end());
         self.diagnostics
-            .report(kind, range)
+            .report(kind, full_range)
             .message(message)
-            .related_to(related_msg, related_range)
+            .related_to(related_msg, open_range)
             .emit();
     }
 

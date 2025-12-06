@@ -152,18 +152,6 @@ fn type_annotation_invalid_token_after() {
       |
     1 | (identifier) @name :: (
       |                       ^
-
-    error: unclosed tree: unclosed tree; expected ')'
-      |
-    1 | (identifier) @name :: (
-      |                       -^
-      |                       |
-      |                       tree started here
-
-    error: unnamed definition must be last: add a name: `Name = (identifier) @name ::`
-      |
-    1 | (identifier) @name :: (
-      | ^^^^^^^^^^^^^^^^^^^^^
     ");
 }
 

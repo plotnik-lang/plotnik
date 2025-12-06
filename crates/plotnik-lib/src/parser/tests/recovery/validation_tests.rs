@@ -1317,10 +1317,5 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       |        ^^^^^^
-
-    error: unnamed definition must be last: add a name: `Name = val`
-      |
-    1 | @val : string
-      |  ^^^
     ");
 }

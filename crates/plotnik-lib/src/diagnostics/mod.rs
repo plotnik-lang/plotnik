@@ -81,8 +81,10 @@ impl Diagnostics {
 
     /// Returns diagnostics with cascading errors suppressed.
     ///
-    /// Suppression rule: when a higher-priority diagnostic's span contains
-    /// a lower-priority diagnostic's span, the lower-priority one is suppressed.
+    /// Suppression rules:
+    /// 1. Containment: when a higher-priority span strictly contains another, suppress the inner
+    /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
+    /// 3. Consequence errors (UnnamedDefNotLast) suppressed when any primary error exists
     pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
         if self.messages.is_empty() {
             return Vec::new();
@@ -90,16 +92,44 @@ impl Diagnostics {
 
         let mut suppressed = vec![false; self.messages.len()];
 
+        // Rule 3: Suppress consequence errors if any primary error exists
+        let has_primary_error = self
+            .messages
+            .iter()
+            .any(|m| m.kind.is_root_cause_error() || m.kind.is_structural_error());
+        if has_primary_error {
+            for (i, msg) in self.messages.iter().enumerate() {
+                if msg.kind.is_consequence_error() {
+                    suppressed[i] = true;
+                }
+            }
+        }
+
         // O(n²) but n is typically small (< 100 diagnostics)
-        for (i, outer) in self.messages.iter().enumerate() {
-            for (j, inner) in self.messages.iter().enumerate() {
-                if i == j || suppressed[j] {
+        for (i, a) in self.messages.iter().enumerate() {
+            for (j, b) in self.messages.iter().enumerate() {
+                if i == j || suppressed[i] || suppressed[j] {
                     continue;
                 }
 
-                // Check if outer contains inner and has higher priority
-                if span_contains(outer.range, inner.range) && outer.kind.suppresses(&inner.kind) {
+                // Rule 1: Strict containment (different start positions)
+                // The containing span suppresses the contained span
+                if span_strictly_contains(a.range, b.range) && a.kind.suppresses(&b.kind) {
                     suppressed[j] = true;
+                    continue;
+                }
+
+                // Rule 2: Same start position
+                if a.range.start() == b.range.start() {
+                    // Root cause errors (Expected*) suppress structural errors (Unclosed*)
+                    if a.kind.is_root_cause_error() && b.kind.is_structural_error() {
+                        suppressed[j] = true;
+                        continue;
+                    }
+                    // Otherwise, fall back to normal priority (lower discriminant wins)
+                    if a.kind.suppresses(&b.kind) {
+                        suppressed[j] = true;
+                    }
                 }
             }
         }
@@ -171,7 +201,7 @@ impl<'a> DiagnosticBuilder<'a> {
     }
 }
 
-/// Check if outer span fully contains inner span.
-fn span_contains(outer: TextRange, inner: TextRange) -> bool {
-    outer.start() <= inner.start() && inner.end() <= outer.end()
+/// Check if outer span strictly contains inner span (different start positions).
+fn span_strictly_contains(outer: TextRange, inner: TextRange) -> bool {
+    outer.start() < inner.start() && inner.end() <= outer.end()
 }

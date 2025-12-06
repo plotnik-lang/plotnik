@@ -383,9 +383,9 @@ fn filtered_suppresses_lower_priority_contained() {
 }
 
 #[test]
-fn filtered_does_not_suppress_higher_priority() {
+fn filtered_consequence_suppressed_by_structural() {
     let mut diagnostics = Diagnostics::new();
-    // Lower priority error (UnnamedDefNotLast) cannot suppress higher priority (UnclosedTree)
+    // Consequence error (UnnamedDefNotLast) suppressed when structural error (UnclosedTree) exists
     diagnostics
         .report(
             DiagnosticKind::UnnamedDefNotLast,
@@ -400,8 +400,9 @@ fn filtered_does_not_suppress_higher_priority() {
         .emit();
 
     let filtered = diagnostics.filtered();
-    // Both should remain - lower priority cannot suppress higher
-    assert_eq!(filtered.len(), 2);
+    // Only UnclosedTree remains - consequence errors suppressed when primary errors exist
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
 }
 
 #[test]

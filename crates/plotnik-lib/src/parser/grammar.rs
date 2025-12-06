@@ -299,7 +299,12 @@ impl Parser<'_> {
                          (caller must push delimiter before calling)"
                     )
                 });
-                self.error_with_related(kind, msg, format!("{construct} started here"), open.span);
+                self.error_unclosed_delimiter(
+                    kind,
+                    msg,
+                    format!("{construct} started here"),
+                    open.span,
+                );
                 break;
             }
             if self.has_fatal_error() {
@@ -355,7 +360,7 @@ impl Parser<'_> {
                          (caller must push delimiter before calling)"
                     )
                 });
-                self.error_with_related(
+                self.error_unclosed_delimiter(
                     DiagnosticKind::UnclosedAlternation,
                     msg,
                     "alternation started here",

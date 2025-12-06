@@ -13,7 +13,7 @@ fn missing_paren() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (identifier
-      | -          ^
+      | -^^^^^^^^^^
       | |
       | tree started here
     ");
@@ -31,7 +31,7 @@ fn missing_bracket() {
     error: unclosed alternation: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
-      | -                     ^
+      | -^^^^^^^^^^^^^^^^^^^^^
       | |
       | alternation started here
     ");
@@ -49,7 +49,7 @@ fn missing_brace() {
     error: unclosed sequence: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      | -       ^
+      | -^^^^^^^
       | |
       | sequence started here
     ");
@@ -67,7 +67,7 @@ fn nested_unclosed() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c)
-      |    -     ^
+      |    -^^^^^
       |    |
       |    tree started here
     ");
@@ -85,7 +85,7 @@ fn deeply_nested_unclosed() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
-      |          - ^
+      |          -^
       |          |
       |          tree started here
     ");
@@ -103,7 +103,7 @@ fn unclosed_alternation_nested() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | [(a) (b
-      |      - ^
+      |      -^
       |      |
       |      tree started here
     ");
@@ -137,10 +137,12 @@ fn unclosed_tree_shows_open_location() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed tree: unclosed tree; expected ')'
       |
-    1 | (call
-      | - tree started here
-    2 |     (identifier)
-      |                 ^
+    1 |   (call
+      |   ^ tree started here
+      |  _|
+      | |
+    2 | |     (identifier)
+      | |_________________^
     ");
 }
 
@@ -157,11 +159,13 @@ fn unclosed_alternation_shows_open_location() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed alternation: unclosed alternation; expected ']'
       |
-    1 | [
-      | - alternation started here
-    2 |     (a)
-    3 |     (b)
-      |        ^
+    1 |   [
+      |   ^ alternation started here
+      |  _|
+      | |
+    2 | |     (a)
+    3 | |     (b)
+      | |________^
     ");
 }
 
@@ -178,11 +182,13 @@ fn unclosed_sequence_shows_open_location() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: unclosed sequence: unclosed sequence; expected '}'
       |
-    1 | {
-      | - sequence started here
-    2 |     (a)
-    3 |     (b)
-      |        ^
+    1 |   {
+      |   ^ sequence started here
+      |  _|
+      | |
+    2 | |     (a)
+    3 | |     (b)
+      | |________^
     ");
 }
 
@@ -193,15 +199,10 @@ fn unclosed_double_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | (call "foo)
-      |       ^^^^^
-
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call "foo)
-      | -          ^
+      | -^^^^^^^^^^
       | |
       | tree started here
     "#);
@@ -214,15 +215,10 @@ fn unclosed_single_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | (call 'foo)
-      |       ^^^^^
-
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call 'foo)
-      | -          ^
+      | -^^^^^^^^^^
       | |
       | tree started here
     ");
