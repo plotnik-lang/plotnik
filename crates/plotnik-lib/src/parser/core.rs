@@ -6,7 +6,7 @@ use super::ast::Root;
 use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
 
 use crate::Error;
 
@@ -254,22 +254,25 @@ impl<'src> Parser<'src> {
         if self.eat(kind) {
             return true;
         }
-        self.error(format!("expected {}", what));
+        self.error(
+            DiagnosticKind::UnexpectedToken,
+            format!("expected {}", what),
+        );
         false
     }
 
-    pub(super) fn error(&mut self, message: impl Into<String>) {
+    pub(super) fn error(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
         let range = self.current_span();
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
-        self.diagnostics.error(message, range).emit();
+        self.diagnostics.report(kind, range).message(message).emit();
     }
 
-    pub(super) fn error_and_bump(&mut self, message: &str) {
-        self.error(message);
+    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error(kind, message);
         if !self.eof() {
             self.start_node(SyntaxKind::Error);
             self.bump();
@@ -278,14 +281,19 @@ impl<'src> Parser<'src> {
     }
 
     #[allow(dead_code)]
-    pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
+    pub(super) fn error_recover(
+        &mut self,
+        kind: DiagnosticKind,
+        message: &str,
+        recovery: TokenSet,
+    ) {
         if self.at_set(recovery) || self.should_stop() {
-            self.error(message);
+            self.error(kind, message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
-        self.error(message);
+        self.error(kind, message);
         while !self.at_set(recovery) && !self.should_stop() {
             self.bump();
         }
@@ -354,6 +362,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn error_with_related(
         &mut self,
+        kind: DiagnosticKind,
         message: impl Into<String>,
         related_msg: impl Into<String>,
         related_range: TextRange,
@@ -365,7 +374,8 @@ impl<'src> Parser<'src> {
         }
         self.last_diagnostic_pos = Some(pos);
         self.diagnostics
-            .error(message, range)
+            .report(kind, range)
+            .message(message)
             .related_to(related_msg, related_range)
             .emit();
     }
@@ -381,6 +391,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn error_with_fix(
         &mut self,
+        kind: DiagnosticKind,
         range: TextRange,
         message: impl Into<String>,
         fix_description: impl Into<String>,
@@ -392,7 +403,8 @@ impl<'src> Parser<'src> {
         }
         self.last_diagnostic_pos = Some(pos);
         self.diagnostics
-            .error(message, range)
+            .report(kind, range)
+            .message(message)
             .fix(fix_description, fix_replacement)
             .emit();
     }

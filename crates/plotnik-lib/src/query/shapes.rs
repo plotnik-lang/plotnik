@@ -11,6 +11,7 @@ use super::Query;
 use super::invariants::{
     ensure_capture_has_inner, ensure_quantifier_has_inner, ensure_ref_has_name,
 };
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxNode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -116,13 +117,11 @@ impl Query<'_> {
                 .unwrap_or_else(|| "field".to_string());
 
             self.shapes_diagnostics
-                .error(
-                    format!(
-                        "field `{}` value must match a single node, not a sequence",
-                        field_name
-                    ),
-                    value.text_range(),
-                )
+                .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+                .message(format!(
+                    "field `{}` value must match a single node, not a sequence",
+                    field_name
+                ))
                 .emit();
         }
 

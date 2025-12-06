@@ -197,10 +197,6 @@ fn named_def_missing_equals() {
       |
     1 | Expr (identifier)
       | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = Expr`
-      |
-    1 | Expr (identifier)
-      | ^^^^ unnamed definition must be last in file; add a name: `Name = Expr`
     ");
 }
 

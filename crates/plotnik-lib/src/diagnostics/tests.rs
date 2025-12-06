@@ -9,7 +9,36 @@ fn severity_display() {
 }
 
 #[test]
-fn error_builder() {
+fn report_with_default_message() {
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            DiagnosticKind::ExpectedTypeName,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .emit();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics.has_errors());
+}
+
+#[test]
+fn report_with_custom_message() {
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            DiagnosticKind::ExpectedTypeName,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("expected type name after '::' (e.g., ::MyType)")
+        .emit();
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics.has_errors());
+}
+
+#[test]
+fn error_builder_legacy() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .error("test error", TextRange::new(0.into(), 5.into()))
@@ -17,26 +46,17 @@ fn error_builder() {
 
     assert_eq!(diagnostics.len(), 1);
     assert!(diagnostics.has_errors());
-    assert!(!diagnostics.has_warnings());
-}
-
-#[test]
-fn warning_builder() {
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .warning("test warning", TextRange::new(0.into(), 5.into()))
-        .emit();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert!(!diagnostics.has_errors());
-    assert!(diagnostics.has_warnings());
 }
 
 #[test]
 fn builder_with_related() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("primary", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("primary")
         .related_to("related info", TextRange::new(6.into(), 10.into()))
         .emit();
 
@@ -56,7 +76,11 @@ fn builder_with_related() {
 fn builder_with_fix() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("fixable", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::InvalidFieldEquals,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("fixable")
         .fix("apply this fix", "fixed")
         .emit();
 
@@ -79,7 +103,11 @@ fn builder_with_fix() {
 fn builder_with_all_options() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("main error", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("main error")
         .related_to("see also", TextRange::new(6.into(), 11.into()))
         .related_to("and here", TextRange::new(12.into(), 17.into()))
         .fix("try this", "HELLO")
@@ -107,7 +135,11 @@ fn builder_with_all_options() {
 fn printer_colored() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("test", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::EmptyTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("test")
         .emit();
 
     let result = diagnostics.printer("hello").colored(true).render();
@@ -126,7 +158,11 @@ fn printer_empty_diagnostics() {
 fn printer_with_path() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("test error", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("test error")
         .emit();
 
     let result = diagnostics.printer("hello world").path("test.pql").render();
@@ -143,7 +179,11 @@ fn printer_with_path() {
 fn printer_zero_width_span() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("zero width error", TextRange::empty(0.into()))
+        .report(
+            DiagnosticKind::ExpectedExpression,
+            TextRange::empty(0.into()),
+        )
+        .message("zero width error")
         .emit();
 
     let result = diagnostics.printer("hello").render();
@@ -159,7 +199,11 @@ fn printer_zero_width_span() {
 fn printer_related_zero_width() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("primary", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("primary")
         .related_to("zero width related", TextRange::empty(6.into()))
         .emit();
 
@@ -178,10 +222,18 @@ fn printer_related_zero_width() {
 fn printer_multiple_diagnostics() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("first error", TextRange::new(0.into(), 5.into()))
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .message("first error")
         .emit();
     diagnostics
-        .error("second error", TextRange::new(6.into(), 10.into()))
+        .report(
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(6.into(), 10.into()),
+        )
+        .message("second error")
         .emit();
 
     let result = diagnostics.printer("hello world!").render();
@@ -198,35 +250,187 @@ fn printer_multiple_diagnostics() {
 }
 
 #[test]
-fn printer_warning() {
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .warning("a warning", TextRange::new(0.into(), 5.into()))
-        .emit();
-
-    let result = diagnostics.printer("hello").render();
-    insta::assert_snapshot!(result, @r"
-    warning: a warning
-      |
-    1 | hello
-      | ^^^^^ a warning
-    ");
-}
-
-#[test]
 fn diagnostics_collection_methods() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .error("error", TextRange::empty(0.into()))
+        .report(DiagnosticKind::UnclosedTree, TextRange::empty(0.into()))
         .emit();
     diagnostics
-        .warning("warning", TextRange::empty(1.into()))
+        .report(
+            DiagnosticKind::UndefinedReference,
+            TextRange::empty(1.into()),
+        )
         .emit();
 
     assert!(!diagnostics.is_empty());
     assert_eq!(diagnostics.len(), 2);
     assert!(diagnostics.has_errors());
-    assert!(diagnostics.has_warnings());
-    assert_eq!(diagnostics.error_count(), 1);
-    assert_eq!(diagnostics.warning_count(), 1);
+    assert_eq!(diagnostics.error_count(), 2);
+}
+
+#[test]
+fn diagnostic_kind_default_severity() {
+    assert_eq!(
+        DiagnosticKind::UnclosedTree.default_severity(),
+        Severity::Error
+    );
+    assert_eq!(
+        DiagnosticKind::UnnamedDefNotLast.default_severity(),
+        Severity::Error
+    );
+}
+
+#[test]
+fn diagnostic_kind_suppression_order() {
+    // Higher priority (earlier in enum) suppresses lower priority (later in enum)
+    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnnamedDefNotLast));
+    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UndefinedReference));
+    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::UnnamedDefNotLast));
+
+    // Same kind doesn't suppress itself
+    assert!(!DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnclosedTree));
+
+    // Lower priority doesn't suppress higher priority
+    assert!(!DiagnosticKind::UnnamedDefNotLast.suppresses(&DiagnosticKind::UnclosedTree));
+}
+
+#[test]
+fn diagnostic_kind_default_messages() {
+    assert_eq!(
+        DiagnosticKind::UnclosedTree.default_message(),
+        "unclosed tree; expected ')'"
+    );
+    assert_eq!(
+        DiagnosticKind::UnclosedSequence.default_message(),
+        "unclosed sequence; expected '}'"
+    );
+    assert_eq!(
+        DiagnosticKind::UnclosedAlternation.default_message(),
+        "unclosed alternation; expected ']'"
+    );
+    assert_eq!(
+        DiagnosticKind::ExpectedExpression.default_message(),
+        "expected expression"
+    );
+}
+
+// === Filtering/suppression tests ===
+
+#[test]
+fn filtered_no_suppression_disjoint_spans() {
+    let mut diagnostics = Diagnostics::new();
+    // Two errors at different positions - both should show
+    diagnostics
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .emit();
+    diagnostics
+        .report(
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(10.into(), 15.into()),
+        )
+        .emit();
+
+    let filtered = diagnostics.filtered();
+    assert_eq!(filtered.len(), 2);
+}
+
+#[test]
+fn filtered_suppresses_lower_priority_contained() {
+    let mut diagnostics = Diagnostics::new();
+    // Higher priority error (UnclosedTree) contains lower priority (UnnamedDefNotLast)
+    diagnostics
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 20.into()),
+        )
+        .emit();
+    diagnostics
+        .report(
+            DiagnosticKind::UnnamedDefNotLast,
+            TextRange::new(5.into(), 15.into()),
+        )
+        .emit();
+
+    let filtered = diagnostics.filtered();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
+}
+
+#[test]
+fn filtered_does_not_suppress_higher_priority() {
+    let mut diagnostics = Diagnostics::new();
+    // Lower priority error (UnnamedDefNotLast) cannot suppress higher priority (UnclosedTree)
+    diagnostics
+        .report(
+            DiagnosticKind::UnnamedDefNotLast,
+            TextRange::new(0.into(), 20.into()),
+        )
+        .emit();
+    diagnostics
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(5.into(), 15.into()),
+        )
+        .emit();
+
+    let filtered = diagnostics.filtered();
+    // Both should remain - lower priority cannot suppress higher
+    assert_eq!(filtered.len(), 2);
+}
+
+#[test]
+fn filtered_same_span_higher_priority_wins() {
+    let mut diagnostics = Diagnostics::new();
+    // Two errors at exact same span
+    diagnostics
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 10.into()),
+        )
+        .emit();
+    diagnostics
+        .report(
+            DiagnosticKind::UnnamedDefNotLast,
+            TextRange::new(0.into(), 10.into()),
+        )
+        .emit();
+
+    let filtered = diagnostics.filtered();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
+}
+
+#[test]
+fn filtered_empty_diagnostics() {
+    let diagnostics = Diagnostics::new();
+    let filtered = diagnostics.filtered();
+    assert!(filtered.is_empty());
+}
+
+#[test]
+fn render_filtered() {
+    let mut diagnostics = Diagnostics::new();
+    // Add overlapping errors where one should be suppressed
+    diagnostics
+        .report(
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 20.into()),
+        )
+        .message("unclosed tree")
+        .emit();
+    diagnostics
+        .report(
+            DiagnosticKind::UnnamedDefNotLast,
+            TextRange::new(5.into(), 15.into()),
+        )
+        .message("unnamed def")
+        .emit();
+
+    let result = diagnostics.render_filtered("(function_declaration");
+    // Should only show the unclosed tree error
+    assert!(result.contains("unclosed tree"));
+    assert!(!result.contains("unnamed def"));
 }

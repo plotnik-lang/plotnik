@@ -194,10 +194,6 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       | ^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier)`
-    error: unnamed definition must be last in file; add a name: `Name = name`
-      |
-    1 | (identifier) #match? @name "test"
-      |                       ^^^^ unnamed definition must be last in file; add a name: `Name = name`
     "#);
 }
 

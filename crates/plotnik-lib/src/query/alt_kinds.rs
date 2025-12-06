@@ -9,6 +9,7 @@ use super::Query;
 use super::invariants::{
     assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
 };
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AltExpr, AltKind, Branch, Expr};
 
 impl Query<'_> {
@@ -78,10 +79,8 @@ impl Query<'_> {
         let untagged_range = branch_range(untagged_branch);
 
         self.alt_kind_diagnostics
-            .error(
-                "mixed tagged and untagged branches in alternation",
-                untagged_range,
-            )
+            .report(DiagnosticKind::MixedAltBranches, untagged_range)
+            .message("mixed tagged and untagged branches in alternation")
             .related_to("tagged branch here", tagged_range)
             .emit();
     }

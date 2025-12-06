@@ -139,10 +139,6 @@ fn named_def_missing_equals_with_garbage() {
       |
     1 | Expr ^^^ (identifier)
       |      ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
-    error: unnamed definition must be last in file; add a name: `Name = Expr`
-      |
-    1 | Expr ^^^ (identifier)
-      | ^^^^ unnamed definition must be last in file; add a name: `Name = Expr`
     "#);
 }
 

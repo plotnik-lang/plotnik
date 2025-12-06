@@ -6,7 +6,7 @@ mod tests;
 
 use rowan::TextRange;
 
-pub use message::Severity;
+pub use message::{DiagnosticKind, Severity};
 pub use printer::DiagnosticsPrinter;
 
 use message::{DiagnosticMessage, Fix, RelatedInfo};
@@ -29,17 +29,29 @@ impl Diagnostics {
         }
     }
 
-    pub fn error(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
+    /// Create a diagnostic with the given kind and span.
+    ///
+    /// Uses the kind's default message. Call `.message()` on the builder to override.
+    pub fn report(&mut self, kind: DiagnosticKind, range: TextRange) -> DiagnosticBuilder<'_> {
         DiagnosticBuilder {
             diagnostics: self,
-            message: DiagnosticMessage::error(range, msg),
+            message: DiagnosticMessage::with_default_message(kind, range),
         }
     }
 
+    /// Create an error diagnostic (legacy API, prefer `report()`).
+    pub fn error(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
+        DiagnosticBuilder {
+            diagnostics: self,
+            message: DiagnosticMessage::new(DiagnosticKind::UnexpectedToken, range, msg),
+        }
+    }
+
+    /// Create a warning diagnostic (legacy API, prefer `report()`).
     pub fn warning(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
         DiagnosticBuilder {
             diagnostics: self,
-            message: DiagnosticMessage::warning(range, msg),
+            message: DiagnosticMessage::new(DiagnosticKind::UnexpectedToken, range, msg),
         }
     }
 
@@ -67,8 +79,55 @@ impl Diagnostics {
         self.messages.iter().filter(|d| d.is_warning()).count()
     }
 
+    /// Returns diagnostics with cascading errors suppressed.
+    ///
+    /// Suppression rule: when a higher-priority diagnostic's span contains
+    /// a lower-priority diagnostic's span, the lower-priority one is suppressed.
+    pub(crate) fn filtered(&self) -> Vec<&DiagnosticMessage> {
+        if self.messages.is_empty() {
+            return Vec::new();
+        }
+
+        let mut suppressed = vec![false; self.messages.len()];
+
+        // O(n²) but n is typically small (< 100 diagnostics)
+        for (i, outer) in self.messages.iter().enumerate() {
+            for (j, inner) in self.messages.iter().enumerate() {
+                if i == j || suppressed[j] {
+                    continue;
+                }
+
+                // Check if outer contains inner and has higher priority
+                if span_contains(outer.range, inner.range) && outer.kind.suppresses(&inner.kind) {
+                    suppressed[j] = true;
+                }
+            }
+        }
+
+        self.messages
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !suppressed[*i])
+            .map(|(_, m)| m)
+            .collect()
+    }
+
+    /// Raw access to all diagnostics (for debugging/testing).
+    #[allow(dead_code)]
+    pub(crate) fn raw(&self) -> &[DiagnosticMessage] {
+        &self.messages
+    }
+
     pub fn printer<'a>(&'a self, source: &'a str) -> DiagnosticsPrinter<'a> {
         DiagnosticsPrinter::new(&self.messages, source)
+    }
+
+    /// Printer that uses filtered diagnostics.
+    pub fn filtered_printer<'a>(&'a self, source: &'a str) -> FilteredDiagnosticsPrinter<'a> {
+        FilteredDiagnosticsPrinter {
+            diagnostics: self,
+            source,
+        }
     }
 
     pub fn render(&self, source: &str) -> String {
@@ -79,12 +138,85 @@ impl Diagnostics {
         self.printer(source).colored(colored).render()
     }
 
+    pub fn render_filtered(&self, source: &str) -> String {
+        self.filtered_printer(source).render()
+    }
+
+    pub fn render_filtered_colored(&self, source: &str, colored: bool) -> String {
+        self.filtered_printer(source).colored(colored).render()
+    }
+
     pub fn extend(&mut self, other: Diagnostics) {
         self.messages.extend(other.messages);
     }
 }
 
+/// Printer wrapper that uses filtered diagnostics.
+pub struct FilteredDiagnosticsPrinter<'a> {
+    diagnostics: &'a Diagnostics,
+    source: &'a str,
+}
+
+impl<'a> FilteredDiagnosticsPrinter<'a> {
+    pub fn path(self, path: &'a str) -> FilteredDiagnosticsPrinterWithPath<'a> {
+        FilteredDiagnosticsPrinterWithPath {
+            diagnostics: self.diagnostics,
+            source: self.source,
+            path: Some(path),
+            colored: false,
+        }
+    }
+
+    pub fn colored(self, colored: bool) -> FilteredDiagnosticsPrinterWithPath<'a> {
+        FilteredDiagnosticsPrinterWithPath {
+            diagnostics: self.diagnostics,
+            source: self.source,
+            path: None,
+            colored,
+        }
+    }
+
+    pub fn render(&self) -> String {
+        let filtered = self.diagnostics.filtered();
+        DiagnosticsPrinter::from_refs(&filtered, self.source).render()
+    }
+}
+
+pub struct FilteredDiagnosticsPrinterWithPath<'a> {
+    diagnostics: &'a Diagnostics,
+    source: &'a str,
+    path: Option<&'a str>,
+    colored: bool,
+}
+
+impl<'a> FilteredDiagnosticsPrinterWithPath<'a> {
+    pub fn path(mut self, path: &'a str) -> Self {
+        self.path = Some(path);
+        self
+    }
+
+    pub fn colored(mut self, colored: bool) -> Self {
+        self.colored = colored;
+        self
+    }
+
+    pub fn render(&self) -> String {
+        let filtered = self.diagnostics.filtered();
+        let mut printer = DiagnosticsPrinter::from_refs(&filtered, self.source);
+        if let Some(p) = self.path {
+            printer = printer.path(p);
+        }
+        printer.colored(self.colored).render()
+    }
+}
+
 impl<'a> DiagnosticBuilder<'a> {
+    /// Override the default message for this diagnostic kind.
+    pub fn message(mut self, msg: impl Into<String>) -> Self {
+        self.message.message = msg.into();
+        self
+    }
+
     pub fn related_to(mut self, msg: impl Into<String>, range: TextRange) -> Self {
         self.message.related.push(RelatedInfo::new(range, msg));
         self
@@ -98,4 +230,9 @@ impl<'a> DiagnosticBuilder<'a> {
     pub fn emit(self) {
         self.diagnostics.messages.push(self.message);
     }
+}
+
+/// Check if outer span fully contains inner span.
+fn span_contains(outer: TextRange, inner: TextRange) -> bool {
+    outer.start() <= inner.start() && inner.end() <= outer.end()
 }

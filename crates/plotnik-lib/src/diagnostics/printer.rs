@@ -8,16 +8,55 @@ use rowan::TextRange;
 use super::message::{DiagnosticMessage, Severity};
 
 pub struct DiagnosticsPrinter<'a> {
-    diagnostics: &'a [DiagnosticMessage],
+    diagnostics: DiagnosticsSlice<'a>,
     source: &'a str,
     path: Option<&'a str>,
     colored: bool,
 }
 
+enum DiagnosticsSlice<'a> {
+    Borrowed(&'a [DiagnosticMessage]),
+    Refs(Vec<&'a DiagnosticMessage>),
+}
+
+impl<'a> DiagnosticsSlice<'a> {
+    fn iter(&self) -> impl Iterator<Item = &DiagnosticMessage> {
+        match self {
+            DiagnosticsSlice::Borrowed(slice) => DiagnosticsIter::Borrowed(slice.iter()),
+            DiagnosticsSlice::Refs(vec) => DiagnosticsIter::Refs(vec.iter()),
+        }
+    }
+}
+
+enum DiagnosticsIter<'a, 'b> {
+    Borrowed(std::slice::Iter<'a, DiagnosticMessage>),
+    Refs(std::slice::Iter<'b, &'a DiagnosticMessage>),
+}
+
+impl<'a, 'b> Iterator for DiagnosticsIter<'a, 'b> {
+    type Item = &'a DiagnosticMessage;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            DiagnosticsIter::Borrowed(iter) => iter.next(),
+            DiagnosticsIter::Refs(iter) => iter.next().copied(),
+        }
+    }
+}
+
 impl<'a> DiagnosticsPrinter<'a> {
     pub(crate) fn new(diagnostics: &'a [DiagnosticMessage], source: &'a str) -> Self {
         Self {
-            diagnostics,
+            diagnostics: DiagnosticsSlice::Borrowed(diagnostics),
+            source,
+            path: None,
+            colored: false,
+        }
+    }
+
+    pub(crate) fn from_refs(diagnostics: &[&'a DiagnosticMessage], source: &'a str) -> Self {
+        Self {
+            diagnostics: DiagnosticsSlice::Refs(diagnostics.to_vec()),
             source,
             path: None,
             colored: false,
@@ -68,7 +107,7 @@ impl<'a> DiagnosticsPrinter<'a> {
                 );
             }
 
-            let level = severity_to_level(diag.severity);
+            let level = severity_to_level(diag.severity());
             let title_group = level.primary_title(&diag.message).element(snippet);
 
             let mut report: Vec<Group> = vec![title_group];

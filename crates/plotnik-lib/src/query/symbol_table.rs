@@ -6,6 +6,7 @@
 
 use indexmap::IndexMap;
 
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Expr, Ref, ast};
 
 use super::Query;
@@ -25,7 +26,8 @@ impl<'a> Query<'a> {
 
             if self.symbol_table.contains_key(name) {
                 self.resolve_diagnostics
-                    .error(format!("duplicate definition: `{}`", name), range)
+                    .report(DiagnosticKind::DuplicateDefinition, range)
+                    .message(format!("duplicate definition: `{}`", name))
                     .emit();
                 continue;
             }
@@ -101,10 +103,8 @@ impl<'a> Query<'a> {
         }
 
         self.resolve_diagnostics
-            .error(
-                format!("undefined reference: `{}`", name),
-                name_token.text_range(),
-            )
+            .report(DiagnosticKind::UndefinedReference, name_token.text_range())
+            .message(format!("undefined reference: `{}`", name))
             .emit();
     }
 }
