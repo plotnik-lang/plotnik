@@ -6,10 +6,10 @@
 //! - `emit_rust`: Rust code emitter
 //! - `emit_typescript`: TypeScript code emitter
 
-pub mod emit_rs;
-pub mod emit_ts;
+pub mod emit;
 mod types;
 
-pub use emit_rs::{Indirection, RustEmitConfig, emit_rust};
-pub use emit_ts::{OptionalStyle, TypeScriptEmitConfig, emit_typescript};
+pub use emit::{
+    Indirection, OptionalStyle, RustEmitConfig, TypeScriptEmitConfig, emit_rust, emit_typescript,
+};
 pub use types::{TypeKey, TypeTable, TypeValue};

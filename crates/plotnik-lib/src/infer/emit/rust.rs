@@ -1,0 +1,231 @@
+//! Rust code emitter for inferred types.
+//!
+//! Emits Rust struct and enum definitions from a `TypeTable`.
+
+use indexmap::IndexMap;
+
+use super::super::types::{TypeKey, TypeTable, TypeValue};
+
+/// Configuration for Rust emission.
+#[derive(Debug, Clone)]
+pub struct RustEmitConfig {
+    /// Indirection type for cyclic references.
+    pub indirection: Indirection,
+    /// Whether to derive common traits.
+    pub derive_debug: bool,
+    pub derive_clone: bool,
+    pub derive_partial_eq: bool,
+}
+
+/// How to handle cyclic type references.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Indirection {
+    Box,
+    Rc,
+    Arc,
+}
+
+impl Default for RustEmitConfig {
+    fn default() -> Self {
+        Self {
+            indirection: Indirection::Box,
+            derive_debug: true,
+            derive_clone: true,
+            derive_partial_eq: false,
+        }
+    }
+}
+
+/// Emit Rust code from a type table.
+pub fn emit_rust(table: &TypeTable<'_>, config: &RustEmitConfig) -> String {
+    let mut output = String::new();
+    let sorted = topological_sort(table);
+
+    for key in sorted {
+        let Some(value) = table.get(&key) else {
+            continue;
+        };
+
+        // Skip built-in types
+        if matches!(key, TypeKey::Node | TypeKey::String | TypeKey::Unit) {
+            continue;
+        }
+
+        let type_def = emit_type_def(&key, value, table, config);
+        if !type_def.is_empty() {
+            output.push_str(&type_def);
+            output.push_str("\n\n");
+        }
+    }
+
+    output.trim_end().to_string()
+}
+
+fn emit_type_def(
+    key: &TypeKey<'_>,
+    value: &TypeValue<'_>,
+    table: &TypeTable<'_>,
+    config: &RustEmitConfig,
+) -> String {
+    let name = key.to_pascal_case();
+
+    match value {
+        TypeValue::Node | TypeValue::String | TypeValue::Unit => String::new(),
+
+        TypeValue::Struct(fields) => {
+            let mut out = emit_derives(config);
+            if fields.is_empty() {
+                out.push_str(&format!("pub struct {};", name));
+            } else {
+                out.push_str(&format!("pub struct {} {{\n", name));
+                for (field_name, field_type) in fields {
+                    let type_str = emit_type_ref(field_type, table, config);
+                    out.push_str(&format!("    pub {}: {},\n", field_name, type_str));
+                }
+                out.push('}');
+            }
+            out
+        }
+
+        TypeValue::TaggedUnion(variants) => {
+            let mut out = emit_derives(config);
+            out.push_str(&format!("pub enum {} {{\n", name));
+            for (variant_name, fields) in variants {
+                if fields.is_empty() {
+                    out.push_str(&format!("    {},\n", variant_name));
+                } else {
+                    out.push_str(&format!("    {} {{\n", variant_name));
+                    for (field_name, field_type) in fields {
+                        let type_str = emit_type_ref(field_type, table, config);
+                        out.push_str(&format!("        {}: {},\n", field_name, type_str));
+                    }
+                    out.push_str("    },\n");
+                }
+            }
+            out.push('}');
+            out
+        }
+
+        TypeValue::Optional(_) | TypeValue::List(_) | TypeValue::NonEmptyList(_) => {
+            // Wrapper types become type aliases
+            let mut out = String::new();
+            let inner_type = emit_type_ref(key, table, config);
+            out.push_str(&format!("pub type {} = {};", name, inner_type));
+            out
+        }
+    }
+}
+
+fn emit_type_ref(key: &TypeKey<'_>, table: &TypeTable<'_>, config: &RustEmitConfig) -> String {
+    let is_cyclic = table.is_cyclic(key);
+
+    let base = match table.get(key) {
+        Some(TypeValue::Node) => "Node".to_string(),
+        Some(TypeValue::String) => "String".to_string(),
+        Some(TypeValue::Unit) => "()".to_string(),
+        Some(TypeValue::Optional(inner)) => {
+            let inner_str = emit_type_ref(inner, table, config);
+            format!("Option<{}>", inner_str)
+        }
+        Some(TypeValue::List(inner)) => {
+            let inner_str = emit_type_ref(inner, table, config);
+            format!("Vec<{}>", inner_str)
+        }
+        Some(TypeValue::NonEmptyList(inner)) => {
+            let inner_str = emit_type_ref(inner, table, config);
+            format!("Vec<{}>", inner_str)
+        }
+        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) => key.to_pascal_case(),
+        None => key.to_pascal_case(),
+    };
+
+    if is_cyclic {
+        wrap_indirection(&base, config.indirection)
+    } else {
+        base
+    }
+}
+
+fn wrap_indirection(type_str: &str, indirection: Indirection) -> String {
+    match indirection {
+        Indirection::Box => format!("Box<{}>", type_str),
+        Indirection::Rc => format!("Rc<{}>", type_str),
+        Indirection::Arc => format!("Arc<{}>", type_str),
+    }
+}
+
+fn emit_derives(config: &RustEmitConfig) -> String {
+    let mut derives = Vec::new();
+    if config.derive_debug {
+        derives.push("Debug");
+    }
+    if config.derive_clone {
+        derives.push("Clone");
+    }
+    if config.derive_partial_eq {
+        derives.push("PartialEq");
+    }
+
+    if derives.is_empty() {
+        String::new()
+    } else {
+        format!("#[derive({})]\n", derives.join(", "))
+    }
+}
+
+/// Topologically sort types so dependencies come before dependents.
+fn topological_sort<'src>(table: &TypeTable<'src>) -> Vec<TypeKey<'src>> {
+    let mut result = Vec::new();
+    let mut visited = IndexMap::new();
+
+    for key in table.types.keys() {
+        visit(key, table, &mut visited, &mut result);
+    }
+
+    result
+}
+
+fn visit<'src>(
+    key: &TypeKey<'src>,
+    table: &TypeTable<'src>,
+    visited: &mut IndexMap<TypeKey<'src>, bool>,
+    result: &mut Vec<TypeKey<'src>>,
+) {
+    if let Some(&in_progress) = visited.get(key) {
+        if in_progress {
+            // Cycle detected, already handled by cyclic marking
+            return;
+        }
+        // Already fully visited
+        return;
+    }
+
+    visited.insert(key.clone(), true); // Mark as in progress
+
+    if let Some(value) = table.get(key) {
+        for dep in dependencies(value) {
+            visit(&dep, table, visited, result);
+        }
+    }
+
+    visited.insert(key.clone(), false); // Mark as done
+    result.push(key.clone());
+}
+
+fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
+    match value {
+        TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
+
+        TypeValue::Struct(fields) => fields.values().cloned().collect(),
+
+        TypeValue::TaggedUnion(variants) => variants
+            .values()
+            .flat_map(|f| f.values())
+            .cloned()
+            .collect(),
+
+        TypeValue::Optional(inner) | TypeValue::List(inner) | TypeValue::NonEmptyList(inner) => {
+            vec![inner.clone()]
+        }
+    }
+}
