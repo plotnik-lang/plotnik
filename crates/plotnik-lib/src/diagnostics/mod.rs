@@ -146,12 +146,15 @@ impl Diagnostics {
             }
         }
 
-        self.messages
+        let mut result: Vec<_> = self
+            .messages
             .iter()
             .enumerate()
             .filter(|(i, _)| !suppressed[*i])
             .map(|(_, m)| m.clone())
-            .collect()
+            .collect();
+        result.sort_by_key(|m| m.range.start());
+        result
     }
 
     /// Raw access to all diagnostics (for debugging/testing).
