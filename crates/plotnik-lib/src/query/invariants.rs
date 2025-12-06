@@ -35,22 +35,6 @@ pub fn ensure_both_branch_kinds<'a>(
 }
 
 #[inline]
-pub fn ensure_capture_has_inner<T>(inner: Option<T>) -> T {
-    inner.expect(
-        "shape_cardinalities: Capture without inner expression \
-         (parser uses checkpoint, inner is guaranteed)",
-    )
-}
-
-#[inline]
-pub fn ensure_quantifier_has_inner<T>(inner: Option<T>) -> T {
-    inner.expect(
-        "shape_cardinalities: Quantifier without inner expression \
-         (parser uses checkpoint, inner is guaranteed)",
-    )
-}
-
-#[inline]
 pub fn ensure_ref_has_name<T>(name: Option<T>) -> T {
     name.expect(
         "shape_cardinalities: Ref without name token \
