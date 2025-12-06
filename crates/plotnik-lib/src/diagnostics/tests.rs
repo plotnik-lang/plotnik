@@ -67,8 +67,6 @@ fn builder_with_related() {
       |
     1 | hello world!
       | ^^^^^ ---- related info
-      | |
-      | unclosed tree: primary
     ");
 }
 
@@ -89,7 +87,7 @@ fn builder_with_fix() {
     error: invalid field syntax: fixable
       |
     1 | hello world
-      | ^^^^^ invalid field syntax: fixable
+      | ^^^^^
       |
     help: apply this fix
       |
@@ -119,9 +117,8 @@ fn builder_with_all_options() {
       |
     1 | hello world stuff!
       | ^^^^^ ----- ----- and here
-      | |     |
-      | |     see also
-      | unclosed tree: main error
+      |       |
+      |       see also
       |
     help: try this
       |
@@ -171,7 +168,7 @@ fn printer_with_path() {
      --> test.pql:1:1
       |
     1 | hello world
-      | ^^^^^ undefined reference: `test error`
+      | ^^^^^
     ");
 }
 
@@ -191,7 +188,7 @@ fn printer_zero_width_span() {
     error: expected expression: zero width error
       |
     1 | hello
-      | ^ expected expression: zero width error
+      | ^
     ");
 }
 
@@ -213,8 +210,6 @@ fn printer_related_zero_width() {
       |
     1 | hello world!
       | ^^^^^ - zero width related
-      | |
-      | unclosed tree: primary
     ");
 }
 
@@ -241,11 +236,11 @@ fn printer_multiple_diagnostics() {
     error: unclosed tree: first error
       |
     1 | hello world!
-      | ^^^^^ unclosed tree: first error
+      | ^^^^^
     error: undefined reference: `second error`
       |
     1 | hello world!
-      |       ^^^^ undefined reference: `second error`
+      |       ^^^^
     ");
 }
 

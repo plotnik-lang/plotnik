@@ -134,11 +134,11 @@ fn named_def_missing_equals_with_garbage() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr ^^^ (identifier)
-      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr ^^^ (identifier)
-      |      ^^^ unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |      ^^^
     "#);
 }
 
@@ -155,11 +155,11 @@ fn named_def_missing_equals_recovers_to_next_def() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Broken ^^^
-      | ^^^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^^^
     error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Broken ^^^
-      |        ^^^ unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |        ^^^
     "#);
 }
 

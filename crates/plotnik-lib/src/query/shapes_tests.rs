@@ -171,7 +171,7 @@ fn field_with_seq_error() {
     error: field `name` value must be a single node
       |
     1 | (call name: {(a) (b)})
-      |             ^^^^^^^^^ field `name` value must be a single node
+      |             ^^^^^^^^^
     ");
 }
 
@@ -198,7 +198,7 @@ fn field_with_ref_to_seq_error() {
     error: field `name` value must be a single node
       |
     2 | (call name: (X))
-      |             ^^^ field `name` value must be a single node
+      |             ^^^
     ");
 }
 

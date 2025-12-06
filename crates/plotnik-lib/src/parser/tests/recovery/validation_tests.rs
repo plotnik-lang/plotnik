@@ -14,7 +14,7 @@ fn ref_with_children_error() {
     error: reference `Expr` cannot contain children
       |
     2 | (Expr (child))
-      |       ^^^^^^^ reference `Expr` cannot contain children
+      |       ^^^^^^^
     ");
 }
 
@@ -31,7 +31,7 @@ fn ref_with_multiple_children_error() {
     error: reference `Expr` cannot contain children
       |
     2 | (Expr (a) (b) @cap)
-      |       ^^^^^^^^^^^^ reference `Expr` cannot contain children
+      |       ^^^^^^^^^^^^
     ");
 }
 
@@ -48,7 +48,7 @@ fn ref_with_field_children_error() {
     error: reference `Expr` cannot contain children
       |
     2 | (Expr name: (identifier))
-      |       ^^^^^^^^^^^^^^^^^^ reference `Expr` cannot contain children
+      |       ^^^^^^^^^^^^^^^^^^
     ");
 }
 
@@ -62,7 +62,7 @@ fn reference_with_supertype_syntax_error() {
     error: invalid supertype syntax: invalid supertype syntax
       |
     1 | (RefName/subtype)
-      |         ^ invalid supertype syntax: invalid supertype syntax
+      |         ^
     ");
 }
 
@@ -78,7 +78,7 @@ fn mixed_tagged_and_untagged() {
     error: mixed tagged and untagged branches in alternation
       |
     1 | [Tagged: (a) (b) Another: (c)]
-      |  ------      ^^^ mixed tagged and untagged branches in alternation
+      |  ------      ^^^
       |  |
       |  tagged branch here
     ");
@@ -96,7 +96,7 @@ fn error_with_unexpected_content() {
     error: (ERROR) takes no arguments: (ERROR) takes no arguments
       |
     1 | (ERROR (something))
-      |        ^ (ERROR) takes no arguments: (ERROR) takes no arguments
+      |        ^
     ");
 }
 
@@ -112,7 +112,7 @@ fn bare_error_keyword() {
     error: ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
       |
     1 | ERROR
-      | ^^^^^ ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
+      | ^^^^^
     ");
 }
 
@@ -128,7 +128,7 @@ fn bare_missing_keyword() {
     error: ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
       |
     1 | MISSING
-      | ^^^^^^^ ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
+      | ^^^^^^^
     ");
 }
 
@@ -144,11 +144,11 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
     error: undefined reference: `Expr`
       |
     1 | [(Expr) (Statement)]
-      |   ^^^^ undefined reference: `Expr`
+      |   ^^^^
     error: undefined reference: `Statement`
       |
     1 | [(Expr) (Statement)]
-      |          ^^^^^^^^^ undefined reference: `Statement`
+      |          ^^^^^^^^^
     ");
 }
 
@@ -164,7 +164,7 @@ fn upper_ident_not_followed_by_equals_is_expression() {
     error: undefined reference: `Expr`
       |
     1 | (Expr)
-      |  ^^^^ undefined reference: `Expr`
+      |  ^^^^
     ");
 }
 
@@ -180,7 +180,7 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr
-      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^
     ");
 }
 
@@ -196,7 +196,7 @@ fn named_def_missing_equals() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr (identifier)
-      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^
     ");
 }
 
@@ -214,7 +214,7 @@ fn unnamed_def_not_allowed_in_middle() {
     error: unnamed definition must be last: add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^ unnamed definition must be last: add a name: `Name = (first)`
+      | ^^^^^^^
     ");
 }
 
@@ -232,11 +232,11 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     error: unnamed definition must be last: add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^ unnamed definition must be last: add a name: `Name = (first)`
+      | ^^^^^^^
     error: unnamed definition must be last: add a name: `Name = (second)`
       |
     2 | (second)
-      | ^^^^^^^^ unnamed definition must be last: add a name: `Name = (second)`
+      | ^^^^^^^^
     ");
 }
 
@@ -252,11 +252,11 @@ fn capture_space_after_dot_is_anchor() {
     error: unnamed definition must be last: add a name: `Name = (identifier) @foo`
       |
     1 | (identifier) @foo . (other)
-      | ^^^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (identifier) @foo`
+      | ^^^^^^^^^^^^^^^^^
     error: unnamed definition must be last: add a name: `Name = .`
       |
     1 | (identifier) @foo . (other)
-      |                   ^ unnamed definition must be last: add a name: `Name = .`
+      |                   ^
     ");
 }
 
@@ -270,7 +270,7 @@ fn def_name_lowercase_error() {
     error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | lowercase = (x)
-      | ^^^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
+      | ^^^^^^^^^
       |
     help: definition names must be PascalCase; use Lowercase instead
       |
@@ -292,7 +292,7 @@ fn def_name_snake_case_suggests_pascal() {
     error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my_expr = (identifier)
-      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
+      | ^^^^^^^
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -314,7 +314,7 @@ fn def_name_kebab_case_suggests_pascal() {
     error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my-expr = (identifier)
-      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
+      | ^^^^^^^
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -336,7 +336,7 @@ fn def_name_dotted_suggests_pascal() {
     error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my.expr = (identifier)
-      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
+      | ^^^^^^^
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -356,7 +356,7 @@ fn def_name_with_underscores_error() {
     error: definition name contains separators: definition names cannot contain separators
       |
     1 | Some_Thing = (x)
-      | ^^^^^^^^^^ definition name contains separators: definition names cannot contain separators
+      | ^^^^^^^^^^
       |
     help: definition names must be PascalCase; use SomeThing instead
       |
@@ -376,7 +376,7 @@ fn def_name_with_hyphens_error() {
     error: definition name contains separators: definition names cannot contain separators
       |
     1 | Some-Thing = (x)
-      | ^^^^^^^^^^ definition name contains separators: definition names cannot contain separators
+      | ^^^^^^^^^^
       |
     help: definition names must be PascalCase; use SomeThing instead
       |
@@ -398,7 +398,7 @@ fn capture_name_pascal_case_error() {
     error: capture name starts with uppercase: capture names must start with lowercase
       |
     1 | (a) @Name
-      |      ^^^^ capture name starts with uppercase: capture names must start with lowercase
+      |      ^^^^
       |
     help: capture names must be snake_case; use @name instead
       |
@@ -420,7 +420,7 @@ fn capture_name_pascal_case_with_hyphens_error() {
     error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (a) @My-Name
-      |      ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
+      |      ^^^^^^^
       |
     help: captures become struct fields; use @my_name instead
       |
@@ -442,7 +442,7 @@ fn capture_name_with_hyphens_error() {
     error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (a) @my-name
-      |      ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
+      |      ^^^^^^^
       |
     help: captures become struct fields; use @my_name instead
       |
@@ -464,7 +464,7 @@ fn capture_dotted_error() {
     error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar
-      |               ^^^^^^^ capture name contains dots: capture names cannot contain dots
+      |               ^^^^^^^
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -486,7 +486,7 @@ fn capture_dotted_multiple_parts() {
     error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar.baz
-      |               ^^^^^^^^^^^ capture name contains dots: capture names cannot contain dots
+      |               ^^^^^^^^^^^
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -508,7 +508,7 @@ fn capture_dotted_followed_by_field() {
     error: capture name contains dots: capture names cannot contain dots
       |
     1 | (node) @foo.bar name: (other)
-      |         ^^^^^^^ capture name contains dots: capture names cannot contain dots
+      |         ^^^^^^^
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -518,7 +518,7 @@ fn capture_dotted_followed_by_field() {
     error: unnamed definition must be last: add a name: `Name = (node) @foo.bar`
       |
     1 | (node) @foo.bar name: (other)
-      | ^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (node) @foo.bar`
+      | ^^^^^^^^^^^^^^^
     ");
 }
 
@@ -534,7 +534,7 @@ fn capture_space_after_dot_breaks_chain() {
     error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo. bar
-      |               ^^^^ capture name contains dots: capture names cannot contain dots
+      |               ^^^^
       |
     help: captures become struct fields; use @foo_ instead
       |
@@ -544,11 +544,11 @@ fn capture_space_after_dot_breaks_chain() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (identifier) @foo. bar
-      |                    ^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |                    ^^^
     error: unnamed definition must be last: add a name: `Name = (identifier) @foo.`
       |
     1 | (identifier) @foo. bar
-      | ^^^^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (identifier) @foo.`
+      | ^^^^^^^^^^^^^^^^^^
     ");
 }
 
@@ -564,7 +564,7 @@ fn capture_hyphenated_error() {
     error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar
-      |               ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
+      |               ^^^^^^^
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -586,7 +586,7 @@ fn capture_hyphenated_multiple() {
     error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar-baz
-      |               ^^^^^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
+      |               ^^^^^^^^^^^
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -608,7 +608,7 @@ fn capture_mixed_dots_and_hyphens() {
     error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar-baz
-      |               ^^^^^^^^^^^ capture name contains dots: capture names cannot contain dots
+      |               ^^^^^^^^^^^
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -630,7 +630,7 @@ fn field_name_pascal_case_error() {
     error: field name starts with uppercase: field names must start with lowercase
       |
     1 | (call Name: (a))
-      |       ^^^^ field name starts with uppercase: field names must start with lowercase
+      |       ^^^^
       |
     help: field names must be snake_case; use name: instead
       |
@@ -650,7 +650,7 @@ fn field_name_with_dots_error() {
     error: field name contains dots: field names cannot contain dots
       |
     1 | (call foo.bar: (x))
-      |       ^^^^^^^ field name contains dots: field names cannot contain dots
+      |       ^^^^^^^
       |
     help: field names must be snake_case; use foo_bar: instead
       |
@@ -670,7 +670,7 @@ fn field_name_with_hyphens_error() {
     error: field name contains hyphens: field names cannot contain hyphens
       |
     1 | (call foo-bar: (x))
-      |       ^^^^^^^ field name contains hyphens: field names cannot contain hyphens
+      |       ^^^^^^^
       |
     help: field names must be snake_case; use foo_bar: instead
       |
@@ -692,7 +692,7 @@ fn negated_field_with_upper_ident_parses() {
     error: field name starts with uppercase: field names must start with lowercase
       |
     1 | (call !Arguments)
-      |        ^^^^^^^^^ field name starts with uppercase: field names must start with lowercase
+      |        ^^^^^^^^^
       |
     help: field names must be snake_case; use arguments: instead
       |
@@ -714,7 +714,7 @@ fn branch_label_snake_case_suggests_pascal() {
     error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My_branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
+      |  ^^^^^^^^^
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -736,7 +736,7 @@ fn branch_label_kebab_case_suggests_pascal() {
     error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My-branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
+      |  ^^^^^^^^^
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -758,7 +758,7 @@ fn branch_label_dotted_suggests_pascal() {
     error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My.branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
+      |  ^^^^^^^^^
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -778,7 +778,7 @@ fn branch_label_with_underscores_error() {
     error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [Some_Label: (x)]
-      |  ^^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
+      |  ^^^^^^^^^^
       |
     help: branch labels must be PascalCase; use SomeLabel: instead
       |
@@ -798,7 +798,7 @@ fn branch_label_with_hyphens_error() {
     error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [Some-Label: (x)]
-      |  ^^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
+      |  ^^^^^^^^^^
       |
     help: branch labels must be PascalCase; use SomeLabel: instead
       |
@@ -823,7 +823,7 @@ fn lowercase_branch_label() {
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     2 |   left: (a)
-      |   ^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
+      |   ^^^^
       |
     help: capitalize as `Left`
       |
@@ -833,7 +833,7 @@ fn lowercase_branch_label() {
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     3 |   right: (b)
-      |   ^^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
+      |   ^^^^^
       |
     help: capitalize as `Right`
       |
@@ -855,7 +855,7 @@ fn lowercase_branch_label_suggests_capitalized() {
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [first: (a) Second: (b)]
-      |  ^^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^^^
       |
     help: capitalize as `First`
       |
@@ -875,7 +875,7 @@ fn mixed_case_branch_labels() {
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [foo: (a) Bar: (b)]
-      |  ^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^
       |
     help: capitalize as `Foo`
       |
@@ -897,7 +897,7 @@ fn type_annotation_dotted_suggests_pascal() {
     error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (a) @x :: My.Type
-      |           ^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
+      |           ^^^^^^^
       |
     help: type names cannot contain separators; use ::MyType instead
       |
@@ -919,7 +919,7 @@ fn type_annotation_kebab_suggests_pascal() {
     error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (a) @x :: My-Type
-      |           ^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
+      |           ^^^^^^^
       |
     help: type names cannot contain separators; use ::MyType instead
       |
@@ -939,7 +939,7 @@ fn type_name_with_dots_error() {
     error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (x) @name :: Some.Type
-      |              ^^^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
+      |              ^^^^^^^^^
       |
     help: type names cannot contain separators; use ::SomeType instead
       |
@@ -959,7 +959,7 @@ fn type_name_with_hyphens_error() {
     error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (x) @name :: Some-Type
-      |              ^^^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
+      |              ^^^^^^^^^
       |
     help: type names cannot contain separators; use ::SomeType instead
       |
@@ -979,7 +979,7 @@ fn comma_in_node_children() {
     error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node (a), (b))
-      |          ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
+      |          ^
       |
     help: remove separator
       |
@@ -999,7 +999,7 @@ fn comma_in_alternation() {
     error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |     ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
+      |     ^
       |
     help: remove separator
       |
@@ -1009,7 +1009,7 @@ fn comma_in_alternation() {
     error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |          ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
+      |          ^
       |
     help: remove separator
       |
@@ -1029,7 +1029,7 @@ fn comma_in_sequence() {
     error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a), (b)}
-      |     ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
+      |     ^
       |
     help: remove separator
       |
@@ -1049,7 +1049,7 @@ fn pipe_in_alternation() {
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^
       |
     help: remove separator
       |
@@ -1059,7 +1059,7 @@ fn pipe_in_alternation() {
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |            ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
+      |            ^
       |
     help: remove separator
       |
@@ -1081,7 +1081,7 @@ fn pipe_between_branches() {
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b)]
-      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^
       |
     help: remove separator
       |
@@ -1101,7 +1101,7 @@ fn pipe_in_tree() {
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (a | b)
-      |    ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
+      |    ^
       |
     help: remove separator
       |
@@ -1111,7 +1111,7 @@ fn pipe_in_tree() {
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a | b)
-      |      ^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |      ^
     ");
 }
 
@@ -1125,7 +1125,7 @@ fn pipe_in_sequence() {
     error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a) | (b)}
-      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^
       |
     help: remove separator
       |
@@ -1145,7 +1145,7 @@ fn field_equals_typo() {
     error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (node name = (identifier))
-      |            ^ invalid field syntax: '=' is not valid for field constraints
+      |            ^
       |
     help: use ':'
       |
@@ -1165,7 +1165,7 @@ fn field_equals_typo_no_space() {
     error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (node name=(identifier))
-      |           ^ invalid field syntax: '=' is not valid for field constraints
+      |           ^
       |
     help: use ':'
       |
@@ -1185,7 +1185,7 @@ fn field_equals_typo_no_expression() {
     error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (call name=)
-      |           ^ invalid field syntax: '=' is not valid for field constraints
+      |           ^
       |
     help: use ':'
       |
@@ -1195,7 +1195,7 @@ fn field_equals_typo_no_expression() {
     error: expected expression: expected expression after field name
       |
     1 | (call name=)
-      |            ^ expected expression: expected expression after field name
+      |            ^
     ");
 }
 
@@ -1211,7 +1211,7 @@ fn field_equals_typo_in_tree() {
     error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (call name = (identifier))
-      |            ^ invalid field syntax: '=' is not valid for field constraints
+      |            ^
       |
     help: use ':'
       |
@@ -1231,7 +1231,7 @@ fn single_colon_type_annotation() {
     error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (identifier) @name : Type
-      |                    ^ invalid type annotation: single colon is not valid for type annotations
+      |                    ^
       |
     help: use '::'
       |
@@ -1250,7 +1250,7 @@ fn single_colon_type_annotation_no_space() {
     error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (identifier) @name:Type
-      |                   ^ invalid type annotation: single colon is not valid for type annotations
+      |                   ^
       |
     help: use '::'
       |
@@ -1271,7 +1271,7 @@ fn single_colon_type_annotation_with_space() {
     error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (a) @x : Type
-      |        ^ invalid type annotation: single colon is not valid for type annotations
+      |        ^
       |
     help: use '::'
       |
@@ -1290,22 +1290,22 @@ fn single_colon_primitive_type() {
     error: capture without target: capture without target
       |
     1 | @val : string
-      | ^ capture without target: capture without target
+      | ^
     error: unexpected token: expected ':' to separate field name from its value
       |
     1 | @val : string
-      |     ^ unexpected token: expected ':' to separate field name from its value
+      |     ^
     error: expected expression: expected expression after field name
       |
     1 | @val : string
-      |      ^ expected expression: expected expression after field name
+      |      ^
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @val : string
-      |        ^^^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |        ^^^^^^
     error: unnamed definition must be last: add a name: `Name = val`
       |
     1 | @val : string
-      |  ^^^ unnamed definition must be last: add a name: `Name = val`
+      |  ^^^
     ");
 }

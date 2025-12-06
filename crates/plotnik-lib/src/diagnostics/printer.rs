@@ -50,11 +50,9 @@ impl<'a> DiagnosticsPrinter<'a> {
         for (i, diag) in self.diagnostics.iter().enumerate() {
             let range = adjust_range(diag.range, self.source.len());
 
-            let mut snippet = Snippet::source(self.source).line_start(1).annotation(
-                AnnotationKind::Primary
-                    .span(range.clone())
-                    .label(&diag.message),
-            );
+            let mut snippet = Snippet::source(self.source)
+                .line_start(1)
+                .annotation(AnnotationKind::Primary.span(range.clone()));
 
             if let Some(p) = self.path {
                 snippet = snippet.path(p);

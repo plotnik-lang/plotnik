@@ -13,7 +13,7 @@ fn missing_paren() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (identifier
-      | -          ^ unclosed tree: unclosed tree; expected ')'
+      | -          ^
       | |
       | tree started here
     ");
@@ -31,7 +31,7 @@ fn missing_bracket() {
     error: unclosed alternation: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
-      | -                     ^ unclosed alternation: unclosed alternation; expected ']'
+      | -                     ^
       | |
       | alternation started here
     ");
@@ -49,7 +49,7 @@ fn missing_brace() {
     error: unclosed sequence: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      | -       ^ unclosed sequence: unclosed sequence; expected '}'
+      | -       ^
       | |
       | sequence started here
     ");
@@ -67,7 +67,7 @@ fn nested_unclosed() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c)
-      |    -     ^ unclosed tree: unclosed tree; expected ')'
+      |    -     ^
       |    |
       |    tree started here
     ");
@@ -85,7 +85,7 @@ fn deeply_nested_unclosed() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
-      |          - ^ unclosed tree: unclosed tree; expected ')'
+      |          - ^
       |          |
       |          tree started here
     ");
@@ -103,7 +103,7 @@ fn unclosed_alternation_nested() {
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | [(a) (b
-      |      - ^ unclosed tree: unclosed tree; expected ')'
+      |      - ^
       |      |
       |      tree started here
     ");
@@ -121,7 +121,7 @@ fn empty_parens() {
     error: empty tree expression: empty tree expression
       |
     1 | ()
-      |  ^ empty tree expression: empty tree expression
+      |  ^
     ");
 }
 
@@ -140,7 +140,7 @@ fn unclosed_tree_shows_open_location() {
     1 | (call
       | - tree started here
     2 |     (identifier)
-      |                 ^ unclosed tree: unclosed tree; expected ')'
+      |                 ^
     ");
 }
 
@@ -161,7 +161,7 @@ fn unclosed_alternation_shows_open_location() {
       | - alternation started here
     2 |     (a)
     3 |     (b)
-      |        ^ unclosed alternation: unclosed alternation; expected ']'
+      |        ^
     ");
 }
 
@@ -182,7 +182,7 @@ fn unclosed_sequence_shows_open_location() {
       | - sequence started here
     2 |     (a)
     3 |     (b)
-      |        ^ unclosed sequence: unclosed sequence; expected '}'
+      |        ^
     ");
 }
 
@@ -196,11 +196,11 @@ fn unclosed_double_quote_string() {
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call "foo)
-      |       ^^^^^ unexpected token: unexpected token; expected a child expression or closing delimiter
+      |       ^^^^^
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call "foo)
-      | -          ^ unclosed tree: unclosed tree; expected ')'
+      | -          ^
       | |
       | tree started here
     "#);
@@ -216,11 +216,11 @@ fn unclosed_single_quote_string() {
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call 'foo)
-      |       ^^^^^ unexpected token: unexpected token; expected a child expression or closing delimiter
+      |       ^^^^^
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call 'foo)
-      | -          ^ unclosed tree: unclosed tree; expected ')'
+      | -          ^
       | |
       | tree started here
     ");

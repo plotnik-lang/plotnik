@@ -38,7 +38,7 @@ fn mixed_alternation_tagged_first() {
     error: mixed tagged and untagged branches in alternation
       |
     1 | [A: (a) (b)]
-      |  -      ^^^ mixed tagged and untagged branches in alternation
+      |  -      ^^^
       |  |
       |  tagged branch here
     ");
@@ -60,7 +60,7 @@ fn mixed_alternation_untagged_first() {
     error: mixed tagged and untagged branches in alternation
       |
     3 |       (a)
-      |       ^^^ mixed tagged and untagged branches in alternation
+      |       ^^^
     4 |       B: (b)
       |       - tagged branch here
     ");
@@ -74,7 +74,7 @@ fn nested_mixed_alternation() {
     error: mixed tagged and untagged branches in alternation
       |
     1 | (call [A: (a) (b)])
-      |        -      ^^^ mixed tagged and untagged branches in alternation
+      |        -      ^^^
       |        |
       |        tagged branch here
     ");
@@ -88,13 +88,13 @@ fn multiple_mixed_alternations() {
     error: mixed tagged and untagged branches in alternation
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])
-      |       -      ^^^ mixed tagged and untagged branches in alternation
+      |       -      ^^^
       |       |
       |       tagged branch here
     error: mixed tagged and untagged branches in alternation
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])
-      |                    -      ^^^ mixed tagged and untagged branches in alternation
+      |                    -      ^^^
       |                    |
       |                    tagged branch here
     ");

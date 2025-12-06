@@ -13,7 +13,7 @@ fn missing_capture_name() {
     error: expected capture name: expected capture name
       |
     1 | (identifier) @
-      |               ^ expected capture name: expected capture name
+      |               ^
     ");
 }
 
@@ -29,7 +29,7 @@ fn missing_field_value() {
     error: expected expression: expected expression after field name
       |
     1 | (call name:)
-      |            ^ expected expression: expected expression after field name
+      |            ^
     ");
 }
 
@@ -43,7 +43,7 @@ fn named_def_eof_after_equals() {
     error: expected expression: expected expression after '=' in named definition
       |
     1 | Expr = 
-      |        ^ expected expression: expected expression after '=' in named definition
+      |        ^
     ");
 }
 
@@ -59,7 +59,7 @@ fn missing_type_name() {
     error: expected type name: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name ::
-      |                      ^ expected type name: expected type name after '::' (e.g., ::MyType or ::string)
+      |                      ^
     ");
 }
 
@@ -75,7 +75,7 @@ fn missing_negated_field_name() {
     error: expected field name: expected field name after '!' (e.g., !value)
       |
     1 | (call !)
-      |        ^ expected field name: expected field name after '!' (e.g., !value)
+      |        ^
     ");
 }
 
@@ -91,7 +91,7 @@ fn missing_subtype() {
     error: expected subtype: expected subtype after '/' (e.g., expression/binary_expression)
       |
     1 | (expression/)
-      |             ^ expected subtype: expected subtype after '/' (e.g., expression/binary_expression)
+      |             ^
     ");
 }
 
@@ -107,7 +107,7 @@ fn tagged_branch_missing_expression() {
     error: expected expression: expected expression after branch label
       |
     1 | [Label:]
-      |        ^ expected expression: expected expression after branch label
+      |        ^
     ");
 }
 
@@ -121,7 +121,7 @@ fn type_annotation_missing_name_at_eof() {
     error: expected type name: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (a) @x ::
-      |          ^ expected type name: expected type name after '::' (e.g., ::MyType or ::string)
+      |          ^
     ");
 }
 
@@ -135,7 +135,7 @@ fn type_annotation_missing_name_with_bracket() {
     error: expected type name: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | [(a) @x :: ]
-      |            ^ expected type name: expected type name after '::' (e.g., ::MyType or ::string)
+      |            ^
     ");
 }
 
@@ -151,17 +151,17 @@ fn type_annotation_invalid_token_after() {
     error: expected type name: expected type name after '::' (e.g., ::MyType or ::string)
       |
     1 | (identifier) @name :: (
-      |                       ^ expected type name: expected type name after '::' (e.g., ::MyType or ::string)
+      |                       ^
     error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (identifier) @name :: (
-      |                       -^ unclosed tree: unclosed tree; expected ')'
+      |                       -^
       |                       |
       |                       tree started here
     error: unnamed definition must be last: add a name: `Name = (identifier) @name ::`
       |
     1 | (identifier) @name :: (
-      | ^^^^^^^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (identifier) @name ::`
+      | ^^^^^^^^^^^^^^^^^^^^^
     ");
 }
 
@@ -177,7 +177,7 @@ fn field_value_is_garbage() {
     error: expected expression: expected expression after field name
       |
     1 | (call name: %%%)
-      |             ^^^ expected expression: expected expression after field name
+      |             ^^^
     ");
 }
 
@@ -193,7 +193,7 @@ fn capture_with_invalid_char() {
     error: expected capture name: expected capture name
       |
     1 | (identifier) @123
-      |               ^^^ expected capture name: expected capture name
+      |               ^^^
     ");
 }
 
@@ -207,7 +207,7 @@ fn bare_capture_at_eof_triggers_sync() {
     error: capture without target: capture without target
       |
     1 | @
-      | ^ capture without target: capture without target
+      | ^
     ");
 }
 
@@ -223,11 +223,11 @@ fn bare_capture_at_root() {
     error: capture without target: capture without target
       |
     1 | @name
-      | ^ capture without target: capture without target
+      | ^
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @name
-      |  ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |  ^^^^
     ");
 }
 
@@ -243,11 +243,11 @@ fn capture_at_start_of_alternation() {
     error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | [@x (a)]
-      |  ^ unexpected token: unexpected token; expected a child expression or closing delimiter
+      |  ^
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | [@x (a)]
-      |   ^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |   ^
     ");
 }
 
@@ -263,15 +263,15 @@ fn mixed_valid_invalid_captures() {
     error: capture without target: capture without target
       |
     1 | (a) @ok @ @name
-      |         ^ capture without target: capture without target
+      |         ^
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a) @ok @ @name
-      |            ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |            ^^^^
     error: unnamed definition must be last: add a name: `Name = (a) @ok`
       |
     1 | (a) @ok @ @name
-      | ^^^^^^^ unnamed definition must be last: add a name: `Name = (a) @ok`
+      | ^^^^^^^
     ");
 }
 
@@ -287,7 +287,7 @@ fn field_equals_typo_missing_value() {
     error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (call name = )
-      |            ^ invalid field syntax: '=' is not valid for field constraints
+      |            ^
       |
     help: use ':'
       |
@@ -297,7 +297,7 @@ fn field_equals_typo_missing_value() {
     error: expected expression: expected expression after field name
       |
     1 | (call name = )
-      |              ^ expected expression: expected expression after field name
+      |              ^
     ");
 }
 
@@ -311,7 +311,7 @@ fn lowercase_branch_label_missing_expression() {
     error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [label:]
-      |  ^^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^^^
       |
     help: capitalize as `Label`
       |
@@ -321,6 +321,6 @@ fn lowercase_branch_label_missing_expression() {
     error: expected expression: expected expression after branch label
       |
     1 | [label:]
-      |        ^ expected expression: expected expression after branch label
+      |        ^
     ");
 }

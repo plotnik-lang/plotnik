@@ -52,7 +52,7 @@ fn undefined_reference() {
     error: undefined reference: `Undefined`
       |
     1 | Call = (call_expression function: (Undefined))
-      |                                    ^^^^^^^^^ undefined reference: `Undefined`
+      |                                    ^^^^^^^^^
     ");
 }
 
@@ -85,7 +85,6 @@ fn mutual_recursion() {
     2 | B = (bar (A))
       |           ^
       |           |
-      |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |           `B` references `A`
     ");
 }
@@ -103,7 +102,7 @@ fn duplicate_definition() {
     error: duplicate definition: `Expr`
       |
     2 | Expr = (other)
-      | ^^^^ duplicate definition: `Expr`
+      | ^^^^
     ");
 }
 
@@ -193,7 +192,7 @@ fn entry_point_undefined_reference() {
     error: undefined reference: `Unknown`
       |
     1 | (call function: (Unknown))
-      |                  ^^^^^^^ undefined reference: `Unknown`
+      |                  ^^^^^^^
     ");
 }
 
@@ -241,15 +240,15 @@ fn multiple_undefined() {
     error: undefined reference: `X`
       |
     1 | (foo (X) (Y) (Z))
-      |       ^ undefined reference: `X`
+      |       ^
     error: undefined reference: `Y`
       |
     1 | (foo (X) (Y) (Z))
-      |           ^ undefined reference: `Y`
+      |           ^
     error: undefined reference: `Z`
       |
     1 | (foo (X) (Y) (Z))
-      |               ^ undefined reference: `Z`
+      |               ^
     ");
 }
 

@@ -29,7 +29,6 @@ fn no_escape_via_plus() {
     1 | E = (call (E)+)
       |            ^
       |            |
-      |            recursive pattern can never match: cycle `E` → `E` has no escape path
       |            `E` references itself
     ");
 }
@@ -57,7 +56,6 @@ fn recursion_in_tree_child() {
     1 | E = (call (E))
       |            ^
       |            |
-      |            recursive pattern can never match: cycle `E` → `E` has no escape path
       |            `E` references itself
     ");
 }
@@ -105,7 +103,6 @@ fn mutual_recursion_no_escape() {
     2 | B = (bar (A))
       |           ^
       |           |
-      |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |           `B` references `A`
     ");
 }
@@ -172,7 +169,6 @@ fn cycle_ref_in_field() {
     2 | B = (bar (A))
       |           ^
       |           |
-      |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |           `B` references `A`
     ");
 }
@@ -193,7 +189,6 @@ fn cycle_ref_in_capture() {
     2 | B = (bar (A))
       |           ^
       |           |
-      |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |           `B` references `A`
     ");
 }
@@ -214,7 +209,6 @@ fn cycle_ref_in_sequence() {
     2 | B = (bar (A))
       |           ^
       |           |
-      |           recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
       |           `B` references `A`
     ");
 }
