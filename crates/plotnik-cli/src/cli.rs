@@ -32,11 +32,11 @@ pub struct Cli {
 pub enum Command {
     /// Debug and inspect queries and source files
     #[command(after_help = r#"EXAMPLES:
-  plotnik debug -q '(identifier) @id' --show-query
+  plotnik debug -q '(identifier) @id'
   plotnik debug -q '(identifier) @id' --only-symbols
-  plotnik debug -s app.ts --show-source
-  plotnik debug -s app.ts --show-source --raw
-  plotnik debug -q '(function_declaration) @fn' -s app.ts -l typescript --show-query"#)]
+  plotnik debug -s app.ts
+  plotnik debug -s app.ts --raw
+  plotnik debug -q '(function_declaration) @fn' -s app.ts -l typescript"#)]
     Debug {
         #[command(flatten)]
         query: QueryArgs,
@@ -88,19 +88,11 @@ pub struct SourceArgs {
 
 #[derive(Args)]
 pub struct OutputArgs {
-    /// Show query syntax tree
-    #[arg(long = "show-query")]
-    pub query: bool,
-
     /// Colorize output (auto-detected by default)
     #[arg(long, default_value = "auto", value_name = "WHEN")]
     pub color: ColorChoice,
 
-    /// Show source syntax tree
-    #[arg(long = "show-source")]
-    pub source: bool,
-
-    /// Show only symbol table
+    /// Show only symbol table (instead of query AST)
     #[arg(long = "only-symbols")]
     pub symbols: bool,
 
