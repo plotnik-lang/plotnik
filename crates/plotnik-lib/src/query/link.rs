@@ -17,8 +17,8 @@ use super::Query;
 
 /// Simple edit distance for fuzzy matching (Levenshtein).
 fn edit_distance(a: &str, b: &str) -> usize {
-    let a_len = a.len();
-    let b_len = b.len();
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
 
     if a_len == 0 {
         return b_len;
@@ -124,7 +124,7 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 }
 
 /// Context for validating child types.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct ValidationContext<'a> {
     /// The parent node type being validated against.
     parent_id: NodeTypeId,
@@ -136,7 +136,7 @@ struct ValidationContext<'a> {
     field: Option<FieldContext<'a>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct FieldContext<'a> {
     name: &'a str,
     id: NodeFieldId,
@@ -371,19 +371,19 @@ impl<'a> Query<'a> {
                         }
                         _ => {
                             // Non-field children: validate as non-field children
-                            if let Some(ref ctx) = child_ctx {
-                                self.validate_non_field_children(&child, ctx, lang, visited);
+                            if let Some(ctx) = child_ctx {
+                                self.validate_non_field_children(&child, &ctx, lang, visited);
                             }
-                            self.validate_expr_structure(&child, child_ctx.clone(), lang, visited);
+                            self.validate_expr_structure(&child, child_ctx, lang, visited);
                         }
                     }
                 }
 
                 // Handle negated fields
-                if let Some(ref ctx) = child_ctx {
+                if let Some(ctx) = child_ctx {
                     for child in node.as_cst().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
-                            self.validate_negated_field(&neg, ctx, lang);
+                            self.validate_negated_field(&neg, &ctx, lang);
                         }
                     }
                 }
@@ -401,12 +401,12 @@ impl<'a> Query<'a> {
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx.clone(), lang, visited);
+                    self.validate_expr_structure(&body, ctx, lang, visited);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx.clone(), lang, visited);
+                    self.validate_expr_structure(&child, ctx, lang, visited);
                 }
             }
             Expr::CapturedExpr(cap) => {
@@ -424,9 +424,11 @@ impl<'a> Query<'a> {
                     return;
                 }
                 let Some(body) = self.symbol_table.get(name).cloned() else {
+                    visited.swap_remove(name);
                     return;
                 };
                 self.validate_expr_structure(&body, ctx, lang, visited);
+                visited.swap_remove(name);
             }
         }
     }
@@ -578,9 +580,11 @@ impl<'a> Query<'a> {
                 return;
             }
             let Some(body) = self.symbol_table.get(name).cloned() else {
+                visited.swap_remove(name);
                 return;
             };
             self.validate_terminal_type(&body, ctx, lang, visited);
+            visited.swap_remove(name);
             return;
         }
 
@@ -673,9 +677,11 @@ impl<'a> Query<'a> {
                     return;
                 }
                 let Some(body) = self.symbol_table.get(name) else {
+                    visited.swap_remove(name);
                     return;
                 };
                 self.collect_terminal_types_impl(body, result, visited);
+                visited.swap_remove(name);
             }
             Expr::FieldExpr(_) => {
                 // Fields are handled separately

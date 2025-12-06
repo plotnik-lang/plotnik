@@ -1009,3 +1009,39 @@ fn ref_followed_in_sequence() {
     help: valid children for `statement_block`: `statement`
     ");
 }
+
+#[test]
+fn ref_validated_in_multiple_contexts() {
+    let input = indoc! {r#"
+        Foo = (number)
+        (function_declaration
+            name: (Foo)
+            body: (statement_block (Foo)))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics_raw(), @r"
+    error: node type `number` is not valid for this field
+      |
+    1 | Foo = (number)
+      |        ^^^^^^
+    2 | (function_declaration
+    3 |     name: (Foo)
+      |     ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+
+    error: `number` cannot be a child of this node
+      |
+    1 | Foo = (number)
+      |        ^^^^^^
+    ...
+    4 |     body: (statement_block (Foo)))
+      |            --------------- inside `statement_block`
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}

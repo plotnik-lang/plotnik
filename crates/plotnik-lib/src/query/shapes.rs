@@ -39,6 +39,9 @@ impl Query<'_> {
         if let Some(&c) = self.shape_cardinality_table.get(expr) {
             return c;
         }
+        // Insert sentinel to break cycles (e.g., `Foo = (Foo)`)
+        self.shape_cardinality_table
+            .insert(expr.clone(), ShapeCardinality::Invalid);
         let c = self.compute_single(expr);
         self.shape_cardinality_table.insert(expr.clone(), c);
         c
