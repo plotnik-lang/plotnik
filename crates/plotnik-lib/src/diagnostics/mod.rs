@@ -83,7 +83,7 @@ impl Diagnostics {
     ///
     /// Suppression rule: when a higher-priority diagnostic's span contains
     /// a lower-priority diagnostic's span, the lower-priority one is suppressed.
-    pub(crate) fn filtered(&self) -> Vec<&DiagnosticMessage> {
+    pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
         if self.messages.is_empty() {
             return Vec::new();
         }
@@ -108,7 +108,7 @@ impl Diagnostics {
             .iter()
             .enumerate()
             .filter(|(i, _)| !suppressed[*i])
-            .map(|(_, m)| m)
+            .map(|(_, m)| m.clone())
             .collect()
     }
 
@@ -118,16 +118,13 @@ impl Diagnostics {
         &self.messages
     }
 
-    pub fn printer<'a>(&'a self, source: &'a str) -> DiagnosticsPrinter<'a> {
-        DiagnosticsPrinter::new(&self.messages, source)
+    pub fn printer<'a>(&self, source: &'a str) -> DiagnosticsPrinter<'a> {
+        DiagnosticsPrinter::new(self.messages.clone(), source)
     }
 
-    /// Printer that uses filtered diagnostics.
-    pub fn filtered_printer<'a>(&'a self, source: &'a str) -> FilteredDiagnosticsPrinter<'a> {
-        FilteredDiagnosticsPrinter {
-            diagnostics: self,
-            source,
-        }
+    /// Printer that uses filtered diagnostics (cascading errors suppressed).
+    pub fn filtered_printer<'a>(&self, source: &'a str) -> DiagnosticsPrinter<'a> {
+        DiagnosticsPrinter::new(self.filtered(), source)
     }
 
     pub fn render(&self, source: &str) -> String {
@@ -148,65 +145,6 @@ impl Diagnostics {
 
     pub fn extend(&mut self, other: Diagnostics) {
         self.messages.extend(other.messages);
-    }
-}
-
-/// Printer wrapper that uses filtered diagnostics.
-pub struct FilteredDiagnosticsPrinter<'a> {
-    diagnostics: &'a Diagnostics,
-    source: &'a str,
-}
-
-impl<'a> FilteredDiagnosticsPrinter<'a> {
-    pub fn path(self, path: &'a str) -> FilteredDiagnosticsPrinterWithPath<'a> {
-        FilteredDiagnosticsPrinterWithPath {
-            diagnostics: self.diagnostics,
-            source: self.source,
-            path: Some(path),
-            colored: false,
-        }
-    }
-
-    pub fn colored(self, colored: bool) -> FilteredDiagnosticsPrinterWithPath<'a> {
-        FilteredDiagnosticsPrinterWithPath {
-            diagnostics: self.diagnostics,
-            source: self.source,
-            path: None,
-            colored,
-        }
-    }
-
-    pub fn render(&self) -> String {
-        let filtered = self.diagnostics.filtered();
-        DiagnosticsPrinter::from_refs(&filtered, self.source).render()
-    }
-}
-
-pub struct FilteredDiagnosticsPrinterWithPath<'a> {
-    diagnostics: &'a Diagnostics,
-    source: &'a str,
-    path: Option<&'a str>,
-    colored: bool,
-}
-
-impl<'a> FilteredDiagnosticsPrinterWithPath<'a> {
-    pub fn path(mut self, path: &'a str) -> Self {
-        self.path = Some(path);
-        self
-    }
-
-    pub fn colored(mut self, colored: bool) -> Self {
-        self.colored = colored;
-        self
-    }
-
-    pub fn render(&self) -> String {
-        let filtered = self.diagnostics.filtered();
-        let mut printer = DiagnosticsPrinter::from_refs(&filtered, self.source);
-        if let Some(p) = self.path {
-            printer = printer.path(p);
-        }
-        printer.colored(self.colored).render()
     }
 }
 
