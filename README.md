@@ -81,7 +81,7 @@ This structure is guaranteed by the query engine. No defensive programming neede
 
 Tree-sitter already has queries:
 
-```scheme
+```clojure
 (function_declaration
   name: (identifier) @name
   body: (statement_block) @body)
