@@ -10,10 +10,10 @@ fn missing_capture_name() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected capture name after '@'
+    error: expected name after `@`
       |
     1 | (identifier) @
-      |               ^ expected capture name after '@'
+      |               ^
     ");
 }
 
@@ -26,10 +26,10 @@ fn missing_field_value() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected expression after field name
+    error: expected an expression; after `field:`
       |
     1 | (call name:)
-      |            ^ expected expression after field name
+      |            ^
     ");
 }
 
@@ -40,10 +40,10 @@ fn named_def_eof_after_equals() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected expression after '=' in named definition
+    error: expected an expression; after `=` in definition
       |
     1 | Expr = 
-      |        ^ expected expression after '=' in named definition
+      |        ^
     ");
 }
 
@@ -56,10 +56,10 @@ fn missing_type_name() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected type name after '::' (e.g., ::MyType or ::string)
+    error: expected type name after `::`; e.g., `::MyType` or `::string`
       |
     1 | (identifier) @name ::
-      |                      ^ expected type name after '::' (e.g., ::MyType or ::string)
+      |                      ^
     ");
 }
 
@@ -72,10 +72,10 @@ fn missing_negated_field_name() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected field name after '!' (e.g., !value)
+    error: expected field name; e.g., `!value`
       |
     1 | (call !)
-      |        ^ expected field name after '!' (e.g., !value)
+      |        ^
     ");
 }
 
@@ -88,10 +88,10 @@ fn missing_subtype() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected subtype after '/' (e.g., expression/binary_expression)
+    error: expected subtype after `/`; e.g., `expression/binary_expression`
       |
     1 | (expression/)
-      |             ^ expected subtype after '/' (e.g., expression/binary_expression)
+      |             ^
     ");
 }
 
@@ -104,10 +104,10 @@ fn tagged_branch_missing_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected expression after branch label
+    error: expected an expression; after `Label:`
       |
     1 | [Label:]
-      |        ^ expected expression after branch label
+      |        ^
     ");
 }
 
@@ -118,10 +118,10 @@ fn type_annotation_missing_name_at_eof() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected type name after '::' (e.g., ::MyType or ::string)
+    error: expected type name after `::`; e.g., `::MyType` or `::string`
       |
     1 | (a) @x ::
-      |          ^ expected type name after '::' (e.g., ::MyType or ::string)
+      |          ^
     ");
 }
 
@@ -132,10 +132,10 @@ fn type_annotation_missing_name_with_bracket() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected type name after '::' (e.g., ::MyType or ::string)
+    error: expected type name after `::`; e.g., `::MyType` or `::string`
       |
     1 | [(a) @x :: ]
-      |            ^ expected type name after '::' (e.g., ::MyType or ::string)
+      |            ^
     ");
 }
 
@@ -148,20 +148,10 @@ fn type_annotation_invalid_token_after() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected type name after '::' (e.g., ::MyType or ::string)
+    error: expected type name after `::`; e.g., `::MyType` or `::string`
       |
     1 | (identifier) @name :: (
-      |                       ^ expected type name after '::' (e.g., ::MyType or ::string)
-    error: unclosed tree; expected ')'
-      |
-    1 | (identifier) @name :: (
-      |                       -^ unclosed tree; expected ')'
-      |                       |
-      |                       tree started here
-    error: unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
-      |
-    1 | (identifier) @name :: (
-      | ^^^^^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @name ::`
+      |                       ^
     ");
 }
 
@@ -174,10 +164,10 @@ fn field_value_is_garbage() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected expression after field name
+    error: expected an expression; after `field:`
       |
     1 | (call name: %%%)
-      |             ^^^ expected expression after field name
+      |             ^^^
     ");
 }
 
@@ -190,10 +180,10 @@ fn capture_with_invalid_char() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected capture name after '@'
+    error: expected name after `@`
       |
     1 | (identifier) @123
-      |               ^^^ expected capture name after '@'
+      |               ^^^
     ");
 }
 
@@ -204,10 +194,10 @@ fn bare_capture_at_eof_triggers_sync() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture '@' must follow an expression to capture
+    error: `@` must follow an expression to capture
       |
     1 | @
-      | ^ capture '@' must follow an expression to capture
+      | ^
     ");
 }
 
@@ -220,14 +210,10 @@ fn bare_capture_at_root() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture '@' must follow an expression to capture
+    error: `@` must follow an expression to capture
       |
     1 | @name
-      | ^ capture '@' must follow an expression to capture
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | @name
-      |  ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^
     ");
 }
 
@@ -240,14 +226,10 @@ fn capture_at_start_of_alternation() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unexpected token; expected a child expression or closing delimiter
+    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
       |
     1 | [@x (a)]
-      |  ^ unexpected token; expected a child expression or closing delimiter
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-      |
-    1 | [@x (a)]
-      |   ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |  ^
     ");
 }
 
@@ -260,18 +242,15 @@ fn mixed_valid_invalid_captures() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture '@' must follow an expression to capture
+    error: `@` must follow an expression to capture
       |
     1 | (a) @ok @ @name
-      |         ^ capture '@' must follow an expression to capture
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |         ^
+
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | (a) @ok @ @name
-      |            ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = (a) @ok`
-      |
-    1 | (a) @ok @ @name
-      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (a) @ok`
+      |            ^^^^
     ");
 }
 
@@ -284,20 +263,21 @@ fn field_equals_typo_missing_value() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '=' is not valid for field constraints
+    error: use `:` for field constraints, not `=`; this isn't a definition
       |
     1 | (call name = )
-      |            ^ '=' is not valid for field constraints
+      |            ^
       |
-    help: use ':'
+    help: use `:`
       |
     1 - (call name = )
     1 + (call name : )
       |
-    error: expected expression after field name
+
+    error: expected an expression; after `field =`
       |
     1 | (call name = )
-      |              ^ expected expression after field name
+      |              ^
     ");
 }
 
@@ -308,19 +288,20 @@ fn lowercase_branch_label_missing_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: tagged alternation labels must be Capitalized (they map to enum variants)
+    error: branch labels must be capitalized; branch labels map to enum variants
       |
     1 | [label:]
-      |  ^^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^^^
       |
-    help: capitalize as `Label`
+    help: use `Label`
       |
     1 - [label:]
     1 + [Label:]
       |
-    error: expected expression after branch label
+
+    error: expected an expression; after `label:`
       |
     1 | [label:]
-      |        ^ expected expression after branch label
+      |        ^
     ");
 }

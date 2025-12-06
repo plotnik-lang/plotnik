@@ -188,8 +188,11 @@ impl<'a> Query<'a> {
             .unwrap_or(ShapeCardinality::One)
     }
 
-    /// All diagnostics combined from all passes.
-    pub fn diagnostics(&self) -> Diagnostics {
+    /// All diagnostics combined from all passes (unfiltered).
+    ///
+    /// Use this for debugging or when you need to see all diagnostics
+    /// including cascading errors.
+    pub fn diagnostics_raw(&self) -> Diagnostics {
         let mut all = Diagnostics::new();
         all.extend(self.parse_diagnostics.clone());
         all.extend(self.alt_kind_diagnostics.clone());
@@ -197,6 +200,14 @@ impl<'a> Query<'a> {
         all.extend(self.recursion_diagnostics.clone());
         all.extend(self.shapes_diagnostics.clone());
         all
+    }
+
+    /// All diagnostics combined from all passes.
+    ///
+    /// Returns diagnostics with cascading errors suppressed.
+    /// For raw access, use [`diagnostics_raw`](Self::diagnostics_raw).
+    pub fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics_raw()
     }
 
     /// Query is valid if there are no error-severity diagnostics (warnings are allowed).

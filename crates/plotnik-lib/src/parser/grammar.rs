@@ -13,6 +13,7 @@ use super::cst::token_sets::{
 };
 use super::cst::{SyntaxKind, TokenSet};
 use super::lexer::token_text;
+use crate::diagnostics::DiagnosticKind;
 
 impl Parser<'_> {
     pub fn parse_root(&mut self) {
@@ -43,13 +44,8 @@ impl Parser<'_> {
             for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
                 self.diagnostics
-                    .error(
-                        format!(
-                            "unnamed definition must be last in file; add a name: `Name = {}`",
-                            def_text.trim()
-                        ),
-                        *span,
-                    )
+                    .report(DiagnosticKind::UnnamedDefNotLast, *span)
+                    .message(format!("give it a name like `Name = {}`", def_text.trim()))
                     .emit();
             }
         }
@@ -74,7 +70,10 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error("expected expression after '=' in named definition");
+            self.error_msg(
+                DiagnosticKind::ExpectedExpression,
+                "after `=` in definition",
+            );
         }
 
         self.finish_node();
@@ -88,16 +87,15 @@ impl Parser<'_> {
             self.parse_expr();
             true
         } else if kind == SyntaxKind::At {
-            self.error_and_bump("capture '@' must follow an expression to capture");
+            self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
             false
         } else if kind == SyntaxKind::Predicate {
-            self.error_and_bump(
-                "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
-            );
+            self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
             false
         } else {
-            self.error_and_bump(
-                "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _",
+            self.error_and_bump_msg(
+                DiagnosticKind::UnexpectedToken,
+                "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
             );
             false
         }
@@ -136,12 +134,10 @@ impl Parser<'_> {
             SyntaxKind::Negation => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
-                self.error_and_bump(
-                    "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)",
-                );
+                self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }
             _ => {
-                self.error_and_bump("unexpected token; expected an expression");
+                self.error_and_bump_msg(DiagnosticKind::UnexpectedToken, "not a valid expression");
             }
         }
 
@@ -166,7 +162,7 @@ impl Parser<'_> {
         match self.peek() {
             SyntaxKind::ParenClose => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
-                self.error("empty tree expression - expected node type or children");
+                self.error(DiagnosticKind::EmptyTree);
                 self.pop_delimiter();
                 self.bump(); // consume ')'
                 self.finish_node();
@@ -191,7 +187,7 @@ impl Parser<'_> {
                 if self.peek() == SyntaxKind::Slash {
                     if is_ref {
                         self.start_node_at(checkpoint, SyntaxKind::Tree);
-                        self.error("references cannot use supertype syntax (/)");
+                        self.error(DiagnosticKind::InvalidSupertypeSyntax);
                         is_ref = false;
                     }
                     self.bump();
@@ -203,8 +199,9 @@ impl Parser<'_> {
                             self.bump_string_tokens();
                         }
                         _ => {
-                            self.error(
-                                "expected subtype after '/' (e.g., expression/binary_expression)",
+                            self.error_msg(
+                                DiagnosticKind::ExpectedSubtype,
+                                "e.g., `expression/binary_expression`",
                             );
                         }
                     }
@@ -214,7 +211,7 @@ impl Parser<'_> {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
                 if self.peek() != SyntaxKind::ParenClose {
-                    self.error("(ERROR) takes no arguments");
+                    self.error(DiagnosticKind::ErrorTakesNoArguments);
                     self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
                 }
                 self.pop_delimiter();
@@ -258,10 +255,8 @@ impl Parser<'_> {
 
             if let Some(name) = &ref_name {
                 self.diagnostics
-                    .error(
-                        format!("reference `{}` cannot contain children", name),
-                        children_span,
-                    )
+                    .report(DiagnosticKind::RefCannotHaveChildren, children_span)
+                    .message(name)
                     .emit();
             }
         } else if is_ref {
@@ -286,22 +281,27 @@ impl Parser<'_> {
     fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
             if self.eof() {
-                let (construct, delim) = match until {
-                    SyntaxKind::ParenClose => ("tree", "')'"),
-                    SyntaxKind::BraceClose => ("sequence", "'}'"),
+                let (construct, delim, kind) = match until {
+                    SyntaxKind::ParenClose => ("tree", "`)`", DiagnosticKind::UnclosedTree),
+                    SyntaxKind::BraceClose => ("sequence", "`}`", DiagnosticKind::UnclosedSequence),
                     _ => panic!(
                         "parse_children: unexpected delimiter {:?} (only ParenClose/BraceClose supported)",
                         until
                     ),
                 };
-                let msg = format!("unclosed {construct}; expected {delim}");
+                let msg = format!("expected {delim}");
                 let open = self.delimiter_stack.last().unwrap_or_else(|| {
                     panic!(
                         "parse_children: unclosed {construct} at EOF but delimiter_stack is empty \
                          (caller must push delimiter before calling)"
                     )
                 });
-                self.error_with_related(msg, format!("{construct} started here"), open.span);
+                self.error_unclosed_delimiter(
+                    kind,
+                    msg,
+                    format!("{construct} started here"),
+                    open.span,
+                );
                 break;
             }
             if self.has_fatal_error() {
@@ -320,16 +320,15 @@ impl Parser<'_> {
                 continue;
             }
             if kind == SyntaxKind::Predicate {
-                self.error_and_bump(
-                    "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
-                );
+                self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
                 continue;
             }
             if recovery.contains(kind) {
                 break;
             }
-            self.error_and_bump(
-                "unexpected token; expected a child expression or closing delimiter",
+            self.error_and_bump_msg(
+                DiagnosticKind::UnexpectedToken,
+                "not valid inside a node — try `(child)` or close with `)`",
             );
         }
     }
@@ -351,14 +350,19 @@ impl Parser<'_> {
     fn parse_alt_children(&mut self) {
         loop {
             if self.eof() {
-                let msg = "unclosed alternation; expected ']'";
+                let msg = "expected `]`";
                 let open = self.delimiter_stack.last().unwrap_or_else(|| {
                     panic!(
                         "parse_alt_children: unclosed alternation at EOF but delimiter_stack is empty \
                          (caller must push delimiter before calling)"
                     )
                 });
-                self.error_with_related(msg, "alternation started here", open.span);
+                self.error_unclosed_delimiter(
+                    DiagnosticKind::UnclosedAlternation,
+                    msg,
+                    "alternation started here",
+                    open.span,
+                );
                 break;
             }
             if self.has_fatal_error() {
@@ -393,8 +397,9 @@ impl Parser<'_> {
             if ALT_RECOVERY.contains(kind) {
                 break;
             }
-            self.error_and_bump(
-                "unexpected token; expected a child expression or closing delimiter",
+            self.error_and_bump_msg(
+                DiagnosticKind::UnexpectedToken,
+                "not valid inside alternation — try `(node)` or close with `]`",
             );
         }
     }
@@ -414,7 +419,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error("expected expression after branch label");
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after `Label:`");
         }
 
         self.finish_node();
@@ -429,9 +434,10 @@ impl Parser<'_> {
         let capitalized = capitalize_first(label_text);
 
         self.error_with_fix(
+            DiagnosticKind::LowercaseBranchLabel,
             span,
-            "tagged alternation labels must be Capitalized (they map to enum variants)",
-            format!("capitalize as `{}`", capitalized),
+            "branch labels map to enum variants",
+            format!("use `{}`", capitalized),
             capitalized,
         );
 
@@ -442,7 +448,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error("expected expression after branch label");
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after `label:`");
         }
 
         self.finish_node();
@@ -494,7 +500,7 @@ impl Parser<'_> {
         self.bump(); // consume At
 
         if self.peek() != SyntaxKind::Id {
-            self.error("expected capture name after '@'");
+            self.error(DiagnosticKind::ExpectedCaptureName);
             return;
         }
 
@@ -524,7 +530,10 @@ impl Parser<'_> {
             self.bump();
             self.validate_type_name(text, span);
         } else {
-            self.error("expected type name after '::' (e.g., ::MyType or ::string)");
+            self.error_msg(
+                DiagnosticKind::ExpectedTypeName,
+                "e.g., `::MyType` or `::string`",
+            );
         }
 
         self.finish_node();
@@ -540,9 +549,10 @@ impl Parser<'_> {
 
         let span = self.current_span();
         self.error_with_fix(
+            DiagnosticKind::InvalidTypeAnnotationSyntax,
             span,
-            "single colon is not valid for type annotations",
-            "use '::'",
+            "single `:` looks like a field",
+            "use `::`",
             "::",
         );
 
@@ -569,7 +579,7 @@ impl Parser<'_> {
         self.expect(SyntaxKind::Negation, "'!' for negated field");
 
         if self.peek() != SyntaxKind::Id {
-            self.error("expected field name after '!' (e.g., !value)");
+            self.error_msg(DiagnosticKind::ExpectedFieldName, "e.g., `!value`");
             self.finish_node();
             return;
         }
@@ -590,8 +600,9 @@ impl Parser<'_> {
             self.parse_field_equals_typo();
         } else {
             // Bare identifiers are not valid expressions; trees require parentheses
-            self.error_and_bump(
-                "bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)",
+            self.error_and_bump_msg(
+                DiagnosticKind::BareIdentifier,
+                "wrap in parentheses: `(identifier)`",
             );
         }
     }
@@ -615,7 +626,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr_no_suffix();
         } else {
-            self.error("expected expression after field name");
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after `field:`");
         }
 
         self.finish_node();
@@ -629,9 +640,10 @@ impl Parser<'_> {
         self.peek();
         let span = self.current_span();
         self.error_with_fix(
+            DiagnosticKind::InvalidFieldEquals,
             span,
-            "'=' is not valid for field constraints",
-            "use ':'",
+            "this isn't a definition",
+            "use `:`",
             ":",
         );
         self.bump();
@@ -639,7 +651,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error("expected expression after field name");
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after `field =`");
         }
 
         self.finish_node();
@@ -659,12 +671,10 @@ impl Parser<'_> {
             ),
         };
         self.error_with_fix(
+            DiagnosticKind::InvalidSeparator,
             span,
-            format!(
-                "'{}' is not valid syntax; plotnik uses whitespace for separation",
-                char_name
-            ),
-            "remove separator",
+            format!("plotnik uses whitespace, not `{}`", char_name),
+            "remove",
             "",
         );
         self.skip_token();
@@ -694,9 +704,10 @@ impl Parser<'_> {
             let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
             self.error_with_fix(
+                DiagnosticKind::CaptureNameHasDots,
                 span,
-                "capture names cannot contain dots",
-                format!("captures become struct fields; use @{} instead", suggested),
+                "captures become struct fields",
+                format!("use `@{}`", suggested),
                 suggested,
             );
             return;
@@ -706,9 +717,10 @@ impl Parser<'_> {
             let suggested = name.replace('-', "_");
             let suggested = to_snake_case(&suggested);
             self.error_with_fix(
+                DiagnosticKind::CaptureNameHasHyphens,
                 span,
-                "capture names cannot contain hyphens",
-                format!("captures become struct fields; use @{} instead", suggested),
+                "captures become struct fields",
+                format!("use `@{}`", suggested),
                 suggested,
             );
             return;
@@ -717,12 +729,10 @@ impl Parser<'_> {
         if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
             self.error_with_fix(
+                DiagnosticKind::CaptureNameUppercase,
                 span,
-                "capture names must start with lowercase",
-                format!(
-                    "capture names must be snake_case; use @{} instead",
-                    suggested
-                ),
+                "captures become struct fields",
+                format!("use `@{}`", suggested),
                 suggested,
             );
         }
@@ -733,12 +743,10 @@ impl Parser<'_> {
         if !name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
+                DiagnosticKind::DefNameLowercase,
                 span,
-                "definition names must start with uppercase",
-                format!(
-                    "definition names must be PascalCase; use {} instead",
-                    suggested
-                ),
+                "definitions map to types",
+                format!("use `{}`", suggested),
                 suggested,
             );
             return;
@@ -747,12 +755,10 @@ impl Parser<'_> {
         if name.contains('_') || name.contains('-') || name.contains('.') {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
+                DiagnosticKind::DefNameHasSeparators,
                 span,
-                "definition names cannot contain separators",
-                format!(
-                    "definition names must be PascalCase; use {} instead",
-                    suggested
-                ),
+                "definitions map to types",
+                format!("use `{}`", suggested),
                 suggested,
             );
         }
@@ -763,12 +769,10 @@ impl Parser<'_> {
         if name.contains('_') || name.contains('-') || name.contains('.') {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
+                DiagnosticKind::BranchLabelHasSeparators,
                 span,
-                "branch labels cannot contain separators",
-                format!(
-                    "branch labels must be PascalCase; use {}: instead",
-                    suggested
-                ),
+                "branch labels map to enum variants",
+                format!("use `{}:`", suggested),
                 format!("{}:", suggested),
             );
         }
@@ -780,9 +784,10 @@ impl Parser<'_> {
             let suggested = name.replace(['.', '-'], "_");
             let suggested = to_snake_case(&suggested);
             self.error_with_fix(
+                DiagnosticKind::FieldNameHasDots,
                 span,
-                "field names cannot contain dots",
-                format!("field names must be snake_case; use {}: instead", suggested),
+                "field names become struct fields",
+                format!("use `{}:`", suggested),
                 format!("{}:", suggested),
             );
             return;
@@ -792,9 +797,10 @@ impl Parser<'_> {
             let suggested = name.replace('-', "_");
             let suggested = to_snake_case(&suggested);
             self.error_with_fix(
+                DiagnosticKind::FieldNameHasHyphens,
                 span,
-                "field names cannot contain hyphens",
-                format!("field names must be snake_case; use {}: instead", suggested),
+                "field names become struct fields",
+                format!("use `{}:`", suggested),
                 format!("{}:", suggested),
             );
             return;
@@ -803,9 +809,10 @@ impl Parser<'_> {
         if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(name);
             self.error_with_fix(
+                DiagnosticKind::FieldNameUppercase,
                 span,
-                "field names must start with lowercase",
-                format!("field names must be snake_case; use {}: instead", suggested),
+                "field names become struct fields",
+                format!("use `{}:`", suggested),
                 format!("{}:", suggested),
             );
         }
@@ -816,12 +823,10 @@ impl Parser<'_> {
         if name.contains('.') || name.contains('-') {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
+                DiagnosticKind::TypeNameInvalidChars,
                 span,
-                "type names cannot contain dots or hyphens",
-                format!(
-                    "type names cannot contain separators; use ::{} instead",
-                    suggested
-                ),
+                "type annotations map to types",
+                format!("use `::{}`", suggested),
                 format!("::{}", suggested),
             );
         }

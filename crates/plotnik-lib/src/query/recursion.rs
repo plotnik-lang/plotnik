@@ -7,6 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use super::Query;
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Def, Expr, SyntaxKind};
 
 impl Query<'_> {
@@ -207,13 +208,10 @@ impl Query<'_> {
             .map(|(r, _)| *r)
             .unwrap_or_else(|| TextRange::empty(0.into()));
 
-        let mut builder = self.recursion_diagnostics.error(
-            format!(
-                "recursive pattern can never match: cycle {} has no escape path",
-                cycle_str
-            ),
-            range,
-        );
+        let mut builder = self
+            .recursion_diagnostics
+            .report(DiagnosticKind::RecursionNoEscape, range)
+            .message(format!("cycle {} has no escape path", cycle_str));
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);

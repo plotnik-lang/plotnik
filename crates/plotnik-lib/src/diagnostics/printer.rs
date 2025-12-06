@@ -8,14 +8,14 @@ use rowan::TextRange;
 use super::message::{DiagnosticMessage, Severity};
 
 pub struct DiagnosticsPrinter<'a> {
-    diagnostics: &'a [DiagnosticMessage],
+    diagnostics: Vec<DiagnosticMessage>,
     source: &'a str,
     path: Option<&'a str>,
     colored: bool,
 }
 
 impl<'a> DiagnosticsPrinter<'a> {
-    pub(crate) fn new(diagnostics: &'a [DiagnosticMessage], source: &'a str) -> Self {
+    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, source: &'a str) -> Self {
         Self {
             diagnostics,
             source,
@@ -50,11 +50,9 @@ impl<'a> DiagnosticsPrinter<'a> {
         for (i, diag) in self.diagnostics.iter().enumerate() {
             let range = adjust_range(diag.range, self.source.len());
 
-            let mut snippet = Snippet::source(self.source).line_start(1).annotation(
-                AnnotationKind::Primary
-                    .span(range.clone())
-                    .label(&diag.message),
-            );
+            let mut snippet = Snippet::source(self.source)
+                .line_start(1)
+                .annotation(AnnotationKind::Primary.span(range.clone()));
 
             if let Some(p) = self.path {
                 snippet = snippet.path(p);
@@ -68,7 +66,7 @@ impl<'a> DiagnosticsPrinter<'a> {
                 );
             }
 
-            let level = severity_to_level(diag.severity);
+            let level = severity_to_level(diag.severity());
             let title_group = level.primary_title(&diag.message).element(snippet);
 
             let mut report: Vec<Group> = vec![title_group];
@@ -84,7 +82,7 @@ impl<'a> DiagnosticsPrinter<'a> {
             }
 
             if i > 0 {
-                w.write_char('\n')?;
+                w.write_str("\n\n")?;
             }
             write!(w, "{}", renderer.render(&report))?;
         }

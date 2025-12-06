@@ -6,7 +6,7 @@ use super::ast::Root;
 use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
 
 use crate::Error;
 
@@ -254,22 +254,45 @@ impl<'src> Parser<'src> {
         if self.eat(kind) {
             return true;
         }
-        self.error(format!("expected {}", what));
+        let msg = format!("expected {}", what);
+        self.error_msg(DiagnosticKind::UnexpectedToken, &msg);
         false
     }
 
-    pub(super) fn error(&mut self, message: impl Into<String>) {
+    /// Returns the suppression span for the current context.
+    ///
+    /// If inside a delimiter (tree/seq/alt), returns a span from the delimiter's
+    /// start to the end of source. This ensures all errors within the same
+    /// delimiter context can suppress each other based on priority.
+    /// At root level, returns the current token's span.
+    pub(super) fn current_suppression_span(&self) -> TextRange {
+        self.delimiter_stack
+            .last()
+            .map(|d| {
+                let source_end = TextSize::from(self.source.len() as u32);
+                TextRange::new(d.span.start(), source_end)
+            })
+            .unwrap_or_else(|| self.current_span())
+    }
+
+    fn error_impl(&mut self, kind: DiagnosticKind, message: Option<&str>) {
         let range = self.current_span();
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
-        self.diagnostics.error(message, range).emit();
+
+        let suppression = self.current_suppression_span();
+        let builder = self.diagnostics.report(kind, range);
+        let builder = match message {
+            Some(msg) => builder.message(msg),
+            None => builder,
+        };
+        builder.suppression_range(suppression).emit();
     }
 
-    pub(super) fn error_and_bump(&mut self, message: &str) {
-        self.error(message);
+    fn bump_as_error(&mut self) {
         if !self.eof() {
             self.start_node(SyntaxKind::Error);
             self.bump();
@@ -277,15 +300,40 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Emit diagnostic with default message for the kind.
+    pub(super) fn error(&mut self, kind: DiagnosticKind) {
+        self.error_impl(kind, None);
+    }
+
+    /// Emit diagnostic with custom message detail.
+    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error_impl(kind, Some(message));
+    }
+
+    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
+        self.error(kind);
+        self.bump_as_error();
+    }
+
+    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error_msg(kind, message);
+        self.bump_as_error();
+    }
+
     #[allow(dead_code)]
-    pub(super) fn error_recover(&mut self, message: &str, recovery: TokenSet) {
+    pub(super) fn error_recover(
+        &mut self,
+        kind: DiagnosticKind,
+        message: &str,
+        recovery: TokenSet,
+    ) {
         if self.at_set(recovery) || self.should_stop() {
-            self.error(message);
+            self.error_msg(kind, message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
-        self.error(message);
+        self.error_msg(kind, message);
         while !self.at_set(recovery) && !self.should_stop() {
             self.bump();
         }
@@ -352,21 +400,27 @@ impl<'src> Parser<'src> {
         self.delimiter_stack.pop()
     }
 
-    pub(super) fn error_with_related(
+    /// Error for unclosed delimiters - uses full span from opening to current position.
+    /// This enables proper cascading error suppression.
+    pub(super) fn error_unclosed_delimiter(
         &mut self,
+        kind: DiagnosticKind,
         message: impl Into<String>,
         related_msg: impl Into<String>,
-        related_range: TextRange,
+        open_range: TextRange,
     ) {
-        let range = self.current_span();
-        let pos = range.start();
+        let current = self.current_span();
+        let pos = current.start();
         if self.last_diagnostic_pos == Some(pos) {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
+        // Full span from opening delimiter to current position for suppression
+        let full_range = TextRange::new(open_range.start(), current.end());
         self.diagnostics
-            .error(message, range)
-            .related_to(related_msg, related_range)
+            .report(kind, full_range)
+            .message(message)
+            .related_to(related_msg, open_range)
             .emit();
     }
 
@@ -381,6 +435,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn error_with_fix(
         &mut self,
+        kind: DiagnosticKind,
         range: TextRange,
         message: impl Into<String>,
         fix_description: impl Into<String>,
@@ -392,7 +447,8 @@ impl<'src> Parser<'src> {
         }
         self.last_diagnostic_pos = Some(pos);
         self.diagnostics
-            .error(message, range)
+            .report(kind, range)
+            .message(message)
             .fix(fix_description, fix_replacement)
             .emit();
     }
