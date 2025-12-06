@@ -36,12 +36,20 @@ pub fn run(args: DebugArgs) {
         None
     };
 
-    let query = query_source.as_ref().map(|src| {
+    let mut query = query_source.as_ref().map(|src| {
         Query::try_from(src).unwrap_or_else(|e| {
             eprintln!("error: {}", e);
             std::process::exit(1);
         })
     });
+
+    // Auto-link when --lang is provided with a query
+    if args.lang.is_some()
+        && let Some(ref mut q) = query
+    {
+        let lang = resolve_lang_for_link(&args.lang);
+        q.link(&lang);
+    }
 
     let show_query = has_query_input && !args.symbols;
     let show_source = has_source_input;
@@ -129,4 +137,12 @@ fn validate(args: &DebugArgs, has_query: bool, has_source: bool) -> Result<(), &
     }
 
     Ok(())
+}
+
+fn resolve_lang_for_link(lang: &Option<String>) -> plotnik_langs::Lang {
+    let name = lang.as_ref().expect("--lang required for --link");
+    plotnik_langs::from_name(name).unwrap_or_else(|| {
+        eprintln!("error: unknown language: {}", name);
+        std::process::exit(1);
+    })
 }

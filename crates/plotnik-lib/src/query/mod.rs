@@ -10,12 +10,16 @@ mod printer;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
+#[cfg(feature = "plotnik-langs")]
+pub mod link;
 pub mod recursion;
 pub mod shapes;
 pub mod symbol_table;
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(all(test, feature = "plotnik-langs"))]
+mod link_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]
@@ -28,6 +32,9 @@ mod shapes_tests;
 mod symbol_table_tests;
 
 use std::collections::HashMap;
+
+#[cfg(feature = "plotnik-langs")]
+use plotnik_langs::{NodeFieldId, NodeTypeId};
 
 use rowan::GreenNodeBuilder;
 
@@ -56,6 +63,10 @@ pub struct Query<'a> {
     ast: Root,
     symbol_table: SymbolTable<'a>,
     shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
+    #[cfg(feature = "plotnik-langs")]
+    node_type_ids: HashMap<&'a str, Option<NodeTypeId>>,
+    #[cfg(feature = "plotnik-langs")]
+    node_field_ids: HashMap<&'a str, Option<NodeFieldId>>,
     exec_fuel: Option<u32>,
     recursion_fuel: Option<u32>,
     exec_fuel_consumed: u32,
@@ -64,6 +75,8 @@ pub struct Query<'a> {
     resolve_diagnostics: Diagnostics,
     recursion_diagnostics: Diagnostics,
     shapes_diagnostics: Diagnostics,
+    #[cfg(feature = "plotnik-langs")]
+    link_diagnostics: Diagnostics,
 }
 
 fn empty_root() -> Root {
@@ -84,6 +97,10 @@ impl<'a> Query<'a> {
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
             shape_cardinality_table: HashMap::new(),
+            #[cfg(feature = "plotnik-langs")]
+            node_type_ids: HashMap::new(),
+            #[cfg(feature = "plotnik-langs")]
+            node_field_ids: HashMap::new(),
             exec_fuel: Some(DEFAULT_EXEC_FUEL),
             recursion_fuel: Some(DEFAULT_RECURSION_FUEL),
             exec_fuel_consumed: 0,
@@ -92,6 +109,8 @@ impl<'a> Query<'a> {
             resolve_diagnostics: Diagnostics::new(),
             recursion_diagnostics: Diagnostics::new(),
             shapes_diagnostics: Diagnostics::new(),
+            #[cfg(feature = "plotnik-langs")]
+            link_diagnostics: Diagnostics::new(),
         }
     }
 
@@ -199,6 +218,8 @@ impl<'a> Query<'a> {
         all.extend(self.resolve_diagnostics.clone());
         all.extend(self.recursion_diagnostics.clone());
         all.extend(self.shapes_diagnostics.clone());
+        #[cfg(feature = "plotnik-langs")]
+        all.extend(self.link_diagnostics.clone());
         all
     }
 
@@ -211,6 +232,18 @@ impl<'a> Query<'a> {
     }
 
     /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
+    #[cfg(feature = "plotnik-langs")]
+    pub fn is_valid(&self) -> bool {
+        !self.parse_diagnostics.has_errors()
+            && !self.alt_kind_diagnostics.has_errors()
+            && !self.resolve_diagnostics.has_errors()
+            && !self.recursion_diagnostics.has_errors()
+            && !self.shapes_diagnostics.has_errors()
+            && !self.link_diagnostics.has_errors()
+    }
+
+    /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
+    #[cfg(not(feature = "plotnik-langs"))]
     pub fn is_valid(&self) -> bool {
         !self.parse_diagnostics.has_errors()
             && !self.alt_kind_diagnostics.has_errors()

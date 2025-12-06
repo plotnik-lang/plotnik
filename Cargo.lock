@@ -401,6 +401,7 @@ dependencies = [
  "indoc",
  "insta",
  "logos",
+ "plotnik-langs",
  "rowan",
  "serde",
  "serde_json",

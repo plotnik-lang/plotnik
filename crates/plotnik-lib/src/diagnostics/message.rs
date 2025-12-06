@@ -60,6 +60,12 @@ pub enum DiagnosticKind {
     RecursionNoEscape,
     FieldSequenceValue,
 
+    // Link pass - grammar validation
+    UnknownNodeType,
+    UnknownField,
+    FieldNotOnNodeType,
+    InvalidFieldChildType,
+
     // Often consequences of earlier errors
     UnnamedDefNotLast,
 }
@@ -157,6 +163,12 @@ impl DiagnosticKind {
             Self::RecursionNoEscape => "infinite recursion detected",
             Self::FieldSequenceValue => "field must match exactly one node",
 
+            // Link pass - grammar validation
+            Self::UnknownNodeType => "unknown node type",
+            Self::UnknownField => "unknown field",
+            Self::FieldNotOnNodeType => "field not valid on this node type",
+            Self::InvalidFieldChildType => "node type not valid for this field",
+
             // Structural
             Self::UnnamedDefNotLast => "only the last definition can be unnamed",
         }
@@ -176,6 +188,12 @@ impl DiagnosticKind {
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
+
+            // Link pass errors with context
+            Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
+            Self::UnknownField => "`{}` is not a valid field".to_string(),
+            Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
+            Self::InvalidFieldChildType => "node type `{}` is not valid for this field".to_string(),
 
             // Recursion with cycle path
             Self::RecursionNoEscape => "infinite recursion: {}".to_string(),
@@ -272,6 +290,7 @@ pub(crate) struct DiagnosticMessage {
     pub(crate) message: String,
     pub(crate) fix: Option<Fix>,
     pub(crate) related: Vec<RelatedInfo>,
+    pub(crate) hints: Vec<String>,
 }
 
 impl DiagnosticMessage {
@@ -283,6 +302,7 @@ impl DiagnosticMessage {
             message: message.into(),
             fix: None,
             related: Vec::new(),
+            hints: Vec::new(),
         }
     }
 
@@ -324,6 +344,9 @@ impl std::fmt::Display for DiagnosticMessage {
                 u32::from(related.range.start()),
                 u32::from(related.range.end())
             )?;
+        }
+        for hint in &self.hints {
+            write!(f, " (hint: {})", hint)?;
         }
         Ok(())
     }

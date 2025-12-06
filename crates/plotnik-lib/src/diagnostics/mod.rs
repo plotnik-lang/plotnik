@@ -223,6 +223,11 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
+    pub fn hint(mut self, hint: impl Into<String>) -> Self {
+        self.message.hints.push(hint.into());
+        self
+    }
+
     pub fn emit(self) {
         self.diagnostics.messages.push(self.message);
     }
