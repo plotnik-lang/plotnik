@@ -24,7 +24,7 @@
 <br/>
 
 <p align="center">
-  <i><strong>⚠️ DISCLAIMER: THE PROJECT IS IN <a href="https://github.com/plotnik-lang/plotnik#roadmap">EARLY STAGE</a> ⚠️</strong></i><br/>
+  <i><strong>⚠️ DISCLAIMER: THE PROJECT IS IN <a href="#roadmap">EARLY STAGE</a> ⚠️</strong></i><br/>
 </p>
 
 <br/>
