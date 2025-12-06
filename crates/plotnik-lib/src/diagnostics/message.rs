@@ -14,13 +14,11 @@ use rowan::TextRange;
 /// - Structural observations are often consequences of earlier errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DiagnosticKind {
-    // === Unclosed delimiters (highest priority) ===
     // These cause cascading errors throughout the rest of the file
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
 
-    // === Expected token errors ===
     // User omitted something required - root cause errors
     ExpectedExpression,
     ExpectedTypeName,
@@ -28,7 +26,6 @@ pub enum DiagnosticKind {
     ExpectedFieldName,
     ExpectedSubtype,
 
-    // === Invalid token/syntax usage ===
     // User wrote something that doesn't belong
     EmptyTree,
     BareIdentifier,
@@ -44,7 +41,6 @@ pub enum DiagnosticKind {
     CaptureWithoutTarget,
     LowercaseBranchLabel,
 
-    // === Naming validation ===
     // Convention violations - fixable with suggestions
     CaptureNameHasDots,
     CaptureNameHasHyphens,
@@ -57,7 +53,6 @@ pub enum DiagnosticKind {
     FieldNameUppercase,
     TypeNameInvalidChars,
 
-    // === Semantic errors ===
     // Valid syntax, invalid semantics
     DuplicateDefinition,
     UndefinedReference,
@@ -65,7 +60,6 @@ pub enum DiagnosticKind {
     RecursionNoEscape,
     FieldSequenceValue,
 
-    // === Structural observations (lowest priority) ===
     // Often consequences of earlier errors
     UnnamedDefNotLast,
 }
