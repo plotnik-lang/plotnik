@@ -20,8 +20,6 @@ fn main() {
                 source_text: source.source_text,
                 source_file: source.source_file,
                 lang,
-                query: output.query,
-                source: output.source,
                 symbols: output.symbols,
                 raw: output.raw,
                 cst: output.cst,

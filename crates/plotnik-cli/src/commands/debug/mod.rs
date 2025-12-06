@@ -13,8 +13,6 @@ pub struct DebugArgs {
     pub source_text: Option<String>,
     pub source_file: Option<std::path::PathBuf>,
     pub lang: Option<String>,
-    pub query: bool,
-    pub source: bool,
     pub symbols: bool,
     pub raw: bool,
     pub cst: bool,
@@ -45,15 +43,11 @@ pub fn run(args: DebugArgs) {
         })
     });
 
-    let show_headers = [args.query, args.source, args.symbols]
-        .iter()
-        .filter(|&&x| x)
-        .count()
-        >= 2;
+    let show_query = has_query_input && !args.symbols;
+    let show_source = has_source_input;
+    let show_headers = (show_query || args.symbols) && show_source;
 
-    if args.query
-        && let Some(ref q) = query
-    {
+    if show_query && let Some(ref q) = query {
         if show_headers {
             println!("=== QUERY ===");
         }
@@ -83,7 +77,7 @@ pub fn run(args: DebugArgs) {
         );
     }
 
-    if args.source {
+    if show_source {
         let resolved_lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
         let source_code = load_source(&args.source_text, &args.source_file);
         let tree = parse_tree(&source_code, resolved_lang);
@@ -120,20 +114,18 @@ fn load_query(args: &DebugArgs) -> String {
 }
 
 fn validate(args: &DebugArgs, has_query: bool, has_source: bool) -> Result<(), &'static str> {
-    if (args.query || args.symbols) && !has_query {
-        return Err("--query and --only-symbols require --query-text or --query-file");
+    if !has_query && !has_source {
+        return Err(
+            "specify at least one input: -q/--query, --query-file, -s/--source-file, or --source",
+        );
     }
 
-    if args.source && !has_source {
-        return Err("--source requires --source-text or --source-file");
+    if args.symbols && !has_query {
+        return Err("--only-symbols requires -q/--query or --query-file");
     }
 
     if args.source_text.is_some() && args.lang.is_none() {
-        return Err("--lang is required when using --source-text");
-    }
-
-    if !args.query && !args.source && !args.symbols {
-        return Err("specify at least one output: --query, --source, or --only-symbols");
+        return Err("--lang is required when using --source");
     }
 
     Ok(())
