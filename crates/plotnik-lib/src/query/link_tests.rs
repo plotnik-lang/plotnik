@@ -115,6 +115,8 @@ fn field_not_on_node_type() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `condition` is not valid on this node type
       |
+    1 | (function_declaration
+      |  -------------------- on `function_declaration`
     2 |     condition: (identifier) @name) @fn
       |     ^^^^^^^^^
       |
@@ -136,6 +138,8 @@ fn field_not_on_node_type_with_suggestion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `parameter` is not valid on this node type
       |
+    1 | (function_declaration
+      |  -------------------- on `function_declaration`
     2 |     parameter: (formal_parameters) @params) @fn
       |     ^^^^^^^^^
       |
@@ -178,7 +182,9 @@ fn negated_field_not_on_node_type() {
     error: field `condition` is not valid on this node type
       |
     1 | (function_declaration !condition) @fn
-      |                        ^^^^^^^^^
+      |  --------------------  ^^^^^^^^^
+      |  |
+      |  on `function_declaration`
       |
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
@@ -198,7 +204,9 @@ fn negated_field_not_on_node_type_with_suggestion() {
     error: field `parameter` is not valid on this node type
       |
     1 | (function_declaration !parameter) @fn
-      |                        ^^^^^^^^^
+      |  --------------------  ^^^^^^^^^
+      |  |
+      |  on `function_declaration`
       |
     help: did you mean `parameters`?
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
@@ -338,7 +346,9 @@ fn invalid_child_type_for_field() {
     error: node type `statement_block` is not valid for this field
       |
     2 |     name: (statement_block) @name) @fn
-      |            ^^^^^^^^^^^^^^^
+      |     ----   ^^^^^^^^^^^^^^^
+      |     |
+      |     field `name` on `function_declaration`
       |
     help: valid types for `name`: `identifier`
     ");
@@ -394,10 +404,11 @@ fn sequence_with_link_errors() {
 
     error: `statement_block` cannot be a child of this node
       |
+    1 | (function_declaration
+      |  -------------------- `function_declaration` only accepts children via fields
+    2 |     {(identifer)
     3 |      (statement_block)} @body) @fn
       |       ^^^^^^^^^^^^^^^
-      |
-    help: `function_declaration` only accepts children via fields
     ");
 }
 
@@ -476,6 +487,8 @@ fn field_on_node_without_fields() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` is not valid on this node type
       |
+    1 | (identifier
+      |  ---------- on `identifier`
     2 |     name: (identifier) @inner) @id
       |     ^^^^
       |
@@ -497,10 +510,10 @@ fn invalid_child_type_no_children_allowed() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `class_declaration` cannot be a child of this node
       |
+    1 | (function_declaration
+      |  -------------------- `function_declaration` only accepts children via fields
     2 |     (class_declaration)) @fn
       |      ^^^^^^^^^^^^^^^^^
-      |
-    help: `function_declaration` only accepts children via fields
     ");
 }
 
@@ -518,6 +531,8 @@ fn invalid_child_type_wrong_type() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `identifier` cannot be a child of this node
       |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
     2 |     (identifier)) @block
       |      ^^^^^^^^^^
       |
@@ -565,6 +580,8 @@ fn invalid_anonymous_child() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: `function` cannot be a child of this node
       |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
     2 |     "function") @block
       |      ^^^^^^^^
       |
@@ -586,6 +603,8 @@ fn invalid_child_in_alternation() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `identifier` cannot be a child of this node
       |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
     2 |     [(function_declaration) (identifier)]) @block
       |                              ^^^^^^^^^^
       |
@@ -607,8 +626,210 @@ fn invalid_child_in_sequence() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `identifier` cannot be a child of this node
       |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
     2 |     {(function_declaration) (identifier)}) @block
       |                              ^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
+
+#[test]
+fn deeply_nested_sequences_valid() {
+    let input = indoc! {r#"
+        (statement_block {{{(function_declaration)}}}) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn deeply_nested_sequences_invalid() {
+    let input = indoc! {r#"
+        (statement_block {{{(identifier)}}}) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    1 | (statement_block {{{(identifier)}}}) @block
+      |  ---------------     ^^^^^^^^^^
+      |  |
+      |  inside `statement_block`
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
+
+#[test]
+fn deeply_nested_alternations_in_field_valid() {
+    let input = indoc! {r#"
+        (function_declaration name: [[[(identifier)]]]) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn deeply_nested_alternations_in_field_invalid() {
+    let input = indoc! {r#"
+        (function_declaration name: [[[(statement_block)]]]) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `statement_block` is not valid for this field
+      |
+    1 | (function_declaration name: [[[(statement_block)]]]) @fn
+      |                       ----      ^^^^^^^^^^^^^^^
+      |                       |
+      |                       field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn deeply_nested_no_fields_allowed() {
+    let input = indoc! {r#"
+        (function_declaration {{{(class_declaration)}}}) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `class_declaration` cannot be a child of this node
+      |
+    1 | (function_declaration {{{(class_declaration)}}}) @fn
+      |  --------------------     ^^^^^^^^^^^^^^^^^
+      |  |
+      |  `function_declaration` only accepts children via fields
+    ");
+}
+
+#[test]
+fn mixed_nested_with_capture_and_quantifier() {
+    let input = indoc! {r#"
+        (statement_block
+            {[(function_declaration)+ @fns
+              (identifier) @id]*}) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
+    2 |     {[(function_declaration)+ @fns
+    3 |       (identifier) @id]*}) @block
+      |        ^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
+
+#[test]
+fn field_with_captured_and_quantified_invalid_type() {
+    let input = indoc! {r#"
+        (function_declaration
+            name: (statement_block)? @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `statement_block` is not valid for this field
+      |
+    2 |     name: (statement_block)? @name) @fn
+      |     ----   ^^^^^^^^^^^^^^^
+      |     |
+      |     field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn multiple_invalid_types_in_alternation_field() {
+    let input = indoc! {r#"
+        (function_declaration
+            name: [(statement_block) (class_declaration)]) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `statement_block` is not valid for this field
+      |
+    2 |     name: [(statement_block) (class_declaration)]) @fn
+      |     ----    ^^^^^^^^^^^^^^^
+      |     |
+      |     field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+
+    error: node type `class_declaration` is not valid for this field
+      |
+    2 |     name: [(statement_block) (class_declaration)]) @fn
+      |     ----                      ^^^^^^^^^^^^^^^^^
+      |     |
+      |     field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn multiple_invalid_types_in_sequence_child() {
+    let input = indoc! {r#"
+        (statement_block
+            {(identifier) (number)}) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
+    2 |     {(identifier) (number)}) @block
+      |       ^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+
+    error: `number` cannot be a child of this node
+      |
+    1 | (statement_block
+      |  --------------- inside `statement_block`
+    2 |     {(identifier) (number)}) @block
+      |                    ^^^^^^
       |
     help: valid children for `statement_block`: `statement`
     ");
