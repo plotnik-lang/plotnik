@@ -214,11 +214,6 @@ fn bare_capture_at_root() {
       |
     1 | @name
       | ^
-
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
-      |
-    1 | @name
-      |  ^^^^
     ");
 }
 
@@ -231,10 +226,10 @@ fn capture_at_start_of_alternation() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
       |
     1 | [@x (a)]
-      |   ^
+      |  ^
     ");
 }
 
@@ -268,6 +263,17 @@ fn field_equals_typo_missing_value() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: use `:` for field constraints, not `=`; this isn't a definition
+      |
+    1 | (call name = )
+      |            ^
+      |
+    help: use `:`
+      |
+    1 - (call name = )
+    1 + (call name : )
+      |
+
     error: expected an expression; after `field =`
       |
     1 | (call name = )
@@ -282,6 +288,17 @@ fn lowercase_branch_label_missing_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: branch labels must be capitalized; branch labels map to enum variants
+      |
+    1 | [label:]
+      |  ^^^^^
+      |
+    help: use `Label`
+      |
+    1 - [label:]
+    1 + [Label:]
+      |
+
     error: expected an expression; after `label:`
       |
     1 | [label:]

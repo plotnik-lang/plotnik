@@ -1097,6 +1097,17 @@ fn pipe_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: separators are not needed; plotnik uses whitespace, not `|`
+      |
+    1 | (a | b)
+      |    ^
+      |
+    help: remove
+      |
+    1 - (a | b)
+    1 + (a  b)
+      |
+
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | (a | b)
@@ -1171,10 +1182,16 @@ fn field_equals_typo_no_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: expected an expression; after `field =`
+    error: use `:` for field constraints, not `=`; this isn't a definition
       |
     1 | (call name=)
-      |            ^
+      |           ^
+      |
+    help: use `:`
+      |
+    1 - (call name=)
+    1 + (call name:)
+      |
     ");
 }
 
@@ -1275,11 +1292,6 @@ fn single_colon_primitive_type() {
       |
     1 | @val : string
       |     ^
-
-    error: expected an expression; after `field:`
-      |
-    1 | @val : string
-      |      ^
 
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |

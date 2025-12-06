@@ -83,9 +83,10 @@ impl Diagnostics {
     ///
     /// Suppression rules:
     /// 1. Containment: when error A's suppression_range contains error B's display range,
-    ///    and A has higher priority, suppress B
+    ///    and A has higher priority, suppress B (only for structural errors)
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
     /// 3. Consequence errors (UnnamedDefNotLast) suppressed when any other error exists
+    /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
     pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
         if self.messages.is_empty() {
             return Vec::new();
@@ -110,11 +111,12 @@ impl Diagnostics {
                     continue;
                 }
 
-                // Rule 1: Suppression range containment
-                // If A's suppression_range contains B's display range, A can suppress B
-                if suppression_range_contains(a.suppression_range, b.range)
-                    && a.kind.suppresses(&b.kind)
-                {
+                // Rule 1: Structural error containment
+                // Only unclosed delimiters can suppress distant errors, because they cause
+                // cascading parse failures throughout the tree
+                let contains = a.suppression_range.start() <= b.range.start()
+                    && b.range.end() <= a.suppression_range.end();
+                if contains && a.kind.is_structural_error() && a.kind.suppresses(&b.kind) {
                     suppressed[j] = true;
                     continue;
                 }
@@ -122,14 +124,24 @@ impl Diagnostics {
                 // Rule 2: Same start position
                 if a.range.start() == b.range.start() {
                     // Root cause errors (Expected*) suppress structural errors (Unclosed*)
+                    // even though structural errors have higher enum priority. This is because
+                    // ExpectedExpression is the actual mistake; UnclosedTree is a consequence.
                     if a.kind.is_root_cause_error() && b.kind.is_structural_error() {
                         suppressed[j] = true;
                         continue;
                     }
-                    // Otherwise, fall back to normal priority (lower discriminant wins)
                     if a.kind.suppresses(&b.kind) {
                         suppressed[j] = true;
+                        continue;
                     }
+                }
+
+                // Rule 4: Adjacent position - when A ends exactly where B starts,
+                // B is likely a consequence of A (e.g., `@x` where `@` is unexpected
+                // and `x` would be reported as bare identifier).
+                // Priority doesn't matter here - position determines causality.
+                if a.range.end() == b.range.start() {
+                    suppressed[j] = true;
                 }
             }
         }
@@ -211,14 +223,4 @@ impl<'a> DiagnosticBuilder<'a> {
     pub fn emit(self) {
         self.diagnostics.messages.push(self.message);
     }
-}
-
-/// Check if a suppression range contains a display range.
-///
-/// For suppression purposes, we use non-strict containment: the inner range
-/// can start at the same position as the outer range. This allows errors
-/// reported at the same position but with different suppression contexts
-/// to properly suppress each other.
-fn suppression_range_contains(suppression: TextRange, display: TextRange) -> bool {
-    suppression.start() <= display.start() && display.end() <= suppression.end()
 }

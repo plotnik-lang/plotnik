@@ -41,5 +41,10 @@ fn combined_errors() {
       |
     1 | (call (Undefined) extra)
       |                   ^^^^^
+
+    error: `Undefined` is not defined
+      |
+    1 | (call (Undefined) extra)
+      |        ^^^^^^^^^
     ");
 }

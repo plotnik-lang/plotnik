@@ -143,10 +143,15 @@ fn predicate_unsupported() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: predicates like `#match?` are not supported
       |
     1 | (a (#eq? @x "foo") b)
-      |           ^
+      |     ^^^^
+
+    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+      |
+    1 | (a (#eq? @x "foo") b)
+      |          ^
 
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
@@ -183,10 +188,15 @@ fn predicate_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: predicates like `#match?` are not supported
       |
     1 | (function #eq? @name "test")
-      |                 ^^^^
+      |           ^^^^
+
+    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+      |
+    1 | (function #eq? @name "test")
+      |                ^
     "#);
 }
 
@@ -233,6 +243,11 @@ fn multiline_garbage_recovery() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+      |
+    2 | ^^^
+      | ^^^
+
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     3 | b)
@@ -290,10 +305,15 @@ fn alternation_recovery_to_capture() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
       |
     1 | [^^^ @name]
-      |       ^^^^
+      |  ^^^
+
+    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+      |
+    1 | [^^^ @name]
+      |      ^
     ");
 }
 
