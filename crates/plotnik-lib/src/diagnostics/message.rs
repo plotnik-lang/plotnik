@@ -169,15 +169,15 @@ impl DiagnosticKind {
 
             // Cases with backtick-wrapped placeholders
             Self::DuplicateDefinition | Self::UndefinedReference => {
-                format!("{}: `{{}}`", self.fallback_message())
+                format!("{}; `{{}}`", self.fallback_message())
             }
 
             // Cases where custom text differs from fallback
-            Self::InvalidTypeAnnotationSyntax => "invalid type annotation: {}".to_string(),
-            Self::MixedAltBranches => "mixed alternation: {}".to_string(),
+            Self::InvalidTypeAnnotationSyntax => "invalid type annotation; {}".to_string(),
+            Self::MixedAltBranches => "mixed alternation; {}".to_string(),
 
             // Standard pattern: fallback + ": {}"
-            _ => format!("{}: {{}}", self.fallback_message()),
+            _ => format!("{}; {{}}", self.fallback_message()),
         }
     }
 

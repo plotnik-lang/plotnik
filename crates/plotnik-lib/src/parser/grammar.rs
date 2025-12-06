@@ -72,7 +72,7 @@ impl Parser<'_> {
         } else {
             self.error_msg(
                 DiagnosticKind::ExpectedExpression,
-                "expected expression after '=' in named definition",
+                "after '=' in named definition",
             );
         }
 
@@ -95,7 +95,7 @@ impl Parser<'_> {
         } else {
             self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
-                "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _",
+                "expected an expression like (node), [choice], {sequence}, \"literal\", or _",
             );
             false
         }
@@ -137,10 +137,7 @@ impl Parser<'_> {
                 self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }
             _ => {
-                self.error_and_bump_msg(
-                    DiagnosticKind::UnexpectedToken,
-                    "unexpected token; expected an expression",
-                );
+                self.error_and_bump_msg(DiagnosticKind::UnexpectedToken, "expected an expression");
             }
         }
 
@@ -204,7 +201,7 @@ impl Parser<'_> {
                         _ => {
                             self.error_msg(
                                 DiagnosticKind::ExpectedSubtype,
-                                "expected subtype after '/' (e.g., expression/binary_expression)",
+                                "after '/' (e.g., expression/binary_expression)",
                             );
                         }
                     }
@@ -331,7 +328,7 @@ impl Parser<'_> {
             }
             self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
-                "unexpected token; expected a child expression or closing delimiter",
+                "expected a child expression or closing delimiter",
             );
         }
     }
@@ -402,7 +399,7 @@ impl Parser<'_> {
             }
             self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
-                "unexpected token; expected a child expression or closing delimiter",
+                "expected a child expression or closing delimiter",
             );
         }
     }
@@ -422,10 +419,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "expected expression after branch label",
-            );
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after branch label");
         }
 
         self.finish_node();
@@ -454,10 +448,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "expected expression after branch label",
-            );
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after branch label");
         }
 
         self.finish_node();
@@ -541,7 +532,7 @@ impl Parser<'_> {
         } else {
             self.error_msg(
                 DiagnosticKind::ExpectedTypeName,
-                "expected type name after '::' (e.g., ::MyType or ::string)",
+                "after '::' (e.g., ::MyType or ::string)",
             );
         }
 
@@ -590,7 +581,7 @@ impl Parser<'_> {
         if self.peek() != SyntaxKind::Id {
             self.error_msg(
                 DiagnosticKind::ExpectedFieldName,
-                "expected field name after '!' (e.g., !value)",
+                "after '!' (e.g., !value)",
             );
             self.finish_node();
             return;
@@ -614,7 +605,7 @@ impl Parser<'_> {
             // Bare identifiers are not valid expressions; trees require parentheses
             self.error_and_bump_msg(
                 DiagnosticKind::BareIdentifier,
-                "bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)",
+                "nodes must be enclosed in parentheses, e.g., (identifier)",
             );
         }
     }
@@ -638,10 +629,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr_no_suffix();
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "expected expression after field name",
-            );
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after field name");
         }
 
         self.finish_node();
@@ -666,10 +654,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "expected expression after field name",
-            );
+            self.error_msg(DiagnosticKind::ExpectedExpression, "after field name");
         }
 
         self.finish_node();

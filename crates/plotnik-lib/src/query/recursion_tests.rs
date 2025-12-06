@@ -24,7 +24,7 @@ fn no_escape_via_plus() {
     let query = Query::try_from("E = (call (E)+)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `E` → `E` has no escape path
+    error: recursive pattern can never match; cycle `E` → `E` has no escape path
       |
     1 | E = (call (E)+)
       |            ^
@@ -51,7 +51,7 @@ fn recursion_in_tree_child() {
     let query = Query::try_from("E = (call (E))").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `E` → `E` has no escape path
+    error: recursive pattern can never match; cycle `E` → `E` has no escape path
       |
     1 | E = (call (E))
       |            ^
@@ -96,7 +96,7 @@ fn mutual_recursion_no_escape() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+    error: recursive pattern can never match; cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo (B))
       |           - `A` references `B` (completing cycle)
@@ -162,7 +162,7 @@ fn cycle_ref_in_field() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+    error: recursive pattern can never match; cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo body: (B))
       |                 - `A` references `B` (completing cycle)
@@ -182,7 +182,7 @@ fn cycle_ref_in_capture() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+    error: recursive pattern can never match; cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo (B) @cap)
       |           - `A` references `B` (completing cycle)
@@ -202,7 +202,7 @@ fn cycle_ref_in_sequence() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+    error: recursive pattern can never match; cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo {(x) (B)})
       |                - `A` references `B` (completing cycle)

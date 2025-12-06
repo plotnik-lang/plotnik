@@ -49,7 +49,7 @@ fn undefined_reference() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: undefined reference: `Undefined`
+    error: undefined reference; `Undefined`
       |
     1 | Call = (call_expression function: (Undefined))
       |                                    ^^^^^^^^^
@@ -78,7 +78,7 @@ fn mutual_recursion() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: recursive pattern can never match: cycle `B` → `A` → `B` has no escape path
+    error: recursive pattern can never match; cycle `B` → `A` → `B` has no escape path
       |
     1 | A = (foo (B))
       |           - `A` references `B` (completing cycle)
@@ -99,7 +99,7 @@ fn duplicate_definition() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: duplicate definition: `Expr`
+    error: duplicate definition; `Expr`
       |
     2 | Expr = (other)
       | ^^^^
@@ -189,7 +189,7 @@ fn entry_point_undefined_reference() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: undefined reference: `Unknown`
+    error: undefined reference; `Unknown`
       |
     1 | (call function: (Unknown))
       |                  ^^^^^^^
@@ -237,17 +237,17 @@ fn multiple_undefined() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: undefined reference: `X`
+    error: undefined reference; `X`
       |
     1 | (foo (X) (Y) (Z))
       |       ^
 
-    error: undefined reference: `Y`
+    error: undefined reference; `Y`
       |
     1 | (foo (X) (Y) (Z))
       |           ^
 
-    error: undefined reference: `Z`
+    error: undefined reference; `Z`
       |
     1 | (foo (X) (Y) (Z))
       |               ^

@@ -63,7 +63,7 @@ fn builder_with_related() {
     assert_eq!(diagnostics.len(), 1);
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree: primary
+    error: unclosed tree; primary
       |
     1 | hello world!
       | ^^^^^ ---- related info
@@ -84,7 +84,7 @@ fn builder_with_fix() {
 
     let result = diagnostics.printer("hello world").render();
     insta::assert_snapshot!(result, @r"
-    error: invalid field syntax: fixable
+    error: invalid field syntax; fixable
       |
     1 | hello world
       | ^^^^^
@@ -113,7 +113,7 @@ fn builder_with_all_options() {
 
     let result = diagnostics.printer("hello world stuff!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree: main error
+    error: unclosed tree; main error
       |
     1 | hello world stuff!
       | ^^^^^ ----- ----- and here
@@ -164,7 +164,7 @@ fn printer_with_path() {
 
     let result = diagnostics.printer("hello world").path("test.pql").render();
     insta::assert_snapshot!(result, @r"
-    error: undefined reference: `test error`
+    error: undefined reference; `test error`
      --> test.pql:1:1
       |
     1 | hello world
@@ -185,7 +185,7 @@ fn printer_zero_width_span() {
 
     let result = diagnostics.printer("hello").render();
     insta::assert_snapshot!(result, @r"
-    error: expected expression: zero width error
+    error: expected expression; zero width error
       |
     1 | hello
       | ^
@@ -206,7 +206,7 @@ fn printer_related_zero_width() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree: primary
+    error: unclosed tree; primary
       |
     1 | hello world!
       | ^^^^^ - zero width related
@@ -233,12 +233,12 @@ fn printer_multiple_diagnostics() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree: first error
+    error: unclosed tree; first error
       |
     1 | hello world!
       | ^^^^^
 
-    error: undefined reference: `second error`
+    error: undefined reference; `second error`
       |
     1 | hello world!
       |       ^^^^

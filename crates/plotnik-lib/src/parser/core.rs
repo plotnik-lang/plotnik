@@ -254,10 +254,8 @@ impl<'src> Parser<'src> {
         if self.eat(kind) {
             return true;
         }
-        self.error_msg(
-            DiagnosticKind::UnexpectedToken,
-            format!("expected {}", what),
-        );
+        let msg = format!("expected {}", what);
+        self.error_msg(DiagnosticKind::UnexpectedToken, &msg);
         false
     }
 
@@ -277,13 +275,7 @@ impl<'src> Parser<'src> {
             .unwrap_or_else(|| self.current_span())
     }
 
-    /// Emit diagnostic with default message for the kind.
-    pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        self.error_msg(kind, kind.fallback_message());
-    }
-
-    /// Emit diagnostic with custom message.
-    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
+    fn error_impl(&mut self, kind: DiagnosticKind, message: Option<&str>) {
         let range = self.current_span();
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
@@ -292,24 +284,40 @@ impl<'src> Parser<'src> {
         self.last_diagnostic_pos = Some(pos);
 
         let suppression = self.current_suppression_span();
-        self.diagnostics
-            .report(kind, range)
-            .message(message)
-            .suppression_range(suppression)
-            .emit();
+        let builder = self.diagnostics.report(kind, range);
+        let builder = match message {
+            Some(msg) => builder.message(msg),
+            None => builder,
+        };
+        builder.suppression_range(suppression).emit();
     }
 
-    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
-        self.error_and_bump_msg(kind, kind.fallback_message());
-    }
-
-    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {
-        self.error_msg(kind, message);
+    fn bump_as_error(&mut self) {
         if !self.eof() {
             self.start_node(SyntaxKind::Error);
             self.bump();
             self.finish_node();
         }
+    }
+
+    /// Emit diagnostic with default message for the kind.
+    pub(super) fn error(&mut self, kind: DiagnosticKind) {
+        self.error_impl(kind, None);
+    }
+
+    /// Emit diagnostic with custom message detail.
+    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error_impl(kind, Some(message));
+    }
+
+    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
+        self.error(kind);
+        self.bump_as_error();
+    }
+
+    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error_msg(kind, message);
+        self.bump_as_error();
     }
 
     #[allow(dead_code)]
