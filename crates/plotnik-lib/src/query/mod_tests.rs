@@ -37,14 +37,14 @@ fn combined_errors() {
     let q = Query::try_from("(call (Undefined) extra)").unwrap();
     assert!(!q.is_valid());
     insta::assert_snapshot!(q.dump_diagnostics(), @r"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
-      |
-    1 | (call (Undefined) extra)
-      |                   ^^^^^
-
     error: `Undefined` is not defined
       |
     1 | (call (Undefined) extra)
       |        ^^^^^^^^^
+
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+      |
+    1 | (call (Undefined) extra)
+      |                   ^^^^^
     ");
 }
