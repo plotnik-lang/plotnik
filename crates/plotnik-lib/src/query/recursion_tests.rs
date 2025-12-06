@@ -4,25 +4,30 @@ use indoc::indoc;
 #[test]
 fn escape_via_alternation() {
     let query = Query::try_from("E = [(x) (call (E))]").unwrap();
+
     assert!(query.is_valid());
 }
 
 #[test]
 fn escape_via_optional() {
     let query = Query::try_from("E = (call (E)?)").unwrap();
+
     assert!(query.is_valid());
 }
 
 #[test]
 fn escape_via_star() {
     let query = Query::try_from("E = (call (E)*)").unwrap();
+
     assert!(query.is_valid());
 }
 
 #[test]
 fn no_escape_via_plus() {
     let query = Query::try_from("E = (call (E)+)").unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `E` → `E` has no escape path
       |
@@ -36,6 +41,7 @@ fn no_escape_via_plus() {
 #[test]
 fn escape_via_empty_tree() {
     let query = Query::try_from("E = [(call) (E)]").unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -49,7 +55,9 @@ fn lazy_quantifiers_same_as_greedy() {
 #[test]
 fn recursion_in_tree_child() {
     let query = Query::try_from("E = (call (E))").unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `E` → `E` has no escape path
       |
@@ -63,27 +71,55 @@ fn recursion_in_tree_child() {
 #[test]
 fn recursion_in_field() {
     let query = Query::try_from("E = (call body: (E))").unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `E` → `E` has no escape path
+      |
+    1 | E = (call body: (E))
+      |                  ^
+      |                  |
+      |                  `E` references itself
+    ");
 }
 
 #[test]
 fn recursion_in_capture() {
     let query = Query::try_from("E = (call (E) @inner)").unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `E` → `E` has no escape path
+      |
+    1 | E = (call (E) @inner)
+      |            ^
+      |            |
+      |            `E` references itself
+    ");
 }
 
 #[test]
 fn recursion_in_sequence() {
     let query = Query::try_from("E = (call {(a) (E)})").unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `E` → `E` has no escape path
+      |
+    1 | E = (call {(a) (E)})
+      |                 ^
+      |                 |
+      |                 `E` references itself
+    ");
 }
 
 #[test]
 fn recursion_through_multiple_children() {
     let query = Query::try_from("E = [(x) (call (a) (E))]").unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -94,7 +130,9 @@ fn mutual_recursion_no_escape() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `B` → `A` → `B` has no escape path
       |
@@ -114,6 +152,7 @@ fn mutual_recursion_one_has_escape() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -125,8 +164,21 @@ fn three_way_cycle_no_escape() {
         C = (c (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `C` → `B` → `A` → `C` has no escape path
+      |
+    1 | A = (a (B))
+      |         - `A` references `B`
+    2 | B = (b (C))
+      |         - `B` references `C` (completing cycle)
+    3 | C = (c (A))
+      |         ^
+      |         |
+      |         `C` references `A`
+    ");
 }
 
 #[test]
@@ -137,6 +189,7 @@ fn three_way_cycle_one_has_escape() {
         C = (c (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -149,8 +202,22 @@ fn diamond_dependency() {
         D = (d (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `C` → `D` → `B` → `A` → `C` has no escape path
+      |
+    1 | A = (a [(B) (C)])
+      |              - `A` references `C` (completing cycle)
+    2 | B = (b (D))
+    3 | C = (c (D))
+      |         ^
+      |         |
+      |         `C` references `D`
+    4 | D = (d (A))
+      |         - `D` references `A`
+    ");
 }
 
 #[test]
@@ -160,7 +227,9 @@ fn cycle_ref_in_field() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `B` → `A` → `B` has no escape path
       |
@@ -180,7 +249,9 @@ fn cycle_ref_in_capture() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `B` → `A` → `B` has no escape path
       |
@@ -200,7 +271,9 @@ fn cycle_ref_in_sequence() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
+
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: infinite recursion: cycle `B` → `A` → `B` has no escape path
       |
@@ -220,6 +293,7 @@ fn cycle_with_quantifier_escape() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -230,8 +304,19 @@ fn cycle_with_plus_no_escape() {
         B = (bar (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+      |
+    1 | A = (foo (B)+)
+      |           - `A` references `B` (completing cycle)
+    2 | B = (bar (A))
+      |           ^
+      |           |
+      |           `B` references `A`
+    ");
 }
 
 #[test]
@@ -241,6 +326,7 @@ fn non_recursive_reference() {
         Tree = (call (Leaf))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -251,12 +337,14 @@ fn entry_point_uses_recursive_def() {
         (program (E))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
 #[test]
 fn direct_self_ref_in_alternation() {
     let query = Query::try_from("E = [(E) (x)]").unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -266,6 +354,7 @@ fn escape_via_literal_string() {
         A = [(A) "escape"]
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -275,6 +364,7 @@ fn escape_via_wildcard() {
         A = [(A) _]
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -284,6 +374,7 @@ fn escape_via_childless_tree() {
         A = [(A) (leaf)]
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -293,6 +384,7 @@ fn escape_via_anchor() {
         A = (foo . [(A) (x)])
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -302,8 +394,17 @@ fn no_escape_tree_all_recursive() {
         A = (foo (A))
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
-    assert!(query.dump_diagnostics().contains("infinite recursion"));
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `A` → `A` has no escape path
+      |
+    1 | A = (foo (A))
+      |           ^
+      |           |
+      |           `A` references itself
+    ");
 }
 
 #[test]
@@ -312,6 +413,7 @@ fn escape_in_capture_inner() {
         A = [(x)@cap (foo (A))]
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
 }
 
@@ -321,5 +423,6 @@ fn ref_in_quantifier_plus_no_escape() {
         A = (foo (A)+)
     "#};
     let query = Query::try_from(input).unwrap();
+
     assert!(!query.is_valid());
 }
