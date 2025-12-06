@@ -392,9 +392,10 @@ impl<'a> Query<'a> {
             .filter_map(|&id| lang.node_type_name(id))
             .collect();
 
+        let range = get_expr_type_range(&value).unwrap_or(value.text_range());
         let mut builder = self
             .link_diagnostics
-            .report(DiagnosticKind::InvalidFieldChildType, value.text_range())
+            .report(DiagnosticKind::InvalidFieldChildType, range)
             .message(child_name);
 
         if !valid_names.is_empty() {
@@ -432,8 +433,9 @@ impl<'a> Query<'a> {
             // Parent has no non-field children defined - all children must be via fields
             let child_name = self.get_expr_type_name(expr).unwrap_or("(unknown)");
             let parent_name = lang.node_type_name(parent_id).unwrap_or("(unknown)");
+            let range = get_expr_type_range(expr).unwrap_or(expr.text_range());
             self.link_diagnostics
-                .report(DiagnosticKind::InvalidChildType, expr.text_range())
+                .report(DiagnosticKind::InvalidChildType, range)
                 .message(child_name)
                 .hint(format!(
                     "`{}` only accepts children via fields",
@@ -458,9 +460,10 @@ impl<'a> Query<'a> {
             }
         }
 
+        let range = get_expr_type_range(expr).unwrap_or(expr.text_range());
         let mut builder = self
             .link_diagnostics
-            .report(DiagnosticKind::InvalidChildType, expr.text_range())
+            .report(DiagnosticKind::InvalidChildType, range)
             .message(child_name);
 
         if !valid_names.is_empty() {
@@ -580,6 +583,26 @@ impl<'a> Query<'a> {
             Expr::QuantifiedExpr(q) => self.get_expr_type_name(&q.inner()?),
             _ => None,
         }
+    }
+}
+
+fn get_expr_type_range(expr: &Expr) -> Option<rowan::TextRange> {
+    match expr {
+        Expr::NamedNode(node) => {
+            if node.is_any() {
+                return None;
+            }
+            Some(node.node_type()?.text_range())
+        }
+        Expr::AnonymousNode(anon) => {
+            if anon.is_any() {
+                return None;
+            }
+            Some(anon.value()?.text_range())
+        }
+        Expr::CapturedExpr(cap) => get_expr_type_range(&cap.inner()?),
+        Expr::QuantifiedExpr(q) => get_expr_type_range(&q.inner()?),
+        _ => None,
     }
 }
 

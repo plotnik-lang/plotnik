@@ -338,7 +338,7 @@ fn invalid_child_type_for_field() {
     error: node type `statement_block` is not valid for this field
       |
     2 |     name: (statement_block) @name) @fn
-      |           ^^^^^^^^^^^^^^^^^
+      |            ^^^^^^^^^^^^^^^
       |
     help: valid types for `name`: `identifier`
     ");
@@ -395,7 +395,7 @@ fn sequence_with_link_errors() {
     error: `statement_block` cannot be a child of this node
       |
     3 |      (statement_block)} @body) @fn
-      |      ^^^^^^^^^^^^^^^^^
+      |       ^^^^^^^^^^^^^^^
       |
     help: `function_declaration` only accepts children via fields
     ");
@@ -498,7 +498,7 @@ fn invalid_child_type_no_children_allowed() {
     error: `class_declaration` cannot be a child of this node
       |
     2 |     (class_declaration)) @fn
-      |     ^^^^^^^^^^^^^^^^^^^
+      |      ^^^^^^^^^^^^^^^^^
       |
     help: `function_declaration` only accepts children via fields
     ");
@@ -519,7 +519,7 @@ fn invalid_child_type_wrong_type() {
     error: `identifier` cannot be a child of this node
       |
     2 |     (identifier)) @block
-      |     ^^^^^^^^^^^^
+      |      ^^^^^^^^^^
       |
     help: valid children for `statement_block`: `statement`
     ");
@@ -566,7 +566,7 @@ fn invalid_anonymous_child() {
     error: `function` cannot be a child of this node
       |
     2 |     "function") @block
-      |     ^^^^^^^^^^
+      |      ^^^^^^^^
       |
     help: valid children for `statement_block`: `statement`
     "#);
@@ -587,7 +587,7 @@ fn invalid_child_in_alternation() {
     error: `identifier` cannot be a child of this node
       |
     2 |     [(function_declaration) (identifier)]) @block
-      |                             ^^^^^^^^^^^^
+      |                              ^^^^^^^^^^
       |
     help: valid children for `statement_block`: `statement`
     ");
@@ -608,7 +608,7 @@ fn invalid_child_in_sequence() {
     error: `identifier` cannot be a child of this node
       |
     2 |     {(function_declaration) (identifier)}) @block
-      |                             ^^^^^^^^^^^^
+      |                              ^^^^^^^^^^
       |
     help: valid children for `statement_block`: `statement`
     ");
