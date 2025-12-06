@@ -113,19 +113,23 @@ fn emit_type_def(
         TypeValue::TaggedUnion(variants) => {
             let mut out = format!("{}type {} =\n", export_prefix, name);
             let variant_count = variants.len();
-            for (i, (variant_name, fields)) in variants.iter().enumerate() {
+            for (i, (variant_name, variant_key)) in variants.iter().enumerate() {
                 out.push_str("  | { tag: \"");
                 out.push_str(variant_name);
                 out.push('"');
-                for (field_name, field_type) in fields {
-                    let (type_str, is_optional) = emit_field_type(field_type, table, config);
-                    let optional =
-                        if is_optional && config.optional_style == OptionalStyle::QuestionMark {
+                // Look up variant type to get fields
+                if let Some(TypeValue::Struct(fields)) = table.get(variant_key) {
+                    for (field_name, field_type) in fields {
+                        let (type_str, is_optional) = emit_field_type(field_type, table, config);
+                        let optional = if is_optional
+                            && config.optional_style == OptionalStyle::QuestionMark
+                        {
                             "?"
                         } else {
                             ""
                         };
-                    out.push_str(&format!("; {}{}: {}", field_name, optional, type_str));
+                        out.push_str(&format!("; {}{}: {}", field_name, optional, type_str));
+                    }
                 }
                 out.push_str(" }");
                 if i < variant_count - 1 {
@@ -266,11 +270,7 @@ pub(crate) fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> 
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
         TypeValue::Struct(fields) => fields.values().cloned().collect(),
-        TypeValue::TaggedUnion(variants) => variants
-            .values()
-            .flat_map(|f| f.values())
-            .cloned()
-            .collect(),
+        TypeValue::TaggedUnion(variants) => variants.values().cloned().collect(),
         TypeValue::Optional(inner) | TypeValue::List(inner) | TypeValue::NonEmptyList(inner) => {
             vec![inner.clone()]
         }

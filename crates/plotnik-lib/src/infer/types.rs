@@ -57,8 +57,8 @@ pub enum TypeValue<'src> {
     Unit,
     /// Struct with named fields
     Struct(IndexMap<&'src str, TypeKey<'src>>),
-    /// Tagged union: variant name → fields
-    TaggedUnion(IndexMap<&'src str, IndexMap<&'src str, TypeKey<'src>>>),
+    /// Tagged union: variant name → variant type (must resolve to Struct or Unit)
+    TaggedUnion(IndexMap<&'src str, TypeKey<'src>>),
     /// Optional wrapper
     Optional(TypeKey<'src>),
     /// Zero-or-more list wrapper
@@ -248,21 +248,57 @@ mod tests {
 
     #[test]
     fn type_value_tagged_union() {
-        let mut variants = IndexMap::new();
+        let mut table = TypeTable::new();
+
+        // Register variant types as structs
         let mut assign_fields = IndexMap::new();
         assign_fields.insert("target", TypeKey::String);
-        variants.insert("Assign", assign_fields);
+        table.insert(
+            TypeKey::Synthetic(vec!["Stmt", "Assign"]),
+            TypeValue::Struct(assign_fields),
+        );
 
         let mut call_fields = IndexMap::new();
         call_fields.insert("func", TypeKey::String);
-        variants.insert("Call", call_fields);
+        table.insert(
+            TypeKey::Synthetic(vec!["Stmt", "Call"]),
+            TypeValue::Struct(call_fields),
+        );
+
+        // TaggedUnion maps variant name → type key
+        let mut variants = IndexMap::new();
+        variants.insert("Assign", TypeKey::Synthetic(vec!["Stmt", "Assign"]));
+        variants.insert("Call", TypeKey::Synthetic(vec!["Stmt", "Call"]));
 
         let union = TypeValue::TaggedUnion(variants);
+        table.insert(TypeKey::Named("Stmt"), union);
 
-        if let TypeValue::TaggedUnion(v) = union {
+        // Smoke: variant lookup works
+        if let Some(TypeValue::TaggedUnion(v)) = table.get(&TypeKey::Named("Stmt")) {
             assert_eq!(v.len(), 2);
             assert!(v.contains_key("Assign"));
             assert!(v.contains_key("Call"));
+            // Can resolve variant types
+            assert!(table.get(&v["Assign"]).is_some());
+        } else {
+            panic!("expected TaggedUnion");
+        }
+    }
+
+    #[test]
+    fn type_value_tagged_union_empty_variant() {
+        let mut table = TypeTable::new();
+
+        // Empty variant uses Unit
+        let mut variants = IndexMap::new();
+        variants.insert("Empty", TypeKey::Unit);
+        table.insert(
+            TypeKey::Named("MaybeEmpty"),
+            TypeValue::TaggedUnion(variants),
+        );
+
+        if let Some(TypeValue::TaggedUnion(v)) = table.get(&TypeKey::Named("MaybeEmpty")) {
+            assert_eq!(v["Empty"], TypeKey::Unit);
         } else {
             panic!("expected TaggedUnion");
         }
