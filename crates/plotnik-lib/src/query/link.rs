@@ -5,7 +5,9 @@
 //! 2. Collect and resolve all field names (FieldExpr, NegatedField)
 //! 3. Validate structural constraints (field on node type, child type for field)
 
-use plotnik_langs::{Lang, NodeTypeId};
+use indexmap::IndexSet;
+use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
+use rowan::TextRange;
 
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::ast::{self, Expr, NamedNode};
@@ -15,8 +17,8 @@ use super::Query;
 
 /// Simple edit distance for fuzzy matching (Levenshtein).
 fn edit_distance(a: &str, b: &str) -> usize {
-    let a_len = a.len();
-    let b_len = b.len();
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
 
     if a_len == 0 {
         return b_len;
@@ -50,6 +52,53 @@ fn find_similar<'a>(name: &str, candidates: &[&'a str], max_distance: usize) -> 
         .map(|(c, _)| c)
 }
 
+/// Check if `child` is a subtype of `supertype`, recursively handling nested supertypes.
+fn is_subtype_of(lang: &Lang, child: NodeTypeId, supertype: NodeTypeId) -> bool {
+    let subtypes = lang.subtypes(supertype);
+    for &subtype in subtypes {
+        if subtype == child {
+            return true;
+        }
+        if lang.is_supertype(subtype) && is_subtype_of(lang, child, subtype) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if `child` is a valid non-field child of `parent`, expanding supertypes.
+fn is_valid_child_expanded(lang: &Lang, parent: NodeTypeId, child: NodeTypeId) -> bool {
+    let valid_types = lang.valid_child_types(parent);
+    for &allowed in valid_types {
+        if allowed == child {
+            return true;
+        }
+        if lang.is_supertype(allowed) && is_subtype_of(lang, child, allowed) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if `child` is a valid field value type, expanding supertypes.
+fn is_valid_field_type_expanded(
+    lang: &Lang,
+    parent: NodeTypeId,
+    field: NodeFieldId,
+    child: NodeTypeId,
+) -> bool {
+    if lang.is_valid_field_type(parent, field, child) {
+        return true;
+    }
+    let valid_types = lang.valid_field_types(parent, field);
+    for &allowed in valid_types {
+        if lang.is_supertype(allowed) && is_subtype_of(lang, child, allowed) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Format a list of items for display, truncating if too long.
 fn format_list(items: &[&str], max_items: usize) -> String {
     if items.is_empty() {
@@ -72,6 +121,26 @@ fn format_list(items: &[&str], max_items: usize) -> String {
             items.len() - max_items
         )
     }
+}
+
+/// Context for validating child types.
+#[derive(Clone, Copy)]
+struct ValidationContext<'a> {
+    /// The parent node type being validated against.
+    parent_id: NodeTypeId,
+    /// The parent node's name for error messages.
+    parent_name: &'a str,
+    /// The parent node type token range for related_to.
+    parent_range: TextRange,
+    /// If validating a field value, the field info.
+    field: Option<FieldContext<'a>>,
+}
+
+#[derive(Clone, Copy)]
+struct FieldContext<'a> {
+    name: &'a str,
+    id: NodeFieldId,
+    range: TextRange,
 }
 
 impl<'a> Query<'a> {
@@ -272,61 +341,128 @@ impl<'a> Query<'a> {
         let defs: Vec<_> = self.ast.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
-            self.validate_expr_structure(&body, None, lang);
+            let mut visited = IndexSet::new();
+            self.validate_expr_structure(&body, None, lang, &mut visited);
         }
     }
 
     fn validate_expr_structure(
         &mut self,
         expr: &Expr,
-        parent_type_id: Option<NodeTypeId>,
+        ctx: Option<ValidationContext<'a>>,
         lang: &Lang,
+        visited: &mut IndexSet<String>,
     ) {
         match expr {
             Expr::NamedNode(node) => {
-                let current_type_id = self.get_node_type_id(node);
-                for child in node.children() {
-                    self.validate_expr_structure(&child, current_type_id, lang);
+                // Validate this node against the context (if any)
+                if let Some(ref ctx) = ctx {
+                    self.validate_terminal_type(expr, ctx, lang, visited);
                 }
-                for child in node.as_cst().children() {
-                    if let Some(neg) = ast::NegatedField::cast(child) {
-                        self.validate_negated_field(&neg, current_type_id, lang);
+
+                // Set up context for children
+                let child_ctx = self.make_node_context(node, lang);
+
+                for child in node.children() {
+                    match &child {
+                        Expr::FieldExpr(f) => {
+                            // Fields get special handling
+                            self.validate_field_expr(f, child_ctx.as_ref(), lang, visited);
+                        }
+                        _ => {
+                            // Non-field children: validate as non-field children
+                            if let Some(ctx) = child_ctx {
+                                self.validate_non_field_children(&child, &ctx, lang, visited);
+                            }
+                            self.validate_expr_structure(&child, child_ctx, lang, visited);
+                        }
+                    }
+                }
+
+                // Handle negated fields
+                if let Some(ctx) = child_ctx {
+                    for child in node.as_cst().children() {
+                        if let Some(neg) = ast::NegatedField::cast(child) {
+                            self.validate_negated_field(&neg, &ctx, lang);
+                        }
                     }
                 }
             }
+            Expr::AnonymousNode(_) => {
+                // Validate this anonymous node against the context (if any)
+                if let Some(ref ctx) = ctx {
+                    self.validate_terminal_type(expr, ctx, lang, visited);
+                }
+            }
             Expr::FieldExpr(f) => {
-                self.validate_field(f, parent_type_id, lang);
-                let Some(value) = f.value() else { return };
-                self.validate_expr_structure(&value, parent_type_id, lang);
+                // Should be handled by parent NamedNode, but handle gracefully
+                self.validate_field_expr(f, ctx.as_ref(), lang, visited);
             }
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, parent_type_id, lang);
+                    self.validate_expr_structure(&body, ctx, lang, visited);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, parent_type_id, lang);
+                    self.validate_expr_structure(&child, ctx, lang, visited);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, parent_type_id, lang);
+                self.validate_expr_structure(&inner, ctx, lang, visited);
             }
             Expr::QuantifiedExpr(q) => {
                 let Some(inner) = q.inner() else { return };
-                self.validate_expr_structure(&inner, parent_type_id, lang);
+                self.validate_expr_structure(&inner, ctx, lang, visited);
             }
-            Expr::AnonymousNode(_) | Expr::Ref(_) => {}
+            Expr::Ref(r) => {
+                let Some(name_token) = r.name() else { return };
+                let name = name_token.text();
+                if !visited.insert(name.to_string()) {
+                    return;
+                }
+                let Some(body) = self.symbol_table.get(name).cloned() else {
+                    visited.swap_remove(name);
+                    return;
+                };
+                self.validate_expr_structure(&body, ctx, lang, visited);
+                visited.swap_remove(name);
+            }
         }
     }
 
-    fn validate_field(
+    /// Create validation context for a named node's children.
+    fn make_node_context(&self, node: &NamedNode, lang: &Lang) -> Option<ValidationContext<'a>> {
+        if node.is_any() {
+            return None;
+        }
+        let type_token = node.node_type()?;
+        if matches!(
+            type_token.kind(),
+            SyntaxKind::KwError | SyntaxKind::KwMissing
+        ) {
+            return None;
+        }
+        let type_name = type_token.text();
+        let parent_id = self.node_type_ids.get(type_name).copied().flatten()?;
+        let parent_name = lang.node_type_name(parent_id)?;
+        Some(ValidationContext {
+            parent_id,
+            parent_name,
+            parent_range: type_token.text_range(),
+            field: None,
+        })
+    }
+
+    /// Validate a field expression.
+    fn validate_field_expr(
         &mut self,
         field: &ast::FieldExpr,
-        parent_type_id: Option<NodeTypeId>,
+        ctx: Option<&ValidationContext<'a>>,
         lang: &Lang,
+        visited: &mut IndexSet<String>,
     ) {
         let Some(name_token) = field.name() else {
             return;
@@ -337,49 +473,258 @@ impl<'a> Query<'a> {
             return;
         };
 
-        let Some(parent_id) = parent_type_id else {
+        let Some(ctx) = ctx else {
             return;
         };
-        if !lang.has_field(parent_id, field_id) {
-            self.emit_field_not_on_node(name_token.text_range(), field_name, parent_id, lang);
+
+        // Check field exists on parent
+        if !lang.has_field(ctx.parent_id, field_id) {
+            self.emit_field_not_on_node(
+                name_token.text_range(),
+                field_name,
+                ctx.parent_id,
+                ctx.parent_range,
+                lang,
+            );
             return;
         }
 
         let Some(value) = field.value() else {
             return;
         };
-        let Some(child_id) = self.get_expr_type_id(&value) else {
+
+        // Create field context for validating the value
+        let field_ctx = ValidationContext {
+            parent_id: ctx.parent_id,
+            parent_name: ctx.parent_name,
+            parent_range: ctx.parent_range,
+            field: Some(FieldContext {
+                name: &self.source[text_range_to_usize(name_token.text_range())],
+                id: field_id,
+                range: name_token.text_range(),
+            }),
+        };
+
+        // Validate field value - this will traverse through alt/seq/quantifier/capture
+        // and validate each terminal type against the field requirements
+        self.validate_expr_structure(&value, Some(field_ctx), lang, visited);
+    }
+
+    /// Validate non-field children. Called for direct children of a NamedNode that aren't fields.
+    fn validate_non_field_children(
+        &mut self,
+        expr: &Expr,
+        ctx: &ValidationContext<'a>,
+        lang: &Lang,
+        visited: &mut IndexSet<String>,
+    ) {
+        // Collect all terminal types from this expression (follows refs)
+        let terminals = self.collect_terminal_types(expr, visited);
+
+        // Check if parent allows any non-field children
+        let valid_types = lang.valid_child_types(ctx.parent_id);
+        let parent_only_fields = valid_types.is_empty();
+
+        for (child_id, child_name, child_range) in terminals {
+            if parent_only_fields {
+                self.link_diagnostics
+                    .report(DiagnosticKind::InvalidChildType, child_range)
+                    .message(child_name)
+                    .related_to(
+                        format!("`{}` only accepts children via fields", ctx.parent_name),
+                        ctx.parent_range,
+                    )
+                    .emit();
+                continue;
+            }
+
+            if is_valid_child_expanded(lang, ctx.parent_id, child_id) {
+                continue;
+            }
+
+            let valid_names: Vec<&str> = valid_types
+                .iter()
+                .filter_map(|&id| lang.node_type_name(id))
+                .collect();
+
+            let mut builder = self
+                .link_diagnostics
+                .report(DiagnosticKind::InvalidChildType, child_range)
+                .message(child_name)
+                .related_to(format!("inside `{}`", ctx.parent_name), ctx.parent_range);
+
+            if !valid_names.is_empty() {
+                builder = builder.hint(format!(
+                    "valid children for `{}`: {}",
+                    ctx.parent_name,
+                    format_list(&valid_names, 5)
+                ));
+            }
+            builder.emit();
+        }
+    }
+
+    /// Validate a terminal type (NamedNode or AnonymousNode) against the context.
+    fn validate_terminal_type(
+        &mut self,
+        expr: &Expr,
+        ctx: &ValidationContext<'a>,
+        lang: &Lang,
+        visited: &mut IndexSet<String>,
+    ) {
+        // Handle refs by following them
+        if let Expr::Ref(r) = expr {
+            let Some(name_token) = r.name() else { return };
+            let name = name_token.text();
+            if !visited.insert(name.to_string()) {
+                return;
+            }
+            let Some(body) = self.symbol_table.get(name).cloned() else {
+                visited.swap_remove(name);
+                return;
+            };
+            self.validate_terminal_type(&body, ctx, lang, visited);
+            visited.swap_remove(name);
+            return;
+        }
+
+        let Some((child_id, child_name, child_range)) = self.get_terminal_type_info(expr) else {
             return;
         };
-        if lang.is_valid_field_type(parent_id, field_id, child_id) {
-            return;
-        }
-        let child_name = self.get_expr_type_name(&value).unwrap_or("(unknown)");
-        let valid_types = lang.valid_field_types(parent_id, field_id);
-        let valid_names: Vec<&str> = valid_types
-            .iter()
-            .filter_map(|&id| lang.node_type_name(id))
-            .collect();
 
-        let mut builder = self
-            .link_diagnostics
-            .report(DiagnosticKind::InvalidFieldChildType, value.text_range())
-            .message(child_name);
+        if let Some(ref field) = ctx.field {
+            // Validating a field value
+            if is_valid_field_type_expanded(lang, ctx.parent_id, field.id, child_id) {
+                return;
+            }
 
-        if !valid_names.is_empty() {
-            builder = builder.hint(format!(
-                "valid types for `{}`: {}",
-                field_name,
-                format_list(&valid_names, 5)
-            ));
+            let valid_types = lang.valid_field_types(ctx.parent_id, field.id);
+            let valid_names: Vec<&str> = valid_types
+                .iter()
+                .filter_map(|&id| lang.node_type_name(id))
+                .collect();
+
+            let mut builder = self
+                .link_diagnostics
+                .report(DiagnosticKind::InvalidFieldChildType, child_range)
+                .message(child_name)
+                .related_to(
+                    format!("field `{}` on `{}`", field.name, ctx.parent_name),
+                    field.range,
+                );
+
+            if !valid_names.is_empty() {
+                builder = builder.hint(format!(
+                    "valid types for `{}`: {}",
+                    field.name,
+                    format_list(&valid_names, 5)
+                ));
+            }
+            builder.emit();
         }
-        builder.emit();
+        // Non-field children are validated by validate_non_field_children
+    }
+
+    /// Collect all terminal types from an expression (traverses through Alt/Seq/Capture/Quantifier/Ref).
+    fn collect_terminal_types(
+        &self,
+        expr: &Expr,
+        visited: &mut IndexSet<String>,
+    ) -> Vec<(NodeTypeId, &'a str, TextRange)> {
+        let mut result = Vec::new();
+        self.collect_terminal_types_impl(expr, &mut result, visited);
+        result
+    }
+
+    fn collect_terminal_types_impl(
+        &self,
+        expr: &Expr,
+        result: &mut Vec<(NodeTypeId, &'a str, TextRange)>,
+        visited: &mut IndexSet<String>,
+    ) {
+        match expr {
+            Expr::NamedNode(_) | Expr::AnonymousNode(_) => {
+                if let Some(info) = self.get_terminal_type_info(expr) {
+                    result.push(info);
+                }
+            }
+            Expr::AltExpr(alt) => {
+                for branch in alt.branches() {
+                    if let Some(body) = branch.body() {
+                        self.collect_terminal_types_impl(&body, result, visited);
+                    }
+                }
+            }
+            Expr::SeqExpr(seq) => {
+                for child in seq.children() {
+                    self.collect_terminal_types_impl(&child, result, visited);
+                }
+            }
+            Expr::CapturedExpr(cap) => {
+                if let Some(inner) = cap.inner() {
+                    self.collect_terminal_types_impl(&inner, result, visited);
+                }
+            }
+            Expr::QuantifiedExpr(q) => {
+                if let Some(inner) = q.inner() {
+                    self.collect_terminal_types_impl(&inner, result, visited);
+                }
+            }
+            Expr::Ref(r) => {
+                let Some(name_token) = r.name() else { return };
+                let name = name_token.text();
+                if !visited.insert(name.to_string()) {
+                    return;
+                }
+                let Some(body) = self.symbol_table.get(name) else {
+                    visited.swap_remove(name);
+                    return;
+                };
+                self.collect_terminal_types_impl(body, result, visited);
+                visited.swap_remove(name);
+            }
+            Expr::FieldExpr(_) => {
+                // Fields are handled separately
+            }
+        }
+    }
+
+    /// Get type info for a terminal expression (NamedNode or AnonymousNode).
+    fn get_terminal_type_info(&self, expr: &Expr) -> Option<(NodeTypeId, &'a str, TextRange)> {
+        match expr {
+            Expr::NamedNode(node) => {
+                if node.is_any() {
+                    return None;
+                }
+                let type_token = node.node_type()?;
+                if matches!(
+                    type_token.kind(),
+                    SyntaxKind::KwError | SyntaxKind::KwMissing
+                ) {
+                    return None;
+                }
+                let type_name = type_token.text();
+                let type_id = self.node_type_ids.get(type_name).copied().flatten()?;
+                let name = &self.source[text_range_to_usize(type_token.text_range())];
+                Some((type_id, name, type_token.text_range()))
+            }
+            Expr::AnonymousNode(anon) => {
+                if anon.is_any() {
+                    return None;
+                }
+                let value_token = anon.value()?;
+                let value = &self.source[text_range_to_usize(value_token.text_range())];
+                let type_id = self.node_type_ids.get(value).copied().flatten()?;
+                Some((type_id, value, value_token.text_range()))
+            }
+            _ => None,
+        }
     }
 
     fn validate_negated_field(
         &mut self,
         neg: &ast::NegatedField,
-        parent_type_id: Option<NodeTypeId>,
+        ctx: &ValidationContext<'a>,
         lang: &Lang,
     ) {
         let Some(name_token) = neg.name() else {
@@ -391,20 +736,24 @@ impl<'a> Query<'a> {
             return;
         };
 
-        let Some(parent_id) = parent_type_id else {
-            return;
-        };
-        if lang.has_field(parent_id, field_id) {
+        if lang.has_field(ctx.parent_id, field_id) {
             return;
         }
-        self.emit_field_not_on_node(name_token.text_range(), field_name, parent_id, lang);
+        self.emit_field_not_on_node(
+            name_token.text_range(),
+            field_name,
+            ctx.parent_id,
+            ctx.parent_range,
+            lang,
+        );
     }
 
     fn emit_field_not_on_node(
         &mut self,
-        range: rowan::TextRange,
+        range: TextRange,
         field_name: &str,
         parent_id: NodeTypeId,
+        parent_range: TextRange,
         lang: &Lang,
     ) {
         let valid_fields = lang.fields_for_node_type(parent_id);
@@ -413,7 +762,8 @@ impl<'a> Query<'a> {
         let mut builder = self
             .link_diagnostics
             .report(DiagnosticKind::FieldNotOnNodeType, range)
-            .message(field_name);
+            .message(field_name)
+            .related_to(format!("on `{}`", parent_name), parent_range);
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
@@ -430,63 +780,9 @@ impl<'a> Query<'a> {
         }
         builder.emit();
     }
-
-    fn get_node_type_id(&self, node: &NamedNode) -> Option<NodeTypeId> {
-        if node.is_any() {
-            return None;
-        }
-        let type_token = node.node_type()?;
-        if matches!(
-            type_token.kind(),
-            SyntaxKind::KwError | SyntaxKind::KwMissing
-        ) {
-            return None;
-        }
-        let type_name = type_token.text();
-        self.node_type_ids.get(type_name).copied().flatten()
-    }
-
-    fn get_expr_type_id(&self, expr: &Expr) -> Option<NodeTypeId> {
-        match expr {
-            Expr::NamedNode(node) => self.get_node_type_id(node),
-            Expr::AnonymousNode(anon) => {
-                if anon.is_any() {
-                    return None;
-                }
-                let value_token = anon.value()?;
-                let value = &self.source[text_range_to_usize(value_token.text_range())];
-                self.node_type_ids.get(value).copied().flatten()
-            }
-            Expr::CapturedExpr(cap) => self.get_expr_type_id(&cap.inner()?),
-            Expr::QuantifiedExpr(q) => self.get_expr_type_id(&q.inner()?),
-            _ => None,
-        }
-    }
-
-    fn get_expr_type_name(&self, expr: &Expr) -> Option<&'a str> {
-        match expr {
-            Expr::NamedNode(node) => {
-                if node.is_any() {
-                    return None;
-                }
-                let type_token = node.node_type()?;
-                Some(&self.source[text_range_to_usize(type_token.text_range())])
-            }
-            Expr::AnonymousNode(anon) => {
-                if anon.is_any() {
-                    return None;
-                }
-                let value_token = anon.value()?;
-                Some(&self.source[text_range_to_usize(value_token.text_range())])
-            }
-            Expr::CapturedExpr(cap) => self.get_expr_type_name(&cap.inner()?),
-            Expr::QuantifiedExpr(q) => self.get_expr_type_name(&q.inner()?),
-            _ => None,
-        }
-    }
 }
 
-fn text_range_to_usize(range: rowan::TextRange) -> std::ops::Range<usize> {
+fn text_range_to_usize(range: TextRange) -> std::ops::Range<usize> {
     let start: usize = range.start().into();
     let end: usize = range.end().into();
     start..end
