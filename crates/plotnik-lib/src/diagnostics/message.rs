@@ -133,56 +133,23 @@ impl DiagnosticKind {
     }
 
     /// Template for custom messages. Contains `{}` placeholder for caller-provided detail.
-    pub fn custom_message(&self) -> &'static str {
+    pub fn custom_message(&self) -> String {
         match self {
-            // Unclosed delimiters
-            Self::UnclosedTree => "unclosed tree: {}",
-            Self::UnclosedSequence => "unclosed sequence: {}",
-            Self::UnclosedAlternation => "unclosed alternation: {}",
+            // Special cases: placeholder embedded in message
+            Self::RefCannotHaveChildren => "reference `{}` cannot contain children".to_string(),
+            Self::FieldSequenceValue => "field `{}` value must be a single node".to_string(),
 
-            // Expected token errors
-            Self::ExpectedExpression => "expected expression: {}",
-            Self::ExpectedTypeName => "expected type name: {}",
-            Self::ExpectedCaptureName => "expected capture name: {}",
-            Self::ExpectedFieldName => "expected field name: {}",
-            Self::ExpectedSubtype => "expected subtype: {}",
+            // Cases with backtick-wrapped placeholders
+            Self::DuplicateDefinition | Self::UndefinedReference => {
+                format!("{}: `{{}}`", self.fallback_message())
+            }
 
-            // Invalid token/syntax usage
-            Self::EmptyTree => "empty tree expression: {}",
-            Self::BareIdentifier => "bare identifier not allowed: {}",
-            Self::InvalidSeparator => "invalid separator: {}",
-            Self::InvalidFieldEquals => "invalid field syntax: {}",
-            Self::InvalidSupertypeSyntax => "invalid supertype syntax: {}",
-            Self::InvalidTypeAnnotationSyntax => "invalid type annotation: {}",
-            Self::ErrorTakesNoArguments => "(ERROR) takes no arguments: {}",
-            Self::RefCannotHaveChildren => "reference `{}` cannot contain children",
-            Self::ErrorMissingOutsideParens => "ERROR/MISSING outside parentheses: {}",
-            Self::UnsupportedPredicate => "unsupported predicate: {}",
-            Self::UnexpectedToken => "unexpected token: {}",
-            Self::CaptureWithoutTarget => "capture without target: {}",
-            Self::LowercaseBranchLabel => "lowercase branch label: {}",
+            // Cases where custom text differs from fallback
+            Self::InvalidTypeAnnotationSyntax => "invalid type annotation: {}".to_string(),
+            Self::MixedAltBranches => "mixed alternation: {}".to_string(),
 
-            // Naming validation
-            Self::CaptureNameHasDots => "capture name contains dots: {}",
-            Self::CaptureNameHasHyphens => "capture name contains hyphens: {}",
-            Self::CaptureNameUppercase => "capture name starts with uppercase: {}",
-            Self::DefNameLowercase => "definition name starts with lowercase: {}",
-            Self::DefNameHasSeparators => "definition name contains separators: {}",
-            Self::BranchLabelHasSeparators => "branch label contains separators: {}",
-            Self::FieldNameHasDots => "field name contains dots: {}",
-            Self::FieldNameHasHyphens => "field name contains hyphens: {}",
-            Self::FieldNameUppercase => "field name starts with uppercase: {}",
-            Self::TypeNameInvalidChars => "type name contains invalid characters: {}",
-
-            // Semantic errors
-            Self::DuplicateDefinition => "duplicate definition: `{}`",
-            Self::UndefinedReference => "undefined reference: `{}`",
-            Self::MixedAltBranches => "mixed alternation: {}",
-            Self::RecursionNoEscape => "recursive pattern can never match: {}",
-            Self::FieldSequenceValue => "field `{}` value must be a single node",
-
-            // Structural observations
-            Self::UnnamedDefNotLast => "unnamed definition must be last: {}",
+            // Standard pattern: fallback + ": {}"
+            _ => format!("{}: {{}}", self.fallback_message()),
         }
     }
 
