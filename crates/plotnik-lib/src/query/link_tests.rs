@@ -1,9 +1,16 @@
 use crate::Query;
+use indoc::indoc;
 
 #[test]
 fn valid_query_with_field() {
-    let mut query = Query::try_from("(function_declaration name: (identifier) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            name: (identifier) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -18,8 +25,13 @@ fn valid_query_with_field() {
 
 #[test]
 fn unknown_node_type_with_suggestion() {
-    let mut query = Query::try_from("(function_declaraton) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaraton) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
@@ -33,8 +45,13 @@ fn unknown_node_type_with_suggestion() {
 
 #[test]
 fn unknown_node_type_no_suggestion() {
-    let mut query = Query::try_from("(xyzzy_foobar_baz) @fn").unwrap();
+    let input = indoc! {r#"
+        (xyzzy_foobar_baz) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `xyzzy_foobar_baz` is not a valid node type
@@ -46,14 +63,20 @@ fn unknown_node_type_no_suggestion() {
 
 #[test]
 fn unknown_field_with_suggestion() {
-    let mut query = Query::try_from("(function_declaration nme: (identifier) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            nme: (identifier) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `nme` is not a valid field
       |
-    1 | (function_declaration nme: (identifier) @name) @fn
-      |                       ^^^
+    2 |     nme: (identifier) @name) @fn
+      |     ^^^
       |
     help: did you mean `name`?
     ");
@@ -61,29 +84,39 @@ fn unknown_field_with_suggestion() {
 
 #[test]
 fn unknown_field_no_suggestion() {
-    let mut query =
-        Query::try_from("(function_declaration xyzzy: (identifier) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            xyzzy: (identifier) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `xyzzy` is not a valid field
       |
-    1 | (function_declaration xyzzy: (identifier) @name) @fn
-      |                       ^^^^^
+    2 |     xyzzy: (identifier) @name) @fn
+      |     ^^^^^
     ");
 }
 
 #[test]
 fn field_not_on_node_type() {
-    let mut query =
-        Query::try_from("(function_declaration condition: (identifier) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            condition: (identifier) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `condition` is not valid on this node type
       |
-    1 | (function_declaration condition: (identifier) @name) @fn
-      |                       ^^^^^^^^^
+    2 |     condition: (identifier) @name) @fn
+      |     ^^^^^^^^^
       |
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
@@ -91,8 +124,13 @@ fn field_not_on_node_type() {
 
 #[test]
 fn negated_field_unknown() {
-    let mut query = Query::try_from("(function_declaration !nme) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration !nme) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `nme` is not a valid field
@@ -106,8 +144,13 @@ fn negated_field_unknown() {
 
 #[test]
 fn negated_field_not_on_node_type() {
-    let mut query = Query::try_from("(function_declaration !condition) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration !condition) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `condition` is not valid on this node type
@@ -121,8 +164,13 @@ fn negated_field_not_on_node_type() {
 
 #[test]
 fn negated_field_valid() {
-    let mut query = Query::try_from("(function_declaration !name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration !name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -135,8 +183,13 @@ fn negated_field_valid() {
 
 #[test]
 fn anonymous_node_unknown() {
-    let mut query = Query::try_from("(function_declaration \"xyzzy_fake_token\") @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration "xyzzy_fake_token") @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: `xyzzy_fake_token` is not a valid node type
@@ -148,39 +201,55 @@ fn anonymous_node_unknown() {
 
 #[test]
 fn error_and_missing_nodes_skip_validation() {
-    let mut query = Query::try_from("(ERROR) @err").unwrap();
+    let input = indoc! {r#"
+        (ERROR) @err
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
 
-    let mut query2 = Query::try_from("(MISSING) @miss").unwrap();
+    let input2 = indoc! {r#"
+        (MISSING) @miss
+    "#};
+
+    let mut query2 = Query::try_from(input2).unwrap();
     query2.link(&plotnik_langs::javascript());
+
     assert!(query2.is_valid());
 }
 
 #[test]
 fn multiple_errors_in_query() {
-    let mut query = Query::try_from("(function_declaraton nme: (identifer) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaraton
+            nme: (identifer) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
       |
-    1 | (function_declaraton nme: (identifer) @name) @fn
+    1 | (function_declaraton
       |  ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
 
     error: `nme` is not a valid field
       |
-    1 | (function_declaraton nme: (identifer) @name) @fn
-      |                      ^^^
+    2 |     nme: (identifer) @name) @fn
+      |     ^^^
       |
     help: did you mean `name`?
 
     error: `identifer` is not a valid node type
       |
-    1 | (function_declaraton nme: (identifer) @name) @fn
-      |                            ^^^^^^^^^
+    2 |     nme: (identifer) @name) @fn
+      |           ^^^^^^^^^
       |
     help: did you mean `identifier`?
     ");
@@ -188,11 +257,15 @@ fn multiple_errors_in_query() {
 
 #[test]
 fn nested_field_validation() {
-    let mut query = Query::try_from(
-        "(function_declaration body: (statement_block (return_statement) @ret) @body) @fn",
-    )
-    .unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            body: (statement_block
+                (return_statement) @ret) @body) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -209,15 +282,20 @@ fn nested_field_validation() {
 
 #[test]
 fn invalid_child_type_for_field() {
-    let mut query =
-        Query::try_from("(function_declaration name: (statement_block) @name) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            name: (statement_block) @name) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: node type `statement_block` is not valid for this field
       |
-    1 | (function_declaration name: (statement_block) @name) @fn
-      |                             ^^^^^^^^^^^^^^^^^
+    2 |     name: (statement_block) @name) @fn
+      |           ^^^^^^^^^^^^^^^^^
       |
     help: valid types for `name`: `identifier`
     ");
@@ -225,21 +303,27 @@ fn invalid_child_type_for_field() {
 
 #[test]
 fn alternation_with_link_errors() {
-    let mut query = Query::try_from("[(function_declaraton) (class_declaraton)] @decl").unwrap();
+    let input = indoc! {r#"
+        [(function_declaraton)
+         (class_declaraton)] @decl
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
       |
-    1 | [(function_declaraton) (class_declaraton)] @decl
+    1 | [(function_declaraton)
       |   ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
 
     error: `class_declaraton` is not a valid node type
       |
-    1 | [(function_declaraton) (class_declaraton)] @decl
-      |                         ^^^^^^^^^^^^^^^^
+    2 |  (class_declaraton)] @decl
+      |   ^^^^^^^^^^^^^^^^
       |
     help: did you mean `class_declaration`?
     ");
@@ -247,16 +331,21 @@ fn alternation_with_link_errors() {
 
 #[test]
 fn sequence_with_link_errors() {
-    let mut query =
-        Query::try_from("(function_declaration {(identifer) (statement_block)} @body) @fn")
-            .unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            {(identifer)
+             (statement_block)} @body) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `identifer` is not a valid node type
       |
-    1 | (function_declaration {(identifer) (statement_block)} @body) @fn
-      |                         ^^^^^^^^^
+    2 |     {(identifer)
+      |       ^^^^^^^^^
       |
     help: did you mean `identifier`?
     ");
@@ -264,8 +353,14 @@ fn sequence_with_link_errors() {
 
 #[test]
 fn quantified_expr_validation() {
-    let mut query = Query::try_from("(function_declaration (identifier)+ @names) @fn").unwrap();
+    let input = indoc! {r#"
+        (function_declaration
+            (identifier)+ @names) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -280,21 +375,27 @@ fn quantified_expr_validation() {
 
 #[test]
 fn wildcard_node_skips_validation() {
-    let mut query = Query::try_from("(_) @any").unwrap();
+    let input = indoc! {r#"
+        (_) @any
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
 }
 
 #[test]
 fn def_reference_with_link() {
-    let mut query = Query::try_from(
-        r#"
-        Func = (function_declaration name: (identifier) @name) @fn
+    let input = indoc! {r#"
+        Func = (function_declaration
+            name: (identifier) @name) @fn
         (program (Func)+)
-        "#,
-    )
-    .unwrap();
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
@@ -313,14 +414,20 @@ fn def_reference_with_link() {
 
 #[test]
 fn field_on_node_without_fields() {
-    let mut query = Query::try_from("(identifier name: (identifier) @inner) @id").unwrap();
+    let input = indoc! {r#"
+        (identifier
+            name: (identifier) @inner) @id
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
+
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` is not valid on this node type
       |
-    1 | (identifier name: (identifier) @inner) @id
-      |             ^^^^
+    2 |     name: (identifier) @inner) @id
+      |     ^^^^
       |
     help: `identifier` has no fields
     ");
