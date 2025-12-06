@@ -254,14 +254,20 @@ impl<'src> Parser<'src> {
         if self.eat(kind) {
             return true;
         }
-        self.error(
+        self.error_msg(
             DiagnosticKind::UnexpectedToken,
             format!("expected {}", what),
         );
         false
     }
 
-    pub(super) fn error(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
+    /// Emit diagnostic with default message for the kind.
+    pub(super) fn error(&mut self, kind: DiagnosticKind) {
+        self.error_msg(kind, kind.default_message());
+    }
+
+    /// Emit diagnostic with custom message.
+    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
         let range = self.current_span();
         let pos = range.start();
         if self.last_diagnostic_pos == Some(pos) {
@@ -271,8 +277,12 @@ impl<'src> Parser<'src> {
         self.diagnostics.report(kind, range).message(message).emit();
     }
 
-    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind, message: &str) {
-        self.error(kind, message);
+    pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
+        self.error_and_bump_msg(kind, kind.default_message());
+    }
+
+    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {
+        self.error_msg(kind, message);
         if !self.eof() {
             self.start_node(SyntaxKind::Error);
             self.bump();
@@ -288,12 +298,12 @@ impl<'src> Parser<'src> {
         recovery: TokenSet,
     ) {
         if self.at_set(recovery) || self.should_stop() {
-            self.error(kind, message);
+            self.error_msg(kind, message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
-        self.error(kind, message);
+        self.error_msg(kind, message);
         while !self.at_set(recovery) && !self.should_stop() {
             self.bump();
         }

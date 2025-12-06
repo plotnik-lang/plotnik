@@ -73,7 +73,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedExpression,
                 "expected expression after '=' in named definition",
             );
@@ -90,19 +90,13 @@ impl Parser<'_> {
             self.parse_expr();
             true
         } else if kind == SyntaxKind::At {
-            self.error_and_bump(
-                DiagnosticKind::CaptureWithoutTarget,
-                "capture '@' must follow an expression to capture",
-            );
+            self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
             false
         } else if kind == SyntaxKind::Predicate {
-            self.error_and_bump(
-                DiagnosticKind::UnsupportedPredicate,
-                "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
-            );
+            self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
             false
         } else {
-            self.error_and_bump(
+            self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
                 "unexpected token; expected an expression like (node), [choice], {sequence}, \"literal\", or _",
             );
@@ -143,13 +137,10 @@ impl Parser<'_> {
             SyntaxKind::Negation => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
-                self.error_and_bump(
-                    DiagnosticKind::ErrorMissingOutsideParens,
-                    "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)",
-                );
+                self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }
             _ => {
-                self.error_and_bump(
+                self.error_and_bump_msg(
                     DiagnosticKind::UnexpectedToken,
                     "unexpected token; expected an expression",
                 );
@@ -177,10 +168,7 @@ impl Parser<'_> {
         match self.peek() {
             SyntaxKind::ParenClose => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
-                self.error(
-                    DiagnosticKind::EmptyTree,
-                    "empty tree expression - expected node type or children",
-                );
+                self.error(DiagnosticKind::EmptyTree);
                 self.pop_delimiter();
                 self.bump(); // consume ')'
                 self.finish_node();
@@ -205,10 +193,7 @@ impl Parser<'_> {
                 if self.peek() == SyntaxKind::Slash {
                     if is_ref {
                         self.start_node_at(checkpoint, SyntaxKind::Tree);
-                        self.error(
-                            DiagnosticKind::InvalidSupertypeSyntax,
-                            "references cannot use supertype syntax (/)",
-                        );
+                        self.error(DiagnosticKind::InvalidSupertypeSyntax);
                         is_ref = false;
                     }
                     self.bump();
@@ -220,7 +205,7 @@ impl Parser<'_> {
                             self.bump_string_tokens();
                         }
                         _ => {
-                            self.error(
+                            self.error_msg(
                                 DiagnosticKind::ExpectedSubtype,
                                 "expected subtype after '/' (e.g., expression/binary_expression)",
                             );
@@ -232,10 +217,7 @@ impl Parser<'_> {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
                 if self.peek() != SyntaxKind::ParenClose {
-                    self.error(
-                        DiagnosticKind::ErrorTakesNoArguments,
-                        "(ERROR) takes no arguments",
-                    );
+                    self.error(DiagnosticKind::ErrorTakesNoArguments);
                     self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
                 }
                 self.pop_delimiter();
@@ -339,16 +321,13 @@ impl Parser<'_> {
                 continue;
             }
             if kind == SyntaxKind::Predicate {
-                self.error_and_bump(
-                    DiagnosticKind::UnsupportedPredicate,
-                    "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported",
-                );
+                self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
                 continue;
             }
             if recovery.contains(kind) {
                 break;
             }
-            self.error_and_bump(
+            self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
                 "unexpected token; expected a child expression or closing delimiter",
             );
@@ -419,7 +398,7 @@ impl Parser<'_> {
             if ALT_RECOVERY.contains(kind) {
                 break;
             }
-            self.error_and_bump(
+            self.error_and_bump_msg(
                 DiagnosticKind::UnexpectedToken,
                 "unexpected token; expected a child expression or closing delimiter",
             );
@@ -441,7 +420,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedExpression,
                 "expected expression after branch label",
             );
@@ -473,7 +452,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedExpression,
                 "expected expression after branch label",
             );
@@ -528,10 +507,7 @@ impl Parser<'_> {
         self.bump(); // consume At
 
         if self.peek() != SyntaxKind::Id {
-            self.error(
-                DiagnosticKind::ExpectedCaptureName,
-                "expected capture name after '@'",
-            );
+            self.error(DiagnosticKind::ExpectedCaptureName);
             return;
         }
 
@@ -561,7 +537,7 @@ impl Parser<'_> {
             self.bump();
             self.validate_type_name(text, span);
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedTypeName,
                 "expected type name after '::' (e.g., ::MyType or ::string)",
             );
@@ -610,7 +586,7 @@ impl Parser<'_> {
         self.expect(SyntaxKind::Negation, "'!' for negated field");
 
         if self.peek() != SyntaxKind::Id {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedFieldName,
                 "expected field name after '!' (e.g., !value)",
             );
@@ -634,7 +610,7 @@ impl Parser<'_> {
             self.parse_field_equals_typo();
         } else {
             // Bare identifiers are not valid expressions; trees require parentheses
-            self.error_and_bump(
+            self.error_and_bump_msg(
                 DiagnosticKind::BareIdentifier,
                 "bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)",
             );
@@ -660,7 +636,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr_no_suffix();
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedExpression,
                 "expected expression after field name",
             );
@@ -688,7 +664,7 @@ impl Parser<'_> {
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
         } else {
-            self.error(
+            self.error_msg(
                 DiagnosticKind::ExpectedExpression,
                 "expected expression after field name",
             );
