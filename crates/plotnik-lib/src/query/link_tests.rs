@@ -123,6 +123,28 @@ fn field_not_on_node_type() {
 }
 
 #[test]
+fn field_not_on_node_type_with_suggestion() {
+    let input = indoc! {r#"
+        (function_declaration
+            parameter: (formal_parameters) @params) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::typescript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: field `parameter` is not valid on this node type
+      |
+    2 |     parameter: (formal_parameters) @params) @fn
+      |     ^^^^^^^^^
+      |
+    help: did you mean `parameters`?
+    help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
+    ");
+}
+
+#[test]
 fn negated_field_unknown() {
     let input = indoc! {r#"
         (function_declaration !nme) @fn
@@ -159,6 +181,27 @@ fn negated_field_not_on_node_type() {
       |                        ^^^^^^^^^
       |
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
+    ");
+}
+
+#[test]
+fn negated_field_not_on_node_type_with_suggestion() {
+    let input = indoc! {r#"
+        (function_declaration !parameter) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::typescript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: field `parameter` is not valid on this node type
+      |
+    1 | (function_declaration !parameter) @fn
+      |                        ^^^^^^^^^
+      |
+    help: did you mean `parameters`?
+    help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
     ");
 }
 

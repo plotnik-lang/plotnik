@@ -418,6 +418,10 @@ impl<'a> Query<'a> {
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
         } else {
+            let max_dist = (field_name.len() / 3).clamp(2, 4);
+            if let Some(similar) = find_similar(field_name, &valid_fields, max_dist) {
+                builder = builder.hint(format!("did you mean `{}`?", similar));
+            }
             builder = builder.hint(format!(
                 "valid fields for `{}`: {}",
                 parent_name,
