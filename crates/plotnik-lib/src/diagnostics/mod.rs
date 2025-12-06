@@ -82,9 +82,10 @@ impl Diagnostics {
     /// Returns diagnostics with cascading errors suppressed.
     ///
     /// Suppression rules:
-    /// 1. Containment: when a higher-priority span strictly contains another, suppress the inner
+    /// 1. Containment: when error A's suppression_range contains error B's display range,
+    ///    and A has higher priority, suppress B
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
-    /// 3. Consequence errors (UnnamedDefNotLast) suppressed when any primary error exists
+    /// 3. Consequence errors (UnnamedDefNotLast) suppressed when any other error exists
     pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
         if self.messages.is_empty() {
             return Vec::new();
@@ -92,11 +93,8 @@ impl Diagnostics {
 
         let mut suppressed = vec![false; self.messages.len()];
 
-        // Rule 3: Suppress consequence errors if any primary error exists
-        let has_primary_error = self
-            .messages
-            .iter()
-            .any(|m| m.kind.is_root_cause_error() || m.kind.is_structural_error());
+        // Rule 3: Suppress consequence errors if any non-consequence error exists
+        let has_primary_error = self.messages.iter().any(|m| !m.kind.is_consequence_error());
         if has_primary_error {
             for (i, msg) in self.messages.iter().enumerate() {
                 if msg.kind.is_consequence_error() {
@@ -112,9 +110,11 @@ impl Diagnostics {
                     continue;
                 }
 
-                // Rule 1: Strict containment (different start positions)
-                // The containing span suppresses the contained span
-                if span_strictly_contains(a.range, b.range) && a.kind.suppresses(&b.kind) {
+                // Rule 1: Suppression range containment
+                // If A's suppression_range contains B's display range, A can suppress B
+                if suppression_range_contains(a.suppression_range, b.range)
+                    && a.kind.suppresses(&b.kind)
+                {
                     suppressed[j] = true;
                     continue;
                 }
@@ -191,6 +191,18 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
+    /// Set the suppression range for this diagnostic.
+    ///
+    /// The suppression range is used to suppress cascading errors. Errors whose
+    /// display range falls within another error's suppression range may be
+    /// suppressed if the containing error has higher priority.
+    ///
+    /// Typically set to the parent context span (e.g., enclosing tree).
+    pub fn suppression_range(mut self, range: TextRange) -> Self {
+        self.message.suppression_range = range;
+        self
+    }
+
     pub fn fix(mut self, description: impl Into<String>, replacement: impl Into<String>) -> Self {
         self.message.fix = Some(Fix::new(replacement, description));
         self
@@ -201,7 +213,12 @@ impl<'a> DiagnosticBuilder<'a> {
     }
 }
 
-/// Check if outer span strictly contains inner span (different start positions).
-fn span_strictly_contains(outer: TextRange, inner: TextRange) -> bool {
-    outer.start() < inner.start() && inner.end() <= outer.end()
+/// Check if a suppression range contains a display range.
+///
+/// For suppression purposes, we use non-strict containment: the inner range
+/// can start at the same position as the outer range. This allows errors
+/// reported at the same position but with different suppression contexts
+/// to properly suppress each other.
+fn suppression_range_contains(suppression: TextRange, display: TextRange) -> bool {
+    suppression.start() <= display.start() && display.end() <= suppression.end()
 }

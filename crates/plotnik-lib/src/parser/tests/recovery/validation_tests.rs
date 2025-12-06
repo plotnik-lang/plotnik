@@ -518,11 +518,6 @@ fn capture_dotted_followed_by_field() {
     1 - (node) @foo.bar name: (other)
     1 + (node) @foo_bar name: (other)
       |
-
-    error: unnamed definition must be last: add a name: `Name = (node) @foo.bar`
-      |
-    1 | (node) @foo.bar name: (other)
-      | ^^^^^^^^^^^^^^^
     ");
 }
 
@@ -550,11 +545,6 @@ fn capture_space_after_dot_breaks_chain() {
       |
     1 | (identifier) @foo. bar
       |                    ^^^
-
-    error: unnamed definition must be last: add a name: `Name = (identifier) @foo.`
-      |
-    1 | (identifier) @foo. bar
-      | ^^^^^^^^^^^^^^^^^^
     ");
 }
 
@@ -1107,17 +1097,6 @@ fn pipe_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
-      |
-    1 | (a | b)
-      |    ^
-      |
-    help: remove separator
-      |
-    1 - (a | b)
-    1 + (a  b)
-      |
-
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a | b)
@@ -1192,17 +1171,6 @@ fn field_equals_typo_no_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: invalid field syntax: '=' is not valid for field constraints
-      |
-    1 | (call name=)
-      |           ^
-      |
-    help: use ':'
-      |
-    1 - (call name=)
-    1 + (call name:)
-      |
-
     error: expected expression: expected expression after field name
       |
     1 | (call name=)

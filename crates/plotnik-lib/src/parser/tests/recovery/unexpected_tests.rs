@@ -14,11 +14,6 @@ fn unexpected_token() {
       |
     1 | (identifier) ^^^ (string)
       |              ^^^
-
-    error: unnamed definition must be last: add a name: `Name = (identifier)`
-      |
-    1 | (identifier) ^^^ (string)
-      | ^^^^^^^^^^^^
     "#);
 }
 
@@ -99,11 +94,6 @@ fn garbage_inside_node() {
       |
     1 | (a (b) @@@ (c)) (d)
       |         ^
-
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | (a (b) @@@ (c)) (d)
-      |          ^
     ");
 }
 
@@ -153,16 +143,6 @@ fn predicate_unsupported() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: unsupported predicate: unsupported predicate
-      |
-    1 | (a (#eq? @x "foo") b)
-      |     ^^^^
-
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | (a (#eq? @x "foo") b)
-      |          ^
-
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a (#eq? @x "foo") b)
@@ -193,11 +173,6 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |                       ^^^^
-
-    error: unnamed definition must be last: add a name: `Name = (identifier)`
-      |
-    1 | (identifier) #match? @name "test"
-      | ^^^^^^^^^^^^
     "#);
 }
 
@@ -208,16 +183,6 @@ fn predicate_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: unsupported predicate: unsupported predicate
-      |
-    1 | (function #eq? @name "test")
-      |           ^^^^
-
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | (function #eq? @name "test")
-      |                ^
-
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (function #eq? @name "test")
@@ -268,11 +233,6 @@ fn multiline_garbage_recovery() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    2 | ^^^
-      | ^^^
-
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     3 | b)
@@ -330,16 +290,6 @@ fn alternation_recovery_to_capture() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | [^^^ @name]
-      |  ^^^
-
-    error: unexpected token: unexpected token; expected a child expression or closing delimiter
-      |
-    1 | [^^^ @name]
-      |      ^
-
     error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | [^^^ @name]
@@ -393,11 +343,6 @@ fn paren_close_inside_alternation() {
       |
     1 | [(a) ) (b)]
       |           ^
-
-    error: unnamed definition must be last: add a name: `Name = [(a)`
-      |
-    1 | [(a) ) (b)]
-      | ^^^^
     "#);
 }
 
@@ -417,11 +362,6 @@ fn bracket_close_inside_sequence() {
       |
     1 | {(a) ] (b)}
       |           ^
-
-    error: unnamed definition must be last: add a name: `Name = {(a)`
-      |
-    1 | {(a) ] (b)}
-      | ^^^^
     "#);
 }
 
@@ -441,11 +381,6 @@ fn paren_close_inside_sequence() {
       |
     1 | {(a) ) (b)}
       |           ^
-
-    error: unnamed definition must be last: add a name: `Name = {(a)`
-      |
-    1 | {(a) ) (b)}
-      | ^^^^
     "#);
 }
 
@@ -460,11 +395,6 @@ fn single_colon_type_annotation_followed_by_non_id() {
       |
     1 | (a) @x : (b)
       |        ^
-
-    error: unnamed definition must be last: add a name: `Name = (a) @x`
-      |
-    1 | (a) @x : (b)
-      | ^^^^^^
     "#);
 }
 

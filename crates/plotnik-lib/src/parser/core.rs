@@ -261,6 +261,22 @@ impl<'src> Parser<'src> {
         false
     }
 
+    /// Returns the suppression span for the current context.
+    ///
+    /// If inside a delimiter (tree/seq/alt), returns a span from the delimiter's
+    /// start to the end of source. This ensures all errors within the same
+    /// delimiter context can suppress each other based on priority.
+    /// At root level, returns the current token's span.
+    pub(super) fn current_suppression_span(&self) -> TextRange {
+        self.delimiter_stack
+            .last()
+            .map(|d| {
+                let source_end = TextSize::from(self.source.len() as u32);
+                TextRange::new(d.span.start(), source_end)
+            })
+            .unwrap_or_else(|| self.current_span())
+    }
+
     /// Emit diagnostic with default message for the kind.
     pub(super) fn error(&mut self, kind: DiagnosticKind) {
         self.error_msg(kind, kind.fallback_message());
@@ -274,7 +290,13 @@ impl<'src> Parser<'src> {
             return;
         }
         self.last_diagnostic_pos = Some(pos);
-        self.diagnostics.report(kind, range).message(message).emit();
+
+        let suppression = self.current_suppression_span();
+        self.diagnostics
+            .report(kind, range)
+            .message(message)
+            .suppression_range(suppression)
+            .emit();
     }
 
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {

@@ -242,7 +242,13 @@ impl RelatedInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DiagnosticMessage {
     pub(crate) kind: DiagnosticKind,
+    /// The range shown to the user (underlined in output).
     pub(crate) range: TextRange,
+    /// The range used for suppression logic. Errors within another error's
+    /// suppression_range may be suppressed. Defaults to `range` but can be
+    /// set to a parent context (e.g., enclosing tree span) for better cascading
+    /// error suppression.
+    pub(crate) suppression_range: TextRange,
     pub(crate) message: String,
     pub(crate) fix: Option<Fix>,
     pub(crate) related: Vec<RelatedInfo>,
@@ -253,6 +259,7 @@ impl DiagnosticMessage {
         Self {
             kind,
             range,
+            suppression_range: range,
             message: message.into(),
             fix: None,
             related: Vec::new(),
