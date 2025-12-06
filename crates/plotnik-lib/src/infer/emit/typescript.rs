@@ -144,7 +144,7 @@ fn emit_type_def(
 }
 
 /// Returns (type_string, is_optional)
-fn emit_field_type(
+pub(crate) fn emit_field_type(
     key: &TypeKey<'_>,
     table: &TypeTable<'_>,
     config: &TypeScriptEmitConfig,
@@ -188,7 +188,7 @@ fn emit_field_type(
     }
 }
 
-fn emit_inline_struct(
+pub(crate) fn emit_inline_struct(
     fields: &IndexMap<&str, TypeKey<'_>>,
     table: &TypeTable<'_>,
     config: &TypeScriptEmitConfig,
@@ -217,7 +217,7 @@ fn emit_inline_struct(
     out
 }
 
-fn wrap_if_union(type_str: &str) -> String {
+pub(crate) fn wrap_if_union(type_str: &str) -> String {
     if type_str.contains('|') {
         format!("({})", type_str)
     } else {
@@ -226,7 +226,7 @@ fn wrap_if_union(type_str: &str) -> String {
 }
 
 /// Topologically sort types so dependencies come before dependents.
-fn topological_sort<'src>(table: &TypeTable<'src>) -> Vec<TypeKey<'src>> {
+pub(crate) fn topological_sort<'src>(table: &TypeTable<'src>) -> Vec<TypeKey<'src>> {
     let mut result = Vec::new();
     let mut visited = IndexMap::new();
 
@@ -262,7 +262,7 @@ fn visit<'src>(
     result.push(key.clone());
 }
 
-fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
+pub(crate) fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
         TypeValue::Struct(fields) => fields.values().cloned().collect(),

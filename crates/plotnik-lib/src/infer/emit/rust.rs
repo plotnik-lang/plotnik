@@ -116,7 +116,11 @@ fn emit_type_def(
     }
 }
 
-fn emit_type_ref(key: &TypeKey<'_>, table: &TypeTable<'_>, config: &RustEmitConfig) -> String {
+pub(crate) fn emit_type_ref(
+    key: &TypeKey<'_>,
+    table: &TypeTable<'_>,
+    config: &RustEmitConfig,
+) -> String {
     let is_cyclic = table.is_cyclic(key);
 
     let base = match table.get(key) {
@@ -146,7 +150,7 @@ fn emit_type_ref(key: &TypeKey<'_>, table: &TypeTable<'_>, config: &RustEmitConf
     }
 }
 
-fn wrap_indirection(type_str: &str, indirection: Indirection) -> String {
+pub(crate) fn wrap_indirection(type_str: &str, indirection: Indirection) -> String {
     match indirection {
         Indirection::Box => format!("Box<{}>", type_str),
         Indirection::Rc => format!("Rc<{}>", type_str),
@@ -154,7 +158,7 @@ fn wrap_indirection(type_str: &str, indirection: Indirection) -> String {
     }
 }
 
-fn emit_derives(config: &RustEmitConfig) -> String {
+pub(crate) fn emit_derives(config: &RustEmitConfig) -> String {
     let mut derives = Vec::new();
     if config.derive_debug {
         derives.push("Debug");
@@ -174,7 +178,7 @@ fn emit_derives(config: &RustEmitConfig) -> String {
 }
 
 /// Topologically sort types so dependencies come before dependents.
-fn topological_sort<'src>(table: &TypeTable<'src>) -> Vec<TypeKey<'src>> {
+pub(crate) fn topological_sort<'src>(table: &TypeTable<'src>) -> Vec<TypeKey<'src>> {
     let mut result = Vec::new();
     let mut visited = IndexMap::new();
 
@@ -212,7 +216,7 @@ fn visit<'src>(
     result.push(key.clone());
 }
 
-fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
+pub(crate) fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
 
