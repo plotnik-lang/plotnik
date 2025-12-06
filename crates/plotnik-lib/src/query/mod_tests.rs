@@ -17,7 +17,7 @@ fn parse_error() {
 fn resolution_error() {
     let q = Query::try_from("(call (Undefined))").unwrap();
     assert!(!q.is_valid());
-    assert!(q.dump_diagnostics().contains("undefined reference"));
+    assert!(q.dump_diagnostics().contains("is not defined"));
 }
 
 #[test]

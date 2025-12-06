@@ -35,7 +35,7 @@ fn mixed_alternation_tagged_first() {
     let query = Query::try_from("[A: (a) (b)]").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: mixed tagged and untagged branches in alternation
+    error: cannot mix labeled and unlabeled branches
       |
     1 | [A: (a) (b)]
       |  -      ^^^
@@ -57,7 +57,7 @@ fn mixed_alternation_untagged_first() {
     .unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: mixed tagged and untagged branches in alternation
+    error: cannot mix labeled and unlabeled branches
       |
     3 |       (a)
       |       ^^^
@@ -71,7 +71,7 @@ fn nested_mixed_alternation() {
     let query = Query::try_from("(call [A: (a) (b)])").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: mixed tagged and untagged branches in alternation
+    error: cannot mix labeled and unlabeled branches
       |
     1 | (call [A: (a) (b)])
       |        -      ^^^
@@ -85,14 +85,14 @@ fn multiple_mixed_alternations() {
     let query = Query::try_from("(foo [A: (a) (b)] [C: (c) (d)])").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: mixed tagged and untagged branches in alternation
+    error: cannot mix labeled and unlabeled branches
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])
       |       -      ^^^
       |       |
       |       tagged branch here
 
-    error: mixed tagged and untagged branches in alternation
+    error: cannot mix labeled and unlabeled branches
       |
     1 | (foo [A: (a) (b)] [C: (c) (d)])
       |                    -      ^^^

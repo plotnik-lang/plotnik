@@ -63,7 +63,7 @@ fn builder_with_related() {
     assert_eq!(diagnostics.len(), 1);
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree; primary
+    error: missing closing `)`; primary
       |
     1 | hello world!
       | ^^^^^ ---- related info
@@ -84,7 +84,7 @@ fn builder_with_fix() {
 
     let result = diagnostics.printer("hello world").render();
     insta::assert_snapshot!(result, @r"
-    error: invalid field syntax; fixable
+    error: use `:` for field constraints, not `=`; fixable
       |
     1 | hello world
       | ^^^^^
@@ -113,7 +113,7 @@ fn builder_with_all_options() {
 
     let result = diagnostics.printer("hello world stuff!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree; main error
+    error: missing closing `)`; main error
       |
     1 | hello world stuff!
       | ^^^^^ ----- ----- and here
@@ -164,7 +164,7 @@ fn printer_with_path() {
 
     let result = diagnostics.printer("hello world").path("test.pql").render();
     insta::assert_snapshot!(result, @r"
-    error: undefined reference; `test error`
+    error: `test error` is not defined
      --> test.pql:1:1
       |
     1 | hello world
@@ -185,7 +185,7 @@ fn printer_zero_width_span() {
 
     let result = diagnostics.printer("hello").render();
     insta::assert_snapshot!(result, @r"
-    error: expected expression; zero width error
+    error: expected an expression; zero width error
       |
     1 | hello
       | ^
@@ -206,7 +206,7 @@ fn printer_related_zero_width() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree; primary
+    error: missing closing `)`; primary
       |
     1 | hello world!
       | ^^^^^ - zero width related
@@ -233,12 +233,12 @@ fn printer_multiple_diagnostics() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: unclosed tree; first error
+    error: missing closing `)`; first error
       |
     1 | hello world!
       | ^^^^^
 
-    error: undefined reference; `second error`
+    error: `second error` is not defined
       |
     1 | hello world!
       |       ^^^^
@@ -294,19 +294,19 @@ fn diagnostic_kind_suppression_order() {
 fn diagnostic_kind_fallback_messages() {
     assert_eq!(
         DiagnosticKind::UnclosedTree.fallback_message(),
-        "unclosed tree"
+        "missing closing `)`"
     );
     assert_eq!(
         DiagnosticKind::UnclosedSequence.fallback_message(),
-        "unclosed sequence"
+        "missing closing `}`"
     );
     assert_eq!(
         DiagnosticKind::UnclosedAlternation.fallback_message(),
-        "unclosed alternation"
+        "missing closing `]`"
     );
     assert_eq!(
         DiagnosticKind::ExpectedExpression.fallback_message(),
-        "expected expression"
+        "expected an expression"
     );
 }
 
@@ -314,26 +314,29 @@ fn diagnostic_kind_fallback_messages() {
 fn diagnostic_kind_custom_messages() {
     assert_eq!(
         DiagnosticKind::UnclosedTree.custom_message(),
-        "unclosed tree: {}"
+        "missing closing `)`; {}"
     );
     assert_eq!(
         DiagnosticKind::UndefinedReference.custom_message(),
-        "undefined reference: `{}`"
+        "`{}` is not defined"
     );
 }
 
 #[test]
 fn diagnostic_kind_message_rendering() {
     // No custom message → fallback
-    assert_eq!(DiagnosticKind::UnclosedTree.message(None), "unclosed tree");
+    assert_eq!(
+        DiagnosticKind::UnclosedTree.message(None),
+        "missing closing `)`"
+    );
     // With custom message → template applied
     assert_eq!(
-        DiagnosticKind::UnclosedTree.message(Some("expected ')'")),
-        "unclosed tree: expected ')'"
+        DiagnosticKind::UnclosedTree.message(Some("expected `)`")),
+        "missing closing `)`; expected `)`"
     );
     assert_eq!(
         DiagnosticKind::UndefinedReference.message(Some("Foo")),
-        "undefined reference: `Foo`"
+        "`Foo` is not defined"
     );
 }
 

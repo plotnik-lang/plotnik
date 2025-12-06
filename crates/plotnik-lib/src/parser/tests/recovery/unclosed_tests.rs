@@ -10,7 +10,7 @@ fn missing_paren() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | (identifier
       | -^^^^^^^^^^
@@ -28,7 +28,7 @@ fn missing_bracket() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed alternation; unclosed alternation; expected ']'
+    error: missing closing `]`; expected `]`
       |
     1 | [(identifier) (string)
       | -^^^^^^^^^^^^^^^^^^^^^
@@ -46,7 +46,7 @@ fn missing_brace() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed sequence; unclosed sequence; expected '}'
+    error: missing closing `}`; expected `}`
       |
     1 | {(a) (b)
       | -^^^^^^^
@@ -64,7 +64,7 @@ fn nested_unclosed() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | (a (b (c)
       |    -^^^^^
@@ -82,7 +82,7 @@ fn deeply_nested_unclosed() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | (a (b (c (d
       |          -^
@@ -100,7 +100,7 @@ fn unclosed_alternation_nested() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | [(a) (b
       |      -^
@@ -118,7 +118,7 @@ fn empty_parens() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: empty tree expression
+    error: empty parentheses are not allowed
       |
     1 | ()
       |  ^
@@ -135,7 +135,7 @@ fn unclosed_tree_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 |   (call
       |   ^ tree started here
@@ -157,7 +157,7 @@ fn unclosed_alternation_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed alternation; unclosed alternation; expected ']'
+    error: missing closing `]`; expected `]`
       |
     1 |   [
       |   ^ alternation started here
@@ -180,7 +180,7 @@ fn unclosed_sequence_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed sequence; unclosed sequence; expected '}'
+    error: missing closing `}`; expected `}`
       |
     1 |   {
       |   ^ sequence started here
@@ -199,7 +199,7 @@ fn unclosed_double_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | (call "foo)
       | -^^^^^^^^^^
@@ -215,7 +215,7 @@ fn unclosed_single_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; unclosed tree; expected ')'
+    error: missing closing `)`; expected `)`
       |
     1 | (call 'foo)
       | -^^^^^^^^^^

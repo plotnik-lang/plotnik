@@ -131,12 +131,12 @@ fn named_def_missing_equals_with_garbage() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | Expr ^^^ (identifier)
       | ^^^^
 
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
       |
     1 | Expr ^^^ (identifier)
       |      ^^^
@@ -153,12 +153,12 @@ fn named_def_missing_equals_recovers_to_next_def() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | Broken ^^^
       | ^^^^^^
 
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
       |
     1 | Broken ^^^
       |        ^^^

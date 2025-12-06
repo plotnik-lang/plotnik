@@ -109,74 +109,94 @@ impl DiagnosticKind {
     /// Base message for this diagnostic kind, used when no custom message is provided.
     pub fn fallback_message(&self) -> &'static str {
         match self {
-            // Unclosed delimiters
-            Self::UnclosedTree => "unclosed tree",
-            Self::UnclosedSequence => "unclosed sequence",
-            Self::UnclosedAlternation => "unclosed alternation",
+            // Unclosed delimiters - clear about what's missing
+            Self::UnclosedTree => "missing closing `)`",
+            Self::UnclosedSequence => "missing closing `}`",
+            Self::UnclosedAlternation => "missing closing `]`",
 
-            // Expected token errors
-            Self::ExpectedExpression => "expected expression",
-            Self::ExpectedTypeName => "expected type name",
-            Self::ExpectedCaptureName => "expected capture name",
+            // Expected token errors - specific about what's needed
+            Self::ExpectedExpression => "expected an expression",
+            Self::ExpectedTypeName => "expected type name after `::`",
+            Self::ExpectedCaptureName => "expected name after `@`",
             Self::ExpectedFieldName => "expected field name",
-            Self::ExpectedSubtype => "expected subtype",
+            Self::ExpectedSubtype => "expected subtype after `/`",
 
-            // Invalid token/syntax usage
-            Self::EmptyTree => "empty tree expression",
-            Self::BareIdentifier => "bare identifier not allowed",
-            Self::InvalidSeparator => "invalid separator",
-            Self::InvalidFieldEquals => "invalid field syntax",
-            Self::InvalidSupertypeSyntax => "invalid supertype syntax",
-            Self::InvalidTypeAnnotationSyntax => "invalid type annotation syntax",
-            Self::ErrorTakesNoArguments => "(ERROR) takes no arguments",
-            Self::RefCannotHaveChildren => "reference cannot contain children",
-            Self::ErrorMissingOutsideParens => "ERROR/MISSING outside parentheses",
-            Self::UnsupportedPredicate => "unsupported predicate",
+            // Invalid syntax - explain what's wrong
+            Self::EmptyTree => "empty parentheses are not allowed",
+            Self::BareIdentifier => "bare identifier is not a valid expression",
+            Self::InvalidSeparator => "separators are not needed",
+            Self::InvalidFieldEquals => "use `:` for field constraints, not `=`",
+            Self::InvalidSupertypeSyntax => "supertype syntax not allowed on references",
+            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations, not `:`",
+            Self::ErrorTakesNoArguments => "`(ERROR)` cannot have child nodes",
+            Self::RefCannotHaveChildren => "references cannot have children",
+            Self::ErrorMissingOutsideParens => {
+                "`ERROR` and `MISSING` must be wrapped in parentheses"
+            }
+            Self::UnsupportedPredicate => "predicates like `#match?` are not supported",
             Self::UnexpectedToken => "unexpected token",
-            Self::CaptureWithoutTarget => "capture without target",
-            Self::LowercaseBranchLabel => "lowercase branch label",
+            Self::CaptureWithoutTarget => "`@` must follow an expression to capture",
+            Self::LowercaseBranchLabel => "branch labels must be capitalized",
 
-            // Naming validation
-            Self::CaptureNameHasDots => "capture name contains dots",
-            Self::CaptureNameHasHyphens => "capture name contains hyphens",
-            Self::CaptureNameUppercase => "capture name starts with uppercase",
-            Self::DefNameLowercase => "definition name starts with lowercase",
-            Self::DefNameHasSeparators => "definition name contains separators",
-            Self::BranchLabelHasSeparators => "branch label contains separators",
-            Self::FieldNameHasDots => "field name contains dots",
-            Self::FieldNameHasHyphens => "field name contains hyphens",
-            Self::FieldNameUppercase => "field name starts with uppercase",
-            Self::TypeNameInvalidChars => "type name contains invalid characters",
+            // Naming convention violations
+            Self::CaptureNameHasDots => "capture names cannot contain `.`",
+            Self::CaptureNameHasHyphens => "capture names cannot contain `-`",
+            Self::CaptureNameUppercase => "capture names must be lowercase",
+            Self::DefNameLowercase => "definition names must start uppercase",
+            Self::DefNameHasSeparators => "definition names must be PascalCase",
+            Self::BranchLabelHasSeparators => "branch labels must be PascalCase",
+            Self::FieldNameHasDots => "field names cannot contain `.`",
+            Self::FieldNameHasHyphens => "field names cannot contain `-`",
+            Self::FieldNameUppercase => "field names must be lowercase",
+            Self::TypeNameInvalidChars => "type names cannot contain `.` or `-`",
 
             // Semantic errors
-            Self::DuplicateDefinition => "duplicate definition",
+            Self::DuplicateDefinition => "name already defined",
             Self::UndefinedReference => "undefined reference",
-            Self::MixedAltBranches => "mixed tagged and untagged branches in alternation",
-            Self::RecursionNoEscape => "recursive pattern can never match",
-            Self::FieldSequenceValue => "field value must be a single node",
+            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
+            Self::RecursionNoEscape => "infinite recursion detected",
+            Self::FieldSequenceValue => "field must match exactly one node",
 
-            // Structural observations
-            Self::UnnamedDefNotLast => "unnamed definition must be last",
+            // Structural
+            Self::UnnamedDefNotLast => "only the last definition can be unnamed",
         }
     }
 
     /// Template for custom messages. Contains `{}` placeholder for caller-provided detail.
     pub fn custom_message(&self) -> String {
         match self {
-            // Special cases: placeholder embedded in message
-            Self::RefCannotHaveChildren => "reference `{}` cannot contain children".to_string(),
-            Self::FieldSequenceValue => "field `{}` value must be a single node".to_string(),
-
-            // Cases with backtick-wrapped placeholders
-            Self::DuplicateDefinition | Self::UndefinedReference => {
-                format!("{}; `{{}}`", self.fallback_message())
+            // Special formatting for references
+            Self::RefCannotHaveChildren => {
+                "`{}` is a reference and cannot have children".to_string()
+            }
+            Self::FieldSequenceValue => {
+                "field `{}` must match exactly one node, not a sequence".to_string()
             }
 
-            // Cases where custom text differs from fallback
-            Self::InvalidTypeAnnotationSyntax => "invalid type annotation; {}".to_string(),
-            Self::MixedAltBranches => "mixed alternation; {}".to_string(),
+            // Semantic errors with name context
+            Self::DuplicateDefinition => "`{}` is already defined".to_string(),
+            Self::UndefinedReference => "`{}` is not defined".to_string(),
 
-            // Standard pattern: fallback + ": {}"
+            // Recursion with cycle path
+            Self::RecursionNoEscape => "infinite recursion: {}".to_string(),
+
+            // Alternation mixing
+            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
+
+            // Unclosed with context
+            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation => {
+                format!("{}; {{}}", self.fallback_message())
+            }
+
+            // Type annotation specifics
+            Self::InvalidTypeAnnotationSyntax => {
+                "type annotations use `::`, not `:` — {}".to_string()
+            }
+
+            // Named def ordering
+            Self::UnnamedDefNotLast => "only the last definition can be unnamed — {}".to_string(),
+
+            // Standard pattern: fallback + context
             _ => format!("{}; {{}}", self.fallback_message()),
         }
     }
