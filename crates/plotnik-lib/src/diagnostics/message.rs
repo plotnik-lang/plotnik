@@ -290,6 +290,7 @@ pub(crate) struct DiagnosticMessage {
     pub(crate) message: String,
     pub(crate) fix: Option<Fix>,
     pub(crate) related: Vec<RelatedInfo>,
+    pub(crate) hints: Vec<String>,
 }
 
 impl DiagnosticMessage {
@@ -301,6 +302,7 @@ impl DiagnosticMessage {
             message: message.into(),
             fix: None,
             related: Vec::new(),
+            hints: Vec::new(),
         }
     }
 
@@ -342,6 +344,9 @@ impl std::fmt::Display for DiagnosticMessage {
                 u32::from(related.range.start()),
                 u32::from(related.range.end())
             )?;
+        }
+        for hint in &self.hints {
+            write!(f, " (hint: {})", hint)?;
         }
         Ok(())
     }

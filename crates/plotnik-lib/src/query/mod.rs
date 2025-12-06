@@ -18,6 +18,8 @@ pub mod symbol_table;
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(all(test, feature = "plotnik-langs"))]
+mod link_tests;
 #[cfg(test)]
 mod mod_tests;
 #[cfg(test)]

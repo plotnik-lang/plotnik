@@ -81,6 +81,10 @@ impl<'a> DiagnosticsPrinter<'a> {
                 );
             }
 
+            for hint in &diag.hints {
+                report.push(Group::with_title(Level::HELP.secondary_title(hint)));
+            }
+
             if i > 0 {
                 w.write_str("\n\n")?;
             }

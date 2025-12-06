@@ -24,6 +24,13 @@ pub trait LangImpl: Send + Sync {
     fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId>;
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId>;
 
+    // Enumeration methods for suggestions
+    fn all_named_node_kinds(&self) -> Vec<&'static str>;
+    fn all_field_names(&self) -> Vec<&'static str>;
+    fn node_type_name(&self, node_type_id: NodeTypeId) -> Option<&'static str>;
+    fn field_name(&self, field_id: NodeFieldId) -> Option<&'static str>;
+    fn fields_for_node_type(&self, node_type_id: NodeTypeId) -> Vec<&'static str>;
+
     fn is_supertype(&self, node_type_id: NodeTypeId) -> bool;
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16];
 
@@ -109,6 +116,43 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
 
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {
         self.ts_lang.field_id_for_name(name)
+    }
+
+    fn all_named_node_kinds(&self) -> Vec<&'static str> {
+        let count = self.ts_lang.node_kind_count();
+        (0..count as u16)
+            .filter(|&id| self.ts_lang.node_kind_is_named(id))
+            .filter_map(|id| self.ts_lang.node_kind_for_id(id))
+            .collect()
+    }
+
+    fn all_field_names(&self) -> Vec<&'static str> {
+        let count = self.ts_lang.field_count();
+        (1..=count as u16)
+            .filter_map(|id| self.ts_lang.field_name_for_id(id))
+            .collect()
+    }
+
+    fn node_type_name(&self, node_type_id: NodeTypeId) -> Option<&'static str> {
+        self.ts_lang.node_kind_for_id(node_type_id)
+    }
+
+    fn field_name(&self, field_id: NodeFieldId) -> Option<&'static str> {
+        self.ts_lang.field_name_for_id(field_id.get())
+    }
+
+    fn fields_for_node_type(&self, node_type_id: NodeTypeId) -> Vec<&'static str> {
+        let count = self.ts_lang.field_count();
+        (1..=count as u16)
+            .filter_map(|id| {
+                let field_id = std::num::NonZeroU16::new(id)?;
+                if self.node_types.has_field(node_type_id, field_id) {
+                    self.ts_lang.field_name_for_id(id)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn is_supertype(&self, node_type_id: NodeTypeId) -> bool {
