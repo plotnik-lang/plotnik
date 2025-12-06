@@ -413,3 +413,68 @@ fn invalid_ref_to_bodyless_def() {
         Ref⁻ X
     ");
 }
+
+#[test]
+fn invalid_capture_without_inner() {
+    // Error recovery: `extra` is invalid, but `@y` still creates a Capture node
+    let query = Query::try_from("(call extra @y)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def¹
+        NamedNode¹ call
+          CapturedExpr⁻ @y
+    ");
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+      |
+    1 | (call extra @y)
+      |       ^^^^^
+    ");
+}
+
+#[test]
+fn invalid_capture_without_inner_standalone() {
+    // Standalone capture without preceding expression
+    let query = Query::try_from("@x").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `@` must follow an expression to capture
+      |
+    1 | @x
+      | ^
+    ");
+}
+
+#[test]
+fn invalid_multiple_captures_with_error() {
+    let query = Query::try_from("(call (Undefined) @x extra @y)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def¹
+        NamedNode¹ call
+          CapturedExpr⁻ @x
+            Ref⁻ Undefined
+          CapturedExpr⁻ @y
+    ");
+}
+
+#[test]
+fn invalid_quantifier_without_inner() {
+    // Error recovery: `extra` is invalid, but `*` still creates a Quantifier node
+    let query = Query::try_from("(foo extra*)").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    Root¹
+      Def¹
+        NamedNode¹ foo
+          QuantifiedExpr⁻ *
+    ");
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+      |
+    1 | (foo extra*)
+      |      ^^^^^
+    ");
+}

@@ -8,9 +8,7 @@
 //! undefined refs, etc.).
 
 use super::Query;
-use super::invariants::{
-    ensure_capture_has_inner, ensure_quantifier_has_inner, ensure_ref_has_name,
-};
+use super::invariants::ensure_ref_has_name;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxNode};
 
@@ -55,12 +53,16 @@ impl Query<'_> {
             Expr::SeqExpr(seq) => self.seq_cardinality(seq),
 
             Expr::CapturedExpr(cap) => {
-                let inner = ensure_capture_has_inner(cap.inner());
+                let Some(inner) = cap.inner() else {
+                    return ShapeCardinality::Invalid;
+                };
                 self.get_or_compute(&inner)
             }
 
             Expr::QuantifiedExpr(q) => {
-                let inner = ensure_quantifier_has_inner(q.inner());
+                let Some(inner) = q.inner() else {
+                    return ShapeCardinality::Invalid;
+                };
                 self.get_or_compute(&inner)
             }
 
