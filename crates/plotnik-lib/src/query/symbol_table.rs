@@ -27,7 +27,7 @@ impl<'a> Query<'a> {
             if self.symbol_table.contains_key(name) {
                 self.resolve_diagnostics
                     .report(DiagnosticKind::DuplicateDefinition, range)
-                    .message(format!("duplicate definition: `{}`", name))
+                    .message(name)
                     .emit();
                 continue;
             }
@@ -104,7 +104,7 @@ impl<'a> Query<'a> {
 
         self.resolve_diagnostics
             .report(DiagnosticKind::UndefinedReference, name_token.text_range())
-            .message(format!("undefined reference: `{}`", name))
+            .message(name)
             .emit();
     }
 }

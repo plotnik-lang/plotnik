@@ -59,10 +59,10 @@ fn reference_with_supertype_syntax_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: references cannot use supertype syntax (/)
+    error: invalid supertype syntax: invalid supertype syntax
       |
     1 | (RefName/subtype)
-      |         ^ references cannot use supertype syntax (/)
+      |         ^ invalid supertype syntax: invalid supertype syntax
     ");
 }
 
@@ -93,10 +93,10 @@ fn error_with_unexpected_content() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: (ERROR) takes no arguments
+    error: (ERROR) takes no arguments: (ERROR) takes no arguments
       |
     1 | (ERROR (something))
-      |        ^ (ERROR) takes no arguments
+      |        ^ (ERROR) takes no arguments: (ERROR) takes no arguments
     ");
 }
 
@@ -109,10 +109,10 @@ fn bare_error_keyword() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
+    error: ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
       |
     1 | ERROR
-      | ^^^^^ ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
+      | ^^^^^ ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
     ");
 }
 
@@ -125,10 +125,10 @@ fn bare_missing_keyword() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
+    error: ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
       |
     1 | MISSING
-      | ^^^^^^^ ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)
+      | ^^^^^^^ ERROR/MISSING outside parentheses: ERROR/MISSING outside parentheses
     ");
 }
 
@@ -177,10 +177,10 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr
-      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     ");
 }
 
@@ -193,10 +193,10 @@ fn named_def_missing_equals() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr (identifier)
-      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     ");
 }
 
@@ -211,10 +211,10 @@ fn unnamed_def_not_allowed_in_middle() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unnamed definition must be last in file; add a name: `Name = (first)`
+    error: unnamed definition must be last: add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
+      | ^^^^^^^ unnamed definition must be last: add a name: `Name = (first)`
     ");
 }
 
@@ -229,14 +229,14 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unnamed definition must be last in file; add a name: `Name = (first)`
+    error: unnamed definition must be last: add a name: `Name = (first)`
       |
     1 | (first)
-      | ^^^^^^^ unnamed definition must be last in file; add a name: `Name = (first)`
-    error: unnamed definition must be last in file; add a name: `Name = (second)`
+      | ^^^^^^^ unnamed definition must be last: add a name: `Name = (first)`
+    error: unnamed definition must be last: add a name: `Name = (second)`
       |
     2 | (second)
-      | ^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (second)`
+      | ^^^^^^^^ unnamed definition must be last: add a name: `Name = (second)`
     ");
 }
 
@@ -249,14 +249,14 @@ fn capture_space_after_dot_is_anchor() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
+    error: unnamed definition must be last: add a name: `Name = (identifier) @foo`
       |
     1 | (identifier) @foo . (other)
-      | ^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @foo`
-    error: unnamed definition must be last in file; add a name: `Name = .`
+      | ^^^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (identifier) @foo`
+    error: unnamed definition must be last: add a name: `Name = .`
       |
     1 | (identifier) @foo . (other)
-      |                   ^ unnamed definition must be last in file; add a name: `Name = .`
+      |                   ^ unnamed definition must be last: add a name: `Name = .`
     ");
 }
 
@@ -267,10 +267,10 @@ fn def_name_lowercase_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names must start with uppercase
+    error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | lowercase = (x)
-      | ^^^^^^^^^ definition names must start with uppercase
+      | ^^^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
       |
     help: definition names must be PascalCase; use Lowercase instead
       |
@@ -289,10 +289,10 @@ fn def_name_snake_case_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names must start with uppercase
+    error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my_expr = (identifier)
-      | ^^^^^^^ definition names must start with uppercase
+      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -311,10 +311,10 @@ fn def_name_kebab_case_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names must start with uppercase
+    error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my-expr = (identifier)
-      | ^^^^^^^ definition names must start with uppercase
+      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -333,10 +333,10 @@ fn def_name_dotted_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names must start with uppercase
+    error: definition name starts with lowercase: definition names must start with uppercase
       |
     1 | my.expr = (identifier)
-      | ^^^^^^^ definition names must start with uppercase
+      | ^^^^^^^ definition name starts with lowercase: definition names must start with uppercase
       |
     help: definition names must be PascalCase; use MyExpr instead
       |
@@ -353,10 +353,10 @@ fn def_name_with_underscores_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names cannot contain separators
+    error: definition name contains separators: definition names cannot contain separators
       |
     1 | Some_Thing = (x)
-      | ^^^^^^^^^^ definition names cannot contain separators
+      | ^^^^^^^^^^ definition name contains separators: definition names cannot contain separators
       |
     help: definition names must be PascalCase; use SomeThing instead
       |
@@ -373,10 +373,10 @@ fn def_name_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: definition names cannot contain separators
+    error: definition name contains separators: definition names cannot contain separators
       |
     1 | Some-Thing = (x)
-      | ^^^^^^^^^^ definition names cannot contain separators
+      | ^^^^^^^^^^ definition name contains separators: definition names cannot contain separators
       |
     help: definition names must be PascalCase; use SomeThing instead
       |
@@ -395,10 +395,10 @@ fn capture_name_pascal_case_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names must start with lowercase
+    error: capture name starts with uppercase: capture names must start with lowercase
       |
     1 | (a) @Name
-      |      ^^^^ capture names must start with lowercase
+      |      ^^^^ capture name starts with uppercase: capture names must start with lowercase
       |
     help: capture names must be snake_case; use @name instead
       |
@@ -417,10 +417,10 @@ fn capture_name_pascal_case_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain hyphens
+    error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (a) @My-Name
-      |      ^^^^^^^ capture names cannot contain hyphens
+      |      ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
       |
     help: captures become struct fields; use @my_name instead
       |
@@ -439,10 +439,10 @@ fn capture_name_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain hyphens
+    error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (a) @my-name
-      |      ^^^^^^^ capture names cannot contain hyphens
+      |      ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
       |
     help: captures become struct fields; use @my_name instead
       |
@@ -461,10 +461,10 @@ fn capture_dotted_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain dots
+    error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar
-      |               ^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^ capture name contains dots: capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -483,10 +483,10 @@ fn capture_dotted_multiple_parts() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain dots
+    error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar.baz
-      |               ^^^^^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^^^^^ capture name contains dots: capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -505,20 +505,20 @@ fn capture_dotted_followed_by_field() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain dots
+    error: capture name contains dots: capture names cannot contain dots
       |
     1 | (node) @foo.bar name: (other)
-      |         ^^^^^^^ capture names cannot contain dots
+      |         ^^^^^^^ capture name contains dots: capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar instead
       |
     1 - (node) @foo.bar name: (other)
     1 + (node) @foo_bar name: (other)
       |
-    error: unnamed definition must be last in file; add a name: `Name = (node) @foo.bar`
+    error: unnamed definition must be last: add a name: `Name = (node) @foo.bar`
       |
     1 | (node) @foo.bar name: (other)
-      | ^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (node) @foo.bar`
+      | ^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (node) @foo.bar`
     ");
 }
 
@@ -531,24 +531,24 @@ fn capture_space_after_dot_breaks_chain() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain dots
+    error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo. bar
-      |               ^^^^ capture names cannot contain dots
+      |               ^^^^ capture name contains dots: capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_ instead
       |
     1 - (identifier) @foo. bar
     1 + (identifier) @foo_ bar
       |
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (identifier) @foo. bar
-      |                    ^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
+      |                    ^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unnamed definition must be last: add a name: `Name = (identifier) @foo.`
       |
     1 | (identifier) @foo. bar
-      | ^^^^^^^^^^^^^^^^^^ unnamed definition must be last in file; add a name: `Name = (identifier) @foo.`
+      | ^^^^^^^^^^^^^^^^^^ unnamed definition must be last: add a name: `Name = (identifier) @foo.`
     ");
 }
 
@@ -561,10 +561,10 @@ fn capture_hyphenated_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain hyphens
+    error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar
-      |               ^^^^^^^ capture names cannot contain hyphens
+      |               ^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
       |
     help: captures become struct fields; use @foo_bar instead
       |
@@ -583,10 +583,10 @@ fn capture_hyphenated_multiple() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain hyphens
+    error: capture name contains hyphens: capture names cannot contain hyphens
       |
     1 | (identifier) @foo-bar-baz
-      |               ^^^^^^^^^^^ capture names cannot contain hyphens
+      |               ^^^^^^^^^^^ capture name contains hyphens: capture names cannot contain hyphens
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -605,10 +605,10 @@ fn capture_mixed_dots_and_hyphens() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture names cannot contain dots
+    error: capture name contains dots: capture names cannot contain dots
       |
     1 | (identifier) @foo.bar-baz
-      |               ^^^^^^^^^^^ capture names cannot contain dots
+      |               ^^^^^^^^^^^ capture name contains dots: capture names cannot contain dots
       |
     help: captures become struct fields; use @foo_bar_baz instead
       |
@@ -627,10 +627,10 @@ fn field_name_pascal_case_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field names must start with lowercase
+    error: field name starts with uppercase: field names must start with lowercase
       |
     1 | (call Name: (a))
-      |       ^^^^ field names must start with lowercase
+      |       ^^^^ field name starts with uppercase: field names must start with lowercase
       |
     help: field names must be snake_case; use name: instead
       |
@@ -647,10 +647,10 @@ fn field_name_with_dots_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field names cannot contain dots
+    error: field name contains dots: field names cannot contain dots
       |
     1 | (call foo.bar: (x))
-      |       ^^^^^^^ field names cannot contain dots
+      |       ^^^^^^^ field name contains dots: field names cannot contain dots
       |
     help: field names must be snake_case; use foo_bar: instead
       |
@@ -667,10 +667,10 @@ fn field_name_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field names cannot contain hyphens
+    error: field name contains hyphens: field names cannot contain hyphens
       |
     1 | (call foo-bar: (x))
-      |       ^^^^^^^ field names cannot contain hyphens
+      |       ^^^^^^^ field name contains hyphens: field names cannot contain hyphens
       |
     help: field names must be snake_case; use foo_bar: instead
       |
@@ -689,10 +689,10 @@ fn negated_field_with_upper_ident_parses() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field names must start with lowercase
+    error: field name starts with uppercase: field names must start with lowercase
       |
     1 | (call !Arguments)
-      |        ^^^^^^^^^ field names must start with lowercase
+      |        ^^^^^^^^^ field name starts with uppercase: field names must start with lowercase
       |
     help: field names must be snake_case; use arguments: instead
       |
@@ -711,10 +711,10 @@ fn branch_label_snake_case_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: branch labels cannot contain separators
+    error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My_branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch labels cannot contain separators
+      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -733,10 +733,10 @@ fn branch_label_kebab_case_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: branch labels cannot contain separators
+    error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My-branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch labels cannot contain separators
+      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -755,10 +755,10 @@ fn branch_label_dotted_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: branch labels cannot contain separators
+    error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [My.branch: (a) Other: (b)]
-      |  ^^^^^^^^^ branch labels cannot contain separators
+      |  ^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
       |
     help: branch labels must be PascalCase; use MyBranch: instead
       |
@@ -775,10 +775,10 @@ fn branch_label_with_underscores_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: branch labels cannot contain separators
+    error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [Some_Label: (x)]
-      |  ^^^^^^^^^^ branch labels cannot contain separators
+      |  ^^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
       |
     help: branch labels must be PascalCase; use SomeLabel: instead
       |
@@ -795,10 +795,10 @@ fn branch_label_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: branch labels cannot contain separators
+    error: branch label contains separators: branch labels cannot contain separators
       |
     1 | [Some-Label: (x)]
-      |  ^^^^^^^^^^ branch labels cannot contain separators
+      |  ^^^^^^^^^^ branch label contains separators: branch labels cannot contain separators
       |
     help: branch labels must be PascalCase; use SomeLabel: instead
       |
@@ -820,20 +820,20 @@ fn lowercase_branch_label() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: tagged alternation labels must be Capitalized (they map to enum variants)
+    error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     2 |   left: (a)
-      |   ^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |   ^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     help: capitalize as `Left`
       |
     2 -   left: (a)
     2 +   Left: (a)
       |
-    error: tagged alternation labels must be Capitalized (they map to enum variants)
+    error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     3 |   right: (b)
-      |   ^^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |   ^^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     help: capitalize as `Right`
       |
@@ -852,10 +852,10 @@ fn lowercase_branch_label_suggests_capitalized() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: tagged alternation labels must be Capitalized (they map to enum variants)
+    error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [first: (a) Second: (b)]
-      |  ^^^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     help: capitalize as `First`
       |
@@ -872,10 +872,10 @@ fn mixed_case_branch_labels() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: tagged alternation labels must be Capitalized (they map to enum variants)
+    error: lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     1 | [foo: (a) Bar: (b)]
-      |  ^^^ tagged alternation labels must be Capitalized (they map to enum variants)
+      |  ^^^ lowercase branch label: tagged alternation labels must be Capitalized (they map to enum variants)
       |
     help: capitalize as `Foo`
       |
@@ -894,10 +894,10 @@ fn type_annotation_dotted_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: type names cannot contain dots or hyphens
+    error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (a) @x :: My.Type
-      |           ^^^^^^^ type names cannot contain dots or hyphens
+      |           ^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
       |
     help: type names cannot contain separators; use ::MyType instead
       |
@@ -916,10 +916,10 @@ fn type_annotation_kebab_suggests_pascal() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: type names cannot contain dots or hyphens
+    error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (a) @x :: My-Type
-      |           ^^^^^^^ type names cannot contain dots or hyphens
+      |           ^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
       |
     help: type names cannot contain separators; use ::MyType instead
       |
@@ -936,10 +936,10 @@ fn type_name_with_dots_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: type names cannot contain dots or hyphens
+    error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (x) @name :: Some.Type
-      |              ^^^^^^^^^ type names cannot contain dots or hyphens
+      |              ^^^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
       |
     help: type names cannot contain separators; use ::SomeType instead
       |
@@ -956,10 +956,10 @@ fn type_name_with_hyphens_error() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: type names cannot contain dots or hyphens
+    error: type name contains invalid characters: type names cannot contain dots or hyphens
       |
     1 | (x) @name :: Some-Type
-      |              ^^^^^^^^^ type names cannot contain dots or hyphens
+      |              ^^^^^^^^^ type name contains invalid characters: type names cannot contain dots or hyphens
       |
     help: type names cannot contain separators; use ::SomeType instead
       |
@@ -976,10 +976,10 @@ fn comma_in_node_children() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: ',' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (node (a), (b))
-      |          ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |          ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -996,20 +996,20 @@ fn comma_in_alternation() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: ',' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |     ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |     ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
     1 - [(a), (b), (c)]
     1 + [(a) (b), (c)]
       |
-    error: ',' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a), (b), (c)]
-      |          ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |          ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -1026,10 +1026,10 @@ fn comma_in_sequence() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: ',' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a), (b)}
-      |     ^ ',' is not valid syntax; plotnik uses whitespace for separation
+      |     ^ invalid separator: ',' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -1046,20 +1046,20 @@ fn pipe_in_alternation() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '|' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |      ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
     1 - [(a) | (b) | (c)]
     1 + [(a)  (b) | (c)]
       |
-    error: '|' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b) | (c)]
-      |            ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |            ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -1078,10 +1078,10 @@ fn pipe_between_branches() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '|' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | [(a) | (b)]
-      |      ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -1098,20 +1098,20 @@ fn pipe_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '|' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | (a | b)
-      |    ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |    ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
     1 - (a | b)
     1 + (a  b)
       |
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | (a | b)
-      |      ^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |      ^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
     ");
 }
 
@@ -1122,10 +1122,10 @@ fn pipe_in_sequence() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '|' is not valid syntax; plotnik uses whitespace for separation
+    error: invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     1 | {(a) | (b)}
-      |      ^ '|' is not valid syntax; plotnik uses whitespace for separation
+      |      ^ invalid separator: '|' is not valid syntax; plotnik uses whitespace for separation
       |
     help: remove separator
       |
@@ -1142,10 +1142,10 @@ fn field_equals_typo() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '=' is not valid for field constraints
+    error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (node name = (identifier))
-      |            ^ '=' is not valid for field constraints
+      |            ^ invalid field syntax: '=' is not valid for field constraints
       |
     help: use ':'
       |
@@ -1162,10 +1162,10 @@ fn field_equals_typo_no_space() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '=' is not valid for field constraints
+    error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (node name=(identifier))
-      |           ^ '=' is not valid for field constraints
+      |           ^ invalid field syntax: '=' is not valid for field constraints
       |
     help: use ':'
       |
@@ -1182,20 +1182,20 @@ fn field_equals_typo_no_expression() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '=' is not valid for field constraints
+    error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (call name=)
-      |           ^ '=' is not valid for field constraints
+      |           ^ invalid field syntax: '=' is not valid for field constraints
       |
     help: use ':'
       |
     1 - (call name=)
     1 + (call name:)
       |
-    error: expected expression after field name
+    error: expected expression: expected expression after field name
       |
     1 | (call name=)
-      |            ^ expected expression after field name
+      |            ^ expected expression: expected expression after field name
     ");
 }
 
@@ -1208,10 +1208,10 @@ fn field_equals_typo_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: '=' is not valid for field constraints
+    error: invalid field syntax: '=' is not valid for field constraints
       |
     1 | (call name = (identifier))
-      |            ^ '=' is not valid for field constraints
+      |            ^ invalid field syntax: '=' is not valid for field constraints
       |
     help: use ':'
       |
@@ -1228,10 +1228,10 @@ fn single_colon_type_annotation() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: single colon is not valid for type annotations
+    error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (identifier) @name : Type
-      |                    ^ single colon is not valid for type annotations
+      |                    ^ invalid type annotation: single colon is not valid for type annotations
       |
     help: use '::'
       |
@@ -1247,10 +1247,10 @@ fn single_colon_type_annotation_no_space() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: single colon is not valid for type annotations
+    error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (identifier) @name:Type
-      |                   ^ single colon is not valid for type annotations
+      |                   ^ invalid type annotation: single colon is not valid for type annotations
       |
     help: use '::'
       |
@@ -1268,10 +1268,10 @@ fn single_colon_type_annotation_with_space() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: single colon is not valid for type annotations
+    error: invalid type annotation: single colon is not valid for type annotations
       |
     1 | (a) @x : Type
-      |        ^ single colon is not valid for type annotations
+      |        ^ invalid type annotation: single colon is not valid for type annotations
       |
     help: use '::'
       |
@@ -1287,25 +1287,25 @@ fn single_colon_primitive_type() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture '@' must follow an expression to capture
+    error: capture without target: capture without target
       |
     1 | @val : string
-      | ^ capture '@' must follow an expression to capture
-    error: expected ':' to separate field name from its value
+      | ^ capture without target: capture without target
+    error: unexpected token: expected ':' to separate field name from its value
       |
     1 | @val : string
-      |     ^ expected ':' to separate field name from its value
-    error: expected expression after field name
+      |     ^ unexpected token: expected ':' to separate field name from its value
+    error: expected expression: expected expression after field name
       |
     1 | @val : string
-      |      ^ expected expression after field name
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+      |      ^ expected expression: expected expression after field name
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | @val : string
-      |        ^^^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unnamed definition must be last in file; add a name: `Name = val`
+      |        ^^^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unnamed definition must be last: add a name: `Name = val`
       |
     1 | @val : string
-      |  ^^^ unnamed definition must be last in file; add a name: `Name = val`
+      |  ^^^ unnamed definition must be last: add a name: `Name = val`
     ");
 }

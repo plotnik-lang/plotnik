@@ -131,14 +131,14 @@ fn named_def_missing_equals_with_garbage() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Expr ^^^ (identifier)
-      | ^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      | ^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Expr ^^^ (identifier)
-      |      ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |      ^^^ unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 
@@ -152,14 +152,14 @@ fn named_def_missing_equals_recovers_to_next_def() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
       |
     1 | Broken ^^^
-      | ^^^^^^ bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
-    error: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      | ^^^^^^ bare identifier not allowed: bare identifier not allowed; nodes must be enclosed in parentheses, e.g., (identifier)
+    error: unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
       |
     1 | Broken ^^^
-      |        ^^^ unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
+      |        ^^^ unexpected token: unexpected token; expected an expression like (node), [choice], {sequence}, "literal", or _
     "#);
 }
 

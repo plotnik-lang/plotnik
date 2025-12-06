@@ -263,7 +263,7 @@ impl<'src> Parser<'src> {
 
     /// Emit diagnostic with default message for the kind.
     pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        self.error_msg(kind, kind.default_message());
+        self.error_msg(kind, kind.fallback_message());
     }
 
     /// Emit diagnostic with custom message.
@@ -278,7 +278,7 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
-        self.error_and_bump_msg(kind, kind.default_message());
+        self.error_and_bump_msg(kind, kind.fallback_message());
     }
 
     pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {

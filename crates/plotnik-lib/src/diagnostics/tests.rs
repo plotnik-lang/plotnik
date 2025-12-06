@@ -63,12 +63,12 @@ fn builder_with_related() {
     assert_eq!(diagnostics.len(), 1);
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: primary
+    error: unclosed tree: primary
       |
     1 | hello world!
       | ^^^^^ ---- related info
       | |
-      | primary
+      | unclosed tree: primary
     ");
 }
 
@@ -86,10 +86,10 @@ fn builder_with_fix() {
 
     let result = diagnostics.printer("hello world").render();
     insta::assert_snapshot!(result, @r"
-    error: fixable
+    error: invalid field syntax: fixable
       |
     1 | hello world
-      | ^^^^^ fixable
+      | ^^^^^ invalid field syntax: fixable
       |
     help: apply this fix
       |
@@ -115,13 +115,13 @@ fn builder_with_all_options() {
 
     let result = diagnostics.printer("hello world stuff!").render();
     insta::assert_snapshot!(result, @r"
-    error: main error
+    error: unclosed tree: main error
       |
     1 | hello world stuff!
       | ^^^^^ ----- ----- and here
       | |     |
       | |     see also
-      | main error
+      | unclosed tree: main error
       |
     help: try this
       |
@@ -167,11 +167,11 @@ fn printer_with_path() {
 
     let result = diagnostics.printer("hello world").path("test.pql").render();
     insta::assert_snapshot!(result, @r"
-    error: test error
+    error: undefined reference: `test error`
      --> test.pql:1:1
       |
     1 | hello world
-      | ^^^^^ test error
+      | ^^^^^ undefined reference: `test error`
     ");
 }
 
@@ -188,10 +188,10 @@ fn printer_zero_width_span() {
 
     let result = diagnostics.printer("hello").render();
     insta::assert_snapshot!(result, @r"
-    error: zero width error
+    error: expected expression: zero width error
       |
     1 | hello
-      | ^ zero width error
+      | ^ expected expression: zero width error
     ");
 }
 
@@ -209,12 +209,12 @@ fn printer_related_zero_width() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: primary
+    error: unclosed tree: primary
       |
     1 | hello world!
       | ^^^^^ - zero width related
       | |
-      | primary
+      | unclosed tree: primary
     ");
 }
 
@@ -238,14 +238,14 @@ fn printer_multiple_diagnostics() {
 
     let result = diagnostics.printer("hello world!").render();
     insta::assert_snapshot!(result, @r"
-    error: first error
+    error: unclosed tree: first error
       |
     1 | hello world!
-      | ^^^^^ first error
-    error: second error
+      | ^^^^^ unclosed tree: first error
+    error: undefined reference: `second error`
       |
     1 | hello world!
-      |       ^^^^ second error
+      |       ^^^^ undefined reference: `second error`
     ");
 }
 
@@ -295,22 +295,49 @@ fn diagnostic_kind_suppression_order() {
 }
 
 #[test]
-fn diagnostic_kind_default_messages() {
+fn diagnostic_kind_fallback_messages() {
     assert_eq!(
-        DiagnosticKind::UnclosedTree.default_message(),
-        "unclosed tree; expected ')'"
+        DiagnosticKind::UnclosedTree.fallback_message(),
+        "unclosed tree"
     );
     assert_eq!(
-        DiagnosticKind::UnclosedSequence.default_message(),
-        "unclosed sequence; expected '}'"
+        DiagnosticKind::UnclosedSequence.fallback_message(),
+        "unclosed sequence"
     );
     assert_eq!(
-        DiagnosticKind::UnclosedAlternation.default_message(),
-        "unclosed alternation; expected ']'"
+        DiagnosticKind::UnclosedAlternation.fallback_message(),
+        "unclosed alternation"
     );
     assert_eq!(
-        DiagnosticKind::ExpectedExpression.default_message(),
+        DiagnosticKind::ExpectedExpression.fallback_message(),
         "expected expression"
+    );
+}
+
+#[test]
+fn diagnostic_kind_custom_messages() {
+    assert_eq!(
+        DiagnosticKind::UnclosedTree.custom_message(),
+        "unclosed tree: {}"
+    );
+    assert_eq!(
+        DiagnosticKind::UndefinedReference.custom_message(),
+        "undefined reference: `{}`"
+    );
+}
+
+#[test]
+fn diagnostic_kind_message_rendering() {
+    // No custom message → fallback
+    assert_eq!(DiagnosticKind::UnclosedTree.message(None), "unclosed tree");
+    // With custom message → template applied
+    assert_eq!(
+        DiagnosticKind::UnclosedTree.message(Some("expected ')'")),
+        "unclosed tree: expected ')'"
+    );
+    assert_eq!(
+        DiagnosticKind::UndefinedReference.message(Some("Foo")),
+        "undefined reference: `Foo`"
     );
 }
 

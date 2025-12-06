@@ -168,10 +168,10 @@ fn field_with_seq_error() {
               NamedNode¹ b
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field `name` value must match a single node, not a sequence
+    error: field `name` value must be a single node
       |
     1 | (call name: {(a) (b)})
-      |             ^^^^^^^^^ field `name` value must match a single node, not a sequence
+      |             ^^^^^^^^^ field `name` value must be a single node
     ");
 }
 
@@ -195,10 +195,10 @@ fn field_with_ref_to_seq_error() {
             Ref⁺ X
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field `name` value must match a single node, not a sequence
+    error: field `name` value must be a single node
       |
     2 | (call name: (X))
-      |             ^^^ field `name` value must match a single node, not a sequence
+      |             ^^^ field `name` value must be a single node
     ");
 }
 

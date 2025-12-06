@@ -149,9 +149,10 @@ impl Diagnostics {
 }
 
 impl<'a> DiagnosticBuilder<'a> {
-    /// Override the default message for this diagnostic kind.
+    /// Provide custom detail for this diagnostic, rendered using the kind's template.
     pub fn message(mut self, msg: impl Into<String>) -> Self {
-        self.message.message = msg.into();
+        let detail = msg.into();
+        self.message.message = self.message.kind.message(Some(&detail));
         self
     }
 

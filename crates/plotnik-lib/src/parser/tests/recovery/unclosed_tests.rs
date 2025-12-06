@@ -10,10 +10,10 @@ fn missing_paren() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; expected ')'
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (identifier
-      | -          ^ unclosed tree; expected ')'
+      | -          ^ unclosed tree: unclosed tree; expected ')'
       | |
       | tree started here
     ");
@@ -28,10 +28,10 @@ fn missing_bracket() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed alternation; expected ']'
+    error: unclosed alternation: unclosed alternation; expected ']'
       |
     1 | [(identifier) (string)
-      | -                     ^ unclosed alternation; expected ']'
+      | -                     ^ unclosed alternation: unclosed alternation; expected ']'
       | |
       | alternation started here
     ");
@@ -46,10 +46,10 @@ fn missing_brace() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed sequence; expected '}'
+    error: unclosed sequence: unclosed sequence; expected '}'
       |
     1 | {(a) (b)
-      | -       ^ unclosed sequence; expected '}'
+      | -       ^ unclosed sequence: unclosed sequence; expected '}'
       | |
       | sequence started here
     ");
@@ -64,10 +64,10 @@ fn nested_unclosed() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; expected ')'
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c)
-      |    -     ^ unclosed tree; expected ')'
+      |    -     ^ unclosed tree: unclosed tree; expected ')'
       |    |
       |    tree started here
     ");
@@ -82,10 +82,10 @@ fn deeply_nested_unclosed() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; expected ')'
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (a (b (c (d
-      |          - ^ unclosed tree; expected ')'
+      |          - ^ unclosed tree: unclosed tree; expected ')'
       |          |
       |          tree started here
     ");
@@ -100,10 +100,10 @@ fn unclosed_alternation_nested() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; expected ')'
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | [(a) (b
-      |      - ^ unclosed tree; expected ')'
+      |      - ^ unclosed tree: unclosed tree; expected ')'
       |      |
       |      tree started here
     ");
@@ -118,10 +118,10 @@ fn empty_parens() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: empty tree expression - expected node type or children
+    error: empty tree expression: empty tree expression
       |
     1 | ()
-      |  ^ empty tree expression - expected node type or children
+      |  ^ empty tree expression: empty tree expression
     ");
 }
 
@@ -135,12 +135,12 @@ fn unclosed_tree_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed tree; expected ')'
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call
       | - tree started here
     2 |     (identifier)
-      |                 ^ unclosed tree; expected ')'
+      |                 ^ unclosed tree: unclosed tree; expected ')'
     ");
 }
 
@@ -155,13 +155,13 @@ fn unclosed_alternation_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed alternation; expected ']'
+    error: unclosed alternation: unclosed alternation; expected ']'
       |
     1 | [
       | - alternation started here
     2 |     (a)
     3 |     (b)
-      |        ^ unclosed alternation; expected ']'
+      |        ^ unclosed alternation: unclosed alternation; expected ']'
     ");
 }
 
@@ -176,13 +176,13 @@ fn unclosed_sequence_shows_open_location() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unclosed sequence; expected '}'
+    error: unclosed sequence: unclosed sequence; expected '}'
       |
     1 | {
       | - sequence started here
     2 |     (a)
     3 |     (b)
-      |        ^ unclosed sequence; expected '}'
+      |        ^ unclosed sequence: unclosed sequence; expected '}'
     ");
 }
 
@@ -193,14 +193,14 @@ fn unclosed_double_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
-    error: unexpected token; expected a child expression or closing delimiter
+    error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call "foo)
-      |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: unclosed tree; expected ')'
+      |       ^^^^^ unexpected token: unexpected token; expected a child expression or closing delimiter
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call "foo)
-      | -          ^ unclosed tree; expected ')'
+      | -          ^ unclosed tree: unclosed tree; expected ')'
       | |
       | tree started here
     "#);
@@ -213,14 +213,14 @@ fn unclosed_single_quote_string() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: unexpected token; expected a child expression or closing delimiter
+    error: unexpected token: unexpected token; expected a child expression or closing delimiter
       |
     1 | (call 'foo)
-      |       ^^^^^ unexpected token; expected a child expression or closing delimiter
-    error: unclosed tree; expected ')'
+      |       ^^^^^ unexpected token: unexpected token; expected a child expression or closing delimiter
+    error: unclosed tree: unclosed tree; expected ')'
       |
     1 | (call 'foo)
-      | -          ^ unclosed tree; expected ')'
+      | -          ^ unclosed tree: unclosed tree; expected ')'
       | |
       | tree started here
     ");

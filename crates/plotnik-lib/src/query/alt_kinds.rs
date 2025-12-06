@@ -80,7 +80,6 @@ impl Query<'_> {
 
         self.alt_kind_diagnostics
             .report(DiagnosticKind::MixedAltBranches, untagged_range)
-            .message("mixed tagged and untagged branches in alternation")
             .related_to("tagged branch here", tagged_range)
             .emit();
     }

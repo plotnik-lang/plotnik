@@ -211,10 +211,7 @@ impl Query<'_> {
         let mut builder = self
             .recursion_diagnostics
             .report(DiagnosticKind::RecursionNoEscape, range)
-            .message(format!(
-                "recursive pattern can never match: cycle {} has no escape path",
-                cycle_str
-            ));
+            .message(format!("cycle {} has no escape path", cycle_str));
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);

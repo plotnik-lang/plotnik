@@ -45,10 +45,7 @@ impl Parser<'_> {
                 let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
                 self.diagnostics
                     .report(DiagnosticKind::UnnamedDefNotLast, *span)
-                    .message(format!(
-                        "unnamed definition must be last in file; add a name: `Name = {}`",
-                        def_text.trim()
-                    ))
+                    .message(format!("add a name: `Name = {}`", def_text.trim()))
                     .emit();
             }
         }
@@ -262,7 +259,7 @@ impl Parser<'_> {
             if let Some(name) = &ref_name {
                 self.diagnostics
                     .report(DiagnosticKind::RefCannotHaveChildren, children_span)
-                    .message(format!("reference `{}` cannot contain children", name))
+                    .message(name)
                     .emit();
             }
         } else if is_ref {

@@ -118,10 +118,7 @@ impl Query<'_> {
 
             self.shapes_diagnostics
                 .report(DiagnosticKind::FieldSequenceValue, value.text_range())
-                .message(format!(
-                    "field `{}` value must match a single node, not a sequence",
-                    field_name
-                ))
+                .message(field_name)
                 .emit();
         }
 

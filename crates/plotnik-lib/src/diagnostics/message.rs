@@ -78,67 +78,122 @@ impl DiagnosticKind {
         self < other
     }
 
-    /// Default message for this diagnostic kind.
-    ///
-    /// Provides a sensible fallback; callers can override with context-specific messages.
-    pub fn default_message(&self) -> &'static str {
+    /// Base message for this diagnostic kind, used when no custom message is provided.
+    pub fn fallback_message(&self) -> &'static str {
         match self {
             // Unclosed delimiters
-            Self::UnclosedTree => "unclosed tree; expected ')'",
-            Self::UnclosedSequence => "unclosed sequence; expected '}'",
-            Self::UnclosedAlternation => "unclosed alternation; expected ']'",
+            Self::UnclosedTree => "unclosed tree",
+            Self::UnclosedSequence => "unclosed sequence",
+            Self::UnclosedAlternation => "unclosed alternation",
 
             // Expected token errors
             Self::ExpectedExpression => "expected expression",
-            Self::ExpectedTypeName => "expected type name after '::'",
-            Self::ExpectedCaptureName => "expected capture name after '@'",
+            Self::ExpectedTypeName => "expected type name",
+            Self::ExpectedCaptureName => "expected capture name",
             Self::ExpectedFieldName => "expected field name",
-            Self::ExpectedSubtype => "expected subtype after '/'",
+            Self::ExpectedSubtype => "expected subtype",
 
             // Invalid token/syntax usage
-            Self::EmptyTree => "empty tree expression - expected node type or children",
-            Self::BareIdentifier => {
-                "bare identifier not allowed; nodes must be enclosed in parentheses"
-            }
-            Self::InvalidSeparator => "invalid separator; plotnik uses whitespace for separation",
-            Self::InvalidFieldEquals => "'=' is not valid for field constraints; use ':'",
-            Self::InvalidSupertypeSyntax => "references cannot use supertype syntax (/)",
+            Self::EmptyTree => "empty tree expression",
+            Self::BareIdentifier => "bare identifier not allowed",
+            Self::InvalidSeparator => "invalid separator",
+            Self::InvalidFieldEquals => "invalid field syntax",
+            Self::InvalidSupertypeSyntax => "invalid supertype syntax",
             Self::InvalidTypeAnnotationSyntax => "invalid type annotation syntax",
             Self::ErrorTakesNoArguments => "(ERROR) takes no arguments",
             Self::RefCannotHaveChildren => "reference cannot contain children",
-            Self::ErrorMissingOutsideParens => {
-                "ERROR and MISSING must be inside parentheses: (ERROR) or (MISSING ...)"
-            }
-            Self::UnsupportedPredicate => {
-                "tree-sitter predicates (#eq?, #match?, #set!, etc.) are not supported"
-            }
+            Self::ErrorMissingOutsideParens => "ERROR/MISSING outside parentheses",
+            Self::UnsupportedPredicate => "unsupported predicate",
             Self::UnexpectedToken => "unexpected token",
-            Self::CaptureWithoutTarget => "capture '@' must follow an expression to capture",
-            Self::LowercaseBranchLabel => {
-                "tagged alternation labels must be Capitalized (they map to enum variants)"
-            }
+            Self::CaptureWithoutTarget => "capture without target",
+            Self::LowercaseBranchLabel => "lowercase branch label",
 
             // Naming validation
-            Self::CaptureNameHasDots => "capture names cannot contain dots",
-            Self::CaptureNameHasHyphens => "capture names cannot contain hyphens",
-            Self::CaptureNameUppercase => "capture names must start with lowercase",
-            Self::DefNameLowercase => "definition names must start with uppercase",
-            Self::DefNameHasSeparators => "definition names cannot contain separators",
-            Self::BranchLabelHasSeparators => "branch labels cannot contain separators",
-            Self::FieldNameHasDots => "field names cannot contain dots",
-            Self::FieldNameHasHyphens => "field names cannot contain hyphens",
-            Self::FieldNameUppercase => "field names must start with lowercase",
-            Self::TypeNameInvalidChars => "type names cannot contain dots or hyphens",
+            Self::CaptureNameHasDots => "capture name contains dots",
+            Self::CaptureNameHasHyphens => "capture name contains hyphens",
+            Self::CaptureNameUppercase => "capture name starts with uppercase",
+            Self::DefNameLowercase => "definition name starts with lowercase",
+            Self::DefNameHasSeparators => "definition name contains separators",
+            Self::BranchLabelHasSeparators => "branch label contains separators",
+            Self::FieldNameHasDots => "field name contains dots",
+            Self::FieldNameHasHyphens => "field name contains hyphens",
+            Self::FieldNameUppercase => "field name starts with uppercase",
+            Self::TypeNameInvalidChars => "type name contains invalid characters",
 
             // Semantic errors
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "mixed tagged and untagged branches in alternation",
-            Self::RecursionNoEscape => "recursive pattern can never match: no escape path",
-            Self::FieldSequenceValue => "field value must match a single node, not a sequence",
+            Self::RecursionNoEscape => "recursive pattern can never match",
+            Self::FieldSequenceValue => "field value must be a single node",
 
             // Structural observations
-            Self::UnnamedDefNotLast => "unnamed definition must be last in file",
+            Self::UnnamedDefNotLast => "unnamed definition must be last",
+        }
+    }
+
+    /// Template for custom messages. Contains `{}` placeholder for caller-provided detail.
+    pub fn custom_message(&self) -> &'static str {
+        match self {
+            // Unclosed delimiters
+            Self::UnclosedTree => "unclosed tree: {}",
+            Self::UnclosedSequence => "unclosed sequence: {}",
+            Self::UnclosedAlternation => "unclosed alternation: {}",
+
+            // Expected token errors
+            Self::ExpectedExpression => "expected expression: {}",
+            Self::ExpectedTypeName => "expected type name: {}",
+            Self::ExpectedCaptureName => "expected capture name: {}",
+            Self::ExpectedFieldName => "expected field name: {}",
+            Self::ExpectedSubtype => "expected subtype: {}",
+
+            // Invalid token/syntax usage
+            Self::EmptyTree => "empty tree expression: {}",
+            Self::BareIdentifier => "bare identifier not allowed: {}",
+            Self::InvalidSeparator => "invalid separator: {}",
+            Self::InvalidFieldEquals => "invalid field syntax: {}",
+            Self::InvalidSupertypeSyntax => "invalid supertype syntax: {}",
+            Self::InvalidTypeAnnotationSyntax => "invalid type annotation: {}",
+            Self::ErrorTakesNoArguments => "(ERROR) takes no arguments: {}",
+            Self::RefCannotHaveChildren => "reference `{}` cannot contain children",
+            Self::ErrorMissingOutsideParens => "ERROR/MISSING outside parentheses: {}",
+            Self::UnsupportedPredicate => "unsupported predicate: {}",
+            Self::UnexpectedToken => "unexpected token: {}",
+            Self::CaptureWithoutTarget => "capture without target: {}",
+            Self::LowercaseBranchLabel => "lowercase branch label: {}",
+
+            // Naming validation
+            Self::CaptureNameHasDots => "capture name contains dots: {}",
+            Self::CaptureNameHasHyphens => "capture name contains hyphens: {}",
+            Self::CaptureNameUppercase => "capture name starts with uppercase: {}",
+            Self::DefNameLowercase => "definition name starts with lowercase: {}",
+            Self::DefNameHasSeparators => "definition name contains separators: {}",
+            Self::BranchLabelHasSeparators => "branch label contains separators: {}",
+            Self::FieldNameHasDots => "field name contains dots: {}",
+            Self::FieldNameHasHyphens => "field name contains hyphens: {}",
+            Self::FieldNameUppercase => "field name starts with uppercase: {}",
+            Self::TypeNameInvalidChars => "type name contains invalid characters: {}",
+
+            // Semantic errors
+            Self::DuplicateDefinition => "duplicate definition: `{}`",
+            Self::UndefinedReference => "undefined reference: `{}`",
+            Self::MixedAltBranches => "mixed alternation: {}",
+            Self::RecursionNoEscape => "recursive pattern can never match: {}",
+            Self::FieldSequenceValue => "field `{}` value must be a single node",
+
+            // Structural observations
+            Self::UnnamedDefNotLast => "unnamed definition must be last: {}",
+        }
+    }
+
+    /// Render the final message.
+    ///
+    /// - `None` → returns `fallback_message()`
+    /// - `Some(detail)` → returns `custom_message()` with `{}` replaced by detail
+    pub fn message(&self, msg: Option<&str>) -> String {
+        match msg {
+            None => self.fallback_message().to_string(),
+            Some(detail) => self.custom_message().replace("{}", detail),
         }
     }
 }
@@ -210,7 +265,7 @@ impl DiagnosticMessage {
     }
 
     pub(crate) fn with_default_message(kind: DiagnosticKind, range: TextRange) -> Self {
-        Self::new(kind, range, kind.default_message())
+        Self::new(kind, range, kind.fallback_message())
     }
 
     pub(crate) fn severity(&self) -> Severity {
