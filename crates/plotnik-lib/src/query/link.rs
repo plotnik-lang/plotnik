@@ -5,6 +5,7 @@
 //! 2. Collect and resolve all field names (FieldExpr, NegatedField)
 //! 3. Validate structural constraints (field on node type, child type for field)
 
+use indexmap::IndexSet;
 use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
 use rowan::TextRange;
 
@@ -340,7 +341,8 @@ impl<'a> Query<'a> {
         let defs: Vec<_> = self.ast.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
-            self.validate_expr_structure(&body, None, lang);
+            let mut visited = IndexSet::new();
+            self.validate_expr_structure(&body, None, lang, &mut visited);
         }
     }
 
@@ -349,12 +351,13 @@ impl<'a> Query<'a> {
         expr: &Expr,
         ctx: Option<ValidationContext<'a>>,
         lang: &Lang,
+        visited: &mut IndexSet<String>,
     ) {
         match expr {
             Expr::NamedNode(node) => {
                 // Validate this node against the context (if any)
                 if let Some(ref ctx) = ctx {
-                    self.validate_terminal_type(expr, ctx, lang);
+                    self.validate_terminal_type(expr, ctx, lang, visited);
                 }
 
                 // Set up context for children
@@ -364,14 +367,14 @@ impl<'a> Query<'a> {
                     match &child {
                         Expr::FieldExpr(f) => {
                             // Fields get special handling
-                            self.validate_field_expr(f, child_ctx.as_ref(), lang);
+                            self.validate_field_expr(f, child_ctx.as_ref(), lang, visited);
                         }
                         _ => {
                             // Non-field children: validate as non-field children
                             if let Some(ref ctx) = child_ctx {
-                                self.validate_non_field_children(&child, ctx, lang);
+                                self.validate_non_field_children(&child, ctx, lang, visited);
                             }
-                            self.validate_expr_structure(&child, child_ctx.clone(), lang);
+                            self.validate_expr_structure(&child, child_ctx.clone(), lang, visited);
                         }
                     }
                 }
@@ -388,34 +391,42 @@ impl<'a> Query<'a> {
             Expr::AnonymousNode(_) => {
                 // Validate this anonymous node against the context (if any)
                 if let Some(ref ctx) = ctx {
-                    self.validate_terminal_type(expr, ctx, lang);
+                    self.validate_terminal_type(expr, ctx, lang, visited);
                 }
             }
             Expr::FieldExpr(f) => {
                 // Should be handled by parent NamedNode, but handle gracefully
-                self.validate_field_expr(f, ctx.as_ref(), lang);
+                self.validate_field_expr(f, ctx.as_ref(), lang, visited);
             }
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx.clone(), lang);
+                    self.validate_expr_structure(&body, ctx.clone(), lang, visited);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx.clone(), lang);
+                    self.validate_expr_structure(&child, ctx.clone(), lang, visited);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, lang);
+                self.validate_expr_structure(&inner, ctx, lang, visited);
             }
             Expr::QuantifiedExpr(q) => {
                 let Some(inner) = q.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, lang);
+                self.validate_expr_structure(&inner, ctx, lang, visited);
             }
-            Expr::Ref(_) => {
-                // References are validated elsewhere (symbol_table pass)
+            Expr::Ref(r) => {
+                let Some(name_token) = r.name() else { return };
+                let name = name_token.text();
+                if !visited.insert(name.to_string()) {
+                    return;
+                }
+                let Some(body) = self.symbol_table.get(name).cloned() else {
+                    return;
+                };
+                self.validate_expr_structure(&body, ctx, lang, visited);
             }
         }
     }
@@ -449,6 +460,7 @@ impl<'a> Query<'a> {
         field: &ast::FieldExpr,
         ctx: Option<&ValidationContext<'a>>,
         lang: &Lang,
+        visited: &mut IndexSet<String>,
     ) {
         let Some(name_token) = field.name() else {
             return;
@@ -493,7 +505,7 @@ impl<'a> Query<'a> {
 
         // Validate field value - this will traverse through alt/seq/quantifier/capture
         // and validate each terminal type against the field requirements
-        self.validate_expr_structure(&value, Some(field_ctx), lang);
+        self.validate_expr_structure(&value, Some(field_ctx), lang, visited);
     }
 
     /// Validate non-field children. Called for direct children of a NamedNode that aren't fields.
@@ -502,9 +514,10 @@ impl<'a> Query<'a> {
         expr: &Expr,
         ctx: &ValidationContext<'a>,
         lang: &Lang,
+        visited: &mut IndexSet<String>,
     ) {
-        // Collect all terminal types from this expression
-        let terminals = self.collect_terminal_types(expr);
+        // Collect all terminal types from this expression (follows refs)
+        let terminals = self.collect_terminal_types(expr, visited);
 
         // Check if parent allows any non-field children
         let valid_types = lang.valid_child_types(ctx.parent_id);
@@ -550,7 +563,27 @@ impl<'a> Query<'a> {
     }
 
     /// Validate a terminal type (NamedNode or AnonymousNode) against the context.
-    fn validate_terminal_type(&mut self, expr: &Expr, ctx: &ValidationContext<'a>, lang: &Lang) {
+    fn validate_terminal_type(
+        &mut self,
+        expr: &Expr,
+        ctx: &ValidationContext<'a>,
+        lang: &Lang,
+        visited: &mut IndexSet<String>,
+    ) {
+        // Handle refs by following them
+        if let Expr::Ref(r) = expr {
+            let Some(name_token) = r.name() else { return };
+            let name = name_token.text();
+            if !visited.insert(name.to_string()) {
+                return;
+            }
+            let Some(body) = self.symbol_table.get(name).cloned() else {
+                return;
+            };
+            self.validate_terminal_type(&body, ctx, lang, visited);
+            return;
+        }
+
         let Some((child_id, child_name, child_range)) = self.get_terminal_type_info(expr) else {
             return;
         };
@@ -588,10 +621,14 @@ impl<'a> Query<'a> {
         // Non-field children are validated by validate_non_field_children
     }
 
-    /// Collect all terminal types from an expression (traverses through Alt/Seq/Capture/Quantifier).
-    fn collect_terminal_types(&self, expr: &Expr) -> Vec<(NodeTypeId, &'a str, TextRange)> {
+    /// Collect all terminal types from an expression (traverses through Alt/Seq/Capture/Quantifier/Ref).
+    fn collect_terminal_types(
+        &self,
+        expr: &Expr,
+        visited: &mut IndexSet<String>,
+    ) -> Vec<(NodeTypeId, &'a str, TextRange)> {
         let mut result = Vec::new();
-        self.collect_terminal_types_impl(expr, &mut result);
+        self.collect_terminal_types_impl(expr, &mut result, visited);
         result
     }
 
@@ -599,6 +636,7 @@ impl<'a> Query<'a> {
         &self,
         expr: &Expr,
         result: &mut Vec<(NodeTypeId, &'a str, TextRange)>,
+        visited: &mut IndexSet<String>,
     ) {
         match expr {
             Expr::NamedNode(_) | Expr::AnonymousNode(_) => {
@@ -609,27 +647,38 @@ impl<'a> Query<'a> {
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     if let Some(body) = branch.body() {
-                        self.collect_terminal_types_impl(&body, result);
+                        self.collect_terminal_types_impl(&body, result, visited);
                     }
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.collect_terminal_types_impl(&child, result);
+                    self.collect_terminal_types_impl(&child, result, visited);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.collect_terminal_types_impl(&inner, result);
+                    self.collect_terminal_types_impl(&inner, result, visited);
                 }
             }
             Expr::QuantifiedExpr(q) => {
                 if let Some(inner) = q.inner() {
-                    self.collect_terminal_types_impl(&inner, result);
+                    self.collect_terminal_types_impl(&inner, result, visited);
                 }
             }
-            Expr::FieldExpr(_) | Expr::Ref(_) => {
-                // Fields are handled separately, refs don't have concrete types
+            Expr::Ref(r) => {
+                let Some(name_token) = r.name() else { return };
+                let name = name_token.text();
+                if !visited.insert(name.to_string()) {
+                    return;
+                }
+                let Some(body) = self.symbol_table.get(name) else {
+                    return;
+                };
+                self.collect_terminal_types_impl(body, result, visited);
+            }
+            Expr::FieldExpr(_) => {
+                // Fields are handled separately
             }
         }
     }

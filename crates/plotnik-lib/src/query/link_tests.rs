@@ -834,3 +834,178 @@ fn multiple_invalid_types_in_sequence_child() {
     help: valid children for `statement_block`: `statement`
     ");
 }
+
+#[test]
+fn ref_followed_for_child_validation() {
+    let input = indoc! {r#"
+        Foo = [(identifier) (string)]
+        (function_declaration (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    1 | Foo = [(identifier) (string)]
+      |         ^^^^^^^^^^
+    2 | (function_declaration (Foo))
+      |  -------------------- `function_declaration` only accepts children via fields
+
+    error: `string` cannot be a child of this node
+      |
+    1 | Foo = [(identifier) (string)]
+      |                      ^^^^^^
+    2 | (function_declaration (Foo))
+      |  -------------------- `function_declaration` only accepts children via fields
+    ");
+}
+
+#[test]
+fn ref_followed_for_field_validation() {
+    let input = indoc! {r#"
+        Foo = [(number) (string)]
+        (function_declaration name: (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `number` is not valid for this field
+      |
+    1 | Foo = [(number) (string)]
+      |         ^^^^^^
+    2 | (function_declaration name: (Foo))
+      |                       ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+
+    error: node type `string` is not valid for this field
+      |
+    1 | Foo = [(number) (string)]
+      |                  ^^^^^^
+    2 | (function_declaration name: (Foo))
+      |                       ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn ref_followed_valid_case() {
+    let input = indoc! {r#"
+        Foo = (identifier)
+        (function_declaration name: (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn ref_followed_recursive_with_invalid_type() {
+    let input = indoc! {r#"
+        Foo = [(number) (Foo)]
+        (function_declaration name: (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `number` is not valid for this field
+      |
+    1 | Foo = [(number) (Foo)]
+      |         ^^^^^^
+    2 | (function_declaration name: (Foo))
+      |                       ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn ref_followed_recursive_valid() {
+    let input = indoc! {r#"
+        Foo = [(identifier) (Foo)]
+        (function_declaration name: (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn ref_followed_mutual_recursion() {
+    let input = indoc! {r#"
+        Foo = [(number) (Bar)]
+        Bar = [(string) (Foo)]
+        (function_declaration name: (Foo))
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: node type `number` is not valid for this field
+      |
+    1 | Foo = [(number) (Bar)]
+      |         ^^^^^^
+    2 | Bar = [(string) (Foo)]
+    3 | (function_declaration name: (Foo))
+      |                       ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+
+    error: node type `string` is not valid for this field
+      |
+    2 | Bar = [(string) (Foo)]
+      |         ^^^^^^
+    3 | (function_declaration name: (Foo))
+      |                       ---- field `name` on `function_declaration`
+      |
+    help: valid types for `name`: `identifier`
+    ");
+}
+
+#[test]
+fn ref_followed_in_sequence() {
+    let input = indoc! {r#"
+        Foo = (number)
+        (statement_block {(Foo) (string)})
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `number` cannot be a child of this node
+      |
+    1 | Foo = (number)
+      |        ^^^^^^
+    2 | (statement_block {(Foo) (string)})
+      |  --------------- inside `statement_block`
+      |
+    help: valid children for `statement_block`: `statement`
+
+    error: `string` cannot be a child of this node
+      |
+    2 | (statement_block {(Foo) (string)})
+      |  ---------------         ^^^^^^
+      |  |
+      |  inside `statement_block`
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
