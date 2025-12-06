@@ -391,14 +391,21 @@ fn sequence_with_link_errors() {
       |       ^^^^^^^^^
       |
     help: did you mean `identifier`?
+
+    error: `statement_block` cannot be a child of this node
+      |
+    3 |      (statement_block)} @body) @fn
+      |      ^^^^^^^^^^^^^^^^^
+      |
+    help: `function_declaration` only accepts children via fields
     ");
 }
 
 #[test]
 fn quantified_expr_validation() {
     let input = indoc! {r#"
-        (function_declaration
-            (identifier)+ @names) @fn
+        (statement_block
+            (function_declaration)+ @fns) @block
     "#};
 
     let mut query = Query::try_from(input).unwrap();
@@ -408,11 +415,11 @@ fn quantified_expr_validation() {
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
       Def
-        CapturedExpr @fn
-          NamedNode function_declaration
-            CapturedExpr @names
+        CapturedExpr @block
+          NamedNode statement_block
+            CapturedExpr @fns
               QuantifiedExpr +
-                NamedNode identifier
+                NamedNode function_declaration
     ");
 }
 
@@ -473,5 +480,136 @@ fn field_on_node_without_fields() {
       |     ^^^^
       |
     help: `identifier` has no fields
+    ");
+}
+
+#[test]
+fn invalid_child_type_no_children_allowed() {
+    let input = indoc! {r#"
+        (function_declaration
+            (class_declaration)) @fn
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `class_declaration` cannot be a child of this node
+      |
+    2 |     (class_declaration)) @fn
+      |     ^^^^^^^^^^^^^^^^^^^
+      |
+    help: `function_declaration` only accepts children via fields
+    ");
+}
+
+#[test]
+fn invalid_child_type_wrong_type() {
+    let input = indoc! {r#"
+        (statement_block
+            (identifier)) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    2 |     (identifier)) @block
+      |     ^^^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
+
+#[test]
+fn valid_child_via_supertype() {
+    let input = indoc! {r#"
+        (statement_block
+            (function_declaration)) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn valid_child_via_nested_supertype() {
+    let input = indoc! {r#"
+        (program
+            (function_declaration)) @prog
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(query.is_valid());
+}
+
+#[test]
+fn invalid_anonymous_child() {
+    let input = indoc! {r#"
+        (statement_block
+            "function") @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
+    error: `function` cannot be a child of this node
+      |
+    2 |     "function") @block
+      |     ^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+    "#);
+}
+
+#[test]
+fn invalid_child_in_alternation() {
+    let input = indoc! {r#"
+        (statement_block
+            [(function_declaration) (identifier)]) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    2 |     [(function_declaration) (identifier)]) @block
+      |                             ^^^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
+    ");
+}
+
+#[test]
+fn invalid_child_in_sequence() {
+    let input = indoc! {r#"
+        (statement_block
+            {(function_declaration) (identifier)}) @block
+    "#};
+
+    let mut query = Query::try_from(input).unwrap();
+    query.link(&plotnik_langs::javascript());
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: `identifier` cannot be a child of this node
+      |
+    2 |     {(function_declaration) (identifier)}) @block
+      |                             ^^^^^^^^^^^^
+      |
+    help: valid children for `statement_block`: `statement`
     ");
 }

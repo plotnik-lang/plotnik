@@ -65,6 +65,7 @@ pub enum DiagnosticKind {
     UnknownField,
     FieldNotOnNodeType,
     InvalidFieldChildType,
+    InvalidChildType,
 
     // Often consequences of earlier errors
     UnnamedDefNotLast,
@@ -168,6 +169,7 @@ impl DiagnosticKind {
             Self::UnknownField => "unknown field",
             Self::FieldNotOnNodeType => "field not valid on this node type",
             Self::InvalidFieldChildType => "node type not valid for this field",
+            Self::InvalidChildType => "node type not valid as child",
 
             // Structural
             Self::UnnamedDefNotLast => "only the last definition can be unnamed",
@@ -194,6 +196,7 @@ impl DiagnosticKind {
             Self::UnknownField => "`{}` is not a valid field".to_string(),
             Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
             Self::InvalidFieldChildType => "node type `{}` is not valid for this field".to_string(),
+            Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
 
             // Recursion with cycle path
             Self::RecursionNoEscape => "infinite recursion: {}".to_string(),

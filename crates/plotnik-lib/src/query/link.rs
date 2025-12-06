@@ -50,6 +50,34 @@ fn find_similar<'a>(name: &str, candidates: &[&'a str], max_distance: usize) -> 
         .map(|(c, _)| c)
 }
 
+/// Check if `child` is a subtype of `supertype`, recursively handling nested supertypes.
+fn is_subtype_of(lang: &Lang, child: NodeTypeId, supertype: NodeTypeId) -> bool {
+    let subtypes = lang.subtypes(supertype);
+    for &subtype in subtypes {
+        if subtype == child {
+            return true;
+        }
+        if lang.is_supertype(subtype) && is_subtype_of(lang, child, subtype) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if `child` is a valid non-field child of `parent`, expanding supertypes.
+fn is_valid_child_expanded(lang: &Lang, parent: NodeTypeId, child: NodeTypeId) -> bool {
+    let valid_types = lang.valid_child_types(parent);
+    for &allowed in valid_types {
+        if allowed == child {
+            return true;
+        }
+        if lang.is_supertype(allowed) && is_subtype_of(lang, child, allowed) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Format a list of items for display, truncating if too long.
 fn format_list(items: &[&str], max_items: usize) -> String {
     if items.is_empty() {
@@ -286,6 +314,7 @@ impl<'a> Query<'a> {
             Expr::NamedNode(node) => {
                 let current_type_id = self.get_node_type_id(node);
                 for child in node.children() {
+                    self.validate_non_field_child(&child, current_type_id, lang);
                     self.validate_expr_structure(&child, current_type_id, lang);
                 }
                 for child in node.as_cst().children() {
@@ -302,11 +331,13 @@ impl<'a> Query<'a> {
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
+                    self.validate_non_field_child(&body, parent_type_id, lang);
                     self.validate_expr_structure(&body, parent_type_id, lang);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
+                    self.validate_non_field_child(&child, parent_type_id, lang);
                     self.validate_expr_structure(&child, parent_type_id, lang);
                 }
             }
@@ -370,6 +401,72 @@ impl<'a> Query<'a> {
             builder = builder.hint(format!(
                 "valid types for `{}`: {}",
                 field_name,
+                format_list(&valid_names, 5)
+            ));
+        }
+        builder.emit();
+    }
+
+    fn validate_non_field_child(
+        &mut self,
+        expr: &Expr,
+        parent_type_id: Option<NodeTypeId>,
+        lang: &Lang,
+    ) {
+        // Field expressions are validated separately by validate_field
+        if matches!(expr, Expr::FieldExpr(_)) {
+            return;
+        }
+
+        let Some(parent_id) = parent_type_id else {
+            return;
+        };
+
+        let Some(child_id) = self.get_expr_type_id(expr) else {
+            return;
+        };
+
+        // Check if parent allows any non-field children
+        let valid_types = lang.valid_child_types(parent_id);
+        if valid_types.is_empty() {
+            // Parent has no non-field children defined - all children must be via fields
+            let child_name = self.get_expr_type_name(expr).unwrap_or("(unknown)");
+            let parent_name = lang.node_type_name(parent_id).unwrap_or("(unknown)");
+            self.link_diagnostics
+                .report(DiagnosticKind::InvalidChildType, expr.text_range())
+                .message(child_name)
+                .hint(format!(
+                    "`{}` only accepts children via fields",
+                    parent_name
+                ))
+                .emit();
+            return;
+        }
+
+        if is_valid_child_expanded(lang, parent_id, child_id) {
+            return;
+        }
+
+        let child_name = self.get_expr_type_name(expr).unwrap_or("(unknown)");
+        let parent_name = lang.node_type_name(parent_id).unwrap_or("(unknown)");
+
+        // Collect valid type names, expanding supertypes for display
+        let mut valid_names: Vec<&str> = Vec::new();
+        for &type_id in valid_types {
+            if let Some(name) = lang.node_type_name(type_id) {
+                valid_names.push(name);
+            }
+        }
+
+        let mut builder = self
+            .link_diagnostics
+            .report(DiagnosticKind::InvalidChildType, expr.text_range())
+            .message(child_name);
+
+        if !valid_names.is_empty() {
+            builder = builder.hint(format!(
+                "valid children for `{}`: {}",
+                parent_name,
                 format_list(&valid_names, 5)
             ));
         }
