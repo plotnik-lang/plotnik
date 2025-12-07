@@ -8,6 +8,10 @@
 
 pub mod emit;
 mod types;
+pub mod tyton;
+
+#[cfg(test)]
+mod tyton_tests;
 
 pub use emit::{
     Indirection, OptionalStyle, RustEmitConfig, TypeScriptEmitConfig, emit_rust, emit_typescript,
