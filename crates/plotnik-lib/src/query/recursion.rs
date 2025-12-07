@@ -8,7 +8,7 @@ use rowan::TextRange;
 
 use super::Query;
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Def, Expr, SyntaxKind};
+use crate::parser::{Def, Expr};
 
 impl Query<'_> {
     pub(super) fn validate_recursion(&mut self) {
@@ -233,32 +233,19 @@ fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
             let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc))
         }
-        Expr::AltExpr(alt) => {
-            alt.branches().any(|b| {
-                b.body()
-                    .map(|body| expr_has_escape(&body, scc))
-                    .unwrap_or(true)
-            }) || alt.exprs().any(|e| expr_has_escape(&e, scc))
-        }
-        Expr::SeqExpr(seq) => seq.children().all(|c| expr_has_escape(&c, scc)),
-        Expr::QuantifiedExpr(q) => match q.operator().map(|op| op.kind()) {
-            Some(
-                SyntaxKind::Question
-                | SyntaxKind::Star
-                | SyntaxKind::QuestionQuestion
-                | SyntaxKind::StarQuestion,
-            ) => true,
-            Some(SyntaxKind::Plus | SyntaxKind::PlusQuestion) => q
-                .inner()
+        Expr::AltExpr(_) => expr.children().iter().any(|c| expr_has_escape(c, scc)),
+        Expr::SeqExpr(_) => expr.children().iter().all(|c| expr_has_escape(c, scc)),
+        Expr::QuantifiedExpr(q) => {
+            if q.is_optional() {
+                return true;
+            }
+            q.inner()
                 .map(|inner| expr_has_escape(&inner, scc))
-                .unwrap_or(true),
-            _ => true,
-        },
-        Expr::CapturedExpr(cap) => cap
-            .inner()
-            .map(|inner| expr_has_escape(&inner, scc))
-            .unwrap_or(true),
-        Expr::FieldExpr(f) => f.value().map(|v| expr_has_escape(&v, scc)).unwrap_or(true),
+                .unwrap_or(true)
+        }
+        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => {
+            expr.children().iter().all(|c| expr_has_escape(c, scc))
+        }
         Expr::AnonymousNode(_) => true,
     }
 }
@@ -270,65 +257,26 @@ fn collect_refs(expr: &Expr) -> IndexSet<String> {
 }
 
 fn collect_refs_into(expr: &Expr, refs: &mut IndexSet<String>) {
-    match expr {
-        Expr::Ref(r) => {
-            let Some(name_token) = r.name() else { return };
-            refs.insert(name_token.text().to_string());
-        }
-        Expr::NamedNode(node) => {
-            for child in node.children() {
-                collect_refs_into(&child, refs);
-            }
-        }
-        Expr::AltExpr(alt) => {
-            for branch in alt.branches() {
-                let Some(body) = branch.body() else { continue };
-                collect_refs_into(&body, refs);
-            }
-        }
-        Expr::SeqExpr(seq) => {
-            for child in seq.children() {
-                collect_refs_into(&child, refs);
-            }
-        }
-        Expr::CapturedExpr(cap) => {
-            let Some(inner) = cap.inner() else { return };
-            collect_refs_into(&inner, refs);
-        }
-        Expr::QuantifiedExpr(q) => {
-            let Some(inner) = q.inner() else { return };
-            collect_refs_into(&inner, refs);
-        }
-        Expr::FieldExpr(f) => {
-            let Some(value) = f.value() else { return };
-            collect_refs_into(&value, refs);
-        }
-        Expr::AnonymousNode(_) => {}
+    if let Expr::Ref(r) = expr
+        && let Some(name_token) = r.name()
+    {
+        refs.insert(name_token.text().to_string());
+    }
+
+    for child in expr.children() {
+        collect_refs_into(&child, refs);
     }
 }
 
 fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
-    match expr {
-        Expr::Ref(r) => {
-            let name_token = r.name()?;
-            if name_token.text() == target {
-                return Some(name_token.text_range());
-            }
-            None
+    if let Expr::Ref(r) = expr {
+        let name_token = r.name()?;
+        if name_token.text() == target {
+            return Some(name_token.text_range());
         }
-        Expr::NamedNode(node) => node
-            .children()
-            .find_map(|child| find_ref_in_expr(&child, target)),
-        Expr::AltExpr(alt) => alt
-            .branches()
-            .find_map(|b| b.body().and_then(|body| find_ref_in_expr(&body, target)))
-            .or_else(|| alt.exprs().find_map(|e| find_ref_in_expr(&e, target))),
-        Expr::SeqExpr(seq) => seq.children().find_map(|c| find_ref_in_expr(&c, target)),
-        Expr::CapturedExpr(cap) => cap
-            .inner()
-            .and_then(|inner| find_ref_in_expr(&inner, target)),
-        Expr::QuantifiedExpr(q) => q.inner().and_then(|inner| find_ref_in_expr(&inner, target)),
-        Expr::FieldExpr(f) => f.value().and_then(|v| find_ref_in_expr(&v, target)),
-        Expr::AnonymousNode(_) => None,
     }
+
+    expr.children()
+        .iter()
+        .find_map(|child| find_ref_in_expr(child, target))
 }

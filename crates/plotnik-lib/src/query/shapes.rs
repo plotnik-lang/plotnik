@@ -10,7 +10,7 @@
 use super::Query;
 use super::invariants::ensure_ref_has_name;
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxNode};
+use crate::parser::{Expr, Ref, SeqExpr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShapeCardinality {
@@ -21,17 +21,22 @@ pub enum ShapeCardinality {
 
 impl Query<'_> {
     pub(super) fn infer_shapes(&mut self) {
-        self.compute_all_cardinalities(self.ast.as_cst().clone());
-        self.validate_shapes(self.ast.as_cst().clone());
-    }
+        let bodies: Vec<_> = self.ast.defs().filter_map(|d| d.body()).collect();
 
-    fn compute_all_cardinalities(&mut self, node: SyntaxNode) {
-        if let Some(expr) = Expr::cast(node.clone()) {
-            self.get_or_compute(&expr);
+        for body in &bodies {
+            self.compute_all_cardinalities(body);
         }
 
-        for child in node.children() {
-            self.compute_all_cardinalities(child);
+        for body in &bodies {
+            self.validate_shapes(body);
+        }
+    }
+
+    fn compute_all_cardinalities(&mut self, expr: &Expr) {
+        self.get_or_compute(expr);
+
+        for child in expr.children() {
+            self.compute_all_cardinalities(&child);
         }
     }
 
@@ -94,41 +99,31 @@ impl Query<'_> {
         self.get_or_compute(&body)
     }
 
-    fn validate_shapes(&mut self, node: SyntaxNode) {
-        let Some(field) = FieldExpr::cast(node.clone()) else {
-            for child in node.children() {
-                self.validate_shapes(child);
+    fn validate_shapes(&mut self, expr: &Expr) {
+        if let Expr::FieldExpr(field) = expr
+            && let Some(value) = field.value()
+        {
+            let card = self
+                .shape_cardinality_table
+                .get(&value)
+                .copied()
+                .unwrap_or(ShapeCardinality::One);
+
+            if card == ShapeCardinality::Many {
+                let field_name = field
+                    .name()
+                    .map(|t| t.text().to_string())
+                    .unwrap_or_else(|| "field".to_string());
+
+                self.shapes_diagnostics
+                    .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+                    .message(field_name)
+                    .emit();
             }
-            return;
-        };
-
-        let Some(value) = field.value() else {
-            for child in node.children() {
-                self.validate_shapes(child);
-            }
-            return;
-        };
-
-        let card = self
-            .shape_cardinality_table
-            .get(&value)
-            .copied()
-            .unwrap_or(ShapeCardinality::One);
-
-        if card == ShapeCardinality::Many {
-            let field_name = field
-                .name()
-                .map(|t| t.text().to_string())
-                .unwrap_or_else(|| "field".to_string());
-
-            self.shapes_diagnostics
-                .report(DiagnosticKind::FieldSequenceValue, value.text_range())
-                .message(field_name)
-                .emit();
         }
 
-        for child in node.children() {
-            self.validate_shapes(child);
+        for child in expr.children() {
+            self.validate_shapes(&child);
         }
     }
 }
