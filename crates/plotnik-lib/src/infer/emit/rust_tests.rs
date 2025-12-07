@@ -527,3 +527,13 @@ fn emit_list_of_optionals() {
     pub type Items = Vec<Option<Item>>;
     ");
 }
+
+#[test]
+fn emit_builtin_value_with_named_key() {
+    let input = indoc! {r#"
+        AliasNode = Node
+        AliasString = string
+        AliasUnit = ()
+    "#};
+    insta::assert_snapshot!(emit(input), @"");
+}

@@ -31,11 +31,14 @@
 //! - `Key?` — optional wrapper
 //! - `Key*` — list wrapper
 //! - `Key+` — non-empty list wrapper
+//! - `Node` / `string` / `()` — bare builtin alias
 //!
 //! Definitions:
 //! - `Name = { ... }` — define a struct
 //! - `Name = [ ... ]` — define a tagged union
 //! - `Name = Other?` — define an optional
+//! - `<Foo bar> = { ... }` — define with synthetic key
+//! - `AliasNode = Node` — alias to builtin
 //!
 //! # Example
 //!
@@ -259,11 +262,19 @@ impl<'src> Parser<'src> {
         match self.peek() {
             Some(Token::LBrace) => self.parse_struct(),
             Some(Token::LBracket) => self.parse_tagged_union(),
-            Some(Token::Node)
-            | Some(Token::String)
-            | Some(Token::Unit)
-            | Some(Token::UpperIdent(_))
-            | Some(Token::LAngle) => {
+            Some(Token::Node) => {
+                self.advance();
+                self.parse_wrapper_or_bare(TypeKey::Node, TypeValue::Node)
+            }
+            Some(Token::String) => {
+                self.advance();
+                self.parse_wrapper_or_bare(TypeKey::String, TypeValue::String)
+            }
+            Some(Token::Unit) => {
+                self.advance();
+                self.parse_wrapper_or_bare(TypeKey::Unit, TypeValue::Unit)
+            }
+            Some(Token::UpperIdent(_)) | Some(Token::LAngle) => {
                 let key = self.parse_type_key()?;
                 self.parse_wrapper(key)
             }
@@ -271,6 +282,28 @@ impl<'src> Parser<'src> {
                 message: "expected type value".to_string(),
                 span,
             }),
+        }
+    }
+
+    fn parse_wrapper_or_bare(
+        &mut self,
+        key: TypeKey<'src>,
+        bare: TypeValue<'src>,
+    ) -> Result<TypeValue<'src>, ParseError> {
+        match self.peek() {
+            Some(Token::Question) => {
+                self.advance();
+                Ok(TypeValue::Optional(key))
+            }
+            Some(Token::Star) => {
+                self.advance();
+                Ok(TypeValue::List(key))
+            }
+            Some(Token::Plus) => {
+                self.advance();
+                Ok(TypeValue::NonEmptyList(key))
+            }
+            _ => Ok(bare),
         }
     }
 
@@ -356,11 +389,16 @@ impl<'src> Parser<'src> {
 
     fn parse_definition(&mut self) -> Result<(TypeKey<'src>, TypeValue<'src>), ParseError> {
         let span = self.current_span();
-        let name = match self.advance() {
-            Some(Token::UpperIdent(name)) => *name,
+        let key = match self.peek() {
+            Some(Token::UpperIdent(name)) => {
+                let name = *name;
+                self.advance();
+                TypeKey::Named(name)
+            }
+            Some(Token::LAngle) => self.parse_synthetic_key()?,
             _ => {
                 return Err(ParseError {
-                    message: "expected type name (uppercase)".to_string(),
+                    message: "expected type name (uppercase) or synthetic key".to_string(),
                     span,
                 });
             }
@@ -369,7 +407,7 @@ impl<'src> Parser<'src> {
         self.expect(Token::Eq)?;
         let value = self.parse_type_value()?;
 
-        Ok((TypeKey::Named(name), value))
+        Ok((key, value))
     }
 
     fn parse_all(&mut self) -> Result<TypeTable<'src>, ParseError> {

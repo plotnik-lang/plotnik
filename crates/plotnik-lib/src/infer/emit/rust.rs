@@ -147,8 +147,8 @@ pub(crate) fn emit_type_ref(
             let inner_str = emit_type_ref(inner, table, config);
             format!("Vec<{}>", inner_str)
         }
-        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) => key.to_pascal_case(),
-        None => key.to_pascal_case(),
+        // Struct, TaggedUnion, or undefined forward reference - use pascal-cased name
+        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => key.to_pascal_case(),
     };
 
     if is_cyclic {

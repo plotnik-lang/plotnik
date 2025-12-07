@@ -11,6 +11,8 @@ mod types;
 pub mod tyton;
 
 #[cfg(test)]
+mod types_tests;
+#[cfg(test)]
 mod tyton_tests;
 
 pub use emit::{

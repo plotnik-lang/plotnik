@@ -565,3 +565,179 @@ fn emit_optional_in_struct_undefined_style() {
     }
     ");
 }
+
+#[test]
+fn emit_tagged_union_with_optional_field_question_mark() {
+    let input = indoc! {r#"
+        MaybeNode = Node?
+        VariantA = { MaybeNode @value }
+        VariantB = { Node @item }
+        Choice = [ A: VariantA B: VariantB ]
+    "#};
+    let config = TypeScriptEmitConfig {
+        optional_style: OptionalStyle::QuestionMark,
+        ..Default::default()
+    };
+    insta::assert_snapshot!(emit_with_config(input, &config), @r#"
+    type MaybeNode = SyntaxNode;
+
+    interface VariantA {
+      value?: SyntaxNode;
+    }
+
+    interface VariantB {
+      item: SyntaxNode;
+    }
+
+    type Choice =
+      | { tag: "A"; value?: SyntaxNode }
+      | { tag: "B"; item: SyntaxNode };
+    "#);
+}
+
+#[test]
+fn emit_struct_with_union_field() {
+    let input = indoc! {r#"
+        A = { Node @a }
+        B = { Node @b }
+        Choice = [ A: A B: B ]
+        Container = { Choice @choice string @name }
+    "#};
+    insta::assert_snapshot!(emit(input), @r#"
+    interface A {
+      a: SyntaxNode;
+    }
+
+    interface B {
+      b: SyntaxNode;
+    }
+
+    type Choice =
+      | { tag: "A"; a: SyntaxNode }
+      | { tag: "B"; b: SyntaxNode };
+
+    interface Container {
+      choice: Choice;
+      name: string;
+    }
+    "#);
+}
+
+#[test]
+fn emit_struct_with_forward_ref() {
+    let input = indoc! {r#"
+        Container = { Later @item }
+        Later = { Node @value }
+    "#};
+    insta::assert_snapshot!(emit(input), @r"
+    interface Later {
+      value: SyntaxNode;
+    }
+
+    interface Container {
+      item: Later;
+    }
+    ");
+}
+
+#[test]
+fn emit_synthetic_type_no_inline() {
+    let input = "<Foo bar> = { Node @value }";
+    let config = TypeScriptEmitConfig {
+        inline_synthetic: false,
+        ..Default::default()
+    };
+    insta::assert_snapshot!(emit_with_config(input, &config), @r"
+    interface FooBar {
+      value: SyntaxNode;
+    }
+    ");
+}
+
+#[test]
+fn emit_synthetic_type_with_inline() {
+    let input = "<Foo bar> = { Node @value }";
+    let config = TypeScriptEmitConfig {
+        inline_synthetic: true,
+        ..Default::default()
+    };
+    insta::assert_snapshot!(emit_with_config(input, &config), @"");
+}
+
+#[test]
+fn emit_field_referencing_tagged_union() {
+    let input = indoc! {r#"
+        VarA = { Node @x }
+        VarB = { Node @y }
+        Choice = [ A: VarA B: VarB ]
+        Container = { Choice @choice }
+    "#};
+    insta::assert_snapshot!(emit(input), @r#"
+    interface VarA {
+      x: SyntaxNode;
+    }
+
+    interface VarB {
+      y: SyntaxNode;
+    }
+
+    type Choice =
+      | { tag: "A"; x: SyntaxNode }
+      | { tag: "B"; y: SyntaxNode };
+
+    interface Container {
+      choice: Choice;
+    }
+    "#);
+}
+
+#[test]
+fn emit_field_referencing_unknown_type() {
+    let input = "Container = { DoesNotExist @unknown }";
+    insta::assert_snapshot!(emit(input), @r"
+    interface Container {
+      unknown: DoesNotExist;
+    }
+    ");
+}
+
+#[test]
+fn emit_empty_interface_no_type_alias() {
+    let input = "Empty = {}";
+    let config = TypeScriptEmitConfig {
+        use_type_alias: false,
+        ..Default::default()
+    };
+    insta::assert_snapshot!(emit_with_config(input, &config), @"interface Empty {}");
+}
+
+#[test]
+fn emit_inline_synthetic_struct_with_optional_field() {
+    let input = indoc! {r#"
+        MaybeNode = Node?
+        <Inner nested> = { Node @value MaybeNode @maybe }
+        Container = { <Inner nested> @inner }
+    "#};
+    let config = TypeScriptEmitConfig {
+        inline_synthetic: true,
+        optional_style: OptionalStyle::QuestionMark,
+        ..Default::default()
+    };
+    insta::assert_snapshot!(emit_with_config(input, &config), @r"
+    type MaybeNode = SyntaxNode;
+
+    interface Container {
+      inner: { value: SyntaxNode; maybe?: SyntaxNode };
+    }
+    ");
+}
+
+#[test]
+fn emit_builtin_value_with_named_key() {
+    let input = indoc! {r#"
+        AliasNode = Node
+        AliasString = string
+        AliasUnit = ()
+    "#};
+    insta::assert_snapshot!(emit(input), @"");
+}

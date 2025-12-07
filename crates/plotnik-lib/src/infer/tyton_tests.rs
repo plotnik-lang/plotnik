@@ -301,7 +301,7 @@ fn error_unclosed_bracket() {
 #[test]
 fn error_lowercase_type_name() {
     let input = "foo = { Node @x }";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type name (uppercase) at 0..3");
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type name (uppercase) or synthetic key at 0..3");
 }
 
 #[test]
@@ -311,13 +311,97 @@ fn error_uppercase_field_name() {
 }
 
 #[test]
-fn error_missing_quantifier() {
-    let input = "Foo = Node";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected quantifier (?, *, +) after type key at 10..10");
+fn parse_bare_builtin_alias_node() {
+    let input = "AliasNode = Node";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Named("AliasNode") = Node
+    "#);
+}
+
+#[test]
+fn parse_bare_builtin_alias_string() {
+    let input = "AliasString = string";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Named("AliasString") = String
+    "#);
+}
+
+#[test]
+fn parse_bare_builtin_alias_unit() {
+    let input = "AliasUnit = ()";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Named("AliasUnit") = Unit
+    "#);
+}
+
+#[test]
+fn parse_synthetic_definition_struct() {
+    let input = "<Foo bar> = { Node @value }";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Synthetic(["Foo", "bar"]) = Struct({"value": Node})
+    "#);
+}
+
+#[test]
+fn parse_synthetic_definition_union() {
+    let input = "<Choice first> = [ A: Node B: string ]";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Synthetic(["Choice", "first"]) = TaggedUnion({"A": Node, "B": String})
+    "#);
+}
+
+#[test]
+fn parse_synthetic_definition_wrapper() {
+    let input = "<Inner nested> = Node?";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Synthetic(["Inner", "nested"]) = Optional(Node)
+    "#);
 }
 
 #[test]
 fn error_invalid_char() {
     let input = "Foo = { Node @x $ }";
     insta::assert_snapshot!(dump_table(input), @r#"ERROR: unexpected character: "$" at 16..17"#);
+}
+
+#[test]
+fn error_eof_in_struct() {
+    let input = "Foo = { Node @x";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type key at 15..15");
+}
+
+#[test]
+fn error_eof_expecting_colon() {
+    let input = "Foo = [ A";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected Colon, got EOF at 9..9");
+}
+
+#[test]
+fn error_invalid_token_in_synthetic() {
+    let input = "Foo = <A @>?";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected identifier or '>' at 9..10");
+}
+
+#[test]
+fn error_invalid_type_value() {
+    let input = "Foo = @bar";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type value at 6..7");
 }
