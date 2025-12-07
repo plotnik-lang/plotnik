@@ -43,8 +43,6 @@ struct InferContext<'src> {
     source: &'src str,
     table: TypeTable<'src>,
     diagnostics: crate::diagnostics::Diagnostics,
-    /// Counter for generating unique synthetic type keys
-    synthetic_counter: usize,
 }
 
 impl<'src> InferContext<'src> {
@@ -53,16 +51,7 @@ impl<'src> InferContext<'src> {
             source,
             table: TypeTable::new(),
             diagnostics: crate::diagnostics::Diagnostics::new(),
-            synthetic_counter: 0,
         }
-    }
-
-    /// Generate a unique suffix for synthetic keys
-    fn next_synthetic_suffix(&mut self) -> &'src str {
-        let n = self.synthetic_counter;
-        self.synthetic_counter += 1;
-        // Leak a small string for the lifetime - this is fine for query processing
-        Box::leak(n.to_string().into_boxed_str())
     }
 
     /// Mark types that contain cyclic references (need Box/Rc/Arc in Rust).
@@ -396,7 +385,7 @@ impl<'src> InferContext<'src> {
     {
         let nested_parent = TypeKey::Synthetic {
             parent: Box::new(parent.clone()),
-            path: vec![capture_name],
+            name: capture_name,
         };
 
         let mut nested_fields = IndexMap::new();
@@ -420,12 +409,7 @@ impl<'src> InferContext<'src> {
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
         } else {
-            // Use unique suffix to allow same capture name in different alternation branches
-            let suffix = self.next_synthetic_suffix();
-            TypeKey::Synthetic {
-                parent: Box::new(parent.clone()),
-                path: vec![capture_name, suffix],
-            }
+            nested_parent.clone()
         };
 
         self.table.insert(
@@ -519,7 +503,7 @@ impl<'src> InferContext<'src> {
         // Synthetic key: Parent + capture_name → e.g., QueryResultItems
         let wrapper_key = TypeKey::Synthetic {
             parent: Box::new(parent.clone()),
-            path: vec![capture_name],
+            name: capture_name,
         };
 
         self.table.insert(wrapper_key.clone(), wrapper);
@@ -584,7 +568,7 @@ impl<'src> InferContext<'src> {
 
             let variant_key = TypeKey::Synthetic {
                 parent: Box::new(parent.clone()),
-                path: vec![label],
+                name: label,
             };
 
             let mut variant_fields = IndexMap::new();
@@ -660,12 +644,7 @@ impl<'src> InferContext<'src> {
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
         } else {
-            // Use unique suffix to allow same capture name in different alternation branches
-            let suffix = self.next_synthetic_suffix();
-            TypeKey::Synthetic {
-                parent: Box::new(parent.clone()),
-                path: vec![suffix],
-            }
+            parent.clone()
         };
 
         self.table.insert(
@@ -705,8 +684,11 @@ impl<'src> InferContext<'src> {
                 MergedField::Same(k) => k,
                 MergedField::Optional(k) => {
                     let wrapper_key = TypeKey::Synthetic {
-                        parent: Box::new(parent.clone()),
-                        path: vec![name, "opt"],
+                        parent: Box::new(TypeKey::Synthetic {
+                            parent: Box::new(parent.clone()),
+                            name,
+                        }),
+                        name: "opt",
                     };
                     self.table
                         .insert(wrapper_key.clone(), TypeValue::Optional(k));

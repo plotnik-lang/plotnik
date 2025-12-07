@@ -68,12 +68,12 @@ pub enum TypeKey<'src> {
     DefaultQuery,
     /// User-provided type name via `:: TypeName`
     Named(&'src str),
-    /// Synthetic type derived from parent + field path.
+    /// Synthetic type derived from parent + capture name.
     /// Parent can be Named, DefaultQuery, or another Synthetic.
-    /// Emitter resolves parent to name, then appends path segments in PascalCase.
+    /// Emitter resolves parent to name, then appends capture name in PascalCase.
     Synthetic {
         parent: Box<TypeKey<'src>>,
-        path: Vec<&'src str>,
+        name: &'src str,
     },
 }
 
@@ -94,10 +94,9 @@ impl TypeKey<'_> {
             TypeKey::Invalid => "Unit".to_string(), // Invalid emits as Unit
             TypeKey::DefaultQuery => entry_name.to_string(),
             TypeKey::Named(name) => (*name).to_string(),
-            TypeKey::Synthetic { parent, path } => {
+            TypeKey::Synthetic { parent, name } => {
                 let parent_name = parent.to_pascal_case_with_entry_name(entry_name);
-                let path_suffix: String = path.iter().map(|s| to_pascal(s)).collect();
-                format!("{}{}", parent_name, path_suffix)
+                format!("{}{}", parent_name, to_pascal(name))
             }
         }
     }

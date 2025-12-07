@@ -23,23 +23,18 @@ fn type_key_to_pascal_case_synthetic() {
     assert_eq!(
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("Foo")),
-            path: vec![]
-        }
-        .to_pascal_case(),
-        "Foo"
-    );
-    assert_eq!(
-        TypeKey::Synthetic {
-            parent: Box::new(TypeKey::Named("Foo")),
-            path: vec!["bar"]
+            name: "bar"
         }
         .to_pascal_case(),
         "FooBar"
     );
     assert_eq!(
         TypeKey::Synthetic {
-            parent: Box::new(TypeKey::Named("Foo")),
-            path: vec!["bar", "baz"]
+            parent: Box::new(TypeKey::Synthetic {
+                parent: Box::new(TypeKey::Named("Foo")),
+                name: "bar"
+            }),
+            name: "baz"
         }
         .to_pascal_case(),
         "FooBarBaz"
@@ -51,7 +46,7 @@ fn type_key_to_pascal_case_snake_case_segments() {
     assert_eq!(
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("Foo")),
-            path: vec!["bar_baz"]
+            name: "bar_baz"
         }
         .to_pascal_case(),
         "FooBarBaz"
@@ -59,7 +54,7 @@ fn type_key_to_pascal_case_snake_case_segments() {
     assert_eq!(
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("FunctionInfo")),
-            path: vec!["params"]
+            name: "params"
         }
         .to_pascal_case(),
         "FunctionInfoParams"
@@ -152,7 +147,7 @@ fn type_value_tagged_union() {
     assign_fields.insert("target", TypeKey::String);
     let assign_key = TypeKey::Synthetic {
         parent: Box::new(TypeKey::Named("Stmt")),
-        path: vec!["Assign"],
+        name: "Assign",
     };
     table.insert(assign_key.clone(), TypeValue::Struct(assign_fields));
 
@@ -160,7 +155,7 @@ fn type_value_tagged_union() {
     call_fields.insert("func", TypeKey::String);
     let call_key = TypeKey::Synthetic {
         parent: Box::new(TypeKey::Named("Stmt")),
-        path: vec!["Call"],
+        name: "Call",
     };
     table.insert(call_key.clone(), TypeValue::Struct(call_fields));
 
@@ -228,21 +223,21 @@ fn type_key_equality() {
     assert_eq!(
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("A")),
-            path: vec!["b"]
+            name: "b"
         },
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("A")),
-            path: vec!["b"]
+            name: "b"
         }
     );
     assert_ne!(
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("A")),
-            path: vec!["b"]
+            name: "b"
         },
         TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("A")),
-            path: vec!["c"]
+            name: "c"
         }
     );
 }
@@ -255,14 +250,14 @@ fn type_key_hash_consistency() {
     set.insert(TypeKey::Named("Foo"));
     set.insert(TypeKey::Synthetic {
         parent: Box::new(TypeKey::Named("A")),
-        path: vec!["b"],
+        name: "b",
     });
 
     assert!(set.contains(&TypeKey::Node));
     assert!(set.contains(&TypeKey::Named("Foo")));
     assert!(set.contains(&TypeKey::Synthetic {
         parent: Box::new(TypeKey::Named("A")),
-        path: vec!["b"]
+        name: "b"
     }));
     assert!(!set.contains(&TypeKey::String));
 }
@@ -277,7 +272,7 @@ fn type_key_is_builtin() {
     assert!(
         !TypeKey::Synthetic {
             parent: Box::new(TypeKey::Named("A")),
-            path: vec![]
+            name: "b"
         }
         .is_builtin()
     );

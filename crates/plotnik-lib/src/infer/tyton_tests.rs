@@ -176,7 +176,7 @@ fn parse_synthetic_key_simple() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Wrapper") = Optional(Synthetic { parent: Named("Foo"), path: ["bar"] })
+    Named("Wrapper") = Optional(Synthetic { parent: Named("Foo"), name: "bar" })
     "#);
 }
 
@@ -188,7 +188,7 @@ fn parse_synthetic_key_multiple_segments() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Wrapper") = List(Synthetic { parent: Named("Foo"), path: ["bar", "baz"] })
+    Named("Wrapper") = List(Synthetic { parent: Synthetic { parent: Named("Foo"), name: "bar" }, name: "baz" })
     "#);
 }
 
@@ -200,7 +200,7 @@ fn parse_struct_with_synthetic() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Container") = Struct({"inner": Synthetic { parent: Named("Inner"), path: ["field"] }})
+    Named("Container") = Struct({"inner": Synthetic { parent: Named("Inner"), name: "field" }})
     "#);
 }
 
@@ -212,7 +212,7 @@ fn parse_union_with_synthetic() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Choice") = TaggedUnion({"First": Synthetic { parent: Named("Choice"), path: ["first"] }, "Second": Synthetic { parent: Named("Choice"), path: ["second"] }})
+    Named("Choice") = TaggedUnion({"First": Synthetic { parent: Named("Choice"), name: "first" }, "Second": Synthetic { parent: Named("Choice"), name: "second" }})
     "#);
 }
 
@@ -410,7 +410,7 @@ fn parse_synthetic_definition_struct() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic { parent: Named("Foo"), path: ["bar"] } = Struct({"value": Node})
+    Synthetic { parent: Named("Foo"), name: "bar" } = Struct({"value": Node})
     "#);
 }
 
@@ -422,7 +422,7 @@ fn parse_synthetic_definition_union() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic { parent: Named("Choice"), path: ["first"] } = TaggedUnion({"A": Node, "B": String})
+    Synthetic { parent: Named("Choice"), name: "first" } = TaggedUnion({"A": Node, "B": String})
     "#);
 }
 
@@ -434,7 +434,7 @@ fn parse_synthetic_definition_wrapper() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic { parent: Named("Inner"), path: ["nested"] } = Optional(Node)
+    Synthetic { parent: Named("Inner"), name: "nested" } = Optional(Node)
     "#);
 }
 

@@ -265,8 +265,8 @@ impl<'src> Parser<'src> {
             }
         };
 
-        // Parse path segments
-        let mut path = Vec::new();
+        // Parse path segments, building nested Synthetic keys
+        let mut result = parent;
         loop {
             let span = self.current_span();
             match self.peek() {
@@ -277,7 +277,10 @@ impl<'src> Parser<'src> {
                 Some(Token::LowerIdent(s)) => {
                     let s = *s;
                     self.advance();
-                    path.push(s);
+                    result = TypeKey::Synthetic {
+                        parent: Box::new(result),
+                        name: s,
+                    };
                 }
                 _ => {
                     return Err(ParseError {
@@ -288,10 +291,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        Ok(TypeKey::Synthetic {
-            parent: Box::new(parent),
-            path,
-        })
+        Ok(result)
     }
 
     fn parse_type_value(&mut self) -> Result<TypeValue<'src>, ParseError> {
@@ -507,10 +507,19 @@ fn emit_key(out: &mut String, key: &TypeKey<'_>) {
         TypeKey::Unit => out.push_str("()"),
         TypeKey::DefaultQuery => out.push_str("#DefaultQuery"),
         TypeKey::Named(name) => out.push_str(name),
-        TypeKey::Synthetic { parent, path } => {
+        TypeKey::Synthetic { parent, name } => {
+            // Flatten nested Synthetic keys into <Parent seg1 seg2 ...>
+            let mut segments = vec![*name];
+            let mut current = parent.as_ref();
+            while let TypeKey::Synthetic { parent: p, name: n } = current {
+                segments.push(*n);
+                current = p.as_ref();
+            }
+            segments.reverse();
+
             out.push('<');
-            emit_key(out, parent);
-            for seg in path.iter() {
+            emit_key(out, current);
+            for seg in segments {
                 out.push(' ');
                 out.push_str(seg);
             }

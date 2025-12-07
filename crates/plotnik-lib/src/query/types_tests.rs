@@ -148,9 +148,9 @@ fn captured_seq_creates_nested_struct() {
     let query = Query::try_from("{(a) @x (b) @y} @pair").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type QueryResultPair0 = { x: SyntaxNode; y: SyntaxNode };
+    type QueryResultPair = { x: SyntaxNode; y: SyntaxNode };
 
-    type QueryResult = { pair: QueryResultPair0 };
+    type QueryResult = { pair: QueryResultPair };
     ");
 }
 
@@ -164,9 +164,9 @@ fn captured_seq_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type QueryResultParams0 = { p: SyntaxNode };
+    type QueryResultParams = { p: SyntaxNode };
 
-    type QueryResult = { params: QueryResultParams0; body: SyntaxNode };
+    type QueryResult = { params: QueryResultParams; body: SyntaxNode };
     ");
 }
 
@@ -305,9 +305,9 @@ fn captured_untagged_alt_with_nested_fields() {
 
     type QueryResultChoiceYOpt = SyntaxNode;
 
-    type QueryResultChoice0 = { x?: SyntaxNode; y?: SyntaxNode };
+    type QueryResultChoice = { x?: SyntaxNode; y?: SyntaxNode };
 
-    type QueryResult = { choice: QueryResultChoice0 };
+    type QueryResult = { choice: QueryResultChoice };
     ");
 }
 
@@ -535,9 +535,9 @@ fn deeply_nested_seq() {
     let query = Query::try_from("{{{(identifier) @x}}} @outer").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type QueryResultOuter0 = { x: SyntaxNode };
+    type QueryResultOuter = { x: SyntaxNode };
 
-    type QueryResult = { outer: QueryResultOuter0 };
+    type QueryResult = { outer: QueryResultOuter };
     ");
 }
 
