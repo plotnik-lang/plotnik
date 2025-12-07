@@ -114,7 +114,7 @@ fn nested_tagged_alt_with_annotation() {
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    <Expr Binary> = { #Node @left #Node @right }
+    <Expr Binary> = { Expr @left Expr @right }
     <Expr Literal> = { #string @value }
     Expr = [ Binary: <Expr Binary> Literal: <Expr Literal> ]
     ");
@@ -281,5 +281,22 @@ fn same_variant_name_across_branches_merges() {
     <x A> = ()
     <x> = [ A: <x A> ]
     #DefaultQuery = { <x> @x }
+    ");
+}
+
+#[test]
+fn recursive_ref_through_optional_field() {
+    let input = indoc! {r#"
+        Rec = (call_expression function: (Rec)? @inner)
+        (Rec)
+    "#};
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <RecWrapped> = Rec?
+    Rec = { <RecWrapped> @inner }
+    #DefaultQuery = ()
     ");
 }

@@ -3,7 +3,7 @@
 //! Walks definitions and infers output types from capture patterns.
 //! Produces a `TypeTable` containing all inferred types.
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use crate::diagnostics::DiagnosticKind;
@@ -31,6 +31,8 @@ impl<'a> Query<'a> {
             let is_last = idx == last_idx;
             ctx.infer_def(def, is_last);
         }
+
+        ctx.mark_cyclic_types();
 
         self.type_table = ctx.table;
         self.type_diagnostics = ctx.diagnostics;
@@ -61,6 +63,87 @@ impl<'src> InferContext<'src> {
         self.synthetic_counter += 1;
         // Leak a small string for the lifetime - this is fine for query processing
         Box::leak(n.to_string().into_boxed_str())
+    }
+
+    /// Mark types that contain cyclic references (need Box/Rc/Arc in Rust).
+    /// Only struct/union types are marked - wrapper types (Optional, List, etc.)
+    /// shouldn't be wrapped in Box themselves, only their inner references.
+    fn mark_cyclic_types(&mut self) {
+        let keys: Vec<_> = self
+            .table
+            .types
+            .keys()
+            .filter(|k| !k.is_builtin())
+            .filter(|k| {
+                matches!(
+                    self.table.get(k),
+                    Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_))
+                )
+            })
+            .cloned()
+            .collect();
+
+        for key in keys {
+            if self.type_references_itself(&key) {
+                self.table.mark_cyclic(key);
+            }
+        }
+    }
+
+    /// Check if a type contains a reference to itself (directly or indirectly).
+    fn type_references_itself(&self, key: &TypeKey<'src>) -> bool {
+        let mut visited = IndexSet::new();
+        self.type_reaches(key, key, &mut visited)
+    }
+
+    /// Check if `current` type can reach `target` type through references.
+    fn type_reaches(
+        &self,
+        current: &TypeKey<'src>,
+        target: &TypeKey<'src>,
+        visited: &mut IndexSet<TypeKey<'src>>,
+    ) -> bool {
+        if !visited.insert(current.clone()) {
+            return false;
+        }
+
+        let Some(value) = self.table.get(current) else {
+            return false;
+        };
+
+        match value {
+            TypeValue::Struct(fields) => {
+                for field_key in fields.values() {
+                    if field_key == target {
+                        return true;
+                    }
+                    if self.type_reaches(field_key, target, visited) {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeValue::TaggedUnion(variants) => {
+                for variant_key in variants.values() {
+                    if variant_key == target {
+                        return true;
+                    }
+                    if self.type_reaches(variant_key, target, visited) {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeValue::Optional(inner)
+            | TypeValue::List(inner)
+            | TypeValue::NonEmptyList(inner) => {
+                if inner == target {
+                    return true;
+                }
+                self.type_reaches(inner, target, visited)
+            }
+            TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => false,
+        }
     }
 
     fn infer_def(&mut self, def: &ast::Def, is_last: bool) {
@@ -244,6 +327,17 @@ impl<'src> InferContext<'src> {
         capture_name: &'src str,
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
+        // Handle quantifier first - it wraps whatever the inner type is
+        // This ensures `(x)+ @name :: string` becomes Vec<String>, not String
+        if let Some(Expr::QuantifiedExpr(q)) = inner {
+            let Some(qinner) = q.inner() else {
+                return TypeKey::Invalid;
+            };
+            let inner_key =
+                self.infer_capture_inner(Some(&qinner), path, capture_name, type_annotation);
+            return self.wrap_with_quantifier(&inner_key, q);
+        }
+
         // :: string annotation
         if type_annotation == Some("string") {
             return TypeKey::String;
@@ -279,23 +373,19 @@ impl<'src> InferContext<'src> {
                 type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node)
             }
 
-            Expr::QuantifiedExpr(q) => {
-                if let Some(qinner) = q.inner() {
-                    let inner_key = self.infer_capture_inner(
-                        Some(&qinner),
-                        path,
-                        capture_name,
-                        type_annotation,
-                    );
-                    self.wrap_with_quantifier(&inner_key, q)
+            Expr::QuantifiedExpr(_) => {
+                unreachable!("quantifier handled at start of function")
+            }
+
+            Expr::FieldExpr(field) => {
+                if let Some(value) = field.value() {
+                    self.infer_capture_inner(Some(&value), path, capture_name, type_annotation)
                 } else {
-                    TypeKey::Invalid
+                    type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node)
                 }
             }
 
-            Expr::CapturedExpr(_) | Expr::FieldExpr(_) => {
-                type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node)
-            }
+            Expr::CapturedExpr(_) => type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node),
         }
     }
 
@@ -382,8 +472,20 @@ impl<'src> InferContext<'src> {
             return Some(wrapped_key);
         }
 
-        // Non-capture quantified expression: recurse into inner and wrap with quantifier
+        // Non-capture quantified expression: track fields added by inner expression
+        // and wrap them with the quantifier
+        let fields_before: Vec<_> = fields.keys().copied().collect();
+
         let inner_key = self.infer_expr(&inner, path, fields)?;
+
+        // Wrap all newly added fields with the quantifier
+        for (name, entry) in fields.iter_mut() {
+            if fields_before.contains(name) {
+                continue;
+            }
+            entry.type_key = self.wrap_with_quantifier(&entry.type_key, quant);
+        }
+
         Some(self.wrap_with_quantifier(&inner_key, quant))
     }
 
