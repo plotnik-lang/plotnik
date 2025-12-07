@@ -4,13 +4,21 @@
 //! Produces a `TypeTable` containing all inferred types.
 
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 use crate::diagnostics::DiagnosticKind;
 use crate::infer::{MergedField, TypeKey, TypeTable, TypeValue};
-use crate::parser::cst::SyntaxKind;
 use crate::parser::{AltKind, Expr, ast, token_src};
 
 use super::Query;
+
+/// Tracks a field's type and the location where it was first captured.
+#[derive(Clone)]
+struct FieldEntry<'src> {
+    type_key: TypeKey<'src>,
+    /// Range of the capture name token (e.g., `@x`)
+    capture_range: TextRange,
+}
 
 impl<'a> Query<'a> {
     pub(super) fn infer_types(&mut self) {
@@ -82,10 +90,27 @@ impl<'src> InferContext<'src> {
         let value = if fields.is_empty() {
             TypeValue::Unit
         } else {
-            TypeValue::Struct(fields)
+            TypeValue::Struct(Self::extract_types(fields))
         };
 
         self.table.insert(key, value);
+    }
+
+    /// Extract just the types from field entries
+    fn extract_types(
+        fields: IndexMap<&'src str, FieldEntry<'src>>,
+    ) -> IndexMap<&'src str, TypeKey<'src>> {
+        fields.into_iter().map(|(k, v)| (k, v.type_key)).collect()
+    }
+
+    /// Extract types by reference for merge operations
+    fn extract_types_ref(
+        fields: &IndexMap<&'src str, FieldEntry<'src>>,
+    ) -> IndexMap<&'src str, TypeKey<'src>> {
+        fields
+            .iter()
+            .map(|(k, v)| (*k, v.type_key.clone()))
+            .collect()
     }
 
     /// Infer type for an expression, collecting captures into `fields`.
@@ -94,7 +119,7 @@ impl<'src> InferContext<'src> {
         &mut self,
         expr: &Expr,
         path: &[&'src str],
-        fields: &mut IndexMap<&'src str, TypeKey<'src>>,
+        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         match expr {
             Expr::NamedNode(node) => {
@@ -138,10 +163,11 @@ impl<'src> InferContext<'src> {
         &mut self,
         cap: &ast::CapturedExpr,
         path: &[&'src str],
-        fields: &mut IndexMap<&'src str, TypeKey<'src>>,
+        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         let name_tok = cap.name()?;
         let capture_name = token_src(&name_tok, self.source);
+        let capture_range = name_tok.text_range();
 
         let type_annotation = cap.type_annotation().and_then(|t| {
             let tok = t.name()?;
@@ -171,7 +197,32 @@ impl<'src> InferContext<'src> {
         let inner_type =
             self.infer_capture_inner(inner.as_ref(), path, capture_name, type_annotation);
 
-        fields.insert(capture_name, inner_type.clone());
+        // Check for duplicate capture in scope
+        // Unlike alternations (where branches are mutually exclusive),
+        // in sequences both captures execute - can't have two values for same name
+        if let Some(existing) = fields.get(capture_name) {
+            self.diagnostics
+                .report(DiagnosticKind::DuplicateCaptureInScope, capture_range)
+                .message(capture_name)
+                .related_to("first use", existing.capture_range)
+                .emit();
+            fields.insert(
+                capture_name,
+                FieldEntry {
+                    type_key: TypeKey::Invalid,
+                    capture_range,
+                },
+            );
+            return Some(TypeKey::Invalid);
+        }
+
+        fields.insert(
+            capture_name,
+            FieldEntry {
+                type_key: inner_type.clone(),
+                capture_range,
+            },
+        );
         Some(inner_type)
     }
 
@@ -225,11 +276,7 @@ impl<'src> InferContext<'src> {
                         capture_name,
                         type_annotation,
                     );
-                    if let Some(op) = q.operator() {
-                        self.wrap_with_quantifier(&inner_key, op.kind())
-                    } else {
-                        inner_key
-                    }
+                    self.wrap_with_quantifier(&inner_key, q)
                 } else {
                     TypeKey::Invalid
                 }
@@ -279,8 +326,19 @@ impl<'src> InferContext<'src> {
             TypeKey::Synthetic(nested_path)
         };
 
-        self.table
-            .insert(key.clone(), TypeValue::Struct(nested_fields));
+        if self
+            .table
+            .try_insert(
+                key.clone(),
+                TypeValue::Struct(Self::extract_types(nested_fields)),
+            )
+            .is_err()
+        {
+            self.diagnostics
+                .report(DiagnosticKind::DuplicateCaptureInScope, inner.text_range())
+                .emit();
+            return TypeKey::Invalid;
+        }
         key
     }
 
@@ -288,15 +346,16 @@ impl<'src> InferContext<'src> {
         &mut self,
         quant: &ast::QuantifiedExpr,
         path: &[&'src str],
-        fields: &mut IndexMap<&'src str, TypeKey<'src>>,
+        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         let inner = quant.inner()?;
-        let op = quant.operator()?;
+        quant.operator()?;
 
         // If the inner is a capture, we need special handling for the wrapper
         if let Expr::CapturedExpr(cap) = &inner {
             let name_tok = cap.name()?;
             let capture_name = token_src(&name_tok, self.source);
+            let capture_range = name_tok.text_range();
 
             let type_annotation = cap.type_annotation().and_then(|t| {
                 let tok = t.name()?;
@@ -305,72 +364,80 @@ impl<'src> InferContext<'src> {
 
             let inner_key =
                 self.infer_capture_inner(cap.inner().as_ref(), path, capture_name, type_annotation);
-            let wrapped_key = self.wrap_with_quantifier(&inner_key, op.kind());
+            let wrapped_key = self.wrap_with_quantifier(&inner_key, quant);
 
-            fields.insert(capture_name, wrapped_key.clone());
+            fields.insert(
+                capture_name,
+                FieldEntry {
+                    type_key: wrapped_key.clone(),
+                    capture_range,
+                },
+            );
             return Some(wrapped_key);
         }
 
         // Non-capture quantified expression: recurse into inner and wrap with quantifier
         let inner_key = self.infer_expr(&inner, path, fields)?;
-        Some(self.wrap_with_quantifier(&inner_key, op.kind()))
+        Some(self.wrap_with_quantifier(&inner_key, quant))
     }
 
     fn wrap_with_quantifier(
         &mut self,
         inner: &TypeKey<'src>,
-        op_kind: SyntaxKind,
+        quant: &ast::QuantifiedExpr,
     ) -> TypeKey<'src> {
-        let wrapper = match op_kind {
-            SyntaxKind::Question | SyntaxKind::QuestionQuestion => {
-                TypeValue::Optional(inner.clone())
-            }
-            SyntaxKind::Star | SyntaxKind::StarQuestion => TypeValue::List(inner.clone()),
-            SyntaxKind::Plus | SyntaxKind::PlusQuestion => TypeValue::NonEmptyList(inner.clone()),
-            _ => return inner.clone(),
+        let wrapper = if quant.is_optional() {
+            TypeValue::Optional(inner.clone())
+        } else if quant.is_list() {
+            TypeValue::List(inner.clone())
+        } else if quant.is_non_empty_list() {
+            TypeValue::NonEmptyList(inner.clone())
+        } else {
+            return inner.clone();
         };
 
-        // Create a unique key for the wrapper
-        let wrapper_key = match inner {
-            TypeKey::Named(name) => {
-                let suffix = match op_kind {
-                    SyntaxKind::Question | SyntaxKind::QuestionQuestion => "Opt",
-                    SyntaxKind::Star | SyntaxKind::StarQuestion => "List",
-                    SyntaxKind::Plus | SyntaxKind::PlusQuestion => "List",
-                    _ => "",
-                };
-                TypeKey::Synthetic(vec![name, suffix])
-            }
-            TypeKey::Synthetic(segments) => {
-                let mut new_segments = segments.clone();
-                let suffix = match op_kind {
-                    SyntaxKind::Question | SyntaxKind::QuestionQuestion => "opt",
-                    SyntaxKind::Star | SyntaxKind::StarQuestion => "list",
-                    SyntaxKind::Plus | SyntaxKind::PlusQuestion => "list",
-                    _ => "",
-                };
-                new_segments.push(suffix);
-                TypeKey::Synthetic(new_segments)
-            }
-            _ => {
-                // For builtins like Node, we directly store the wrapper under a synthetic key
-                let type_name = match inner {
-                    TypeKey::Node => "Node",
-                    TypeKey::String => "String",
-                    TypeKey::Unit => "Unit",
-                    _ => "Unknown",
-                };
-                let suffix = match op_kind {
-                    SyntaxKind::Question | SyntaxKind::QuestionQuestion => "Opt",
-                    SyntaxKind::Star | SyntaxKind::StarQuestion => "List",
-                    SyntaxKind::Plus | SyntaxKind::PlusQuestion => "List",
-                    _ => "",
-                };
-                TypeKey::Synthetic(vec![type_name, suffix])
-            }
+        // Generate a unique key for the wrapper type
+        let wrapper_name = match inner {
+            TypeKey::Named(name) => format!("{}Wrapped", name),
+            TypeKey::Node => "NodeWrapped".to_string(),
+            TypeKey::String => "StringWrapped".to_string(),
+            TypeKey::Synthetic(path) => format!("{}Wrapped", path.join("_")),
+            TypeKey::DefaultQuery => "QueryWrapped".to_string(),
+            TypeKey::Unit => "UnitWrapped".to_string(),
+            TypeKey::Invalid => return TypeKey::Invalid,
         };
 
-        self.table.insert(wrapper_key.clone(), wrapper);
+        // For simple wrappers around Node/String, just return the wrapper directly
+        // without creating a synthetic type entry. The printer will handle these.
+        if matches!(inner, TypeKey::Node | TypeKey::String) {
+            let prefix = if quant.is_optional() {
+                "opt"
+            } else if quant.is_list() {
+                "list"
+            } else if quant.is_non_empty_list() {
+                "nonempty"
+            } else {
+                "wrapped"
+            };
+            let inner_name = match inner {
+                TypeKey::Node => "node",
+                TypeKey::String => "string",
+                _ => "unknown",
+            };
+            let wrapper_key = TypeKey::Synthetic(vec![prefix, inner_name]);
+            self.table.insert(wrapper_key.clone(), wrapper);
+            return wrapper_key;
+        }
+
+        let wrapper_key = TypeKey::Synthetic(vec![Box::leak(wrapper_name.into_boxed_str())]);
+        if self
+            .table
+            .try_insert(wrapper_key.clone(), wrapper.clone())
+            .is_err()
+        {
+            // Key already exists with same wrapper - that's fine
+            return wrapper_key;
+        }
         wrapper_key
     }
 
@@ -378,7 +445,7 @@ impl<'src> InferContext<'src> {
         &mut self,
         alt: &ast::AltExpr,
         path: &[&'src str],
-        fields: &mut IndexMap<&'src str, TypeKey<'src>>,
+        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         // Alt without capture: just collect fields from all branches into current scope
         match alt.kind() {
@@ -393,7 +460,9 @@ impl<'src> InferContext<'src> {
             AltKind::Untagged | AltKind::Mixed => {
                 // Untagged alt: merge fields from branches
                 let branch_fields = self.collect_branch_fields(alt, path);
-                let merged = TypeTable::merge_fields(&branch_fields);
+                let branch_types: Vec<_> =
+                    branch_fields.iter().map(Self::extract_types_ref).collect();
+                let merged = self.table.merge_fields(&branch_types);
                 self.apply_merged_fields(merged, fields, alt);
             }
         }
@@ -452,9 +521,10 @@ impl<'src> InferContext<'src> {
                     _ => TypeValue::Unit,
                 }
             } else {
-                TypeValue::Struct(variant_fields)
+                TypeValue::Struct(Self::extract_types(variant_fields))
             };
 
+            // Variant types shouldn't conflict - they have unique paths including the label
             self.table.insert(variant_key.clone(), variant_value);
             variants.insert(label, variant_key);
         }
@@ -467,8 +537,17 @@ impl<'src> InferContext<'src> {
             TypeKey::Synthetic(path.to_vec())
         };
 
-        self.table
-            .insert(key.clone(), TypeValue::TaggedUnion(variants));
+        // Detect conflict: same key with incompatible TaggedUnion
+        if self
+            .table
+            .try_insert(key.clone(), TypeValue::TaggedUnion(variants))
+            .is_err()
+        {
+            self.diagnostics
+                .report(DiagnosticKind::DuplicateCaptureInScope, alt.text_range())
+                .emit();
+            return TypeKey::Invalid;
+        }
         key
     }
 
@@ -479,7 +558,8 @@ impl<'src> InferContext<'src> {
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
         let branch_fields = self.collect_branch_fields(alt, path);
-        let merged = TypeTable::merge_fields(&branch_fields);
+        let branch_types: Vec<_> = branch_fields.iter().map(Self::extract_types_ref).collect();
+        let merged = self.table.merge_fields(&branch_types);
 
         if merged.is_empty() {
             return type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node);
@@ -496,8 +576,19 @@ impl<'src> InferContext<'src> {
             TypeKey::Synthetic(path.to_vec())
         };
 
-        self.table
-            .insert(key.clone(), TypeValue::Struct(result_fields));
+        if self
+            .table
+            .try_insert(
+                key.clone(),
+                TypeValue::Struct(Self::extract_types(result_fields)),
+            )
+            .is_err()
+        {
+            self.diagnostics
+                .report(DiagnosticKind::DuplicateCaptureInScope, alt.text_range())
+                .emit();
+            return TypeKey::Invalid;
+        }
         key
     }
 
@@ -505,7 +596,7 @@ impl<'src> InferContext<'src> {
         &mut self,
         alt: &ast::AltExpr,
         path: &[&'src str],
-    ) -> Vec<IndexMap<&'src str, TypeKey<'src>>> {
+    ) -> Vec<IndexMap<&'src str, FieldEntry<'src>>> {
         let mut branch_fields = Vec::new();
 
         for branch in alt.branches() {
@@ -522,7 +613,7 @@ impl<'src> InferContext<'src> {
     fn apply_merged_fields(
         &mut self,
         merged: IndexMap<&'src str, MergedField<'src>>,
-        fields: &mut IndexMap<&'src str, TypeKey<'src>>,
+        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
         alt: &ast::AltExpr,
     ) {
         for (name, merge_result) in merged {
@@ -542,7 +633,14 @@ impl<'src> InferContext<'src> {
                     TypeKey::Invalid
                 }
             };
-            fields.insert(name, key);
+            fields.insert(
+                name,
+                FieldEntry {
+                    type_key: key,
+                    // Use the alt's range as a fallback since we don't have individual capture ranges here
+                    capture_range: alt.text_range(),
+                },
+            );
         }
     }
 }

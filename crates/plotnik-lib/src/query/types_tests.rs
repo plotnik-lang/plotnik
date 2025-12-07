@@ -62,16 +62,16 @@ fn comprehensive_type_inference() {
     UsingRef = { BinaryOp @expr }
     <Nested params> = { #Node @p }
     Nested = { <Nested params> @params #Node @body }
-    <Node Opt> = #Node?
-    <Node List> = #Node+
-    WithQuantifiers = { <Node Opt> @maybe_dec <Node List> @methods <Node List> @fields }
+    <opt node> = #Node?
+    <nonempty node> = #Node+
+    WithQuantifiers = { <opt node> @maybe_dec <opt node> @methods <nonempty node> @fields }
     <TaggedAlt Assign> = { #Node @target }
     <TaggedAlt Call> = { #Node @func }
     TaggedAlt = [ Assign: <TaggedAlt Assign> Call: <TaggedAlt Call> ]
     <right opt> = #Node?
     UntaggedAlt = { #Node @left <right opt> @right }
-    <Simple List> = Simple*
-    #DefaultQuery = { <Simple List> @items }
+    <SimpleWrapped> = Simple?
+    #DefaultQuery = { <SimpleWrapped> @items }
     ");
 }
 
@@ -158,8 +158,8 @@ fn quantified_ref() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
     Item = { #Node @value }
-    <Item List> = Item+
-    List = { <Item List> @items }
+    <ItemWrapped> = Item+
+    List = { <ItemWrapped> @items }
     ");
 }
 
@@ -199,9 +199,104 @@ fn tagged_union_branch_with_ref() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
     <Rec Base> = ()
-    <Rec Opt> = Rec?
-    <Rec Rec> = { <Rec Opt> @value }
+    <RecWrapped> = Rec?
+    <Rec Rec> = { <RecWrapped> @value }
     Rec = [ Base: <Rec Base> Rec: <Rec Rec> ]
     #DefaultQuery = ()
+    ");
+}
+
+#[test]
+fn nested_tagged_alts_in_untagged_alt_conflict() {
+    // Each branch captures @x with different TaggedUnion types
+    // Branch 1: @x is TaggedUnion with variant A
+    // Branch 2: @x is TaggedUnion with variant B
+    // This is a type conflict - different structures under same capture name
+    let input = "[[A: (a) @aa] @x [B: (b) @bb] @x]";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <x A> = { #Node @aa }
+    <x> = [ A: <x A> ]
+    <x B> = { #Node @bb }
+    #DefaultQuery = { #Invalid @x }
+    ");
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `x` has conflicting types across branches
+      |
+    1 | [[A: (a) @aa] @x [B: (b) @bb] @x]
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    error: duplicate capture in same scope
+      |
+    1 | [[A: (a) @aa] @x [B: (b) @bb] @x]
+      |                  ^^^^^^^^^^^^
+    ");
+}
+
+#[test]
+fn nested_untagged_alts_drop_field() {
+    // Each branch captures @x with different struct types
+    // Branch 1: @x has field @y
+    // Branch 2: @x has field @z
+    // This is a type conflict - different structures under same capture name
+    let input = "[[(a) @y] @x [(b) @z] @x]";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <x> = { #Node @y }
+    #DefaultQuery = { #Invalid @x }
+    ");
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `x` has conflicting types across branches
+      |
+    1 | [[(a) @y] @x [(b) @z] @x]
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    error: duplicate capture in same scope
+      |
+    1 | [[(a) @y] @x [(b) @z] @x]
+      |              ^^^^^^^^
+    ");
+}
+
+#[test]
+fn list_vs_nonempty_list_merged_silently() {
+    // Different quantifiers: * (List) vs + (NonEmptyList)
+    // These are incompatible types - List vs NonEmptyList
+    let input = "[(a)* @x (b)+ @x]";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <opt node> = #Node?
+    <nonempty node> = #Node+
+    #DefaultQuery = { #Invalid @x }
+    ");
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `x` has conflicting types across branches
+      |
+    1 | [(a)* @x (b)+ @x]
+      | ^^^^^^^^^^^^^^^^^
+    ");
+}
+
+#[test]
+fn same_variant_name_across_branches_merges() {
+    // Both branches have variant A - should merge correctly
+    let input = "[[A: (a)] @x [A: (b)] @x]";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <x A> = ()
+    <x> = [ A: <x A> ]
+    #DefaultQuery = { <x> @x }
     ");
 }

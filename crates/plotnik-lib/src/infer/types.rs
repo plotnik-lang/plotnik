@@ -177,6 +177,28 @@ impl<'src> TypeTable<'src> {
         key
     }
 
+    /// Insert a type definition, detecting conflicts with existing incompatible types.
+    ///
+    /// Returns `Ok(key)` if inserted successfully (no conflict).
+    /// Returns `Err(key)` if there was an existing incompatible type (conflict).
+    ///
+    /// On conflict, the existing type is NOT overwritten - caller should use Invalid.
+    pub fn try_insert(
+        &mut self,
+        key: TypeKey<'src>,
+        value: TypeValue<'src>,
+    ) -> Result<TypeKey<'src>, TypeKey<'src>> {
+        if let Some(existing) = self.types.get(&key) {
+            if !self.values_are_compatible(existing, &value) {
+                return Err(key);
+            }
+            // Compatible - keep existing, don't overwrite
+            return Ok(key);
+        }
+        self.types.insert(key.clone(), value);
+        Ok(key)
+    }
+
     /// Mark a type as cyclic (requires indirection in Rust).
     pub fn mark_cyclic(&mut self, key: TypeKey<'src>) {
         if !self.cyclic.contains(&key) {
@@ -192,6 +214,84 @@ impl<'src> TypeTable<'src> {
     /// Get a type by key.
     pub fn get(&self, key: &TypeKey<'src>) -> Option<&TypeValue<'src>> {
         self.types.get(key)
+    }
+
+    /// Check if two type keys are structurally compatible.
+    ///
+    /// For built-in types, this is simple equality.
+    /// For synthetic types, we compare the underlying TypeValue structure.
+    /// Two synthetic keys pointing to different TaggedUnions or Structs are incompatible.
+    pub fn types_are_compatible(&self, a: &TypeKey<'src>, b: &TypeKey<'src>) -> bool {
+        if a == b {
+            return true;
+        }
+
+        // Different built-in types are incompatible
+        if a.is_builtin() || b.is_builtin() {
+            return false;
+        }
+
+        // For synthetic/named types, compare the underlying values
+        let val_a = self.get(a);
+        let val_b = self.get(b);
+
+        match (val_a, val_b) {
+            (Some(va), Some(vb)) => self.values_are_compatible(va, vb),
+            // If either is missing, consider incompatible (shouldn't happen in practice)
+            _ => false,
+        }
+    }
+
+    /// Check if two type values are structurally compatible.
+    fn values_are_compatible(&self, a: &TypeValue<'src>, b: &TypeValue<'src>) -> bool {
+        use TypeValue::*;
+        match (a, b) {
+            (Node, Node) => true,
+            (String, String) => true,
+            (Unit, Unit) => true,
+            (Invalid, Invalid) => true,
+            (Optional(ka), Optional(kb)) => self.types_are_compatible(ka, kb),
+            (List(ka), List(kb)) => self.types_are_compatible(ka, kb),
+            (NonEmptyList(ka), NonEmptyList(kb)) => self.types_are_compatible(ka, kb),
+            // List and NonEmptyList are NOT compatible - different cardinality guarantees
+            (List(_), NonEmptyList(_)) | (NonEmptyList(_), List(_)) => false,
+            (Struct(fa), Struct(fb)) => {
+                // Structs must have exactly the same fields with compatible types
+                if fa.len() != fb.len() {
+                    return false;
+                }
+                for (name, key_a) in fa {
+                    match fb.get(name) {
+                        Some(key_b) => {
+                            if !self.types_are_compatible(key_a, key_b) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+            }
+            (TaggedUnion(va), TaggedUnion(vb)) => {
+                // TaggedUnions must have exactly the same variants
+                if va.len() != vb.len() {
+                    return false;
+                }
+                for (name, key_a) in va {
+                    match vb.get(name) {
+                        Some(key_b) => {
+                            if !self.types_are_compatible(key_a, key_b) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+            }
+            // Different type constructors are incompatible
+            _ => false,
+        }
     }
 
     /// Iterate over all types in insertion order.
@@ -220,6 +320,7 @@ impl<'src> TypeTable<'src> {
     ///
     /// Merged: `{ x: Invalid }` (with diagnostic warning)
     pub fn merge_fields(
+        &self,
         branches: &[IndexMap<&'src str, TypeKey<'src>>],
     ) -> IndexMap<&'src str, MergedField<'src>> {
         if branches.is_empty() {
@@ -251,9 +352,11 @@ impl<'src> TypeTable<'src> {
                 continue;
             }
 
-            // Check if all occurrences have the same type
+            // Check if all occurrences have compatible types (structural comparison)
             let first_type = type_occurrences[0];
-            let all_same_type = type_occurrences.iter().all(|t| *t == first_type);
+            let all_same_type = type_occurrences
+                .iter()
+                .all(|t| self.types_are_compatible(t, first_type));
 
             let merged = if !all_same_type {
                 // Type conflict

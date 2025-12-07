@@ -55,6 +55,7 @@ pub enum DiagnosticKind {
 
     // Valid syntax, invalid semantics
     DuplicateDefinition,
+    DuplicateCaptureInScope,
     UndefinedReference,
     MixedAltBranches,
     RecursionNoEscape,
@@ -163,6 +164,7 @@ impl DiagnosticKind {
 
             // Semantic errors
             Self::DuplicateDefinition => "name already defined",
+            Self::DuplicateCaptureInScope => "duplicate capture in same scope",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
             Self::RecursionNoEscape => "infinite recursion detected",
@@ -199,6 +201,7 @@ impl DiagnosticKind {
 
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
+            Self::DuplicateCaptureInScope => "capture `@{}` already used in this scope".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
 
             // Link pass errors with context
