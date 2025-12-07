@@ -62,7 +62,7 @@ fn comprehensive_type_inference() {
     UsingRef = { BinaryOp @expr }
     <Nested params 0> = { #Node @p }
     Nested = { <Nested params 0> @params #Node @body }
-    <opt node> = #Node?
+    <opt node> = #Node*
     <nonempty node> = #Node+
     WithQuantifiers = { <opt node> @maybe_dec <opt node> @methods <nonempty node> @fields }
     <TaggedAlt Assign> = { #Node @target }
@@ -70,7 +70,7 @@ fn comprehensive_type_inference() {
     TaggedAlt = [ Assign: <TaggedAlt Assign> Call: <TaggedAlt Call> ]
     <right opt> = #Node?
     UntaggedAlt = { #Node @left <right opt> @right }
-    <SimpleWrapped> = Simple?
+    <SimpleWrapped> = Simple*
     #DefaultQuery = { <SimpleWrapped> @items }
     ");
 }
@@ -221,18 +221,13 @@ fn nested_tagged_alts_in_untagged_alt_conflict() {
     <x A> = { #Node @aa }
     <x> = [ A: <x A> ]
     <x B> = { #Node @bb }
-    #DefaultQuery = { #Invalid @x }
+    #DefaultQuery = { <x> @x }
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture `x` has conflicting types across branches
+    error: tagged alternations with different variants cannot be merged
       |
     1 | [[A: (a) @aa] @x [B: (b) @bb] @x]
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-    error: duplicate capture in same scope
-      |
-    1 | [[A: (a) @aa] @x [B: (b) @bb] @x]
-      |                  ^^^^^^^^^^^^
+      |  ^^^^^^^^^^^^    ------------ incompatible
     ");
 }
 
@@ -258,24 +253,19 @@ fn nested_untagged_alts_merge_fields() {
 }
 
 #[test]
-fn list_vs_nonempty_list_merged_silently() {
+fn list_vs_nonempty_list_merged_to_list() {
     // Different quantifiers: * (List) vs + (NonEmptyList)
-    // These are incompatible types - List vs NonEmptyList
+    // These merge to List (the more general type)
     let input = "[(a)* @x (b)+ @x]";
 
     let query = Query::try_from(input).unwrap();
 
-    assert!(!query.is_valid());
+    assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    <opt node> = #Node?
+    <opt node> = #Node*
     <nonempty node> = #Node+
-    #DefaultQuery = { #Invalid @x }
-    ");
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture `x` has conflicting types across branches
-      |
-    1 | [(a)* @x (b)+ @x]
-      | ^^^^^^^^^^^^^^^^^
+    <list merged> = #Node*
+    #DefaultQuery = { <list merged> @x }
     ");
 }
 

@@ -49,6 +49,7 @@
 //! name collisions while keeping names readable.
 
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 /// Identity of a type in the type table.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -155,6 +156,8 @@ pub struct TypeTable<'src> {
     pub types: IndexMap<TypeKey<'src>, TypeValue<'src>>,
     /// Types that contain cyclic references (need Box in Rust).
     pub cyclic: Vec<TypeKey<'src>>,
+    /// Source spans where each type was first defined.
+    definition_spans: IndexMap<TypeKey<'src>, TextRange>,
 }
 
 impl<'src> TypeTable<'src> {
@@ -168,6 +171,7 @@ impl<'src> TypeTable<'src> {
         Self {
             types,
             cyclic: Vec::new(),
+            definition_spans: IndexMap::new(),
         }
     }
 
@@ -177,26 +181,38 @@ impl<'src> TypeTable<'src> {
         key
     }
 
-    /// Insert a type definition, detecting conflicts with existing incompatible types.
+    /// Insert a type definition with a source span, detecting conflicts.
     ///
     /// Returns `Ok(key)` if inserted successfully (no conflict).
-    /// Returns `Err(key)` if there was an existing incompatible type (conflict).
+    /// Returns `Err(existing_span)` if there was an existing incompatible type.
     ///
     /// On conflict, the existing type is NOT overwritten - caller should use Invalid.
     pub fn try_insert(
         &mut self,
         key: TypeKey<'src>,
         value: TypeValue<'src>,
-    ) -> Result<TypeKey<'src>, TypeKey<'src>> {
+        span: TextRange,
+    ) -> Result<TypeKey<'src>, TextRange> {
         if let Some(existing) = self.types.get(&key) {
             if !self.values_are_compatible(existing, &value) {
-                return Err(key);
+                let existing_span = self.definition_spans.get(&key).copied().unwrap_or(span);
+                return Err(existing_span);
             }
             // Compatible - keep existing, don't overwrite
             return Ok(key);
         }
         self.types.insert(key.clone(), value);
+        self.definition_spans.insert(key.clone(), span);
         Ok(key)
+    }
+
+    /// Insert without span tracking. Returns true if inserted, false if key existed.
+    pub fn try_insert_untracked(&mut self, key: TypeKey<'src>, value: TypeValue<'src>) -> bool {
+        if self.types.contains_key(&key) {
+            return false;
+        }
+        self.types.insert(key, value);
+        true
     }
 
     /// Mark a type as cyclic (requires indirection in Rust).
@@ -223,6 +239,11 @@ impl<'src> TypeTable<'src> {
     /// Two synthetic keys pointing to different TaggedUnions or Structs are incompatible.
     pub fn types_are_compatible(&self, a: &TypeKey<'src>, b: &TypeKey<'src>) -> bool {
         if a == b {
+            return true;
+        }
+
+        // Invalid is compatible with anything - don't cascade errors
+        if *a == TypeKey::Invalid || *b == TypeKey::Invalid {
             return true;
         }
 
@@ -253,8 +274,10 @@ impl<'src> TypeTable<'src> {
             (Optional(ka), Optional(kb)) => self.types_are_compatible(ka, kb),
             (List(ka), List(kb)) => self.types_are_compatible(ka, kb),
             (NonEmptyList(ka), NonEmptyList(kb)) => self.types_are_compatible(ka, kb),
-            // List and NonEmptyList are NOT compatible - different cardinality guarantees
-            (List(_), NonEmptyList(_)) | (NonEmptyList(_), List(_)) => false,
+            // List and NonEmptyList are compatible if inner types match - merge to List
+            (List(ka), NonEmptyList(kb)) | (NonEmptyList(ka), List(kb)) => {
+                self.types_are_compatible(ka, kb)
+            }
             (Struct(fa), Struct(fb)) => {
                 // Structs must have exactly the same fields with compatible types
                 if fa.len() != fb.len() {
@@ -297,6 +320,36 @@ impl<'src> TypeTable<'src> {
     /// Iterate over all types in insertion order.
     pub fn iter(&self) -> impl Iterator<Item = (&TypeKey<'src>, &TypeValue<'src>)> {
         self.types.iter()
+    }
+
+    /// Try to merge List and NonEmptyList types into List.
+    ///
+    /// Returns `Some(List(inner))` if one is List and other is NonEmptyList with compatible inner types.
+    /// Returns `None` otherwise.
+    fn try_merge_list_types(
+        &mut self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<TypeKey<'src>> {
+        let val_a = self.get(a)?;
+        let val_b = self.get(b)?;
+
+        let inner = match (val_a, val_b) {
+            (TypeValue::List(ka), TypeValue::NonEmptyList(kb))
+            | (TypeValue::NonEmptyList(ka), TypeValue::List(kb)) => {
+                if self.types_are_compatible(ka, kb) {
+                    ka.clone()
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        };
+
+        // Return or create a List type with the inner type
+        let list_key = TypeKey::Synthetic(vec!["list", "merged"]);
+        self.insert(list_key.clone(), TypeValue::List(inner));
+        Some(list_key)
     }
 
     /// Try to merge two struct types into one, returning the merged fields.
@@ -432,7 +485,21 @@ impl<'src> TypeTable<'src> {
                 .iter()
                 .all(|t| self.types_are_compatible(t, first_type));
 
-            let merged = if !all_same_type {
+            // Check for List/NonEmptyList merge case
+            let list_merge_key = if type_occurrences.len() == 2 {
+                self.try_merge_list_types(type_occurrences[0], type_occurrences[1])
+            } else {
+                None
+            };
+
+            let merged = if let Some(merged_key) = list_merge_key {
+                // List and NonEmptyList merged to List
+                if present_count == branch_count {
+                    MergedField::Same(merged_key)
+                } else {
+                    MergedField::Optional(merged_key)
+                }
+            } else if !all_same_type {
                 // Types differ - try to merge if both are structs
                 if type_occurrences.len() == 2 {
                     if let Some(struct_merged) =

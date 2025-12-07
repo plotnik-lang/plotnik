@@ -64,6 +64,7 @@ pub enum DiagnosticKind {
     // Type inference errors
     TypeConflictInMerge,
     MergeAltRequiresAnnotation,
+    IncompatibleTaggedAlternations,
 
     // Link pass - grammar validation
     UnknownNodeType,
@@ -174,6 +175,9 @@ impl DiagnosticKind {
             Self::TypeConflictInMerge => "capture has conflicting types across branches",
             Self::MergeAltRequiresAnnotation => {
                 "merged alternation with captures requires type annotation"
+            }
+            Self::IncompatibleTaggedAlternations => {
+                "tagged alternations with different variants cannot be merged"
             }
 
             // Link pass - grammar validation

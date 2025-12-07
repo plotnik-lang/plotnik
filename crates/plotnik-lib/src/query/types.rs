@@ -392,12 +392,13 @@ impl<'src> InferContext<'src> {
         inner: &TypeKey<'src>,
         quant: &ast::QuantifiedExpr,
     ) -> TypeKey<'src> {
-        let wrapper = if quant.is_optional() {
-            TypeValue::Optional(inner.clone())
-        } else if quant.is_list() {
+        // Check list/non-empty-list before optional since * matches both is_list() and is_optional()
+        let wrapper = if quant.is_list() {
             TypeValue::List(inner.clone())
         } else if quant.is_non_empty_list() {
             TypeValue::NonEmptyList(inner.clone())
+        } else if quant.is_optional() {
+            TypeValue::Optional(inner.clone())
         } else {
             return inner.clone();
         };
@@ -436,10 +437,9 @@ impl<'src> InferContext<'src> {
         }
 
         let wrapper_key = TypeKey::Synthetic(vec![Box::leak(wrapper_name.into_boxed_str())]);
-        if self
+        if !self
             .table
-            .try_insert(wrapper_key.clone(), wrapper.clone())
-            .is_err()
+            .try_insert_untracked(wrapper_key.clone(), wrapper.clone())
         {
             // Key already exists with same wrapper - that's fine
             return wrapper_key;
@@ -544,15 +544,19 @@ impl<'src> InferContext<'src> {
         };
 
         // Detect conflict: same key with incompatible TaggedUnion
-        if self
-            .table
-            .try_insert(key.clone(), TypeValue::TaggedUnion(variants))
-            .is_err()
+        let current_span = alt.text_range();
+        if let Err(existing_span) =
+            self.table
+                .try_insert(key.clone(), TypeValue::TaggedUnion(variants), current_span)
         {
             self.diagnostics
-                .report(DiagnosticKind::DuplicateCaptureInScope, alt.text_range())
+                .report(
+                    DiagnosticKind::IncompatibleTaggedAlternations,
+                    existing_span,
+                )
+                .related_to("incompatible", current_span)
                 .emit();
-            return TypeKey::Invalid;
+            return key;
         }
         key
     }
