@@ -21,6 +21,8 @@ pub struct TypeScriptEmitConfig {
     pub node_type_name: String,
     /// Whether to emit `type Foo = ...` instead of `interface Foo { ... }`.
     pub use_type_alias: bool,
+    /// Name for the default (unnamed) query entry point.
+    pub default_query_name: String,
 }
 
 /// How to represent optional types.
@@ -43,6 +45,7 @@ impl Default for TypeScriptEmitConfig {
             inline_synthetic: true,
             node_type_name: "SyntaxNode".to_string(),
             use_type_alias: false,
+            default_query_name: "QueryResult".to_string(),
         }
     }
 }
@@ -83,7 +86,7 @@ fn emit_type_def(
     table: &TypeTable<'_>,
     config: &TypeScriptEmitConfig,
 ) -> String {
-    let name = key.to_pascal_case();
+    let name = type_name(key, config);
     let export_prefix = if config.export && !matches!(key, TypeKey::Synthetic(_)) {
         "export "
     } else {
@@ -192,13 +195,13 @@ pub(crate) fn emit_field_type(
             if config.inline_synthetic && matches!(key, TypeKey::Synthetic(_)) {
                 (emit_inline_struct(fields, table, config), false)
             } else {
-                (key.to_pascal_case(), false)
+                (type_name(key, config), false)
             }
         }
 
-        Some(TypeValue::TaggedUnion(_)) => (key.to_pascal_case(), false),
+        Some(TypeValue::TaggedUnion(_)) => (type_name(key, config), false),
 
-        None => (key.to_pascal_case(), false),
+        None => (type_name(key, config), false),
     }
 }
 
@@ -229,6 +232,14 @@ pub(crate) fn emit_inline_struct(
     }
     out.push_str(" }");
     out
+}
+
+fn type_name(key: &TypeKey<'_>, config: &TypeScriptEmitConfig) -> String {
+    if key.is_default_query() {
+        config.default_query_name.clone()
+    } else {
+        key.to_pascal_case()
+    }
 }
 
 pub(crate) fn wrap_if_union(type_str: &str) -> String {

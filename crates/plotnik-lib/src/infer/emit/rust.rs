@@ -15,6 +15,8 @@ pub struct RustEmitConfig {
     pub derive_debug: bool,
     pub derive_clone: bool,
     pub derive_partial_eq: bool,
+    /// Name for the default (unnamed) query entry point type.
+    pub default_query_name: String,
 }
 
 /// How to handle cyclic type references.
@@ -32,6 +34,7 @@ impl Default for RustEmitConfig {
             derive_debug: true,
             derive_clone: true,
             derive_partial_eq: false,
+            default_query_name: "QueryResult".to_string(),
         }
     }
 }
@@ -67,7 +70,10 @@ fn emit_type_def(
     table: &TypeTable<'_>,
     config: &RustEmitConfig,
 ) -> String {
-    let name = key.to_pascal_case();
+    let name = match key {
+        TypeKey::DefaultQuery => config.default_query_name.clone(),
+        _ => key.to_pascal_case(),
+    };
 
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => String::new(),
@@ -148,7 +154,10 @@ pub(crate) fn emit_type_ref(
             format!("Vec<{}>", inner_str)
         }
         // Struct, TaggedUnion, or undefined forward reference - use pascal-cased name
-        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => key.to_pascal_case(),
+        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => match key {
+            TypeKey::DefaultQuery => config.default_query_name.clone(),
+            _ => key.to_pascal_case(),
+        },
     };
 
     if is_cyclic {

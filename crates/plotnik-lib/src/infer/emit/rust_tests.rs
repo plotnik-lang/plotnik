@@ -537,3 +537,56 @@ fn emit_builtin_value_with_named_key() {
     "#};
     insta::assert_snapshot!(emit(input), @"");
 }
+
+// --- DefaultQuery ---
+
+#[test]
+fn emit_default_query_struct() {
+    let input = "#DefaultQuery = { #Node @value }";
+
+    insta::assert_snapshot!(emit(input), @r"
+    #[derive(Debug, Clone)]
+    pub struct QueryResult {
+        pub value: Node,
+    }
+    ");
+}
+
+#[test]
+fn emit_default_query_custom_name() {
+    let input = "#DefaultQuery = { #Node @value }";
+    let config = RustEmitConfig {
+        default_query_name: "MyResult".to_string(),
+        ..Default::default()
+    };
+
+    insta::assert_snapshot!(emit_with_config(input, &config), @r"
+    #[derive(Debug, Clone)]
+    pub struct MyResult {
+        pub value: Node,
+    }
+    ");
+}
+
+#[test]
+fn emit_default_query_referenced() {
+    let input = indoc! {r#"
+        Item = { #Node @value }
+        Items = Item*
+        #DefaultQuery = { Items @items }
+    "#};
+
+    insta::assert_snapshot!(emit(input), @r"
+    #[derive(Debug, Clone)]
+    pub struct Item {
+        pub value: Node,
+    }
+
+    pub type Items = Vec<Item>;
+
+    #[derive(Debug, Clone)]
+    pub struct QueryResult {
+        pub items: Vec<Item>,
+    }
+    ");
+}

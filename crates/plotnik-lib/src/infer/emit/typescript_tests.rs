@@ -447,6 +447,7 @@ fn emit_all_config_options() {
         inline_synthetic: true,
         node_type_name: "ASTNode".to_string(),
         use_type_alias: false,
+        default_query_name: "QueryResult".to_string(),
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
     export type MaybeNode = ASTNode;
@@ -740,4 +741,53 @@ fn emit_builtin_value_with_named_key() {
         AliasUnit = ()
     "#};
     insta::assert_snapshot!(emit(input), @"");
+}
+
+// --- DefaultQuery ---
+
+#[test]
+fn emit_default_query_interface() {
+    let input = "#DefaultQuery = { #Node @value }";
+
+    insta::assert_snapshot!(emit(input), @r"
+    interface QueryResult {
+      value: SyntaxNode;
+    }
+    ");
+}
+
+#[test]
+fn emit_default_query_custom_name() {
+    let input = "#DefaultQuery = { #Node @value }";
+    let config = TypeScriptEmitConfig {
+        default_query_name: "MyResult".to_string(),
+        ..Default::default()
+    };
+
+    insta::assert_snapshot!(emit_with_config(input, &config), @r"
+    interface MyResult {
+      value: SyntaxNode;
+    }
+    ");
+}
+
+#[test]
+fn emit_default_query_referenced() {
+    let input = indoc! {r#"
+        Item = { #Node @value }
+        Items = Item*
+        #DefaultQuery = { Items @items }
+    "#};
+
+    insta::assert_snapshot!(emit(input), @r"
+    interface Item {
+      value: SyntaxNode;
+    }
+
+    type Items = Item[];
+
+    interface QueryResult {
+      items: Item[];
+    }
+    ");
 }

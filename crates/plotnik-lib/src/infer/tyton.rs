@@ -23,6 +23,7 @@
 //! - `#Node` — built-in node type
 //! - `#string` — built-in string type
 //! - `#Invalid` — built-in invalid type
+//! - `#DefaultQuery` — unnamed entry point query
 //! - `()` — built-in unit type
 //! - `PascalName` — named type
 //! - `<Foo bar baz>` — synthetic key from path segments
@@ -40,6 +41,7 @@
 //! - `Name = [ ... ]` — define a tagged union
 //! - `Name = Other?` — define an optional
 //! - `<Foo bar> = { ... }` — define with synthetic key
+//! - `#DefaultQuery = { ... }` — define unnamed entry point
 //! - `AliasNode = #Node` — alias to builtin
 //!
 //! # Example
@@ -69,6 +71,9 @@ enum Token<'src> {
 
     #[token("#Invalid")]
     Invalid,
+
+    #[token("#DefaultQuery")]
+    DefaultQuery,
 
     #[token("()")]
     Unit,
@@ -210,6 +215,10 @@ impl<'src> Parser<'src> {
             Some(Token::Invalid) => {
                 self.advance();
                 Ok(TypeKey::Invalid)
+            }
+            Some(Token::DefaultQuery) => {
+                self.advance();
+                Ok(TypeKey::DefaultQuery)
             }
             Some(Token::Unit) => {
                 self.advance();
@@ -410,6 +419,10 @@ impl<'src> Parser<'src> {
                 self.advance();
                 TypeKey::Named(name)
             }
+            Some(Token::DefaultQuery) => {
+                self.advance();
+                TypeKey::DefaultQuery
+            }
             Some(Token::LAngle) => self.parse_synthetic_key()?,
             _ => {
                 return Err(ParseError {
@@ -475,6 +488,7 @@ fn emit_key(out: &mut String, key: &TypeKey<'_>) {
         TypeKey::String => out.push_str("#string"),
         TypeKey::Invalid => out.push_str("#Invalid"),
         TypeKey::Unit => out.push_str("()"),
+        TypeKey::DefaultQuery => out.push_str("#DefaultQuery"),
         TypeKey::Named(name) => out.push_str(name),
         TypeKey::Synthetic(segments) => {
             out.push('<');
