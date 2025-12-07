@@ -1,4 +1,4 @@
-use super::tyton::parse;
+use super::tyton::{emit, parse};
 use indoc::indoc;
 
 fn dump_table(input: &str) -> String {
@@ -404,4 +404,116 @@ fn error_invalid_token_in_synthetic() {
 fn error_invalid_type_value() {
     let input = "Foo = @bar";
     insta::assert_snapshot!(dump_table(input), @"ERROR: expected type value at 6..7");
+}
+
+// === emit tests ===
+
+#[test]
+fn emit_empty() {
+    let table = parse("").unwrap();
+    insta::assert_snapshot!(emit(&table), @"");
+}
+
+#[test]
+fn emit_struct_simple() {
+    let table = parse("Foo = { Node @name }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Foo = { Node @name }");
+}
+
+#[test]
+fn emit_struct_multiple_fields() {
+    let table = parse("Func = { string @name Node @body Node @params }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Func = { string @name Node @body Node @params }");
+}
+
+#[test]
+fn emit_struct_empty() {
+    let table = parse("Empty = {}").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Empty = {  }");
+}
+
+#[test]
+fn emit_tagged_union() {
+    let table = parse("Stmt = [ Assign: AssignStmt Call: CallStmt ]").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Stmt = [ Assign: AssignStmt Call: CallStmt ]");
+}
+
+#[test]
+fn emit_optional() {
+    let table = parse("MaybeNode = Node?").unwrap();
+    insta::assert_snapshot!(emit(&table), @"MaybeNode = Node?");
+}
+
+#[test]
+fn emit_list() {
+    let table = parse("Nodes = Node*").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Nodes = Node*");
+}
+
+#[test]
+fn emit_non_empty_list() {
+    let table = parse("Nodes = Node+").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Nodes = Node+");
+}
+
+#[test]
+fn emit_synthetic_key() {
+    let table = parse("<Foo bar> = { Node @value }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"<Foo bar> = { Node @value }");
+}
+
+#[test]
+fn emit_synthetic_in_wrapper() {
+    let table = parse("Wrapper = <Foo bar>?").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Wrapper = <Foo bar>?");
+}
+
+#[test]
+fn emit_bare_builtins() {
+    let input = indoc! {r#"
+        AliasNode = Node
+        AliasString = string
+        AliasUnit = ()
+    "#};
+    let table = parse(input).unwrap();
+    insta::assert_snapshot!(emit(&table), @r"
+    AliasNode = Node
+    AliasString = string
+    AliasUnit = ()
+    ");
+}
+
+#[test]
+fn emit_multiple_definitions() {
+    let input = indoc! {r#"
+        AssignStmt = { Node @target Node @value }
+        CallStmt = { Node @func Node @args }
+        Stmt = [ Assign: AssignStmt Call: CallStmt ]
+        Stmts = Stmt*
+    "#};
+    let table = parse(input).unwrap();
+    insta::assert_snapshot!(emit(&table), @r"
+    AssignStmt = { Node @target Node @value }
+    CallStmt = { Node @func Node @args }
+    Stmt = [ Assign: AssignStmt Call: CallStmt ]
+    Stmts = Stmt*
+    ");
+}
+
+#[test]
+fn emit_roundtrip() {
+    let input = indoc! {r#"
+        FuncInfo = { string @name Node @body }
+        Param = { string @name string @type_annotation }
+        Params = Param*
+        FuncDecl = { FuncInfo @info Params @params }
+        Stmt = [ Func: FuncDecl Expr: Node ]
+        MaybeStmt = Stmt?
+    "#};
+
+    let table1 = parse(input).unwrap();
+    let emitted = emit(&table1);
+    let table2 = parse(&emitted).unwrap();
+
+    assert_eq!(table1.types, table2.types);
 }
