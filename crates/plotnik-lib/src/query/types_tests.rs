@@ -4,299 +4,461 @@ use crate::Query;
 use indoc::indoc;
 
 #[test]
-fn comprehensive_type_inference() {
+fn capture_node_produces_node_field() {
+    let query = Query::try_from("(identifier) @id").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { id: SyntaxNode };");
+}
+
+#[test]
+fn multiple_captures_produce_multiple_fields() {
+    let query = Query::try_from("(binary left: (_) @left right: (_) @right)").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { left: SyntaxNode; right: SyntaxNode };");
+}
+
+#[test]
+fn no_captures_produces_unit() {
+    let query = Query::try_from("(identifier)").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"");
+}
+
+#[test]
+fn nested_capture_flattens() {
+    let query = Query::try_from("(function name: (identifier) @name)").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { name: SyntaxNode };");
+}
+
+#[test]
+fn string_annotation() {
+    let query = Query::try_from("(identifier) @name :: string").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { name: string };");
+}
+
+#[test]
+fn named_type_annotation() {
+    let query = Query::try_from("(identifier) @value :: MyType").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { value: MyType };");
+}
+
+#[test]
+fn annotation_on_quantified_wraps_inner() {
+    let query = Query::try_from("(identifier)+ @names :: string").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { names: [string, ...string[]] };");
+}
+
+#[test]
+fn capture_ref_produces_ref_type() {
     let input = indoc! {r#"
-        // Simple capture → flat struct with Node field
-        Simple = (identifier) @id
-
-        // Multiple captures → flat struct
-        BinaryOp = (binary_expression
-            left: (_) @left
-            operator: _ @op
-            right: (_) @right)
-
-        // :: string annotation → String type
-        WithString = (identifier) @name :: string
-
-        // :: TypeName annotation → named type
-        Named = (identifier) @value :: MyType
-
-        // Ref usage → type reference
-        UsingRef = (statement (BinaryOp) @expr)
-
-        // Nested seq with capture → synthetic key
-        Nested = (function
-            {(param) @p} @params
-            (body) @body)
-
-        // Quantifiers on captures
-        WithQuantifiers = (class
-            (decorator)? @maybe_dec
-            (method)* @methods
-            (field)+ @fields)
-
-        // Tagged alternation → TaggedUnion
-        TaggedAlt = [
-            Assign: (assignment left: (_) @target)
-            Call: (call function: (_) @func)
-        ]
-
-        // Untagged alternation → merged struct
-        UntaggedAlt = [
-            (assignment left: (_) @left right: (_) @right)
-            (call function: (_) @left)
-        ]
-
-        // Entry point (unnamed last def) → DefaultQuery
-        (program (Simple)* @items)
+        Inner = (identifier) @name
+        (wrapper (Inner) @inner)
     "#};
-
     let query = Query::try_from(input).unwrap();
-
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    Simple = { #Node @id }
-    BinaryOp = { #Node @left #Node @op #Node @right }
-    WithString = { #string @name }
-    Named = { MyType @value }
-    UsingRef = { BinaryOp @expr }
-    <Nested params 0> = { #Node @p }
-    Nested = { <Nested params 0> @params #Node @body }
-    <opt node> = #Node*
-    <nonempty node> = #Node+
-    WithQuantifiers = { <opt node> @maybe_dec <opt node> @methods <nonempty node> @fields }
-    <TaggedAlt Assign> = { #Node @target }
-    <TaggedAlt Call> = { #Node @func }
-    TaggedAlt = [ Assign: <TaggedAlt Assign> Call: <TaggedAlt Call> ]
-    <right opt> = #Node?
-    UntaggedAlt = { #Node @left <right opt> @right }
-    <SimpleWrapped> = Simple*
-    #DefaultQuery = { <SimpleWrapped> @items }
+    type Inner = { name: SyntaxNode };
+
+    type QueryResult = { inner: Inner };
     ");
 }
 
 #[test]
-fn type_conflict_in_untagged_alt() {
+fn ref_without_capture_contributes_nothing() {
     let input = indoc! {r#"
-        Conflict = [
-            (identifier) @x :: string
-            (number) @x
-        ] @result
+        Inner = (identifier) @name
+        (wrapper (Inner))
     "#};
-
     let query = Query::try_from(input).unwrap();
-
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture `x` has conflicting types across branches
-      |
-    1 |   Conflict = [
-      |  ____________^
-    2 | |     (identifier) @x :: string
-    3 | |     (number) @x
-    4 | | ] @result
-      | |_^
-    ");
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type Inner = { name: SyntaxNode };");
 }
 
 #[test]
-fn nested_tagged_alt_with_annotation() {
-    let input = indoc! {r#"
-        Expr = [
-            Binary: (binary_expression
-                left: (Expr) @left
-                right: (Expr) @right)
-            Literal: (number) @value :: string
-        ]
-    "#};
-
-    let query = Query::try_from(input).unwrap();
-
+fn optional_node() {
+    let query = Query::try_from("(identifier)? @maybe").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <Expr Binary> = { Expr @left Expr @right }
-    <Expr Literal> = { #string @value }
-    Expr = [ Binary: <Expr Binary> Literal: <Expr Literal> ]
-    ");
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { maybe?: SyntaxNode };");
 }
 
 #[test]
-fn captured_ref_becomes_type_reference() {
-    let input = indoc! {r#"
-        Inner = (identifier) @name :: string
-        Outer = (wrapper (Inner) @inner)
-    "#};
-
-    let query = Query::try_from(input).unwrap();
-
+fn list_of_nodes() {
+    let query = Query::try_from("(identifier)* @items").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    Inner = { #string @name }
-    Outer = { Inner @inner }
-    ");
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { items: SyntaxNode[] };");
 }
 
 #[test]
-fn empty_captures_produce_unit() {
-    let input = "(empty_node)";
-
-    let query = Query::try_from(input).unwrap();
-
+fn nonempty_list_of_nodes() {
+    let query = Query::try_from("(identifier)+ @items").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @"#DefaultQuery = ()");
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { items: [SyntaxNode, ...SyntaxNode[]] };");
 }
 
 #[test]
 fn quantified_ref() {
     let input = indoc! {r#"
         Item = (item) @value
-        List = (container (Item)+ @items)
+        (container (Item)+ @items)
     "#};
-
     let query = Query::try_from(input).unwrap();
-
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    Item = { #Node @value }
-    <ItemWrapped> = Item+
-    List = { <ItemWrapped> @items }
+    type Item = { value: SyntaxNode };
+
+    type QueryResult = { items: [Item, ...Item[]] };
     ");
 }
 
 #[test]
-fn recursive_type_with_annotation_preserves_fields() {
-    let input = r#"Func = (function_declaration name: (identifier) @name) @func :: Func (Func)"#;
+fn quantifier_outside_capture() {
+    let query = Query::try_from("((identifier) @id)*").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { id: SyntaxNode[] };");
+}
 
+#[test]
+fn captured_seq_creates_nested_struct() {
+    let query = Query::try_from("{(a) @x (b) @y} @pair").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { pair: { x: SyntaxNode; y: SyntaxNode } };");
+}
+
+#[test]
+fn captured_seq_in_tree() {
+    let input = indoc! {r#"
+        (function
+            {(param) @p} @params
+            (body) @body)
+    "#};
     let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { params: { p: SyntaxNode }; body: SyntaxNode };");
+}
 
+#[test]
+fn empty_captured_seq_is_node() {
+    let query = Query::try_from("{} @empty").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { empty: SyntaxNode };");
+}
+
+#[test]
+fn tagged_alt_produces_union() {
+    let input = "[A: (a) @x B: (b) @y]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"");
+}
+
+#[test]
+fn tagged_alt_as_definition() {
+    let input = indoc! {r#"
+        Expr = [
+            Binary: (binary left: (_) @left right: (_) @right)
+            Literal: (number) @value
+        ]
+    "#};
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r#"
+    type Expr =
+      | { tag: "Binary"; left: SyntaxNode; right: SyntaxNode }
+      | { tag: "Literal"; value: SyntaxNode };
+    "#);
+}
+
+#[test]
+fn tagged_branch_without_captures_is_unit() {
+    let input = "[A: (a) B: (b)]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"");
+}
+
+#[test]
+fn tagged_branch_with_ref() {
+    let input = indoc! {r#"
+        Rec = [Base: (a) Nested: (Rec)?] @value
+        (Rec)
+    "#};
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type Rec = { value: RecValue };");
+}
+
+#[test]
+fn captured_tagged_alt() {
+    let input = "(container [A: (a) B: (b)] @choice)";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { choice: DefaultQueryChoice };");
+}
+
+#[test]
+fn untagged_alt_same_capture_merges() {
+    let input = "[(a) @x (b) @x]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x: SyntaxNode };");
+}
+
+#[test]
+fn untagged_alt_different_captures_becomes_optional() {
+    let input = "[(a) @x (b) @y]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x?: SyntaxNode; y?: SyntaxNode };");
+}
+
+#[test]
+fn untagged_alt_nested_alt_merges() {
+    let input = "[(a) @x (b) @y [(c) @x (d) @y]]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x?: SyntaxNode; y?: SyntaxNode };");
+}
+
+#[test]
+fn captured_untagged_alt_with_nested_fields() {
+    let input = "[{(a) @x} {(b) @y}] @choice";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { choice: { x?: SyntaxNode; y?: SyntaxNode } };");
+}
+
+#[test]
+fn merge_same_type_unchanged() {
+    let input = "[(identifier) @x (identifier) @x]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x: SyntaxNode };");
+}
+
+#[test]
+fn merge_absent_field_becomes_optional() {
+    let input = "[(identifier) @x (number)]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x?: SyntaxNode };");
+}
+
+#[test]
+fn merge_list_and_nonempty_list_to_list() {
+    let input = "[(a)* @x (b)+ @x]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x: SyntaxNode[] };");
+}
+
+#[test]
+fn merge_optional_and_required_to_optional() {
+    let input = "[(a)? @x (b) @x]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x?: SyntaxNode };");
+}
+
+#[test]
+fn self_recursive_type_marked_cyclic() {
+    let input = "Expr = [(identifier) (call (Expr) @callee)]";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type Expr = { callee?: Expr };");
+}
+
+#[test]
+fn recursive_through_optional() {
+    let input = indoc! {r#"
+        Rec = (call function: (Rec)? @inner)
+        (Rec)
+    "#};
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type Rec = { inner?: Rec };");
+}
+
+#[test]
+fn recursive_in_tagged_alt() {
+    let input = indoc! {r#"
+        Expr = [
+            Ident: (identifier) @name
+            Call: (call function: (Expr) @func)
+        ]
+    "#};
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r#"
+    type Expr =
+      | { tag: "Ident"; name: SyntaxNode }
+      | { tag: "Call"; func: Expr };
+    "#);
+}
+
+#[test]
+fn unnamed_last_def_is_default_query() {
+    let input = "(program (identifier)* @items)";
+    let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { items: SyntaxNode[] };");
+}
+
+#[test]
+fn named_defs_plus_entry_point() {
+    let input = indoc! {r#"
+        Item = (item) @value
+        (container (Item)* @items)
+    "#};
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    Func = { #Node @name Func @func }
-    #DefaultQuery = ()
+    type Item = { value: SyntaxNode };
+
+    type QueryResult = { items: Item[] };
     ");
 }
 
 #[test]
-fn anonymous_tagged_alt_uses_default_query_name() {
-    let input = "[A: (identifier) @id B: (number) @num]";
-
+fn tagged_alt_at_entry_point() {
+    let input = "[A: (a) @x B: (b) @y]";
     let query = Query::try_from(input).unwrap();
-
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <A> = { #Node @id }
-    <B> = { #Node @num }
-    #DefaultQuery = [ A: <A> B: <B> ]
-    ");
+    insta::assert_snapshot!(query.dump_types(), @"");
 }
 
 #[test]
-fn tagged_union_branch_with_ref() {
-    let input = "Rec = [Base: (a) Rec: (Rec)?] (Rec)";
-
+fn type_conflict_in_untagged_alt() {
+    let input = "[(identifier) @x :: string (number) @x]";
     let query = Query::try_from(input).unwrap();
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <Rec Base> = ()
-    <RecWrapped> = Rec?
-    <Rec Rec> = { <RecWrapped> @value }
-    Rec = [ Base: <Rec Base> Rec: <Rec Rec> ]
-    #DefaultQuery = ()
-    ");
-}
-
-#[test]
-fn nested_tagged_alts_in_untagged_alt_conflict() {
-    // Each branch captures @x with different TaggedUnion types
-    // Branch 1: @x is TaggedUnion with variant A
-    // Branch 2: @x is TaggedUnion with variant B
-    // This is a type conflict - different structures under same capture name
-    let input = "[[A: (a) @aa] @x [B: (b) @bb] @x]";
-
-    let query = Query::try_from(input).unwrap();
-
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <x A> = { #Node @aa }
-    <x> = [ A: <x A> ]
-    <x B> = { #Node @bb }
-    #DefaultQuery = { <x> @x }
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `x` has conflicting types across branches
+      |
+    1 | [(identifier) @x :: string (number) @x]
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     ");
+}
+
+#[test]
+fn incompatible_tagged_alts_in_merge() {
+    let input = "[[A: (a) @x] @y [B: (b) @z] @y]";
+    let query = Query::try_from(input).unwrap();
+    assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: tagged alternations with different variants cannot be merged
       |
-    1 | [[A: (a) @aa] @x [B: (b) @bb] @x]
-      |  ^^^^^^^^^^^^    ------------ incompatible
+    1 | [[A: (a) @x] @y [B: (b) @z] @y]
+      |  ^^^^^^^^^^^    ----------- incompatible
     ");
 }
 
 #[test]
-fn nested_untagged_alts_merge_fields() {
-    // Each branch captures @x with different struct types
-    // Branch 1: @x has field @y
-    // Branch 2: @x has field @z
-    // These get merged: fields from both branches become optional
-    let input = "[[(a) @y] @x [(b) @z] @x]";
-
+fn duplicate_capture_in_sequence() {
+    let input = "{(a) @x (b) @x}";
     let query = Query::try_from(input).unwrap();
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <x 0> = { #Node @y }
-    <x 1> = { #Node @z }
-    <x y opt> = #Node?
-    <x z opt> = #Node?
-    <x merged> = { <x y opt> @y <x z opt> @z }
-    #DefaultQuery = { <x merged> @x }
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `@x` already used in this scope
+      |
+    1 | {(a) @x (b) @x}
+      |       -      ^
+      |       |
+      |       first use
     ");
 }
 
 #[test]
-fn list_vs_nonempty_list_merged_to_list() {
-    // Different quantifiers: * (List) vs + (NonEmptyList)
-    // These merge to List (the more general type)
-    let input = "[(a)* @x (b)+ @x]";
-
+fn duplicate_capture_nested() {
+    let input = "(foo (a) @x (bar (b) @x))";
     let query = Query::try_from(input).unwrap();
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_types(), @r"
-    <opt node> = #Node*
-    <nonempty node> = #Node+
-    <list merged> = #Node*
-    #DefaultQuery = { <list merged> @x }
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: capture `@x` already used in this scope
+      |
+    1 | (foo (a) @x (bar (b) @x))
+      |           - first use ^
     ");
 }
 
 #[test]
-fn same_variant_name_across_branches_merges() {
-    // Both branches have variant A - should merge correctly
+fn wildcard_capture() {
+    let query = Query::try_from("(_) @node").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { node: SyntaxNode };");
+}
+
+#[test]
+fn anonymous_node_capture() {
+    let query = Query::try_from("_ @anon").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { anon: SyntaxNode };");
+}
+
+#[test]
+fn string_literal_capture() {
+    let query = Query::try_from(r#""if" @kw"#).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { kw: SyntaxNode };");
+}
+
+#[test]
+fn field_value_capture() {
+    let query = Query::try_from("(call name: (identifier) @name)").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { name: SyntaxNode };");
+}
+
+#[test]
+fn deeply_nested_seq() {
+    let query = Query::try_from("{{{(identifier) @x}}} @outer").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { outer: { x: SyntaxNode } };");
+}
+
+#[test]
+fn same_tag_in_branches_merges() {
     let input = "[[A: (a)] @x [A: (b)] @x]";
-
     let query = Query::try_from(input).unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @"type QueryResult = { x: DefaultQueryX };");
+}
 
+#[test]
+fn annotation_on_captured_ref() {
+    let input = indoc! {r#"
+        Inner = (identifier) @name
+        (wrapper (Inner) @inner :: CustomType)
+    "#};
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    <x A> = ()
-    <x> = [ A: <x A> ]
-    #DefaultQuery = { <x> @x }
+    type Inner = { name: SyntaxNode };
+
+    type QueryResult = { inner: Inner };
     ");
 }
 
 #[test]
-fn recursive_ref_through_optional_field() {
+fn multiple_defs_with_refs() {
     let input = indoc! {r#"
-        Rec = (call_expression function: (Rec)? @inner)
-        (Rec)
+        A = (a) @x
+        B = (b (A) @a)
+        C = (c (B) @b)
+        (root (C) @c)
     "#};
-
     let query = Query::try_from(input).unwrap();
-
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    <RecWrapped> = Rec?
-    Rec = { <RecWrapped> @inner }
-    #DefaultQuery = ()
+    type A = { x: SyntaxNode };
+
+    type B = { a: A };
+
+    type C = { b: B };
+
+    type QueryResult = { c: C };
     ");
 }

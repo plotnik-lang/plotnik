@@ -15,10 +15,6 @@ use std::num::NonZeroU16;
 
 mod invariants;
 
-// ============================================================================
-// Deserialization Layer
-// ============================================================================
-
 /// Raw node definition from `node-types.json`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RawNode {
@@ -56,10 +52,6 @@ pub fn parse_node_types(json: &str) -> Result<Vec<RawNode>, serde_json::Error> {
     serde_json::from_str(json)
 }
 
-// ============================================================================
-// Common Types
-// ============================================================================
-
 /// Node type ID (tree-sitter uses u16).
 pub type NodeTypeId = u16;
 
@@ -72,10 +64,6 @@ pub struct Cardinality {
     pub multiple: bool,
     pub required: bool,
 }
-
-// ============================================================================
-// NodeTypes Trait
-// ============================================================================
 
 /// Trait for node type constraint lookups.
 ///
@@ -155,10 +143,6 @@ impl<T: NodeTypes + ?Sized> NodeTypes for &T {
         (*self).is_valid_child_type(node_type_id, child)
     }
 }
-
-// ============================================================================
-// Static Analysis Layer (zero runtime init)
-// ============================================================================
 
 /// Field info for static storage.
 #[derive(Debug, Clone, Copy)]
@@ -324,10 +308,6 @@ impl NodeTypes for StaticNodeTypes {
         self.valid_child_types(node_type_id).contains(&child)
     }
 }
-
-// ============================================================================
-// Dynamic Analysis Layer (runtime construction)
-// ============================================================================
 
 /// Information about a single field on a node type.
 #[derive(Debug, Clone)]

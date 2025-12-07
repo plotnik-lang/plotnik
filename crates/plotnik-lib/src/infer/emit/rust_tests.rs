@@ -20,8 +20,6 @@ fn emit_cyclic(input: &str, cyclic_types: &[&str]) -> String {
     emit_rust(&table, &RustEmitConfig::default())
 }
 
-// --- Simple Structs ---
-
 #[test]
 fn emit_struct_single_field() {
     let input = "Foo = { #Node @value }";
@@ -85,8 +83,6 @@ fn emit_struct_nested_refs() {
     }
     ");
 }
-
-// --- Tagged Unions ---
 
 #[test]
 fn emit_tagged_union_simple() {
@@ -168,8 +164,6 @@ fn emit_tagged_union_with_builtins() {
     ");
 }
 
-// --- Wrapper Types ---
-
 #[test]
 fn emit_optional() {
     let input = "MaybeNode = #Node?";
@@ -239,8 +233,6 @@ fn emit_nested_wrappers() {
     ");
 }
 
-// --- Cyclic Types ---
-
 #[test]
 fn emit_cyclic_box() {
     let input = indoc! {r#"
@@ -292,8 +284,6 @@ fn emit_cyclic_arc() {
     ");
 }
 
-// --- Config Variations ---
-
 #[test]
 fn emit_no_derives() {
     let input = "Foo = { #Node @value }";
@@ -343,8 +333,6 @@ fn emit_all_derives() {
     }
     ");
 }
-
-// --- Complex Scenarios ---
 
 #[test]
 fn emit_complex_program() {
@@ -455,8 +443,6 @@ fn emit_mixed_wrappers_and_structs() {
     ");
 }
 
-// --- Edge Cases ---
-
 #[test]
 fn emit_single_variant_union() {
     let input = indoc! {r#"
@@ -538,8 +524,6 @@ fn emit_builtin_value_with_named_key() {
     insta::assert_snapshot!(emit(input), @"");
 }
 
-// --- DefaultQuery ---
-
 #[test]
 fn emit_default_query_struct() {
     let input = "#DefaultQuery = { #Node @value }";
@@ -590,8 +574,6 @@ fn emit_default_query_referenced() {
     }
     ");
 }
-
-// --- Keyword Escaping ---
 
 #[test]
 fn emit_struct_with_keyword_fields() {

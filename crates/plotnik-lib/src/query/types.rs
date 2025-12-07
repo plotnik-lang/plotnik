@@ -162,7 +162,7 @@ impl<'src> InferContext<'src> {
 
         let path = match &key {
             TypeKey::Named(name) => vec![*name],
-            TypeKey::DefaultQuery => vec![],
+            TypeKey::DefaultQuery => vec!["DefaultQuery"],
             _ => vec![],
         };
 
@@ -571,7 +571,7 @@ impl<'src> InferContext<'src> {
                 let branch_types: Vec<_> =
                     branch_fields.iter().map(Self::extract_types_ref).collect();
                 let merged = self.table.merge_fields(&branch_types);
-                self.apply_merged_fields(merged, fields, alt);
+                self.apply_merged_fields(merged, fields, alt, path);
             }
         }
         None
@@ -678,7 +678,7 @@ impl<'src> InferContext<'src> {
         }
 
         let mut result_fields = IndexMap::new();
-        self.apply_merged_fields(merged, &mut result_fields, alt);
+        self.apply_merged_fields(merged, &mut result_fields, alt, path);
 
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
@@ -722,12 +722,16 @@ impl<'src> InferContext<'src> {
         merged: IndexMap<&'src str, MergedField<'src>>,
         fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
         alt: &ast::AltExpr,
+        path: &[&'src str],
     ) {
         for (name, merge_result) in merged {
             let key = match merge_result {
                 MergedField::Same(k) => k,
                 MergedField::Optional(k) => {
-                    let wrapper_key = TypeKey::Synthetic(vec![name, "opt"]);
+                    let mut wrapper_path = path.to_vec();
+                    wrapper_path.push(name);
+                    wrapper_path.push("opt");
+                    let wrapper_key = TypeKey::Synthetic(wrapper_path);
                     self.table
                         .insert(wrapper_key.clone(), TypeValue::Optional(k));
                     wrapper_key

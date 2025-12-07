@@ -278,6 +278,15 @@ impl<'src> TypeTable<'src> {
             (List(ka), NonEmptyList(kb)) | (NonEmptyList(ka), List(kb)) => {
                 self.types_are_compatible(ka, kb)
             }
+            // Optional<T> and T are compatible - merge to Optional<T>
+            (Optional(k), other) | (other, Optional(k)) => {
+                let other_as_key = match other {
+                    Node => TypeKey::Node,
+                    String => TypeKey::String,
+                    _ => return false,
+                };
+                self.types_are_compatible(k, &other_as_key)
+            }
             (Struct(fa), Struct(fb)) => {
                 // Structs must have exactly the same fields with compatible types
                 if fa.len() != fb.len() {
@@ -350,6 +359,43 @@ impl<'src> TypeTable<'src> {
         let list_key = TypeKey::Synthetic(vec!["list", "merged"]);
         self.insert(list_key.clone(), TypeValue::List(inner));
         Some(list_key)
+    }
+
+    /// Try to merge Optional<T> and T into Optional<T>.
+    ///
+    /// Returns `Some(Optional(inner))` if one is Optional and other is the unwrapped type.
+    /// Returns `None` otherwise.
+    fn try_merge_optional_types(
+        &mut self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<TypeKey<'src>> {
+        let val_a = self.get(a);
+        let val_b = self.get(b);
+
+        // Handle cases where one is a wrapper type (Optional) around the other
+        match (val_a, val_b) {
+            (Some(TypeValue::Optional(ka)), Some(TypeValue::Optional(kb))) => {
+                // Both optional - check inner compatibility
+                if self.types_are_compatible(ka, kb) {
+                    return Some(a.clone());
+                }
+                None
+            }
+            (Some(TypeValue::Optional(k)), _) => {
+                if self.types_are_compatible(k, b) {
+                    return Some(a.clone());
+                }
+                None
+            }
+            (_, Some(TypeValue::Optional(k))) => {
+                if self.types_are_compatible(a, k) {
+                    return Some(b.clone());
+                }
+                None
+            }
+            _ => None,
+        }
     }
 
     /// Try to merge two struct types into one, returning the merged fields.
@@ -492,7 +538,17 @@ impl<'src> TypeTable<'src> {
                 None
             };
 
-            let merged = if let Some(merged_key) = list_merge_key {
+            // Check for Optional/Required merge case
+            let optional_merge_key = if type_occurrences.len() == 2 && list_merge_key.is_none() {
+                self.try_merge_optional_types(type_occurrences[0], type_occurrences[1])
+            } else {
+                None
+            };
+
+            let merged = if let Some(merged_key) = optional_merge_key {
+                // Optional merge result is already Optional - don't double-wrap
+                MergedField::Same(merged_key)
+            } else if let Some(merged_key) = list_merge_key {
                 // List and NonEmptyList merged to List
                 if present_count == branch_count {
                     MergedField::Same(merged_key)

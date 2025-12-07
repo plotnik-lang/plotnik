@@ -12,8 +12,6 @@ fn emit_with_config(input: &str, config: &TypeScriptEmitConfig) -> String {
     emit_typescript(&table, config)
 }
 
-// --- Simple Structs (Interfaces) ---
-
 #[test]
 fn emit_interface_single_field() {
     let input = "Foo = { #Node @value }";
@@ -69,8 +67,6 @@ fn emit_interface_nested_refs() {
     }
     ");
 }
-
-// --- Tagged Unions ---
 
 #[test]
 fn emit_tagged_union_simple() {
@@ -133,8 +129,6 @@ fn emit_tagged_union_with_builtins() {
       | { tag: "Empty" };
     "#);
 }
-
-// --- Wrapper Types ---
 
 #[test]
 fn emit_optional_null() {
@@ -249,8 +243,6 @@ fn emit_list_of_optionals() {
     ");
 }
 
-// --- Config Variations ---
-
 #[test]
 fn emit_with_export() {
     let input = "Foo = { #Node @value }";
@@ -359,8 +351,6 @@ fn emit_inline_synthetic() {
     ");
 }
 
-// --- Complex Scenarios ---
-
 #[test]
 fn emit_complex_program() {
     let input = indoc! {r#"
@@ -460,8 +450,6 @@ fn emit_all_config_options() {
     export type Items = Item[];
     ");
 }
-
-// --- Edge Cases ---
 
 #[test]
 fn emit_single_variant_union() {
@@ -742,8 +730,6 @@ fn emit_builtin_value_with_named_key() {
     "#};
     insta::assert_snapshot!(emit(input), @"");
 }
-
-// --- DefaultQuery ---
 
 #[test]
 fn emit_default_query_interface() {

@@ -486,8 +486,6 @@ fn error_unprefixed_string() {
     insta::assert_snapshot!(dump_table(input), @"ERROR: expected type value at 6..12");
 }
 
-// === emit tests ===
-
 #[test]
 fn emit_empty() {
     let table = parse("").unwrap();
