@@ -20,27 +20,30 @@ fn parse_empty() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     ");
 }
 
 #[test]
 fn parse_struct_simple() {
-    let input = "Foo = { Node @name }";
+    let input = "Foo = { #Node @name }";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Foo") = Struct({"name": Node})
     "#);
 }
 
 #[test]
 fn parse_struct_multiple_fields() {
-    let input = "Func = { string @name Node @body Node @params }";
+    let input = "Func = { #string @name #Node @body #Node @params }";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Func") = Struct({"name": String, "body": Node, "params": Node})
     "#);
 }
@@ -52,6 +55,7 @@ fn parse_struct_empty() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Empty") = Struct({})
     "#);
 }
@@ -63,6 +67,7 @@ fn parse_struct_with_unit() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Wrapper") = Struct({"unit": Unit})
     "#);
 }
@@ -74,6 +79,7 @@ fn parse_tagged_union() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Stmt") = TaggedUnion({"Assign": Named("AssignStmt"), "Call": Named("CallStmt")})
     "#);
 }
@@ -85,50 +91,55 @@ fn parse_tagged_union_single() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Single") = TaggedUnion({"Only": Named("OnlyVariant")})
     "#);
 }
 
 #[test]
 fn parse_tagged_union_with_builtins() {
-    let input = "Mixed = [ Text: string Code: Node Empty: () ]";
+    let input = "Mixed = [ Text: #string Code: #Node Empty: () ]";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Mixed") = TaggedUnion({"Text": String, "Code": Node, "Empty": Unit})
     "#);
 }
 
 #[test]
 fn parse_optional() {
-    let input = "MaybeNode = Node?";
+    let input = "MaybeNode = #Node?";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("MaybeNode") = Optional(Node)
     "#);
 }
 
 #[test]
 fn parse_list() {
-    let input = "Nodes = Node*";
+    let input = "Nodes = #Node*";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Nodes") = List(Node)
     "#);
 }
 
 #[test]
 fn parse_non_empty_list() {
-    let input = "Nodes = Node+";
+    let input = "Nodes = #Node+";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Nodes") = NonEmptyList(Node)
     "#);
 }
@@ -140,6 +151,7 @@ fn parse_optional_named() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("MaybeStmt") = Optional(Named("Stmt"))
     "#);
 }
@@ -151,6 +163,7 @@ fn parse_list_named() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Stmts") = List(Named("Stmt"))
     "#);
 }
@@ -162,6 +175,7 @@ fn parse_synthetic_key_simple() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Wrapper") = Optional(Synthetic(["Foo", "bar"]))
     "#);
 }
@@ -173,6 +187,7 @@ fn parse_synthetic_key_multiple_segments() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Wrapper") = List(Synthetic(["Foo", "bar", "baz"]))
     "#);
 }
@@ -184,6 +199,7 @@ fn parse_struct_with_synthetic() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Container") = Struct({"inner": Synthetic(["Inner", "field"])})
     "#);
 }
@@ -195,6 +211,7 @@ fn parse_union_with_synthetic() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("Choice") = TaggedUnion({"First": Synthetic(["Choice", "first"]), "Second": Synthetic(["Choice", "second"])})
     "#);
 }
@@ -202,8 +219,8 @@ fn parse_union_with_synthetic() {
 #[test]
 fn parse_multiple_definitions() {
     let input = indoc! {r#"
-        AssignStmt = { Node @target Node @value }
-        CallStmt = { Node @func Node @args }
+        AssignStmt = { #Node @target #Node @value }
+        CallStmt = { #Node @func #Node @args }
         Stmt = [ Assign: AssignStmt Call: CallStmt ]
         Stmts = Stmt*
     "#};
@@ -211,6 +228,7 @@ fn parse_multiple_definitions() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("AssignStmt") = Struct({"target": Node, "value": Node})
     Named("CallStmt") = Struct({"func": Node, "args": Node})
     Named("Stmt") = TaggedUnion({"Assign": Named("AssignStmt"), "Call": Named("CallStmt")})
@@ -221,11 +239,11 @@ fn parse_multiple_definitions() {
 #[test]
 fn parse_complex_example() {
     let input = indoc! {r#"
-        FuncInfo = { string @name Node @body }
-        Param = { string @name string @type_annotation }
+        FuncInfo = { #string @name #Node @body }
+        Param = { #string @name #string @type_annotation }
         Params = Param*
         FuncDecl = { FuncInfo @info Params @params }
-        Stmt = [ Func: FuncDecl Expr: Node ]
+        Stmt = [ Func: FuncDecl Expr: #Node ]
         MaybeStmt = Stmt?
         Program = { Stmt @statements }
     "#};
@@ -233,6 +251,7 @@ fn parse_complex_example() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("FuncInfo") = Struct({"name": String, "body": Node})
     Named("Param") = Struct({"name": String, "type_annotation": String})
     Named("Params") = List(Named("Param"))
@@ -246,15 +265,16 @@ fn parse_complex_example() {
 #[test]
 fn parse_all_builtins() {
     let input = indoc! {r#"
-        AllBuiltins = { Node @node string @str () @unit }
-        OptNode = Node?
-        ListStr = string*
+        AllBuiltins = { #Node @node #string @str () @unit }
+        OptNode = #Node?
+        ListStr = #string*
         NonEmptyUnit = ()+
     "#};
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("AllBuiltins") = Struct({"node": Node, "str": String, "unit": Unit})
     Named("OptNode") = Optional(Node)
     Named("ListStr") = List(String)
@@ -263,15 +283,39 @@ fn parse_all_builtins() {
 }
 
 #[test]
+fn parse_invalid_builtin() {
+    let input = "HasInvalid = { #Invalid @bad }";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Invalid = Invalid
+    Named("HasInvalid") = Struct({"bad": Invalid})
+    "#);
+}
+
+#[test]
+fn parse_invalid_wrapper() {
+    let input = "MaybeInvalid = #Invalid?";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Invalid = Invalid
+    Named("MaybeInvalid") = Optional(Invalid)
+    "#);
+}
+
+#[test]
 fn error_missing_eq() {
-    let input = "Foo { Node @x }";
+    let input = "Foo { #Node @x }";
     insta::assert_snapshot!(dump_table(input), @"ERROR: expected Eq, got LBrace at 4..5");
 }
 
 #[test]
 fn error_missing_at() {
-    let input = "Foo = { Node name }";
-    insta::assert_snapshot!(dump_table(input), @r#"ERROR: expected At, got LowerIdent("name") at 13..17"#);
+    let input = "Foo = { #Node name }";
+    insta::assert_snapshot!(dump_table(input), @r#"ERROR: expected At, got LowerIdent("name") at 14..18"#);
 }
 
 #[test]
@@ -288,8 +332,8 @@ fn error_empty_synthetic() {
 
 #[test]
 fn error_unclosed_brace() {
-    let input = "Foo = { Node @x";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type key at 15..15");
+    let input = "Foo = { #Node @x";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type key at 16..16");
 }
 
 #[test]
@@ -300,34 +344,36 @@ fn error_unclosed_bracket() {
 
 #[test]
 fn error_lowercase_type_name() {
-    let input = "foo = { Node @x }";
+    let input = "foo = { #Node @x }";
     insta::assert_snapshot!(dump_table(input), @"ERROR: expected type name (uppercase) or synthetic key at 0..3");
 }
 
 #[test]
 fn error_uppercase_field_name() {
-    let input = "Foo = { Node @Name }";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected field name (lowercase) at 14..18");
+    let input = "Foo = { #Node @Name }";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected field name (lowercase) at 15..19");
 }
 
 #[test]
 fn parse_bare_builtin_alias_node() {
-    let input = "AliasNode = Node";
+    let input = "AliasNode = #Node";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("AliasNode") = Node
     "#);
 }
 
 #[test]
 fn parse_bare_builtin_alias_string() {
-    let input = "AliasString = string";
+    let input = "AliasString = #string";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("AliasString") = String
     "#);
 }
@@ -339,53 +385,69 @@ fn parse_bare_builtin_alias_unit() {
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Named("AliasUnit") = Unit
     "#);
 }
 
 #[test]
-fn parse_synthetic_definition_struct() {
-    let input = "<Foo bar> = { Node @value }";
+fn parse_bare_builtin_alias_invalid() {
+    let input = "AliasInvalid = #Invalid";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
+    Named("AliasInvalid") = Invalid
+    "#);
+}
+
+#[test]
+fn parse_synthetic_definition_struct() {
+    let input = "<Foo bar> = { #Node @value }";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Invalid = Invalid
     Synthetic(["Foo", "bar"]) = Struct({"value": Node})
     "#);
 }
 
 #[test]
 fn parse_synthetic_definition_union() {
-    let input = "<Choice first> = [ A: Node B: string ]";
+    let input = "<Choice first> = [ A: #Node B: #string ]";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Synthetic(["Choice", "first"]) = TaggedUnion({"A": Node, "B": String})
     "#);
 }
 
 #[test]
 fn parse_synthetic_definition_wrapper() {
-    let input = "<Inner nested> = Node?";
+    let input = "<Inner nested> = #Node?";
     insta::assert_snapshot!(dump_table(input), @r#"
     Node = Node
     String = String
     Unit = Unit
+    Invalid = Invalid
     Synthetic(["Inner", "nested"]) = Optional(Node)
     "#);
 }
 
 #[test]
 fn error_invalid_char() {
-    let input = "Foo = { Node @x $ }";
-    insta::assert_snapshot!(dump_table(input), @r#"ERROR: unexpected character: "$" at 16..17"#);
+    let input = "Foo = { #Node @x $ }";
+    insta::assert_snapshot!(dump_table(input), @r#"ERROR: unexpected character: "$" at 17..18"#);
 }
 
 #[test]
 fn error_eof_in_struct() {
-    let input = "Foo = { Node @x";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type key at 15..15");
+    let input = "Foo = { #Node @x";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type key at 16..16");
 }
 
 #[test]
@@ -406,6 +468,24 @@ fn error_invalid_type_value() {
     insta::assert_snapshot!(dump_table(input), @"ERROR: expected type value at 6..7");
 }
 
+#[test]
+fn error_unprefixed_node() {
+    let input = "Foo = { Node @x }";
+    insta::assert_snapshot!(dump_table(input), @r#"
+    Node = Node
+    String = String
+    Unit = Unit
+    Invalid = Invalid
+    Named("Foo") = Struct({"x": Named("Node")})
+    "#);
+}
+
+#[test]
+fn error_unprefixed_string() {
+    let input = "Foo = string";
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected type value at 6..12");
+}
+
 // === emit tests ===
 
 #[test]
@@ -416,14 +496,14 @@ fn emit_empty() {
 
 #[test]
 fn emit_struct_simple() {
-    let table = parse("Foo = { Node @name }").unwrap();
-    insta::assert_snapshot!(emit(&table), @"Foo = { Node @name }");
+    let table = parse("Foo = { #Node @name }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Foo = { #Node @name }");
 }
 
 #[test]
 fn emit_struct_multiple_fields() {
-    let table = parse("Func = { string @name Node @body Node @params }").unwrap();
-    insta::assert_snapshot!(emit(&table), @"Func = { string @name Node @body Node @params }");
+    let table = parse("Func = { #string @name #Node @body #Node @params }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Func = { #string @name #Node @body #Node @params }");
 }
 
 #[test]
@@ -440,26 +520,26 @@ fn emit_tagged_union() {
 
 #[test]
 fn emit_optional() {
-    let table = parse("MaybeNode = Node?").unwrap();
-    insta::assert_snapshot!(emit(&table), @"MaybeNode = Node?");
+    let table = parse("MaybeNode = #Node?").unwrap();
+    insta::assert_snapshot!(emit(&table), @"MaybeNode = #Node?");
 }
 
 #[test]
 fn emit_list() {
-    let table = parse("Nodes = Node*").unwrap();
-    insta::assert_snapshot!(emit(&table), @"Nodes = Node*");
+    let table = parse("Nodes = #Node*").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Nodes = #Node*");
 }
 
 #[test]
 fn emit_non_empty_list() {
-    let table = parse("Nodes = Node+").unwrap();
-    insta::assert_snapshot!(emit(&table), @"Nodes = Node+");
+    let table = parse("Nodes = #Node+").unwrap();
+    insta::assert_snapshot!(emit(&table), @"Nodes = #Node+");
 }
 
 #[test]
 fn emit_synthetic_key() {
-    let table = parse("<Foo bar> = { Node @value }").unwrap();
-    insta::assert_snapshot!(emit(&table), @"<Foo bar> = { Node @value }");
+    let table = parse("<Foo bar> = { #Node @value }").unwrap();
+    insta::assert_snapshot!(emit(&table), @"<Foo bar> = { #Node @value }");
 }
 
 #[test]
@@ -471,14 +551,14 @@ fn emit_synthetic_in_wrapper() {
 #[test]
 fn emit_bare_builtins() {
     let input = indoc! {r#"
-        AliasNode = Node
-        AliasString = string
+        AliasNode = #Node
+        AliasString = #string
         AliasUnit = ()
     "#};
     let table = parse(input).unwrap();
     insta::assert_snapshot!(emit(&table), @r"
-    AliasNode = Node
-    AliasString = string
+    AliasNode = #Node
+    AliasString = #string
     AliasUnit = ()
     ");
 }
@@ -486,15 +566,15 @@ fn emit_bare_builtins() {
 #[test]
 fn emit_multiple_definitions() {
     let input = indoc! {r#"
-        AssignStmt = { Node @target Node @value }
-        CallStmt = { Node @func Node @args }
+        AssignStmt = { #Node @target #Node @value }
+        CallStmt = { #Node @func #Node @args }
         Stmt = [ Assign: AssignStmt Call: CallStmt ]
         Stmts = Stmt*
     "#};
     let table = parse(input).unwrap();
     insta::assert_snapshot!(emit(&table), @r"
-    AssignStmt = { Node @target Node @value }
-    CallStmt = { Node @func Node @args }
+    AssignStmt = { #Node @target #Node @value }
+    CallStmt = { #Node @func #Node @args }
     Stmt = [ Assign: AssignStmt Call: CallStmt ]
     Stmts = Stmt*
     ");
@@ -503,11 +583,11 @@ fn emit_multiple_definitions() {
 #[test]
 fn emit_roundtrip() {
     let input = indoc! {r#"
-        FuncInfo = { string @name Node @body }
-        Param = { string @name string @type_annotation }
+        FuncInfo = { #string @name #Node @body }
+        Param = { #string @name #string @type_annotation }
         Params = Param*
         FuncDecl = { FuncInfo @info Params @params }
-        Stmt = [ Func: FuncDecl Expr: Node ]
+        Stmt = [ Func: FuncDecl Expr: #Node ]
         MaybeStmt = Stmt?
     "#};
 

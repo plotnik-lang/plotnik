@@ -91,7 +91,7 @@ fn emit_type_def(
     };
 
     match value {
-        TypeValue::Node | TypeValue::String | TypeValue::Unit => String::new(),
+        TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => String::new(),
 
         TypeValue::Struct(fields) => {
             if config.use_type_alias {
@@ -166,7 +166,7 @@ pub(crate) fn emit_field_type(
     match table.get(key) {
         Some(TypeValue::Node) => (config.node_type_name.clone(), false),
         Some(TypeValue::String) => ("string".to_string(), false),
-        Some(TypeValue::Unit) => ("{}".to_string(), false),
+        Some(TypeValue::Unit) | Some(TypeValue::Invalid) => ("{}".to_string(), false),
 
         Some(TypeValue::Optional(inner)) => {
             let (inner_str, _) = emit_field_type(inner, table, config);
@@ -279,7 +279,7 @@ fn visit<'src>(
 
 pub(crate) fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
     match value {
-        TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
+        TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => vec![],
         TypeValue::Struct(fields) => fields.values().cloned().collect(),
         TypeValue::TaggedUnion(variants) => variants.values().cloned().collect(),
         TypeValue::Optional(inner) | TypeValue::List(inner) | TypeValue::NonEmptyList(inner) => {
