@@ -3,6 +3,31 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum OutputLang {
+    #[default]
+    Rust,
+    Typescript,
+    Ts,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum IndirectionChoice {
+    #[default]
+    Box,
+    Rc,
+    Arc,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum OptionalChoice {
+    #[default]
+    Null,
+    Undefined,
+    #[value(name = "questionmark")]
+    QuestionMark,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
 pub enum ColorChoice {
     #[default]
     Auto,
@@ -50,6 +75,29 @@ pub enum Command {
 
         #[command(flatten)]
         output: OutputArgs,
+    },
+
+    /// Infer and emit types from a query
+    #[command(after_help = r#"EXAMPLES:
+  plotnik infer -q '(identifier) @id' -l rust
+  plotnik infer -q '(function_declaration name: (identifier) @name) @fn' -l ts --export
+  plotnik infer --query-file query.plot -l rust --derive debug,clone,partialeq"#)]
+    Infer {
+        #[command(flatten)]
+        query: QueryArgs,
+
+        /// Output language
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: OutputLang,
+
+        #[command(flatten)]
+        common: InferCommonArgs,
+
+        #[command(flatten)]
+        rust: RustArgs,
+
+        #[command(flatten)]
+        typescript: TypeScriptArgs,
     },
 
     /// Print documentation
@@ -111,4 +159,57 @@ pub struct OutputArgs {
     /// Show inferred cardinalities
     #[arg(long)]
     pub cardinalities: bool,
+}
+
+#[derive(Args)]
+pub struct InferCommonArgs {
+    /// Name for the entry point type (default: QueryResult)
+    #[arg(long, value_name = "NAME")]
+    pub entry_name: Option<String>,
+
+    /// Colorize diagnostics output
+    #[arg(long, default_value = "auto", value_name = "WHEN")]
+    pub color: ColorChoice,
+}
+
+#[derive(Args)]
+pub struct RustArgs {
+    /// Indirection type for cyclic references
+    #[arg(long, value_name = "TYPE")]
+    pub indirection: Option<IndirectionChoice>,
+
+    /// Derive macros (comma-separated: debug, clone, partialeq)
+    #[arg(long, value_name = "TRAITS", value_delimiter = ',')]
+    pub derive: Option<Vec<String>>,
+
+    /// Emit no derive macros
+    #[arg(long)]
+    pub no_derive: bool,
+}
+
+#[derive(Args)]
+pub struct TypeScriptArgs {
+    /// How to represent optional values
+    #[arg(long, value_name = "STYLE")]
+    pub optional: Option<OptionalChoice>,
+
+    /// Add export keyword to types
+    #[arg(long)]
+    pub export: bool,
+
+    /// Make fields readonly
+    #[arg(long)]
+    pub readonly: bool,
+
+    /// Use type aliases instead of interfaces
+    #[arg(long)]
+    pub type_alias: bool,
+
+    /// Name for the Node type (default: SyntaxNode)
+    #[arg(long, value_name = "NAME")]
+    pub node_type: Option<String>,
+
+    /// Emit nested synthetic types instead of inlining
+    #[arg(long)]
+    pub nested: bool,
 }

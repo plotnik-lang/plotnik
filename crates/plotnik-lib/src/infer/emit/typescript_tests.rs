@@ -146,7 +146,7 @@ fn emit_optional_null() {
 fn emit_optional_undefined() {
     let input = "MaybeNode = #Node?";
     let config = TypeScriptEmitConfig {
-        optional_style: OptionalStyle::Undefined,
+        optional: OptionalStyle::Undefined,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @"type MaybeNode = SyntaxNode | undefined;");
@@ -159,7 +159,7 @@ fn emit_optional_question_mark() {
         Foo = { MaybeNode @maybe }
     "#};
     let config = TypeScriptEmitConfig {
-        optional_style: OptionalStyle::QuestionMark,
+        optional: OptionalStyle::QuestionMark,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -284,7 +284,7 @@ fn emit_readonly_fields() {
 fn emit_custom_node_type() {
     let input = "Foo = { #Node @value }";
     let config = TypeScriptEmitConfig {
-        node_type_name: "TSNode".to_string(),
+        node_type: "TSNode".to_string(),
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -298,7 +298,7 @@ fn emit_custom_node_type() {
 fn emit_type_alias_instead_of_interface() {
     let input = "Foo = { #Node @value #string @name }";
     let config = TypeScriptEmitConfig {
-        use_type_alias: true,
+        type_alias: true,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @"type Foo = { value: SyntaxNode; name: string };");
@@ -308,7 +308,7 @@ fn emit_type_alias_instead_of_interface() {
 fn emit_type_alias_empty() {
     let input = "Empty = {}";
     let config = TypeScriptEmitConfig {
-        use_type_alias: true,
+        type_alias: true,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @"type Empty = {};");
@@ -321,7 +321,7 @@ fn emit_type_alias_nested() {
         Outer = { Inner @inner #string @label }
     "#};
     let config = TypeScriptEmitConfig {
-        use_type_alias: true,
+        type_alias: true,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -337,7 +337,7 @@ fn emit_no_inline_synthetic() {
         Container = { <Inner field> @inner }
     "#};
     let config = TypeScriptEmitConfig {
-        inline_synthetic: false,
+        nested: true,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -441,13 +441,13 @@ fn emit_all_config_options() {
         Items = Item*
     "#};
     let config = TypeScriptEmitConfig {
-        optional_style: OptionalStyle::QuestionMark,
+        optional: OptionalStyle::QuestionMark,
         export: true,
         readonly: true,
-        inline_synthetic: true,
-        node_type_name: "ASTNode".to_string(),
-        use_type_alias: false,
-        default_query_name: "QueryResult".to_string(),
+        nested: false,
+        node_type: "ASTNode".to_string(),
+        type_alias: false,
+        entry_name: "QueryResult".to_string(),
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
     export type MaybeNode = ASTNode;
@@ -554,7 +554,7 @@ fn emit_optional_in_struct_undefined_style() {
         Container = { MaybeNode @item #string @name }
     "#};
     let config = TypeScriptEmitConfig {
-        optional_style: OptionalStyle::Undefined,
+        optional: OptionalStyle::Undefined,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -576,7 +576,7 @@ fn emit_tagged_union_with_optional_field_question_mark() {
         Choice = [ A: VariantA B: VariantB ]
     "#};
     let config = TypeScriptEmitConfig {
-        optional_style: OptionalStyle::QuestionMark,
+        optional: OptionalStyle::QuestionMark,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r#"
@@ -645,7 +645,7 @@ fn emit_struct_with_forward_ref() {
 fn emit_synthetic_type_no_inline() {
     let input = "<Foo bar> = { #Node @value }";
     let config = TypeScriptEmitConfig {
-        inline_synthetic: false,
+        nested: true,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -659,7 +659,7 @@ fn emit_synthetic_type_no_inline() {
 fn emit_synthetic_type_with_inline() {
     let input = "<Foo bar> = { #Node @value }";
     let config = TypeScriptEmitConfig {
-        inline_synthetic: true,
+        nested: false,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @"");
@@ -706,7 +706,7 @@ fn emit_field_referencing_unknown_type() {
 fn emit_empty_interface_no_type_alias() {
     let input = "Empty = {}";
     let config = TypeScriptEmitConfig {
-        use_type_alias: false,
+        type_alias: false,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @"interface Empty {}");
@@ -720,8 +720,8 @@ fn emit_inline_synthetic_struct_with_optional_field() {
         Container = { <Inner nested> @inner }
     "#};
     let config = TypeScriptEmitConfig {
-        inline_synthetic: true,
-        optional_style: OptionalStyle::QuestionMark,
+        nested: false,
+        optional: OptionalStyle::QuestionMark,
         ..Default::default()
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
@@ -760,7 +760,7 @@ fn emit_default_query_interface() {
 fn emit_default_query_custom_name() {
     let input = "#DefaultQuery = { #Node @value }";
     let config = TypeScriptEmitConfig {
-        default_query_name: "MyResult".to_string(),
+        entry_name: "MyResult".to_string(),
         ..Default::default()
     };
 

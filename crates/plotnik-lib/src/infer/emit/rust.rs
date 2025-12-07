@@ -9,19 +9,22 @@ use super::super::types::{TypeKey, TypeTable, TypeValue};
 /// Configuration for Rust emission.
 #[derive(Debug, Clone)]
 pub struct RustEmitConfig {
+    /// Name for the entry point type (default: "QueryResult").
+    pub entry_name: String,
     /// Indirection type for cyclic references.
     pub indirection: Indirection,
-    /// Whether to derive common traits.
+    /// Whether to derive Debug.
     pub derive_debug: bool,
+    /// Whether to derive Clone.
     pub derive_clone: bool,
+    /// Whether to derive PartialEq.
     pub derive_partial_eq: bool,
-    /// Name for the default (unnamed) query entry point type.
-    pub default_query_name: String,
 }
 
 /// How to handle cyclic type references.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Indirection {
+    #[default]
     Box,
     Rc,
     Arc,
@@ -30,11 +33,11 @@ pub enum Indirection {
 impl Default for RustEmitConfig {
     fn default() -> Self {
         Self {
+            entry_name: "QueryResult".to_string(),
             indirection: Indirection::Box,
             derive_debug: true,
             derive_clone: true,
             derive_partial_eq: false,
-            default_query_name: "QueryResult".to_string(),
         }
     }
 }
@@ -71,7 +74,7 @@ fn emit_type_def(
     config: &RustEmitConfig,
 ) -> String {
     let name = match key {
-        TypeKey::DefaultQuery => config.default_query_name.clone(),
+        TypeKey::DefaultQuery => config.entry_name.clone(),
         _ => key.to_pascal_case(),
     };
 
@@ -155,7 +158,7 @@ pub(crate) fn emit_type_ref(
         }
         // Struct, TaggedUnion, or undefined forward reference - use pascal-cased name
         Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => match key {
-            TypeKey::DefaultQuery => config.default_query_name.clone(),
+            TypeKey::DefaultQuery => config.entry_name.clone(),
             _ => key.to_pascal_case(),
         },
     };

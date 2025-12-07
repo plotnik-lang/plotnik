@@ -556,7 +556,7 @@ fn emit_default_query_struct() {
 fn emit_default_query_custom_name() {
     let input = "#DefaultQuery = { #Node @value }";
     let config = RustEmitConfig {
-        default_query_name: "MyResult".to_string(),
+        entry_name: "MyResult".to_string(),
         ..Default::default()
     };
 

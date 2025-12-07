@@ -10,19 +10,19 @@ use super::super::types::{TypeKey, TypeTable, TypeValue};
 #[derive(Debug, Clone)]
 pub struct TypeScriptEmitConfig {
     /// How to represent optional values.
-    pub optional_style: OptionalStyle,
+    pub optional: OptionalStyle,
     /// Whether to export types.
     pub export: bool,
     /// Whether to make fields readonly.
     pub readonly: bool,
-    /// Whether to inline synthetic types.
-    pub inline_synthetic: bool,
+    /// Whether to emit nested synthetic types instead of inlining them.
+    pub nested: bool,
     /// Name for the Node type.
-    pub node_type_name: String,
+    pub node_type: String,
     /// Whether to emit `type Foo = ...` instead of `interface Foo { ... }`.
-    pub use_type_alias: bool,
+    pub type_alias: bool,
     /// Name for the default (unnamed) query entry point.
-    pub default_query_name: String,
+    pub entry_name: String,
 }
 
 /// How to represent optional types.
@@ -39,13 +39,13 @@ pub enum OptionalStyle {
 impl Default for TypeScriptEmitConfig {
     fn default() -> Self {
         Self {
-            optional_style: OptionalStyle::Null,
+            optional: OptionalStyle::Null,
             export: false,
             readonly: false,
-            inline_synthetic: true,
-            node_type_name: "SyntaxNode".to_string(),
-            use_type_alias: false,
-            default_query_name: "QueryResult".to_string(),
+            nested: false,
+            node_type: "SyntaxNode".to_string(),
+            type_alias: false,
+            entry_name: "QueryResult".to_string(),
         }
     }
 }
@@ -65,8 +65,8 @@ pub fn emit_typescript(table: &TypeTable<'_>, config: &TypeScriptEmitConfig) -> 
             continue;
         }
 
-        // Skip synthetic types if inlining
-        if config.inline_synthetic && matches!(key, TypeKey::Synthetic(_)) {
+        // Skip synthetic types if not nested (i.e., inlining)
+        if !config.nested && matches!(key, TypeKey::Synthetic(_)) {
             continue;
         }
 
@@ -97,7 +97,7 @@ fn emit_type_def(
         TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => String::new(),
 
         TypeValue::Struct(fields) => {
-            if config.use_type_alias {
+            if config.type_alias {
                 let inline = emit_inline_struct(fields, table, config);
                 format!("{}type {} = {};", export_prefix, name, inline)
             } else if fields.is_empty() {
@@ -107,12 +107,12 @@ fn emit_type_def(
                 for (field_name, field_type) in fields {
                     let (type_str, is_optional) = emit_field_type(field_type, table, config);
                     let readonly = if config.readonly { "readonly " } else { "" };
-                    let optional =
-                        if is_optional && config.optional_style == OptionalStyle::QuestionMark {
-                            "?"
-                        } else {
-                            ""
-                        };
+                    let optional = if is_optional && config.optional == OptionalStyle::QuestionMark
+                    {
+                        "?"
+                    } else {
+                        ""
+                    };
                     out.push_str(&format!(
                         "  {}{}{}: {};\n",
                         readonly, field_name, optional, type_str
@@ -134,13 +134,12 @@ fn emit_type_def(
                 if let Some(TypeValue::Struct(fields)) = table.get(variant_key) {
                     for (field_name, field_type) in fields {
                         let (type_str, is_optional) = emit_field_type(field_type, table, config);
-                        let optional = if is_optional
-                            && config.optional_style == OptionalStyle::QuestionMark
-                        {
-                            "?"
-                        } else {
-                            ""
-                        };
+                        let optional =
+                            if is_optional && config.optional == OptionalStyle::QuestionMark {
+                                "?"
+                            } else {
+                                ""
+                            };
                         out.push_str(&format!("; {}{}: {}", field_name, optional, type_str));
                     }
                 }
@@ -167,13 +166,13 @@ pub(crate) fn emit_field_type(
     config: &TypeScriptEmitConfig,
 ) -> (String, bool) {
     match table.get(key) {
-        Some(TypeValue::Node) => (config.node_type_name.clone(), false),
+        Some(TypeValue::Node) => (config.node_type.clone(), false),
         Some(TypeValue::String) => ("string".to_string(), false),
         Some(TypeValue::Unit) | Some(TypeValue::Invalid) => ("{}".to_string(), false),
 
         Some(TypeValue::Optional(inner)) => {
             let (inner_str, _) = emit_field_type(inner, table, config);
-            let type_str = match config.optional_style {
+            let type_str = match config.optional {
                 OptionalStyle::Null => format!("{} | null", inner_str),
                 OptionalStyle::Undefined => format!("{} | undefined", inner_str),
                 OptionalStyle::QuestionMark => inner_str,
@@ -192,7 +191,7 @@ pub(crate) fn emit_field_type(
         }
 
         Some(TypeValue::Struct(fields)) => {
-            if config.inline_synthetic && matches!(key, TypeKey::Synthetic(_)) {
+            if !config.nested && matches!(key, TypeKey::Synthetic(_)) {
                 (emit_inline_struct(fields, table, config), false)
             } else {
                 (type_name(key, config), false)
@@ -217,7 +216,7 @@ pub(crate) fn emit_inline_struct(
     let mut out = String::from("{ ");
     for (i, (field_name, field_type)) in fields.iter().enumerate() {
         let (type_str, is_optional) = emit_field_type(field_type, table, config);
-        let optional = if is_optional && config.optional_style == OptionalStyle::QuestionMark {
+        let optional = if is_optional && config.optional == OptionalStyle::QuestionMark {
             "?"
         } else {
             ""
@@ -236,7 +235,7 @@ pub(crate) fn emit_inline_struct(
 
 fn type_name(key: &TypeKey<'_>, config: &TypeScriptEmitConfig) -> String {
     if key.is_default_query() {
-        config.default_query_name.clone()
+        config.entry_name.clone()
     } else {
         key.to_pascal_case()
     }

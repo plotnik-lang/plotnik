@@ -5,6 +5,28 @@ fn snapshot(input: &str) -> String {
     format_tokens(input, false)
 }
 
+/// Format tokens with spans for debugging
+#[allow(dead_code)]
+fn snapshot_with_spans(input: &str) -> String {
+    let tokens = lex(input);
+    let mut out = String::new();
+    for token in tokens {
+        if !token.kind.is_trivia() {
+            let start: usize = token.span.start().into();
+            let end: usize = token.span.end().into();
+            out.push_str(&format!(
+                "{:?} {:?} @ {}..{} (source: {:?})\n",
+                token.kind,
+                token_text(input, &token),
+                start,
+                end,
+                &input[start..end]
+            ));
+        }
+    }
+    out
+}
+
 /// Format tokens with trivia included
 fn snapshot_raw(input: &str) -> String {
     format_tokens(input, true)
@@ -159,6 +181,14 @@ fn capture_simple() {
     At "@"
     Id "name"
     "#);
+}
+
+#[test]
+fn capture_spans_debug() {
+    let input = "(identifier) @name :: string";
+    eprintln!("Input: {:?}", input);
+    eprintln!("Tokens with spans:");
+    eprintln!("{}", snapshot_with_spans(input));
 }
 
 #[test]

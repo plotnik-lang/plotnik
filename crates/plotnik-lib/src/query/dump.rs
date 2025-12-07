@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod test_helpers {
     use crate::Query;
+    use crate::infer::tyton;
 
     impl Query<'_> {
         pub fn dump_cst(&self) -> String {
@@ -35,6 +36,10 @@ mod test_helpers {
 
         pub fn dump_diagnostics_raw(&self) -> String {
             self.diagnostics_raw().render(self.source)
+        }
+
+        pub fn dump_types(&self) -> String {
+            tyton::emit(&self.type_table)
         }
     }
 }
