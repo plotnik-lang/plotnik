@@ -1,6 +1,7 @@
 //! Tyton: Types Testing Object Notation
 //!
 //! A compact DSL for constructing `TypeTable` test fixtures.
+//! Supports both parsing (text → TypeTable) and emitting (TypeTable → text).
 //!
 //! # Design
 //!
@@ -48,10 +49,12 @@
 //! Stmts = Stmt*
 //! ```
 
+use std::fmt::Write;
+
+use indexmap::IndexMap;
 use logos::Logos;
 
 use super::{TypeKey, TypeTable, TypeValue};
-use indexmap::IndexMap;
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\n\r]+")]
@@ -426,4 +429,88 @@ impl<'src> Parser<'src> {
 pub fn parse(input: &str) -> Result<TypeTable<'_>, ParseError> {
     let mut parser = Parser::new(input)?;
     parser.parse_all()
+}
+
+/// Emit TypeTable as tyton notation.
+pub fn emit(table: &TypeTable<'_>) -> String {
+    let mut out = String::new();
+
+    for (key, value) in table.iter() {
+        if is_builtin(key) {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        emit_key(&mut out, key);
+        out.push_str(" = ");
+        emit_value(&mut out, value);
+    }
+
+    out
+}
+
+fn is_builtin(key: &TypeKey<'_>) -> bool {
+    matches!(key, TypeKey::Node | TypeKey::String | TypeKey::Unit)
+}
+
+fn emit_key(out: &mut String, key: &TypeKey<'_>) {
+    match key {
+        TypeKey::Node => out.push_str("Node"),
+        TypeKey::String => out.push_str("string"),
+        TypeKey::Unit => out.push_str("()"),
+        TypeKey::Named(name) => out.push_str(name),
+        TypeKey::Synthetic(segments) => {
+            out.push('<');
+            for (i, seg) in segments.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                out.push_str(seg);
+            }
+            out.push('>');
+        }
+    }
+}
+
+fn emit_value(out: &mut String, value: &TypeValue<'_>) {
+    match value {
+        TypeValue::Node => out.push_str("Node"),
+        TypeValue::String => out.push_str("string"),
+        TypeValue::Unit => out.push_str("()"),
+        TypeValue::Struct(fields) => {
+            out.push_str("{ ");
+            for (i, (field, key)) in fields.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                emit_key(out, key);
+                write!(out, " @{}", field).unwrap();
+            }
+            out.push_str(" }");
+        }
+        TypeValue::TaggedUnion(variants) => {
+            out.push_str("[ ");
+            for (i, (tag, key)) in variants.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                write!(out, "{}: ", tag).unwrap();
+                emit_key(out, key);
+            }
+            out.push_str(" ]");
+        }
+        TypeValue::Optional(key) => {
+            emit_key(out, key);
+            out.push('?');
+        }
+        TypeValue::List(key) => {
+            emit_key(out, key);
+            out.push('*');
+        }
+        TypeValue::NonEmptyList(key) => {
+            emit_key(out, key);
+            out.push('+');
+        }
+    }
 }
