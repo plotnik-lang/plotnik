@@ -24,7 +24,7 @@
 <br/>
 
 <p align="center">
-  <i><strong>⚠️ DISCLAIMER: THE PROJECT IS IN <a href="#roadmap">EARLY STAGE</a> ⚠️</strong></i><br/>
+  <i><strong>⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN, SORRY. ⚠️</strong></i><br/>
 </p>
 
 <br/>
@@ -187,7 +187,7 @@ For the detailed specification, see the [Language Reference](docs/REFERENCE.md).
 
 ## Supported Languages
 
-Plotnik ships with schema support for 26 languages:
+Plotnik is bundled with 26 languages:
 
 > Bash, C, C++, C#, CSS, Elixir, Go, Haskell, HCL, HTML, Java, JavaScript, JSON, Kotlin, Lua, Nix, PHP, Python, Ruby, Rust, Scala, Solidity, Swift, TypeScript, TSX, YAML
 
@@ -206,7 +206,6 @@ The foundation is complete: a resilient parser that recovers from errors and kee
 - [x] Recursion validation via Tarjan SCC analysis (escape path detection)
 - [x] Shape cardinality inference (One vs Many) for field constraint validation
 - [x] Alternation validation (mixed tagged/untagged detection)
-- [ ] Semantic validation: capture naming rules, type annotation consistency
 
 ### Liftoff: type inference
 
@@ -215,7 +214,7 @@ The schema infrastructure is built. Type inference is next.
 - [x] `node-types.json` parsing and schema representation (`plotnik-core`)
 - [x] Proc macro for compile-time schema embedding (`plotnik-macros`)
 - [x] 26 languages bundled with static node type tables (`plotnik-langs`)
-- [ ] Query validation against language schemas (node types, fields, children)
+- [x] Query validation against language schemas (node types, fields, children)
 - [ ] Full type inference: query → output shape → generated structs
 
 ### Acceleration: query engine
