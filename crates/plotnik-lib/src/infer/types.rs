@@ -55,6 +55,9 @@ pub enum TypeKey<'src> {
     /// Invalid type for unresolvable conflicts (built-in)
     /// Emitted same as Unit in code generators.
     Invalid,
+    /// The unnamed entry point query (last definition without a name).
+    /// Default emitted name is "QueryResult", but emitters may override.
+    DefaultQuery,
     /// User-provided type name via `:: TypeName`
     Named(&'src str),
     /// Path-based synthetic name: ["Foo", "bar"] → FooBar
@@ -69,6 +72,7 @@ impl TypeKey<'_> {
             TypeKey::String => "String".to_string(),
             TypeKey::Unit => "Unit".to_string(),
             TypeKey::Invalid => "Unit".to_string(), // Invalid emits as Unit
+            TypeKey::DefaultQuery => "DefaultQuery".to_string(),
             TypeKey::Named(name) => (*name).to_string(),
             TypeKey::Synthetic(segments) => segments.iter().map(|s| to_pascal(s)).collect(),
         }
@@ -80,6 +84,11 @@ impl TypeKey<'_> {
             self,
             TypeKey::Node | TypeKey::String | TypeKey::Unit | TypeKey::Invalid
         )
+    }
+
+    /// Returns true if this is the default query entry point.
+    pub fn is_default_query(&self) -> bool {
+        matches!(self, TypeKey::DefaultQuery)
     }
 }
 

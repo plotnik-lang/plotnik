@@ -475,6 +475,7 @@ fn emit_key(out: &mut String, key: &TypeKey<'_>) {
         TypeKey::String => out.push_str("#string"),
         TypeKey::Invalid => out.push_str("#Invalid"),
         TypeKey::Unit => out.push_str("()"),
+        TypeKey::DefaultQuery => out.push_str("#DefaultQuery"),
         TypeKey::Named(name) => out.push_str(name),
         TypeKey::Synthetic(segments) => {
             out.push('<');

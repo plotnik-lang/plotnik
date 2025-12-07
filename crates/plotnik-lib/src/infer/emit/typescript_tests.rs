@@ -447,6 +447,7 @@ fn emit_all_config_options() {
         inline_synthetic: true,
         node_type_name: "ASTNode".to_string(),
         use_type_alias: false,
+        default_query_name: "QueryResult".to_string(),
     };
     insta::assert_snapshot!(emit_with_config(input, &config), @r"
     export type MaybeNode = ASTNode;
