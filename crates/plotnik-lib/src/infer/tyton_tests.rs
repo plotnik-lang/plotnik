@@ -176,7 +176,7 @@ fn parse_synthetic_key_simple() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Wrapper") = Optional(Synthetic(["Foo", "bar"]))
+    Named("Wrapper") = Optional(Synthetic { parent: Named("Foo"), path: ["bar"] })
     "#);
 }
 
@@ -188,7 +188,7 @@ fn parse_synthetic_key_multiple_segments() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Wrapper") = List(Synthetic(["Foo", "bar", "baz"]))
+    Named("Wrapper") = List(Synthetic { parent: Named("Foo"), path: ["bar", "baz"] })
     "#);
 }
 
@@ -200,7 +200,7 @@ fn parse_struct_with_synthetic() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Container") = Struct({"inner": Synthetic(["Inner", "field"])})
+    Named("Container") = Struct({"inner": Synthetic { parent: Named("Inner"), path: ["field"] }})
     "#);
 }
 
@@ -212,7 +212,7 @@ fn parse_union_with_synthetic() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Named("Choice") = TaggedUnion({"First": Synthetic(["Choice", "first"]), "Second": Synthetic(["Choice", "second"])})
+    Named("Choice") = TaggedUnion({"First": Synthetic { parent: Named("Choice"), path: ["first"] }, "Second": Synthetic { parent: Named("Choice"), path: ["second"] }})
     "#);
 }
 
@@ -327,7 +327,7 @@ fn error_missing_colon_in_union() {
 #[test]
 fn error_empty_synthetic() {
     let input = "Foo = <>?";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: synthetic key cannot be empty at 8..9");
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected parent key (uppercase name, #DefaultQuery, or <...>) at 7..8");
 }
 
 #[test]
@@ -410,7 +410,7 @@ fn parse_synthetic_definition_struct() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic(["Foo", "bar"]) = Struct({"value": Node})
+    Synthetic { parent: Named("Foo"), path: ["bar"] } = Struct({"value": Node})
     "#);
 }
 
@@ -422,7 +422,7 @@ fn parse_synthetic_definition_union() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic(["Choice", "first"]) = TaggedUnion({"A": Node, "B": String})
+    Synthetic { parent: Named("Choice"), path: ["first"] } = TaggedUnion({"A": Node, "B": String})
     "#);
 }
 
@@ -434,7 +434,7 @@ fn parse_synthetic_definition_wrapper() {
     String = String
     Unit = Unit
     Invalid = Invalid
-    Synthetic(["Inner", "nested"]) = Optional(Node)
+    Synthetic { parent: Named("Inner"), path: ["nested"] } = Optional(Node)
     "#);
 }
 
@@ -459,7 +459,7 @@ fn error_eof_expecting_colon() {
 #[test]
 fn error_invalid_token_in_synthetic() {
     let input = "Foo = <A @>?";
-    insta::assert_snapshot!(dump_table(input), @"ERROR: expected identifier or '>' at 9..10");
+    insta::assert_snapshot!(dump_table(input), @"ERROR: expected path segment (lowercase) or '>' at 9..10");
 }
 
 #[test]

@@ -239,8 +239,34 @@ impl<'src> Parser<'src> {
 
     fn parse_synthetic_key(&mut self) -> Result<TypeKey<'src>, ParseError> {
         self.expect(Token::LAngle)?;
-        let mut segments = Vec::new();
 
+        // Parse parent key first
+        let parent_span = self.current_span();
+        let parent: TypeKey<'src> = match self.peek() {
+            Some(Token::DefaultQuery) => {
+                self.advance();
+                TypeKey::DefaultQuery
+            }
+            Some(Token::UpperIdent(s)) => {
+                let s = *s;
+                self.advance();
+                TypeKey::Named(s)
+            }
+            Some(Token::LAngle) => {
+                // Nested synthetic key
+                self.parse_synthetic_key()?
+            }
+            _ => {
+                return Err(ParseError {
+                    message: "expected parent key (uppercase name, #DefaultQuery, or <...>)"
+                        .to_string(),
+                    span: parent_span,
+                });
+            }
+        };
+
+        // Parse path segments
+        let mut path = Vec::new();
         loop {
             let span = self.current_span();
             match self.peek() {
@@ -248,33 +274,24 @@ impl<'src> Parser<'src> {
                     self.advance();
                     break;
                 }
-                Some(Token::UpperIdent(s)) => {
-                    let s = *s;
-                    self.advance();
-                    segments.push(s);
-                }
                 Some(Token::LowerIdent(s)) => {
                     let s = *s;
                     self.advance();
-                    segments.push(s);
+                    path.push(s);
                 }
                 _ => {
                     return Err(ParseError {
-                        message: "expected identifier or '>'".to_string(),
+                        message: "expected path segment (lowercase) or '>'".to_string(),
                         span,
                     });
                 }
             }
         }
 
-        if segments.is_empty() {
-            return Err(ParseError {
-                message: "synthetic key cannot be empty".to_string(),
-                span: self.current_span(),
-            });
-        }
-
-        Ok(TypeKey::Synthetic(segments))
+        Ok(TypeKey::Synthetic {
+            parent: Box::new(parent),
+            path,
+        })
     }
 
     fn parse_type_value(&mut self) -> Result<TypeValue<'src>, ParseError> {
@@ -490,12 +507,11 @@ fn emit_key(out: &mut String, key: &TypeKey<'_>) {
         TypeKey::Unit => out.push_str("()"),
         TypeKey::DefaultQuery => out.push_str("#DefaultQuery"),
         TypeKey::Named(name) => out.push_str(name),
-        TypeKey::Synthetic(segments) => {
+        TypeKey::Synthetic { parent, path } => {
             out.push('<');
-            for (i, seg) in segments.iter().enumerate() {
-                if i > 0 {
-                    out.push(' ');
-                }
+            emit_key(out, parent);
+            for seg in path.iter() {
+                out.push(' ');
                 out.push_str(seg);
             }
             out.push('>');

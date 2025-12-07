@@ -66,7 +66,7 @@ pub fn emit_typescript(table: &TypeTable<'_>, config: &TypeScriptEmitConfig) -> 
         }
 
         // Skip synthetic types if not nested (i.e., inlining)
-        if !config.nested && matches!(key, TypeKey::Synthetic(_)) {
+        if !config.nested && matches!(key, TypeKey::Synthetic { .. }) {
             continue;
         }
 
@@ -87,7 +87,7 @@ fn emit_type_def(
     config: &TypeScriptEmitConfig,
 ) -> String {
     let name = type_name(key, config);
-    let export_prefix = if config.export && !matches!(key, TypeKey::Synthetic(_)) {
+    let export_prefix = if config.export && !matches!(key, TypeKey::Synthetic { .. }) {
         "export "
     } else {
         ""
@@ -191,7 +191,7 @@ pub(crate) fn emit_field_type(
         }
 
         Some(TypeValue::Struct(fields)) => {
-            if !config.nested && matches!(key, TypeKey::Synthetic(_)) {
+            if !config.nested && matches!(key, TypeKey::Synthetic { .. }) {
                 (emit_inline_struct(fields, table, config), false)
             } else {
                 (type_name(key, config), false)
@@ -234,11 +234,7 @@ pub(crate) fn emit_inline_struct(
 }
 
 fn type_name(key: &TypeKey<'_>, config: &TypeScriptEmitConfig) -> String {
-    if key.is_default_query() {
-        config.entry_name.clone()
-    } else {
-        key.to_pascal_case()
-    }
+    key.to_pascal_case_with_entry_name(&config.entry_name)
 }
 
 pub(crate) fn wrap_if_union(type_str: &str) -> String {

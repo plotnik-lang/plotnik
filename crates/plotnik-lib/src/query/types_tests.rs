@@ -50,7 +50,7 @@ fn annotation_on_quantified_wraps_inner() {
     let query = Query::try_from("(identifier)+ @names :: string").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type NonemptyString = [string, ...string[]];
+    type QueryResultNames = [string, ...string[]];
 
     type QueryResult = { names: [string, ...string[]] };
     ");
@@ -87,7 +87,7 @@ fn optional_node() {
     let query = Query::try_from("(identifier)? @maybe").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode;
+    type QueryResultMaybe = SyntaxNode;
 
     type QueryResult = { maybe?: SyntaxNode };
     ");
@@ -98,7 +98,7 @@ fn list_of_nodes() {
     let query = Query::try_from("(identifier)* @items").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode[];
+    type QueryResultItems = SyntaxNode[];
 
     type QueryResult = { items: SyntaxNode[] };
     ");
@@ -109,7 +109,7 @@ fn nonempty_list_of_nodes() {
     let query = Query::try_from("(identifier)+ @items").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type NonemptyNode = [SyntaxNode, ...SyntaxNode[]];
+    type QueryResultItems = [SyntaxNode, ...SyntaxNode[]];
 
     type QueryResult = { items: [SyntaxNode, ...SyntaxNode[]] };
     ");
@@ -126,7 +126,7 @@ fn quantified_ref() {
     insta::assert_snapshot!(query.dump_types(), @r"
     type Item = { value: SyntaxNode };
 
-    type ItemWrapped = [Item, ...Item[]];
+    type QueryResultItems = [Item, ...Item[]];
 
     type QueryResult = { items: [Item, ...Item[]] };
     ");
@@ -137,7 +137,7 @@ fn quantifier_outside_capture() {
     let query = Query::try_from("((identifier) @id)*").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode[];
+    type QueryResultId = SyntaxNode[];
 
     type QueryResult = { id: SyntaxNode[] };
     ");
@@ -148,9 +148,9 @@ fn captured_seq_creates_nested_struct() {
     let query = Query::try_from("{(a) @x (b) @y} @pair").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryPair0 = { x: SyntaxNode; y: SyntaxNode };
+    type QueryResultPair0 = { x: SyntaxNode; y: SyntaxNode };
 
-    type QueryResult = { pair: DefaultQueryPair0 };
+    type QueryResult = { pair: QueryResultPair0 };
     ");
 }
 
@@ -164,9 +164,9 @@ fn captured_seq_in_tree() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryParams0 = { p: SyntaxNode };
+    type QueryResultParams0 = { p: SyntaxNode };
 
-    type QueryResult = { params: DefaultQueryParams0; body: SyntaxNode };
+    type QueryResult = { params: QueryResultParams0; body: SyntaxNode };
     ");
 }
 
@@ -183,11 +183,11 @@ fn tagged_alt_produces_union() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type DefaultQueryA = { x: SyntaxNode };
+    type QueryResultA = { x: SyntaxNode };
 
-    type DefaultQueryB = { y: SyntaxNode };
+    type QueryResultB = { y: SyntaxNode };
 
-    type DefaultQuery =
+    type QueryResult =
       | { tag: "A"; x: SyntaxNode }
       | { tag: "B"; y: SyntaxNode };
     "#);
@@ -220,7 +220,7 @@ fn tagged_branch_without_captures_is_unit() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type DefaultQuery =
+    type QueryResult =
       | { tag: "A" }
       | { tag: "B" };
     "#);
@@ -235,15 +235,13 @@ fn tagged_branch_with_ref() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type RecValueNested = { value?: Rec };
-
     type RecValue =
       | { tag: "Base" }
-      | { tag: "Nested"; value?: Rec };
+      | { tag: "Nested"; value: Rec };
 
     type Rec = { value: RecValue };
 
-    type RecWrapped = Rec;
+    type RecValueNested = { value: Rec };
     "#);
 }
 
@@ -253,11 +251,11 @@ fn captured_tagged_alt() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type DefaultQueryChoice =
+    type QueryResultChoice =
       | { tag: "A" }
       | { tag: "B" };
 
-    type QueryResult = { choice: DefaultQueryChoice };
+    type QueryResult = { choice: QueryResultChoice };
     "#);
 }
 
@@ -275,9 +273,9 @@ fn untagged_alt_different_captures_becomes_optional() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryXOpt = SyntaxNode;
+    type QueryResultXOpt = SyntaxNode;
 
-    type DefaultQueryYOpt = SyntaxNode;
+    type QueryResultYOpt = SyntaxNode;
 
     type QueryResult = { x?: SyntaxNode; y?: SyntaxNode };
     ");
@@ -289,9 +287,9 @@ fn untagged_alt_nested_alt_merges() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryXOpt = SyntaxNode;
+    type QueryResultXOpt = SyntaxNode;
 
-    type DefaultQueryYOpt = SyntaxNode;
+    type QueryResultYOpt = SyntaxNode;
 
     type QueryResult = { x?: SyntaxNode; y?: SyntaxNode };
     ");
@@ -303,13 +301,13 @@ fn captured_untagged_alt_with_nested_fields() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryChoiceXOpt = SyntaxNode;
+    type QueryResultChoiceXOpt = SyntaxNode;
 
-    type DefaultQueryChoiceYOpt = SyntaxNode;
+    type QueryResultChoiceYOpt = SyntaxNode;
 
-    type DefaultQueryChoice0 = { x?: SyntaxNode; y?: SyntaxNode };
+    type QueryResultChoice0 = { x?: SyntaxNode; y?: SyntaxNode };
 
-    type QueryResult = { choice: DefaultQueryChoice0 };
+    type QueryResult = { choice: QueryResultChoice0 };
     ");
 }
 
@@ -327,7 +325,7 @@ fn merge_absent_field_becomes_optional() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryXOpt = SyntaxNode;
+    type QueryResultXOpt = SyntaxNode;
 
     type QueryResult = { x?: SyntaxNode };
     ");
@@ -339,13 +337,9 @@ fn merge_list_and_nonempty_list_to_list() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode[];
+    type QueryResultX = [SyntaxNode, ...SyntaxNode[]];
 
-    type NonemptyNode = [SyntaxNode, ...SyntaxNode[]];
-
-    type ListMerged = SyntaxNode[];
-
-    type QueryResult = { x: SyntaxNode[] };
+    type QueryResult = { x: [SyntaxNode, ...SyntaxNode[]] };
     ");
 }
 
@@ -355,7 +349,7 @@ fn merge_optional_and_required_to_optional() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode;
+    type QueryResultX = SyntaxNode;
 
     type QueryResult = { x?: SyntaxNode };
     ");
@@ -384,7 +378,7 @@ fn recursive_through_optional() {
     insta::assert_snapshot!(query.dump_types(), @r"
     type Rec = { inner?: Rec };
 
-    type RecWrapped = Rec;
+    type RecInner = Rec;
     ");
 }
 
@@ -415,7 +409,7 @@ fn unnamed_last_def_is_default_query() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type OptNode = SyntaxNode[];
+    type QueryResultItems = SyntaxNode[];
 
     type QueryResult = { items: SyntaxNode[] };
     ");
@@ -432,7 +426,7 @@ fn named_defs_plus_entry_point() {
     insta::assert_snapshot!(query.dump_types(), @r"
     type Item = { value: SyntaxNode };
 
-    type ItemWrapped = Item[];
+    type QueryResultItems = Item[];
 
     type QueryResult = { items: Item[] };
     ");
@@ -444,11 +438,11 @@ fn tagged_alt_at_entry_point() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type DefaultQueryA = { x: SyntaxNode };
+    type QueryResultA = { x: SyntaxNode };
 
-    type DefaultQueryB = { y: SyntaxNode };
+    type QueryResultB = { y: SyntaxNode };
 
-    type DefaultQuery =
+    type QueryResult =
       | { tag: "A"; x: SyntaxNode }
       | { tag: "B"; y: SyntaxNode };
     "#);
@@ -541,9 +535,9 @@ fn deeply_nested_seq() {
     let query = Query::try_from("{{{(identifier) @x}}} @outer").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    type DefaultQueryOuter0 = { x: SyntaxNode };
+    type QueryResultOuter0 = { x: SyntaxNode };
 
-    type QueryResult = { outer: DefaultQueryOuter0 };
+    type QueryResult = { outer: QueryResultOuter0 };
     ");
 }
 
@@ -553,10 +547,10 @@ fn same_tag_in_branches_merges() {
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r#"
-    type DefaultQueryX =
+    type QueryResultX =
       | { tag: "A" };
 
-    type QueryResult = { x: DefaultQueryX };
+    type QueryResult = { x: QueryResultX };
     "#);
 }
 

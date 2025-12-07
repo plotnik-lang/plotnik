@@ -68,21 +68,37 @@ pub enum TypeKey<'src> {
     DefaultQuery,
     /// User-provided type name via `:: TypeName`
     Named(&'src str),
-    /// Path-based synthetic name: ["Foo", "bar"] → FooBar
-    Synthetic(Vec<&'src str>),
+    /// Synthetic type derived from parent + field path.
+    /// Parent can be Named, DefaultQuery, or another Synthetic.
+    /// Emitter resolves parent to name, then appends path segments in PascalCase.
+    Synthetic {
+        parent: Box<TypeKey<'src>>,
+        path: Vec<&'src str>,
+    },
 }
 
 impl TypeKey<'_> {
     /// Render as PascalCase type name.
+    /// For Synthetic keys with DefaultQuery parent, uses "DefaultQuery" as the parent name.
+    /// Use `to_pascal_case_with_entry_name` to customize the DefaultQuery name.
     pub fn to_pascal_case(&self) -> String {
+        self.to_pascal_case_with_entry_name("DefaultQuery")
+    }
+
+    /// Render as PascalCase type name, using the given entry_name for DefaultQuery.
+    pub fn to_pascal_case_with_entry_name(&self, entry_name: &str) -> String {
         match self {
             TypeKey::Node => "Node".to_string(),
             TypeKey::String => "String".to_string(),
             TypeKey::Unit => "Unit".to_string(),
             TypeKey::Invalid => "Unit".to_string(), // Invalid emits as Unit
-            TypeKey::DefaultQuery => "DefaultQuery".to_string(),
+            TypeKey::DefaultQuery => entry_name.to_string(),
             TypeKey::Named(name) => (*name).to_string(),
-            TypeKey::Synthetic(segments) => segments.iter().map(|s| to_pascal(s)).collect(),
+            TypeKey::Synthetic { parent, path } => {
+                let parent_name = parent.to_pascal_case_with_entry_name(entry_name);
+                let path_suffix: String = path.iter().map(|s| to_pascal(s)).collect();
+                format!("{}{}", parent_name, path_suffix)
+            }
         }
     }
 
@@ -356,7 +372,7 @@ impl<'src> TypeTable<'src> {
         };
 
         // Return or create a List type with the inner type
-        let list_key = TypeKey::Synthetic(vec!["list", "merged"]);
+        let list_key = TypeKey::Named(Box::leak("ListMerged".to_string().into_boxed_str()));
         self.insert(list_key.clone(), TypeValue::List(inner));
         Some(list_key)
     }
@@ -568,8 +584,14 @@ impl<'src> TypeTable<'src> {
                                 let key = match mf {
                                     MergedField::Same(k) => k,
                                     MergedField::Optional(k) => {
-                                        let wrapper_key =
-                                            TypeKey::Synthetic(vec![*field_name, name, "opt"]);
+                                        let wrapper_name = format!(
+                                            "{}{}Opt",
+                                            to_pascal(field_name),
+                                            to_pascal(name)
+                                        );
+                                        let wrapper_key = TypeKey::Named(Box::leak(
+                                            wrapper_name.into_boxed_str(),
+                                        ));
                                         self.insert(wrapper_key.clone(), TypeValue::Optional(k));
                                         wrapper_key
                                     }
@@ -580,7 +602,8 @@ impl<'src> TypeTable<'src> {
                             .collect();
 
                         // Create a new merged struct type
-                        let merged_key = TypeKey::Synthetic(vec![*field_name, "merged"]);
+                        let merged_name = format!("{}Merged", to_pascal(field_name));
+                        let merged_key = TypeKey::Named(Box::leak(merged_name.into_boxed_str()));
                         self.insert(merged_key.clone(), TypeValue::Struct(merged_fields));
 
                         if present_count == branch_count {

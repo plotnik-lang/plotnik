@@ -160,12 +160,6 @@ impl<'src> InferContext<'src> {
             return;
         };
 
-        let path = match &key {
-            TypeKey::Named(name) => vec![*name],
-            TypeKey::DefaultQuery => vec!["DefaultQuery"],
-            _ => vec![],
-        };
-
         // Special case: tagged alternation at def level produces TaggedUnion directly
         if let Expr::AltExpr(alt) = &body
             && matches!(alt.kind(), AltKind::Tagged)
@@ -174,12 +168,12 @@ impl<'src> InferContext<'src> {
                 TypeKey::Named(name) => Some(*name),
                 _ => None,
             };
-            self.infer_tagged_alt(alt, &path, type_annotation);
+            self.infer_tagged_alt(alt, &key, type_annotation);
             return;
         }
 
         let mut fields = IndexMap::new();
-        self.infer_expr(&body, &path, &mut fields);
+        self.infer_expr(&body, &key, &mut fields);
 
         let value = if fields.is_empty() {
             TypeValue::Unit
@@ -212,13 +206,13 @@ impl<'src> InferContext<'src> {
     fn infer_expr(
         &mut self,
         expr: &Expr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         match expr {
             Expr::NamedNode(node) => {
                 for child in node.children() {
-                    self.infer_expr(&child, path, fields);
+                    self.infer_expr(&child, parent, fields);
                 }
                 Some(TypeKey::Node)
             }
@@ -233,30 +227,30 @@ impl<'src> InferContext<'src> {
 
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.infer_expr(&child, path, fields);
+                    self.infer_expr(&child, parent, fields);
                 }
                 None
             }
 
             Expr::FieldExpr(field) => {
                 if let Some(value) = field.value() {
-                    self.infer_expr(&value, path, fields);
+                    self.infer_expr(&value, parent, fields);
                 }
                 None
             }
 
-            Expr::CapturedExpr(cap) => self.infer_capture(cap, path, fields),
+            Expr::CapturedExpr(cap) => self.infer_capture(cap, parent, fields),
 
-            Expr::QuantifiedExpr(quant) => self.infer_quantified(quant, path, fields),
+            Expr::QuantifiedExpr(quant) => self.infer_quantified(quant, parent, fields),
 
-            Expr::AltExpr(alt) => self.infer_alt(alt, path, fields),
+            Expr::AltExpr(alt) => self.infer_alt(alt, parent, fields),
         }
     }
 
     fn infer_capture(
         &mut self,
         cap: &ast::CapturedExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         let name_tok = cap.name()?;
@@ -276,12 +270,12 @@ impl<'src> InferContext<'src> {
             match inner_expr {
                 Expr::NamedNode(node) => {
                     for child in node.children() {
-                        self.infer_expr(&child, path, fields);
+                        self.infer_expr(&child, parent, fields);
                     }
                 }
                 Expr::FieldExpr(field) => {
                     if let Some(value) = field.value() {
-                        self.infer_expr(&value, path, fields);
+                        self.infer_expr(&value, parent, fields);
                     }
                 }
                 _ => {}
@@ -289,7 +283,7 @@ impl<'src> InferContext<'src> {
         }
 
         let inner_type =
-            self.infer_capture_inner(inner.as_ref(), path, capture_name, type_annotation);
+            self.infer_capture_inner(inner.as_ref(), parent, capture_name, type_annotation);
 
         // Check for duplicate capture in scope
         // Unlike alternations (where branches are mutually exclusive),
@@ -323,7 +317,7 @@ impl<'src> InferContext<'src> {
     fn infer_capture_inner(
         &mut self,
         inner: Option<&Expr>,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         capture_name: &'src str,
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
@@ -334,8 +328,8 @@ impl<'src> InferContext<'src> {
                 return TypeKey::Invalid;
             };
             let inner_key =
-                self.infer_capture_inner(Some(&qinner), path, capture_name, type_annotation);
-            return self.wrap_with_quantifier(&inner_key, q);
+                self.infer_capture_inner(Some(&qinner), parent, capture_name, type_annotation);
+            return self.wrap_with_quantifier(&inner_key, q, parent, capture_name);
         }
 
         // :: string annotation
@@ -357,14 +351,14 @@ impl<'src> InferContext<'src> {
                 }
             }
 
-            Expr::SeqExpr(seq) => {
-                self.infer_nested_scope(inner, path, capture_name, type_annotation, || {
-                    seq.children().collect()
+            Expr::SeqExpr(_) => {
+                self.infer_nested_scope(inner, parent, capture_name, type_annotation, || {
+                    inner.children().into_iter().collect()
                 })
             }
 
             Expr::AltExpr(alt) => {
-                self.infer_nested_scope(inner, path, capture_name, type_annotation, || {
+                self.infer_nested_scope(inner, parent, capture_name, type_annotation, || {
                     alt.branches().filter_map(|b| b.body()).collect()
                 })
             }
@@ -379,7 +373,7 @@ impl<'src> InferContext<'src> {
 
             Expr::FieldExpr(field) => {
                 if let Some(value) = field.value() {
-                    self.infer_capture_inner(Some(&value), path, capture_name, type_annotation)
+                    self.infer_capture_inner(Some(&value), parent, capture_name, type_annotation)
                 } else {
                     type_annotation.map(TypeKey::Named).unwrap_or(TypeKey::Node)
                 }
@@ -392,7 +386,7 @@ impl<'src> InferContext<'src> {
     fn infer_nested_scope<F>(
         &mut self,
         inner: &Expr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         capture_name: &'src str,
         type_annotation: Option<&'src str>,
         get_children: F,
@@ -400,19 +394,21 @@ impl<'src> InferContext<'src> {
     where
         F: FnOnce() -> Vec<Expr>,
     {
-        let mut nested_path = path.to_vec();
-        nested_path.push(capture_name);
+        let nested_parent = TypeKey::Synthetic {
+            parent: Box::new(parent.clone()),
+            path: vec![capture_name],
+        };
 
         let mut nested_fields = IndexMap::new();
 
         match inner {
             Expr::AltExpr(alt) => {
-                let alt_key = self.infer_alt_as_type(alt, &nested_path, type_annotation);
+                let alt_key = self.infer_alt_as_type(alt, &nested_parent, type_annotation);
                 return alt_key;
             }
             _ => {
                 for child in get_children() {
-                    self.infer_expr(&child, &nested_path, &mut nested_fields);
+                    self.infer_expr(&child, &nested_parent, &mut nested_fields);
                 }
             }
         }
@@ -426,9 +422,10 @@ impl<'src> InferContext<'src> {
         } else {
             // Use unique suffix to allow same capture name in different alternation branches
             let suffix = self.next_synthetic_suffix();
-            let mut unique_path = nested_path;
-            unique_path.push(suffix);
-            TypeKey::Synthetic(unique_path)
+            TypeKey::Synthetic {
+                parent: Box::new(parent.clone()),
+                path: vec![capture_name, suffix],
+            }
         };
 
         self.table.insert(
@@ -441,7 +438,7 @@ impl<'src> InferContext<'src> {
     fn infer_quantified(
         &mut self,
         quant: &ast::QuantifiedExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         let inner = quant.inner()?;
@@ -458,9 +455,13 @@ impl<'src> InferContext<'src> {
                 Some(token_src(&tok, self.source))
             });
 
-            let inner_key =
-                self.infer_capture_inner(cap.inner().as_ref(), path, capture_name, type_annotation);
-            let wrapped_key = self.wrap_with_quantifier(&inner_key, quant);
+            let inner_key = self.infer_capture_inner(
+                cap.inner().as_ref(),
+                parent,
+                capture_name,
+                type_annotation,
+            );
+            let wrapped_key = self.wrap_with_quantifier(&inner_key, quant, parent, capture_name);
 
             fields.insert(
                 capture_name,
@@ -476,24 +477,34 @@ impl<'src> InferContext<'src> {
         // and wrap them with the quantifier
         let fields_before: Vec<_> = fields.keys().copied().collect();
 
-        let inner_key = self.infer_expr(&inner, path, fields)?;
+        let inner_key = self.infer_expr(&inner, parent, fields)?;
 
         // Wrap all newly added fields with the quantifier
-        for (name, entry) in fields.iter_mut() {
-            if fields_before.contains(name) {
+        let field_names: Vec<_> = fields.keys().copied().collect();
+        for name in field_names {
+            if fields_before.contains(&name) {
                 continue;
             }
-            entry.type_key = self.wrap_with_quantifier(&entry.type_key, quant);
+            if let Some(entry) = fields.get_mut(name) {
+                entry.type_key = self.wrap_with_quantifier(&entry.type_key, quant, parent, name);
+            }
         }
 
-        Some(self.wrap_with_quantifier(&inner_key, quant))
+        // Return wrapped inner key (though typically unused when wrapping field captures)
+        Some(inner_key)
     }
 
     fn wrap_with_quantifier(
         &mut self,
         inner: &TypeKey<'src>,
         quant: &ast::QuantifiedExpr,
+        parent: &TypeKey<'src>,
+        capture_name: &'src str,
     ) -> TypeKey<'src> {
+        if matches!(inner, TypeKey::Invalid) {
+            return TypeKey::Invalid;
+        }
+
         // Check list/non-empty-list before optional since * matches both is_list() and is_optional()
         let wrapper = if quant.is_list() {
             TypeValue::List(inner.clone())
@@ -505,54 +516,20 @@ impl<'src> InferContext<'src> {
             return inner.clone();
         };
 
-        // Generate a unique key for the wrapper type
-        let wrapper_name = match inner {
-            TypeKey::Named(name) => format!("{}Wrapped", name),
-            TypeKey::Node => "NodeWrapped".to_string(),
-            TypeKey::String => "StringWrapped".to_string(),
-            TypeKey::Synthetic(path) => format!("{}Wrapped", path.join("_")),
-            TypeKey::DefaultQuery => "QueryWrapped".to_string(),
-            TypeKey::Unit => "UnitWrapped".to_string(),
-            TypeKey::Invalid => return TypeKey::Invalid,
+        // Synthetic key: Parent + capture_name → e.g., QueryResultItems
+        let wrapper_key = TypeKey::Synthetic {
+            parent: Box::new(parent.clone()),
+            path: vec![capture_name],
         };
 
-        // For simple wrappers around Node/String, just return the wrapper directly
-        // without creating a synthetic type entry. The printer will handle these.
-        if matches!(inner, TypeKey::Node | TypeKey::String) {
-            let prefix = if quant.is_optional() {
-                "opt"
-            } else if quant.is_list() {
-                "list"
-            } else if quant.is_non_empty_list() {
-                "nonempty"
-            } else {
-                "wrapped"
-            };
-            let inner_name = match inner {
-                TypeKey::Node => "node",
-                TypeKey::String => "string",
-                _ => "unknown",
-            };
-            let wrapper_key = TypeKey::Synthetic(vec![prefix, inner_name]);
-            self.table.insert(wrapper_key.clone(), wrapper);
-            return wrapper_key;
-        }
-
-        let wrapper_key = TypeKey::Synthetic(vec![Box::leak(wrapper_name.into_boxed_str())]);
-        if !self
-            .table
-            .try_insert_untracked(wrapper_key.clone(), wrapper.clone())
-        {
-            // Key already exists with same wrapper - that's fine
-            return wrapper_key;
-        }
+        self.table.insert(wrapper_key.clone(), wrapper);
         wrapper_key
     }
 
     fn infer_alt(
         &mut self,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
     ) -> Option<TypeKey<'src>> {
         // Alt without capture: just collect fields from all branches into current scope
@@ -561,17 +538,17 @@ impl<'src> InferContext<'src> {
                 // Tagged alt without capture: unusual, but collect fields
                 for branch in alt.branches() {
                     if let Some(body) = branch.body() {
-                        self.infer_expr(&body, path, fields);
+                        self.infer_expr(&body, parent, fields);
                     }
                 }
             }
             AltKind::Untagged | AltKind::Mixed => {
                 // Untagged alt: merge fields from branches
-                let branch_fields = self.collect_branch_fields(alt, path);
+                let branch_fields = self.collect_branch_fields(alt, parent);
                 let branch_types: Vec<_> =
                     branch_fields.iter().map(Self::extract_types_ref).collect();
                 let merged = self.table.merge_fields(&branch_types);
-                self.apply_merged_fields(merged, fields, alt, path);
+                self.apply_merged_fields(merged, fields, alt, parent);
             }
         }
         None
@@ -580,13 +557,13 @@ impl<'src> InferContext<'src> {
     fn infer_alt_as_type(
         &mut self,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
         match alt.kind() {
-            AltKind::Tagged => self.infer_tagged_alt(alt, path, type_annotation),
+            AltKind::Tagged => self.infer_tagged_alt(alt, parent, type_annotation),
             AltKind::Untagged | AltKind::Mixed => {
-                self.infer_untagged_alt(alt, path, type_annotation)
+                self.infer_untagged_alt(alt, parent, type_annotation)
             }
         }
     }
@@ -594,7 +571,7 @@ impl<'src> InferContext<'src> {
     fn infer_tagged_alt(
         &mut self,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
         let mut variants = IndexMap::new();
@@ -605,17 +582,18 @@ impl<'src> InferContext<'src> {
             };
             let label = token_src(&label_tok, self.source);
 
-            let mut variant_path = path.to_vec();
-            variant_path.push(label);
+            let variant_key = TypeKey::Synthetic {
+                parent: Box::new(parent.clone()),
+                path: vec![label],
+            };
 
             let mut variant_fields = IndexMap::new();
             let body_type = if let Some(body) = branch.body() {
-                self.infer_expr(&body, &variant_path, &mut variant_fields)
+                self.infer_expr(&body, &variant_key, &mut variant_fields)
             } else {
                 None
             };
 
-            let variant_key = TypeKey::Synthetic(variant_path);
             let variant_value = if variant_fields.is_empty() {
                 // No captures: check if the body produced a meaningful type
                 match body_type {
@@ -637,20 +615,19 @@ impl<'src> InferContext<'src> {
             variants.insert(label, variant_key);
         }
 
-        let key = if let Some(name) = type_annotation {
+        let union_key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
-        } else if path.is_empty() {
-            TypeKey::DefaultQuery
         } else {
-            TypeKey::Synthetic(path.to_vec())
+            parent.clone()
         };
 
         // Detect conflict: same key with incompatible TaggedUnion
         let current_span = alt.text_range();
-        if let Err(existing_span) =
-            self.table
-                .try_insert(key.clone(), TypeValue::TaggedUnion(variants), current_span)
-        {
+        if let Err(existing_span) = self.table.try_insert(
+            union_key.clone(),
+            TypeValue::TaggedUnion(variants),
+            current_span,
+        ) {
             self.diagnostics
                 .report(
                     DiagnosticKind::IncompatibleTaggedAlternations,
@@ -658,18 +635,18 @@ impl<'src> InferContext<'src> {
                 )
                 .related_to("incompatible", current_span)
                 .emit();
-            return key;
+            return union_key;
         }
-        key
+        union_key
     }
 
     fn infer_untagged_alt(
         &mut self,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
         type_annotation: Option<&'src str>,
     ) -> TypeKey<'src> {
-        let branch_fields = self.collect_branch_fields(alt, path);
+        let branch_fields = self.collect_branch_fields(alt, parent);
         let branch_types: Vec<_> = branch_fields.iter().map(Self::extract_types_ref).collect();
         let merged = self.table.merge_fields(&branch_types);
 
@@ -678,18 +655,17 @@ impl<'src> InferContext<'src> {
         }
 
         let mut result_fields = IndexMap::new();
-        self.apply_merged_fields(merged, &mut result_fields, alt, path);
+        self.apply_merged_fields(merged, &mut result_fields, alt, parent);
 
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
-        } else if path.is_empty() {
-            TypeKey::DefaultQuery
         } else {
             // Use unique suffix to allow same capture name in different alternation branches
             let suffix = self.next_synthetic_suffix();
-            let mut unique_path = path.to_vec();
-            unique_path.push(suffix);
-            TypeKey::Synthetic(unique_path)
+            TypeKey::Synthetic {
+                parent: Box::new(parent.clone()),
+                path: vec![suffix],
+            }
         };
 
         self.table.insert(
@@ -702,14 +678,14 @@ impl<'src> InferContext<'src> {
     fn collect_branch_fields(
         &mut self,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
     ) -> Vec<IndexMap<&'src str, FieldEntry<'src>>> {
         let mut branch_fields = Vec::new();
 
         for branch in alt.branches() {
             let mut fields = IndexMap::new();
             if let Some(body) = branch.body() {
-                self.infer_expr(&body, path, &mut fields);
+                self.infer_expr(&body, parent, &mut fields);
             }
             branch_fields.push(fields);
         }
@@ -720,18 +696,18 @@ impl<'src> InferContext<'src> {
     fn apply_merged_fields(
         &mut self,
         merged: IndexMap<&'src str, MergedField<'src>>,
-        fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
+        result_fields: &mut IndexMap<&'src str, FieldEntry<'src>>,
         alt: &ast::AltExpr,
-        path: &[&'src str],
+        parent: &TypeKey<'src>,
     ) {
         for (name, merge_result) in merged {
             let key = match merge_result {
                 MergedField::Same(k) => k,
                 MergedField::Optional(k) => {
-                    let mut wrapper_path = path.to_vec();
-                    wrapper_path.push(name);
-                    wrapper_path.push("opt");
-                    let wrapper_key = TypeKey::Synthetic(wrapper_path);
+                    let wrapper_key = TypeKey::Synthetic {
+                        parent: Box::new(parent.clone()),
+                        path: vec![name, "opt"],
+                    };
                     self.table
                         .insert(wrapper_key.clone(), TypeValue::Optional(k));
                     wrapper_key
@@ -744,7 +720,7 @@ impl<'src> InferContext<'src> {
                     TypeKey::Invalid
                 }
             };
-            fields.insert(
+            result_fields.insert(
                 name,
                 FieldEntry {
                     type_key: key,

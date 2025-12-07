@@ -93,10 +93,7 @@ fn emit_type_def(
     table: &TypeTable<'_>,
     config: &RustEmitConfig,
 ) -> String {
-    let name = match key {
-        TypeKey::DefaultQuery => config.entry_name.clone(),
-        _ => key.to_pascal_case(),
-    };
+    let name = key.to_pascal_case_with_entry_name(&config.entry_name);
 
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => String::new(),
@@ -179,10 +176,9 @@ pub(crate) fn emit_type_ref(
             format!("Vec<{}>", inner_str)
         }
         // Struct, TaggedUnion, or undefined forward reference - use pascal-cased name
-        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => match key {
-            TypeKey::DefaultQuery => config.entry_name.clone(),
-            _ => key.to_pascal_case(),
-        },
+        Some(TypeValue::Struct(_)) | Some(TypeValue::TaggedUnion(_)) | None => {
+            key.to_pascal_case_with_entry_name(&config.entry_name)
+        }
     };
 
     if is_cyclic {
