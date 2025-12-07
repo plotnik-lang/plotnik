@@ -162,3 +162,46 @@ fn quantified_ref() {
     List = { <Item List> @items }
     ");
 }
+
+#[test]
+fn recursive_type_with_annotation_preserves_fields() {
+    let input = r#"Func = (function_declaration name: (identifier) @name) @func :: Func (Func)"#;
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    Func = { #Node @name Func @func }
+    #DefaultQuery = ()
+    ");
+}
+
+#[test]
+fn anonymous_tagged_alt_uses_default_query_name() {
+    let input = "[A: (identifier) @id B: (number) @num]";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <A> = { #Node @id }
+    <B> = { #Node @num }
+    #DefaultQuery = [ A: <A> B: <B> ]
+    ");
+}
+
+#[test]
+fn tagged_union_branch_with_ref() {
+    let input = "Rec = [Base: (a) Rec: (Rec)?] (Rec)";
+
+    let query = Query::try_from(input).unwrap();
+
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_types(), @r"
+    <Rec Base> = ()
+    <Rec Opt> = Rec?
+    <Rec Rec> = { <Rec Opt> @value }
+    Rec = [ Base: <Rec Base> Rec: <Rec Rec> ]
+    #DefaultQuery = ()
+    ");
+}

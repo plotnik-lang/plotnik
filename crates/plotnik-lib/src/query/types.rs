@@ -149,6 +149,25 @@ impl<'src> InferContext<'src> {
         });
 
         let inner = cap.inner();
+
+        // Flat extraction: collect nested captures from inner expression into outer fields
+        // Only for NamedNode/AnonymousNode - Seq/Alt create their own scopes when captured
+        if let Some(ref inner_expr) = inner {
+            match inner_expr {
+                Expr::NamedNode(node) => {
+                    for child in node.children() {
+                        self.infer_expr(&child, path, fields);
+                    }
+                }
+                Expr::FieldExpr(field) => {
+                    if let Some(value) = field.value() {
+                        self.infer_expr(&value, path, fields);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         let inner_type =
             self.infer_capture_inner(inner.as_ref(), path, capture_name, type_annotation);
 
@@ -292,8 +311,9 @@ impl<'src> InferContext<'src> {
             return Some(wrapped_key);
         }
 
-        // Non-capture quantified expression: recurse into inner
-        self.infer_expr(&inner, path, fields)
+        // Non-capture quantified expression: recurse into inner and wrap with quantifier
+        let inner_key = self.infer_expr(&inner, path, fields)?;
+        Some(self.wrap_with_quantifier(&inner_key, op.kind()))
     }
 
     fn wrap_with_quantifier(
@@ -412,13 +432,25 @@ impl<'src> InferContext<'src> {
             variant_path.push(label);
 
             let mut variant_fields = IndexMap::new();
-            if let Some(body) = branch.body() {
-                self.infer_expr(&body, &variant_path, &mut variant_fields);
-            }
+            let body_type = if let Some(body) = branch.body() {
+                self.infer_expr(&body, &variant_path, &mut variant_fields)
+            } else {
+                None
+            };
 
             let variant_key = TypeKey::Synthetic(variant_path);
             let variant_value = if variant_fields.is_empty() {
-                TypeValue::Unit
+                // No captures: check if the body produced a meaningful type
+                match body_type {
+                    Some(key) if !key.is_builtin() => {
+                        // Branch body has a non-builtin type (e.g., Ref or wrapped type)
+                        // Create a struct with a "value" field
+                        let mut fields = IndexMap::new();
+                        fields.insert("value", key);
+                        TypeValue::Struct(fields)
+                    }
+                    _ => TypeValue::Unit,
+                }
             } else {
                 TypeValue::Struct(variant_fields)
             };
@@ -429,6 +461,8 @@ impl<'src> InferContext<'src> {
 
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
+        } else if path.is_empty() {
+            TypeKey::DefaultQuery
         } else {
             TypeKey::Synthetic(path.to_vec())
         };
@@ -456,6 +490,8 @@ impl<'src> InferContext<'src> {
 
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
+        } else if path.is_empty() {
+            TypeKey::DefaultQuery
         } else {
             TypeKey::Synthetic(path.to_vec())
         };
