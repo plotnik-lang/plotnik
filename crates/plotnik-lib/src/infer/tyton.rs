@@ -201,12 +201,10 @@ impl<'src> Parser<'src> {
                 self.advance();
                 Ok(TypeKey::Unit)
             }
-            Some(Token::UpperIdent(_)) => {
-                if let Some(Token::UpperIdent(name)) = self.advance().cloned() {
-                    Ok(TypeKey::Named(name))
-                } else {
-                    unreachable!()
-                }
+            Some(Token::UpperIdent(name)) => {
+                let name = *name;
+                self.advance();
+                Ok(TypeKey::Named(name))
             }
             Some(Token::LAngle) => self.parse_synthetic_key(),
             _ => Err(ParseError {
@@ -227,15 +225,15 @@ impl<'src> Parser<'src> {
                     self.advance();
                     break;
                 }
-                Some(Token::UpperIdent(_)) => {
-                    if let Some(Token::UpperIdent(s)) = self.advance().cloned() {
-                        segments.push(s);
-                    }
+                Some(Token::UpperIdent(s)) => {
+                    let s = *s;
+                    self.advance();
+                    segments.push(s);
                 }
-                Some(Token::LowerIdent(_)) => {
-                    if let Some(Token::LowerIdent(s)) = self.advance().cloned() {
-                        segments.push(s);
-                    }
+                Some(Token::LowerIdent(s)) => {
+                    let s = *s;
+                    self.advance();
+                    segments.push(s);
                 }
                 _ => {
                     return Err(ParseError {

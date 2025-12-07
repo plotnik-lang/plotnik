@@ -257,19 +257,20 @@ fn visit<'src>(
     visited: &mut IndexMap<TypeKey<'src>, bool>,
     result: &mut Vec<TypeKey<'src>>,
 ) {
-    if let Some(&in_progress) = visited.get(key) {
-        if in_progress {
-            return;
-        }
+    if visited.contains_key(key) {
         return;
     }
 
     visited.insert(key.clone(), true);
 
-    if let Some(value) = table.get(key) {
-        for dep in dependencies(value) {
-            visit(&dep, table, visited, result);
-        }
+    let Some(value) = table.get(key) else {
+        visited.insert(key.clone(), false);
+        result.push(key.clone());
+        return;
+    };
+
+    for dep in dependencies(value) {
+        visit(&dep, table, visited, result);
     }
 
     visited.insert(key.clone(), false);
