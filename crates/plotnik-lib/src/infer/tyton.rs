@@ -23,6 +23,7 @@
 //! - `#Node` — built-in node type
 //! - `#string` — built-in string type
 //! - `#Invalid` — built-in invalid type
+//! - `#DefaultQuery` — unnamed entry point query
 //! - `()` — built-in unit type
 //! - `PascalName` — named type
 //! - `<Foo bar baz>` — synthetic key from path segments
@@ -40,6 +41,7 @@
 //! - `Name = [ ... ]` — define a tagged union
 //! - `Name = Other?` — define an optional
 //! - `<Foo bar> = { ... }` — define with synthetic key
+//! - `#DefaultQuery = { ... }` — define unnamed entry point
 //! - `AliasNode = #Node` — alias to builtin
 //!
 //! # Example

@@ -35,6 +35,13 @@
 //! Built-in types (Node, String, Unit, Invalid) have both a key and value variant for
 //! consistency—the key is what you reference, the value is what gets stored.
 //!
+//! ## DefaultQuery Key
+//!
+//! `TypeKey::DefaultQuery` represents the unnamed entry point query (the last definition
+//! without a name). It has no corresponding `TypeValue` variant—it's purely a key that
+//! maps to a Struct or other value. The emitted name ("QueryResult" by default) is
+//! configurable per code generator.
+//!
 //! ## Synthetic Keys
 //!
 //! For nested captures like `(function @fn { (param @p) @params })`, we need unique type
