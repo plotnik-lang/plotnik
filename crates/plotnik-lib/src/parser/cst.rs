@@ -136,7 +136,6 @@ pub enum SyntaxKind {
     Garbage,
     Error,
 
-    // --- Node kinds (non-terminals) ---
     Root,
     Tree,
     Ref,

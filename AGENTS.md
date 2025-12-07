@@ -34,9 +34,19 @@ crates/
         recursion.rs     # Escape analysis (recursion validation)
         shapes.rs        # Shape inference
         *_tests.rs     # Test files per module
+      infer/           # Type inference and emission
+        mod.rs         # Re-exports, TypePrinter builder
+        types.rs       # Type IR (TypeDef, Field, etc.)
+        tyton.rs       # Tyton → TypeDef conversion
+        printer.rs     # TypePrinter API
+        emit/          # Language-specific emitters
+          mod.rs       # Emitter trait, common utilities
+          rust.rs      # Rust type emission
+          typescript.rs # TypeScript type emission
+        *_tests.rs     # Test files per module
       lib.rs           # Re-exports Query, Diagnostics, Error
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, docs, langs)
+    src/commands/      # Subcommands (debug, docs, infer, langs)
   plotnik-langs/       # Tree-sitter language bindings
 docs/
   REFERENCE.md         # Language specification
@@ -59,6 +69,7 @@ Module = "what", function = "action".
 Run: `cargo run -p plotnik-cli -- <command>`
 
 - `debug` — Inspect queries/sources
+- `infer` — Generate type definitions from queries
 - `docs [topic]` — Print docs (reference, examples)
 - `langs` — List supported languages
 
@@ -74,6 +85,27 @@ cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
 cargo run -p plotnik-cli -- debug -s app.ts
 cargo run -p plotnik-cli -- debug -s app.ts --raw
 cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript
+```
+
+### infer options
+
+Input: `-q/--query <Q>`, `--query-file <F>`
+
+Output language: `-l/--lang <rust|ts|typescript>`
+
+Common: `--entry-name <NAME>`, `--color <auto|always|never>`
+
+Rust-specific: `--indirection <box|rc|arc>`, `--derive <traits>`, `--no-derive`
+
+TypeScript-specific: `--optional <null|undefined|questionmark>`, `--export`, `--readonly`, `--type-alias`, `--node-type <NAME>`, `--nested`
+
+```sh
+cargo run -p plotnik-cli -- infer -q '(identifier) @id' -l rust
+cargo run -p plotnik-cli -- infer -q '(fn)' -l rust --derive debug,clone
+cargo run -p plotnik-cli -- infer -q '(fn)' -l rust --no-derive
+cargo run -p plotnik-cli -- infer -q '(identifier)' -l ts --export
+cargo run -p plotnik-cli -- infer -q '(identifier)?' -l ts --optional undefined
+cargo run -p plotnik-cli -- infer -q '(fn)' -l ts --readonly --type-alias
 ```
 
 ## Syntax

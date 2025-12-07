@@ -7,7 +7,10 @@
 mod dump;
 mod invariants;
 mod printer;
+mod types;
 pub use printer::QueryPrinter;
+
+use crate::infer::TypePrinter;
 
 pub mod alt_kinds;
 #[cfg(feature = "plotnik-langs")]
@@ -30,6 +33,8 @@ mod recursion_tests;
 mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
+#[cfg(test)]
+mod types_tests;
 
 use std::collections::HashMap;
 
@@ -40,6 +45,7 @@ use rowan::GreenNodeBuilder;
 
 use crate::Result;
 use crate::diagnostics::Diagnostics;
+use crate::infer::TypeTable;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
@@ -63,6 +69,7 @@ pub struct Query<'a> {
     ast: Root,
     symbol_table: SymbolTable<'a>,
     shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
+    type_table: TypeTable<'a>,
     #[cfg(feature = "plotnik-langs")]
     node_type_ids: HashMap<&'a str, Option<NodeTypeId>>,
     #[cfg(feature = "plotnik-langs")]
@@ -75,6 +82,7 @@ pub struct Query<'a> {
     resolve_diagnostics: Diagnostics,
     recursion_diagnostics: Diagnostics,
     shapes_diagnostics: Diagnostics,
+    type_diagnostics: Diagnostics,
     #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
 }
@@ -97,6 +105,7 @@ impl<'a> Query<'a> {
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
             shape_cardinality_table: HashMap::new(),
+            type_table: TypeTable::new(),
             #[cfg(feature = "plotnik-langs")]
             node_type_ids: HashMap::new(),
             #[cfg(feature = "plotnik-langs")]
@@ -109,6 +118,7 @@ impl<'a> Query<'a> {
             resolve_diagnostics: Diagnostics::new(),
             recursion_diagnostics: Diagnostics::new(),
             shapes_diagnostics: Diagnostics::new(),
+            type_diagnostics: Diagnostics::new(),
             #[cfg(feature = "plotnik-langs")]
             link_diagnostics: Diagnostics::new(),
         }
@@ -142,6 +152,7 @@ impl<'a> Query<'a> {
         self.resolve_names();
         self.validate_recursion();
         self.infer_shapes();
+        self.infer_types();
         Ok(self)
     }
 
@@ -218,6 +229,7 @@ impl<'a> Query<'a> {
         all.extend(self.resolve_diagnostics.clone());
         all.extend(self.recursion_diagnostics.clone());
         all.extend(self.shapes_diagnostics.clone());
+        all.extend(self.type_diagnostics.clone());
         #[cfg(feature = "plotnik-langs")]
         all.extend(self.link_diagnostics.clone());
         all
@@ -239,6 +251,7 @@ impl<'a> Query<'a> {
             && !self.resolve_diagnostics.has_errors()
             && !self.recursion_diagnostics.has_errors()
             && !self.shapes_diagnostics.has_errors()
+            && !self.type_diagnostics.has_errors()
             && !self.link_diagnostics.has_errors()
     }
 
@@ -250,6 +263,14 @@ impl<'a> Query<'a> {
             && !self.resolve_diagnostics.has_errors()
             && !self.recursion_diagnostics.has_errors()
             && !self.shapes_diagnostics.has_errors()
+            && !self.type_diagnostics.has_errors()
+    }
+
+    /// Get a type printer for emitting inferred types as code.
+    ///
+    /// Returns a builder that can be configured for Rust or TypeScript output.
+    pub fn type_printer(&self) -> TypePrinter<'a> {
+        TypePrinter::new(self.type_table.clone())
     }
 }
 

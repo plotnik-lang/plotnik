@@ -55,10 +55,16 @@ pub enum DiagnosticKind {
 
     // Valid syntax, invalid semantics
     DuplicateDefinition,
+    DuplicateCaptureInScope,
     UndefinedReference,
     MixedAltBranches,
     RecursionNoEscape,
     FieldSequenceValue,
+
+    // Type inference errors
+    TypeConflictInMerge,
+    MergeAltRequiresAnnotation,
+    IncompatibleTaggedAlternations,
 
     // Link pass - grammar validation
     UnknownNodeType,
@@ -159,10 +165,20 @@ impl DiagnosticKind {
 
             // Semantic errors
             Self::DuplicateDefinition => "name already defined",
+            Self::DuplicateCaptureInScope => "duplicate capture in same scope",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
             Self::RecursionNoEscape => "infinite recursion detected",
             Self::FieldSequenceValue => "field must match exactly one node",
+
+            // Type inference errors
+            Self::TypeConflictInMerge => "capture has conflicting types across branches",
+            Self::MergeAltRequiresAnnotation => {
+                "merged alternation with captures requires type annotation"
+            }
+            Self::IncompatibleTaggedAlternations => {
+                "tagged alternations with different variants cannot be merged"
+            }
 
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",
@@ -189,6 +205,7 @@ impl DiagnosticKind {
 
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
+            Self::DuplicateCaptureInScope => "capture `@{}` already used in this scope".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
 
             // Link pass errors with context
@@ -200,6 +217,14 @@ impl DiagnosticKind {
 
             // Recursion with cycle path
             Self::RecursionNoEscape => "infinite recursion: {}".to_string(),
+
+            // Type inference
+            Self::TypeConflictInMerge => {
+                "capture `{}` has conflicting types across branches".to_string()
+            }
+            Self::MergeAltRequiresAnnotation => {
+                "merged alternation requires `:: {}` type annotation".to_string()
+            }
 
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),

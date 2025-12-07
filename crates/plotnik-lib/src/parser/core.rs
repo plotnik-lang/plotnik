@@ -220,6 +220,7 @@ impl<'src> Parser<'src> {
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
 
+        self.drain_trivia();
         self.reset_debug_fuel();
 
         self.consume_exec_fuel();

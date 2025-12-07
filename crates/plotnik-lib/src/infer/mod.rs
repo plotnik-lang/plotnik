@@ -3,10 +3,10 @@
 //! This module provides:
 //! - `TypeTable`: collection of inferred types
 //! - `TypeKey` / `TypeValue`: type representation
-//! - `emit_rust`: Rust code emitter
-//! - `emit_typescript`: TypeScript code emitter
+//! - `TypePrinter`: builder for emitting types as code
 
 pub mod emit;
+mod printer;
 mod types;
 pub mod tyton;
 
@@ -15,7 +15,6 @@ mod types_tests;
 #[cfg(test)]
 mod tyton_tests;
 
-pub use emit::{
-    Indirection, OptionalStyle, RustEmitConfig, TypeScriptEmitConfig, emit_rust, emit_typescript,
-};
-pub use types::{TypeKey, TypeTable, TypeValue};
+pub use emit::{Indirection, OptionalStyle, RustEmitConfig, TypeScriptEmitConfig};
+pub use printer::{RustPrinter, TypePrinter, TypeScriptPrinter};
+pub use types::{MergedField, TypeKey, TypeTable, TypeValue};

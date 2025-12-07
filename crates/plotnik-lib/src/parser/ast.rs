@@ -330,6 +330,20 @@ impl QuantifiedExpr {
             })
             .unwrap_or(false)
     }
+
+    /// Returns true if quantifier is a list (*, *?).
+    pub fn is_list(&self) -> bool {
+        self.operator()
+            .map(|op| matches!(op.kind(), SyntaxKind::Star | SyntaxKind::StarQuestion))
+            .unwrap_or(false)
+    }
+
+    /// Returns true if quantifier is a non-empty list (+, +?).
+    pub fn is_non_empty_list(&self) -> bool {
+        self.operator()
+            .map(|op| matches!(op.kind(), SyntaxKind::Plus | SyntaxKind::PlusQuestion))
+            .unwrap_or(false)
+    }
 }
 
 impl FieldExpr {

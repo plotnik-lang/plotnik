@@ -17,9 +17,9 @@ fn whitespace_preserved() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
+          Whitespace "  "
           At "@"
           Id "name"
-      Whitespace "  "
       Newline "\n"
     "#);
 }
@@ -127,8 +127,8 @@ fn trivia_between_alternation_items() {
               ParenOpen "("
               Id "b"
               ParenClose ")"
+          Newline "\n"
           BracketClose "]"
-      Newline "\n"
       Newline "\n"
     "#);
 }

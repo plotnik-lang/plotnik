@@ -49,6 +49,7 @@
 //! name collisions while keeping names readable.
 
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 /// Identity of a type in the type table.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -67,21 +68,36 @@ pub enum TypeKey<'src> {
     DefaultQuery,
     /// User-provided type name via `:: TypeName`
     Named(&'src str),
-    /// Path-based synthetic name: ["Foo", "bar"] → FooBar
-    Synthetic(Vec<&'src str>),
+    /// Synthetic type derived from parent + capture name.
+    /// Parent can be Named, DefaultQuery, or another Synthetic.
+    /// Emitter resolves parent to name, then appends capture name in PascalCase.
+    Synthetic {
+        parent: Box<TypeKey<'src>>,
+        name: &'src str,
+    },
 }
 
 impl TypeKey<'_> {
     /// Render as PascalCase type name.
+    /// For Synthetic keys with DefaultQuery parent, uses "DefaultQuery" as the parent name.
+    /// Use `to_pascal_case_with_entry_name` to customize the DefaultQuery name.
     pub fn to_pascal_case(&self) -> String {
+        self.to_pascal_case_with_entry_name("DefaultQuery")
+    }
+
+    /// Render as PascalCase type name, using the given entry_name for DefaultQuery.
+    pub fn to_pascal_case_with_entry_name(&self, entry_name: &str) -> String {
         match self {
             TypeKey::Node => "Node".to_string(),
             TypeKey::String => "String".to_string(),
             TypeKey::Unit => "Unit".to_string(),
             TypeKey::Invalid => "Unit".to_string(), // Invalid emits as Unit
-            TypeKey::DefaultQuery => "DefaultQuery".to_string(),
+            TypeKey::DefaultQuery => entry_name.to_string(),
             TypeKey::Named(name) => (*name).to_string(),
-            TypeKey::Synthetic(segments) => segments.iter().map(|s| to_pascal(s)).collect(),
+            TypeKey::Synthetic { parent, name } => {
+                let parent_name = parent.to_pascal_case_with_entry_name(entry_name);
+                format!("{}{}", parent_name, to_pascal(name))
+            }
         }
     }
 
@@ -155,6 +171,8 @@ pub struct TypeTable<'src> {
     pub types: IndexMap<TypeKey<'src>, TypeValue<'src>>,
     /// Types that contain cyclic references (need Box in Rust).
     pub cyclic: Vec<TypeKey<'src>>,
+    /// Source spans where each type was first defined.
+    definition_spans: IndexMap<TypeKey<'src>, TextRange>,
 }
 
 impl<'src> TypeTable<'src> {
@@ -168,6 +186,7 @@ impl<'src> TypeTable<'src> {
         Self {
             types,
             cyclic: Vec::new(),
+            definition_spans: IndexMap::new(),
         }
     }
 
@@ -175,6 +194,40 @@ impl<'src> TypeTable<'src> {
     pub fn insert(&mut self, key: TypeKey<'src>, value: TypeValue<'src>) -> TypeKey<'src> {
         self.types.insert(key.clone(), value);
         key
+    }
+
+    /// Insert a type definition with a source span, detecting conflicts.
+    ///
+    /// Returns `Ok(key)` if inserted successfully (no conflict).
+    /// Returns `Err(existing_span)` if there was an existing incompatible type.
+    ///
+    /// On conflict, the existing type is NOT overwritten - caller should use Invalid.
+    pub fn try_insert(
+        &mut self,
+        key: TypeKey<'src>,
+        value: TypeValue<'src>,
+        span: TextRange,
+    ) -> Result<TypeKey<'src>, TextRange> {
+        if let Some(existing) = self.types.get(&key) {
+            if !self.values_are_compatible(existing, &value) {
+                let existing_span = self.definition_spans.get(&key).copied().unwrap_or(span);
+                return Err(existing_span);
+            }
+            // Compatible - keep existing, don't overwrite
+            return Ok(key);
+        }
+        self.types.insert(key.clone(), value);
+        self.definition_spans.insert(key.clone(), span);
+        Ok(key)
+    }
+
+    /// Insert without span tracking. Returns true if inserted, false if key existed.
+    pub fn try_insert_untracked(&mut self, key: TypeKey<'src>, value: TypeValue<'src>) -> bool {
+        if self.types.contains_key(&key) {
+            return false;
+        }
+        self.types.insert(key, value);
+        true
     }
 
     /// Mark a type as cyclic (requires indirection in Rust).
@@ -194,9 +247,236 @@ impl<'src> TypeTable<'src> {
         self.types.get(key)
     }
 
+    /// Check if two type keys are structurally compatible.
+    ///
+    /// For built-in types, this is simple equality.
+    /// For synthetic types, we compare the underlying TypeValue structure.
+    /// Two synthetic keys pointing to different TaggedUnions or Structs are incompatible.
+    pub fn types_are_compatible(&self, a: &TypeKey<'src>, b: &TypeKey<'src>) -> bool {
+        if a == b {
+            return true;
+        }
+
+        // Invalid is compatible with anything - don't cascade errors
+        if *a == TypeKey::Invalid || *b == TypeKey::Invalid {
+            return true;
+        }
+
+        // Different built-in types are incompatible
+        if a.is_builtin() || b.is_builtin() {
+            return false;
+        }
+
+        // For synthetic/named types, compare the underlying values
+        let val_a = self.get(a);
+        let val_b = self.get(b);
+
+        match (val_a, val_b) {
+            (Some(va), Some(vb)) => self.values_are_compatible(va, vb),
+            // If either is missing, consider incompatible (shouldn't happen in practice)
+            _ => false,
+        }
+    }
+
+    /// Check if two type values are structurally compatible.
+    fn values_are_compatible(&self, a: &TypeValue<'src>, b: &TypeValue<'src>) -> bool {
+        use TypeValue::*;
+        match (a, b) {
+            (Node, Node) => true,
+            (String, String) => true,
+            (Unit, Unit) => true,
+            (Invalid, Invalid) => true,
+            (Optional(ka), Optional(kb)) => self.types_are_compatible(ka, kb),
+            (List(ka), List(kb)) => self.types_are_compatible(ka, kb),
+            (NonEmptyList(ka), NonEmptyList(kb)) => self.types_are_compatible(ka, kb),
+            // List and NonEmptyList are compatible if inner types match - merge to List
+            (List(ka), NonEmptyList(kb)) | (NonEmptyList(ka), List(kb)) => {
+                self.types_are_compatible(ka, kb)
+            }
+            // Optional<T> and T are compatible - merge to Optional<T>
+            (Optional(k), other) | (other, Optional(k)) => {
+                let other_as_key = match other {
+                    Node => TypeKey::Node,
+                    String => TypeKey::String,
+                    _ => return false,
+                };
+                self.types_are_compatible(k, &other_as_key)
+            }
+            (Struct(fa), Struct(fb)) => {
+                // Structs must have exactly the same fields with compatible types
+                if fa.len() != fb.len() {
+                    return false;
+                }
+                for (name, key_a) in fa {
+                    match fb.get(name) {
+                        Some(key_b) => {
+                            if !self.types_are_compatible(key_a, key_b) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+            }
+            (TaggedUnion(va), TaggedUnion(vb)) => {
+                // TaggedUnions must have exactly the same variants
+                if va.len() != vb.len() {
+                    return false;
+                }
+                for (name, key_a) in va {
+                    match vb.get(name) {
+                        Some(key_b) => {
+                            if !self.types_are_compatible(key_a, key_b) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+            }
+            // Different type constructors are incompatible
+            _ => false,
+        }
+    }
+
     /// Iterate over all types in insertion order.
     pub fn iter(&self) -> impl Iterator<Item = (&TypeKey<'src>, &TypeValue<'src>)> {
         self.types.iter()
+    }
+
+    /// Try to merge List and NonEmptyList types into List.
+    ///
+    /// Returns `Some(List(inner))` if one is List and other is NonEmptyList with compatible inner types.
+    /// Returns `None` otherwise.
+    fn try_merge_list_types(
+        &mut self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<TypeKey<'src>> {
+        let val_a = self.get(a)?;
+        let val_b = self.get(b)?;
+
+        let inner = match (val_a, val_b) {
+            (TypeValue::List(ka), TypeValue::NonEmptyList(kb))
+            | (TypeValue::NonEmptyList(ka), TypeValue::List(kb)) => {
+                if self.types_are_compatible(ka, kb) {
+                    ka.clone()
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        };
+
+        // Return or create a List type with the inner type
+        let list_key = TypeKey::Named(Box::leak("ListMerged".to_string().into_boxed_str()));
+        self.insert(list_key.clone(), TypeValue::List(inner));
+        Some(list_key)
+    }
+
+    /// Try to merge Optional<T> and T into Optional<T>.
+    ///
+    /// Returns `Some(Optional(inner))` if one is Optional and other is the unwrapped type.
+    /// Returns `None` otherwise.
+    fn try_merge_optional_types(
+        &mut self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<TypeKey<'src>> {
+        let val_a = self.get(a);
+        let val_b = self.get(b);
+
+        // Handle cases where one is a wrapper type (Optional) around the other
+        match (val_a, val_b) {
+            (Some(TypeValue::Optional(ka)), Some(TypeValue::Optional(kb))) => {
+                // Both optional - check inner compatibility
+                if self.types_are_compatible(ka, kb) {
+                    return Some(a.clone());
+                }
+                None
+            }
+            (Some(TypeValue::Optional(k)), _) => {
+                if self.types_are_compatible(k, b) {
+                    return Some(a.clone());
+                }
+                None
+            }
+            (_, Some(TypeValue::Optional(k))) => {
+                if self.types_are_compatible(a, k) {
+                    return Some(b.clone());
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to merge two struct types into one, returning the merged fields.
+    ///
+    /// Returns `Some(merged_fields)` if both types are structs (regardless of field shape).
+    /// Returns `None` if either type is not a struct.
+    ///
+    /// The merge rules:
+    /// - Fields present in both structs with compatible types keep that type
+    /// - Fields present in only one struct become Optional
+    /// - Fields with conflicting types become Invalid
+    fn try_merge_struct_fields(
+        &self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<IndexMap<&'src str, MergedField<'src>>> {
+        let val_a = self.get(a)?;
+        let val_b = self.get(b)?;
+
+        let (fields_a, fields_b) = match (val_a, val_b) {
+            (TypeValue::Struct(fa), TypeValue::Struct(fb)) => (fa, fb),
+            _ => return None,
+        };
+
+        // Collect all field names from both structs
+        let mut all_fields: IndexMap<&'src str, ()> = IndexMap::new();
+        for name in fields_a.keys() {
+            all_fields.entry(*name).or_insert(());
+        }
+        for name in fields_b.keys() {
+            all_fields.entry(*name).or_insert(());
+        }
+
+        let mut result = IndexMap::new();
+        for field_name in all_fields.keys() {
+            let type_a = fields_a.get(field_name);
+            let type_b = fields_b.get(field_name);
+
+            let merged = match (type_a, type_b) {
+                (Some(ta), Some(tb)) => {
+                    if self.types_are_compatible(ta, tb) {
+                        MergedField::Same(ta.clone())
+                    } else {
+                        // Recursively try to merge nested structs
+                        if let Some(nested_merged) = self.try_merge_struct_fields(ta, tb) {
+                            if nested_merged
+                                .values()
+                                .any(|m| matches!(m, MergedField::Conflict))
+                            {
+                                MergedField::Conflict
+                            } else {
+                                // Both are structs - they can be merged (caller handles actual merge)
+                                MergedField::Same(ta.clone())
+                            }
+                        } else {
+                            MergedField::Conflict
+                        }
+                    }
+                }
+                (Some(t), None) | (None, Some(t)) => MergedField::Optional(t.clone()),
+                (None, None) => continue,
+            };
+            result.insert(*field_name, merged);
+        }
+
+        Some(result)
     }
 
     /// Merge fields from multiple struct branches (for untagged unions).
@@ -205,6 +485,7 @@ impl<'src> TypeTable<'src> {
     /// - Fields present in all branches with the same type keep that type
     /// - Fields present in only some branches become Optional
     /// - Fields with conflicting types across branches become Invalid
+    /// - Fields that are both structs get recursively merged
     ///
     /// # Example
     ///
@@ -213,6 +494,13 @@ impl<'src> TypeTable<'src> {
     ///
     /// Merged: `{ name: String, value: Optional<Node>, extra: Optional<Node> }`
     ///
+    /// # Struct Merge Example
+    ///
+    /// Branch 1: `{ x: { y: Node } }`
+    /// Branch 2: `{ x: { z: Node } }`
+    ///
+    /// Merged: `{ x: { y: Optional<Node>, z: Optional<Node> } }`
+    ///
     /// # Type Conflict Example
     ///
     /// Branch 1: `{ x: String }`
@@ -220,6 +508,7 @@ impl<'src> TypeTable<'src> {
     ///
     /// Merged: `{ x: Invalid }` (with diagnostic warning)
     pub fn merge_fields(
+        &mut self,
         branches: &[IndexMap<&'src str, TypeKey<'src>>],
     ) -> IndexMap<&'src str, MergedField<'src>> {
         if branches.is_empty() {
@@ -251,13 +540,83 @@ impl<'src> TypeTable<'src> {
                 continue;
             }
 
-            // Check if all occurrences have the same type
+            // Check if all occurrences have compatible types (structural comparison)
             let first_type = type_occurrences[0];
-            let all_same_type = type_occurrences.iter().all(|t| *t == first_type);
+            let all_same_type = type_occurrences
+                .iter()
+                .all(|t| self.types_are_compatible(t, first_type));
 
-            let merged = if !all_same_type {
-                // Type conflict
-                MergedField::Conflict
+            // Check for List/NonEmptyList merge case
+            let list_merge_key = if type_occurrences.len() == 2 {
+                self.try_merge_list_types(type_occurrences[0], type_occurrences[1])
+            } else {
+                None
+            };
+
+            // Check for Optional/Required merge case
+            let optional_merge_key = if type_occurrences.len() == 2 && list_merge_key.is_none() {
+                self.try_merge_optional_types(type_occurrences[0], type_occurrences[1])
+            } else {
+                None
+            };
+
+            let merged = if let Some(merged_key) = optional_merge_key {
+                // Optional merge result is already Optional - don't double-wrap
+                MergedField::Same(merged_key)
+            } else if let Some(merged_key) = list_merge_key {
+                // List and NonEmptyList merged to List
+                if present_count == branch_count {
+                    MergedField::Same(merged_key)
+                } else {
+                    MergedField::Optional(merged_key)
+                }
+            } else if !all_same_type {
+                // Types differ - try to merge if both are structs
+                if type_occurrences.len() == 2 {
+                    if let Some(struct_merged) =
+                        self.try_merge_struct_fields(type_occurrences[0], type_occurrences[1])
+                    {
+                        // Both are structs - create a merged struct type
+                        let merged_fields: IndexMap<&'src str, TypeKey<'src>> = struct_merged
+                            .into_iter()
+                            .map(|(name, mf)| {
+                                let key = match mf {
+                                    MergedField::Same(k) => k,
+                                    MergedField::Optional(k) => {
+                                        let wrapper_name = format!(
+                                            "{}{}Opt",
+                                            to_pascal(field_name),
+                                            to_pascal(name)
+                                        );
+                                        let wrapper_key = TypeKey::Named(Box::leak(
+                                            wrapper_name.into_boxed_str(),
+                                        ));
+                                        self.insert(wrapper_key.clone(), TypeValue::Optional(k));
+                                        wrapper_key
+                                    }
+                                    MergedField::Conflict => TypeKey::Invalid,
+                                };
+                                (name, key)
+                            })
+                            .collect();
+
+                        // Create a new merged struct type
+                        let merged_name = format!("{}Merged", to_pascal(field_name));
+                        let merged_key = TypeKey::Named(Box::leak(merged_name.into_boxed_str()));
+                        self.insert(merged_key.clone(), TypeValue::Struct(merged_fields));
+
+                        if present_count == branch_count {
+                            MergedField::Same(merged_key)
+                        } else {
+                            MergedField::Optional(merged_key)
+                        }
+                    } else {
+                        MergedField::Conflict
+                    }
+                } else {
+                    // More than 2 branches with different struct types - TODO: support N-way merge
+                    MergedField::Conflict
+                }
             } else if present_count == branch_count {
                 // Present in all branches with same type
                 MergedField::Same(first_type.clone())
