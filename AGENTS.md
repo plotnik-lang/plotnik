@@ -125,39 +125,61 @@ Use `Option<T>` for casts, not `TryFrom`. Use `QueryPrinter` from `query/printer
 
 ## Testing
 
-Uses `insta` for snapshot testing. Critical workflow:
+Uses `insta` for snapshot testing.
 
-1. Use `indoc!` macro for multi-line query input
-2. Always write empty string `@""` for new snapshots
-3. Run `cargo insta accept` to populate snapshots (or `cargo insta review` to inspect)
+### File organization
+
+- Code lives in `foo.rs`, tests live in `foo_tests.rs`
+- Test module included via `#[cfg(test)] mod foo_tests;` in parent
+
+### Test structure
+
+- Separate AAA (Arrange-Act-Assert) parts by blank lines
+- Input: string → Output: snapshot of string
+- Single-line input: plain string literal
+- Multi-line input: `indoc!` macro
+- Never write expected snapshot content manually — always `@""`
 
 ```rust
 #[test]
-fn my_test() {
+fn valid_query() {
     let input = indoc! {r#"
     (function_declaration
         name: (identifier) @name)
     "#};
 
-    let query = Query::new(input).unwrap();
+    let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @""); // <-- empty string, always
+    insta::assert_snapshot!(query.dump_ast(), @"");
+}
+
+#[test]
+fn simple_case() {
+    let query = Query::try_from("(identifier)").unwrap();
+    assert!(query.is_valid());
+    insta::assert_snapshot!(query.dump_ast(), @"");
+}
+
+#[test]
+fn error_case() {
+    let query = Query::try_from("(unclosed").unwrap();
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @"");
 }
 ```
 
-Then run:
+### Workflow
 
 ```sh
 cargo test --workspace
 cargo insta accept
 ```
 
-Never write snapshot content manually. Let insta generate it.
-
-**Test patterns:**
+### Patterns by test type
 
 - Valid parsing: `assert!(query.is_valid())` + snapshot `dump_*()` output
 - Error recovery: `assert!(!query.is_valid())` + snapshot `dump_diagnostics()` only
+- Lexer tests: use helper functions `snapshot(input)` / `snapshot_raw(input)`
 
 ## Coverage
 
