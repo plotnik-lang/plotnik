@@ -42,6 +42,7 @@ mod test_helpers {
                 .typescript()
                 .optional(OptionalStyle::QuestionMark)
                 .type_alias(true)
+                .nested(true)
                 .render()
         }
     }
