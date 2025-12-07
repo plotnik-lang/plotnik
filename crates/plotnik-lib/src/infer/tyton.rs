@@ -70,6 +70,9 @@ enum Token<'src> {
     #[token("#Invalid")]
     Invalid,
 
+    #[token("#DefaultQuery")]
+    DefaultQuery,
+
     #[token("()")]
     Unit,
 
@@ -210,6 +213,10 @@ impl<'src> Parser<'src> {
             Some(Token::Invalid) => {
                 self.advance();
                 Ok(TypeKey::Invalid)
+            }
+            Some(Token::DefaultQuery) => {
+                self.advance();
+                Ok(TypeKey::DefaultQuery)
             }
             Some(Token::Unit) => {
                 self.advance();
@@ -409,6 +416,10 @@ impl<'src> Parser<'src> {
                 let name = *name;
                 self.advance();
                 TypeKey::Named(name)
+            }
+            Some(Token::DefaultQuery) => {
+                self.advance();
+                TypeKey::DefaultQuery
             }
             Some(Token::LAngle) => self.parse_synthetic_key()?,
             _ => {
