@@ -19,6 +19,8 @@ pub struct TypeScriptEmitConfig {
     pub inline_synthetic: bool,
     /// Name for the Node type.
     pub node_type_name: String,
+    /// Whether to emit `type Foo = ...` instead of `interface Foo { ... }`.
+    pub use_type_alias: bool,
 }
 
 /// How to represent optional types.
@@ -36,10 +38,11 @@ impl Default for TypeScriptEmitConfig {
     fn default() -> Self {
         Self {
             optional_style: OptionalStyle::Null,
-            export: true,
+            export: false,
             readonly: false,
             inline_synthetic: true,
             node_type_name: "SyntaxNode".to_string(),
+            use_type_alias: false,
         }
     }
 }
@@ -81,13 +84,20 @@ fn emit_type_def(
     config: &TypeScriptEmitConfig,
 ) -> String {
     let name = key.to_pascal_case();
-    let export_prefix = if config.export { "export " } else { "" };
+    let export_prefix = if config.export && !matches!(key, TypeKey::Synthetic(_)) {
+        "export "
+    } else {
+        ""
+    };
 
     match value {
         TypeValue::Node | TypeValue::String | TypeValue::Unit => String::new(),
 
         TypeValue::Struct(fields) => {
-            if fields.is_empty() {
+            if config.use_type_alias {
+                let inline = emit_inline_struct(fields, table, config);
+                format!("{}type {} = {};", export_prefix, name, inline)
+            } else if fields.is_empty() {
                 format!("{}interface {} {{}}", export_prefix, name)
             } else {
                 let mut out = format!("{}interface {} {{\n", export_prefix, name);

@@ -5,5 +5,10 @@
 pub mod rust;
 pub mod typescript;
 
+#[cfg(test)]
+mod rust_tests;
+#[cfg(test)]
+mod typescript_tests;
+
 pub use rust::{Indirection, RustEmitConfig, emit_rust};
 pub use typescript::{OptionalStyle, TypeScriptEmitConfig, emit_typescript};

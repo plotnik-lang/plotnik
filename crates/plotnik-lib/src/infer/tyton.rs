@@ -2,6 +2,20 @@
 //!
 //! A compact DSL for constructing `TypeTable` test fixtures.
 //!
+//! # Design
+//!
+//! Tyton uses a **flattened structure** mirroring `TypeTable`: all types are
+//! top-level definitions referenced by name. No inline nesting is supported.
+//!
+//! ```text
+//! // ✗ Invalid: inline optional
+//! Foo = { Node? @maybe }
+//!
+//! // ✓ Valid: separate definition + reference
+//! MaybeNode = Node?
+//! Foo = { MaybeNode @maybe }
+//! ```
+//!
 //! # Syntax
 //!
 //! Keys:
