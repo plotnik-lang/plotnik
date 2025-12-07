@@ -41,6 +41,8 @@ struct InferContext<'src> {
     source: &'src str,
     table: TypeTable<'src>,
     diagnostics: crate::diagnostics::Diagnostics,
+    /// Counter for generating unique synthetic type keys
+    synthetic_counter: usize,
 }
 
 impl<'src> InferContext<'src> {
@@ -49,7 +51,16 @@ impl<'src> InferContext<'src> {
             source,
             table: TypeTable::new(),
             diagnostics: crate::diagnostics::Diagnostics::new(),
+            synthetic_counter: 0,
         }
+    }
+
+    /// Generate a unique suffix for synthetic keys
+    fn next_synthetic_suffix(&mut self) -> &'src str {
+        let n = self.synthetic_counter;
+        self.synthetic_counter += 1;
+        // Leak a small string for the lifetime - this is fine for query processing
+        Box::leak(n.to_string().into_boxed_str())
     }
 
     fn infer_def(&mut self, def: &ast::Def, is_last: bool) {
@@ -323,22 +334,17 @@ impl<'src> InferContext<'src> {
         let key = if let Some(name) = type_annotation {
             TypeKey::Named(name)
         } else {
-            TypeKey::Synthetic(nested_path)
+            // Use unique suffix to allow same capture name in different alternation branches
+            let suffix = self.next_synthetic_suffix();
+            let mut unique_path = nested_path;
+            unique_path.push(suffix);
+            TypeKey::Synthetic(unique_path)
         };
 
-        if self
-            .table
-            .try_insert(
-                key.clone(),
-                TypeValue::Struct(Self::extract_types(nested_fields)),
-            )
-            .is_err()
-        {
-            self.diagnostics
-                .report(DiagnosticKind::DuplicateCaptureInScope, inner.text_range())
-                .emit();
-            return TypeKey::Invalid;
-        }
+        self.table.insert(
+            key.clone(),
+            TypeValue::Struct(Self::extract_types(nested_fields)),
+        );
         key
     }
 
@@ -573,22 +579,17 @@ impl<'src> InferContext<'src> {
         } else if path.is_empty() {
             TypeKey::DefaultQuery
         } else {
-            TypeKey::Synthetic(path.to_vec())
+            // Use unique suffix to allow same capture name in different alternation branches
+            let suffix = self.next_synthetic_suffix();
+            let mut unique_path = path.to_vec();
+            unique_path.push(suffix);
+            TypeKey::Synthetic(unique_path)
         };
 
-        if self
-            .table
-            .try_insert(
-                key.clone(),
-                TypeValue::Struct(Self::extract_types(result_fields)),
-            )
-            .is_err()
-        {
-            self.diagnostics
-                .report(DiagnosticKind::DuplicateCaptureInScope, alt.text_range())
-                .emit();
-            return TypeKey::Invalid;
-        }
+        self.table.insert(
+            key.clone(),
+            TypeValue::Struct(Self::extract_types(result_fields)),
+        );
         key
     }
 

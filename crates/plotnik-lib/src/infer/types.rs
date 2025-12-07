@@ -299,12 +299,79 @@ impl<'src> TypeTable<'src> {
         self.types.iter()
     }
 
+    /// Try to merge two struct types into one, returning the merged fields.
+    ///
+    /// Returns `Some(merged_fields)` if both types are structs (regardless of field shape).
+    /// Returns `None` if either type is not a struct.
+    ///
+    /// The merge rules:
+    /// - Fields present in both structs with compatible types keep that type
+    /// - Fields present in only one struct become Optional
+    /// - Fields with conflicting types become Invalid
+    fn try_merge_struct_fields(
+        &self,
+        a: &TypeKey<'src>,
+        b: &TypeKey<'src>,
+    ) -> Option<IndexMap<&'src str, MergedField<'src>>> {
+        let val_a = self.get(a)?;
+        let val_b = self.get(b)?;
+
+        let (fields_a, fields_b) = match (val_a, val_b) {
+            (TypeValue::Struct(fa), TypeValue::Struct(fb)) => (fa, fb),
+            _ => return None,
+        };
+
+        // Collect all field names from both structs
+        let mut all_fields: IndexMap<&'src str, ()> = IndexMap::new();
+        for name in fields_a.keys() {
+            all_fields.entry(*name).or_insert(());
+        }
+        for name in fields_b.keys() {
+            all_fields.entry(*name).or_insert(());
+        }
+
+        let mut result = IndexMap::new();
+        for field_name in all_fields.keys() {
+            let type_a = fields_a.get(field_name);
+            let type_b = fields_b.get(field_name);
+
+            let merged = match (type_a, type_b) {
+                (Some(ta), Some(tb)) => {
+                    if self.types_are_compatible(ta, tb) {
+                        MergedField::Same(ta.clone())
+                    } else {
+                        // Recursively try to merge nested structs
+                        if let Some(nested_merged) = self.try_merge_struct_fields(ta, tb) {
+                            if nested_merged
+                                .values()
+                                .any(|m| matches!(m, MergedField::Conflict))
+                            {
+                                MergedField::Conflict
+                            } else {
+                                // Both are structs - they can be merged (caller handles actual merge)
+                                MergedField::Same(ta.clone())
+                            }
+                        } else {
+                            MergedField::Conflict
+                        }
+                    }
+                }
+                (Some(t), None) | (None, Some(t)) => MergedField::Optional(t.clone()),
+                (None, None) => continue,
+            };
+            result.insert(*field_name, merged);
+        }
+
+        Some(result)
+    }
+
     /// Merge fields from multiple struct branches (for untagged unions).
     ///
     /// Given a list of field maps (one per branch), produces a merged field map where:
     /// - Fields present in all branches with the same type keep that type
     /// - Fields present in only some branches become Optional
     /// - Fields with conflicting types across branches become Invalid
+    /// - Fields that are both structs get recursively merged
     ///
     /// # Example
     ///
@@ -313,6 +380,13 @@ impl<'src> TypeTable<'src> {
     ///
     /// Merged: `{ name: String, value: Optional<Node>, extra: Optional<Node> }`
     ///
+    /// # Struct Merge Example
+    ///
+    /// Branch 1: `{ x: { y: Node } }`
+    /// Branch 2: `{ x: { z: Node } }`
+    ///
+    /// Merged: `{ x: { y: Optional<Node>, z: Optional<Node> } }`
+    ///
     /// # Type Conflict Example
     ///
     /// Branch 1: `{ x: String }`
@@ -320,7 +394,7 @@ impl<'src> TypeTable<'src> {
     ///
     /// Merged: `{ x: Invalid }` (with diagnostic warning)
     pub fn merge_fields(
-        &self,
+        &mut self,
         branches: &[IndexMap<&'src str, TypeKey<'src>>],
     ) -> IndexMap<&'src str, MergedField<'src>> {
         if branches.is_empty() {
@@ -359,8 +433,45 @@ impl<'src> TypeTable<'src> {
                 .all(|t| self.types_are_compatible(t, first_type));
 
             let merged = if !all_same_type {
-                // Type conflict
-                MergedField::Conflict
+                // Types differ - try to merge if both are structs
+                if type_occurrences.len() == 2 {
+                    if let Some(struct_merged) =
+                        self.try_merge_struct_fields(type_occurrences[0], type_occurrences[1])
+                    {
+                        // Both are structs - create a merged struct type
+                        let merged_fields: IndexMap<&'src str, TypeKey<'src>> = struct_merged
+                            .into_iter()
+                            .map(|(name, mf)| {
+                                let key = match mf {
+                                    MergedField::Same(k) => k,
+                                    MergedField::Optional(k) => {
+                                        let wrapper_key =
+                                            TypeKey::Synthetic(vec![*field_name, name, "opt"]);
+                                        self.insert(wrapper_key.clone(), TypeValue::Optional(k));
+                                        wrapper_key
+                                    }
+                                    MergedField::Conflict => TypeKey::Invalid,
+                                };
+                                (name, key)
+                            })
+                            .collect();
+
+                        // Create a new merged struct type
+                        let merged_key = TypeKey::Synthetic(vec![*field_name, "merged"]);
+                        self.insert(merged_key.clone(), TypeValue::Struct(merged_fields));
+
+                        if present_count == branch_count {
+                            MergedField::Same(merged_key)
+                        } else {
+                            MergedField::Optional(merged_key)
+                        }
+                    } else {
+                        MergedField::Conflict
+                    }
+                } else {
+                    // More than 2 branches with different struct types - TODO: support N-way merge
+                    MergedField::Conflict
+                }
             } else if present_count == branch_count {
                 // Present in all branches with same type
                 MergedField::Same(first_type.clone())

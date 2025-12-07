@@ -242,7 +242,7 @@ fn type_value_invalid() {
 
 #[test]
 fn merge_fields_empty_branches() {
-    let table = TypeTable::new();
+    let mut table = TypeTable::new();
     let branches: Vec<IndexMap<&str, TypeKey>> = vec![];
 
     let merged = table.merge_fields(&branches);
@@ -252,11 +252,12 @@ fn merge_fields_empty_branches() {
 
 #[test]
 fn merge_fields_single_branch() {
+    let mut table = TypeTable::new();
     let mut branch = IndexMap::new();
     branch.insert("name", TypeKey::String);
     branch.insert("value", TypeKey::Node);
 
-    let merged = TypeTable::new().merge_fields(&[branch]);
+    let merged = table.merge_fields(&[branch]);
 
     assert_eq!(merged.len(), 2);
     assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
@@ -265,13 +266,14 @@ fn merge_fields_single_branch() {
 
 #[test]
 fn merge_fields_identical_branches() {
+    let mut table = TypeTable::new();
     let mut branch1 = IndexMap::new();
     branch1.insert("name", TypeKey::String);
 
     let mut branch2 = IndexMap::new();
     branch2.insert("name", TypeKey::String);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     assert_eq!(merged.len(), 1);
     assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
@@ -279,6 +281,7 @@ fn merge_fields_identical_branches() {
 
 #[test]
 fn merge_fields_missing_in_some_branches() {
+    let mut table = TypeTable::new();
     let mut branch1 = IndexMap::new();
     branch1.insert("name", TypeKey::String);
     branch1.insert("value", TypeKey::Node);
@@ -287,7 +290,7 @@ fn merge_fields_missing_in_some_branches() {
     branch2.insert("name", TypeKey::String);
     // value missing
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     assert_eq!(merged.len(), 2);
     assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
@@ -296,13 +299,14 @@ fn merge_fields_missing_in_some_branches() {
 
 #[test]
 fn merge_fields_disjoint_branches() {
+    let mut table = TypeTable::new();
     let mut branch1 = IndexMap::new();
     branch1.insert("a", TypeKey::String);
 
     let mut branch2 = IndexMap::new();
     branch2.insert("b", TypeKey::Node);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     assert_eq!(merged.len(), 2);
     assert_eq!(merged["a"], MergedField::Optional(TypeKey::String));
@@ -311,13 +315,14 @@ fn merge_fields_disjoint_branches() {
 
 #[test]
 fn merge_fields_type_conflict() {
+    let mut table = TypeTable::new();
     let mut branch1 = IndexMap::new();
     branch1.insert("x", TypeKey::String);
 
     let mut branch2 = IndexMap::new();
     branch2.insert("x", TypeKey::Node);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     assert_eq!(merged.len(), 1);
     assert_eq!(merged["x"], MergedField::Conflict);
@@ -325,6 +330,7 @@ fn merge_fields_type_conflict() {
 
 #[test]
 fn merge_fields_partial_conflict() {
+    let mut table = TypeTable::new();
     // Three branches: x is String in branch 1 and 2, Node in branch 3
     let mut branch1 = IndexMap::new();
     branch1.insert("x", TypeKey::String);
@@ -335,13 +341,14 @@ fn merge_fields_partial_conflict() {
     let mut branch3 = IndexMap::new();
     branch3.insert("x", TypeKey::Node);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2, branch3]);
+    let merged = table.merge_fields(&[branch1, branch2, branch3]);
 
     assert_eq!(merged["x"], MergedField::Conflict);
 }
 
 #[test]
 fn merge_fields_complex_scenario() {
+    let mut table = TypeTable::new();
     // Branch 1: { name: String, value: Node }
     // Branch 2: { name: String, extra: Node }
     // Result: { name: String, value: Optional<Node>, extra: Optional<Node> }
@@ -353,7 +360,7 @@ fn merge_fields_complex_scenario() {
     branch2.insert("name", TypeKey::String);
     branch2.insert("extra", TypeKey::Node);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     assert_eq!(merged.len(), 3);
     assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
@@ -363,6 +370,7 @@ fn merge_fields_complex_scenario() {
 
 #[test]
 fn merge_fields_preserves_order() {
+    let mut table = TypeTable::new();
     let mut branch1 = IndexMap::new();
     branch1.insert("z", TypeKey::String);
     branch1.insert("a", TypeKey::String);
@@ -370,7 +378,7 @@ fn merge_fields_preserves_order() {
     let mut branch2 = IndexMap::new();
     branch2.insert("m", TypeKey::String);
 
-    let merged = TypeTable::new().merge_fields(&[branch1, branch2]);
+    let merged = table.merge_fields(&[branch1, branch2]);
 
     let keys: Vec<_> = merged.keys().collect();
     // Order follows first occurrence across branches

@@ -60,8 +60,8 @@ fn comprehensive_type_inference() {
     WithString = { #string @name }
     Named = { MyType @value }
     UsingRef = { BinaryOp @expr }
-    <Nested params> = { #Node @p }
-    Nested = { <Nested params> @params #Node @body }
+    <Nested params 0> = { #Node @p }
+    Nested = { <Nested params 0> @params #Node @body }
     <opt node> = #Node?
     <nonempty node> = #Node+
     WithQuantifiers = { <opt node> @maybe_dec <opt node> @methods <nonempty node> @fields }
@@ -237,30 +237,23 @@ fn nested_tagged_alts_in_untagged_alt_conflict() {
 }
 
 #[test]
-fn nested_untagged_alts_drop_field() {
+fn nested_untagged_alts_merge_fields() {
     // Each branch captures @x with different struct types
     // Branch 1: @x has field @y
     // Branch 2: @x has field @z
-    // This is a type conflict - different structures under same capture name
+    // These get merged: fields from both branches become optional
     let input = "[[(a) @y] @x [(b) @z] @x]";
 
     let query = Query::try_from(input).unwrap();
 
-    assert!(!query.is_valid());
+    assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_types(), @r"
-    <x> = { #Node @y }
-    #DefaultQuery = { #Invalid @x }
-    ");
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: capture `x` has conflicting types across branches
-      |
-    1 | [[(a) @y] @x [(b) @z] @x]
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-    error: duplicate capture in same scope
-      |
-    1 | [[(a) @y] @x [(b) @z] @x]
-      |              ^^^^^^^^
+    <x 0> = { #Node @y }
+    <x 1> = { #Node @z }
+    <x y opt> = #Node?
+    <x z opt> = #Node?
+    <x merged> = { <x y opt> @y <x z opt> @z }
+    #DefaultQuery = { <x merged> @x }
     ");
 }
 
