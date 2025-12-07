@@ -2,9 +2,26 @@
 //!
 //! Each struct wraps a `SyntaxNode` and provides typed accessors.
 //! Cast is infallible for correct `SyntaxKind` - validation happens elsewhere.
+//!
+//! ## String Lifetime Limitation
+//!
+//! `SyntaxToken::text()` returns `&str` tied to the token's lifetime, not to the
+//! source `&'src str`. This is a rowan design: tokens store interned strings, not
+//! spans into the original source.
+//!
+//! When building data structures that need source-lifetime strings (e.g.,
+//! `SymbolTable<'src>`), use [`token_src`] instead of `token.text()`.
 
 use super::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::TextRange;
+
+/// Extracts token text with source lifetime.
+///
+/// Use this instead of `token.text()` when you need `&'src str`.
+pub fn token_src<'src>(token: &SyntaxToken, source: &'src str) -> &'src str {
+    let range = token.text_range();
+    &source[range.start().into()..range.end().into()]
+}
 
 macro_rules! ast_node {
     ($name:ident, $kind:ident) => {
@@ -50,6 +67,21 @@ macro_rules! define_expr {
             }
         }
     };
+}
+
+impl Expr {
+    /// Returns direct child expressions.
+    pub fn children(&self) -> Vec<Expr> {
+        match self {
+            Expr::NamedNode(n) => n.children().collect(),
+            Expr::SeqExpr(s) => s.children().collect(),
+            Expr::CapturedExpr(c) => c.inner().into_iter().collect(),
+            Expr::QuantifiedExpr(q) => q.inner().into_iter().collect(),
+            Expr::FieldExpr(f) => f.value().into_iter().collect(),
+            Expr::AltExpr(a) => a.branches().filter_map(|b| b.body()).collect(),
+            Expr::Ref(_) | Expr::AnonymousNode(_) => vec![],
+        }
+    }
 }
 
 ast_node!(Root, Root);
@@ -282,6 +314,21 @@ impl QuantifiedExpr {
                         | SyntaxKind::QuestionQuestion
                 )
             })
+    }
+
+    /// Returns true if quantifier allows zero matches (?, *, ??, *?).
+    pub fn is_optional(&self) -> bool {
+        self.operator()
+            .map(|op| {
+                matches!(
+                    op.kind(),
+                    SyntaxKind::Question
+                        | SyntaxKind::Star
+                        | SyntaxKind::QuestionQuestion
+                        | SyntaxKind::StarQuestion
+                )
+            })
+            .unwrap_or(false)
     }
 }
 

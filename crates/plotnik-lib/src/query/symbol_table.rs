@@ -7,7 +7,7 @@
 use indexmap::IndexMap;
 
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Expr, Ref, ast};
+use crate::parser::{Expr, Ref, ast, token_src};
 
 use super::Query;
 
@@ -21,12 +21,11 @@ impl<'a> Query<'a> {
                 continue;
             };
 
-            let range = name_token.text_range();
-            let name = &self.source[range.start().into()..range.end().into()];
+            let name = token_src(&name_token, self.source);
 
             if self.symbol_table.contains_key(name) {
                 self.resolve_diagnostics
-                    .report(DiagnosticKind::DuplicateDefinition, range)
+                    .report(DiagnosticKind::DuplicateDefinition, name_token.text_range())
                     .message(name)
                     .emit();
                 continue;
@@ -53,44 +52,12 @@ impl<'a> Query<'a> {
     }
 
     fn collect_reference_diagnostics(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Ref(r) => {
-                self.check_ref_diagnostic(r);
-            }
-            Expr::NamedNode(node) => {
-                for child in node.children() {
-                    self.collect_reference_diagnostics(&child);
-                }
-            }
-            Expr::AltExpr(alt) => {
-                for branch in alt.branches() {
-                    let Some(body) = branch.body() else { continue };
-                    self.collect_reference_diagnostics(&body);
-                }
-                // Parser wraps all alt children in Branch nodes
-                assert!(
-                    alt.exprs().next().is_none(),
-                    "symbol_table: unexpected bare Expr in Alt (parser should wrap in Branch)"
-                );
-            }
-            Expr::SeqExpr(seq) => {
-                for child in seq.children() {
-                    self.collect_reference_diagnostics(&child);
-                }
-            }
-            Expr::CapturedExpr(cap) => {
-                let Some(inner) = cap.inner() else { return };
-                self.collect_reference_diagnostics(&inner);
-            }
-            Expr::QuantifiedExpr(q) => {
-                let Some(inner) = q.inner() else { return };
-                self.collect_reference_diagnostics(&inner);
-            }
-            Expr::FieldExpr(f) => {
-                let Some(value) = f.value() else { return };
-                self.collect_reference_diagnostics(&value);
-            }
-            Expr::AnonymousNode(_) => {}
+        if let Expr::Ref(r) = expr {
+            self.check_ref_diagnostic(r);
+        }
+
+        for child in expr.children() {
+            self.collect_reference_diagnostics(&child);
         }
     }
 

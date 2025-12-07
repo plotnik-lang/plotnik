@@ -24,38 +24,13 @@ impl Query<'_> {
     }
 
     fn validate_alt_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::AltExpr(alt) => {
-                self.check_mixed_alternation(alt);
-                for branch in alt.branches() {
-                    let Some(body) = branch.body() else { continue };
-                    self.validate_alt_expr(&body);
-                }
-                assert_alt_no_bare_exprs(alt);
-            }
-            Expr::NamedNode(node) => {
-                for child in node.children() {
-                    self.validate_alt_expr(&child);
-                }
-            }
-            Expr::SeqExpr(seq) => {
-                for child in seq.children() {
-                    self.validate_alt_expr(&child);
-                }
-            }
-            Expr::CapturedExpr(cap) => {
-                let Some(inner) = cap.inner() else { return };
-                self.validate_alt_expr(&inner);
-            }
-            Expr::QuantifiedExpr(q) => {
-                let Some(inner) = q.inner() else { return };
-                self.validate_alt_expr(&inner);
-            }
-            Expr::FieldExpr(f) => {
-                let Some(value) = f.value() else { return };
-                self.validate_alt_expr(&value);
-            }
-            Expr::Ref(_) | Expr::AnonymousNode(_) => {}
+        if let Expr::AltExpr(alt) = expr {
+            self.check_mixed_alternation(alt);
+            assert_alt_no_bare_exprs(alt);
+        }
+
+        for child in expr.children() {
+            self.validate_alt_expr(&child);
         }
     }
 
