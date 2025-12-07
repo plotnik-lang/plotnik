@@ -590,3 +590,48 @@ fn emit_default_query_referenced() {
     }
     ");
 }
+
+// --- Keyword Escaping ---
+
+#[test]
+fn emit_struct_with_keyword_fields() {
+    let input = "Foo = { #Node @type #Node @fn #Node @match }";
+    insta::assert_snapshot!(emit(input), @r"
+    #[derive(Debug, Clone)]
+    pub struct Foo {
+        pub r#type: Node,
+        pub r#fn: Node,
+        pub r#match: Node,
+    }
+    ");
+}
+
+#[test]
+fn emit_keyword_field_in_enum() {
+    let input = indoc! {r#"
+        TypeVariant = { #Node @type }
+        FnVariant = { #Node @fn }
+        E = [ Type: TypeVariant Fn: FnVariant ]
+    "#};
+    insta::assert_snapshot!(emit(input), @r"
+    #[derive(Debug, Clone)]
+    pub struct TypeVariant {
+        pub r#type: Node,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct FnVariant {
+        pub r#fn: Node,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum E {
+        Type {
+            r#type: Node,
+        },
+        Fn {
+            r#fn: Node,
+        },
+    }
+    ");
+}

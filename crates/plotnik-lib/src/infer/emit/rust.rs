@@ -4,6 +4,26 @@
 
 use indexmap::IndexMap;
 
+/// Rust keywords that must be escaped with `r#` prefix when used as identifiers.
+const RUST_KEYWORDS: &[&str] = &[
+    // Strict keywords
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+    "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type",
+    "unsafe", "use", "where", "while", // Reserved keywords
+    "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try", "typeof",
+    "unsized", "virtual", "yield",
+];
+
+/// Escape a name if it's a Rust keyword by prefixing with `r#`.
+fn escape_keyword(name: &str) -> String {
+    if RUST_KEYWORDS.contains(&name) {
+        format!("r#{}", name)
+    } else {
+        name.to_string()
+    }
+}
+
 use super::super::types::{TypeKey, TypeTable, TypeValue};
 
 /// Configuration for Rust emission.
@@ -89,7 +109,8 @@ fn emit_type_def(
                 out.push_str(&format!("pub struct {} {{\n", name));
                 for (field_name, field_type) in fields {
                     let type_str = emit_type_ref(field_type, table, config);
-                    out.push_str(&format!("    pub {}: {},\n", field_name, type_str));
+                    let escaped_name = escape_keyword(field_name);
+                    out.push_str(&format!("    pub {}: {},\n", escaped_name, type_str));
                 }
                 out.push('}');
             }
@@ -110,7 +131,8 @@ fn emit_type_def(
                         out.push_str(&format!("    {} {{\n", variant_name));
                         for (field_name, field_type) in f {
                             let type_str = emit_type_ref(field_type, table, config);
-                            out.push_str(&format!("        {}: {},\n", field_name, type_str));
+                            let escaped_name = escape_keyword(field_name);
+                            out.push_str(&format!("        {}: {},\n", escaped_name, type_str));
                         }
                         out.push_str("    },\n");
                     }
