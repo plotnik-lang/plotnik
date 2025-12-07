@@ -70,7 +70,7 @@ fn emit_type_def(
     let name = key.to_pascal_case();
 
     match value {
-        TypeValue::Node | TypeValue::String | TypeValue::Unit => String::new(),
+        TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => String::new(),
 
         TypeValue::Struct(fields) => {
             let mut out = emit_derives(config);
@@ -134,7 +134,7 @@ pub(crate) fn emit_type_ref(
     let base = match table.get(key) {
         Some(TypeValue::Node) => "Node".to_string(),
         Some(TypeValue::String) => "String".to_string(),
-        Some(TypeValue::Unit) => "()".to_string(),
+        Some(TypeValue::Unit) | Some(TypeValue::Invalid) => "()".to_string(),
         Some(TypeValue::Optional(inner)) => {
             let inner_str = emit_type_ref(inner, table, config);
             format!("Option<{}>", inner_str)
@@ -225,7 +225,7 @@ fn visit<'src>(
 
 pub(crate) fn dependencies<'src>(value: &TypeValue<'src>) -> Vec<TypeKey<'src>> {
     match value {
-        TypeValue::Node | TypeValue::String | TypeValue::Unit => vec![],
+        TypeValue::Node | TypeValue::String | TypeValue::Unit | TypeValue::Invalid => vec![],
 
         TypeValue::Struct(fields) => fields.values().cloned().collect(),
 

@@ -1,4 +1,4 @@
-use super::types::{TypeKey, TypeTable, TypeValue, to_pascal};
+use super::types::{MergedField, TypeKey, TypeTable, TypeValue, to_pascal};
 use indexmap::IndexMap;
 
 #[test]
@@ -6,6 +6,7 @@ fn type_key_to_pascal_case_builtins() {
     assert_eq!(TypeKey::Node.to_pascal_case(), "Node");
     assert_eq!(TypeKey::String.to_pascal_case(), "String");
     assert_eq!(TypeKey::Unit.to_pascal_case(), "Unit");
+    assert_eq!(TypeKey::Invalid.to_pascal_case(), "Unit"); // Invalid emits as Unit
 }
 
 #[test]
@@ -48,6 +49,7 @@ fn type_table_new_has_builtins() {
     assert_eq!(table.get(&TypeKey::Node), Some(&TypeValue::Node));
     assert_eq!(table.get(&TypeKey::String), Some(&TypeValue::String));
     assert_eq!(table.get(&TypeKey::Unit), Some(&TypeValue::Unit));
+    assert_eq!(table.get(&TypeKey::Invalid), Some(&TypeValue::Invalid));
 }
 
 #[test]
@@ -81,13 +83,14 @@ fn type_table_iter_preserves_order() {
     table.insert(TypeKey::Named("C"), TypeValue::Unit);
 
     let keys: Vec<_> = table.iter().map(|(k, _)| k.clone()).collect();
-    // Builtins first, then inserted order
+    // Builtins first (Node, String, Unit, Invalid), then inserted order
     assert_eq!(keys[0], TypeKey::Node);
     assert_eq!(keys[1], TypeKey::String);
     assert_eq!(keys[2], TypeKey::Unit);
-    assert_eq!(keys[3], TypeKey::Named("A"));
-    assert_eq!(keys[4], TypeKey::Named("B"));
-    assert_eq!(keys[5], TypeKey::Named("C"));
+    assert_eq!(keys[3], TypeKey::Invalid);
+    assert_eq!(keys[4], TypeKey::Named("A"));
+    assert_eq!(keys[5], TypeKey::Named("B"));
+    assert_eq!(keys[6], TypeKey::Named("C"));
 }
 
 #[test]
@@ -219,4 +222,156 @@ fn type_key_hash_consistency() {
     assert!(set.contains(&TypeKey::Named("Foo")));
     assert!(set.contains(&TypeKey::Synthetic(vec!["a", "b"])));
     assert!(!set.contains(&TypeKey::String));
+}
+
+#[test]
+fn type_key_is_builtin() {
+    assert!(TypeKey::Node.is_builtin());
+    assert!(TypeKey::String.is_builtin());
+    assert!(TypeKey::Unit.is_builtin());
+    assert!(TypeKey::Invalid.is_builtin());
+    assert!(!TypeKey::Named("Foo").is_builtin());
+    assert!(!TypeKey::Synthetic(vec!["a"]).is_builtin());
+}
+
+#[test]
+fn type_value_invalid() {
+    assert_eq!(TypeValue::Invalid, TypeValue::Invalid);
+    assert_ne!(TypeValue::Invalid, TypeValue::Unit);
+}
+
+#[test]
+fn merge_fields_empty_branches() {
+    let branches: Vec<IndexMap<&str, TypeKey>> = vec![];
+
+    let merged = TypeTable::merge_fields(&branches);
+
+    assert!(merged.is_empty());
+}
+
+#[test]
+fn merge_fields_single_branch() {
+    let mut branch = IndexMap::new();
+    branch.insert("name", TypeKey::String);
+    branch.insert("value", TypeKey::Node);
+
+    let merged = TypeTable::merge_fields(&[branch]);
+
+    assert_eq!(merged.len(), 2);
+    assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
+    assert_eq!(merged["value"], MergedField::Same(TypeKey::Node));
+}
+
+#[test]
+fn merge_fields_identical_branches() {
+    let mut branch1 = IndexMap::new();
+    branch1.insert("name", TypeKey::String);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("name", TypeKey::String);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
+}
+
+#[test]
+fn merge_fields_missing_in_some_branches() {
+    let mut branch1 = IndexMap::new();
+    branch1.insert("name", TypeKey::String);
+    branch1.insert("value", TypeKey::Node);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("name", TypeKey::String);
+    // value missing
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    assert_eq!(merged.len(), 2);
+    assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
+    assert_eq!(merged["value"], MergedField::Optional(TypeKey::Node));
+}
+
+#[test]
+fn merge_fields_disjoint_branches() {
+    let mut branch1 = IndexMap::new();
+    branch1.insert("a", TypeKey::String);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("b", TypeKey::Node);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    assert_eq!(merged.len(), 2);
+    assert_eq!(merged["a"], MergedField::Optional(TypeKey::String));
+    assert_eq!(merged["b"], MergedField::Optional(TypeKey::Node));
+}
+
+#[test]
+fn merge_fields_type_conflict() {
+    let mut branch1 = IndexMap::new();
+    branch1.insert("x", TypeKey::String);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("x", TypeKey::Node);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged["x"], MergedField::Conflict);
+}
+
+#[test]
+fn merge_fields_partial_conflict() {
+    // Three branches: x is String in branch 1 and 2, Node in branch 3
+    let mut branch1 = IndexMap::new();
+    branch1.insert("x", TypeKey::String);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("x", TypeKey::String);
+
+    let mut branch3 = IndexMap::new();
+    branch3.insert("x", TypeKey::Node);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2, branch3]);
+
+    assert_eq!(merged["x"], MergedField::Conflict);
+}
+
+#[test]
+fn merge_fields_complex_scenario() {
+    // Branch 1: { name: String, value: Node }
+    // Branch 2: { name: String, extra: Node }
+    // Result: { name: String, value: Optional<Node>, extra: Optional<Node> }
+    let mut branch1 = IndexMap::new();
+    branch1.insert("name", TypeKey::String);
+    branch1.insert("value", TypeKey::Node);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("name", TypeKey::String);
+    branch2.insert("extra", TypeKey::Node);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    assert_eq!(merged.len(), 3);
+    assert_eq!(merged["name"], MergedField::Same(TypeKey::String));
+    assert_eq!(merged["value"], MergedField::Optional(TypeKey::Node));
+    assert_eq!(merged["extra"], MergedField::Optional(TypeKey::Node));
+}
+
+#[test]
+fn merge_fields_preserves_order() {
+    let mut branch1 = IndexMap::new();
+    branch1.insert("z", TypeKey::String);
+    branch1.insert("a", TypeKey::String);
+
+    let mut branch2 = IndexMap::new();
+    branch2.insert("m", TypeKey::String);
+
+    let merged = TypeTable::merge_fields(&[branch1, branch2]);
+
+    let keys: Vec<_> = merged.keys().collect();
+    // Order follows first occurrence across branches
+    assert_eq!(keys, vec![&"z", &"a", &"m"]);
 }

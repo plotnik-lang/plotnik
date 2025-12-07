@@ -24,7 +24,7 @@ fn emit_cyclic(input: &str, cyclic_types: &[&str]) -> String {
 
 #[test]
 fn emit_struct_single_field() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     insta::assert_snapshot!(emit(input), @r"
     #[derive(Debug, Clone)]
     pub struct Foo {
@@ -35,7 +35,7 @@ fn emit_struct_single_field() {
 
 #[test]
 fn emit_struct_multiple_fields() {
-    let input = "Func = { string @name Node @body Node @params }";
+    let input = "Func = { #string @name #Node @body #Node @params }";
     insta::assert_snapshot!(emit(input), @r"
     #[derive(Debug, Clone)]
     pub struct Func {
@@ -69,8 +69,8 @@ fn emit_struct_with_unit_field() {
 #[test]
 fn emit_struct_nested_refs() {
     let input = indoc! {r#"
-        Inner = { Node @value }
-        Outer = { Inner @inner string @label }
+        Inner = { #Node @value }
+        Outer = { Inner @inner #string @label }
     "#};
     insta::assert_snapshot!(emit(input), @r"
     #[derive(Debug, Clone)]
@@ -91,8 +91,8 @@ fn emit_struct_nested_refs() {
 #[test]
 fn emit_tagged_union_simple() {
     let input = indoc! {r#"
-        AssignStmt = { Node @target Node @value }
-        CallStmt = { Node @func }
+        AssignStmt = { #Node @target #Node @value }
+        CallStmt = { #Node @func }
         Stmt = [ Assign: AssignStmt Call: CallStmt ]
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -123,7 +123,7 @@ fn emit_tagged_union_simple() {
 #[test]
 fn emit_tagged_union_with_empty_variant() {
     let input = indoc! {r#"
-        ValueVariant = { Node @value }
+        ValueVariant = { #Node @value }
         Expr = [ Some: ValueVariant None: () ]
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -157,7 +157,7 @@ fn emit_tagged_union_all_empty() {
 
 #[test]
 fn emit_tagged_union_with_builtins() {
-    let input = "Value = [ Text: string Code: Node Empty: () ]";
+    let input = "Value = [ Text: #string Code: #Node Empty: () ]";
     insta::assert_snapshot!(emit(input), @r"
     #[derive(Debug, Clone)]
     pub enum Value {
@@ -172,26 +172,26 @@ fn emit_tagged_union_with_builtins() {
 
 #[test]
 fn emit_optional() {
-    let input = "MaybeNode = Node?";
+    let input = "MaybeNode = #Node?";
     insta::assert_snapshot!(emit(input), @"pub type MaybeNode = Option<Node>;");
 }
 
 #[test]
 fn emit_list() {
-    let input = "Nodes = Node*";
+    let input = "Nodes = #Node*";
     insta::assert_snapshot!(emit(input), @"pub type Nodes = Vec<Node>;");
 }
 
 #[test]
 fn emit_non_empty_list() {
-    let input = "Nodes = Node+";
+    let input = "Nodes = #Node+";
     insta::assert_snapshot!(emit(input), @"pub type Nodes = Vec<Node>;");
 }
 
 #[test]
 fn emit_optional_named() {
     let input = indoc! {r#"
-        Stmt = { Node @value }
+        Stmt = { #Node @value }
         MaybeStmt = Stmt?
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -207,7 +207,7 @@ fn emit_optional_named() {
 #[test]
 fn emit_list_named() {
     let input = indoc! {r#"
-        Stmt = { Node @value }
+        Stmt = { #Node @value }
         Stmts = Stmt*
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -223,7 +223,7 @@ fn emit_list_named() {
 #[test]
 fn emit_nested_wrappers() {
     let input = indoc! {r#"
-        Item = { Node @value }
+        Item = { #Node @value }
         Items = Item*
         MaybeItems = Items?
     "#};
@@ -244,7 +244,7 @@ fn emit_nested_wrappers() {
 #[test]
 fn emit_cyclic_box() {
     let input = indoc! {r#"
-        TreeNode = { Node @value TreeNode @left TreeNode @right }
+        TreeNode = { #Node @value TreeNode @left TreeNode @right }
     "#};
     insta::assert_snapshot!(emit_cyclic(input, &["TreeNode"]), @r"
     #[derive(Debug, Clone)]
@@ -258,7 +258,7 @@ fn emit_cyclic_box() {
 
 #[test]
 fn emit_cyclic_rc() {
-    let input = "TreeNode = { Node @value TreeNode @child }";
+    let input = "TreeNode = { #Node @value TreeNode @child }";
     let config = RustEmitConfig {
         indirection: Indirection::Rc,
         ..Default::default()
@@ -276,7 +276,7 @@ fn emit_cyclic_rc() {
 
 #[test]
 fn emit_cyclic_arc() {
-    let input = "TreeNode = { Node @value TreeNode @child }";
+    let input = "TreeNode = { #Node @value TreeNode @child }";
     let config = RustEmitConfig {
         indirection: Indirection::Arc,
         ..Default::default()
@@ -296,7 +296,7 @@ fn emit_cyclic_arc() {
 
 #[test]
 fn emit_no_derives() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     let config = RustEmitConfig {
         derive_debug: false,
         derive_clone: false,
@@ -312,7 +312,7 @@ fn emit_no_derives() {
 
 #[test]
 fn emit_debug_only() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     let config = RustEmitConfig {
         derive_debug: true,
         derive_clone: false,
@@ -329,7 +329,7 @@ fn emit_debug_only() {
 
 #[test]
 fn emit_all_derives() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     let config = RustEmitConfig {
         derive_debug: true,
         derive_clone: true,
@@ -349,11 +349,11 @@ fn emit_all_derives() {
 #[test]
 fn emit_complex_program() {
     let input = indoc! {r#"
-        FuncInfo = { string @name Node @body }
-        Param = { string @name string @type_annotation }
+        FuncInfo = { #string @name #Node @body }
+        Param = { #string @name #string @type_annotation }
         Params = Param*
         FuncDecl = { FuncInfo @info Params @params }
-        ExprStmt = { Node @expr }
+        ExprStmt = { #Node @expr }
         Stmt = [ Func: FuncDecl Expr: ExprStmt ]
         Program = { Stmt @statements }
     "#};
@@ -420,8 +420,8 @@ fn emit_synthetic_keys() {
 #[test]
 fn emit_mixed_wrappers_and_structs() {
     let input = indoc! {r#"
-        Leaf = { string @text }
-        Branch = { Node @left Node @right }
+        Leaf = { #string @text }
+        Branch = { #Node @left #Node @right }
         Tree = [ Leaf: Leaf Branch: Branch ]
         Forest = Tree*
         MaybeForest = Forest?
@@ -460,7 +460,7 @@ fn emit_mixed_wrappers_and_structs() {
 #[test]
 fn emit_single_variant_union() {
     let input = indoc! {r#"
-        OnlyVariant = { Node @value }
+        OnlyVariant = { #Node @value }
         Single = [ Only: OnlyVariant ]
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -481,7 +481,7 @@ fn emit_single_variant_union() {
 #[test]
 fn emit_deeply_nested() {
     let input = indoc! {r#"
-        A = { Node @val }
+        A = { #Node @val }
         B = { A @a }
         C = { B @b }
         D = { C @c }
@@ -512,7 +512,7 @@ fn emit_deeply_nested() {
 #[test]
 fn emit_list_of_optionals() {
     let input = indoc! {r#"
-        Item = { Node @value }
+        Item = { #Node @value }
         MaybeItem = Item?
         Items = MaybeItem*
     "#};
@@ -531,8 +531,8 @@ fn emit_list_of_optionals() {
 #[test]
 fn emit_builtin_value_with_named_key() {
     let input = indoc! {r#"
-        AliasNode = Node
-        AliasString = string
+        AliasNode = #Node
+        AliasString = #string
         AliasUnit = ()
     "#};
     insta::assert_snapshot!(emit(input), @"");

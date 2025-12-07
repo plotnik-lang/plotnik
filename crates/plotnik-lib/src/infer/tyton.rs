@@ -10,18 +10,19 @@
 //!
 //! ```text
 //! // ✗ Invalid: inline optional
-//! Foo = { Node? @maybe }
+//! Foo = { #Node? @maybe }
 //!
 //! // ✓ Valid: separate definition + reference
-//! MaybeNode = Node?
+//! MaybeNode = #Node?
 //! Foo = { MaybeNode @maybe }
 //! ```
 //!
 //! # Syntax
 //!
 //! Keys:
-//! - `Node` — built-in node type
-//! - `string` — built-in string type  
+//! - `#Node` — built-in node type
+//! - `#string` — built-in string type
+//! - `#Invalid` — built-in invalid type
 //! - `()` — built-in unit type
 //! - `PascalName` — named type
 //! - `<Foo bar baz>` — synthetic key from path segments
@@ -32,19 +33,19 @@
 //! - `Key?` — optional wrapper
 //! - `Key*` — list wrapper
 //! - `Key+` — non-empty list wrapper
-//! - `Node` / `string` / `()` — bare builtin alias
+//! - `#Node` / `#string` / `()` — bare builtin alias
 //!
 //! Definitions:
 //! - `Name = { ... }` — define a struct
 //! - `Name = [ ... ]` — define a tagged union
 //! - `Name = Other?` — define an optional
 //! - `<Foo bar> = { ... }` — define with synthetic key
-//! - `AliasNode = Node` — alias to builtin
+//! - `AliasNode = #Node` — alias to builtin
 //!
 //! # Example
 //!
 //! ```text
-//! FuncInfo = { string @name Node @body }
+//! FuncInfo = { #string @name #Node @body }
 //! Stmt = [ Assign: AssignStmt Call: CallStmt ]
 //! Stmts = Stmt*
 //! ```
@@ -59,12 +60,15 @@ use super::{TypeKey, TypeTable, TypeValue};
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\n\r]+")]
 enum Token<'src> {
-    // Built-in type keywords
-    #[token("Node")]
+    // Built-in type keywords (prefixed with #)
+    #[token("#Node")]
     Node,
 
-    #[token("string")]
+    #[token("#string")]
     String,
+
+    #[token("#Invalid")]
+    Invalid,
 
     #[token("()")]
     Unit,
@@ -203,6 +207,10 @@ impl<'src> Parser<'src> {
                 self.advance();
                 Ok(TypeKey::String)
             }
+            Some(Token::Invalid) => {
+                self.advance();
+                Ok(TypeKey::Invalid)
+            }
             Some(Token::Unit) => {
                 self.advance();
                 Ok(TypeKey::Unit)
@@ -272,6 +280,10 @@ impl<'src> Parser<'src> {
             Some(Token::String) => {
                 self.advance();
                 self.parse_wrapper_or_bare(TypeKey::String, TypeValue::String)
+            }
+            Some(Token::Invalid) => {
+                self.advance();
+                self.parse_wrapper_or_bare(TypeKey::Invalid, TypeValue::Invalid)
             }
             Some(Token::Unit) => {
                 self.advance();
@@ -451,13 +463,17 @@ pub fn emit(table: &TypeTable<'_>) -> String {
 }
 
 fn is_builtin(key: &TypeKey<'_>) -> bool {
-    matches!(key, TypeKey::Node | TypeKey::String | TypeKey::Unit)
+    matches!(
+        key,
+        TypeKey::Node | TypeKey::String | TypeKey::Unit | TypeKey::Invalid
+    )
 }
 
 fn emit_key(out: &mut String, key: &TypeKey<'_>) {
     match key {
-        TypeKey::Node => out.push_str("Node"),
-        TypeKey::String => out.push_str("string"),
+        TypeKey::Node => out.push_str("#Node"),
+        TypeKey::String => out.push_str("#string"),
+        TypeKey::Invalid => out.push_str("#Invalid"),
         TypeKey::Unit => out.push_str("()"),
         TypeKey::Named(name) => out.push_str(name),
         TypeKey::Synthetic(segments) => {
@@ -475,8 +491,9 @@ fn emit_key(out: &mut String, key: &TypeKey<'_>) {
 
 fn emit_value(out: &mut String, value: &TypeValue<'_>) {
     match value {
-        TypeValue::Node => out.push_str("Node"),
-        TypeValue::String => out.push_str("string"),
+        TypeValue::Node => out.push_str("#Node"),
+        TypeValue::String => out.push_str("#string"),
+        TypeValue::Invalid => out.push_str("#Invalid"),
         TypeValue::Unit => out.push_str("()"),
         TypeValue::Struct(fields) => {
             out.push_str("{ ");

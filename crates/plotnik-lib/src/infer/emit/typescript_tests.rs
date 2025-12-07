@@ -16,7 +16,7 @@ fn emit_with_config(input: &str, config: &TypeScriptEmitConfig) -> String {
 
 #[test]
 fn emit_interface_single_field() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     insta::assert_snapshot!(emit(input), @r"
     interface Foo {
       value: SyntaxNode;
@@ -26,7 +26,7 @@ fn emit_interface_single_field() {
 
 #[test]
 fn emit_interface_multiple_fields() {
-    let input = "Func = { string @name Node @body Node @params }";
+    let input = "Func = { #string @name #Node @body #Node @params }";
     insta::assert_snapshot!(emit(input), @r"
     interface Func {
       name: string;
@@ -55,8 +55,8 @@ fn emit_interface_with_unit_field() {
 #[test]
 fn emit_interface_nested_refs() {
     let input = indoc! {r#"
-        Inner = { Node @value }
-        Outer = { Inner @inner string @label }
+        Inner = { #Node @value }
+        Outer = { Inner @inner #string @label }
     "#};
     insta::assert_snapshot!(emit(input), @r"
     interface Inner {
@@ -75,8 +75,8 @@ fn emit_interface_nested_refs() {
 #[test]
 fn emit_tagged_union_simple() {
     let input = indoc! {r#"
-        AssignStmt = { Node @target Node @value }
-        CallStmt = { Node @func }
+        AssignStmt = { #Node @target #Node @value }
+        CallStmt = { #Node @func }
         Stmt = [ Assign: AssignStmt Call: CallStmt ]
     "#};
     insta::assert_snapshot!(emit(input), @r#"
@@ -98,7 +98,7 @@ fn emit_tagged_union_simple() {
 #[test]
 fn emit_tagged_union_with_empty_variant() {
     let input = indoc! {r#"
-        ValueVariant = { Node @value }
+        ValueVariant = { #Node @value }
         Expr = [ Some: ValueVariant None: () ]
     "#};
     insta::assert_snapshot!(emit(input), @r#"
@@ -125,7 +125,7 @@ fn emit_tagged_union_all_empty() {
 
 #[test]
 fn emit_tagged_union_with_builtins() {
-    let input = "Value = [ Text: string Code: Node Empty: () ]";
+    let input = "Value = [ Text: #string Code: #Node Empty: () ]";
     insta::assert_snapshot!(emit(input), @r#"
     type Value =
       | { tag: "Text" }
@@ -138,13 +138,13 @@ fn emit_tagged_union_with_builtins() {
 
 #[test]
 fn emit_optional_null() {
-    let input = "MaybeNode = Node?";
+    let input = "MaybeNode = #Node?";
     insta::assert_snapshot!(emit(input), @"type MaybeNode = SyntaxNode | null;");
 }
 
 #[test]
 fn emit_optional_undefined() {
-    let input = "MaybeNode = Node?";
+    let input = "MaybeNode = #Node?";
     let config = TypeScriptEmitConfig {
         optional_style: OptionalStyle::Undefined,
         ..Default::default()
@@ -155,7 +155,7 @@ fn emit_optional_undefined() {
 #[test]
 fn emit_optional_question_mark() {
     let input = indoc! {r#"
-        MaybeNode = Node?
+        MaybeNode = #Node?
         Foo = { MaybeNode @maybe }
     "#};
     let config = TypeScriptEmitConfig {
@@ -173,20 +173,20 @@ fn emit_optional_question_mark() {
 
 #[test]
 fn emit_list() {
-    let input = "Nodes = Node*";
+    let input = "Nodes = #Node*";
     insta::assert_snapshot!(emit(input), @"type Nodes = SyntaxNode[];");
 }
 
 #[test]
 fn emit_non_empty_list() {
-    let input = "Nodes = Node+";
+    let input = "Nodes = #Node+";
     insta::assert_snapshot!(emit(input), @"type Nodes = [SyntaxNode, ...SyntaxNode[]];");
 }
 
 #[test]
 fn emit_optional_named() {
     let input = indoc! {r#"
-        Stmt = { Node @value }
+        Stmt = { #Node @value }
         MaybeStmt = Stmt?
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -201,7 +201,7 @@ fn emit_optional_named() {
 #[test]
 fn emit_list_named() {
     let input = indoc! {r#"
-        Stmt = { Node @value }
+        Stmt = { #Node @value }
         Stmts = Stmt*
     "#};
     insta::assert_snapshot!(emit(input), @r"
@@ -216,7 +216,7 @@ fn emit_list_named() {
 #[test]
 fn emit_nested_wrappers() {
     let input = indoc! {r#"
-        Item = { Node @value }
+        Item = { #Node @value }
         Items = Item*
         MaybeItems = Items?
     "#};
@@ -234,7 +234,7 @@ fn emit_nested_wrappers() {
 #[test]
 fn emit_list_of_optionals() {
     let input = indoc! {r#"
-        Item = { Node @value }
+        Item = { #Node @value }
         MaybeItem = Item?
         Items = MaybeItem*
     "#};
@@ -253,7 +253,7 @@ fn emit_list_of_optionals() {
 
 #[test]
 fn emit_with_export() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     let config = TypeScriptEmitConfig {
         export: true,
         ..Default::default()
@@ -267,7 +267,7 @@ fn emit_with_export() {
 
 #[test]
 fn emit_readonly_fields() {
-    let input = "Foo = { Node @value string @name }";
+    let input = "Foo = { #Node @value #string @name }";
     let config = TypeScriptEmitConfig {
         readonly: true,
         ..Default::default()
@@ -282,7 +282,7 @@ fn emit_readonly_fields() {
 
 #[test]
 fn emit_custom_node_type() {
-    let input = "Foo = { Node @value }";
+    let input = "Foo = { #Node @value }";
     let config = TypeScriptEmitConfig {
         node_type_name: "TSNode".to_string(),
         ..Default::default()
@@ -296,7 +296,7 @@ fn emit_custom_node_type() {
 
 #[test]
 fn emit_type_alias_instead_of_interface() {
-    let input = "Foo = { Node @value string @name }";
+    let input = "Foo = { #Node @value #string @name }";
     let config = TypeScriptEmitConfig {
         use_type_alias: true,
         ..Default::default()
@@ -317,8 +317,8 @@ fn emit_type_alias_empty() {
 #[test]
 fn emit_type_alias_nested() {
     let input = indoc! {r#"
-        Inner = { Node @value }
-        Outer = { Inner @inner string @label }
+        Inner = { #Node @value }
+        Outer = { Inner @inner #string @label }
     "#};
     let config = TypeScriptEmitConfig {
         use_type_alias: true,
@@ -364,11 +364,11 @@ fn emit_inline_synthetic() {
 #[test]
 fn emit_complex_program() {
     let input = indoc! {r#"
-        FuncInfo = { string @name Node @body }
-        Param = { string @name string @type_annotation }
+        FuncInfo = { #string @name #Node @body }
+        Param = { #string @name #string @type_annotation }
         Params = Param*
         FuncDecl = { FuncInfo @info Params @params }
-        ExprStmt = { Node @expr }
+        ExprStmt = { #Node @expr }
         Stmt = [ Func: FuncDecl Expr: ExprStmt ]
         Program = { Stmt @statements }
     "#};
@@ -407,8 +407,8 @@ fn emit_complex_program() {
 #[test]
 fn emit_mixed_wrappers_and_structs() {
     let input = indoc! {r#"
-        Leaf = { string @text }
-        Branch = { Node @left Node @right }
+        Leaf = { #string @text }
+        Branch = { #Node @left #Node @right }
         Tree = [ Leaf: Leaf Branch: Branch ]
         Forest = Tree*
         MaybeForest = Forest?
@@ -436,8 +436,8 @@ fn emit_mixed_wrappers_and_structs() {
 #[test]
 fn emit_all_config_options() {
     let input = indoc! {r#"
-        MaybeNode = Node?
-        Item = { Node @value MaybeNode @maybe }
+        MaybeNode = #Node?
+        Item = { #Node @value MaybeNode @maybe }
         Items = Item*
     "#};
     let config = TypeScriptEmitConfig {
@@ -465,7 +465,7 @@ fn emit_all_config_options() {
 #[test]
 fn emit_single_variant_union() {
     let input = indoc! {r#"
-        OnlyVariant = { Node @value }
+        OnlyVariant = { #Node @value }
         Single = [ Only: OnlyVariant ]
     "#};
     insta::assert_snapshot!(emit(input), @r#"
@@ -481,7 +481,7 @@ fn emit_single_variant_union() {
 #[test]
 fn emit_deeply_nested() {
     let input = indoc! {r#"
-        A = { Node @val }
+        A = { #Node @val }
         B = { A @a }
         C = { B @b }
         D = { C @c }
@@ -508,8 +508,8 @@ fn emit_deeply_nested() {
 #[test]
 fn emit_union_in_list() {
     let input = indoc! {r#"
-        A = { Node @a }
-        B = { Node @b }
+        A = { #Node @a }
+        B = { #Node @b }
         Choice = [ A: A B: B ]
         Choices = Choice*
     "#};
@@ -533,8 +533,8 @@ fn emit_union_in_list() {
 #[test]
 fn emit_optional_in_struct_null_style() {
     let input = indoc! {r#"
-        MaybeNode = Node?
-        Container = { MaybeNode @item string @name }
+        MaybeNode = #Node?
+        Container = { MaybeNode @item #string @name }
     "#};
     insta::assert_snapshot!(emit(input), @r"
     type MaybeNode = SyntaxNode | null;
@@ -549,8 +549,8 @@ fn emit_optional_in_struct_null_style() {
 #[test]
 fn emit_optional_in_struct_undefined_style() {
     let input = indoc! {r#"
-        MaybeNode = Node?
-        Container = { MaybeNode @item string @name }
+        MaybeNode = #Node?
+        Container = { MaybeNode @item #string @name }
     "#};
     let config = TypeScriptEmitConfig {
         optional_style: OptionalStyle::Undefined,
@@ -569,9 +569,9 @@ fn emit_optional_in_struct_undefined_style() {
 #[test]
 fn emit_tagged_union_with_optional_field_question_mark() {
     let input = indoc! {r#"
-        MaybeNode = Node?
+        MaybeNode = #Node?
         VariantA = { MaybeNode @value }
-        VariantB = { Node @item }
+        VariantB = { #Node @item }
         Choice = [ A: VariantA B: VariantB ]
     "#};
     let config = TypeScriptEmitConfig {
@@ -598,10 +598,10 @@ fn emit_tagged_union_with_optional_field_question_mark() {
 #[test]
 fn emit_struct_with_union_field() {
     let input = indoc! {r#"
-        A = { Node @a }
-        B = { Node @b }
+        A = { #Node @a }
+        B = { #Node @b }
         Choice = [ A: A B: B ]
-        Container = { Choice @choice string @name }
+        Container = { Choice @choice #string @name }
     "#};
     insta::assert_snapshot!(emit(input), @r#"
     interface A {
@@ -627,7 +627,7 @@ fn emit_struct_with_union_field() {
 fn emit_struct_with_forward_ref() {
     let input = indoc! {r#"
         Container = { Later @item }
-        Later = { Node @value }
+        Later = { #Node @value }
     "#};
     insta::assert_snapshot!(emit(input), @r"
     interface Later {
@@ -642,7 +642,7 @@ fn emit_struct_with_forward_ref() {
 
 #[test]
 fn emit_synthetic_type_no_inline() {
-    let input = "<Foo bar> = { Node @value }";
+    let input = "<Foo bar> = { #Node @value }";
     let config = TypeScriptEmitConfig {
         inline_synthetic: false,
         ..Default::default()
@@ -656,7 +656,7 @@ fn emit_synthetic_type_no_inline() {
 
 #[test]
 fn emit_synthetic_type_with_inline() {
-    let input = "<Foo bar> = { Node @value }";
+    let input = "<Foo bar> = { #Node @value }";
     let config = TypeScriptEmitConfig {
         inline_synthetic: true,
         ..Default::default()
@@ -667,8 +667,8 @@ fn emit_synthetic_type_with_inline() {
 #[test]
 fn emit_field_referencing_tagged_union() {
     let input = indoc! {r#"
-        VarA = { Node @x }
-        VarB = { Node @y }
+        VarA = { #Node @x }
+        VarB = { #Node @y }
         Choice = [ A: VarA B: VarB ]
         Container = { Choice @choice }
     "#};
@@ -714,8 +714,8 @@ fn emit_empty_interface_no_type_alias() {
 #[test]
 fn emit_inline_synthetic_struct_with_optional_field() {
     let input = indoc! {r#"
-        MaybeNode = Node?
-        <Inner nested> = { Node @value MaybeNode @maybe }
+        MaybeNode = #Node?
+        <Inner nested> = { #Node @value MaybeNode @maybe }
         Container = { <Inner nested> @inner }
     "#};
     let config = TypeScriptEmitConfig {
@@ -735,8 +735,8 @@ fn emit_inline_synthetic_struct_with_optional_field() {
 #[test]
 fn emit_builtin_value_with_named_key() {
     let input = indoc! {r#"
-        AliasNode = Node
-        AliasString = string
+        AliasNode = #Node
+        AliasString = #string
         AliasUnit = ()
     "#};
     insta::assert_snapshot!(emit(input), @"");
