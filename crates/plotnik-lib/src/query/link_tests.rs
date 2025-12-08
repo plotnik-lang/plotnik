@@ -928,6 +928,13 @@ fn ref_followed_recursive_with_invalid_type() {
       |                       ---- field `name` on `function_declaration`
       |
     help: valid types for `name`: `identifier`
+
+    error: infinite recursion: cycle `Foo` → `Foo` has no escape path
+      |
+    1 | Foo = [(number) (Foo)]
+      |                  ^^^
+      |                  |
+      |                  `Foo` references itself
     ");
 }
 
@@ -941,7 +948,15 @@ fn ref_followed_recursive_valid() {
     let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
 
-    assert!(query.is_valid());
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `Foo` → `Foo` has no escape path
+      |
+    1 | Foo = [(identifier) (Foo)]
+      |                      ^^^
+      |                      |
+      |                      `Foo` references itself
+    ");
 }
 
 #[test]
@@ -957,6 +972,11 @@ fn ref_followed_mutual_recursion() {
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `Foo` → `Foo` has no escape path
+      |
+    1 | Foo = [(number) (Bar)]
+      | ^
+
     error: node type `number` is not valid for this field
       |
     1 | Foo = [(number) (Bar)]
