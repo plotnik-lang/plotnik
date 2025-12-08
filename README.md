@@ -243,6 +243,6 @@ The CLI foundation exists. The full developer experience is ahead.
 
 ## License
 
-This project is licensed under the [MIT license].
+This project is licensed under the [AGPLv3].
 
-[MIT license]: LICENSE.md
+[AGPLv3]: LICENSE
