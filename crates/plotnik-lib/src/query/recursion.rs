@@ -253,9 +253,9 @@ impl Query<'_> {
                 let to = &path[(i + 1) % path.len()];
                 self.find_reference_location(from, to).map(|range| {
                     let msg = if i == path.len() - 1 {
-                        format!("`{}` references `{}` (completing cycle)", from, to)
+                        format!("references `{}` (completing cycle)", to)
                     } else {
-                        format!("`{}` references `{}`", from, to)
+                        format!("references `{}`", to)
                     };
                     (range, msg)
                 })
@@ -267,7 +267,7 @@ impl Query<'_> {
         if cycle.len() == 1 {
             return self
                 .find_unguarded_reference_location(&cycle[0], &cycle[0])
-                .map(|range| vec![(range, format!("`{}` references itself", cycle[0]))])
+                .map(|range| vec![(range, "references itself".to_string())])
                 .unwrap_or_default();
         }
         self.build_chain_generic(cycle, |from, to| {
@@ -286,9 +286,9 @@ impl Query<'_> {
                 let to = &path_nodes[(i + 1) % path_nodes.len()];
                 find_loc(from, to).map(|range| {
                     let msg = if i == path_nodes.len() - 1 {
-                        format!("`{}` references `{}` (completing cycle)", from, to)
+                        format!("references `{}` (completing cycle)", to)
                     } else {
-                        format!("`{}` references `{}`", from, to)
+                        format!("references `{}`", to)
                     };
                     (range, msg)
                 })
@@ -302,14 +302,6 @@ impl Query<'_> {
         scc: &[String],
         related: Vec<(TextRange, String)>,
     ) {
-        let cycle_str = if scc.len() == 1 {
-            format!("`{}` → `{}`", primary_name, primary_name)
-        } else {
-            let mut cycle: Vec<_> = scc.iter().map(|s| format!("`{}`", s)).collect();
-            cycle.push(format!("`{}`", scc[0]));
-            cycle.join(" → ")
-        };
-
         let range = related
             .first()
             .map(|(r, _)| *r)
@@ -325,8 +317,7 @@ impl Query<'_> {
 
         let mut builder = self
             .recursion_diagnostics
-            .report(DiagnosticKind::RecursionNoEscape, range)
-            .message(format!("cycle {} has no escape path", cycle_str));
+            .report(DiagnosticKind::RecursionNoEscape, range);
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);
@@ -344,14 +335,6 @@ impl Query<'_> {
         scc: &[String],
         related: Vec<(TextRange, String)>,
     ) {
-        let cycle_str = if scc.len() == 1 {
-            format!("`{}` → `{}`", primary_name, primary_name)
-        } else {
-            let mut cycle: Vec<_> = scc.iter().map(|s| format!("`{}`", s)).collect();
-            cycle.push(format!("`{}`", scc[0]));
-            cycle.join(" → ")
-        };
-
         let range = related
             .first()
             .map(|(r, _)| *r)
@@ -367,11 +350,7 @@ impl Query<'_> {
 
         let mut builder = self
             .recursion_diagnostics
-            .report(DiagnosticKind::DirectRecursion, range)
-            .message(format!(
-                "cycle {} will stuck without matching anything",
-                cycle_str
-            ));
+            .report(DiagnosticKind::DirectRecursion, range);
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);
