@@ -78,15 +78,15 @@ fn mutual_recursion() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B))
-      |           - `A` references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 

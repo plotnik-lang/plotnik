@@ -162,8 +162,8 @@ impl DiagnosticKind {
             Self::DuplicateDefinition => "name already defined",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
-            Self::RecursionNoEscape => "infinite recursion detected",
-            Self::DirectRecursion => "direct recursion: query will stuck without matching anything",
+            Self::RecursionNoEscape => "infinite recursion: cycle has no escape path",
+            Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field must match exactly one node",
 
             // Link pass - grammar validation
@@ -199,10 +199,6 @@ impl DiagnosticKind {
             Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
             Self::InvalidFieldChildType => "node type `{}` is not valid for this field".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
-
-            // Recursion with cycle path
-            Self::RecursionNoEscape => "infinite recursion: {}".to_string(),
-            Self::DirectRecursion => "direct recursion: {}".to_string(),
 
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),

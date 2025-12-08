@@ -29,12 +29,12 @@ fn invalid_recursion_with_plus() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | E = (call (E)+)
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -45,12 +45,12 @@ fn invalid_unguarded_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `E` → `E` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | E = [(call) (E)]
       |              ^
       |              |
-      |              `E` references itself
+      |              references itself
     ");
 }
 
@@ -68,12 +68,12 @@ fn invalid_mandatory_recursion_in_tree_child() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | E = (call (E))
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -84,12 +84,12 @@ fn invalid_mandatory_recursion_in_field() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | E = (call body: (E))
       |                  ^
       |                  |
-      |                  `E` references itself
+      |                  E references itself
     ");
 }
 
@@ -100,12 +100,12 @@ fn invalid_mandatory_recursion_in_capture() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | E = (call (E) @inner)
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -116,12 +116,12 @@ fn invalid_mandatory_recursion_in_sequence() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | E = (call {(a) (E)})
       |                 ^
       |                 |
-      |                 `E` references itself
+      |                 E references itself
     ");
 }
 
@@ -143,15 +143,15 @@ fn invalid_mutual_recursion_without_base_case() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B))
-      |           - `A` references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -178,17 +178,17 @@ fn invalid_three_way_mutual_recursion() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `C` → `B` → `A` → `C` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (a (B))
-      |         - `A` references `B`
+      |         - references B
     2 | B = (b (C))
-      |         - `B` references `C` (completing cycle)
+      |         - references C (completing cycle)
     3 | C = (c (A))
       | -       ^
       | |       |
-      | |       `C` references `A`
-      | `C` is defined here
+      | |       references A
+      | C is defined here
     ");
 }
 
@@ -217,18 +217,18 @@ fn invalid_diamond_dependency_recursion() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `C` → `D` → `B` → `A` → `C` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (a [(B) (C)])
-      |              - `A` references `C` (completing cycle)
+      |              - references C (completing cycle)
     2 | B = (b (D))
     3 | C = (c (D))
       | -       ^
       | |       |
-      | |       `C` references `D`
-      | `C` is defined here
+      | |       references D
+      | C is defined here
     4 | D = (d (A))
-      |         - `D` references `A`
+      |         - references A
     ");
 }
 
@@ -243,15 +243,15 @@ fn invalid_mutual_recursion_via_field() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo body: (B))
-      |                 - `A` references `B` (completing cycle)
+      |                 - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -266,15 +266,15 @@ fn invalid_mutual_recursion_via_capture() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B) @cap)
-      |           - `A` references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -289,15 +289,15 @@ fn invalid_mutual_recursion_via_sequence() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo {(x) (B)})
-      |                - `A` references `B` (completing cycle)
+      |                - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -323,15 +323,15 @@ fn invalid_mutual_recursion_with_plus_quantifier() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `B` → `A` → `B` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B)+)
-      |           - `A` references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         `B` references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -364,12 +364,12 @@ fn invalid_direct_left_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `E` → `E` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | E = [(E) (x)]
       |       ^
       |       |
-      |       `E` references itself
+      |       references itself
     ");
 }
 
@@ -380,12 +380,12 @@ fn invalid_direct_right_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `E` → `E` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | E = [(x) (E)]
       |           ^
       |           |
-      |           `E` references itself
+      |           references itself
     ");
 }
 
@@ -396,12 +396,12 @@ fn invalid_direct_left_recursion_in_tagged_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `E` → `E` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | E = [Left: (E) Right: (x)]
       |             ^
       |             |
-      |             `E` references itself
+      |             references itself
     ");
 }
 
@@ -415,12 +415,12 @@ fn invalid_unguarded_left_recursion_branch() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `A` → `A` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) 'escape']
       |       ^
       |       |
-      |       `A` references itself
+      |       references itself
     ");
 }
 
@@ -434,12 +434,12 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `A` → `A` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) _]
       |       ^
       |       |
-      |       `A` references itself
+      |       references itself
     ");
 }
 
@@ -453,12 +453,12 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `A` → `A` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) (leaf)]
       |       ^
       |       |
-      |       `A` references itself
+      |       references itself
     ");
 }
 
@@ -482,12 +482,12 @@ fn invalid_mandatory_recursion_direct_child() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (A))
       |           ^
       |           |
-      |           `A` references itself
+      |           A references itself
     ");
 }
 
@@ -524,12 +524,12 @@ fn invalid_simple_unguarded_recursion() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `A` → `A` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     3 |   (A)
       |    ^
       |    |
-      |    `A` references itself
+      |    references itself
     ");
 }
 
@@ -544,14 +544,14 @@ fn invalid_unguarded_mutual_recursion_chain() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `B` → `A` → `B` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | A = [(B) (x)]
-      |       - `A` references `B` (completing cycle)
+      |       - references B (completing cycle)
     2 | B = (A)
       | -    ^
       | |    |
-      | |    `B` references `A`
-      | `B` is defined here
+      | |    references A
+      | B is defined here
     ");
 }

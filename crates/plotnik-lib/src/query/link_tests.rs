@@ -929,12 +929,12 @@ fn ref_followed_recursive_with_invalid_type() {
       |
     help: valid types for `name`: `identifier`
 
-    error: direct recursion: cycle `Foo` → `Foo` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | Foo = [(number) (Foo)]
       |                  ^^^
       |                  |
-      |                  `Foo` references itself
+      |                  references itself
     ");
 }
 
@@ -950,12 +950,12 @@ fn ref_followed_recursive_valid() {
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: cycle `Foo` → `Foo` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | Foo = [(identifier) (Foo)]
       |                      ^^^
       |                      |
-      |                      `Foo` references itself
+      |                      references itself
     ");
 }
 
@@ -991,15 +991,15 @@ fn ref_followed_mutual_recursion() {
       |
     help: valid types for `name`: `identifier`
 
-    error: direct recursion: cycle `Bar` → `Foo` → `Bar` will stuck without matching anything
+    error: infinite recursion: cycle consumes no input
       |
     1 | Foo = [(number) (Bar)]
-      |                  --- `Foo` references `Bar` (completing cycle)
+      |                  --- references Bar (completing cycle)
     2 | Bar = [(string) (Foo)]
       | ---              ^^^
       | |                |
-      | |                `Bar` references `Foo`
-      | `Bar` is defined here
+      | |                references Foo
+      | Bar is defined here
     ");
 }
 
