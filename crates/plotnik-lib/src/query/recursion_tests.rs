@@ -367,6 +367,22 @@ fn invalid_direct_left_recursion_in_alternation() {
 }
 
 #[test]
+fn invalid_direct_left_recursion_in_tagged_alternation() {
+    let query = Query::try_from("E = [Left: (E) Right: (x)]").unwrap();
+
+    assert!(!query.is_valid());
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle `E` → `E` has no escape path
+      |
+    1 | E = [Left: (E) Right: (x)]
+      |             ^
+      |             |
+      |             `E` references itself
+    ");
+}
+
+#[test]
 fn invalid_unguarded_left_recursion_branch() {
     let input = indoc! {r#"
         A = [(A) 'escape']
@@ -389,7 +405,7 @@ fn invalid_unguarded_left_recursion_branch() {
 fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     let input = indoc! {r#"
         A = [(A) _]
-    "#};
+     "#};
     let query = Query::try_from(input).unwrap();
 
     assert!(!query.is_valid());
