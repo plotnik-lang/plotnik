@@ -83,9 +83,10 @@ fn mutual_recursion() {
     1 | A = (foo (B))
       |           - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
