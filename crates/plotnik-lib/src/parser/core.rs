@@ -6,9 +6,8 @@ use super::ast::Root;
 use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-
 use crate::Error;
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
 
 #[derive(Debug)]
 pub struct ParseResult {
@@ -19,13 +18,12 @@ pub struct ParseResult {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OpenDelimiter {
-    #[allow(dead_code)] // for future mismatch detection (e.g., `(]`)
+    #[allow(dead_code)] // for future mismatch detection
     pub kind: SyntaxKind,
     pub span: TextRange,
 }
 
-/// Trivia tokens (whitespace, comments) are buffered and flushed as leading trivia
-/// when starting a new node. This gives predictable trivia attachment without backtracking.
+/// Trivia tokens are buffered and flushed when starting a new node.
 pub struct Parser<'src> {
     pub(super) source: &'src str,
     pub(super) tokens: Vec<Token>,
@@ -101,7 +99,6 @@ impl<'src> Parser<'src> {
         self.fatal_error.is_some()
     }
 
-    /// Returns `Error` at EOF (acts as sentinel).
     pub(super) fn current(&self) -> SyntaxKind {
         self.nth(0)
     }
@@ -112,7 +109,6 @@ impl<'src> Parser<'src> {
 
     pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
         self.ensure_progress();
-
         self.tokens
             .get(self.pos + lookahead)
             .map_or(SyntaxKind::Error, |t| t.kind)
@@ -203,7 +199,6 @@ impl<'src> Parser<'src> {
         self.builder.start_node(kind.into());
     }
 
-    /// Wrap previously-parsed content using checkpoint.
     pub(super) fn start_node_at(&mut self, checkpoint: Checkpoint, kind: SyntaxKind) {
         self.builder.start_node_at(checkpoint, kind.into());
     }
@@ -219,9 +214,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
-
         self.reset_debug_fuel();
-
         self.consume_exec_fuel();
 
         let token = self.tokens[self.pos];
@@ -232,11 +225,8 @@ impl<'src> Parser<'src> {
 
     pub(super) fn skip_token(&mut self) {
         assert!(!self.eof(), "skip_token called at EOF");
-
         self.reset_debug_fuel();
-
         self.consume_exec_fuel();
-
         self.pos += 1;
     }
 
@@ -249,47 +239,31 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// On mismatch: emit diagnostic but don't consume (allows parent recovery).
+    /// On mismatch: emit diagnostic but don't consume.
     pub(super) fn expect(&mut self, kind: SyntaxKind, what: &str) -> bool {
         if self.eat(kind) {
             return true;
         }
-        let msg = format!("expected {}", what);
-        self.error_msg(DiagnosticKind::UnexpectedToken, &msg);
+        self.error_msg(
+            DiagnosticKind::UnexpectedToken,
+            format!("expected {}", what),
+        );
         false
     }
 
-    /// Returns the suppression span for the current context.
-    ///
-    /// If inside a delimiter (tree/seq/alt), returns a span from the delimiter's
-    /// start to the end of source. This ensures all errors within the same
-    /// delimiter context can suppress each other based on priority.
-    /// At root level, returns the current token's span.
     pub(super) fn current_suppression_span(&self) -> TextRange {
         self.delimiter_stack
             .last()
-            .map(|d| {
-                let source_end = TextSize::from(self.source.len() as u32);
-                TextRange::new(d.span.start(), source_end)
-            })
+            .map(|d| TextRange::new(d.span.start(), TextSize::from(self.source.len() as u32)))
             .unwrap_or_else(|| self.current_span())
     }
 
-    fn error_impl(&mut self, kind: DiagnosticKind, message: Option<&str>) {
-        let range = self.current_span();
-        let pos = range.start();
+    fn should_report(&mut self, pos: TextSize) -> bool {
         if self.last_diagnostic_pos == Some(pos) {
-            return;
+            return false;
         }
         self.last_diagnostic_pos = Some(pos);
-
-        let suppression = self.current_suppression_span();
-        let builder = self.diagnostics.report(kind, range);
-        let builder = match message {
-            Some(msg) => builder.message(msg),
-            None => builder,
-        };
-        builder.suppression_range(suppression).emit();
+        true
     }
 
     fn bump_as_error(&mut self) {
@@ -300,14 +274,34 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Emit diagnostic with default message for the kind.
-    pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        self.error_impl(kind, None);
+    fn get_error_ranges(&mut self) -> Option<(TextRange, TextRange)> {
+        let range = self.current_span();
+        if !self.should_report(range.start()) {
+            return None;
+        }
+        let suppression = self.current_suppression_span();
+        Some((range, suppression))
     }
 
-    /// Emit diagnostic with custom message detail.
-    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: &str) {
-        self.error_impl(kind, Some(message));
+    pub(super) fn error(&mut self, kind: DiagnosticKind) {
+        let Some((range, suppression)) = self.get_error_ranges() else {
+            return;
+        };
+        self.diagnostics
+            .report(kind, range)
+            .suppression_range(suppression)
+            .emit();
+    }
+
+    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
+        let Some((range, suppression)) = self.get_error_ranges() else {
+            return;
+        };
+        self.diagnostics
+            .report(kind, range)
+            .message(message)
+            .suppression_range(suppression)
+            .emit();
     }
 
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
@@ -315,7 +309,7 @@ impl<'src> Parser<'src> {
         self.bump_as_error();
     }
 
-    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: &str) {
+    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
         self.error_msg(kind, message);
         self.bump_as_error();
     }
@@ -359,14 +353,11 @@ impl<'src> Parser<'src> {
         true
     }
 
-    fn at_def_start(&mut self) -> bool {
+    pub(super) fn at_def_start(&mut self) -> bool {
         let kind = self.peek();
-        // Named def: UpperIdent followed by =
         if kind == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
             return true;
         }
-        // Anonymous def: tokens that can validly start a root-level expression
-        // (excludes LowerIdent, Dot, Negation which only make sense inside trees)
         ROOT_EXPR_FIRST.contains(kind)
     }
 
@@ -400,8 +391,6 @@ impl<'src> Parser<'src> {
         self.delimiter_stack.pop()
     }
 
-    /// Error for unclosed delimiters - uses full span from opening to current position.
-    /// This enables proper cascading error suppression.
     pub(super) fn error_unclosed_delimiter(
         &mut self,
         kind: DiagnosticKind,
@@ -410,12 +399,10 @@ impl<'src> Parser<'src> {
         open_range: TextRange,
     ) {
         let current = self.current_span();
-        let pos = current.start();
-        if self.last_diagnostic_pos == Some(pos) {
+        if !self.should_report(current.start()) {
             return;
         }
-        self.last_diagnostic_pos = Some(pos);
-        // Full span from opening delimiter to current position for suppression
+        // Use full range for easier downstream error suppression
         let full_range = TextRange::new(open_range.start(), current.end());
         self.diagnostics
             .report(kind, full_range)
@@ -425,12 +412,11 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn last_non_trivia_end(&self) -> Option<TextSize> {
-        for i in (0..self.pos).rev() {
-            if !self.tokens[i].kind.is_trivia() {
-                return Some(self.tokens[i].span.end());
-            }
-        }
-        None
+        self.tokens[..self.pos]
+            .iter()
+            .rev()
+            .find(|t| !t.kind.is_trivia())
+            .map(|t| t.span.end())
     }
 
     pub(super) fn error_with_fix(
@@ -441,11 +427,9 @@ impl<'src> Parser<'src> {
         fix_description: impl Into<String>,
         fix_replacement: impl Into<String>,
     ) {
-        let pos = range.start();
-        if self.last_diagnostic_pos == Some(pos) {
+        if !self.should_report(range.start()) {
             return;
         }
-        self.last_diagnostic_pos = Some(pos);
         self.diagnostics
             .report(kind, range)
             .message(message)
