@@ -1,68 +1,137 @@
-# plotnik
+# Ethos
 
-Query language for tree-sitter AST with named subqueries, recursion, and type inference. See [docs/REFERENCE.md](docs/REFERENCE.md) for spec.
+- `AGENTS.md` (this file) is our constitution. You're welcome to propose useful amendments.
+- We implement resilient parser, provides user-friendly error messages.
+- We call error messages "diagnostics" to avoid confusion with other errors (see `diagnostics/` folder).
+- We strive to achieve excellent stability by enforcing invariants in the code:
+  - `assert!` and `.expect()` for simple cases
+  - `invariants.rs` otherwise, to skip the coverage of unreachable code
 
-Lexer (logos) + parser (rowan) are resilient: collect errors, don't fail-fast.
+# Plotnik Query Language
 
-## Project Structure
+Plotnik is a strongly-typed, whitespace-delimited pattern matching language for syntax trees (similar to Tree-sitter but stricter).
+
+## Grammar Synopsis
+
+- **Root**: List of definitions (`Def = expr`).
+- **Nodes**: `(kind child1 child2)` or `(kind)`.
+- **Strings**: `"literal"`, `'literal'`.
+- **Wildcards**: `_` (matches any node).
+- **Sequences**: `{ expr1 expr2 }`.
+- **Alternations**: `[ expr1 expr2 ]` (untagged) OR `[ Label: expr1 Label: expr2 ]` (tagged).
+- **References**: `(DefName)` (Must be PascalCase, no children).
+
+## Modifiers & Constraints
+
+| Feature        | Syntax           | Constraint                                             |
+| :------------- | :--------------- | :----------------------------------------------------- |
+| **Field**      | `name: expr`     | `expr` must match exactly **one** node (no multi-seq). |
+| **Negation**   | `!name`          | Asserts field `name` is absent.                        |
+| **Capture**    | `expr @name`     | `snake_case`. Suffix.                                  |
+| **Type**       | `expr ::Type`    | `PascalCase` or `::string`. Suffix.                    |
+| **Quantifier** | `*`, `+`, `?`    | Greedy. Suffix.                                        |
+| **Non-Greedy** | `*?`, `+?`, `??` | Suffix.                                                |
+| **Anchor**     | `.`              | Immediate child anchor.                                |
+
+## CRITICAL RULES (Strict Enforcement)
+
+1.  **CASING MATTERS**:
+    - **Definitions/Refs**: `PascalCase` (e.g., `MethodDecl`, `(MethodDecl)`).
+    - **Node Kinds**: `snake_case` (e.g., `(identifier)`).
+    - **Fields/Captures**: `snake_case` (e.g., `name:`, `@val`).
+    - **Branch Labels**: `PascalCase` (e.g., `[ Ok: (true) Err: (false) ]`).
+2.  **NO MIXED ALTS**: Alternations must be ALL labeled or ALL unlabeled.
+3.  **REFS HAVE NO CHILDREN**:
+    - Does not work: `(MyDef child)`
+
+## Examples
+
+```plotnik
+// Definition
+Function = (function_definition
+    name: (identifier) @name
+    parameters: (parameters {
+        (identifier)*
+    })
+    body: (Block)
+)
+
+// Reference usage
+Block = (block {
+    [
+        Stmt: (Statement)
+        Expr: (Expression)
+    ]*
+})
+
+// Alternation with labels
+Boolean = [
+    True: "true"
+    False: "false"
+]
+```
+
+# Plotnik Query Data Model and Type Inference
+
+1.  **Flat Scoping (Golden Rule)**
+    - Query nesting doesn't create data nesting
+    - `(A (B (C @val)))` → `{ val: Node }`. Intermediate nodes are ignored.
+    - **New Scope** is created _only_ by capturing a container: `{...} @name` or `[...] @name`.
+
+2.  **Field Generation**
+    - Only explicit `@capture` creates a field.
+    - `key: (pattern)` is a structural constraint, **NOT** an extraction. It has nothing to do with tree-sitter fields.
+
+3.  **Cardinality**
+    - `(x) @k` → `k: T` (Required)
+    - `(x)? @k` → `k: T?` (Optional)
+    - `(x)* @k` → `k: T[]` (List)
+    - `(x)+ @k` → `k: [T, ...T[]]` (Non-empty List)
+
+4.  **Types**
+    - `(some_node) @x` (default) → `Node` (AST reference).
+    - `{...} @x` → receives some synthetic name based on the type of parent scope and capture name
+      - `Query = { (foo) @foo (bar) @bar (baz) @baz } @qux`:
+        - `@foo`, `@bar`, `@baz`: `Node` for
+        - `@qux`: `struct QueryQux { foo: Node, bar: Node, baz: Node }`
+        - entry point: `struct Query { qux : QueryQux }`
+    - `@x :: string` → `string` (extracts source text).
+    - `@x :: Type` → `Type` (assigns nominal type to the structure).
+
+5.  **Alternations**
+    - Tagged: `[ L1: (a) @x  L2: (b) @y ]`
+      → Discriminated Union: `{ tag: "L1", x: Node } | { tag: "L2", y: Node }`.
+    - Untagged: `[ (a) @x  (b) @x ]`
+      → Merged Struct: `{ x: Node }`. Captures must be type-compatible across branches.
+    - Mixed: `[ (a) @x  (b) ]` (invalid) - the diagnostics will be reported, but we infer as for untagged
+      → Merged Struct: `{ x: Node }`. Captures must be type-compatible across branches.
+
+# Project Structure
 
 ```
 crates/
-  plotnik-lib/         # Core library
-    src/
-      diagnostics/     # Diagnostic infrastructure
-        mod.rs         # Diagnostics struct, DiagnosticBuilder
-        message.rs     # DiagnosticMessage, Severity, Fix
-        printer.rs     # DiagnosticsPrinter for rendering
-      parser/          # Syntax infrastructure
-        lexer.rs       # Token definitions (logos)
-        cst.rs         # SyntaxKind enum
-        ast.rs         # Typed AST wrappers over CST
-        core.rs        # Parser infrastructure
-        grammar.rs     # Grammar rules
-        invariants.rs  # Parser invariant checks
-        mod.rs         # Re-exports, Parse struct, parse()
-        tests/         # Parser tests (snapshots)
-        *_tests.rs     # Test files (lexer_tests, ast_tests, cst_tests)
-      query/           # Query processing
-        mod.rs         # Query struct, new(), pipeline
-        dump.rs        # dump_* debug output methods (test-only)
-        printer.rs     # QueryPrinter for AST output
-        invariants.rs  # Query invariant checks
-        alt_kinds.rs     # Alternation validation
-        symbol_table.rs  # Name resolution, symbol table
-        recursion.rs     # Escape analysis (recursion validation)
-        shapes.rs        # Shape inference
-        *_tests.rs     # Test files per module
-      lib.rs           # Re-exports Query, Diagnostics, Error
   plotnik-cli/         # CLI tool
     src/commands/      # Subcommands (debug, docs, langs)
-  plotnik-langs/       # Tree-sitter language bindings
+  plotnik-core/        # Common code
+  plotnik-lib/         # Plotnik as library
+    src/
+      diagnostics/     # Diagnostics (user-friendly errors)
+      parser/          # Syntactic parsing of the query
+      query/           # Analysis and representation of the parsed query
+  plotnik-langs/       # Tree-sitter language bindings (wrapped)
+  plotnik-macros/      # Proc macros of the project
 docs/
+  adr/                 # Architecture Decision Records (ADRs)
   REFERENCE.md         # Language specification
 ```
 
-## Pipeline
-
-```rust
-parser::parse()           // Parse → CST
-alt_kinds::validate()     // Validate alternation kinds
-symbol_table::resolve()   // Resolve names → SymbolTable
-recursion::validate()     // Validate recursion termination
-shapes::infer()           // Infer and validate shape cardinalities
-```
-
-Module = "what", function = "action".
-
-## CLI
+# CLI
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-- `debug` — Inspect queries/sources
-- `docs [topic]` — Print docs (reference, examples)
+- `debug` — Inspect queries and source file ASTs
+  - Example: `cargo run -p plotnik-cli -- debug -q '(foo) @bar'`
 - `langs` — List supported languages
-
-### debug options
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
@@ -76,79 +145,44 @@ cargo run -p plotnik-cli -- debug -s app.ts --raw
 cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript
 ```
 
-## Syntax
+# Coding rules
 
-Grammar: `(type)`, `[a b]` (alt), `{a b}` (seq), `_` (wildcard), `@name`, `::Type`, `field:`, `*+?`, `"lit"`/`'lit'`, `(a/b)` (supertype), `(ERROR)`, `Name = expr` (def), `[A: ... B: ...]` (tagged alt)
+- Avoid nesting logic: prefer early exit in functions (return) and loops (continue/break)
+- Write code comments for seniors, not for juniors
 
-SyntaxKind: `Root`, `Tree`, `Ref`, `Str`, `Field`, `Capture`, `Type`, `Quantifier`, `Seq`, `Alt`, `Branch`, `Wildcard`, `Anchor`, `NegatedField`, `Def`
+# Testing rules
 
-Expr = `Tree | Ref | Str | Alt | Seq | Capture | Quantifier | Field | Wildcard`. Quantifier/Capture wrap their target. `Anchor` and `NegatedField` are predicates (not expressions).
-
-## Diagnostics
-
-`Diagnostics` struct collects errors/warnings across passes. Access per-pass or combined:
-
-```rust
-query.parse_diagnostics()      // Parse errors
-query.alt_kind_diagnostics()   // Alternation validation
-query.resolve_diagnostics()    // Name resolution
-query.ref_cycle_diagnostics()  // Recursion validation
-query.shape_diagnostics()      // Shape cardinality validation
-query.all_diagnostics()        // All combined
-query.diagnostics()            // Alias for all_diagnostics()
-```
-
-Render: `query.render_diagnostics()` or `query.render_diagnostics_colored(bool)`.
-
-Check validity: `query.is_valid()` returns false if any pass has errors (warnings allowed).
-
-## Constraints
-
-- Defs must be named except last (entry point)
-- Fields: `field: expr` — no sequences as direct values
-- Alternations: same-name captures need same type; use `@x :: T` for merged structs; tagged alts for discriminated unions
-- `.` anchor = strict adjacency; without = scanning
-- Names: `Upper` = user-defined, `lower` = tree-sitter nodes
-- Captures: snake_case only, no dots
-
-## Data Model
-
-- Nesting in query ≠ nesting in output: `(a (b @b))` → `{b: Node}`
-- New scopes only from captured `{...}@s` or `[...]@c`
-- `?`/`*`/`+` = optional/list/non-empty list
-
-## AST Layer (`parser/ast.rs`)
-
-Types: `Root`, `Def`, `Tree`, `Ref`, `Str`, `Alt`, `Branch`, `Seq`, `Capture`, `Type`, `Quantifier`, `Field`, `NegatedField`, `Wildcard`, `Anchor`, `Expr`
-
-Use `Option<T>` for casts, not `TryFrom`. Use `QueryPrinter` from `query/printer.rs` for output.
-
-## Testing
-
-Uses `insta` for snapshot testing.
-
-### File organization
+## File organization
 
 - Code lives in `foo.rs`, tests live in `foo_tests.rs`
 - Test module included via `#[cfg(test)] mod foo_tests;` in parent
 
-### Test structure
+## CLI commands
+
+- IMPORTANT: the `debug` is your first tool you should use to test your changes
+- Run tests: `cargo nextest run --hide-progress-bar --status-level none --failure-output final`
+- We use snapshot testing (`insta`) heavily
+  - Accept snapshots: `cargo insta accept`
+
+## Test structure
 
 - Separate AAA (Arrange-Act-Assert) parts by blank lines
-- Input: string → Output: snapshot of string
+  - Exception: when the test is 3 or less lines total
+- Desired structure: input is string, output is string (snapshot of something)
 - Single-line input: plain string literal
 - Multi-line input: `indoc!` macro
-- Never write expected snapshot content manually — always `@""`
+- IMPORTANT: never write snapshots manually — always use `@""` and then `cargo insta accept`
 
 ```rust
 #[test]
 fn valid_query() {
     let input = indoc! {r#"
-    (function_declaration
+      (function_declaration
         name: (identifier) @name)
     "#};
 
     let query = Query::try_from(input).unwrap();
+
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @"");
 }
@@ -168,14 +202,7 @@ fn error_case() {
 }
 ```
 
-### Workflow
-
-```sh
-cargo test --workspace
-cargo insta accept
-```
-
-### Patterns by test type
+## Patterns by test type
 
 - Valid parsing: `assert!(query.is_valid())` + snapshot `dump_*()` output
 - Error recovery: `assert!(!query.is_valid())` + snapshot `dump_diagnostics()` only
@@ -188,39 +215,12 @@ Uses `cargo-llvm-cov`, already installed.
 Find uncovered lines per file:
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]\+\(, [0-9]\+\)\*\?'
+cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]'
 ```
 
-## Invariants
+### `invariants.rs`
 
-Two-tier resilience strategy:
-
-1. Parser: resilient, collects errors, continues parsing
-2. Our code: strict invariants, maximal coverage in tests, panic on violations
-
-Invariant checks live in dedicated modules named `invariants.rs`.
-They are excluded from test coverage because they're unreachable.
-They usually wrap a specific assert.
-It was done due to limitation of inline coverage exclusion in Rust.
-But it seems to be useful to extract such invariant check helpers anyways:
-
-- if it just performs assertion and doesn't return value, it starts with `assert_`
-- if it returns value, it's name consists of' `ensure_` and some statement about return value
-  Find any of such files for more examples.
-
-## Not implemented
-
-- Semantic validation: casing rules
-
-## Deferred
-
-- Predicates (`#match?` etc.) — runtime filters, not structural
-
-## Rules
-
-- Update AGENTS.md when changes add useful context
-- Check diagnostics after changes
-- Follow rnix-parser/taplo patterns
-- Span-based tokens, no text in intermediate structures
-- Don't put AI slop comments in the code
-- IMPORTANT: Avoid nesting logic, prefer early exit code flow in functions (return) and loops (continue/break)
+- Contains functions and `impl` blocks for invariant check functionality
+- Each function panics on invariant violation, it may or may not return the value
+- When returning value, the name is `ensure_something(...)`, where something is related to return value
+- When there is no return value, the name is `assert_something(...)` and something is related to function arguments
