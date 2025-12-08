@@ -34,7 +34,7 @@ fn invalid_recursion_with_plus() {
     1 | E = (call (E)+)
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -73,7 +73,7 @@ fn invalid_mandatory_recursion_in_tree_child() {
     1 | E = (call (E))
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -89,7 +89,7 @@ fn invalid_mandatory_recursion_in_field() {
     1 | E = (call body: (E))
       |                  ^
       |                  |
-      |                  `E` references itself
+      |                  E references itself
     ");
 }
 
@@ -105,7 +105,7 @@ fn invalid_mandatory_recursion_in_capture() {
     1 | E = (call (E) @inner)
       |            ^
       |            |
-      |            `E` references itself
+      |            E references itself
     ");
 }
 
@@ -121,7 +121,7 @@ fn invalid_mandatory_recursion_in_sequence() {
     1 | E = (call {(a) (E)})
       |                 ^
       |                 |
-      |                 `E` references itself
+      |                 E references itself
     ");
 }
 
@@ -146,12 +146,12 @@ fn invalid_mutual_recursion_without_base_case() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B))
-      |           - references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -181,14 +181,14 @@ fn invalid_three_way_mutual_recursion() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (a (B))
-      |         - references `B`
+      |         - references B
     2 | B = (b (C))
-      |         - references `C` (completing cycle)
+      |         - references C (completing cycle)
     3 | C = (c (A))
       | -       ^
       | |       |
-      | |       references `A`
-      | `C` is defined here
+      | |       references A
+      | C is defined here
     ");
 }
 
@@ -220,15 +220,15 @@ fn invalid_diamond_dependency_recursion() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (a [(B) (C)])
-      |              - references `C` (completing cycle)
+      |              - references C (completing cycle)
     2 | B = (b (D))
     3 | C = (c (D))
       | -       ^
       | |       |
-      | |       references `D`
-      | `C` is defined here
+      | |       references D
+      | C is defined here
     4 | D = (d (A))
-      |         - references `A`
+      |         - references A
     ");
 }
 
@@ -246,12 +246,12 @@ fn invalid_mutual_recursion_via_field() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo body: (B))
-      |                 - references `B` (completing cycle)
+      |                 - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -269,12 +269,12 @@ fn invalid_mutual_recursion_via_capture() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B) @cap)
-      |           - references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -292,12 +292,12 @@ fn invalid_mutual_recursion_via_sequence() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo {(x) (B)})
-      |                - references `B` (completing cycle)
+      |                - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -326,12 +326,12 @@ fn invalid_mutual_recursion_with_plus_quantifier() {
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B)+)
-      |           - references `B` (completing cycle)
+      |           - references B (completing cycle)
     2 | B = (bar (A))
       | -         ^
       | |         |
-      | |         references `A`
-      | `B` is defined here
+      | |         references A
+      | B is defined here
     ");
 }
 
@@ -487,7 +487,7 @@ fn invalid_mandatory_recursion_direct_child() {
     1 | A = (foo (A))
       |           ^
       |           |
-      |           `A` references itself
+      |           A references itself
     ");
 }
 
@@ -547,11 +547,11 @@ fn invalid_unguarded_mutual_recursion_chain() {
     error: infinite recursion: cycle consumes no input
       |
     1 | A = [(B) (x)]
-      |       - references `B` (completing cycle)
+      |       - references B (completing cycle)
     2 | B = (A)
       | -    ^
       | |    |
-      | |    references `A`
-      | `B` is defined here
+      | |    references A
+      | B is defined here
     ");
 }

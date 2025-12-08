@@ -204,7 +204,7 @@ impl Query<'_> {
 
     fn build_self_ref_chain(&self, name: &str) -> Vec<(TextRange, String)> {
         self.find_reference_location(name, name)
-            .map(|range| vec![(range, format!("`{}` references itself", name))])
+            .map(|range| vec![(range, format!("{} references itself", name))])
             .unwrap_or_default()
     }
 
@@ -253,9 +253,9 @@ impl Query<'_> {
                 let to = &path[(i + 1) % path.len()];
                 self.find_reference_location(from, to).map(|range| {
                     let msg = if i == path.len() - 1 {
-                        format!("references `{}` (completing cycle)", to)
+                        format!("references {} (completing cycle)", to)
                     } else {
-                        format!("references `{}`", to)
+                        format!("references {}", to)
                     };
                     (range, msg)
                 })
@@ -286,9 +286,9 @@ impl Query<'_> {
                 let to = &path_nodes[(i + 1) % path_nodes.len()];
                 find_loc(from, to).map(|range| {
                     let msg = if i == path_nodes.len() - 1 {
-                        format!("references `{}` (completing cycle)", to)
+                        format!("references {} (completing cycle)", to)
                     } else {
-                        format!("references `{}`", to)
+                        format!("references {}", to)
                     };
                     (range, msg)
                 })
@@ -324,7 +324,7 @@ impl Query<'_> {
         }
 
         if let Some(range) = def_range {
-            builder = builder.related_to(format!("`{}` is defined here", primary_name), range);
+            builder = builder.related_to(format!("{} is defined here", primary_name), range);
         }
 
         builder.emit();
@@ -357,7 +357,7 @@ impl Query<'_> {
         }
 
         if let Some(range) = def_range {
-            builder = builder.related_to(format!("`{}` is defined here", primary_name), range);
+            builder = builder.related_to(format!("{} is defined here", primary_name), range);
         }
 
         builder.emit();
