@@ -147,9 +147,8 @@ impl Query<'_> {
         let mut stack = IndexSet::new();
 
         for start_node in scc {
-            if Self::detect_cycle(start_node, &adj, &mut visited, &mut stack) {
-                let last = stack.last().unwrap().clone();
-                let index = stack.get_index_of(&last).unwrap();
+            if let Some(target) = Self::detect_cycle(start_node, &adj, &mut visited, &mut stack) {
+                let index = stack.get_index_of(&target).unwrap();
                 return Some(stack.iter().skip(index).cloned().collect());
             }
         }
@@ -162,12 +161,12 @@ impl Query<'_> {
         adj: &IndexMap<String, IndexSet<String>>,
         visited: &mut IndexSet<String>,
         stack: &mut IndexSet<String>,
-    ) -> bool {
+    ) -> Option<String> {
         if stack.contains(node) {
-            return true;
+            return Some(node.clone());
         }
         if visited.contains(node) {
-            return false;
+            return None;
         }
 
         visited.insert(node.clone());
@@ -175,14 +174,14 @@ impl Query<'_> {
 
         if let Some(neighbors) = adj.get(node) {
             for neighbor in neighbors {
-                if Self::detect_cycle(neighbor, adj, visited, stack) {
-                    return true;
+                if let Some(target) = Self::detect_cycle(neighbor, adj, visited, stack) {
+                    return Some(target);
                 }
             }
         }
 
         stack.pop();
-        false
+        None
     }
 
     fn find_def_by_name(&self, name: &str) -> Option<Def> {
@@ -346,12 +345,25 @@ impl Query<'_> {
             .map(|(r, _)| *r)
             .unwrap_or_else(|| TextRange::empty(0.into()));
 
+        let def_range = self
+            .find_def_by_name(primary_name)
+            .and_then(|def| def.name())
+            .map(|n| n.text_range());
+
         let mut builder = self
             .recursion_diagnostics
-            .report(DiagnosticKind::DirectRecursion, range);
+            .report(DiagnosticKind::DirectRecursion, range)
+            .message(format!(
+                "cycle {} will stuck without matching anything",
+                cycle_str
+            ));
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);
+        }
+
+        if let Some(range) = def_range {
+            builder = builder.related_to(format!("`{}` is defined here", primary_name), range);
         }
 
         builder.emit();

@@ -45,12 +45,13 @@ fn invalid_unguarded_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(call) (E)]
-      |              ^
-      |              |
-      |              `E` references itself
+      | -            ^
+      | |            |
+      | |            `E` references itself
+      | `E` is defined here
     ");
 }
 
@@ -357,12 +358,13 @@ fn invalid_direct_left_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(E) (x)]
-      |       ^
-      |       |
-      |       `E` references itself
+      | -     ^
+      | |     |
+      | |     `E` references itself
+      | `E` is defined here
     ");
 }
 
@@ -373,12 +375,13 @@ fn invalid_direct_right_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(x) (E)]
-      |           ^
-      |           |
-      |           `E` references itself
+      | -         ^
+      | |         |
+      | |         `E` references itself
+      | `E` is defined here
     ");
 }
 
@@ -389,12 +392,13 @@ fn invalid_direct_left_recursion_in_tagged_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [Left: (E) Right: (x)]
-      |             ^
-      |             |
-      |             `E` references itself
+      | -           ^
+      | |           |
+      | |           `E` references itself
+      | `E` is defined here
     ");
 }
 
@@ -408,12 +412,13 @@ fn invalid_unguarded_left_recursion_branch() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) 'escape']
-      |       ^
-      |       |
-      |       `A` references itself
+      | -     ^
+      | |     |
+      | |     `A` references itself
+      | `A` is defined here
     ");
 }
 
@@ -427,12 +432,13 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) _]
-      |       ^
-      |       |
-      |       `A` references itself
+      | -     ^
+      | |     |
+      | |     `A` references itself
+      | `A` is defined here
     ");
 }
 
@@ -446,12 +452,13 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) (leaf)]
-      |       ^
-      |       |
-      |       `A` references itself
+      | -     ^
+      | |     |
+      | |     `A` references itself
+      | `A` is defined here
     ");
 }
 
@@ -507,19 +514,25 @@ fn invalid_mandatory_recursion_nested_plus() {
 #[test]
 fn invalid_simple_unguarded_recursion() {
     let input = indoc! {r#"
-        A = [(A) (foo)]
+        A = [
+          (foo)
+          (A)
+        ]
     "#};
     let query = Query::try_from(input).unwrap();
 
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
-    1 | A = [(A) (foo)]
-      |       ^
-      |       |
-      |       `A` references itself
+    1 | A = [
+      | - `A` is defined here
+    2 |   (foo)
+    3 |   (A)
+      |    ^
+      |    |
+      |    `A` references itself
     ");
 }
 
@@ -534,9 +547,14 @@ fn invalid_unguarded_mutual_recursion_chain() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: direct recursion: query will stuck without matching anything
+    error: direct recursion: cycle `B` → `A` → `B` will stuck without matching anything
       |
     1 | A = [(B) (x)]
-      | ^
+      |       - `A` references `B` (completing cycle)
+    2 | B = (A)
+      | -    ^
+      | |    |
+      | |    `B` references `A`
+      | `B` is defined here
     ");
 }
