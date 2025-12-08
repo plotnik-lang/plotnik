@@ -315,6 +315,14 @@ impl Query<'_> {
             .map(|(r, _)| *r)
             .unwrap_or_else(|| TextRange::empty(0.into()));
 
+        let def_range = if scc.len() > 1 {
+            self.find_def_by_name(primary_name)
+                .and_then(|def| def.name())
+                .map(|n| n.text_range())
+        } else {
+            None
+        };
+
         let mut builder = self
             .recursion_diagnostics
             .report(DiagnosticKind::RecursionNoEscape, range)
@@ -322,6 +330,10 @@ impl Query<'_> {
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);
+        }
+
+        if let Some(range) = def_range {
+            builder = builder.related_to(format!("`{}` is defined here", primary_name), range);
         }
 
         builder.emit();
@@ -345,10 +357,13 @@ impl Query<'_> {
             .map(|(r, _)| *r)
             .unwrap_or_else(|| TextRange::empty(0.into()));
 
-        let def_range = self
-            .find_def_by_name(primary_name)
-            .and_then(|def| def.name())
-            .map(|n| n.text_range());
+        let def_range = if scc.len() > 1 {
+            self.find_def_by_name(primary_name)
+                .and_then(|def| def.name())
+                .map(|n| n.text_range())
+        } else {
+            None
+        };
 
         let mut builder = self
             .recursion_diagnostics

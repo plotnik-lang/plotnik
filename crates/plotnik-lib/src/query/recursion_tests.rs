@@ -48,10 +48,9 @@ fn invalid_unguarded_recursion_in_alternation() {
     error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(call) (E)]
-      | -            ^
-      | |            |
-      | |            `E` references itself
-      | `E` is defined here
+      |              ^
+      |              |
+      |              `E` references itself
     ");
 }
 
@@ -149,9 +148,10 @@ fn invalid_mutual_recursion_without_base_case() {
     1 | A = (foo (B))
       |           - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
@@ -185,9 +185,10 @@ fn invalid_three_way_mutual_recursion() {
     2 | B = (b (C))
       |         - `B` references `C` (completing cycle)
     3 | C = (c (A))
-      |         ^
-      |         |
-      |         `C` references `A`
+      | -       ^
+      | |       |
+      | |       `C` references `A`
+      | `C` is defined here
     ");
 }
 
@@ -222,9 +223,10 @@ fn invalid_diamond_dependency_recursion() {
       |              - `A` references `C` (completing cycle)
     2 | B = (b (D))
     3 | C = (c (D))
-      |         ^
-      |         |
-      |         `C` references `D`
+      | -       ^
+      | |       |
+      | |       `C` references `D`
+      | `C` is defined here
     4 | D = (d (A))
       |         - `D` references `A`
     ");
@@ -246,9 +248,10 @@ fn invalid_mutual_recursion_via_field() {
     1 | A = (foo body: (B))
       |                 - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
@@ -268,9 +271,10 @@ fn invalid_mutual_recursion_via_capture() {
     1 | A = (foo (B) @cap)
       |           - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
@@ -290,9 +294,10 @@ fn invalid_mutual_recursion_via_sequence() {
     1 | A = (foo {(x) (B)})
       |                - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
@@ -323,9 +328,10 @@ fn invalid_mutual_recursion_with_plus_quantifier() {
     1 | A = (foo (B)+)
       |           - `A` references `B` (completing cycle)
     2 | B = (bar (A))
-      |           ^
-      |           |
-      |           `B` references `A`
+      | -         ^
+      | |         |
+      | |         `B` references `A`
+      | `B` is defined here
     ");
 }
 
@@ -361,10 +367,9 @@ fn invalid_direct_left_recursion_in_alternation() {
     error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(E) (x)]
-      | -     ^
-      | |     |
-      | |     `E` references itself
-      | `E` is defined here
+      |       ^
+      |       |
+      |       `E` references itself
     ");
 }
 
@@ -378,10 +383,9 @@ fn invalid_direct_right_recursion_in_alternation() {
     error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [(x) (E)]
-      | -         ^
-      | |         |
-      | |         `E` references itself
-      | `E` is defined here
+      |           ^
+      |           |
+      |           `E` references itself
     ");
 }
 
@@ -395,10 +399,9 @@ fn invalid_direct_left_recursion_in_tagged_alternation() {
     error: direct recursion: cycle `E` → `E` will stuck without matching anything
       |
     1 | E = [Left: (E) Right: (x)]
-      | -           ^
-      | |           |
-      | |           `E` references itself
-      | `E` is defined here
+      |             ^
+      |             |
+      |             `E` references itself
     ");
 }
 
@@ -415,10 +418,9 @@ fn invalid_unguarded_left_recursion_branch() {
     error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) 'escape']
-      | -     ^
-      | |     |
-      | |     `A` references itself
-      | `A` is defined here
+      |       ^
+      |       |
+      |       `A` references itself
     ");
 }
 
@@ -435,10 +437,9 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) _]
-      | -     ^
-      | |     |
-      | |     `A` references itself
-      | `A` is defined here
+      |       ^
+      |       |
+      |       `A` references itself
     ");
 }
 
@@ -455,10 +456,9 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
     error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
     1 | A = [(A) (leaf)]
-      | -     ^
-      | |     |
-      | |     `A` references itself
-      | `A` is defined here
+      |       ^
+      |       |
+      |       `A` references itself
     ");
 }
 
@@ -526,9 +526,6 @@ fn invalid_simple_unguarded_recursion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: direct recursion: cycle `A` → `A` will stuck without matching anything
       |
-    1 | A = [
-      | - `A` is defined here
-    2 |   (foo)
     3 |   (A)
       |    ^
       |    |
