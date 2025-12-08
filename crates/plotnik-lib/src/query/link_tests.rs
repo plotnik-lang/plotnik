@@ -928,6 +928,13 @@ fn ref_followed_recursive_with_invalid_type() {
       |                       ---- field `name` on `function_declaration`
       |
     help: valid types for `name`: `identifier`
+
+    error: direct recursion: cycle `Foo` → `Foo` will stuck without matching anything
+      |
+    1 | Foo = [(number) (Foo)]
+      |                  ^^^
+      |                  |
+      |                  `Foo` references itself
     ");
 }
 
@@ -941,7 +948,15 @@ fn ref_followed_recursive_valid() {
     let mut query = Query::try_from(input).unwrap();
     query.link(&plotnik_langs::javascript());
 
-    assert!(query.is_valid());
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: direct recursion: cycle `Foo` → `Foo` will stuck without matching anything
+      |
+    1 | Foo = [(identifier) (Foo)]
+      |                      ^^^
+      |                      |
+      |                      `Foo` references itself
+    ");
 }
 
 #[test]
@@ -975,6 +990,16 @@ fn ref_followed_mutual_recursion() {
       |                       ---- field `name` on `function_declaration`
       |
     help: valid types for `name`: `identifier`
+
+    error: direct recursion: cycle `Bar` → `Foo` → `Bar` will stuck without matching anything
+      |
+    1 | Foo = [(number) (Bar)]
+      |                  --- `Foo` references `Bar` (completing cycle)
+    2 | Bar = [(string) (Foo)]
+      | ---              ^^^
+      | |                |
+      | |                `Bar` references `Foo`
+      | `Bar` is defined here
     ");
 }
 
