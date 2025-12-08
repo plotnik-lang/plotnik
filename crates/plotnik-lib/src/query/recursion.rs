@@ -41,7 +41,7 @@ impl Query<'_> {
             // Ensure every recursive cycle consumes at least one node.
             if let Some(cycle) = self.find_unguarded_cycle(&scc, &scc_set) {
                 let chain = self.build_unguarded_chain(&cycle);
-                self.emit_recursion_error(&cycle[0], &cycle, chain);
+                self.emit_direct_recursion_error(&cycle[0], &cycle, chain);
             }
         }
     }
@@ -320,6 +320,35 @@ impl Query<'_> {
             .recursion_diagnostics
             .report(DiagnosticKind::RecursionNoEscape, range)
             .message(format!("cycle {} has no escape path", cycle_str));
+
+        for (rel_range, rel_msg) in related {
+            builder = builder.related_to(rel_msg, rel_range);
+        }
+
+        builder.emit();
+    }
+    fn emit_direct_recursion_error(
+        &mut self,
+        primary_name: &str,
+        scc: &[String],
+        related: Vec<(TextRange, String)>,
+    ) {
+        let cycle_str = if scc.len() == 1 {
+            format!("`{}` → `{}`", primary_name, primary_name)
+        } else {
+            let mut cycle: Vec<_> = scc.iter().map(|s| format!("`{}`", s)).collect();
+            cycle.push(format!("`{}`", scc[0]));
+            cycle.join(" → ")
+        };
+
+        let range = related
+            .first()
+            .map(|(r, _)| *r)
+            .unwrap_or_else(|| TextRange::empty(0.into()));
+
+        let mut builder = self
+            .recursion_diagnostics
+            .report(DiagnosticKind::DirectRecursion, range);
 
         for (rel_range, rel_msg) in related {
             builder = builder.related_to(rel_msg, rel_range);

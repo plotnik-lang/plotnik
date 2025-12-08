@@ -58,6 +58,7 @@ pub enum DiagnosticKind {
     UndefinedReference,
     MixedAltBranches,
     RecursionNoEscape,
+    DirectRecursion,
     FieldSequenceValue,
 
     // Link pass - grammar validation
@@ -162,6 +163,7 @@ impl DiagnosticKind {
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
             Self::RecursionNoEscape => "infinite recursion detected",
+            Self::DirectRecursion => "direct recursion: query will stuck without matching anything",
             Self::FieldSequenceValue => "field must match exactly one node",
 
             // Link pass - grammar validation
@@ -200,6 +202,7 @@ impl DiagnosticKind {
 
             // Recursion with cycle path
             Self::RecursionNoEscape => "infinite recursion: {}".to_string(),
+            Self::DirectRecursion => "direct recursion: {}".to_string(),
 
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),

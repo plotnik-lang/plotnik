@@ -45,7 +45,7 @@ fn invalid_unguarded_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | E = [(call) (E)]
       |              ^
@@ -357,12 +357,28 @@ fn invalid_direct_left_recursion_in_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | E = [(E) (x)]
       |       ^
       |       |
       |       `E` references itself
+    ");
+}
+
+#[test]
+fn invalid_direct_right_recursion_in_alternation() {
+    let query = Query::try_from("E = [(x) (E)]").unwrap();
+
+    assert!(!query.is_valid());
+
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: direct recursion: query will stuck without matching anything
+      |
+    1 | E = [(x) (E)]
+      |           ^
+      |           |
+      |           `E` references itself
     ");
 }
 
@@ -373,7 +389,7 @@ fn invalid_direct_left_recursion_in_tagged_alternation() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `E` → `E` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | E = [Left: (E) Right: (x)]
       |             ^
@@ -392,7 +408,7 @@ fn invalid_unguarded_left_recursion_branch() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | A = [(A) 'escape']
       |       ^
@@ -411,7 +427,7 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | A = [(A) _]
       |       ^
@@ -430,7 +446,7 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | A = [(A) (leaf)]
       |       ^
@@ -498,7 +514,7 @@ fn invalid_simple_unguarded_recursion() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | A = [(A) (foo)]
       |       ^
@@ -518,7 +534,7 @@ fn invalid_unguarded_mutual_recursion_chain() {
     assert!(!query.is_valid());
 
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle `A` → `A` has no escape path
+    error: direct recursion: query will stuck without matching anything
       |
     1 | A = [(B) (x)]
       | ^
