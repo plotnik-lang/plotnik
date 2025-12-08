@@ -2,28 +2,28 @@ use crate::Query;
 use indoc::indoc;
 
 #[test]
-fn escape_via_alternation() {
+fn valid_recursion_with_alternation_base_case() {
     let query = Query::try_from("E = [(x) (call (E))]").unwrap();
 
     assert!(query.is_valid());
 }
 
 #[test]
-fn escape_via_optional() {
+fn valid_recursion_with_optional() {
     let query = Query::try_from("E = (call (E)?)").unwrap();
 
     assert!(query.is_valid());
 }
 
 #[test]
-fn escape_via_star() {
+fn valid_recursion_with_star() {
     let query = Query::try_from("E = (call (E)*)").unwrap();
 
     assert!(query.is_valid());
 }
 
 #[test]
-fn no_escape_via_plus() {
+fn invalid_recursion_with_plus() {
     let query = Query::try_from("E = (call (E)+)").unwrap();
 
     assert!(!query.is_valid());
@@ -39,7 +39,7 @@ fn no_escape_via_plus() {
 }
 
 #[test]
-fn escape_via_empty_tree() {
+fn invalid_unguarded_recursion_in_alternation() {
     let query = Query::try_from("E = [(call) (E)]").unwrap();
 
     assert!(!query.is_valid());
@@ -55,14 +55,14 @@ fn escape_via_empty_tree() {
 }
 
 #[test]
-fn lazy_quantifiers_same_as_greedy() {
+fn validity_of_lazy_quantifiers_matches_greedy() {
     assert!(Query::try_from("E = (call (E)??)").unwrap().is_valid());
     assert!(Query::try_from("E = (call (E)*?)").unwrap().is_valid());
     assert!(!Query::try_from("E = (call (E)+?)").unwrap().is_valid());
 }
 
 #[test]
-fn recursion_in_tree_child() {
+fn invalid_mandatory_recursion_in_tree_child() {
     let query = Query::try_from("E = (call (E))").unwrap();
 
     assert!(!query.is_valid());
@@ -78,7 +78,7 @@ fn recursion_in_tree_child() {
 }
 
 #[test]
-fn recursion_in_field() {
+fn invalid_mandatory_recursion_in_field() {
     let query = Query::try_from("E = (call body: (E))").unwrap();
 
     assert!(!query.is_valid());
@@ -94,7 +94,7 @@ fn recursion_in_field() {
 }
 
 #[test]
-fn recursion_in_capture() {
+fn invalid_mandatory_recursion_in_capture() {
     let query = Query::try_from("E = (call (E) @inner)").unwrap();
 
     assert!(!query.is_valid());
@@ -110,7 +110,7 @@ fn recursion_in_capture() {
 }
 
 #[test]
-fn recursion_in_sequence() {
+fn invalid_mandatory_recursion_in_sequence() {
     let query = Query::try_from("E = (call {(a) (E)})").unwrap();
 
     assert!(!query.is_valid());
@@ -126,14 +126,14 @@ fn recursion_in_sequence() {
 }
 
 #[test]
-fn recursion_through_multiple_children() {
+fn valid_recursion_with_base_case_and_descent() {
     let query = Query::try_from("E = [(x) (call (a) (E))]").unwrap();
 
     assert!(query.is_valid());
 }
 
 #[test]
-fn mutual_recursion_no_escape() {
+fn invalid_mutual_recursion_without_base_case() {
     let input = indoc! {r#"
         A = (foo (B))
         B = (bar (A))
@@ -155,7 +155,7 @@ fn mutual_recursion_no_escape() {
 }
 
 #[test]
-fn mutual_recursion_one_has_escape() {
+fn valid_mutual_recursion_with_base_case() {
     let input = indoc! {r#"
         A = [(x) (foo (B))]
         B = (bar (A))
@@ -166,7 +166,7 @@ fn mutual_recursion_one_has_escape() {
 }
 
 #[test]
-fn three_way_cycle_no_escape() {
+fn invalid_three_way_mutual_recursion() {
     let input = indoc! {r#"
         A = (a (B))
         B = (b (C))
@@ -191,7 +191,7 @@ fn three_way_cycle_no_escape() {
 }
 
 #[test]
-fn three_way_cycle_one_has_escape() {
+fn valid_three_way_mutual_recursion_with_base_case() {
     let input = indoc! {r#"
         A = [(x) (a (B))]
         B = (b (C))
@@ -203,7 +203,7 @@ fn three_way_cycle_one_has_escape() {
 }
 
 #[test]
-fn diamond_dependency() {
+fn invalid_diamond_dependency_recursion() {
     let input = indoc! {r#"
         A = (a [(B) (C)])
         B = (b (D))
@@ -230,7 +230,7 @@ fn diamond_dependency() {
 }
 
 #[test]
-fn cycle_ref_in_field() {
+fn invalid_mutual_recursion_via_field() {
     let input = indoc! {r#"
         A = (foo body: (B))
         B = (bar (A))
@@ -252,7 +252,7 @@ fn cycle_ref_in_field() {
 }
 
 #[test]
-fn cycle_ref_in_capture() {
+fn invalid_mutual_recursion_via_capture() {
     let input = indoc! {r#"
         A = (foo (B) @cap)
         B = (bar (A))
@@ -274,7 +274,7 @@ fn cycle_ref_in_capture() {
 }
 
 #[test]
-fn cycle_ref_in_sequence() {
+fn invalid_mutual_recursion_via_sequence() {
     let input = indoc! {r#"
         A = (foo {(x) (B)})
         B = (bar (A))
@@ -296,7 +296,7 @@ fn cycle_ref_in_sequence() {
 }
 
 #[test]
-fn cycle_with_quantifier_escape() {
+fn valid_mutual_recursion_with_optional_quantifier() {
     let input = indoc! {r#"
         A = (foo (B)?)
         B = (bar (A))
@@ -307,7 +307,7 @@ fn cycle_with_quantifier_escape() {
 }
 
 #[test]
-fn cycle_with_plus_no_escape() {
+fn invalid_mutual_recursion_with_plus_quantifier() {
     let input = indoc! {r#"
         A = (foo (B)+)
         B = (bar (A))
@@ -329,7 +329,7 @@ fn cycle_with_plus_no_escape() {
 }
 
 #[test]
-fn non_recursive_reference() {
+fn valid_non_recursive_reference() {
     let input = indoc! {r#"
         Leaf = (identifier)
         Tree = (call (Leaf))
@@ -340,7 +340,7 @@ fn non_recursive_reference() {
 }
 
 #[test]
-fn entry_point_uses_recursive_def() {
+fn valid_entry_point_using_recursive_def() {
     let input = indoc! {r#"
         E = [(x) (call (E))]
         (program (E))
@@ -351,9 +351,7 @@ fn entry_point_uses_recursive_def() {
 }
 
 #[test]
-fn direct_self_ref_in_alternation() {
-    // Left-recursion: E calls E without consuming anything.
-    // Has escape path (x), but recursive path is unguarded.
+fn invalid_direct_left_recursion_in_alternation() {
     let query = Query::try_from("E = [(E) (x)]").unwrap();
 
     assert!(!query.is_valid());
@@ -369,8 +367,7 @@ fn direct_self_ref_in_alternation() {
 }
 
 #[test]
-fn escape_via_literal_string() {
-    // Left-recursion: A calls A without consuming.
+fn invalid_unguarded_left_recursion_branch() {
     let input = indoc! {r#"
         A = [(A) 'escape']
     "#};
@@ -389,8 +386,7 @@ fn escape_via_literal_string() {
 }
 
 #[test]
-fn escape_via_wildcard() {
-    // Left-recursion
+fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     let input = indoc! {r#"
         A = [(A) _]
     "#};
@@ -409,8 +405,7 @@ fn escape_via_wildcard() {
 }
 
 #[test]
-fn escape_via_childless_tree() {
-    // Left-recursion
+fn invalid_unguarded_left_recursion_with_tree_alt() {
     let input = indoc! {r#"
         A = [(A) (leaf)]
     "#};
@@ -429,7 +424,7 @@ fn escape_via_childless_tree() {
 }
 
 #[test]
-fn escape_via_anchor() {
+fn valid_recursion_guarded_by_anchor() {
     let input = indoc! {r#"
         A = (foo . [(A) (x)])
     "#};
@@ -439,7 +434,7 @@ fn escape_via_anchor() {
 }
 
 #[test]
-fn no_escape_tree_all_recursive() {
+fn invalid_mandatory_recursion_direct_child() {
     let input = indoc! {r#"
         A = (foo (A))
     "#};
@@ -458,7 +453,7 @@ fn no_escape_tree_all_recursive() {
 }
 
 #[test]
-fn escape_in_capture_inner() {
+fn valid_recursion_with_capture_base_case() {
     let input = indoc! {r#"
         A = [(x)@cap (foo (A))]
     "#};
@@ -468,7 +463,7 @@ fn escape_in_capture_inner() {
 }
 
 #[test]
-fn ref_in_quantifier_plus_no_escape() {
+fn invalid_mandatory_recursion_nested_plus() {
     let input = indoc! {r#"
         A = (foo (A)+)
     "#};
@@ -478,7 +473,7 @@ fn ref_in_quantifier_plus_no_escape() {
 }
 
 #[test]
-fn unguarded_recursion_simple() {
+fn invalid_simple_unguarded_recursion() {
     let input = indoc! {r#"
         A = [(A) (foo)]
     "#};
@@ -497,7 +492,7 @@ fn unguarded_recursion_simple() {
 }
 
 #[test]
-fn unguarded_mutual_recursion() {
+fn invalid_unguarded_mutual_recursion_chain() {
     let input = indoc! {r#"
         A = [(B) (x)]
         B = (A)
