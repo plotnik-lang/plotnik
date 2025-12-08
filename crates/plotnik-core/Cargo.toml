@@ -2,7 +2,7 @@
 name = "plotnik-core"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "AGPL-3.0-only"
 description = "Core data structures for Plotnik"
 repository = "https://github.com/plotnik-lang/plotnik"
 
