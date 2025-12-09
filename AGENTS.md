@@ -6,6 +6,35 @@
 - We strive to achieve excellent stability by enforcing invariants in the code:
   - `assert!` and `.expect()` for simple cases
   - `invariants.rs` otherwise, to skip the coverage of unreachable code
+- We maintain the architecture decision records (ADRs)
+  - AI agent is responsible for creating new ADR when such decision was made during agentic coding session
+
+# Architecture Decision Records (ADRs)
+
+- **Location**: `docs/adr/`
+- **Naming**: `ADR-XXXX-short-title-in-kebab-case.md` (`XXXX` is a sequential number).
+- **Template**:
+
+  ```markdown
+  # ADR-XXXX: Title of the Decision
+
+  - **Status**: Proposed | Accepted | Deprecated | Superseded by [ADR-YYYY](ADR-YYYY-...)
+  - **Date**: YYYY-MM-DD
+
+  ## Context
+
+  Describe the issue, problem, or driving force.
+
+  ## Decision
+
+  Clearly state the decision that was made.
+
+  ## Consequences
+
+  - **Positive**: Benefits, alignment with goals.
+  - **Negative**: Drawbacks, trade-offs, future challenges.
+  - **Considered Alternatives**: Describe rejected options and why.
+  ```
 
 # Plotnik Query Language
 
