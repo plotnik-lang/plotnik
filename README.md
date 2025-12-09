@@ -24,7 +24,7 @@
 <br/>
 
 <p align="center">
-  <i><strong>⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN, SORRY. ⚠️</strong></i><br/>
+  <i><strong>⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN YET ⚠️</strong></i><br/>
 </p>
 
 <br/>
