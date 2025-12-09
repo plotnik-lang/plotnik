@@ -8,7 +8,6 @@
 //! undefined refs, etc.).
 
 use super::Query;
-use super::invariants::ensure_ref_has_name;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Expr, Ref, SeqExpr};
 
@@ -89,7 +88,10 @@ impl Query<'_> {
     }
 
     fn ref_cardinality(&mut self, r: &Ref) -> ShapeCardinality {
-        let name_tok = ensure_ref_has_name(r.name());
+        let name_tok = r.name().expect(
+            "shape_cardinalities: Ref without name token \
+             (parser only creates Ref for PascalCase Id)",
+        );
         let name = name_tok.text();
 
         let Some(body) = self.symbol_table.get(name).cloned() else {
