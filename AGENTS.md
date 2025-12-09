@@ -189,9 +189,9 @@ cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l t
 ## CLI commands
 
 - IMPORTANT: the `debug` is your first tool you should use to test your changes
-- Run tests: `cargo nextest run --hide-progress-bar --status-level none --failure-output final`
+- Run tests: `make test`
 - We use snapshot testing (`insta`) heavily
-  - Accept snapshots: `cargo insta accept`
+  - Accept snapshots: `make snapshots`
 
 ## Test structure
 
@@ -239,17 +239,23 @@ fn error_case() {
 
 ## Coverage
 
-Uses `cargo-llvm-cov`, already installed.
+Uses `cargo-llvm-cov` (already installed)
 
 Find uncovered lines per file:
 
 ```sh
-cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]'
+$ make coverage-lines | grep recursion
+crates/plotnik-lib/src/query/recursion.rs: 78, 210, 214, ...
 ```
 
 ### `invariants.rs`
 
-- Contains functions and `impl` blocks for invariant check functionality
-- Each function panics on invariant violation, it may or may not return the value
-- When returning value, the name is `ensure_something(...)`, where something is related to return value
-- When there is no return value, the name is `assert_something(...)` and something is related to function arguments
+- The goal of this file is to exclude coverage of the unreachable code branches
+- It contains functions and `impl` blocks for invariant check functionality
+- Each function panics on invariant violation
+- The naming convention: `ensure_something(...)`, where something refers the return value
+- It doesn't make sense to put the `panic!(...)`, `assert!()` or `.expect()` because they don't cause coverage problems:
+  - `panic!()` usually is called in catch-all `match` branches
+    - eventually we extract the whole `match` to the `invariants.rs`, for well-established code
+  - `assert!()` is coverage-friendly alternative for `if condition { panic!(...) }`
+  - `.expect()` is useful for unwrapping `Result`/`Option` values
