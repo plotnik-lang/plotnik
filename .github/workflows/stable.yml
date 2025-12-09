@@ -36,14 +36,20 @@ jobs:
           cache-on-failure: "true"
           prefix-key: v0-rust-stable
 
+      - name: Install cargo-nextest
+        uses: baptiste0928/cargo-install@b687c656bda5733207e629b50a22bf68974a0305 # v3.3.2
+        with:
+          crate: cargo-nextest
+          locked: true
+
       - name: Check
-        run: cargo check --workspace --all-targets
+        run: make check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: make clippy
 
       - name: Test
-        run: cargo test --workspace
+        run: make test
 
   check-publish:
     runs-on: ubuntu-latest
