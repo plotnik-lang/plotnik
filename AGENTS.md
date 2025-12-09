@@ -4,7 +4,7 @@
 - We implement resilient parser, provides user-friendly error messages.
 - We call error messages "diagnostics" to avoid confusion with other errors (see `diagnostics/` folder).
 - We strive to achieve excellent stability by enforcing invariants in the code:
-  - `assert!` and `.expect()` for simple cases
+  - `panic!`, `assert!` or `.expect()` for simple cases
   - `invariants.rs` otherwise, to skip the coverage of unreachable code
 - We maintain the architecture decision records (ADRs)
   - AI agent is responsible for creating new ADR when such decision was made during agentic coding session

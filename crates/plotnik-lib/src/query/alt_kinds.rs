@@ -6,9 +6,7 @@
 use rowan::TextRange;
 
 use super::Query;
-use super::invariants::{
-    assert_alt_no_bare_exprs, assert_root_no_bare_exprs, ensure_both_branch_kinds,
-};
+use super::invariants::ensure_both_branch_kinds;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AltExpr, AltKind, Branch, Expr};
 
@@ -20,13 +18,19 @@ impl Query<'_> {
             self.validate_alt_expr(&body);
         }
 
-        assert_root_no_bare_exprs(&self.ast);
+        assert!(
+            self.ast.exprs().next().is_none(),
+            "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
+        );
     }
 
     fn validate_alt_expr(&mut self, expr: &Expr) {
         if let Expr::AltExpr(alt) = expr {
             self.check_mixed_alternation(alt);
-            assert_alt_no_bare_exprs(alt);
+            assert!(
+                alt.exprs().next().is_none(),
+                "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
+            );
         }
 
         for child in expr.children() {

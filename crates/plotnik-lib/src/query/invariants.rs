@@ -2,23 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::parser::{AltExpr, Branch, Root};
-
-#[inline]
-pub fn assert_root_no_bare_exprs(root: &Root) {
-    assert!(
-        root.exprs().next().is_none(),
-        "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
-    );
-}
-
-#[inline]
-pub fn assert_alt_no_bare_exprs(alt: &AltExpr) {
-    assert!(
-        alt.exprs().next().is_none(),
-        "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
-    );
-}
+use crate::parser::Branch;
 
 #[inline]
 pub fn ensure_both_branch_kinds<'a>(
@@ -32,12 +16,4 @@ pub fn ensure_both_branch_kinds<'a>(
              (should be caught by AltKind::compute_kind)"
         ),
     }
-}
-
-#[inline]
-pub fn ensure_ref_has_name<T>(name: Option<T>) -> T {
-    name.expect(
-        "shape_cardinalities: Ref without name token \
-         (parser only creates Ref for PascalCase Id)",
-    )
 }

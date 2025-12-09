@@ -6,7 +6,6 @@
 use rowan::{Checkpoint, TextRange};
 
 use super::core::Parser;
-use super::invariants::assert_nonempty;
 
 use super::cst::token_sets::{
     ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
@@ -65,7 +64,11 @@ impl Parser<'_> {
 
         self.peek();
         let ate_equals = self.eat(SyntaxKind::Equals);
-        self.assert_equals_eaten(ate_equals);
+        assert!(
+            ate_equals,
+            "parse_def: expected '=' but found {:?} (caller should verify Equals is present)",
+            self.current()
+        );
 
         if EXPR_FIRST.contains(self.peek()) {
             self.parse_expr();
@@ -491,7 +494,12 @@ impl Parser<'_> {
         }
 
         let closing = self.peek();
-        self.assert_string_quote_match(closing, open_quote);
+        assert_eq!(
+            closing, open_quote,
+            "bump_string_tokens: expected closing {:?} but found {:?} \
+             (lexer should only produce quote tokens from complete strings)",
+            open_quote, closing
+        );
         self.bump();
     }
 
@@ -612,7 +620,12 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Field);
 
         let kind = self.peek();
-        self.assert_id_token(kind);
+        assert_eq!(
+            kind,
+            SyntaxKind::Id,
+            "parse_field: expected Id but found {:?} (caller should verify Id is present)",
+            kind
+        );
         let span = self.current_span();
         let text = token_text(self.source, &self.tokens[self.pos]);
         self.bump();
@@ -865,7 +878,7 @@ fn to_pascal_case(s: &str) -> String {
 }
 
 fn capitalize_first(s: &str) -> String {
-    assert_nonempty(s);
+    assert!(!s.is_empty(), "capitalize_first: called with empty string");
     let mut chars = s.chars();
     let c = chars.next().unwrap();
     c.to_uppercase().chain(chars).collect()
