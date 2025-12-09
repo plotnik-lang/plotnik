@@ -18,7 +18,7 @@
   <a href="https://github.com/plotnik-lang/plotnik/actions/workflows/stable.yml"><img src="https://github.com/plotnik-lang/plotnik/actions/workflows/stable.yml/badge.svg" alt="stable"></a>
   <a href="https://github.com/plotnik-lang/plotnik/actions/workflows/nightly.yml"><img src="https://github.com/plotnik-lang/plotnik/actions/workflows/nightly.yml/badge.svg" alt="nightly"></a>
   <a href="https://codecov.io/gh/plotnik-lang/plotnik"><img src="https://codecov.io/gh/plotnik-lang/plotnik/graph/badge.svg?token=071HXJIY3E"/></a>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache-2.0 License"></a>
 </p>
 
 <br/>
@@ -243,6 +243,6 @@ The CLI foundation exists. The full developer experience is ahead.
 
 ## License
 
-This project is licensed under the [AGPLv3].
+This project is licensed under the [Apache License (Version 2.0)].
 
-[AGPLv3]: LICENSE
+[Apache License (Version 2.0)]: LICENSE

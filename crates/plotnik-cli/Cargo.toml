@@ -2,7 +2,7 @@
 name = "plotnik-cli"
 version = "0.1.0"
 edition = "2024"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 description = "CLI for plotnik - typed query language for tree-sitter AST"
 repository = "https://github.com/plotnik-lang/plotnik"
 documentation = "https://docs.rs/plotnik-cli"
