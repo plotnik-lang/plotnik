@@ -2,7 +2,7 @@
 name = "plotnik-langs"
 version = "0.1.0"
 edition = "2024"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 description = "Tree-sitter language bindings for Plotnik query language"
 repository = "https://github.com/plotnik-lang/plotnik"
 documentation = "https://docs.rs/plotnik-langs"
