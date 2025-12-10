@@ -68,7 +68,7 @@ yaml = ["dep:tree-sitter-yaml", "plotnik-macros/yaml"]
 paste = "1.0"
 plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
 plotnik-macros = { version = "0.1.0", path = "../plotnik-macros" }
-tree-sitter = "0.25"
+tree-sitter = "0.26"
 tree-sitter-bash = { version = "0.25.0", optional = true }
 tree-sitter-c = { version = "0.24.0", optional = true }
 tree-sitter-cpp = { version = "0.23.0", optional = true }

@@ -69,4 +69,4 @@ yaml = ["plotnik-langs/yaml"]
 clap = { version = "4.5", features = ["derive"] }
 plotnik-langs = { version = "0.1.0", path = "../plotnik-langs", default-features = false }
 plotnik-lib = { version = "0.1.0", path = "../plotnik-lib" }
-tree-sitter = "0.25"
+tree-sitter = "0.26"
