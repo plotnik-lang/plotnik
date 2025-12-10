@@ -115,6 +115,9 @@ enum Effect {
     StartObject,         // push new {} onto container stack
     EndObject,           // pop object from stack, becomes current
     Field(DataFieldId),      // move current value into field on top object
+    StartVariant(DataFieldId), // push new variant (tagged) onto container stack
+    EndVariant,          // pop variant from stack, becomes current
+    ToString,            // convert current Node value to String (source text)
 }
 ```
 
@@ -162,15 +165,21 @@ struct Executor<'a> {
     stack: Vec<Container<'a>>,   // objects/arrays being built
 }
 
+// Result is the final `current` value after execution completes.
+// This allows returning any value type: Object, Array, Node, String, or Variant.
+
 enum Value<'a> {
     Node(Node<'a>),                          // AST node reference
+    String(String),                          // Text values (from @capture :: string)
     Array(Vec<Value<'a>>),                   // completed array
     Object(HashMap<DataFieldId, Value<'a>>), // completed object
+    Variant(DataFieldId, Box<Value<'a>>),    // tagged variant (tag + payload)
 }
 
 enum Container<'a> {
     Array(Vec<Value<'a>>),                   // array under construction
     Object(HashMap<DataFieldId, Value<'a>>),     // object under construction
+    Variant(DataFieldId, Box<Container<'a>>),    // variant under construction
 }
 ```
 
@@ -194,8 +203,10 @@ StartObject
   Field("name")
   StartArray
     (match "a")
+    ToString
     PushElement
     (match "b")
+    ToString
     PushElement
   EndArray
   Field("params")
@@ -204,26 +215,27 @@ EndObject
 
 Execution trace:
 
-| Effect          | current   | stack                            |
-| --------------- | --------- | -------------------------------- |
-| StartObject     | -         | [{}]                             |
-| (match "foo")   | Node(foo) | [{}]                             |
-| Field("name")   | -         | [{name: Node(foo)}]              |
-| StartArray      | -         | [{name:...}, []]                 |
-| (match "a")     | Node(a)   | [{name:...}, []]                 |
-| PushElement     | -         | [{name:...}, [Node(a)]]          |
-| (match "b")     | Node(b)   | [{name:...}, [Node(a)]]          |
-| PushElement     | -         | [{name:...}, [Node(a), Node(b)]] |
-| EndArray        | [...]     | [{name:...}]                     |
-| Field("params") | -         | [{name:..., params:[...]}]       |
-| EndObject       | {...}     | []                               |
+| Effect          | current     | stack                                    |
+| --------------- | ----------- | ---------------------------------------- |
+| StartObject     | -           | [{}]                                     |
+| (match "foo")   | Node(foo)   | [{}]                                     |
+| Field("name")   | -           | [{name: Node(foo)}]                      |
+| StartArray      | -           | [{name:...}, []]                         |
+| (match "a")     | Node(a)     | [{name:...}, []]                         |
+| PushElement     | -           | [{name:...}, [String("a")]]              |
+| (match "b")     | Node(b)     | [{name:...}, [String("a")]]              |
+| ToString        | String("b") | [{name:...}, [String("a")]]              |
+| PushElement     | -           | [{name:...}, [String("a"), String("b")]] |
+| EndArray        | [...]       | [{name:...}]                             |
+| Field("params") | -           | [{name:..., params:[...]}]               |
+| EndObject       | {...}       | []                                       |
 
 Final result:
 
 ```json
 {
   "name": Node(foo),
-  "params": [Node(a), Node(b)]
+  "params": ["a", "b"]
 }
 ```
 
@@ -298,6 +310,26 @@ T1: ... (sequence contents)    next: [T2]
 T2: ε + EndObject              next: [T3]
 T3: ε + Field("name")          next: [...]
 ```
+
+### Tagged Alternations
+
+Tagged branches use `StartVariant` to create explicit tagged structures.
+
+```
+[ A: (true) ]
+```
+
+Effect stream:
+
+```
+StartVariant("A")
+StartObject
+...
+EndObject
+EndVariant
+```
+
+The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions. When serialized to JSON, it flattens to match the documented data model: `{ tag: "A", ...payload }`.
 
 ### Definition References and Recursion
 
