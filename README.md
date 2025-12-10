@@ -8,10 +8,17 @@
 <h1><p align="center">Plotnik</p></h1>
 
 <p align="center">
-  Typed query language for <a href="https://tree-sitter.github.io/">Tree-sitter</a>. Your queries return typed structs.<br/>
-  Captures become fields, quantifiers become arrays, alternations become unions.
+  <i>The last mile for autonomous coding</i>
 </p>
 
+<br/>
+
+<p align="center">
+  Plotnik is a query language for source code.<br/>
+  Queries extract relevant structured data.<br/>
+  Transactions apply changes granularly and atomically.
+</p>
+  
 <br/>
 
 <p align="center">
@@ -24,7 +31,7 @@
 <br/>
 
 <p align="center">
-  <i><strong>⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN YET ⚠️</strong></i><br/>
+  ⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN YET ⚠️<br/>
 </p>
 
 <br/>
