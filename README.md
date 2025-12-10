@@ -37,7 +37,7 @@
 
 Tree-sitter solved parsing. It powers syntax highlighting and code navigation at GitHub, drives the editing experience in Zed, Helix, and Neovim. It gives you a fast, accurate, incremental syntax tree for virtually any language.
 
-The hard problem now is what comes _after_ parsing, extraction of meaning from the tree:
+The hard problem now is what comes _after_ parsing: extraction of meaning from the tree, and safe transformation back to source:
 
 ```typescript
 function extractFunction(node: SyntaxNode): FunctionInfo | null {
@@ -56,7 +56,7 @@ function extractFunction(node: SyntaxNode): FunctionInfo | null {
 }
 ```
 
-Every extraction requires a new function, each one a potential source of bugs that won't surface until production.
+Every extraction requires a new function, each one a potential source of bugs that won't surface until production. And once you've extracted what you need, applying changes back to the source requires careful span tracking, validation, and error handling—another layer of brittle code.
 
 ## The solution
 
@@ -79,6 +79,8 @@ interface FunctionInfo {
 ```
 
 This structure is guaranteed by the query engine. No defensive programming needed.
+
+Once extraction is complete, Plotnik will support **transactions** to apply validated changes back to the source. The same typed nodes used for extraction become targets for transformation—completing the loop from source to structured data and back to source.
 
 ## But what about Tree-sitter queries?
 
