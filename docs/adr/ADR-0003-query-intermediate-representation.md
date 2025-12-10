@@ -183,6 +183,17 @@ enum Container<'a> {
 }
 ```
 
+#### Execution Pipeline
+
+For any given transition, the execution order is strict to ensure data consistency during backtracking:
+
+1. **Match**: Validate node kind/fields. If fail, abort.
+2. **Enter**: Push `Frame` with current `builder.watermark()`.
+3. **Effects**: Emit new effects (committed tentatively).
+4. **Exit**: Pop `Frame` (validate return).
+
+This order ensures that if a definition call succeeds, its effects are present. If it fails later, the watermark saved during `Enter` allows rolling back all effects emitted by that definition.
+
 #### Example
 
 Query:
@@ -511,6 +522,9 @@ Trade-off: More flexible (runtime query construction), but slower than generated
 
 4. **State-centric graph representation**
    - Rejected: States carry no semantic weight; edge-centric is simpler
+
+5. **Vectorized Reference Markers (`Vec<RefTransition>`)**
+   - Rejected: Optimized for alias chains (e.g. `A = B`, `B = C`) to allow full epsilon elimination. However, this bloats the `Transition` struct for all other cases. Standard epsilon elimination is sufficient; traversing a few remaining epsilon transitions for aliases is cheaper than increasing memory pressure on the whole graph.
 
 ## References
 
