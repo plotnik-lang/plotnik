@@ -16,7 +16,7 @@
 <p align="center">
   Plotnik is a query language for source code.<br/>
   Queries extract relevant structured data.<br/>
-  Transactions allow granular, atomic changes.
+  Transactions allow granular, atomic edits.
 </p>
   
 <br/>
