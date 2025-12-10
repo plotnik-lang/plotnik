@@ -8,7 +8,7 @@
 <h1><p align="center">Plotnik</p></h1>
 
 <p align="center">
-  <i>The last mile for autonomous coding</i>
+  <i>The last mile for autonomous coding.</i>
 </p>
 
 <br/>
