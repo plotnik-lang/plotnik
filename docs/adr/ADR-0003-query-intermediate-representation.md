@@ -173,7 +173,7 @@ struct TransitionView<'a> {
 }
 
 impl<'a> TransitionView<'a> {
-    fn matcher(&self) -> Option<MatcherView<'a>>;
+    fn matcher(&self) -> MatcherView<'a>;
     fn next(&self) -> impl Iterator<Item = TransitionView<'a>>;
     fn pre_effects(&self) -> &[EffectOp];
     fn post_effects(&self) -> &[EffectOp];
@@ -195,7 +195,7 @@ impl<'a> MatcherView<'a> {
     fn matches(&self, cursor: &TreeCursor) -> bool;
 }
 
-enum MatcherKind { Node, Anonymous, Wildcard, Down, Up }
+enum MatcherKind { Epsilon, Node, Anonymous, Wildcard, Down, Up }
 ```
 
 **Execution Flow**:
@@ -237,7 +237,7 @@ Internal storage. Engine code uses `TransitionView` instead of accessing this di
 ```rust
 #[repr(C)]
 struct Transition {
-    matcher: Option<Matcher>,    // 16 bytes (see Matcher below), None is epsilon-transition
+    matcher: Matcher,            // 16 bytes (Epsilon variant for epsilon-transitions)
     pre_anchored: bool,          // 1 byte
     post_anchored: bool,         // 1 byte
     _pad1: [u8; 2],              // 2 bytes padding
@@ -246,7 +246,7 @@ struct Transition {
     ref_marker: Option<RefTransition>, // 4 bytes
     next: Slice<TransitionId>,   // 8 bytes
 }
-// Size: 48 bytes, Align: 4 bytes (max of Slice and Option<Matcher> alignment)
+// Size: 48 bytes, Align: 4 bytes
 ```
 
 The `TransitionView` resolves `Slice<T>` by combining the graph's segment offset with the slice's start/len fields.
@@ -269,6 +269,7 @@ Note: `NodeTypeId` and `NodeFieldId` are defined in `plotnik-core` (tree-sitter 
 ```rust
 #[repr(C)]
 enum Matcher {
+    Epsilon,                           // no payload
     Node {
         kind: NodeTypeId,              // 2 bytes
         field: Option<NodeFieldId>,    // 2 bytes
@@ -282,7 +283,7 @@ enum Matcher {
     Down,
     Up,
 }
-// Size: 12 bytes + discriminant, padded to 16 bytes. Align: 4 bytes
+// Size: 16 bytes (4-byte discriminant + 12-byte largest variant). Align: 4 bytes
 ```
 
 Navigation variants `Down`/`Up` move the cursor without matching. They enable nested patterns like `(function_declaration (identifier) @name)` where we must descend into children.
