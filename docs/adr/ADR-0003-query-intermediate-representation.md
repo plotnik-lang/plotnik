@@ -351,19 +351,23 @@ EndObject
 EndVariant
 ```
 
-The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions. When serialized to JSON, it flattens to match the documented data model: `{ tag: "A", ...payload }`.
+The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions.
 
-**Constraint: branches must produce objects.** Top-level quantifiers in tagged branches are disallowed:
+**JSON serialization** depends on payload type:
 
-```
-// Invalid: branch A has top-level quantifier, produces array not object
-[A: (foo (bar) @x)* B: (baz) @y]
+- **Object payload**: Flatten fields into the tagged object.
+  ```json
+  { "$tag": "A", "x": 1, "y": 2 }
+  ```
+- **Array/Primitive payload**: Wrap in a `content` field.
+  ```json
+  { "$tag": "A", "content": [1, 2, 3] }
+  { "$tag": "B", "content": "foo" }
+  ```
 
-// Valid: wrap quantifier in a sequence with capture
-[A: { (foo (bar) @x)* } @items B: (baz) @y]
-```
+The `$tag` key avoids collisions with user-defined `@tag` captures.
 
-Flattening requires object payloads (`{ tag: "A", ...payload }`). Arrays cannot be spread into objects. This constraint is enforced during query validation; the diagnostic suggests wrapping with `{ ... } @name`.
+This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
 
 ### Definition References and Recursion
 

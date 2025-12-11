@@ -589,10 +589,10 @@ Labels create a discriminated union:
 ] @stmt :: Stmt
 ```
 
-Output type (discriminant is always `tag`):
+Output type (discriminant is always `$tag`):
 
 ```typescript
-type Stmt = { tag: "Assign"; left: Node } | { tag: "Call"; func: Node };
+type Stmt = { $tag: "Assign"; left: Node } | { $tag: "Call"; func: Node };
 ```
 
 In Rust, tagged alternations become enums:
@@ -754,8 +754,8 @@ Output type:
 
 ```typescript
 type MemberChain =
-  | { tag: "Base"; name: Node }
-  | { tag: "Access"; object: MemberChain; property: Node };
+  | { $tag: "Base"; name: Node }
+  | { $tag: "Access"; object: MemberChain; property: Node };
 ```
 
 ---
@@ -787,14 +787,14 @@ Output types:
 
 ```typescript
 type Statement =
-  | { tag: "Assign"; target: string; value: Expression }
-  | { tag: "Call"; func: string; args: Expression[] }
-  | { tag: "Return"; value?: Expression };
+  | { $tag: "Assign"; target: string; value: Expression }
+  | { $tag: "Call"; func: string; args: Expression[] }
+  | { $tag: "Return"; value?: Expression };
 
 type Expression =
-  | { tag: "Ident"; name: string }
-  | { tag: "Num"; value: string }
-  | { tag: "Str"; value: string };
+  | { $tag: "Ident"; name: string }
+  | { $tag: "Num"; value: string }
+  | { $tag: "Str"; value: string };
 
 type Root = {
   statements: [Statement, ...Statement[]];

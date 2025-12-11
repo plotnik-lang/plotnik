@@ -161,12 +161,12 @@ This produces:
 
 ```typescript
 type Statement =
-  | { tag: "Assign"; target: string; value: Expression }
-  | { tag: "Call"; func: string; args: Expression[] };
+  | { $tag: "Assign"; target: string; value: Expression }
+  | { $tag: "Call"; func: string; args: Expression[] };
 
 type Expression =
-  | { tag: "Ident"; name: string }
-  | { tag: "Num"; value: string };
+  | { $tag: "Ident"; name: string }
+  | { $tag: "Num"; value: string };
 
 type TopDefinitions = {
   statements: [Statement, ...Statement[]];
@@ -177,7 +177,7 @@ Then process the results:
 
 ```typescript
 for (const stmt of result.statements) {
-  switch (stmt.tag) {
+  switch (stmt.$tag) {
     case "Assign":
       console.log(`Assignment to ${stmt.target}`);
       break;
