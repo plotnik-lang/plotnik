@@ -365,6 +365,18 @@ The `$tag` and `$data` keys avoid collisions with user-defined captures. Uniform
 
 This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
 
+**Constraint: branches must produce objects.** Top-level quantifiers in tagged branches are disallowed:
+
+```
+// Invalid: branch A has top-level quantifier, produces array not object
+[A: (foo (bar) @x)* B: (baz) @y]
+
+// Valid: wrap quantifier in a sequence with capture
+[A: { (foo (bar) @x)* } @items B: (baz) @y]
+```
+
+Flattening requires object payloads (`{ tag: "A", ...payload }`). Arrays cannot be spread into objects. This constraint is enforced during query validation; the diagnostic suggests wrapping with `{ ... } @name`.
+
 ### Definition References and Recursion
 
 When a pattern references another definition (e.g., `(Expr)` inside `Binary`), the IR uses `RefId` to identify the call site. Each `Ref` node in the query AST gets a unique `RefId`, which is preserved through epsilon elimination.
