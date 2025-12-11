@@ -430,7 +430,7 @@ struct Interpreter<'a> {
 
 After initial construction, epsilon transitions can be eliminated by computing epsilon closures. The `pre_effects`/`post_effects` split is essential for correctness here.
 
-**Why the split matters**: A match transition overwrites `current` with the matched node. Effects from *preceding* epsilon transitions (like `PushElement`) need the *previous* `current` value. Without the split, merging them into a single post-match list would use the wrong value.
+**Why the split matters**: A match transition overwrites `current` with the matched node. Effects from _preceding_ epsilon transitions (like `PushElement`) need the _previous_ `current` value. Without the split, merging them into a single post-match list would use the wrong value.
 
 ```
 Before (raw graph):
@@ -446,6 +446,7 @@ T3': Match(B) + [PushElement]                   // PushElement runs after Match(
 ```
 
 **Accumulation rules**:
+
 - Effects from incoming epsilon paths → accumulate into `pre_effects`
 - Effects from outgoing epsilon paths → accumulate into `post_effects`
 
