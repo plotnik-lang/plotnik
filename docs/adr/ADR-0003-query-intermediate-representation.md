@@ -111,6 +111,17 @@ struct Arena {
     len: usize,
 }
 
+impl Arena {
+    fn new(len: usize) -> Self {
+        let layout = std::alloc::Layout::from_size_align(len, ARENA_ALIGN).unwrap();
+        let ptr = unsafe { std::alloc::alloc(layout) };
+        if ptr.is_null() {
+            std::alloc::handle_alloc_error(layout);
+        }
+        Self { ptr, len }
+    }
+}
+
 impl Drop for Arena {
     fn drop(&mut self) {
         let layout = std::alloc::Layout::from_size_align(self.len, ARENA_ALIGN).unwrap();
@@ -143,12 +154,25 @@ Entrypoints use fixed-size metadata with indirect string storage:
 struct Entrypoint {
     name_offset: u32,  // index into entrypoint_names segment
     name_len: u32,
-    target: TransitionId,
+    target: TransitionId, // Index into transitions segment (offset 0)
 }
 // Size: 12 bytes, Align: 4 bytes
 ```
 
 The `name_offset` points into the `entrypoint_names` segment (u8 array), where alignment is irrelevant. This avoids the alignment hazards of inline variable-length strings. Note: entrypoint names are stored separately from data field names because they serve different purposes—entrypoint names identify subqueries for lookup, while data field names are used in output object construction.
+
+##### Construction Process
+
+The graph is built in two passes to ensure a single contiguous allocation:
+
+1.  **Analysis Pass**: Traverse the Query AST to count all elements (transitions, effects, negated fields, strings).
+2.  **Layout & Allocation**: Compute aligned offsets for all segments and allocate the `Arena` once.
+3.  **Emission Pass**: Serialize data into the arena.
+    - **String Tables**: Written sequentially to `u8` segments.
+    - **Slices**: `Slice<T>` fields are populated with `start` indices relative to their segment base.
+    - **Structs**: `Transition`, `Entrypoint`, etc., are written using `std::ptr::write` to their calculated offsets.
+
+This approach eliminates dynamic resizing (`realloc`) and fragmentation.
 
 ##### Slice Resolution
 
@@ -205,7 +229,7 @@ impl<'a> MatcherView<'a> {
     fn node_kind(&self) -> Option<NodeTypeId>;
     fn field(&self) -> Option<NodeFieldId>;
     fn negated_fields(&self) -> &[NodeFieldId];  // resolved from Slice
-    fn matches(&self, cursor: &TreeCursor) -> bool;
+    fn matches(&self, cursor: &mut TreeCursor) -> bool;
 }
 
 enum MatcherKind { Epsilon, Node, Anonymous, Wildcard, Down, Up }
@@ -236,9 +260,13 @@ struct Slice<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T> Slice<T> {
+impl Slice<T> {
     const EMPTY: Self = Self { start: 0, len: 0, _phantom: PhantomData };
 }
+
+// Note: PhantomData<T> does not prevent crossing segment boundaries (e.g. passing
+// Slice<EffectOp> where Slice<TransitionId> is expected). Implementers should
+// consider wrapping these in newtypes if stricter compile-time safety is required.
 ```
 
 Size: 8 bytes. Using `u32` for both fields fills the natural alignment with no padding waste, supporting up to 4B items per slice—well beyond any realistic query.
@@ -280,7 +308,7 @@ Each named definition has an entry point. The default entry is the last definiti
 Note: `NodeTypeId` is `u16`. `NodeFieldId` is `NonZeroU16`, which guarantees `Option<NodeFieldId>` uses value `0` for `None` — a stable layout suitable for raw serialization. Both types are defined in `plotnik-core`.
 
 ```rust
-#[repr(C)]
+#[repr(C, u32)]
 enum Matcher {
     Epsilon,                           // no payload
     Node {
@@ -304,7 +332,7 @@ Navigation variants `Down`/`Up` move the cursor without matching. They enable ne
 #### Reference Markers
 
 ```rust
-#[repr(u8)]  // Explicit 1-byte discriminant for stable serialization
+#[repr(C, u8)]  // Explicit 1-byte discriminant for stable serialization
 enum RefTransition {
     None,          // no marker (discriminant 0)
     Enter(RefId),  // push ref_id onto return stack (discriminant 1)
@@ -434,6 +462,12 @@ Effect semantics on `current`:
 - `PushElement` → moves `current` into top array, clears to `None`
 - `End*` → pops container from stack into `current`
 - `ToString` → replaces `current` Node with its source text as String
+
+**Error Handling**
+
+The interpreter assumes the effect stream is well-formed (guaranteed by the query compiler).
+
+- **Panic**: Any operation on invalid state (e.g., `Field` when `current` is `None`, `EndArray` with empty stack, `ToString` on non-Node). These indicate bugs in the IR construction.
 
 #### Execution Pipeline
 
@@ -836,32 +870,32 @@ The IR design is WASM-compatible:
 - **`BTreeMap` for objects**: Deterministic iteration order ensures reproducible output across platforms.
 - **Fixed-size Entrypoints**: The `Entrypoint` struct (12 bytes, align 4) avoids variable-length inline strings that would cause alignment hazards.
 - **No platform-specific primitives**: All types are portable (`u16`, `u32`, byte arrays).
+- **Allocator Independence**: Uses `std::alloc::alloc` via `Layout`. On `wasm32-unknown-unknown`, this defaults to the system allocator. Implementers targeting other environments (e.g., Emscripten) must ensure a global allocator is configured.
 
 #### Serialization Format
 
-For wire transfer between machines with different architectures, the arena uses a portable binary format:
+The arena uses a simple binary format for caching compiled queries to disk. The current scope is limited to same-machine, same-version usage (e.g., caching a compiled query between CLI invocations). Cross-architecture portability and version migration are explicitly out of scope for this ADR and will be addressed in future work if needed.
 
-- **Byte order**: Little-endian for all multi-byte integers (`u16`, `u32`). This matches WASM's native byte order and x86/ARM in little-endian mode.
+- **Validation**: The `magic` bytes must be `b"PLNK"`. The `version` field must match the exact compiler version AND platform ABI hash (pointer width + endianness). Any mismatch invalidates the cache.
+- **Byte order**: Native (little-endian on x86/ARM/WASM). No byte-swapping is performed.
 - **String encoding**: UTF-8 for all string data (entrypoint names, data field names, variant tags).
-- **Format**: The serialized form is a header followed by the raw arena bytes:
+- **Layout**: Header followed by raw arena bytes:
 
 ```
 Header (16 bytes):
   magic: [u8; 4]           // "PLNK"
-  version: u32             // format version (little-endian)
+  version: u32             // format version (must match exactly)
   arena_len: u32           // byte length of arena data
   segment_count: u32       // number of segment offset entries
 
 Segment Offsets (segment_count × 4 bytes):
-  [u32; segment_count]     // successors_offset, effects_offset, ... (little-endian)
+  [u32; segment_count]     // successors_offset, effects_offset, ...
 
 Arena Data (arena_len bytes):
-  [u8; arena_len]          // raw arena, requires fixup on big-endian hosts
+  [u8; arena_len]          // raw arena bytes, used directly without fixup
 ```
 
-**Loading**: On little-endian hosts (WASM, x86, ARM LE), the arena can be used directly after verifying alignment. On big-endian hosts, multi-byte values within each segment must be byte-swapped according to their type's size.
-
-This format prioritizes simplicity over zero-copy loading on all platforms. The typical query graph is small (<100KB), so the byte-swap cost on big-endian hosts is negligible.
+**Loading**: The loader verifies magic, version, and arena length. If any mismatch occurs, the cache is invalidated and the query is recompiled. No byte-swapping or layout fixup is performed—mismatched architectures simply trigger recompilation.
 
 ### Considered Alternatives
 
@@ -880,8 +914,8 @@ This format prioritizes simplicity over zero-copy loading on all platforms. The 
 5. **Vectorized Reference Markers (`Vec<RefTransition>`)**
    - Rejected: Optimized for alias chains (e.g. `A = B`, `B = C`) to allow full epsilon elimination. However, this bloats the `Transition` struct for all other cases. Standard epsilon elimination is sufficient; traversing a few remaining epsilon transitions for aliases is cheaper than increasing memory pressure on the whole graph.
 
-6. **Platform-native byte order**
-   - Rejected: Would require architecture detection and conditional byte-swapping on both ends. Little-endian-only is simpler and covers >99% of deployment targets.
+6. **Portable binary format**
+   - Deferred: Cross-architecture serialization would require byte-swapping and layout fixups. Current scope is same-machine caching only; portability can be added later if needed.
 
 ## References
 
