@@ -53,12 +53,12 @@ The graph is immutable after construction. We use a single contiguous allocation
 struct TransitionGraph {
     data: Box<[u8]>,
     // segment offsets (aligned for each type)
-    successors_offset: usize,
-    effects_offset: usize,
-    negated_fields_offset: usize,
-    data_fields_offset: usize,
-    variant_tags_offset: usize,
-    entrypoints_offset: usize,
+    successors_offset: u32,
+    effects_offset: u32,
+    negated_fields_offset: u32,
+    data_fields_offset: u32,
+    variant_tags_offset: u32,
+    entrypoints_offset: u32,
     default_entrypoint: TransitionId,
 }
 
@@ -74,25 +74,78 @@ impl TransitionGraph {
 
 ##### Memory Arena Design
 
-The single `Box<[u8]>` allocation is divided into typed segments. Each segment is properly aligned for its type, ensuring safe access across all architectures (x86, ARM, RISC-V).
+The single `Box<[u8]>` allocation is divided into typed segments. Each segment is properly aligned for its type, ensuring safe access across all architectures (x86, ARM, WASM).
 
 **Segment Layout**:
 
-- Transitions: `[Transition; N]` at offset 0
-- Successors: `[TransitionId; M]` at `successors_offset`
-- Effects: `[EffectOp; P]` at `effects_offset`
-- Negated Fields: `[NodeFieldId; Q]` at `negated_fields_offset`
-- Data Fields: `[u8; R]` (string data) at `data_fields_offset`
-- Variant Tags: `[u8; S]` (string data) at `variant_tags_offset`
-- Entrypoints: `[(name, TransitionId); T]` (length-prefixed strings) at `entrypoints_offset`
+| Segment        | Type                | Offset                  | Alignment |
+| -------------- | ------------------- | ----------------------- | --------- |
+| Transitions    | `[Transition; N]`   | 0 (implicit)            | 4 bytes   |
+| Successors     | `[TransitionId; M]` | `successors_offset`     | 4 bytes   |
+| Effects        | `[EffectOp; P]`     | `effects_offset`        | 2 bytes   |
+| Negated Fields | `[NodeFieldId; Q]`  | `negated_fields_offset` | 2 bytes   |
+| Data Fields    | `[u8; R]`           | `data_fields_offset`    | 1 byte    |
+| Variant Tags   | `[u8; S]`           | `variant_tags_offset`   | 1 byte    |
+| Entrypoints    | `[Entrypoint; T]`   | `entrypoints_offset`    | 4 bytes   |
+
+Transitions always start at offset 0—no explicit offset stored. The arena base address is allocated with 8-byte alignment, satisfying `Transition`'s requirement.
 
 Note: `entry(&str)` performs linear scan — O(n) where n = definition count (typically <20).
 
-The offsets are computed during graph construction to ensure:
+##### Memory Layout & Alignment
 
-1. Each segment starts at its type's natural alignment boundary
-2. No padding bytes are wasted between same-typed items
-3. String data is stored as length-prefixed UTF-8 bytes
+Casting `&u8` to `&T` when the address is not aligned to `T` causes traps on WASM and faults on strict ARM. The `Box<[u8]>` type only guarantees 1-byte alignment. We enforce alignment explicitly:
+
+**A. Base Allocation Alignment**
+
+The arena must be allocated with alignment equal to the maximum of all segment types:
+
+```rust
+const ARENA_ALIGN: usize = 4; // align_of::<Transition>()
+
+let layout = std::alloc::Layout::from_size_align(total_size, ARENA_ALIGN).unwrap();
+let ptr = std::alloc::alloc(layout);
+let data: Box<[u8]> = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(ptr, total_size)) };
+```
+
+**B. Segment Offset Calculation**
+
+Each segment offset is rounded up to its type's alignment:
+
+```rust
+fn align_up(offset: usize, align: usize) -> usize {
+    (offset + align - 1) & !(align - 1)
+}
+
+// Example: if Transitions end at byte 103, Successors (align 4) start at 104
+let successors_offset = align_up(transitions_end, align_of::<TransitionId>());
+```
+
+**C. Entrypoints Structure**
+
+Entrypoints use fixed-size metadata with indirect string storage:
+
+```rust
+#[repr(C)]
+struct Entrypoint {
+    name_offset: u32,  // index into data_fields segment
+    name_len: u32,
+    target: TransitionId,
+}
+// Size: 12 bytes, Align: 4 bytes
+```
+
+The `name_offset` points into the `data_fields` segment (u8 array), where alignment is irrelevant. This avoids the alignment hazards of inline variable-length strings.
+
+##### Slice Resolution
+
+`Slice<T>` handles are resolved to actual slices by combining:
+
+1. The segment's base offset (e.g., `effects_offset` for `Slice<EffectOp>`)
+2. The slice's `start` field (element index within segment)
+3. The slice's `len` field
+
+The `TransitionView` methods (`pre_effects()`, `post_effects()`, `next()`) perform this resolution internally, returning standard `&[T]` slices. Engine code never performs offset arithmetic directly.
 
 **Access Pattern**:
 
@@ -182,18 +235,21 @@ Size: 8 bytes. Using `u32` for both fields fills the natural alignment with no p
 Internal storage. Engine code uses `TransitionView` instead of accessing this directly.
 
 ```rust
+#[repr(C)]
 struct Transition {
-    matcher: Option<Matcher>,
-    pre_anchored: bool,
-    post_anchored: bool,
-    pre_effects: Slice<EffectOp>,
-    post_effects: Slice<EffectOp>,
-    ref_marker: Option<RefTransition>,
-    next: Slice<TransitionId>,
+    matcher: Option<Matcher>,    // 16 bytes (see Matcher below), None is epsilon-transition
+    pre_anchored: bool,          // 1 byte
+    post_anchored: bool,         // 1 byte
+    _pad1: [u8; 2],              // 2 bytes padding
+    pre_effects: Slice<EffectOp>,  // 8 bytes
+    post_effects: Slice<EffectOp>, // 8 bytes
+    ref_marker: Option<RefTransition>, // 4 bytes
+    next: Slice<TransitionId>,   // 8 bytes
 }
+// Size: 48 bytes, Align: 4 bytes (max of Slice and Option<Matcher> alignment)
 ```
 
-The `TransitionView` resolves `Slice<T>` using the graph's `get_slice` method, hiding all offset calculations from the engine code.
+The `TransitionView` resolves `Slice<T>` by combining the graph's segment offset with the slice's start/len fields.
 
 **Design Note**: The `ref_marker` field is intentionally a single `Option<RefTransition>` rather than a `Slice`. This means a transition can carry at most one Enter or Exit marker. While this prevents full epsilon elimination for nested reference sequences (e.g., `Enter(A) → Enter(B)`), we accept this limitation for simplicity. Such sequences remain as chains of epsilon transitions in the final graph.
 
@@ -211,20 +267,22 @@ Each named definition has an entry point. The default entry is the last definiti
 Note: `NodeTypeId` and `NodeFieldId` are defined in `plotnik-core` (tree-sitter uses `u16` and `NonZeroU16` respectively).
 
 ```rust
+#[repr(C)]
 enum Matcher {
     Node {
-        kind: NodeTypeId,
-        field: Option<NodeFieldId>,
-        negated_fields: Slice<NodeFieldId>,
+        kind: NodeTypeId,              // 2 bytes
+        field: Option<NodeFieldId>,    // 2 bytes
+        negated_fields: Slice<NodeFieldId>, // 8 bytes
     },
     Anonymous {
-        kind: NodeTypeId,
-        field: Option<NodeFieldId>,
+        kind: NodeTypeId,              // 2 bytes
+        field: Option<NodeFieldId>,    // 2 bytes
     },
     Wildcard,
     Down,
     Up,
 }
+// Size: 12 bytes + discriminant, padded to 16 bytes. Align: 4 bytes
 ```
 
 Navigation variants `Down`/`Up` move the cursor without matching. They enable nested patterns like `(function_declaration (identifier) @name)` where we must descend into children.
@@ -232,10 +290,12 @@ Navigation variants `Down`/`Up` move the cursor without matching. They enable ne
 #### Reference Markers
 
 ```rust
+#[repr(C)]
 enum RefTransition {
     Enter(RefId),  // push ref_id onto return stack
     Exit(RefId),   // pop from return stack (must match ref_id)
 }
+// Size: 4 bytes (1-byte discriminant + 2-byte payload + 1-byte padding), Align: 2 bytes
 ```
 
 Thompson construction creates epsilon transitions with optional `Enter`/`Exit` markers. Epsilon elimination propagates these markers to surviving transitions. At runtime, the engine uses markers to filter which `next` transitions are valid based on return stack state. Multiple transitions can share the same `RefId` after epsilon elimination.
@@ -246,6 +306,7 @@ Instructions stored in the transition graph. These are static, `Copy`, and conta
 
 ```rust
 #[derive(Clone, Copy)]
+#[repr(C)]
 enum EffectOp {
     StartArray,              // push new [] onto container stack
     PushElement,             // move current value into top array
@@ -257,13 +318,30 @@ enum EffectOp {
     EndVariant,              // pop variant from stack, wrap current, becomes current
     ToString,                // convert current Node value to String (source text)
 }
+// Size: 4 bytes (1-byte discriminant + 2-byte payload + 1-byte padding), Align: 2 bytes
 ```
 
-Size: 4 bytes (1-byte discriminant + 2-byte payload + 1-byte padding).
-
-Note: There is no `CaptureNode` instruction. Node capture is implicit—a successful match automatically emits `RuntimeEffect::CaptureNode` to the builder (see below).
+Note: There is no `CaptureNode` instruction. Node capture is implicit—a successful match automatically emits `RuntimeEffect::CaptureNode` to the effect stream (see below).
 
 Effects capture structure only—arrays, objects, variants. Type annotations (`:: str`, `:: Type`) are separate metadata applied during post-processing.
+
+##### Effect Placement Rules
+
+After epsilon elimination, effects are classified as pre or post based on when they must execute relative to the match:
+
+| Effect         | Placement | Reason                                     |
+| -------------- | --------- | ------------------------------------------ |
+| `StartArray`   | Pre       | Container must exist before elements added |
+| `StartObject`  | Pre       | Container must exist before fields added   |
+| `StartVariant` | Pre       | Tag must be set before payload captured    |
+| `PushElement`  | Post      | Consumes the just-matched node             |
+| `Field`        | Post      | Consumes the just-matched node             |
+| `EndArray`     | Post      | Finalizes after last element matched       |
+| `EndObject`    | Post      | Finalizes after last field matched         |
+| `EndVariant`   | Post      | Wraps payload after it's captured          |
+| `ToString`     | Post      | Converts the just-matched node to text     |
+
+Pre-effects from incoming epsilon paths accumulate in order. Post-effects from outgoing epsilon paths accumulate in order. This ordering is deterministic and essential for correct data construction.
 
 ### Data Construction (Dynamic Interpreter)
 
@@ -273,7 +351,7 @@ The interpreter emits events to a linear stream during matching. After a success
 
 #### Runtime Effects
 
-Events emitted to the builder during interpretation. Unlike `EffectOp`, these carry runtime data.
+Events emitted to the effect stream during interpretation. Unlike `EffectOp`, these carry runtime data.
 
 ```rust
 enum RuntimeEffect<'a> {
@@ -284,16 +362,16 @@ enum RuntimeEffect<'a> {
 
 The `CaptureNode` variant is never stored in the graph—it's generated by the interpreter when a match succeeds. This separation keeps the graph static (no lifetimes) while allowing the runtime stream to carry actual node references.
 
-#### Builder
+#### Effect Stream
 
 ```rust
 /// Accumulates runtime effects during matching; supports rollback on backtrack
-struct Builder<'a> {
+struct EffectStream<'a> {
     effects: Vec<RuntimeEffect<'a>>,
 }
 ```
 
-The builder accumulates effects as a linear stream during matching. It provides:
+The effect stream accumulates effects linearly during matching. It provides:
 
 - **Effect emission**: Appends `EffectOp` instructions and `CaptureNode` events
 - **Watermarking**: Records position before attempting branches
@@ -344,7 +422,7 @@ Effect semantics on `current`:
 
 For any given transition, the execution order is strict to ensure data consistency during backtracking:
 
-1. **Enter**: Push `Frame` with current `builder.watermark()`.
+1. **Enter**: Push `Frame` with current `effect_stream.watermark()`.
 2. **Pre-Effects**: Emit `pre_effects` as `RuntimeEffect::Op(...)`.
 3. **Match**: Validate node kind/fields. If fail, rollback to watermark and abort.
 4. **Capture**: Emit `RuntimeEffect::CaptureNode(matched_node)` — implicit, not from graph.
@@ -420,14 +498,9 @@ Two mechanisms work together (same for both execution modes):
 
 1. **Cursor checkpoint**: `cursor.descendant_index()` returns a `usize` position; `cursor.goto_descendant(pos)` restores it. O(1) save, O(depth) restore, no allocation.
 
-2. **Effect watermark**: `builder.watermark()` before attempting a branch; `builder.rollback(watermark)` on failure.
+2. **Effect watermark**: `effect_stream.watermark()` before attempting a branch; `effect_stream.rollback(watermark)` on failure.
 
-Both execution modes save state before attempting branches:
-
-- **Cursor checkpoint**: Current position in the AST (cheap to save, O(depth) to restore)
-- **Builder watermark**: Current effect count (O(1) save and restore)
-
-The pattern is: attempt first branch, and on failure, restore both cursor and effects to their saved states before trying the next branch. This ensures each alternative starts from the same clean state.
+Both execution modes follow the same pattern: save state before attempting a branch; on failure, restore both cursor and effects before trying the next branch. This ensures each alternative starts from the same clean state.
 
 ```
 
@@ -562,7 +635,7 @@ In proc-macro mode, each definition becomes a Rust function. References become d
 
 **Dynamic**: The interpreter maintains an explicit return stack. On `Enter(ref_id)`:
 
-1. Push frame with `ref_id`, cursor checkpoint, builder watermark
+1. Push frame with `ref_id`, cursor checkpoint, effect stream watermark
 2. Follow `next` into the definition body
 
 On `Exit(ref_id)`:
@@ -571,7 +644,7 @@ On `Exit(ref_id)`:
 2. Pop frame
 3. Continue to `next` successors unconditionally
 
-**Entry filtering mechanism**: The filtering happens when _entering_ an `Exit` transition, not when leaving it. After epsilon elimination, multiple `Exit` transitions with different `RefId`s may be reachable from the same point (merged from different call sites). The interpreter only takes an `Exit(ref_id)` transition if `ref_id` matches the current stack top. This ensures returns go to the correct call site.
+**Entry filtering mechanism**: After epsilon elimination, multiple `Exit` transitions with different `RefId`s may be reachable from the same point (merged from different call sites). The interpreter only takes an `Exit(ref_id)` transition if `ref_id` matches the current stack top. This ensures returns go to the correct call site.
 
 After taking an `Exit` and popping the frame, successors are followed unconditionally—they represent the continuation after the call. If a successor has an `Enter` marker, that's a _new_ call (e.g., `(A) (B)` where returning from A continues to calling B), not a return path.
 
@@ -580,7 +653,7 @@ After taking an `Exit` and popping the frame, successors are followed unconditio
 struct Frame {
     ref_id: RefId,                  // which call site we're inside
     cursor_checkpoint: usize,       // cursor position before call
-    builder_watermark: usize,       // effect count before call
+    effect_stream_watermark: usize, // effect count before call
 }
 
 /// Runtime query executor
@@ -588,7 +661,7 @@ struct Interpreter<'a> {
     graph: &'a TransitionGraph,
     return_stack: Vec<Frame>,       // call stack for definition references
     cursor: TreeCursor<'a>,         // current position in AST
-    builder: Builder,               // effect accumulator
+    effect_stream: EffectStream<'a>, // effect accumulator
 }
 ```
 
@@ -693,17 +766,17 @@ Trade-off: More flexible (runtime query construction), but slower than generated
 
 ## Execution Mode Comparison
 
-| Aspect            | Proc Macro                 | Dynamic                      |
-| ----------------- | -------------------------- | ---------------------------- |
-| Query source      | Compile-time literal       | Runtime string               |
-| Graph lifetime    | Compile-time only          | Runtime                      |
-| Data construction | Direct (no effect stream)  | `RuntimeEffect` stream + exe |
-| Definition calls  | Rust function calls        | Explicit return stack        |
-| Return stack      | Rust call stack            | `Vec<Frame>`                 |
-| Backtracking      | Drop + re-alloc            | `truncate()` effects         |
-| Performance       | Zero dispatch, single pass | Interpretation + 2 pass      |
-| Type safety       | Compile-time checked       | Runtime types                |
-| Use case          | Known queries              | User-provided queries        |
+| Aspect            | Proc Macro                 | Dynamic                       |
+| ----------------- | -------------------------- | ----------------------------- |
+| Query source      | Compile-time literal       | Runtime string                |
+| Graph lifetime    | Compile-time only          | Runtime                       |
+| Data construction | Direct (no effect stream)  | `RuntimeEffect` stream + exec |
+| Definition calls  | Rust function calls        | Explicit return stack         |
+| Return stack      | Rust call stack            | `Vec<Frame>`                  |
+| Backtracking      | Drop + re-alloc            | `truncate()` effects          |
+| Performance       | Zero dispatch, single pass | Interpretation + 2 pass       |
+| Type safety       | Compile-time checked       | Runtime types                 |
+| Use case          | Known queries              | User-provided queries         |
 
 ## Consequences
 
@@ -740,11 +813,38 @@ These mechanisms deserve their own ADR (fuel budget design, configurable limits,
 
 The IR design is WASM-compatible:
 
-- **Single arena allocation**: No fragmentation concerns in linear memory
-- **`usize` offsets**: 32-bit on WASM32, limiting arena to 4GB (sufficient for any query)
-- **`BTreeMap` for objects**: Deterministic iteration order ensures reproducible output
-- **Per-type alignment**: Segment offsets computed at construction time, respecting target alignment requirements
-- **No platform-specific primitives**: All types are portable (`u16`, `u32`, `Box<[u8]>`)
+- **Single arena allocation**: No fragmentation concerns in linear memory. Note: WASM linear memory grows in 64KB pages; the arena coexists with other allocations (e.g., tree-sitter's memory) but this is standard for any WASM allocation.
+- **Explicit alignment**: Arena allocated with `std::alloc::Layout`, segment offsets computed with `align_up()`. Prevents misaligned access traps on WASM and strict ARM.
+- **`u32` offsets**: All segment offsets are `u32`, matching WASM32's pointer size. 4GB arena limit is sufficient for any query.
+- **`BTreeMap` for objects**: Deterministic iteration order ensures reproducible output across platforms.
+- **Fixed-size Entrypoints**: The `Entrypoint` struct (12 bytes, align 4) avoids variable-length inline strings that would cause alignment hazards.
+- **No platform-specific primitives**: All types are portable (`u16`, `u32`, `Box<[u8]>`).
+
+#### Serialization Format
+
+For wire transfer between machines with different architectures, the arena uses a portable binary format:
+
+- **Byte order**: Little-endian for all multi-byte integers (`u16`, `u32`). This matches WASM's native byte order and x86/ARM in little-endian mode.
+- **String encoding**: UTF-8 for all string data (definition names, field names, variant tags).
+- **Format**: The serialized form is a header followed by the raw arena bytes:
+
+```
+Header (16 bytes):
+  magic: [u8; 4]           // "PLNK"
+  version: u32             // format version (little-endian)
+  arena_len: u32           // byte length of arena data
+  segment_count: u32       // number of segment offset entries
+
+Segment Offsets (segment_count × 4 bytes):
+  [u32; segment_count]     // successors_offset, effects_offset, ... (little-endian)
+
+Arena Data (arena_len bytes):
+  [u8; arena_len]          // raw arena, requires fixup on big-endian hosts
+```
+
+**Loading**: On little-endian hosts (WASM, x86, ARM LE), the arena can be used directly after verifying alignment. On big-endian hosts, multi-byte values within each segment must be byte-swapped according to their type's size.
+
+This format prioritizes simplicity over zero-copy loading on all platforms. The typical query graph is small (<100KB), so the byte-swap cost on big-endian hosts is negligible.
 
 ### Considered Alternatives
 
@@ -762,6 +862,9 @@ The IR design is WASM-compatible:
 
 5. **Vectorized Reference Markers (`Vec<RefTransition>`)**
    - Rejected: Optimized for alias chains (e.g. `A = B`, `B = C`) to allow full epsilon elimination. However, this bloats the `Transition` struct for all other cases. Standard epsilon elimination is sufficient; traversing a few remaining epsilon transitions for aliases is cheaper than increasing memory pressure on the whole graph.
+
+6. **Platform-native byte order**
+   - Rejected: Would require architecture detection and conditional byte-swapping on both ends. Little-endian-only is simpler and covers >99% of deployment targets.
 
 ## References
 
