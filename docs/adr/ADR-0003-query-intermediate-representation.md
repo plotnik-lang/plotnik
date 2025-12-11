@@ -359,13 +359,13 @@ The resulting `Value::Variant` preserves the tag distinct from the payload, prev
   ```json
   { "$tag": "A", "x": 1, "y": 2 }
   ```
-- **Array/Primitive payload**: Wrap in a `content` field.
+- **Array/Primitive payload**: Wrap in a `$data` field.
   ```json
-  { "$tag": "A", "content": [1, 2, 3] }
-  { "$tag": "B", "content": "foo" }
+  { "$tag": "A", "$data": [1, 2, 3] }
+  { "$tag": "B", "$data": "foo" }
   ```
 
-The `$tag` key avoids collisions with user-defined `@tag` captures.
+The `$tag` and `$data` keys avoid collisions with user-defined captures.
 
 This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
 
