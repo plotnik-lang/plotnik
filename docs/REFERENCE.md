@@ -14,7 +14,7 @@ Plotnik uses an NFA-based recursive cursor walk with backtracking. Understanding
 
 - **Root-anchored:** Matching starts at the root of the target tree and must match the entire structure (like `^...$` in regex, not a substring search)
 - **Backtracking:** When a branch fails, the engine backtracks and tries alternatives
-- **Ordered choice:** In alternations `[A B C]`, branches are tried in order; first match wins (PEG semantics)
+- **Ordered choice:** In alternations `[A B C]`, branches are tried in order; first match wins
 
 ### Trivia Handling
 
