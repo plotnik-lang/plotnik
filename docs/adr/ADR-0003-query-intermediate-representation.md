@@ -47,36 +47,191 @@ These structures are used by both execution modes.
 
 #### Transition Graph Container
 
+The graph is immutable after construction. We use a single contiguous allocation sliced into typed segments with proper alignment handling.
+
 ```rust
 struct TransitionGraph {
-    transitions: Vec<Transition>,
-    data_fields: Vec<String>,   // DataFieldId → field name
-    variant_tags: Vec<String>,  // VariantTagId → tag name
-    entrypoints: Vec<(String, TransitionId)>,
+    data: Box<[u8]>,
+    // segment offsets (aligned for each type)
+    successors_offset: usize,
+    effects_offset: usize,
+    negated_fields_offset: usize,
+    data_fields_offset: usize,
+    variant_tags_offset: usize,
+    entrypoints_offset: usize,
     default_entrypoint: TransitionId,
 }
 
-type TransitionId = usize;   // position in transitions array (structural)
-type DataFieldId = usize;    // index into data_fields
-type VariantTagId = usize;   // index into variant_tags
-type RefId = usize;          // unique per each named subquery reference (Ref node in the query AST)
+impl TransitionGraph {
+    fn new() -> Self;
+    fn get(&self, id: TransitionId) -> TransitionView<'_>;
+    fn entry(&self, name: &str) -> Option<TransitionView<'_>>;
+    fn default_entry(&self) -> TransitionView<'_>;
+    fn field_name(&self, id: DataFieldId) -> &str;
+    fn tag_name(&self, id: VariantTagId) -> &str;
+}
+```
+
+##### Memory Arena Design
+
+The single `Box<[u8]>` allocation is divided into typed segments. Each segment is properly aligned for its type, ensuring safe access across all architectures (x86, ARM, RISC-V).
+
+**Segment Layout**:
+
+- Transitions: `[Transition; N]` at offset 0
+- Successors: `[TransitionId; M]` at `successors_offset`
+- Effects: `[EffectOp; P]` at `effects_offset`
+- Negated Fields: `[NodeFieldId; Q]` at `negated_fields_offset`
+- Data Fields: `[u8; R]` (string data) at `data_fields_offset`
+- Variant Tags: `[u8; S]` (string data) at `variant_tags_offset`
+- Entrypoints: `[(name, TransitionId); T]` (length-prefixed strings) at `entrypoints_offset`
+
+Note: `entry(&str)` performs linear scan — O(n) where n = definition count (typically <20).
+
+The offsets are computed during graph construction to ensure:
+
+1. Each segment starts at its type's natural alignment boundary
+2. No padding bytes are wasted between same-typed items
+3. String data is stored as length-prefixed UTF-8 bytes
+
+**Access Pattern**:
+
+The `TransitionView` and `MatcherView` types provide safe access by:
+
+- Resolving `Slice<T>` handles to actual slices within the appropriate segment
+- Converting relative indices to absolute pointers
+- Hiding all offset arithmetic from the query engine
+
+This design achieves:
+
+- **Cache efficiency**: All graph data in one contiguous allocation
+- **Memory efficiency**: No per-node allocations, minimal overhead
+- **Type safety**: Phantom types ensure slices point to correct segments
+- **Zero-copy**: Direct references into the arena, no cloning
+
+#### Transition View
+
+`TransitionView` bundles a graph reference with a transition, enabling ergonomic access without explicit slice resolution:
+
+```rust
+struct TransitionView<'a> {
+    graph: &'a TransitionGraph,
+    raw: &'a Transition,
+}
+
+impl<'a> TransitionView<'a> {
+    fn matcher(&self) -> Option<MatcherView<'a>>;
+    fn next(&self) -> impl Iterator<Item = TransitionView<'a>>;
+    fn pre_effects(&self) -> &[EffectOp];
+    fn post_effects(&self) -> &[EffectOp];
+    fn is_pre_anchored(&self) -> bool;
+    fn is_post_anchored(&self) -> bool;
+    fn ref_marker(&self) -> Option<&RefTransition>;
+}
+
+struct MatcherView<'a> {
+    graph: &'a TransitionGraph,
+    raw: &'a Matcher,
+}
+
+impl<'a> MatcherView<'a> {
+    fn kind(&self) -> MatcherKind;
+    fn node_kind(&self) -> Option<NodeTypeId>;
+    fn field(&self) -> Option<NodeFieldId>;
+    fn negated_fields(&self) -> &[NodeFieldId];  // resolved from Slice
+    fn matches(&self, cursor: &TreeCursor) -> bool;
+}
+
+enum MatcherKind { Node, Anonymous, Wildcard, Down, Up }
+```
+
+**Execution Flow**:
+
+The engine traverses transitions following this pattern:
+
+1. **Pre-effects** execute unconditionally before any matching attempt
+2. **Matching** determines whether to proceed:
+   - With matcher: Test against current cursor position
+   - Without matcher (epsilon): Always proceed
+3. **On successful match**: Implicitly capture the node, execute post-effects
+4. **Successors** are processed recursively, with appropriate backtracking
+
+The `TransitionView` abstraction hides all segment access complexity. The same logical flow applies to both execution modes—dynamic interpretation emits effects while proc-macro generation produces direct construction code.
+
+#### Slice Handle
+
+A compact, relative reference to a contiguous range within a segment. Replaces `&[T]` to keep structs self-contained.
+
+```rust
+#[repr(C)]
+struct Slice<T> {
+    start: u32,  // Index within segment
+    len: u32,    // Number of items
+    _phantom: PhantomData<T>,
+}
+
+impl<T> Slice<T> {
+    const EMPTY: Self = Self { start: 0, len: 0, _phantom: PhantomData };
+}
+```
+
+Size: 8 bytes. Using `u32` for both fields fills the natural alignment with no padding waste, supporting up to 4B items per slice—well beyond any realistic query.
+
+#### Raw Transition
+
+Internal storage. Engine code uses `TransitionView` instead of accessing this directly.
+
+```rust
+struct Transition {
+    matcher: Option<Matcher>,
+    pre_anchored: bool,
+    post_anchored: bool,
+    pre_effects: Slice<EffectOp>,
+    post_effects: Slice<EffectOp>,
+    ref_marker: Option<RefTransition>,
+    next: Slice<TransitionId>,
+}
+```
+
+The `TransitionView` resolves `Slice<T>` using the graph's `get_slice` method, hiding all offset calculations from the engine code.
+
+**Design Note**: The `ref_marker` field is intentionally a single `Option<RefTransition>` rather than a `Slice`. This means a transition can carry at most one Enter or Exit marker. While this prevents full epsilon elimination for nested reference sequences (e.g., `Enter(A) → Enter(B)`), we accept this limitation for simplicity. Such sequences remain as chains of epsilon transitions in the final graph.
+
+```rust
+type TransitionId = u32;
+type DataFieldId = u16;
+type VariantTagId = u16;
+type RefId = u16;
 ```
 
 Each named definition has an entry point. The default entry is the last definition. Multiple entry points share the same transition graph.
 
-#### Transition
+#### Matcher
+
+Note: `NodeTypeId` and `NodeFieldId` are defined in `plotnik-core` (tree-sitter uses `u16` and `NonZeroU16` respectively).
 
 ```rust
-struct Transition {
-    matcher: Option<Matcher>,       // None = epsilon (no node consumed)
-    pre_anchored: bool,             // must match at current position, no scanning
-    post_anchored: bool,            // after match, cursor must be at last sibling
-    pre_effects: Vec<Effect>,       // effects before match (consume previous current)
-    post_effects: Vec<Effect>,      // effects after match (consume new current)
-    ref_marker: Option<RefTransition>,  // call boundary marker
-    next: Vec<TransitionId>,        // successors; order = priority (first = greedy)
+enum Matcher {
+    Node {
+        kind: NodeTypeId,
+        field: Option<NodeFieldId>,
+        negated_fields: Slice<NodeFieldId>,
+    },
+    Anonymous {
+        kind: NodeTypeId,
+        field: Option<NodeFieldId>,
+    },
+    Wildcard,
+    Down,
+    Up,
 }
+```
 
+Navigation variants `Down`/`Up` move the cursor without matching. They enable nested patterns like `(function_declaration (identifier) @name)` where we must descend into children.
+
+#### Reference Markers
+
+```rust
 enum RefTransition {
     Enter(RefId),  // push ref_id onto return stack
     Exit(RefId),   // pop from return stack (must match ref_id)
@@ -85,33 +240,13 @@ enum RefTransition {
 
 Thompson construction creates epsilon transitions with optional `Enter`/`Exit` markers. Epsilon elimination propagates these markers to surviving transitions. At runtime, the engine uses markers to filter which `next` transitions are valid based on return stack state. Multiple transitions can share the same `RefId` after epsilon elimination.
 
-#### Matcher
+#### Effect Operations
+
+Instructions stored in the transition graph. These are static, `Copy`, and contain no runtime data.
 
 ```rust
-enum Matcher {
-    // Matches named node like `identifier`, `function_declaration`
-    Node {
-        kind: NodeTypeId,
-        field: Option<NodeFieldId>,        // tree-sitter field constraint
-        negated_fields: Vec<NodeFieldId>,  // fields that must be absent
-    },
-    // literal text: "(", "function", ";", etc., resolved to NodeTypeId
-    Anonymous {
-        kind: NodeTypeId,
-        field: Option<NodeFieldId>,        // tree-sitter field constraint
-    },
-    Wildcard, // matches any node
-    Down,     // descend to first child
-    Up,       // ascend to parent
-}
-```
-
-Navigation variants `Down`/`Up` move the cursor without matching. They enable nested patterns like `(function_declaration (identifier) @name)` where we must descend into children.
-
-#### Effects
-
-```rust
-enum Effect {
+#[derive(Clone, Copy)]
+enum EffectOp {
     StartArray,              // push new [] onto container stack
     PushElement,             // move current value into top array
     EndArray,                // pop array from stack, becomes current
@@ -124,36 +259,47 @@ enum Effect {
 }
 ```
 
-Note: Match transitions set `current` to the matched node (not an effect).
+Size: 4 bytes (1-byte discriminant + 2-byte payload + 1-byte padding).
 
-Effects capture structure only—nodes, arrays, objects. Type annotations (`:: str`, `:: Type`) are separate metadata applied during post-processing when constructing the final output.
+Note: There is no `CaptureNode` instruction. Node capture is implicit—a successful match automatically emits `RuntimeEffect::CaptureNode` to the builder (see below).
 
-### Data Construction
+Effects capture structure only—arrays, objects, variants. Type annotations (`:: str`, `:: Type`) are separate metadata applied during post-processing.
 
-Effects emit to a linear stream during matching. After a successful match, the effect stream is executed to build the output.
+### Data Construction (Dynamic Interpreter)
+
+This section describes data construction for the dynamic interpreter. Proc-macro codegen uses direct construction instead (see [Direct Construction](#direct-construction-no-effect-stream)).
+
+The interpreter emits events to a linear stream during matching. After a successful match, the stream is executed to build the output.
+
+#### Runtime Effects
+
+Events emitted to the builder during interpretation. Unlike `EffectOp`, these carry runtime data.
+
+```rust
+enum RuntimeEffect<'a> {
+    Op(EffectOp),            // forwarded instruction from graph
+    CaptureNode(Node<'a>),   // emitted implicitly on successful match
+}
+```
+
+The `CaptureNode` variant is never stored in the graph—it's generated by the interpreter when a match succeeds. This separation keeps the graph static (no lifetimes) while allowing the runtime stream to carry actual node references.
 
 #### Builder
 
 ```rust
-/// Accumulates effects during matching; supports rollback on backtrack
-struct Builder {
-    effects: Vec<Effect>,
-}
-
-impl Builder {
-    fn emit(&mut self, effect: Effect) {
-        self.effects.push(effect);
-    }
-
-    fn watermark(&self) -> usize {  // save point for backtracking
-        self.effects.len()
-    }
-
-    fn rollback(&mut self, watermark: usize) {  // discard effects after watermark
-        self.effects.truncate(watermark);
-    }
+/// Accumulates runtime effects during matching; supports rollback on backtrack
+struct Builder<'a> {
+    effects: Vec<RuntimeEffect<'a>>,
 }
 ```
+
+The builder accumulates effects as a linear stream during matching. It provides:
+
+- **Effect emission**: Appends `EffectOp` instructions and `CaptureNode` events
+- **Watermarking**: Records position before attempting branches
+- **Rollback**: Truncates to saved position on backtrack
+
+This append-only design makes backtracking trivial—just truncate the vector. No complex undo logic needed.
 
 #### Execution Model
 
@@ -175,28 +321,39 @@ enum Value<'a> {
     Node(Node<'a>),                          // AST node reference
     String(String),                          // Text values (from @capture :: string)
     Array(Vec<Value<'a>>),                   // completed array
-    Object(HashMap<DataFieldId, Value<'a>>), // completed object
+    Object(BTreeMap<DataFieldId, Value<'a>>), // completed object (BTreeMap for deterministic iteration)
     Variant(VariantTagId, Box<Value<'a>>),   // tagged variant (tag + payload)
 }
 
 enum Container<'a> {
     Array(Vec<Value<'a>>),                   // array under construction
-    Object(HashMap<DataFieldId, Value<'a>>), // object under construction
+    Object(BTreeMap<DataFieldId, Value<'a>>), // object under construction
     Variant(VariantTagId),                   // variant tag; EndVariant wraps current value
 }
 ```
+
+Effect semantics on `current`:
+
+- `CaptureNode(node)` → sets `current` to `Value::Node(node)`
+- `Field(id)` → moves `current` into top object, clears to `None`
+- `PushElement` → moves `current` into top array, clears to `None`
+- `End*` → pops container from stack into `current`
+- `ToString` → replaces `current` Node with its source text as String
 
 #### Execution Pipeline
 
 For any given transition, the execution order is strict to ensure data consistency during backtracking:
 
 1. **Enter**: Push `Frame` with current `builder.watermark()`.
-2. **Pre-Effects**: Emit `pre_effects` (uses previous `current` value).
+2. **Pre-Effects**: Emit `pre_effects` as `RuntimeEffect::Op(...)`.
 3. **Match**: Validate node kind/fields. If fail, rollback to watermark and abort.
-4. **Post-Effects**: Emit `post_effects` (uses new `current` value).
-5. **Exit**: Pop `Frame` (validate return).
+4. **Capture**: Emit `RuntimeEffect::CaptureNode(matched_node)` — implicit, not from graph.
+5. **Post-Effects**: Emit `post_effects` as `RuntimeEffect::Op(...)`.
+6. **Exit**: Pop `Frame` (validate return).
 
 This order ensures correct behavior during epsilon elimination. Pre-effects run before the match overwrites `current`, allowing effects like `PushElement` to be safely merged from preceding epsilon transitions. Post-effects run after, for effects that need the newly matched node.
+
+The key insight: `CaptureNode` is generated by the interpreter on successful match, not stored as an instruction. The graph only contains structural operations (`EffectOp`); the runtime stream (`RuntimeEffect`) adds the actual node data.
 
 #### Example
 
@@ -210,49 +367,49 @@ Func = (function_declaration
 
 Input: `function foo(a, b) {}`
 
-Effect stream (annotated with pre/post classification):
+Runtime effect stream (showing `EffectOp` from graph vs implicit `CaptureNode`):
 
 ```
-pre:  StartObject
-      (match "foo")
-post: Field("name")
-pre:  StartArray
-      (match "a")
-post: ToString
-post: PushElement
-      (match "b")
-post: ToString
-post: PushElement
-post: EndArray
-post: Field("params")
-post: EndObject
+graph pre:  Op(StartObject)
+implicit:   CaptureNode(foo)        ← from successful match
+graph post: Op(Field("name"))
+graph pre:  Op(StartArray)
+implicit:   CaptureNode(a)          ← from successful match
+graph post: Op(ToString)
+graph post: Op(PushElement)
+implicit:   CaptureNode(b)          ← from successful match
+graph post: Op(ToString)
+graph post: Op(PushElement)
+graph post: Op(EndArray)
+graph post: Op(Field("params"))
+graph post: Op(EndObject)
 ```
 
-Note: In the raw graph, effects live on epsilon transitions between matches. The pre/post classification determines where they land after epsilon elimination. `StartObject` and `StartArray` are pre-effects (setup before matching). `Field`, `PushElement`, `ToString`, and `End*` are post-effects (consume the matched node or finalize containers).
+Note: The graph stores only `EffectOp` instructions. `CaptureNode` events are generated by the interpreter on each successful match—they never appear in `Transition.pre_effects` or `Transition.post_effects`.
 
-Execution trace:
+In the raw graph, `EffectOp`s live on epsilon transitions between matches. The pre/post classification determines where they land after epsilon elimination. `StartObject` and `StartArray` are pre-effects (setup before matching). `Field`, `PushElement`, `ToString`, and `End*` are post-effects (consume the matched node or finalize containers).
 
-| Effect          | current     | stack                                    |
-| --------------- | ----------- | ---------------------------------------- |
-| StartObject     | -           | [{}]                                     |
-| (match "foo")   | Node(foo)   | [{}]                                     |
-| Field("name")   | -           | [{name: Node(foo)}]                      |
-| StartArray      | -           | [{name:...}, []]                         |
-| (match "a")     | Node(a)     | [{name:...}, []]                         |
-| ToString        | String("a") | [{name:...}, []]                         |
-| PushElement     | -           | [{name:...}, [String("a")]]              |
-| (match "b")     | Node(b)     | [{name:...}, [String("a")]]              |
-| ToString        | String("b") | [{name:...}, [String("a")]]              |
-| PushElement     | -           | [{name:...}, [String("a"), String("b")]] |
-| EndArray        | [...]       | [{name:...}]                             |
-| Field("params") | -           | [{name:..., params:[...]}]               |
-| EndObject       | {...}       | []                                       |
+Execution trace (key steps, second array element omitted):
+
+| RuntimeEffect       | current    | stack           |
+| ------------------- | ---------- | --------------- |
+| Op(StartObject)     | -          | [{}]            |
+| CaptureNode(foo)    | Node(foo)  | [{}]            |
+| Op(Field("name"))   | -          | [{name: Node}]  |
+| Op(StartArray)      | -          | [{...}, []]     |
+| CaptureNode(a)      | Node(a)    | [{...}, []]     |
+| Op(ToString)        | "a"        | [{...}, []]     |
+| Op(PushElement)     | -          | [{...}, ["a"]]  |
+| _(repeat for "b")_  | ...        | ...             |
+| Op(EndArray)        | ["a", "b"] | [{...}]         |
+| Op(Field("params")) | -          | [{..., params}] |
+| Op(EndObject)       | {...}      | []              |
 
 Final result:
 
 ```json
 {
-  "name": Node(foo),
+  "name": "<Node: foo>",
   "params": ["a", "b"]
 }
 ```
@@ -265,55 +422,59 @@ Two mechanisms work together (same for both execution modes):
 
 2. **Effect watermark**: `builder.watermark()` before attempting a branch; `builder.rollback(watermark)` on failure.
 
-```rust
-// This logic appears in both modes:
-// - Proc macro: generated as literal Rust code
-// - Dynamic: executed by the interpreter
+Both execution modes save state before attempting branches:
 
-let cursor_checkpoint = cursor.descendant_index();
-let builder_watermark = builder.watermark();
+- **Cursor checkpoint**: Current position in the AST (cheap to save, O(depth) to restore)
+- **Builder watermark**: Current effect count (O(1) save and restore)
 
-if try_first_branch(cursor, builder) {
-    return true;
-}
+The pattern is: attempt first branch, and on failure, restore both cursor and effects to their saved states before trying the next branch. This ensures each alternative starts from the same clean state.
 
-cursor.goto_descendant(cursor_checkpoint);
-builder.rollback(builder_watermark);
-
-try_second_branch(cursor, builder)
 ```
 
 ### Quantifiers
 
 Quantifiers compile to epsilon transitions with specific `next` ordering:
 
-**Greedy `*`/`+`**:
+**Greedy `*`** (zero or more):
 
 ```
+
 Entry ─ε→ [try match first, then exit]
-          ↓
-        Match ─ε→ loop back to Entry
+↓
+Match ─ε→ loop back to Entry
+
 ```
+
+**Greedy `+`** (one or more):
+
+```
+
+         ┌──────────────────────────┐
+         ↓                          │
+
+Entry ─→ Match ─ε→ Loop ─ε→ [try match first, then exit]
+
+```
+
+The `+` quantifier differs from `*`: it enters directly at `Match`, requiring at least one successful match before the exit path becomes available. After the first match, the `Loop` node behaves like `*` (match-first, exit-second).
 
 **Non-greedy `*?`/`+?`**:
 
-```
-Entry ─ε→ [try exit first, then match]
-```
-
-Same structure, different `next` order. The first successor has priority.
+Same structures as above, but with reversed `next` ordering: exit path has priority over match path. For `+?`, after the mandatory first match, the loop prefers exiting over matching more.
 
 ### Arrays
 
 Array construction uses epsilon transitions with effects:
 
 ```
-T0: ε + StartArray             next: [T1]       // pre-effect: setup array
-T1: ε (branch)                 next: [T2, T4]   // try match or exit
-T2: Match(expr)                next: [T3]
-T3: ε + PushElement            next: [T1]       // post-effect: consume matched node
-T4: ε + EndArray               next: [T5]       // post-effect: finalize array
-T5: ε + Field("items")         next: [...]      // post-effect: assign to field
+
+T0: ε + StartArray next: [T1] // pre-effect: setup array
+T1: ε (branch) next: [T2, T4] // try match or exit
+T2: Match(expr) next: [T3]
+T3: ε + PushElement next: [T1] // post-effect: consume matched node
+T4: ε + EndArray next: [T5] // post-effect: finalize array
+T5: ε + Field("items") next: [...] // post-effect: assign to field
+
 ```
 
 After epsilon elimination, `PushElement` from T3 merges into T2 as a post-effect. `StartArray` from T0 merges into T2 as a pre-effect (first iteration only—loop iterations enter from T3, not T0).
@@ -325,10 +486,12 @@ Backtracking naturally handles partial arrays: truncating the effect stream remo
 Nested objects from `{...} @name` use `StartObject`/`EndObject` effects:
 
 ```
-T0: ε + StartObject            next: [T1]       // pre-effect: setup object
-T1: ... (sequence contents)    next: [T2]
-T2: ε + EndObject              next: [T3]       // post-effect: finalize object
-T3: ε + Field("name")          next: [...]      // post-effect: assign to field
+
+T0: ε + StartObject next: [T1] // pre-effect: setup object
+T1: ... (sequence contents) next: [T2]
+T2: ε + EndObject next: [T3] // post-effect: finalize object
+T3: ε + Field("name") next: [...] // post-effect: assign to field
+
 ```
 
 `StartObject` is a pre-effect (merges forward). `EndObject` and `Field` are post-effects (merge backward onto preceding match).
@@ -338,18 +501,22 @@ T3: ε + Field("name")          next: [...]      // post-effect: assign to field
 Tagged branches use `StartVariant` to create explicit tagged structures.
 
 ```
+
 [ A: (true) ]
+
 ```
 
 Effect stream:
 
 ```
+
 StartVariant("A")
 StartObject
 ...
 EndObject
 EndVariant
-```
+
+````
 
 The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions.
 
@@ -359,23 +526,17 @@ The resulting `Value::Variant` preserves the tag distinct from the payload, prev
 { "$tag": "A", "$data": { "x": 1, "y": 2 } }
 { "$tag": "B", "$data": [1, 2, 3] }
 { "$tag": "C", "$data": "foo" }
-```
+````
 
 The `$tag` and `$data` keys avoid collisions with user-defined captures. Uniform structure simplifies parsing (always access `.$data`) and eliminates conditional flatten-vs-wrap logic.
 
+**Nested variants** (variant containing variant) serialize naturally:
+
+```json
+{ "$tag": "Outer", "$data": { "$tag": "Inner", "$data": 42 } }
+```
+
 This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
-
-**Constraint: branches must produce objects.** Top-level quantifiers in tagged branches are disallowed:
-
-```
-// Invalid: branch A has top-level quantifier, produces array not object
-[A: (foo (bar) @x)* B: (baz) @y]
-
-// Valid: wrap quantifier in a sequence with capture
-[A: { (foo (bar) @x)* } @items B: (baz) @y]
-```
-
-Flattening requires object payloads (`{ tag: "A", ...payload }`). Arrays cannot be spread into objects. This constraint is enforced during query validation; the diagnostic suggests wrapping with `{ ... } @name`.
 
 ### Definition References and Recursion
 
@@ -397,18 +558,7 @@ The `RefId` is semantic identity—"which reference in the query pattern"—dist
 
 **Proc macro**: Each definition becomes a Rust function. References become function calls. Rust's call stack serves as the return stack—`RefId` is implicit in the call site.
 
-```rust
-// Generated code
-fn match_expr(cursor: &mut TreeCursor, builder: &mut Builder) -> bool {
-    // ... alternation over Num, Binary, Call variants
-}
-
-fn match_binary(cursor: &mut TreeCursor, builder: &mut Builder) -> bool {
-    // ...
-    if !match_expr(cursor, builder) { return false; }  // RefId implicit
-    // ...
-}
-```
+In proc-macro mode, each definition becomes a Rust function. References become direct function calls, with the Rust call stack serving as the implicit return stack. The `RefId` exists only in the IR—the generated code relies on Rust's natural call/return mechanism.
 
 **Dynamic**: The interpreter maintains an explicit return stack. On `Enter(ref_id)`:
 
@@ -417,9 +567,13 @@ fn match_binary(cursor: &mut TreeCursor, builder: &mut Builder) -> bool {
 
 On `Exit(ref_id)`:
 
-1. Verify top frame matches `ref_id`
-2. Filter `next` to only transitions reachable from the call site (same `ref_id` on their entry path)
-3. Pop frame on successful exit
+1. Verify top frame matches `ref_id` (invariant: mismatched ref_id indicates IR bug)
+2. Pop frame
+3. Continue to `next` successors unconditionally
+
+**Entry filtering mechanism**: The filtering happens when _entering_ an `Exit` transition, not when leaving it. After epsilon elimination, multiple `Exit` transitions with different `RefId`s may be reachable from the same point (merged from different call sites). The interpreter only takes an `Exit(ref_id)` transition if `ref_id` matches the current stack top. This ensures returns go to the correct call site.
+
+After taking an `Exit` and popping the frame, successors are followed unconditionally—they represent the continuation after the call. If a successor has an `Enter` marker, that's a _new_ call (e.g., `(A) (B)` where returning from A continues to calling B), not a return path.
 
 ```rust
 /// Return stack entry for definition calls
@@ -440,7 +594,7 @@ struct Interpreter<'a> {
 
 ### Epsilon Elimination (Optimization)
 
-After initial construction, epsilon transitions can be eliminated by computing epsilon closures. The `pre_effects`/`post_effects` split is essential for correctness here.
+After initial construction, epsilon transitions can be **partially** eliminated by computing epsilon closures. Full elimination is not always possible due to the single `ref_marker` limitation—sequences like `Enter(A) → Enter(B)` cannot be merged into one transition. The `pre_effects`/`post_effects` split is essential for correctness here.
 
 **Why the split matters**: A match transition overwrites `current` with the matched node. Effects from _preceding_ epsilon transitions (like `PushElement`) need the _previous_ `current` value. Without the split, merging them into a single post-match list would use the wrong value.
 
@@ -459,10 +613,10 @@ T3': Match(B) + [PushElement]                   // PushElement runs after Match(
 
 **Accumulation rules**:
 
-- Effects from incoming epsilon paths → accumulate into `pre_effects`
-- Effects from outgoing epsilon paths → accumulate into `post_effects`
+- `EffectOp`s from incoming epsilon paths → accumulate into `pre_effects`
+- `EffectOp`s from outgoing epsilon paths → accumulate into `post_effects`
 
-This is why both are `Vec<Effect>` rather than `Option<Effect>`.
+This is why both are `Slice<EffectOp>` rather than `Option<EffectOp>`.
 
 **Reference expansion**: For definition references, epsilon elimination propagates `Enter`/`Exit` markers to surviving transitions:
 
@@ -481,10 +635,12 @@ T3': Match(...) + Exit(0)   next: [T5']  // marker propagated
 
 All expanded entry transitions share the same `RefId`. All expanded exit transitions share the same `RefId`. The engine filters valid continuations at runtime based on stack state—no explicit continuation storage needed.
 
+**Limitation**: Complete epsilon elimination is impossible when reference markers chain (e.g., nested calls). The single `ref_marker` slot prevents merging `Enter(A) → Enter(B)` sequences. These remain as epsilon transition chains in the final graph.
+
 This optimization benefits both modes:
 
-- **Proc macro**: Fewer transitions → less generated code
-- **Dynamic**: Fewer graph traversals → faster interpretation
+- **Proc macro**: Fewer transitions → less generated code (where elimination is possible)
+- **Dynamic**: Fewer graph traversals → faster interpretation (but must handle remaining epsilons)
 
 ### Proc Macro Code Generation
 
@@ -505,6 +661,12 @@ Generated code uses:
 
 At runtime, there is no graph—just plain Rust code.
 
+#### Direct Construction (No Effect Stream)
+
+Unlike the dynamic interpreter, proc-macro generated code constructs output values directly—no intermediate effect stream. Output structs are built in a single pass as matching proceeds.
+
+Backtracking in direct construction means dropping partially-built values and re-allocating. This is acceptable because modern allocators maintain thread-local free lists, making the alloc→drop→alloc pattern for small objects essentially O(1).
+
 ### Dynamic Execution
 
 When used dynamically, the transition graph is interpreted at runtime:
@@ -519,22 +681,29 @@ The interpreter maintains:
 - Current transition pointer
 - Explicit return stack for definition calls
 - Cursor position
-- Effect stream with watermarks
+- `RuntimeEffect` stream with watermarks
 
-Trade-off: More flexible (runtime query construction), but slower than generated code.
+Unlike proc-macro codegen, the dynamic interpreter uses the `RuntimeEffect` stream approach. This is necessary because:
+
+- We don't know the output structure at compile time
+- `RuntimeEffect` stream provides a uniform way to build any output shape
+- Backtracking via `truncate()` is simple and correct
+
+Trade-off: More flexible (runtime query construction), but slower than generated code due to interpretation overhead and the extra effect execution pass.
 
 ## Execution Mode Comparison
 
-| Aspect           | Proc Macro             | Dynamic                 |
-| ---------------- | ---------------------- | ----------------------- |
-| Query source     | Compile-time literal   | Runtime string          |
-| Graph lifetime   | Compile-time only      | Runtime                 |
-| Definition calls | Rust function calls    | Explicit return stack   |
-| Return stack     | Rust call stack        | `Vec<Frame>`            |
-| Backtracking     | Generated `if`/`else`  | Interpreter loop        |
-| Performance      | Zero dispatch overhead | Interpretation overhead |
-| Type safety      | Compile-time checked   | Runtime types           |
-| Use case         | Known queries          | User-provided queries   |
+| Aspect            | Proc Macro                 | Dynamic                      |
+| ----------------- | -------------------------- | ---------------------------- |
+| Query source      | Compile-time literal       | Runtime string               |
+| Graph lifetime    | Compile-time only          | Runtime                      |
+| Data construction | Direct (no effect stream)  | `RuntimeEffect` stream + exe |
+| Definition calls  | Rust function calls        | Explicit return stack        |
+| Return stack      | Rust call stack            | `Vec<Frame>`                 |
+| Backtracking      | Drop + re-alloc            | `truncate()` effects         |
+| Performance       | Zero dispatch, single pass | Interpretation + 2 pass      |
+| Type safety       | Compile-time checked       | Runtime types                |
+| Use case          | Known queries              | User-provided queries        |
 
 ## Consequences
 
@@ -542,17 +711,40 @@ Trade-off: More flexible (runtime query construction), but slower than generated
 
 - **Shared IR**: One representation serves both execution modes
 - **Proc macro zero-overhead**: Generated code is plain Rust with no dispatch
+- **Pre-allocated graph**: Single contiguous allocation
 - **Dynamic flexibility**: Queries can be constructed or modified at runtime
-- **Unified backtracking**: Same watermark mechanism for cursor and effects in both modes
 - **Optimizable**: Epsilon elimination benefits both modes
 - **Multiple entry points**: Same graph supports querying any definition
+- **Clean separation**: `EffectOp` (static instructions) vs `RuntimeEffect` (dynamic events) eliminates lifetime issues
 
 ### Negative
 
 - **Two code paths**: Must maintain both codegen and interpreter
+- **Different data construction**: Proc macro uses direct construction, dynamic uses `RuntimeEffect` stream
 - **Proc macro compile cost**: Complex queries generate more code
-- **Dynamic runtime cost**: Interpretation overhead vs. generated code
+- **Dynamic runtime cost**: Interpretation overhead + effect execution pass
 - **Testing burden**: Must verify both modes produce identical results
+
+### Runtime Safety
+
+Both execution modes require fuel mechanisms to prevent runaway execution:
+
+- **runtime_fuel**: Decremented on each transition, prevents infinite loops
+- **recursion_fuel**: Decremented on each `Enter` marker, prevents stack overflow
+
+These mechanisms deserve their own ADR (fuel budget design, configurable limits, error reporting on exhaustion). The IR itself carries no fuel-related data—fuel checking is purely an interpreter/codegen concern.
+
+**Note**: Static loop detection (e.g., direct recursion like `A = (A)` or mutual recursion like `A = (B)`, `B = (A)`) is handled at the query parser level before IR construction. The IR assumes well-formed input without infinite loops in the pattern structure itself.
+
+### WASM Compatibility
+
+The IR design is WASM-compatible:
+
+- **Single arena allocation**: No fragmentation concerns in linear memory
+- **`usize` offsets**: 32-bit on WASM32, limiting arena to 4GB (sufficient for any query)
+- **`BTreeMap` for objects**: Deterministic iteration order ensures reproducible output
+- **Per-type alignment**: Segment offsets computed at construction time, respecting target alignment requirements
+- **No platform-specific primitives**: All types are portable (`u16`, `u32`, `Box<[u8]>`)
 
 ### Considered Alternatives
 
@@ -573,7 +765,6 @@ Trade-off: More flexible (runtime query construction), but slower than generated
 
 ## References
 
-- Thompson, K. (1968). "Programming Techniques: Regular expression search algorithm." Communications of the ACM, 11(6), pp. 419-422. — fragment composition technique adapted here
-- Woods, W. A. (1970). "Transition network grammars for natural language analysis." Communications of the ACM, 13(10), pp. 591-606. — recursive transition networks
+- Bazaco, D. (2022). "Building a Regex Engine" blog series. https://www.abstractsyntaxseed.com/blog/regex-engine/introduction — NFA construction and modern regex features
 - Tree-sitter TreeCursor API: `descendant_index()`, `goto_descendant()`
 - [ADR-0001: Query Parser](ADR-0001-query-parser.md)

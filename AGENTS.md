@@ -133,7 +133,7 @@ Boolean = [
 
 5.  **Alternations**
     - Tagged: `[ L1: (a) @x  L2: (b) @y ]`
-      → Discriminated Union: `{ tag: "L1", x: Node } | { tag: "L2", y: Node }`.
+      → Discriminated Union: `{ "$tag": "L1", "$data": { x: Node } } | { "$tag": "L2", "$data": { y: Node } }`.
     - Untagged: `[ (a) @x  (b) @x ]`
       → Merged Struct: `{ x: Node }`. Captures must be type-compatible across branches.
     - Mixed: `[ (a) @x  (b) ]` (invalid) - the diagnostics will be reported, but we infer as for untagged

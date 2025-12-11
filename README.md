@@ -182,7 +182,9 @@ for (const stmt of result.statements) {
       console.log(`Assignment to ${stmt.$data.target}`);
       break;
     case "Call":
-      console.log(`Call to ${stmt.$data.func} with ${stmt.$data.args.length} args`);
+      console.log(
+        `Call to ${stmt.$data.func} with ${stmt.$data.args.length} args`,
+      );
       break;
   }
 }
