@@ -492,6 +492,9 @@ interface Section {
 
 Match one of several alternatives with `[...]`:
 
+- **Untagged** (no labels): Simpler output, fields merge. Use when you only need the captured data.
+- **Tagged** (with labels): Precise discriminated union. Use when you need to know which branch matched.
+
 ```
 [
   (identifier)
@@ -589,10 +592,12 @@ Labels create a discriminated union:
 ] @stmt :: Stmt
 ```
 
-Output type (discriminant is always `$tag`):
+Output type (discriminant is always `$tag`, payload in `$data`):
 
 ```typescript
-type Stmt = { $tag: "Assign"; left: Node } | { $tag: "Call"; func: Node };
+type Stmt =
+  | { $tag: "Assign"; $data: { left: Node } }
+  | { $tag: "Call"; $data: { func: Node } };
 ```
 
 In Rust, tagged alternations become enums:
@@ -754,8 +759,8 @@ Output type:
 
 ```typescript
 type MemberChain =
-  | { $tag: "Base"; name: Node }
-  | { $tag: "Access"; object: MemberChain; property: Node };
+  | { $tag: "Base"; $data: { name: Node } }
+  | { $tag: "Access"; $data: { object: MemberChain; property: Node } };
 ```
 
 ---
@@ -787,14 +792,14 @@ Output types:
 
 ```typescript
 type Statement =
-  | { $tag: "Assign"; target: string; value: Expression }
-  | { $tag: "Call"; func: string; args: Expression[] }
-  | { $tag: "Return"; value?: Expression };
+  | { $tag: "Assign"; $data: { target: string; value: Expression } }
+  | { $tag: "Call"; $data: { func: string; args: Expression[] } }
+  | { $tag: "Return"; $data: { value?: Expression } };
 
 type Expression =
-  | { $tag: "Ident"; name: string }
-  | { $tag: "Num"; value: string }
-  | { $tag: "Str"; value: string };
+  | { $tag: "Ident"; $data: { name: string } }
+  | { $tag: "Num"; $data: { value: string } }
+  | { $tag: "Str"; $data: { value: string } };
 
 type Root = {
   statements: [Statement, ...Statement[]];

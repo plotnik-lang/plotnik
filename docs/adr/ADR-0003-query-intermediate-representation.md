@@ -353,19 +353,15 @@ EndVariant
 
 The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions.
 
-**JSON serialization** depends on payload type:
+**JSON serialization** always uses `$data` wrapper for uniformity:
 
-- **Object payload**: Flatten fields into the tagged object.
-  ```json
-  { "$tag": "A", "x": 1, "y": 2 }
-  ```
-- **Array/Primitive payload**: Wrap in a `$data` field.
-  ```json
-  { "$tag": "A", "$data": [1, 2, 3] }
-  { "$tag": "B", "$data": "foo" }
-  ```
+```json
+{ "$tag": "A", "$data": { "x": 1, "y": 2 } }
+{ "$tag": "B", "$data": [1, 2, 3] }
+{ "$tag": "C", "$data": "foo" }
+```
 
-The `$tag` and `$data` keys avoid collisions with user-defined captures.
+The `$tag` and `$data` keys avoid collisions with user-defined captures. Uniform structure simplifies parsing (always access `.$data`) and eliminates conditional flatten-vs-wrap logic.
 
 This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
 

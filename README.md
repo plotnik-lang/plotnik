@@ -126,7 +126,7 @@ Plotnik extends Tree-sitter's query syntax with:
 - **Named expressions** for composition and reuse
 - **Recursion** for arbitrarily nested structures
 - **Type annotations** for precise output shapes
-- **Tagged alternations** for discriminated unions
+- **Alternations**: untagged for simplicity, tagged for precision (discriminated unions)
 
 ## Use cases
 
@@ -161,12 +161,12 @@ This produces:
 
 ```typescript
 type Statement =
-  | { $tag: "Assign"; target: string; value: Expression }
-  | { $tag: "Call"; func: string; args: Expression[] };
+  | { $tag: "Assign"; $data: { target: string; value: Expression } }
+  | { $tag: "Call"; $data: { func: string; args: Expression[] } };
 
 type Expression =
-  | { $tag: "Ident"; name: string }
-  | { $tag: "Num"; value: string };
+  | { $tag: "Ident"; $data: { name: string } }
+  | { $tag: "Num"; $data: { value: string } };
 
 type TopDefinitions = {
   statements: [Statement, ...Statement[]];
@@ -179,10 +179,10 @@ Then process the results:
 for (const stmt of result.statements) {
   switch (stmt.$tag) {
     case "Assign":
-      console.log(`Assignment to ${stmt.target}`);
+      console.log(`Assignment to ${stmt.$data.target}`);
       break;
     case "Call":
-      console.log(`Call to ${stmt.func} with ${stmt.args.length} args`);
+      console.log(`Call to ${stmt.$data.func} with ${stmt.$data.args.length} args`);
       break;
   }
 }
