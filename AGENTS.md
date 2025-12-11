@@ -13,6 +13,10 @@
 
 - **Location**: `docs/adr/`
 - **Naming**: `ADR-XXXX-short-title-in-kebab-case.md` (`XXXX` is a sequential number).
+- **Index**:
+  - [ADR-0001: Query Parser](docs/adr/ADR-0001-query-parser.md)
+  - [ADR-0002: Diagnostics System](docs/adr/ADR-0002-diagnostics-system.md)
+  - [ADR-0003: Query Intermediate Representation](docs/adr/ADR-0003-query-intermediate-representation.md)
 - **Template**:
 
   ```markdown
