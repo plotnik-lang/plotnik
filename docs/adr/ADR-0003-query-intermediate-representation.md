@@ -256,7 +256,7 @@ struct Transition {
     _pad1: [u8; 2],              // 2 bytes padding
     pre_effects: Slice<EffectOp>,  // 8 bytes
     post_effects: Slice<EffectOp>, // 8 bytes
-    ref_marker: Option<RefTransition>, // 4 bytes (niche optimization)
+    ref_marker: RefTransition,       // 4 bytes (explicit None variant)
     next: Slice<TransitionId>,   // 8 bytes
 }
 // Size: 48 bytes, Align: 4 bytes
@@ -264,9 +264,7 @@ struct Transition {
 
 The `TransitionView` resolves `Slice<T>` by combining the graph's segment offset with the slice's start/len fields.
 
-**Serialization Note**: `Option<RefTransition>` is 4 bytes due to niche optimization (Rust uses unused discriminant value 2 for `None`). However, `Option<T>` layout is Rust-specific and not guaranteed stable across compiler versions. For binary serialization, the implementation must serialize `ref_marker` explicitly (e.g., as a tag byte + optional payload) rather than relying on in-memory representation.
-
-**Design Note**: The `ref_marker` field is intentionally a single `Option<RefTransition>` rather than a `Slice`. This means a transition can carry at most one Enter or Exit marker. While this prevents full epsilon elimination for nested reference sequences (e.g., `Enter(A) → Enter(B)`), we accept this limitation for simplicity. Such sequences remain as chains of epsilon transitions in the final graph.
+**Design Note**: The `ref_marker` field is intentionally a single `RefTransition` rather than a `Slice`. This means a transition can carry at most one Enter or Exit marker. While this prevents full epsilon elimination for nested reference sequences (e.g., `Enter(A) → Enter(B)`), we accept this limitation for simplicity. Such sequences remain as chains of epsilon transitions in the final graph.
 
 ```rust
 type TransitionId = u32;
@@ -279,7 +277,7 @@ Each named definition has an entry point. The default entry is the last definiti
 
 #### Matcher
 
-Note: `NodeTypeId` and `NodeFieldId` are defined in `plotnik-core` (tree-sitter uses `u16` and `NonZeroU16` respectively).
+Note: `NodeTypeId` is `u16`. `NodeFieldId` is `NonZeroU16`, which guarantees `Option<NodeFieldId>` uses value `0` for `None` — a stable layout suitable for raw serialization. Both types are defined in `plotnik-core`.
 
 ```rust
 #[repr(C)]
@@ -306,15 +304,18 @@ Navigation variants `Down`/`Up` move the cursor without matching. They enable ne
 #### Reference Markers
 
 ```rust
-#[repr(C)]
+#[repr(u8)]  // Explicit 1-byte discriminant for stable serialization
 enum RefTransition {
-    Enter(RefId),  // push ref_id onto return stack
-    Exit(RefId),   // pop from return stack (must match ref_id)
+    None,          // no marker (discriminant 0)
+    Enter(RefId),  // push ref_id onto return stack (discriminant 1)
+    Exit(RefId),   // pop from return stack, must match ref_id (discriminant 2)
 }
-// Size: 4 bytes (1-byte discriminant + 2-byte payload + 1-byte padding), Align: 2 bytes
+// Size: 4 bytes (1-byte discriminant + 1-byte padding + 2-byte RefId), Align: 2 bytes
 ```
 
-Thompson construction creates epsilon transitions with optional `Enter`/`Exit` markers. Epsilon elimination propagates these markers to surviving transitions. At runtime, the engine uses markers to filter which `next` transitions are valid based on return stack state. Multiple transitions can share the same `RefId` after epsilon elimination.
+The explicit `None` variant (rather than `Option<RefTransition>`) ensures stable binary layout for raw arena serialization. `Option<Enum>` relies on compiler-specific niche optimization whose bit-pattern is unspecified.
+
+Thompson construction creates epsilon transitions with `Enter`/`Exit` markers. Epsilon elimination propagates these markers to surviving transitions. At runtime, the engine uses markers to filter which `next` transitions are valid based on return stack state. Multiple transitions can share the same `RefId` after epsilon elimination.
 
 #### Effect Operations
 
