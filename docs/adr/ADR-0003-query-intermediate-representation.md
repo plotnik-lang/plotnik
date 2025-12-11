@@ -58,6 +58,7 @@ struct TransitionGraph {
     negated_fields_offset: u32,
     data_fields_offset: u32,
     variant_tags_offset: u32,
+    entrypoint_names_offset: u32,
     entrypoints_offset: u32,
     default_entrypoint: TransitionId,
 }
@@ -69,6 +70,7 @@ impl TransitionGraph {
     fn default_entry(&self) -> TransitionView<'_>;
     fn field_name(&self, id: DataFieldId) -> &str;
     fn tag_name(&self, id: VariantTagId) -> &str;
+    fn entrypoint_name(&self, entry: &Entrypoint) -> &str;
 }
 ```
 
@@ -78,15 +80,16 @@ The single `Box<[u8]>` allocation is divided into typed segments. Each segment i
 
 **Segment Layout**:
 
-| Segment        | Type                | Offset                  | Alignment |
-| -------------- | ------------------- | ----------------------- | --------- |
-| Transitions    | `[Transition; N]`   | 0 (implicit)            | 4 bytes   |
-| Successors     | `[TransitionId; M]` | `successors_offset`     | 4 bytes   |
-| Effects        | `[EffectOp; P]`     | `effects_offset`        | 2 bytes   |
-| Negated Fields | `[NodeFieldId; Q]`  | `negated_fields_offset` | 2 bytes   |
-| Data Fields    | `[u8; R]`           | `data_fields_offset`    | 1 byte    |
-| Variant Tags   | `[u8; S]`           | `variant_tags_offset`   | 1 byte    |
-| Entrypoints    | `[Entrypoint; T]`   | `entrypoints_offset`    | 4 bytes   |
+| Segment          | Type                | Offset                    | Alignment |
+| ---------------- | ------------------- | ------------------------- | --------- |
+| Transitions      | `[Transition; N]`   | 0 (implicit)              | 4 bytes   |
+| Successors       | `[TransitionId; M]` | `successors_offset`       | 4 bytes   |
+| Effects          | `[EffectOp; P]`     | `effects_offset`          | 2 bytes   |
+| Negated Fields   | `[NodeFieldId; Q]`  | `negated_fields_offset`   | 2 bytes   |
+| Data Fields      | `[u8; R]`           | `data_fields_offset`      | 1 byte    |
+| Variant Tags     | `[u8; S]`           | `variant_tags_offset`     | 1 byte    |
+| Entrypoint Names | `[u8; U]`           | `entrypoint_names_offset` | 1 byte    |
+| Entrypoints      | `[Entrypoint; T]`   | `entrypoints_offset`      | 4 bytes   |
 
 Transitions always start at offset 0—no explicit offset stored. The arena base address is allocated with 8-byte alignment, satisfying `Transition`'s requirement.
 
@@ -128,14 +131,14 @@ Entrypoints use fixed-size metadata with indirect string storage:
 ```rust
 #[repr(C)]
 struct Entrypoint {
-    name_offset: u32,  // index into data_fields segment
+    name_offset: u32,  // index into entrypoint_names segment
     name_len: u32,
     target: TransitionId,
 }
 // Size: 12 bytes, Align: 4 bytes
 ```
 
-The `name_offset` points into the `data_fields` segment (u8 array), where alignment is irrelevant. This avoids the alignment hazards of inline variable-length strings.
+The `name_offset` points into the `entrypoint_names` segment (u8 array), where alignment is irrelevant. This avoids the alignment hazards of inline variable-length strings. Note: entrypoint names are stored separately from data field names because they serve different purposes—entrypoint names identify subqueries for lookup, while data field names are used in output object construction.
 
 ##### Slice Resolution
 
@@ -826,7 +829,7 @@ The IR design is WASM-compatible:
 For wire transfer between machines with different architectures, the arena uses a portable binary format:
 
 - **Byte order**: Little-endian for all multi-byte integers (`u16`, `u32`). This matches WASM's native byte order and x86/ARM in little-endian mode.
-- **String encoding**: UTF-8 for all string data (definition names, field names, variant tags).
+- **String encoding**: UTF-8 for all string data (entrypoint names, data field names, variant tags).
 - **Format**: The serialized form is a header followed by the raw arena bytes:
 
 ```
