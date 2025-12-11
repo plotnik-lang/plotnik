@@ -50,14 +50,16 @@ These structures are used by both execution modes.
 ```rust
 struct TransitionGraph {
     transitions: Vec<Transition>,
-    data_fields: Vec<String>,  // DataFieldId → data field
+    data_fields: Vec<String>,   // DataFieldId → field name
+    variant_tags: Vec<String>,  // VariantTagId → tag name
     entrypoints: Vec<(String, TransitionId)>,
     default_entrypoint: TransitionId,
 }
 
-type TransitionId = usize;  // position in transitions array (structural)
-type DataFieldId = usize;   // index into FieldNames
-type RefId = usize;         // unique per each named subquery reference (Ref node in the query AST)
+type TransitionId = usize;   // position in transitions array (structural)
+type DataFieldId = usize;    // index into data_fields
+type VariantTagId = usize;   // index into variant_tags
+type RefId = usize;          // unique per each named subquery reference (Ref node in the query AST)
 ```
 
 Each named definition has an entry point. The default entry is the last definition. Multiple entry points share the same transition graph.
@@ -109,15 +111,15 @@ Navigation variants `Down`/`Up` move the cursor without matching. They enable ne
 
 ```rust
 enum Effect {
-    StartArray,          // push new [] onto container stack
-    PushElement,         // move current value into top array
-    EndArray,            // pop array from stack, becomes current
-    StartObject,         // push new {} onto container stack
-    EndObject,           // pop object from stack, becomes current
+    StartArray,              // push new [] onto container stack
+    PushElement,             // move current value into top array
+    EndArray,                // pop array from stack, becomes current
+    StartObject,             // push new {} onto container stack
+    EndObject,               // pop object from stack, becomes current
     Field(DataFieldId),      // move current value into field on top object
-    StartVariant(DataFieldId), // push new variant (tagged) onto container stack
-    EndVariant,          // pop variant from stack, becomes current
-    ToString,            // convert current Node value to String (source text)
+    StartVariant(VariantTagId), // push variant tag onto container stack
+    EndVariant,              // pop variant from stack, wrap current, becomes current
+    ToString,                // convert current Node value to String (source text)
 }
 ```
 
@@ -173,13 +175,13 @@ enum Value<'a> {
     String(String),                          // Text values (from @capture :: string)
     Array(Vec<Value<'a>>),                   // completed array
     Object(HashMap<DataFieldId, Value<'a>>), // completed object
-    Variant(DataFieldId, Box<Value<'a>>),    // tagged variant (tag + payload)
+    Variant(VariantTagId, Box<Value<'a>>),   // tagged variant (tag + payload)
 }
 
 enum Container<'a> {
     Array(Vec<Value<'a>>),                   // array under construction
-    Object(HashMap<DataFieldId, Value<'a>>),     // object under construction
-    Variant(DataFieldId, Box<Container<'a>>),    // variant under construction
+    Object(HashMap<DataFieldId, Value<'a>>), // object under construction
+    Variant(VariantTagId),                   // variant tag; EndVariant wraps current value
 }
 ```
 
@@ -201,7 +203,7 @@ Query:
 ```
 Func = (function_declaration
     name: (identifier) @name
-    parameters: (parameters (identifier)* @params))
+    parameters: (parameters (identifier)* @params :: string))
 ```
 
 Input: `function foo(a, b) {}`
@@ -233,6 +235,7 @@ Execution trace:
 | Field("name")   | -           | [{name: Node(foo)}]                      |
 | StartArray      | -           | [{name:...}, []]                         |
 | (match "a")     | Node(a)     | [{name:...}, []]                         |
+| ToString        | String("a") | [{name:...}, []]                         |
 | PushElement     | -           | [{name:...}, [String("a")]]              |
 | (match "b")     | Node(b)     | [{name:...}, [String("a")]]              |
 | ToString        | String("b") | [{name:...}, [String("a")]]              |
@@ -341,6 +344,18 @@ EndVariant
 ```
 
 The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions. When serialized to JSON, it flattens to match the documented data model: `{ tag: "A", ...payload }`.
+
+**Constraint: branches must produce objects.** Top-level quantifiers in tagged branches are disallowed:
+
+```
+// Invalid: branch A has top-level quantifier, produces array not object
+[A: (foo (bar) @x)* B: (baz) @y]
+
+// Valid: wrap quantifier in a sequence with capture
+[A: { (foo (bar) @x)* } @items B: (baz) @y]
+```
+
+Flattening requires object payloads (`{ tag: "A", ...payload }`). Arrays cannot be spread into objects. This constraint is enforced during query validation; the diagnostic suggests wrapping with `{ ... } @name`.
 
 ### Definition References and Recursion
 
