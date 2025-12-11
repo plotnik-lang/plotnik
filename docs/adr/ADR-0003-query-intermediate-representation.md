@@ -51,7 +51,7 @@ The graph is immutable after construction. We use a single contiguous allocation
 
 ```rust
 struct TransitionGraph {
-    data: Box<[u8]>,
+    data: Arena,  // custom type, see Memory Layout & Alignment
     // segment offsets (aligned for each type)
     successors_offset: u32,
     effects_offset: u32,
@@ -76,7 +76,7 @@ impl TransitionGraph {
 
 ##### Memory Arena Design
 
-The single `Box<[u8]>` allocation is divided into typed segments. Each segment is properly aligned for its type, ensuring safe access across all architectures (x86, ARM, WASM).
+The single contiguous allocation is divided into typed segments. Each segment is properly aligned for its type, ensuring safe access across all architectures (x86, ARM, WASM).
 
 **Segment Layout**:
 
@@ -91,25 +91,35 @@ The single `Box<[u8]>` allocation is divided into typed segments. Each segment i
 | Entrypoint Names | `[u8; U]`           | `entrypoint_names_offset` | 1 byte    |
 | Entrypoints      | `[Entrypoint; T]`   | `entrypoints_offset`      | 4 bytes   |
 
-Transitions always start at offset 0—no explicit offset stored. The arena base address is allocated with 8-byte alignment, satisfying `Transition`'s requirement.
+Transitions always start at offset 0—no explicit offset stored. The arena base address is allocated with 4-byte alignment, satisfying `Transition`'s requirement.
 
 Note: `entry(&str)` performs linear scan — O(n) where n = definition count (typically <20).
 
 ##### Memory Layout & Alignment
 
-Casting `&u8` to `&T` when the address is not aligned to `T` causes traps on WASM and faults on strict ARM. The `Box<[u8]>` type only guarantees 1-byte alignment. We enforce alignment explicitly:
+Casting `&u8` to `&T` when the address is not aligned to `T` causes traps on WASM and faults on strict ARM. We enforce alignment explicitly via a custom arena type.
 
 **A. Base Allocation Alignment**
 
-The arena must be allocated with alignment equal to the maximum of all segment types:
+The arena must be allocated with alignment equal to the maximum of all segment types. We use a custom `Arena` wrapper that tracks the allocation layout for correct deallocation:
 
 ```rust
 const ARENA_ALIGN: usize = 4; // align_of::<Transition>()
 
-let layout = std::alloc::Layout::from_size_align(total_size, ARENA_ALIGN).unwrap();
-let ptr = std::alloc::alloc(layout);
-let data: Box<[u8]> = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(ptr, total_size)) };
+struct Arena {
+    ptr: *mut u8,
+    len: usize,
+}
+
+impl Drop for Arena {
+    fn drop(&mut self) {
+        let layout = std::alloc::Layout::from_size_align(self.len, ARENA_ALIGN).unwrap();
+        unsafe { std::alloc::dealloc(self.ptr, layout) };
+    }
+}
 ```
+
+Standard `Box<[u8]>` cannot be used here: it assumes 1-byte alignment and would pass incorrect layout to `dealloc`, causing undefined behavior.
 
 **B. Segment Offset Calculation**
 
@@ -246,13 +256,15 @@ struct Transition {
     _pad1: [u8; 2],              // 2 bytes padding
     pre_effects: Slice<EffectOp>,  // 8 bytes
     post_effects: Slice<EffectOp>, // 8 bytes
-    ref_marker: Option<RefTransition>, // 4 bytes
+    ref_marker: Option<RefTransition>, // 4 bytes (niche optimization)
     next: Slice<TransitionId>,   // 8 bytes
 }
 // Size: 48 bytes, Align: 4 bytes
 ```
 
 The `TransitionView` resolves `Slice<T>` by combining the graph's segment offset with the slice's start/len fields.
+
+**Serialization Note**: `Option<RefTransition>` is 4 bytes due to niche optimization (Rust uses unused discriminant value 2 for `None`). However, `Option<T>` layout is Rust-specific and not guaranteed stable across compiler versions. For binary serialization, the implementation must serialize `ref_marker` explicitly (e.g., as a tag byte + optional payload) rather than relying on in-memory representation.
 
 **Design Note**: The `ref_marker` field is intentionally a single `Option<RefTransition>` rather than a `Slice`. This means a transition can carry at most one Enter or Exit marker. While this prevents full epsilon elimination for nested reference sequences (e.g., `Enter(A) → Enter(B)`), we accept this limitation for simplicity. Such sequences remain as chains of epsilon transitions in the final graph.
 
@@ -822,7 +834,7 @@ The IR design is WASM-compatible:
 - **`u32` offsets**: All segment offsets are `u32`, matching WASM32's pointer size. 4GB arena limit is sufficient for any query.
 - **`BTreeMap` for objects**: Deterministic iteration order ensures reproducible output across platforms.
 - **Fixed-size Entrypoints**: The `Entrypoint` struct (12 bytes, align 4) avoids variable-length inline strings that would cause alignment hazards.
-- **No platform-specific primitives**: All types are portable (`u16`, `u32`, `Box<[u8]>`).
+- **No platform-specific primitives**: All types are portable (`u16`, `u32`, byte arrays).
 
 #### Serialization Format
 
