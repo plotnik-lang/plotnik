@@ -351,7 +351,19 @@ EndObject
 EndVariant
 ```
 
-The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions. When serialized to JSON, it flattens to match the documented data model: `{ tag: "A", ...payload }`.
+The resulting `Value::Variant` preserves the tag distinct from the payload, preventing name collisions.
+
+**JSON serialization** always uses `$data` wrapper for uniformity:
+
+```json
+{ "$tag": "A", "$data": { "x": 1, "y": 2 } }
+{ "$tag": "B", "$data": [1, 2, 3] }
+{ "$tag": "C", "$data": "foo" }
+```
+
+The `$tag` and `$data` keys avoid collisions with user-defined captures. Uniform structure simplifies parsing (always access `.$data`) and eliminates conditional flatten-vs-wrap logic.
+
+This mirrors Rust's serde adjacently-tagged representation and remains fully readable for LLMs. No query validation restriction—all payload types are valid.
 
 **Constraint: branches must produce objects.** Top-level quantifiers in tagged branches are disallowed:
 
@@ -430,7 +442,7 @@ struct Interpreter<'a> {
 
 After initial construction, epsilon transitions can be eliminated by computing epsilon closures. The `pre_effects`/`post_effects` split is essential for correctness here.
 
-**Why the split matters**: A match transition overwrites `current` with the matched node. Effects from *preceding* epsilon transitions (like `PushElement`) need the *previous* `current` value. Without the split, merging them into a single post-match list would use the wrong value.
+**Why the split matters**: A match transition overwrites `current` with the matched node. Effects from _preceding_ epsilon transitions (like `PushElement`) need the _previous_ `current` value. Without the split, merging them into a single post-match list would use the wrong value.
 
 ```
 Before (raw graph):
@@ -446,6 +458,7 @@ T3': Match(B) + [PushElement]                   // PushElement runs after Match(
 ```
 
 **Accumulation rules**:
+
 - Effects from incoming epsilon paths → accumulate into `pre_effects`
 - Effects from outgoing epsilon paths → accumulate into `post_effects`
 
