@@ -68,12 +68,13 @@ Each named definition has an entry point. The default entry is the last definiti
 
 ```rust
 struct Transition {
-    matcher: Option<Matcher>,      // None = epsilon (no node consumed)
-    pre_anchored: bool,            // must match at current position, no scanning
-    post_anchored: bool,           // after match, cursor must be at last sibling
-    effects: Vec<Effect>,          // data construction ops emitted on success
+    matcher: Option<Matcher>,       // None = epsilon (no node consumed)
+    pre_anchored: bool,             // must match at current position, no scanning
+    post_anchored: bool,            // after match, cursor must be at last sibling
+    pre_effects: Vec<Effect>,       // effects before match (consume previous current)
+    post_effects: Vec<Effect>,      // effects after match (consume new current)
     ref_marker: Option<RefTransition>,  // call boundary marker
-    next: Vec<TransitionId>,       // successors; order = priority (first = greedy)
+    next: Vec<TransitionId>,        // successors; order = priority (first = greedy)
 }
 
 enum RefTransition {
@@ -189,12 +190,13 @@ enum Container<'a> {
 
 For any given transition, the execution order is strict to ensure data consistency during backtracking:
 
-1. **Match**: Validate node kind/fields. If fail, abort.
-2. **Enter**: Push `Frame` with current `builder.watermark()`.
-3. **Effects**: Emit new effects (committed tentatively).
-4. **Exit**: Pop `Frame` (validate return).
+1. **Enter**: Push `Frame` with current `builder.watermark()`.
+2. **Pre-Effects**: Emit `pre_effects` (uses previous `current` value).
+3. **Match**: Validate node kind/fields. If fail, rollback to watermark and abort.
+4. **Post-Effects**: Emit `post_effects` (uses new `current` value).
+5. **Exit**: Pop `Frame` (validate return).
 
-This order ensures that if a definition call succeeds, its effects are present. If it fails later, the watermark saved during `Enter` allows rolling back all effects emitted by that definition.
+This order ensures correct behavior during epsilon elimination. Pre-effects run before the match overwrites `current`, allowing effects like `PushElement` to be safely merged from preceding epsilon transitions. Post-effects run after, for effects that need the newly matched node.
 
 #### Example
 
@@ -208,23 +210,25 @@ Func = (function_declaration
 
 Input: `function foo(a, b) {}`
 
-Effect stream:
+Effect stream (annotated with pre/post classification):
 
 ```
-StartObject
-  (match "foo")
-  Field("name")
-  StartArray
-    (match "a")
-    ToString
-    PushElement
-    (match "b")
-    ToString
-    PushElement
-  EndArray
-  Field("params")
-EndObject
+pre:  StartObject
+      (match "foo")
+post: Field("name")
+pre:  StartArray
+      (match "a")
+post: ToString
+post: PushElement
+      (match "b")
+post: ToString
+post: PushElement
+post: EndArray
+post: Field("params")
+post: EndObject
 ```
+
+Note: In the raw graph, effects live on epsilon transitions between matches. The pre/post classification determines where they land after epsilon elimination. `StartObject` and `StartArray` are pre-effects (setup before matching). `Field`, `PushElement`, `ToString`, and `End*` are post-effects (consume the matched node or finalize containers).
 
 Execution trace:
 
@@ -304,13 +308,15 @@ Same structure, different `next` order. The first successor has priority.
 Array construction uses epsilon transitions with effects:
 
 ```
-T0: ε + StartArray             next: [T1]
-T1: ε (branch)                 next: [T2, T5]  // try match or exit
+T0: ε + StartArray             next: [T1]       // pre-effect: setup array
+T1: ε (branch)                 next: [T2, T4]   // try match or exit
 T2: Match(expr)                next: [T3]
-T3: ε + PushElement            next: [T1]      // loop back
-T4: ε + EndArray               next: [T5]
-T5: ε + Field("items")         next: [...]
+T3: ε + PushElement            next: [T1]       // post-effect: consume matched node
+T4: ε + EndArray               next: [T5]       // post-effect: finalize array
+T5: ε + Field("items")         next: [...]      // post-effect: assign to field
 ```
+
+After epsilon elimination, `PushElement` from T3 merges into T2 as a post-effect. `StartArray` from T0 merges into T2 as a pre-effect (first iteration only—loop iterations enter from T3, not T0).
 
 Backtracking naturally handles partial arrays: truncating the effect stream removes uncommitted `PushElement` effects.
 
@@ -319,11 +325,13 @@ Backtracking naturally handles partial arrays: truncating the effect stream remo
 Nested objects from `{...} @name` use `StartObject`/`EndObject` effects:
 
 ```
-T0: ε + StartObject            next: [T1]
+T0: ε + StartObject            next: [T1]       // pre-effect: setup object
 T1: ... (sequence contents)    next: [T2]
-T2: ε + EndObject              next: [T3]
-T3: ε + Field("name")          next: [...]
+T2: ε + EndObject              next: [T3]       // post-effect: finalize object
+T3: ε + Field("name")          next: [...]      // post-effect: assign to field
 ```
+
+`StartObject` is a pre-effect (merges forward). `EndObject` and `Field` are post-effects (merge backward onto preceding match).
 
 ### Tagged Alternations
 
@@ -420,19 +428,28 @@ struct Interpreter<'a> {
 
 ### Epsilon Elimination (Optimization)
 
-After initial construction, epsilon transitions can be eliminated by computing epsilon closures:
+After initial construction, epsilon transitions can be eliminated by computing epsilon closures. The `pre_effects`/`post_effects` split is essential for correctness here.
+
+**Why the split matters**: A match transition overwrites `current` with the matched node. Effects from *preceding* epsilon transitions (like `PushElement`) need the *previous* `current` value. Without the split, merging them into a single post-match list would use the wrong value.
 
 ```
-Before:
-T0: ε + StartArray     next: [T1]
-T1: ε + Field          next: [T2]
-T2: Match(kind)        next: [T3]
+Before (raw graph):
+T1: Match(A)                    next: [T2]      // current = A
+T2: ε + PushElement             next: [T3]      // pushes A (correct)
+T3: Match(B)                    next: [...]     // current = B
 
-After:
-T0': Match(kind) + [StartArray, Field]   next: [T3']
+After elimination (with split):
+T3': pre: [PushElement], Match(B), post: []     // PushElement runs before Match(B), pushes A ✓
+
+Wrong (without split, effects merged as post):
+T3': Match(B) + [PushElement]                   // PushElement runs after Match(B), pushes B ✗
 ```
 
-Effects from eliminated epsilons accumulate on the surviving match transition. This is why `effects` is `Vec<Effect>` rather than `Option<Effect>`.
+**Accumulation rules**:
+- Effects from incoming epsilon paths → accumulate into `pre_effects`
+- Effects from outgoing epsilon paths → accumulate into `post_effects`
+
+This is why both are `Vec<Effect>` rather than `Option<Effect>`.
 
 **Reference expansion**: For definition references, epsilon elimination propagates `Enter`/`Exit` markers to surviving transitions:
 
