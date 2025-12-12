@@ -99,9 +99,11 @@ struct BacktrackPoint {
     cursor_checkpoint: u32,          // tree-sitter descendant_index
     effect_watermark: u32,
     recursion_frame: Option<u32>,    // saved frame index
-    alternatives: Slice<TransitionId>,
+    alternatives: Slice<TransitionId>,  // view into IR successors, not owned
 }
 ```
+
+`alternatives` references the IR's successor data (inline or spilled)—no runtime allocation per backtrack point.
 
 | Operation | Action                                                 |
 | --------- | ------------------------------------------------------ |
@@ -129,7 +131,16 @@ struct CallFrame {
 }
 ```
 
-**Append-only invariant**: Frames are never removed. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
+**Append-only invariant**: Frames persist for backtracking correctness. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
+
+**Frame pruning**: After `Exit`, frames at the stack top may be reclaimed if:
+
+1. Not the current frame (already exited)
+2. Not referenced by any live backtrack point
+
+This bounds memory by `max(recursion_depth, backtrack_depth)` rather than total call count. Without pruning, `(Rule)*` over N items allocates N frames; with pruning, it remains O(1) for non-backtracking iteration.
+
+The `BacktrackPoint.recursion_frame` field establishes a "high-water mark"—the minimum frame index that must be preserved. Frames above this mark with no active reference can be popped.
 
 | Operation         | Action                                                                         |
 | ----------------- | ------------------------------------------------------------------------------ |
@@ -196,3 +207,4 @@ Details deferred.
 
 - [ADR-0004: Query IR Binary Format](ADR-0004-query-ir-binary-format.md)
 - [ADR-0005: Transition Graph Format](ADR-0005-transition-graph-format.md)
+- [ADR-0007: Type Metadata Format](ADR-0007-type-metadata-format.md)

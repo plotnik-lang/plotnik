@@ -20,6 +20,7 @@
   - [ADR-0004: Query IR Binary Format](docs/adr/ADR-0004-query-ir-binary-format.md)
   - [ADR-0005: Transition Graph Format](docs/adr/ADR-0005-transition-graph-format.md)
   - [ADR-0006: Dynamic Query Execution](docs/adr/ADR-0006-dynamic-query-execution.md)
+  - [ADR-0007: Type Metadata Format](docs/adr/ADR-0007-type-metadata-format.md)
 - **Template**:
 
   ```markdown
@@ -48,7 +49,7 @@
 ADRs must be succint and straight to the point.
 They must contain examples with high information density and pedagogical value.
 These are docs people usually don't want to read, but when they do, they find it quite fascinating.
-Avoid imperative code, describe structure definitions, their purpose and how to use them properly.
+Don't write imperative code, describe structure definitions, their purpose and how to use them properly (and how to NOT use).
 
 # Plotnik Query Language
 

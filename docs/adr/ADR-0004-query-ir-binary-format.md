@@ -6,7 +6,7 @@
 
 ## Context
 
-The Query IR lives in a single contiguous allocation—cache-friendly, zero fragmentation, portable to WASM. This ADR defines the binary layout. Graph structures are in [ADR-0005](ADR-0005-transition-graph-format.md).
+The Query IR lives in a single contiguous allocation—cache-friendly, zero fragmentation, portable to WASM. This ADR defines the binary layout. Graph structures are in [ADR-0005](ADR-0005-transition-graph-format.md). Type metadata is in [ADR-0007](ADR-0007-type-metadata-format.md).
 
 ## Decision
 
@@ -20,7 +20,8 @@ struct QueryIR {
     negated_fields_offset: u32,
     string_refs_offset: u32,
     string_bytes_offset: u32,
-    type_info_offset: u32,
+    type_defs_offset: u32,
+    type_members_offset: u32,
     entrypoints_offset: u32,
 }
 ```
@@ -40,6 +41,8 @@ struct QueryIRBuffer {
 
 Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`. The 64-byte alignment ensures transitions never straddle cache lines.
 
+**Deallocation**: `QueryIRBuffer` must implement `Drop` to reconstruct the exact `Layout` (size + 64-byte alignment) and call `std::alloc::dealloc`. Using `Box::from_raw` or similar would assume align=1 and cause undefined behavior.
+
 ### Segments
 
 | Segment        | Type                | Offset                  | Align |
@@ -50,49 +53,68 @@ Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>`
 | Negated Fields | `[NodeFieldId; Q]`  | `negated_fields_offset` | 2     |
 | String Refs    | `[StringRef; R]`    | `string_refs_offset`    | 4     |
 | String Bytes   | `[u8; S]`           | `string_bytes_offset`   | 1     |
-| Type Info      | `[TypeInfo; U]`     | `type_info_offset`      | 4     |
-| Entrypoints    | `[Entrypoint; T]`   | `entrypoints_offset`    | 4     |
+| Type Defs      | `[TypeDef; T]`      | `type_defs_offset`      | 4     |
+| Type Members   | `[TypeMember; U]`   | `type_members_offset`   | 2     |
+| Entrypoints    | `[Entrypoint; V]`   | `entrypoints_offset`    | 4     |
 
 Each offset is aligned: `(offset + align - 1) & !(align - 1)`.
 
-### Stringsi
+For `Transition`, `EffectOp` see [ADR-0005](ADR-0005-transition-graph-format.md). For `TypeDef`, `TypeMember` see [ADR-0007](ADR-0007-type-metadata-format.md).
 
-Single pool for all strings (field names, variant tags, entrypoint names):
+### Strings
+
+Single pool for all strings (field names, variant tags, entrypoint names, type names):
 
 ```rust
+type StringId = u16;
+
 #[repr(C)]
 struct StringRef {
     offset: u32,  // into string_bytes
     len: u16,
     _pad: u16,
 }
+// 8 bytes, align 4
 
-#[repr(C)]
-struct Entrypoint {
-    name_id: u16,  // into string_refs
-    _pad: u16,
-    target: TransitionId,
-}
+type DataFieldId = StringId;   // field names in effects
+type VariantTagId = StringId;  // variant tags in effects
+
+type TypeId = u16;  // see ADR-0007 for semantics
 ```
 
-`DataFieldId(u16)` and `VariantTagId(u16)` index into `string_refs`. Distinct types, same table.
+`StringId` indexes into `string_refs`. `DataFieldId` and `VariantTagId` are aliases for type safety. `TypeId` indexes into type_defs (with reserved primitives 0-2).
 
 Strings are interned during construction—identical strings share storage and ID.
+
+### Entrypoints
+
+```rust
+#[repr(C)]
+struct Entrypoint {
+    name_id: StringId,      // 2
+    _pad: u16,              // 2
+    target: TransitionId,   // 4
+    result_type: TypeId,    // 2 - see ADR-0007
+    _pad2: u16,             // 2
+}
+// 12 bytes, align 4
+```
 
 ### Serialization
 
 ```
-Header (44 bytes):
-  magic: [u8; 4]       b"PLNK"
-  version: u32         format version + ABI hash
-  checksum: u32        CRC32(offsets || buffer_data)
+Header (48 bytes):
+  magic: [u8; 4]           b"PLNK"
+  version: u32             format version + ABI hash
+  checksum: u32            CRC32(offsets || buffer_data)
   buffer_len: u32
   successors_offset: u32
   effects_offset: u32
   negated_fields_offset: u32
   string_refs_offset: u32
   string_bytes_offset: u32
-  type_info_offset: u32
+  type_defs_offset: u32
+  type_members_offset: u32
   entrypoints_offset: u32
 
 Buffer Data (buffer_len bytes)
@@ -104,7 +126,7 @@ Little-endian always. UTF-8 strings. Version mismatch or checksum failure → re
 
 Three passes:
 
-1. **Analysis**: Count elements, intern strings
+1. **Analysis**: Count elements, intern strings, infer types
 2. **Layout**: Compute aligned offsets, allocate once
 3. **Emission**: Write via `ptr::write`
 
@@ -128,15 +150,16 @@ Buffer layout:
 0x0280  Negated Fields []
 0x0280  String Refs    [{0,4}, {4,5}, {9,5}, ...]
 0x02C0  String Bytes   "namevalueIdentNumFuncExpr"
-0x0300  Type Info      [...]
-0x0340  Entrypoints    [{4, T0}, {5, T3}]
+0x0300  Type Defs      [Record{...}, Enum{...}, ...]
+0x0340  Type Members   [{name,Str}, {Ident,Ty5}, ...]
+0x0380  Entrypoints    [{name=Func, target=Tr0, type=Ty3}, ...]
 ```
 
 `"name"` stored once, used by both `@name` captures.
 
 ## Consequences
 
-**Positive**: Cache-efficient, O(1) string lookup, zero-copy access, simple validation.
+**Positive**: Cache-efficient, O(1) string lookup, zero-copy access, simple validation. Self-contained binaries enable query caching by input hash.
 
 **Negative**: Format changes require rebuild. No version migration.
 
@@ -146,3 +169,4 @@ Buffer layout:
 
 - [ADR-0005: Transition Graph Format](ADR-0005-transition-graph-format.md)
 - [ADR-0006: Dynamic Query Execution](ADR-0006-dynamic-query-execution.md)
+- [ADR-0007: Type Metadata Format](ADR-0007-type-metadata-format.md)
