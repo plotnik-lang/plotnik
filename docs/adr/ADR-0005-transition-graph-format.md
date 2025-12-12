@@ -14,6 +14,8 @@ Edge-centric IR: transitions carry all semantics (matching, effects, successors)
 
 ```rust
 type TransitionId = u32;
+type NodeTypeId = u16;       // from tree-sitter, do not change
+type NodeFieldId = NonZeroU16;  // from tree-sitter, Option uses 0 for None
 type DataFieldId = u16;
 type VariantTagId = u16;
 type RefId = u16;
@@ -65,6 +67,7 @@ enum Matcher {
     Anonymous {
         kind: NodeTypeId,                   // 2
         field: Option<NodeFieldId>,         // 2
+        negated_fields: Slice<NodeFieldId>, // 8
     },
     Wildcard,
     Down,  // cursor to first child
@@ -73,7 +76,7 @@ enum Matcher {
 // 16 bytes, align 4
 ```
 
-`NodeFieldId` is `NonZeroU16`—`Option<NodeFieldId>` uses 0 for `None`.
+`Option<NodeFieldId>` uses 0 for `None` (niche optimization).
 
 ### RefTransition
 
@@ -92,7 +95,7 @@ Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecifie
 ### EffectOp
 
 ```rust
-#[repr(C)]
+#[repr(C, u16)]
 enum EffectOp {
     StartArray,
     PushElement,

@@ -14,31 +14,31 @@ The Query IR lives in a single contiguous allocation—cache-friendly, zero frag
 
 ```rust
 struct QueryIR {
-    data: Arena,
+    ir_buffer: QueryIRBuffer,
     successors_offset: u32,
     effects_offset: u32,
     negated_fields_offset: u32,
     string_refs_offset: u32,
     string_bytes_offset: u32,
+    type_info_offset: u32,
     entrypoints_offset: u32,
-    default_entrypoint: TransitionId,
 }
 ```
 
-Transitions start at offset 0 (implicit).
+Transitions start at offset 0. Default entrypoint is always at offset 0.
 
-### Arena
+### QueryIRBuffer
 
 ```rust
-const ARENA_ALIGN: usize = 4;
+const BUFFER_ALIGN: usize = 4;
 
-struct Arena {
+struct QueryIRBuffer {
     ptr: *mut u8,
     len: usize,
 }
 ```
 
-Allocated via `Layout::from_size_align(len, ARENA_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`.
+Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`.
 
 ### Segments
 
@@ -50,11 +50,12 @@ Allocated via `Layout::from_size_align(len, ARENA_ALIGN)`. Standard `Box<[u8]>` 
 | Negated Fields | `[NodeFieldId; Q]`  | `negated_fields_offset` | 2     |
 | String Refs    | `[StringRef; R]`    | `string_refs_offset`    | 4     |
 | String Bytes   | `[u8; S]`           | `string_bytes_offset`   | 1     |
+| Type Info      | `[TypeInfo; U]`     | `type_info_offset`      | 4     |
 | Entrypoints    | `[Entrypoint; T]`   | `entrypoints_offset`    | 4     |
 
 Each offset is aligned: `(offset + align - 1) & !(align - 1)`.
 
-### Strings
+### Stringsi
 
 Single pool for all strings (field names, variant tags, entrypoint names):
 
@@ -81,15 +82,20 @@ Strings are interned during construction—identical strings share storage and I
 ### Serialization
 
 ```
-Header (20 bytes):
+Header (44 bytes):
   magic: [u8; 4]       b"PLNK"
   version: u32         format version + ABI hash
-  checksum: u32        CRC32(segment_offsets || arena_data)
-  arena_len: u32
-  segment_count: u32
+  checksum: u32        CRC32(offsets || buffer_data)
+  buffer_len: u32
+  successors_offset: u32
+  effects_offset: u32
+  negated_fields_offset: u32
+  string_refs_offset: u32
+  string_bytes_offset: u32
+  type_info_offset: u32
+  entrypoints_offset: u32
 
-Segment Offsets (segment_count × 4 bytes)
-Arena Data (arena_len bytes)
+Buffer Data (buffer_len bytes)
 ```
 
 Little-endian always. UTF-8 strings. Version mismatch or checksum failure → recompile.
@@ -113,7 +119,7 @@ Func = (function_declaration name: (identifier) @name)
 Expr = [ Ident: (identifier) @name  Num: (number) @value ]
 ```
 
-Arena layout:
+Buffer layout:
 
 ```
 0x0000  Transitions    [T0, T1, T2, ...]
@@ -121,8 +127,9 @@ Arena layout:
 0x0200  Effects        [StartObject, Field(0), ...]
 0x0280  Negated Fields []
 0x0280  String Refs    [{0,4}, {4,5}, {9,5}, ...]
-0x02C0  String Bytes   "namevalueIdentNum FuncExpr"
-0x0300  Entrypoints    [{4, T0}, {5, T3}]
+0x02C0  String Bytes   "namevalueIdentNumFuncExpr"
+0x0300  Type Info      [...]
+0x0340  Entrypoints    [{4, T0}, {5, T3}]
 ```
 
 `"name"` stored once, used by both `@name` captures.
