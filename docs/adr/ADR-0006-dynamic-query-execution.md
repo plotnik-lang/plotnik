@@ -99,9 +99,11 @@ struct BacktrackPoint {
     cursor_checkpoint: u32,          // tree-sitter descendant_index
     effect_watermark: u32,
     recursion_frame: Option<u32>,    // saved frame index
-    alternatives: Slice<TransitionId>,
+    alternatives: Slice<TransitionId>,  // view into IR successors, not owned
 }
 ```
+
+`alternatives` references the IR's successor data (inline or spilled)—no runtime allocation per backtrack point.
 
 | Operation | Action                                                 |
 | --------- | ------------------------------------------------------ |
@@ -196,3 +198,4 @@ Details deferred.
 
 - [ADR-0004: Query IR Binary Format](ADR-0004-query-ir-binary-format.md)
 - [ADR-0005: Transition Graph Format](ADR-0005-transition-graph-format.md)
+- [ADR-0007: Type Metadata Format](ADR-0007-type-metadata-format.md)

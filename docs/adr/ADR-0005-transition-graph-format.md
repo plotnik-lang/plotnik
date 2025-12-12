@@ -16,9 +16,8 @@ Edge-centric IR: transitions carry all semantics (matching, effects, successors)
 type TransitionId = u32;
 type NodeTypeId = u16;       // from tree-sitter, do not change
 type NodeFieldId = NonZeroU16;  // from tree-sitter, Option uses 0 for None
-type DataFieldId = u16;
-type VariantTagId = u16;
 type RefId = u16;
+// StringId, DataFieldId, VariantTagId: see ADR-0004
 ```
 
 ### Slice
@@ -308,3 +307,4 @@ Incoming epsilon effects → `pre_effects`. Outgoing → `post_effects`.
 
 - [ADR-0004: Query IR Binary Format](ADR-0004-query-ir-binary-format.md)
 - [ADR-0006: Dynamic Query Execution](ADR-0006-dynamic-query-execution.md)
+- [ADR-0007: Type Metadata Format](ADR-0007-type-metadata-format.md)
