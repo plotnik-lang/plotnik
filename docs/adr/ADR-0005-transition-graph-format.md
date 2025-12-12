@@ -138,13 +138,11 @@ Call site:
 T1: ε + Enter(Func)  successors=[T10, T2, T3]
                                │    └─────┴─── return transitions (stored in frame)
                                └─────────────── definition entry
-```
 
 Definition:
 T10: Match(...) successors=[T11]
 T11: ε + Exit(Func) successors=[] (ignored, returns from frame)
-
-````
+```
 
 ### EffectOp
 
@@ -162,7 +160,7 @@ enum EffectOp {
     ToString,
 }
 // 4 bytes, align 2
-````
+```
 
 No `CaptureNode`—implicit on successful match.
 
