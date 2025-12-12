@@ -41,6 +41,8 @@ struct QueryIRBuffer {
 
 Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`. The 64-byte alignment ensures transitions never straddle cache lines.
 
+**Deallocation**: `QueryIRBuffer` must implement `Drop` to reconstruct the exact `Layout` (size + 64-byte alignment) and call `std::alloc::dealloc`. Using `Box::from_raw` or similar would assume align=1 and cause undefined behavior.
+
 ### Segments
 
 | Segment        | Type                | Offset                  | Align |

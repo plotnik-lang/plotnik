@@ -60,10 +60,10 @@ Single `ref_marker` slot—sequences like `Enter(A) → Enter(B)` remain as epsi
 
 Successors use a small-size optimization to avoid indirection for the common case:
 
-| `successor_count` | Layout                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| 0–5               | `successor_data[0..count]` contains `TransitionId` values directly                   |
-| > 5               | `successor_data[0]` is offset into `successors` segment, `successor_count` is length |
+| `successor_count` | Layout                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| 0–5               | `successor_data[0..count]` contains `TransitionId` values directly                  |
+| > 5               | `successor_data[0]` is index into `successors` segment, `successor_count` is length |
 
 Why 5 slots: 24 available bytes / 4 bytes per `TransitionId` = 6 slots, minus 1 for the count field leaves 5.
 
@@ -279,6 +279,14 @@ T6: ε + Field("val") + EndVariant     → [T7]
 ### Epsilon Elimination
 
 Partial—full elimination impossible due to single `ref_marker`.
+
+**Execution order** (all transitions, including epsilon):
+
+1. Emit `pre_effects`
+2. Execute matcher (epsilon always succeeds)
+3. On success: emit implicit `CaptureNode`, emit `post_effects`
+
+An epsilon transition with `pre: [StartObject]` and `post: [EndObject]` legitimately creates an empty object. To avoid accidental empty structures in graph rewrites, move effects to the destination's `pre` or source's `post` as appropriate.
 
 Why pre/post split matters:
 

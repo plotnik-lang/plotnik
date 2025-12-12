@@ -131,7 +131,16 @@ struct CallFrame {
 }
 ```
 
-**Append-only invariant**: Frames are never removed. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
+**Append-only invariant**: Frames persist for backtracking correctness. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
+
+**Frame pruning**: After `Exit`, frames at the stack top may be reclaimed if:
+
+1. Not the current frame (already exited)
+2. Not referenced by any live backtrack point
+
+This bounds memory by `max(recursion_depth, backtrack_depth)` rather than total call count. Without pruning, `(Rule)*` over N items allocates N frames; with pruning, it remains O(1) for non-backtracking iteration.
+
+The `BacktrackPoint.recursion_frame` field establishes a "high-water mark"—the minimum frame index that must be preserved. Frames above this mark with no active reference can be popped.
 
 | Operation         | Action                                                                         |
 | ----------------- | ------------------------------------------------------------------------------ |
