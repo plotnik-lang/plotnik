@@ -84,13 +84,37 @@ enum Matcher {
 #[repr(C, u8)]
 enum RefTransition {
     None,
-    Enter(RefId),  // push return stack
-    Exit(RefId),   // pop, must match
+    Enter(RefId),  // push call frame with returns
+    Exit(RefId),   // pop frame, use stored returns
 }
 // 4 bytes, align 2
 ```
 
 Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecified).
+
+### Enter/Exit Semantics
+
+**Problem**: A definition can be called from multiple sites. Naively, `Exit.next` would contain all possible return points from all call sites, requiring O(N) filtering at runtime to find which return is valid for the current call.
+
+**Solution**: Store return transitions at `Enter` time (in the call frame), retrieve at `Exit` time. O(1) exit, no filtering.
+
+For `Enter(ref_id)` transitions, `next` has special structure:
+
+- `next[0]`: definition entry point (where to jump)
+- `next[1..]`: return transitions (stored in call frame)
+
+For `Exit(ref_id)` transitions, `next` is **ignored**. Return transitions come from the call frame pushed at `Enter`. See [ADR-0006](ADR-0006-dynamic-query-execution.md) for execution details.
+
+```
+Call site:
+T1: ε + Enter(Func)  next=[T10, T2, T3]
+                          │    └─────┴─── return transitions (stored in frame)
+                          └─────────────── definition entry
+
+Definition:
+T10: Match(...)      next=[T11]
+T11: ε + Exit(Func)  next=[] (ignored, returns from frame)
+```
 
 ### EffectOp
 
