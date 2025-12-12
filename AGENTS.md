@@ -16,7 +16,10 @@
 - **Index**:
   - [ADR-0001: Query Parser](docs/adr/ADR-0001-query-parser.md)
   - [ADR-0002: Diagnostics System](docs/adr/ADR-0002-diagnostics-system.md)
-  - [ADR-0003: Query Intermediate Representation](docs/adr/ADR-0003-query-intermediate-representation.md)
+  - ADR-0003: Query Intermediate Representation (superseded by ADR-0004, ADR-0005, ADR-0006, available via git history)
+  - [ADR-0004: Query IR Binary Format](docs/adr/ADR-0004-query-ir-binary-format.md)
+  - [ADR-0005: Transition Graph Format](docs/adr/ADR-0005-transition-graph-format.md)
+  - [ADR-0006: Dynamic Query Execution](docs/adr/ADR-0006-dynamic-query-execution.md)
 - **Template**:
 
   ```markdown
@@ -39,6 +42,13 @@
   - **Negative**: Drawbacks, trade-offs, future challenges.
   - **Considered Alternatives**: Describe rejected options and why.
   ```
+
+## How to write ADRs
+
+ADRs must be succint and straight to the point.
+They must contain examples with high information density and pedagogical value.
+These are docs people usually don't want to read, but when they do, they find it quite fascinating.
+Avoid imperative code, describe structure definitions, their purpose and how to use them properly.
 
 # Plotnik Query Language
 
