@@ -125,12 +125,12 @@ No `CaptureNode`—implicit on successful match.
 
 ```rust
 struct TransitionView<'a> {
-    graph: &'a TransitionGraph,
+    query_ir: &'a QueryIR,
     raw: &'a Transition,
 }
 
 struct MatcherView<'a> {
-    graph: &'a TransitionGraph,
+    query_ir: &'a QueryIR,
     raw: &'a Matcher,
 }
 

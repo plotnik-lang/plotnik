@@ -89,7 +89,7 @@ struct Frame {
 }
 
 struct Interpreter<'a> {
-    graph: &'a TransitionGraph,
+    query_ir: &'a QueryIR,
     stack: Vec<Frame>,
     cursor: TreeCursor<'a>,
     effects: EffectStream<'a>,

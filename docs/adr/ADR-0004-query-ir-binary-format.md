@@ -13,7 +13,7 @@ The Query IR lives in a single contiguous allocation—cache-friendly, zero frag
 ### Container
 
 ```rust
-struct TransitionGraph {
+struct QueryIR {
     data: Arena,
     successors_offset: u32,
     effects_offset: u32,
