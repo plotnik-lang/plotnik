@@ -16,7 +16,7 @@
 - **Index**:
   - [ADR-0001: Query Parser](docs/adr/ADR-0001-query-parser.md)
   - [ADR-0002: Diagnostics System](docs/adr/ADR-0002-diagnostics-system.md)
-  - [ADR-0003: Query Intermediate Representation](docs/adr/ADR-0003-query-intermediate-representation.md) (superseded by ADR-0004, ADR-0005, ADR-0006)
+  - ADR-0003: Query Intermediate Representation (superseded by ADR-0004, ADR-0005, ADR-0006, available via git history)
   - [ADR-0004: Query IR Binary Format](docs/adr/ADR-0004-query-ir-binary-format.md)
   - [ADR-0005: Transition Graph Format](docs/adr/ADR-0005-transition-graph-format.md)
   - [ADR-0006: Dynamic Query Execution](docs/adr/ADR-0006-dynamic-query-execution.md)

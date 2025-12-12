@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2025-12-12
-- **Supersedes**: Parts of [ADR-0003](ADR-0003-query-intermediate-representation.md)
+- **Supersedes**: Parts of ADR-0003
 
 ## Context
 
