@@ -48,6 +48,7 @@
 ADRs must be succint and straight to the point.
 They must contain examples with high information density and pedagogical value.
 These are docs people usually don't want to read, but when they do, they find it quite fascinating.
+Avoid imperative code, describe structure definitions, their purpose and how to use them properly.
 
 # Plotnik Query Language
 

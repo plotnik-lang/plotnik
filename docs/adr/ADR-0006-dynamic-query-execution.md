@@ -17,7 +17,7 @@ For each transition:
 1. Emit `pre_effects`
 2. Match (epsilon always succeeds)
 3. On success: emit `CaptureNode`, emit `post_effects`
-4. Process `next` with backtracking
+4. Process successors with backtracking
 
 ### Effect Stream
 
@@ -112,7 +112,7 @@ Restore also truncates `effects` to `effect_watermark` and sets `recursion_stack
 
 ### Recursion
 
-**Problem**: A definition can be called from N sites. Naively, `Exit.next` contains all N return points, requiring O(N) filtering.
+**Problem**: A definition can be called from N sites. Naively, Exit's successors contain all N return points, requiring O(N) filtering.
 
 **Solution**: Store returns in call frame at `Enter`, retrieve at `Exit`. O(1), no filtering.
 
@@ -125,18 +125,18 @@ struct RecursionStack {
 struct CallFrame {
     parent: Option<u32>,          // index of caller's frame
     ref_id: RefId,                // verify Exit matches Enter
-    returns: Slice<TransitionId>, // from Enter.next[1..]
+    returns: Slice<TransitionId>, // from Enter.successors()[1..]
 }
 ```
 
 **Append-only invariant**: Frames are never removed. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
 
-| Operation         | Action                                                                     |
-| ----------------- | -------------------------------------------------------------------------- |
-| `Enter(ref_id)`   | Push frame (parent = `current`), set `current = len-1`, follow `next[0]`   |
-| `Exit(ref_id)`    | Verify ref_id, set `current = frame.parent`, continue with `frame.returns` |
-| Save backtrack    | Store `current`                                                            |
-| Restore backtrack | Set `current` to saved value                                               |
+| Operation         | Action                                                                         |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `Enter(ref_id)`   | Push frame (parent = `current`), set `current = len-1`, follow `successors[0]` |
+| `Exit(ref_id)`    | Verify ref_id, set `current = frame.parent`, continue with `frame.returns`     |
+| Save backtrack    | Store `current`                                                                |
+| Restore backtrack | Set `current` to saved value                                                   |
 
 **Why index instead of depth?** Using logical depth breaks on Enter-Exit-Enter sequences:
 

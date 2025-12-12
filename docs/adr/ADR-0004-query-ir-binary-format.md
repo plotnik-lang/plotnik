@@ -30,7 +30,7 @@ Transitions start at offset 0. Default entrypoint is always at offset 0.
 ### QueryIRBuffer
 
 ```rust
-const BUFFER_ALIGN: usize = 4;
+const BUFFER_ALIGN: usize = 64;  // cache-line alignment for transitions
 
 struct QueryIRBuffer {
     ptr: *mut u8,
@@ -38,13 +38,13 @@ struct QueryIRBuffer {
 }
 ```
 
-Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`.
+Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`. The 64-byte alignment ensures transitions never straddle cache lines.
 
 ### Segments
 
 | Segment        | Type                | Offset                  | Align |
 | -------------- | ------------------- | ----------------------- | ----- |
-| Transitions    | `[Transition; N]`   | 0                       | 4     |
+| Transitions    | `[Transition; N]`   | 0                       | 64    |
 | Successors     | `[TransitionId; M]` | `successors_offset`     | 4     |
 | Effects        | `[EffectOp; P]`     | `effects_offset`        | 2     |
 | Negated Fields | `[NodeFieldId; Q]`  | `negated_fields_offset` | 2     |

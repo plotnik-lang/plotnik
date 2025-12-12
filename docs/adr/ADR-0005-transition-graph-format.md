@@ -37,21 +37,50 @@ struct Slice<T> {
 ### Transition
 
 ```rust
-#[repr(C)]
+#[repr(C, align(64))]
 struct Transition {
-    matcher: Matcher,              // 16 bytes
+    // --- 40 bytes metadata ---
+    matcher: Matcher,              // 16
     pre_anchored: bool,            // 1
     post_anchored: bool,           // 1
     _pad1: [u8; 2],                // 2
     pre_effects: Slice<EffectOp>,  // 8
     post_effects: Slice<EffectOp>, // 8
     ref_marker: RefTransition,     // 4
-    next: Slice<TransitionId>,     // 8
+
+    // --- 24 bytes control flow ---
+    successor_count: u32,          // 4
+    successor_data: [u32; 5],      // 20
 }
-// 48 bytes, align 4
+// 64 bytes, align 64 (cache-line aligned)
 ```
 
 Single `ref_marker` slot—sequences like `Enter(A) → Enter(B)` remain as epsilon chains.
+
+### Inline Successors (SSO-style)
+
+Successors use a small-size optimization to avoid indirection for the common case:
+
+| `successor_count` | Layout                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| 0–5               | `successor_data[0..count]` contains `TransitionId` values directly                   |
+| > 5               | `successor_data[0]` is offset into `successors` segment, `successor_count` is length |
+
+Why 5 slots: 24 available bytes / 4 bytes per `TransitionId` = 6 slots, minus 1 for the count field leaves 5.
+
+Coverage:
+
+- Linear sequences: 1 successor
+- Simple branches, quantifiers: 2 successors
+- Most alternations: 2–5 branches
+
+Only massive alternations (6+ branches) spill to the external buffer.
+
+Cache benefits:
+
+- 64 bytes = L1 cache line on x86/ARM64
+- No transition straddles cache lines
+- No pointer chase for 99%+ of transitions
 
 ### Matcher
 
@@ -98,23 +127,25 @@ Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecifie
 
 **Solution**: Store return transitions at `Enter` time (in the call frame), retrieve at `Exit` time. O(1) exit, no filtering.
 
-For `Enter(ref_id)` transitions, `next` has special structure:
+For `Enter(ref_id)` transitions, `successor_data` has special structure:
 
-- `next[0]`: definition entry point (where to jump)
-- `next[1..]`: return transitions (stored in call frame)
+- `successor_data[0]`: definition entry point (where to jump)
+- `successor_data[1..count]`: return transitions (stored in call frame)
 
-For `Exit(ref_id)` transitions, `next` is **ignored**. Return transitions come from the call frame pushed at `Enter`. See [ADR-0006](ADR-0006-dynamic-query-execution.md) for execution details.
+For `Exit(ref_id)` transitions, successors are **ignored**. Return transitions come from the call frame pushed at `Enter`. See [ADR-0006](ADR-0006-dynamic-query-execution.md) for execution details.
 
 ```
 Call site:
-T1: ε + Enter(Func)  next=[T10, T2, T3]
-                          │    └─────┴─── return transitions (stored in frame)
-                          └─────────────── definition entry
+T1: ε + Enter(Func)  successors=[T10, T2, T3]
+                               │    └─────┴─── return transitions (stored in frame)
+                               └─────────────── definition entry
+```
 
 Definition:
-T10: Match(...)      next=[T11]
-T11: ε + Exit(Func)  next=[] (ignored, returns from frame)
-```
+T10: Match(...) successors=[T11]
+T11: ε + Exit(Func) successors=[] (ignored, returns from frame)
+
+````
 
 ### EffectOp
 
@@ -132,7 +163,7 @@ enum EffectOp {
     ToString,
 }
 // 4 bytes, align 2
-```
+````
 
 No `CaptureNode`—implicit on successful match.
 
@@ -164,7 +195,7 @@ struct MatcherView<'a> {
 enum MatcherKind { Epsilon, Node, Anonymous, Wildcard, Down, Up }
 ```
 
-Views resolve `Slice<T>` to `&[T]`. Engine code never touches offsets directly.
+Views resolve `Slice<T>` to `&[T]`. `TransitionView::successors()` returns `&[TransitionId]`, hiding the inline/spilled distinction—callers see a uniform slice regardless of storage location. Engine code never touches offsets or `successor_data` directly.
 
 ### Quantifiers
 
@@ -269,9 +300,9 @@ Incoming epsilon effects → `pre_effects`. Outgoing → `post_effects`.
 
 ## Consequences
 
-**Positive**: No state objects. Compact 48-byte transitions. Views hide offset arithmetic.
+**Positive**: No state objects. Cache-line aligned 64-byte transitions eliminate cache straddling. Inline successors remove pointer chasing for common cases. Views hide offset arithmetic and inline/spilled distinction.
 
-**Negative**: Single `ref_marker` leaves some epsilon chains. Large queries may pressure cache.
+**Negative**: Single `ref_marker` leaves some epsilon chains. 33% size increase over minimal layout (acceptable for KB-scale query binaries).
 
 ## References
 
