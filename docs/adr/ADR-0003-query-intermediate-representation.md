@@ -1,6 +1,6 @@
 # ADR-0003: Query Intermediate Representation
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0004](ADR-0004-query-ir-binary-format.md), [ADR-0005](ADR-0005-transition-graph-format.md), [ADR-0006](ADR-0006-dynamic-query-execution.md)
 - **Date**: 2025-12-10
 
 ## Context
