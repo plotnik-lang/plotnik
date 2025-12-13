@@ -27,6 +27,7 @@ pub mod typing;
 
 pub use graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use graph_optimize::OptimizeStats;
+pub use symbol_table::UNNAMED_DEF;
 pub use typing::{
     InferredMember, InferredTypeDef, TypeDescription, TypeInferenceResult, UnificationError,
 };
