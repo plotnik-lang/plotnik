@@ -18,7 +18,6 @@
 
 pub mod diagnostics;
 pub mod graph;
-pub mod infer;
 pub mod ir;
 pub mod parser;
 pub mod query;

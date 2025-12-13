@@ -13,13 +13,21 @@
 //! The `BuildGraph` borrows strings from the source (`&'src str`).
 //! String interning happens during emission to `CompiledQuery`.
 
+mod analysis;
 mod build;
 mod construct;
+mod optimize;
 
+#[cfg(test)]
+mod analysis_tests;
 #[cfg(test)]
 mod build_tests;
 #[cfg(test)]
 mod construct_tests;
+#[cfg(test)]
+mod optimize_tests;
 
+pub use analysis::{AnalysisResult, StringInterner, analyze};
 pub use build::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use construct::{GraphConstructor, construct_graph};
+pub use optimize::{OptimizeStats, eliminate_epsilons};
