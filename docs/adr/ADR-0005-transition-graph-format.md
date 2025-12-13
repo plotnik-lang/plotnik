@@ -1,7 +1,7 @@
 # ADR-0005: Transition Graph Format
 
 - **Status**: Accepted
-- **Date**: 2025-12-12
+- **Date**: 2024-12-12
 - **Supersedes**: Parts of ADR-0003
 
 ## Context
@@ -38,21 +38,21 @@ struct Slice<T> {
 ```rust
 #[repr(C, align(64))]
 struct Transition {
-    // --- 40 bytes metadata ---
+    // --- 32 bytes metadata ---
     matcher: Matcher,              // 16
-    pre_anchored: bool,            // 1
-    post_anchored: bool,           // 1
+    pre_nav: PreNav,               // 2 (see ADR-0008)
     _pad1: [u8; 2],                // 2
-    pre_effects: Slice<EffectOp>,  // 8
-    post_effects: Slice<EffectOp>, // 8
+    effects: Slice<EffectOp>,      // 8
     ref_marker: RefTransition,     // 4
 
-    // --- 24 bytes control flow ---
+    // --- 32 bytes control flow ---
     successor_count: u32,          // 4
-    successor_data: [u32; 5],      // 20
+    successor_data: [u32; 7],      // 28
 }
 // 64 bytes, align 64 (cache-line aligned)
 ```
+
+Navigation is fully determined by `pre_nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for `PreNav` definition and semantics.
 
 Single `ref_marker` slot—sequences like `Enter(A) → Enter(B)` remain as epsilon chains.
 
@@ -62,18 +62,18 @@ Successors use a small-size optimization to avoid indirection for the common cas
 
 | `successor_count` | Layout                                                                              |
 | ----------------- | ----------------------------------------------------------------------------------- |
-| 0–5               | `successor_data[0..count]` contains `TransitionId` values directly                  |
-| > 5               | `successor_data[0]` is index into `successors` segment, `successor_count` is length |
+| 0–7               | `successor_data[0..count]` contains `TransitionId` values directly                  |
+| > 7               | `successor_data[0]` is index into `successors` segment, `successor_count` is length |
 
-Why 5 slots: 24 available bytes / 4 bytes per `TransitionId` = 6 slots, minus 1 for the count field leaves 5.
+Why 7 slots: 32 available bytes / 4 bytes per `TransitionId` = 8 slots, minus 1 for the count field leaves 7.
 
 Coverage:
 
 - Linear sequences: 1 successor
 - Simple branches, quantifiers: 2 successors
-- Most alternations: 2–5 branches
+- Most alternations: 2–7 branches
 
-Only massive alternations (6+ branches) spill to the external buffer.
+Only massive alternations (8+ branches) spill to the external buffer.
 
 Cache benefits:
 
@@ -98,13 +98,13 @@ enum Matcher {
         negated_fields: Slice<NodeFieldId>, // 8
     },
     Wildcard,
-    Down,  // cursor to first child
-    Up,    // cursor to parent
 }
 // 16 bytes, align 4
 ```
 
 `Option<NodeFieldId>` uses 0 for `None` (niche optimization).
+
+Navigation (descend/ascend) is handled by `PreNav`, not matchers. Matchers are purely for node matching.
 
 ### RefTransition
 
@@ -118,6 +118,8 @@ enum RefTransition {
 // 4 bytes, align 2
 ```
 
+Layout: 1-byte discriminant + 1-byte padding + 2-byte `RefId` payload = 4 bytes. Alignment is 2 (from `RefId: u16`). Fits comfortably in the 64-byte `Transition` struct with room to spare.
+
 Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecified).
 
 ### Enter/Exit Semantics
@@ -126,10 +128,12 @@ Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecifie
 
 **Solution**: Store return transitions at `Enter` time (in the call frame), retrieve at `Exit` time. O(1) exit, no filtering.
 
-For `Enter(ref_id)` transitions, `successor_data` has special structure:
+For `Enter(ref_id)` transitions, the **logical** successor list (accessed via `TransitionView::successors()`) has special structure:
 
-- `successor_data[0]`: definition entry point (where to jump)
-- `successor_data[1..count]`: return transitions (stored in call frame)
+- `successors()[0]`: definition entry point (where to jump)
+- `successors()[1..]`: return transitions (stored in call frame)
+
+This structure applies to the view, not raw `successor_data` memory. The SSO optimization (inline vs spilled storage) is orthogonal—the view abstracts it away. An `Enter` with 8+ returns spills to the external segment like any other transition; the interpreter accesses the logical list uniformly.
 
 For `Exit(ref_id)` transitions, successors are **ignored**. Return transitions come from the call frame pushed at `Enter`. See [ADR-0006](ADR-0006-dynamic-query-execution.md) for execution details.
 
@@ -149,6 +153,7 @@ T11: ε + Exit(Func) successors=[] (ignored, returns from frame)
 ```rust
 #[repr(C, u16)]
 enum EffectOp {
+    CaptureNode,                   // store matched node as current value
     StartArray,
     PushElement,
     EndArray,
@@ -162,19 +167,9 @@ enum EffectOp {
 // 4 bytes, align 2
 ```
 
-No `CaptureNode`—implicit on successful match.
+`CaptureNode` is explicit—graph construction places it at the correct position relative to container effects.
 
-### Effect Placement
-
-| Effect         | Placement | Why                        |
-| -------------- | --------- | -------------------------- |
-| `StartArray`   | Pre       | Container before elements  |
-| `StartObject`  | Pre       | Container before fields    |
-| `StartVariant` | Pre       | Tag before payload         |
-| `PushElement`  | Post      | Consumes matched node      |
-| `Field`        | Post      | Consumes matched node      |
-| `End*`         | Post      | Finalizes after last match |
-| `ToString`     | Post      | Converts matched node      |
+**Invariant**: The interpreter clears `matched_node` slot on `Enter` and backtrack restore. This prevents stale captures if a graph construction bug produces `Epsilon → CaptureNode` without a preceding `Match`. With proper graphs, `CaptureNode` always follows a successful match that populates the slot.
 
 ### View Types
 
@@ -189,12 +184,14 @@ struct MatcherView<'a> {
     raw: &'a Matcher,
 }
 
-enum MatcherKind { Epsilon, Node, Anonymous, Wildcard, Down, Up }
+enum MatcherKind { Epsilon, Node, Anonymous, Wildcard }
 ```
 
 Views resolve `Slice<T>` to `&[T]`. `TransitionView::successors()` returns `&[TransitionId]`, hiding the inline/spilled distinction—callers see a uniform slice regardless of storage location. Engine code never touches offsets or `successor_data` directly.
 
 ### Quantifiers
+
+Examples in this section show graph structure and effects. Navigation (`pre_nav`) is omitted for brevity—see [ADR-0008](ADR-0008-tree-navigation.md) for full transition examples with navigation.
 
 **Greedy `*`**:
 
@@ -229,22 +226,22 @@ Query: `(parameters (identifier)* @params)`
 Before elimination:
 
 ```
-T0: ε + StartArray       → [T1]
-T1: ε (branch)           → [T2, T4]
-T2: Match(identifier)    → [T3]
-T3: ε + PushElement      → [T1]
-T4: ε + EndArray         → [T5]
-T5: ε + Field("params")  → [...]
+T0: ε [StartArray]                    → [T1]
+T1: ε (branch)                        → [T2, T4]
+T2: Match(identifier)                 → [T3]
+T3: ε [CaptureNode, PushElement]      → [T1]
+T4: ε [EndArray]                      → [T5]
+T5: ε [Field("params")]               → [...]
 ```
 
 After:
 
 ```
-T2': pre:[StartArray] Match(identifier) post:[PushElement]  → [T2', T4']
-T4': post:[EndArray, Field("params")]                       → [...]
+T2': Match(identifier) [StartArray, CaptureNode, PushElement]  → [T2', T4']
+T4': ε [EndArray, Field("params")]                             → [...]
 ```
 
-First iteration gets `StartArray` from T0's path. Loop iterations skip it.
+First iteration gets `StartArray` from T0's path. Loop iterations skip it. Note T4' remains epsilon—effects cannot merge into T2' without breaking semantics.
 
 ### Example: Object
 
@@ -276,32 +273,34 @@ T6: ε + Field("val") + EndVariant     → [T7]
 
 ### Epsilon Elimination
 
-Partial—full elimination impossible due to single `ref_marker`.
+Partial—full elimination impossible due to single `ref_marker` and effect ordering constraints.
 
 **Execution order** (all transitions, including epsilon):
 
-1. Emit `pre_effects`
-2. Execute matcher (epsilon always succeeds)
-3. On success: emit implicit `CaptureNode`, emit `post_effects`
+1. Execute `pre_nav` and matcher
+2. On success: emit `effects` in order
 
-An epsilon transition with `pre: [StartObject]` and `post: [EndObject]` legitimately creates an empty object. To avoid accidental empty structures in graph rewrites, move effects to the destination's `pre` or source's `post` as appropriate.
+With explicit `CaptureNode`, effect order is unambiguous. When eliminating epsilon chains, concatenate effect lists in traversal order.
 
-Why pre/post split matters:
+**When epsilon nodes must remain**:
+
+1. **Ref markers**: A transition can hold at most one `Enter`/`Exit`. Sequences like `Enter(A) → Enter(B)` need epsilon.
+2. **Branch points**: An epsilon with multiple successors cannot merge into predecessors without duplicating effects.
+3. **Effect ordering conflicts**: When incoming and outgoing effects cannot be safely reordered.
+
+Example of safe elimination:
 
 ```
 Before:
-T1: Match(A)        → [T2]      // current = A
-T2: ε + PushElement → [T3]      // push A ✓
-T3: Match(B)        → [...]     // current = B
+T1: Match(A) [CaptureNode]                 → [T2]
+T2: ε [PushElement]                        → [T3]
+T3: Match(B) [CaptureNode, Field("b")]     → [...]
 
-After (correct):
-T3': pre:[PushElement] Match(B)     // push A, then match B ✓
-
-Wrong (no split):
-T3': Match(B) post:[PushElement]    // match B, push B ✗
+After:
+T3': Match(B) [PushElement, CaptureNode, Field("b")]  → [...]
 ```
 
-Incoming epsilon effects → `pre_effects`. Outgoing → `post_effects`.
+`PushElement` consumes T1's captured value before T3 overwrites `current`.
 
 ## Consequences
 

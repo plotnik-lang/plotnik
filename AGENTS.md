@@ -21,6 +21,7 @@
   - [ADR-0005: Transition Graph Format](docs/adr/ADR-0005-transition-graph-format.md)
   - [ADR-0006: Dynamic Query Execution](docs/adr/ADR-0006-dynamic-query-execution.md)
   - [ADR-0007: Type Metadata Format](docs/adr/ADR-0007-type-metadata-format.md)
+  - [ADR-0008: Tree Navigation](docs/adr/ADR-0008-tree-navigation.md)
 - **Template**:
 
   ```markdown

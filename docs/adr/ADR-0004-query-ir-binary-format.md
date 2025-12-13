@@ -1,7 +1,7 @@
 # ADR-0004: Query IR Binary Format
 
 - **Status**: Accepted
-- **Date**: 2025-12-12
+- **Date**: 2024-12-12
 - **Supersedes**: Parts of ADR-0003
 
 ## Context
@@ -23,6 +23,7 @@ struct QueryIR {
     type_defs_offset: u32,
     type_members_offset: u32,
     entrypoints_offset: u32,
+    ignored_kinds_offset: u32,  // 0 = no ignored kinds
 }
 ```
 
@@ -36,12 +37,22 @@ const BUFFER_ALIGN: usize = 64;  // cache-line alignment for transitions
 struct QueryIRBuffer {
     ptr: *mut u8,
     len: usize,
+    owned: bool,  // true if allocated, false if mmap'd
 }
 ```
 
 Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>` won't work—it assumes 1-byte alignment and corrupts `dealloc`. The 64-byte alignment ensures transitions never straddle cache lines.
 
-**Deallocation**: `QueryIRBuffer` must implement `Drop` to reconstruct the exact `Layout` (size + 64-byte alignment) and call `std::alloc::dealloc`. Using `Box::from_raw` or similar would assume align=1 and cause undefined behavior.
+**Ownership semantics**:
+
+| `owned` | Source              | `Drop` action                                    |
+| ------- | ------------------- | ------------------------------------------------ |
+| `true`  | `std::alloc::alloc` | Reconstruct `Layout`, call `std::alloc::dealloc` |
+| `false` | `mmap` / external   | No-op (caller manages lifetime)                  |
+
+For mmap'd queries, the OS maps file pages directly into address space. The 64-byte header ensures buffer data starts aligned. `QueryIRBuffer` with `owned: false` provides a view without taking ownership—the backing file mapping must outlive the `QueryIR`.
+
+**Deallocation**: When `owned: true`, `Drop` must reconstruct the exact `Layout` (size + 64-byte alignment) and call `std::alloc::dealloc`. Using `Box::from_raw` or similar would assume align=1 and cause undefined behavior.
 
 ### Segments
 
@@ -56,6 +67,7 @@ Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>`
 | Type Defs      | `[TypeDef; T]`      | `type_defs_offset`      | 4     |
 | Type Members   | `[TypeMember; U]`   | `type_members_offset`   | 2     |
 | Entrypoints    | `[Entrypoint; V]`   | `entrypoints_offset`    | 4     |
+| Ignored Kinds  | `[NodeTypeId; W]`   | `ignored_kinds_offset`  | 2     |
 
 Each offset is aligned: `(offset + align - 1) & !(align - 1)`.
 
@@ -103,7 +115,7 @@ struct Entrypoint {
 ### Serialization
 
 ```
-Header (48 bytes):
+Header (64 bytes):
   magic: [u8; 4]           b"PLNK"
   version: u32             format version + ABI hash
   checksum: u32            CRC32(offsets || buffer_data)
@@ -116,9 +128,13 @@ Header (48 bytes):
   type_defs_offset: u32
   type_members_offset: u32
   entrypoints_offset: u32
+  ignored_kinds_offset: u32
+  _pad: [u8; 12]           reserved, zero-filled
 
 Buffer Data (buffer_len bytes)
 ```
+
+Header is 64 bytes to ensure buffer data starts at a 64-byte aligned offset. This enables true zero-copy `mmap` usage where transitions at offset 0 within the buffer are correctly aligned.
 
 Little-endian always. UTF-8 strings. Version mismatch or checksum failure → recompile.
 
