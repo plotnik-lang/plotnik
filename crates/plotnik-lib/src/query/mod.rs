@@ -209,7 +209,6 @@ impl<'a> Query<'a> {
     }
 
     /// Build graph and return dump of graph before optimization (for debugging).
-    #[cfg(test)]
     pub fn build_graph_with_pre_opt_dump(mut self) -> (Self, String) {
         if !self.is_valid() {
             return (self, String::new());

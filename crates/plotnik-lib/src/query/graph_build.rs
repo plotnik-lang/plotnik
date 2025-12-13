@@ -367,24 +367,20 @@ impl<'a> Query<'a> {
     fn construct_seq(&mut self, seq: &SeqExpr, ctx: NavContext) -> Fragment {
         let items: Vec<_> = seq.items().collect();
 
+        // Uncaptured sequences don't create object scope - they just group items.
+        // Captures propagate to parent scope. Object scope is created by:
+        // - Captured sequences ({...} @name) via construct_capture
+        // - QIS quantifiers that wrap loop body with StartObject/EndObject
+
         let start_id = self.graph.add_epsilon();
         self.graph.node_mut(start_id).set_nav(ctx.to_nav(false));
-        self.graph
-            .node_mut(start_id)
-            .add_effect(BuildEffect::StartObject);
 
         let (child_fragments, _exit_ctx) = self.construct_item_sequence(&items, false);
         let inner = self.graph.sequence(&child_fragments);
 
-        let end_id = self.graph.add_epsilon();
-        self.graph
-            .node_mut(end_id)
-            .add_effect(BuildEffect::EndObject);
-
         self.graph.connect(start_id, inner.entry);
-        self.graph.connect(inner.exit, end_id);
 
-        Fragment::new(start_id, end_id)
+        Fragment::new(start_id, inner.exit)
     }
 
     fn construct_capture(&mut self, cap: &CapturedExpr, ctx: NavContext) -> Fragment {
@@ -402,6 +398,15 @@ impl<'a> Query<'a> {
             .and_then(|t| t.name())
             .map(|n| n.text() == "string")
             .unwrap_or(false);
+
+        // Captured sequence/alternation creates object scope for nested fields.
+        // Tagged alternations use variants instead (handled in construct_tagged_alt).
+        // Quantifiers only need wrapper if QIS (2+ captures) - otherwise the array is the direct value.
+        let needs_object_wrapper = match &inner_expr {
+            Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
+            Expr::QuantifiedExpr(q) => self.qis_triggers.contains_key(q),
+            _ => false,
+        };
 
         let matchers = self.find_all_matchers(inner_frag.entry);
         for matcher_id in matchers {
@@ -421,12 +426,32 @@ impl<'a> Query<'a> {
                 .as_ref()
                 .map(|t| t.text_range())
                 .unwrap_or_default();
+
+            let (entry, exit) = if needs_object_wrapper {
+                // Wrap with StartObject/EndObject for composite captures
+                let start_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(start_id)
+                    .add_effect(BuildEffect::StartObject);
+                self.graph.connect(start_id, inner_frag.entry);
+
+                let end_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(end_id)
+                    .add_effect(BuildEffect::EndObject);
+                self.graph.connect(inner_frag.exit, end_id);
+
+                (start_id, end_id)
+            } else {
+                (inner_frag.entry, inner_frag.exit)
+            };
+
             let field_id = self.graph.add_epsilon();
             self.graph
                 .node_mut(field_id)
                 .add_effect(BuildEffect::Field { name, span });
-            self.graph.connect(inner_frag.exit, field_id);
-            Fragment::new(inner_frag.entry, field_id)
+            self.graph.connect(exit, field_id);
+            Fragment::new(entry, field_id)
         } else {
             inner_frag
         }

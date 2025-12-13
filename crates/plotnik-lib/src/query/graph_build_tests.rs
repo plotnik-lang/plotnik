@@ -49,10 +49,9 @@ fn sequence() {
     insta::assert_snapshot!(snapshot("Q = { (a) (b) }"), @r"
     Q = N1
 
-    N0: ε [StartObj] → N1
-    N1: [Next] (a) [StartObj] → N2
-    N2: [Next] (b) → N3
-    N3: ε [EndObj] → ∅
+    N0: ε → N1
+    N1: [Next] (a) → N2
+    N2: [Next] (b) → ∅
     ");
 }
 
@@ -61,12 +60,11 @@ fn sequence_with_captures() {
     insta::assert_snapshot!(snapshot("Q = { (a) @x (b) @y }"), @r"
     Q = N1
 
-    N0: ε [StartObj] → N1
-    N1: [Next] (a) [StartObj] [Capture] → N3
+    N0: ε → N1
+    N1: [Next] (a) [Capture] → N3
     N2: ε [Field(x)] → N3
-    N3: [Next] (b) [Field(x)] [Capture] → N5
-    N4: ε [Field(y)] → N5
-    N5: ε [Field(y)] [EndObj] → ∅
+    N3: [Next] (b) [Field(x)] [Capture] → N4
+    N4: ε [Field(y)] → ∅
     ");
 }
 
@@ -234,9 +232,9 @@ fn optimized_sequence() {
     insta::assert_snapshot!(snapshot_optimized("Q = { (a) @x (b) @y }"), @r"
     Q = N1
 
-    N1: [Next] (a) [StartObj] [Capture] → N3
-    N3: [Next] (b) [Field(x)] [Capture] → N5
-    N5: ε [Field(y)] [EndObj] → ∅
+    N1: [Next] (a) [Capture] → N3
+    N3: [Next] (b) [Field(x)] [Capture] → N4
+    N4: ε [Field(y)] → ∅
     ");
 }
 

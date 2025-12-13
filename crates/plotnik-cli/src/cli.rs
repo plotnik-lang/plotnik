@@ -111,4 +111,16 @@ pub struct OutputArgs {
     /// Show inferred cardinalities
     #[arg(long)]
     pub cardinalities: bool,
+
+    /// Show compiled graph
+    #[arg(long)]
+    pub graph: bool,
+
+    /// Show unoptimized graph (before epsilon elimination)
+    #[arg(long)]
+    pub graph_raw: bool,
+
+    /// Show inferred types
+    #[arg(long)]
+    pub types: bool,
 }

@@ -250,10 +250,10 @@ fn sequence_without_capture_propagates() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → Void
+    Foo → T3
 
     === Types ===
-    T3: Record FooScope3 {
+    T3: Record Foo {
         x: Node
         y: Node
     }
@@ -337,19 +337,27 @@ fn tagged_alternation_captured_creates_enum() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T7
 
     === Types ===
-    T3: Record FooA {
+    T3: Record FooScope3A {
         x: Node
     }
-    T4: Record FooB {
+    T4: Enum FooScope3 {
+        A: T3
+    }
+    T5: Record FooScope5B {
         y: Node
     }
-    T5: Enum Foo {
-        A: T3
-        B: T4
+    T6: Enum FooScope5 {
+        B: T5
     }
+    T7: Record Foo {
+        choice: T4
+    }
+
+    === Errors ===
+    field `choice` in `Foo`: incompatible types [Node, Node]
     ");
 }
 
@@ -365,12 +373,18 @@ fn captured_untagged_alternation_creates_struct() {
     Foo → T5
 
     === Types ===
-    T3: Optional <anon> → Node
-    T4: Optional <anon> → Node
-    T5: Record Foo {
-        x: T3
-        y: T4
+    T3: Record FooScope3 {
+        x: Node
     }
+    T4: Record FooScope4 {
+        y: Node
+    }
+    T5: Record Foo {
+        val: T3
+    }
+
+    === Errors ===
+    field `val` in `Foo`: incompatible types [Node, Node]
     ");
 }
 
@@ -436,7 +450,7 @@ fn quantifier_on_sequence() {
     Foo → T4
 
     === Types ===
-    T3: Record FooItem {
+    T3: Record FooScope3 {
         x: Node
         y: Node
     }
@@ -460,11 +474,11 @@ fn qis_single_capture_no_trigger() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Single → Void
+    Single → T4
 
     === Types ===
     T3: ArrayStar <anon> → Node
-    T4: Record SingleScope3 {
+    T4: Record Single {
         item: T3
     }
     ");
@@ -482,14 +496,16 @@ fn qis_alternation_in_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T4
+    Foo → T5
 
     === Types ===
-    T3: Record FooItem {
-        y: Node
+    T3: Record FooScope3 {
         x: Node
     }
-    T4: ArrayStar <anon> → T3
+    T4: Record FooScope4 {
+        y: Node
+    }
+    T5: ArrayStar <anon> → T4
     ");
 }
 

@@ -1,15 +1,14 @@
 //! Type inference for Query's BuildGraph.
 //!
-//! Analyzes the graph and infers output type structure for each definition.
-//! Follows rules from ADR-0007 and ADR-0009.
+//! Analyzes the graph structure statically to determine output types.
+//! Follows rules from ADR-0006, ADR-0007 and ADR-0009.
 //!
 //! # Algorithm Overview
 //!
-//! 1. Pre-analyze array regions to detect QIS (Quantifier-Induced Scope)
-//! 2. Walk graph from each definition entry point using stack-based scope tracking
-//! 3. StartObject/EndObject delimit scopes that may become composite types
-//! 4. QIS creates implicit structs when quantified expressions have ≥2 captures
-//! 5. Field(name) consumes pending type and records it in current scope
+//! 1. Traverse graph to collect all scope boundaries (StartObject/EndObject, StartArray/EndArray)
+//! 2. Associate Field effects with their containing object scope
+//! 3. Build types bottom-up from scope hierarchy
+//! 4. Handle branching by merging fields with optionality rules
 
 use std::collections::{HashMap, HashSet};
 
@@ -76,8 +75,13 @@ pub struct InferredMember<'src> {
     pub ty: TypeId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// ─────────────────────────────────────────────────────────────────────────────
+// Cardinality
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum Cardinality {
+    #[default]
     One,
     Optional,
     Star,
@@ -104,55 +108,39 @@ impl Cardinality {
             x => x,
         }
     }
-
-    fn multiply(self, other: Cardinality) -> Cardinality {
-        use Cardinality::*;
-        match (self, other) {
-            (One, x) | (x, One) => x,
-            (Optional, Optional) => Optional,
-            (Optional, Plus) | (Plus, Optional) => Star,
-            (Optional, Star) | (Star, Optional) => Star,
-            (Star, _) | (_, Star) => Star,
-            (Plus, Plus) => Plus,
-        }
-    }
 }
 
-/// Shape includes type information for proper compatibility checking.
+// ─────────────────────────────────────────────────────────────────────────────
+// Field and Scope tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TypeShape<'src> {
+enum TypeShape {
     Primitive(TypeId),
-    Struct(Vec<(&'src str, TypeId)>),
-    Composite(TypeId),
 }
 
-impl<'src> TypeShape<'src> {
+impl TypeShape {
     fn to_description(&self) -> TypeDescription {
         match self {
             TypeShape::Primitive(TYPE_NODE) => TypeDescription::Node,
             TypeShape::Primitive(TYPE_STR) => TypeDescription::String,
             TypeShape::Primitive(_) => TypeDescription::Node,
-            TypeShape::Struct(fields) => {
-                TypeDescription::Struct(fields.iter().map(|(n, _)| n.to_string()).collect())
-            }
-            TypeShape::Composite(_) => TypeDescription::Struct(vec!["...".to_string()]),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-struct FieldInfo<'src> {
-    shape: TypeShape<'src>,
+struct FieldInfo {
     base_type: TypeId,
+    shape: TypeShape,
     cardinality: Cardinality,
     branch_count: usize,
-    all_shapes: Vec<TypeShape<'src>>,
     spans: Vec<TextRange>,
 }
 
 #[derive(Debug, Clone, Default)]
 struct ScopeInfo<'src> {
-    fields: IndexMap<&'src str, FieldInfo<'src>>,
+    fields: IndexMap<&'src str, FieldInfo>,
     variants: IndexMap<&'src str, ScopeInfo<'src>>,
     has_variants: bool,
 }
@@ -162,26 +150,22 @@ impl<'src> ScopeInfo<'src> {
         &mut self,
         name: &'src str,
         base_type: TypeId,
-        shape: TypeShape<'src>,
         cardinality: Cardinality,
         span: TextRange,
     ) {
+        let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
-            if !existing.all_shapes.contains(&shape) {
-                existing.all_shapes.push(shape);
-            }
             existing.spans.push(span);
         } else {
             self.fields.insert(
                 name,
                 FieldInfo {
-                    shape: shape.clone(),
                     base_type,
+                    shape,
                     cardinality,
                     branch_count: 1,
-                    all_shapes: vec![shape],
                     spans: vec![span],
                 },
             );
@@ -191,33 +175,35 @@ impl<'src> ScopeInfo<'src> {
     fn merge_from(&mut self, other: ScopeInfo<'src>) -> Vec<MergeError<'src>> {
         let mut errors = Vec::new();
 
-        for (name, info) in other.fields {
+        for (name, other_info) in other.fields {
             if let Some(existing) = self.fields.get_mut(name) {
-                if let Some(mut err) = check_compatibility(&existing.shape, &info.shape, name) {
-                    err.spans = existing.spans.clone();
-                    err.spans.extend(info.spans.iter().cloned());
-                    errors.push(err);
-                    for shape in &info.all_shapes {
-                        if !existing.all_shapes.contains(shape) {
-                            existing.all_shapes.push(shape.clone());
-                        }
-                    }
+                // Check type compatibility
+                if existing.shape != other_info.shape {
+                    errors.push(MergeError {
+                        field: name,
+                        shapes: vec![existing.shape.clone(), other_info.shape.clone()],
+                        spans: existing
+                            .spans
+                            .iter()
+                            .chain(&other_info.spans)
+                            .cloned()
+                            .collect(),
+                    });
                 }
-                existing.spans.extend(info.spans);
-                existing.cardinality = existing.cardinality.join(info.cardinality);
-                existing.branch_count += info.branch_count;
+                existing.cardinality = existing.cardinality.join(other_info.cardinality);
+                existing.branch_count += other_info.branch_count;
+                existing.spans.extend(other_info.spans);
             } else {
-                self.fields.insert(name, info);
+                self.fields.insert(name, other_info);
             }
         }
 
-        for (tag, variant_info) in other.variants {
-            if let Some(existing) = self.variants.get_mut(tag) {
-                let variant_errors = existing.merge_from(variant_info);
-                errors.extend(variant_errors);
-            } else {
-                self.variants.insert(tag, variant_info);
-            }
+        for (tag, other_variant) in other.variants {
+            let variant = self.variants.entry(tag).or_default();
+            errors.extend(variant.merge_from(other_variant));
+        }
+
+        if other.has_variants {
             self.has_variants = true;
         }
 
@@ -240,57 +226,19 @@ impl<'src> ScopeInfo<'src> {
 #[derive(Debug)]
 struct MergeError<'src> {
     field: &'src str,
-    shapes: Vec<TypeShape<'src>>,
+    shapes: Vec<TypeShape>,
     spans: Vec<TextRange>,
 }
 
-fn check_compatibility<'src>(
-    a: &TypeShape<'src>,
-    b: &TypeShape<'src>,
-    field: &'src str,
-) -> Option<MergeError<'src>> {
-    match (a, b) {
-        (TypeShape::Primitive(t1), TypeShape::Primitive(t2)) if t1 == t2 => None,
-        (TypeShape::Primitive(_), TypeShape::Primitive(_)) => Some(MergeError {
-            field,
-            shapes: vec![a.clone(), b.clone()],
-            spans: vec![],
-        }),
-        (TypeShape::Composite(t1), TypeShape::Composite(t2)) if t1 == t2 => None,
-        (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
-            if fields_a.len() != fields_b.len() {
-                return Some(MergeError {
-                    field,
-                    shapes: vec![a.clone(), b.clone()],
-                    spans: vec![],
-                });
-            }
-            for ((name_a, type_a), (name_b, type_b)) in fields_a.iter().zip(fields_b.iter()) {
-                if name_a != name_b || type_a != type_b {
-                    return Some(MergeError {
-                        field,
-                        shapes: vec![a.clone(), b.clone()],
-                        spans: vec![],
-                    });
-                }
-            }
-            None
-        }
-        _ => Some(MergeError {
-            field,
-            shapes: vec![a.clone(), b.clone()],
-            spans: vec![],
-        }),
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Scope stack for traversal
+// ─────────────────────────────────────────────────────────────────────────────
 
-/// Entry on the scope stack during traversal.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct ScopeStackEntry<'src> {
     scope: ScopeInfo<'src>,
     is_object: bool,
-    /// Captures pending type before StartObject (for sequences captured as a whole)
-    outer_pending: Option<PendingType<'src>>,
+    outer_pending: Option<PendingType>,
 }
 
 impl<'src> ScopeStackEntry<'src> {
@@ -302,7 +250,7 @@ impl<'src> ScopeStackEntry<'src> {
         }
     }
 
-    fn new_object(outer_pending: Option<PendingType<'src>>) -> Self {
+    fn new_object(outer_pending: Option<PendingType>) -> Self {
         Self {
             scope: ScopeInfo::default(),
             is_object: true,
@@ -311,75 +259,74 @@ impl<'src> ScopeStackEntry<'src> {
     }
 }
 
-/// Pending type waiting for a Field assignment.
 #[derive(Debug, Clone)]
-struct PendingType<'src> {
-    shape: TypeShape<'src>,
+struct PendingType {
     base_type: TypeId,
     cardinality: Cardinality,
 }
 
-impl<'src> PendingType<'src> {
-    fn primitive(ty: TypeId) -> Self {
+impl PendingType {
+    fn primitive(type_id: TypeId) -> Self {
         Self {
-            shape: TypeShape::Primitive(ty),
-            base_type: ty,
+            base_type: type_id,
             cardinality: Cardinality::One,
         }
     }
 }
 
-/// Pre-computed info about an array region for QIS detection.
-#[derive(Debug, Clone)]
-struct ArrayRegionInfo<'src> {
-    /// Field names captured within this array region (excluding nested arrays)
-    captures: Vec<(&'src str, TextRange)>,
-    /// Whether QIS is triggered (≥2 captures)
-    qis_triggered: bool,
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Traversal state
+// ─────────────────────────────────────────────────────────────────────────────
 
-/// Tracks state within a quantified (array) region.
-#[derive(Debug, Clone)]
-struct ArrayFrame<'src> {
-    /// Node ID of the StartArray
-    start_id: NodeId,
-    /// Cardinality of this array (Star or Plus)
+#[derive(Clone, Default)]
+struct ArrayFrame {
     cardinality: Cardinality,
-    /// Pre-computed region info (captures, QIS status)
-    region_info: ArrayRegionInfo<'src>,
+    element_type: Option<TypeId>,
+    /// Node ID where this array started (for lookup in precomputed map)
+    start_node: Option<NodeId>,
+    /// Whether PushElement was actually called (vs prepass placeholder)
+    push_called: bool,
 }
 
-#[derive(Debug, Clone)]
-struct TraversalState<'src> {
-    pending: Option<PendingType<'src>>,
-    current_variant: Option<&'src str>,
-    /// Stack of array frames (tracking array nesting)
-    array_stack: Vec<ArrayFrame<'src>>,
-    /// Set of fields that should be skipped (handled by QIS)
-    skip_fields: HashSet<&'src str>,
+#[derive(Clone, Default)]
+struct TraversalState {
+    pending: Option<PendingType>,
+    current_variant: Option<&'static str>,
+    array_stack: Vec<ArrayFrame>,
+    object_depth: usize,
 }
 
-impl<'src> Default for TraversalState<'src> {
-    fn default() -> Self {
-        Self {
-            pending: None,
-            current_variant: None,
-            array_stack: Vec::new(),
-            skip_fields: HashSet::new(),
+impl TraversalState {
+    fn effective_array_cardinality(&self) -> Cardinality {
+        // Inside object scope, array cardinality doesn't apply to fields
+        if self.object_depth > 0 {
+            return Cardinality::One;
         }
-    }
-}
-
-impl<'src> TraversalState<'src> {
-    fn current_array_cardinality(&self) -> Cardinality {
         self.array_stack
             .iter()
-            .filter(|f| !f.region_info.qis_triggered)
             .fold(Cardinality::One, |acc, frame| {
                 acc.multiply(frame.cardinality)
             })
     }
 }
+
+impl Cardinality {
+    fn multiply(self, other: Cardinality) -> Cardinality {
+        use Cardinality::*;
+        match (self, other) {
+            (One, x) | (x, One) => x,
+            (Optional, Optional) => Optional,
+            (Optional, Plus) | (Plus, Optional) => Star,
+            (Optional, Star) | (Star, Optional) => Star,
+            (Star, _) | (_, Star) => Star,
+            (Plus, Plus) => Plus,
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inference context
+// ─────────────────────────────────────────────────────────────────────────────
 
 struct InferenceContext<'src, 'g> {
     graph: &'g BuildGraph<'src>,
@@ -389,17 +336,12 @@ struct InferenceContext<'src, 'g> {
     diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
     current_def_name: &'src str,
-    /// Whether we're at definition root level (no fields assigned yet at root scope)
-    at_definition_root: bool,
-    /// Pre-computed array region info for QIS detection
-    array_regions: HashMap<NodeId, ArrayRegionInfo<'src>>,
-    /// Node ID of root-level QIS array (skip type creation in traverse for this)
-    root_qis_node: Option<NodeId>,
+    /// Precomputed array element types: StartArray node ID -> element TypeId
+    array_element_types: HashMap<NodeId, TypeId>,
 }
 
 impl<'src, 'g> InferenceContext<'src, 'g> {
     fn new(graph: &'g BuildGraph<'src>, dead_nodes: &'g HashSet<NodeId>) -> Self {
-        let array_regions = analyze_array_regions(graph, dead_nodes);
         Self {
             graph,
             dead_nodes,
@@ -408,9 +350,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             diagnostics: Diagnostics::new(),
             errors: Vec::new(),
             current_def_name: "",
-            at_definition_root: true,
-            array_regions,
-            root_qis_node: None,
+            array_element_types: HashMap::new(),
         }
     }
 
@@ -422,18 +362,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
     fn infer_definition(&mut self, def_name: &'src str, entry_id: NodeId) -> TypeId {
         self.current_def_name = def_name;
-        self.at_definition_root = true;
         let mut visited = HashSet::new();
         let mut merge_errors = Vec::new();
         let mut scope_stack = vec![ScopeStackEntry::new_root()];
 
-        // Check if definition starts with a QIS array (array at root with ≥2 captures)
-        let root_qis_info = self.check_root_qis(entry_id);
-        if root_qis_info.is_some() {
-            self.root_qis_node = Some(entry_id);
-        }
-
-        self.traverse(
+        let final_pending = self.traverse(
             entry_id,
             TraversalState::default(),
             &mut visited,
@@ -442,11 +375,10 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             &mut scope_stack,
         );
 
-        let root_entry = scope_stack
-            .pop()
-            .unwrap_or_else(|| ScopeStackEntry::new_root());
+        let root_entry = scope_stack.pop().unwrap_or_else(ScopeStackEntry::new_root);
         let scope = root_entry.scope;
 
+        // Report merge errors
         for err in merge_errors {
             let types_str = err
                 .shapes
@@ -479,68 +411,38 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             });
         }
 
-        // Check for QIS at definition root
-        if let Some((captures, cardinality)) = root_qis_info {
-            if !captures.is_empty() {
-                let element_name = format!("{}Item", def_name);
-                let element_name: &'src str = Box::leak(element_name.into_boxed_str());
-                let element_type_id = self.create_qis_struct_type(element_name, &captures);
-                return self.wrap_with_cardinality(element_type_id, cardinality);
-            }
-        }
-
+        // Determine result type
         if scope.has_variants && !scope.variants.is_empty() {
             self.create_enum_type(def_name, &scope)
         } else if !scope.fields.is_empty() {
             self.create_struct_type(def_name, &scope)
+        } else if let Some(pending) = final_pending {
+            pending.base_type
         } else {
             TYPE_VOID
         }
     }
 
-    /// Check if definition root has a QIS array (returns captures and cardinality if so).
-    fn check_root_qis(
-        &self,
-        entry_id: NodeId,
-    ) -> Option<(Vec<(&'src str, TextRange)>, Cardinality)> {
-        let node = self.graph.node(entry_id);
-        let has_start_array = node
-            .effects
-            .iter()
-            .any(|e| matches!(e, BuildEffect::StartArray));
-
-        if !has_start_array {
-            return None;
-        }
-
-        let region_info = self.array_regions.get(&entry_id)?;
-        if !region_info.qis_triggered {
-            return None;
-        }
-
-        // TODO: Determine actual cardinality (Star vs Plus) from graph structure
-        Some((region_info.captures.clone(), Cardinality::Star))
-    }
-
     fn traverse(
         &mut self,
         node_id: NodeId,
-        mut state: TraversalState<'src>,
+        mut state: TraversalState,
         visited: &mut HashSet<NodeId>,
         depth: usize,
         errors: &mut Vec<MergeError<'src>>,
         scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) {
+    ) -> Option<PendingType> {
         if self.dead_nodes.contains(&node_id) || depth > 200 {
-            return;
+            return state.pending;
         }
 
         if !visited.insert(node_id) {
-            return;
+            return state.pending;
         }
 
         let node = self.graph.node(node_id);
 
+        // Process effects
         for effect in &node.effects {
             match effect {
                 BuildEffect::CaptureNode => {
@@ -551,132 +453,100 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
                 BuildEffect::Field { name, span } => {
                     if let Some(pending) = state.pending.take() {
-                        self.at_definition_root = false;
+                        // SAFETY: name comes from source with 'src lifetime
+                        let name: &'src str = unsafe { std::mem::transmute(*name) };
+                        let current_variant = state.current_variant.map(|v| {
+                            let v: &'src str = unsafe { std::mem::transmute(v) };
+                            v
+                        });
 
-                        // Skip fields that are handled by QIS
-                        if state.skip_fields.contains(name) {
-                            continue;
-                        }
+                        let effective_card = pending
+                            .cardinality
+                            .multiply(state.effective_array_cardinality());
 
-                        let current_variant = state.current_variant;
                         let current_scope = scope_stack
                             .last_mut()
                             .map(|e| &mut e.scope)
                             .expect("scope stack should not be empty");
 
-                        let effective_cardinality = pending
-                            .cardinality
-                            .multiply(state.current_array_cardinality());
-
                         if let Some(tag) = current_variant {
                             let variant_scope = current_scope.variants.entry(tag).or_default();
-                            variant_scope.add_field(
-                                *name,
-                                pending.base_type,
-                                pending.shape,
-                                effective_cardinality,
-                                *span,
-                            );
+                            variant_scope.add_field(name, pending.base_type, effective_card, *span);
                         } else {
-                            current_scope.add_field(
-                                *name,
-                                pending.base_type,
-                                pending.shape,
-                                effective_cardinality,
-                                *span,
-                            );
+                            current_scope.add_field(name, pending.base_type, effective_card, *span);
                         }
                     }
                 }
                 BuildEffect::StartArray => {
-                    // Look up pre-computed region info for this StartArray node
-                    let region_info =
-                        self.array_regions
-                            .get(&node_id)
-                            .cloned()
-                            .unwrap_or_else(|| ArrayRegionInfo {
-                                captures: Vec::new(),
-                                qis_triggered: false,
-                            });
-
-                    // If QIS triggered, mark these fields to skip during traversal
-                    if region_info.qis_triggered {
-                        for (name, _) in &region_info.captures {
-                            state.skip_fields.insert(*name);
-                        }
-                    }
-
                     state.array_stack.push(ArrayFrame {
-                        start_id: node_id,
                         cardinality: Cardinality::Star,
-                        region_info,
+                        element_type: None,
+                        start_node: Some(node_id),
+                        push_called: false,
                     });
                 }
-                BuildEffect::PushElement => {}
-                BuildEffect::EndArray => {
-                    if let Some(array_frame) = state.array_stack.pop() {
-                        let array_card = array_frame.cardinality;
-                        let is_root_qis = self.root_qis_node == Some(array_frame.start_id);
-
-                        // Remove skip_fields for this array's captures
-                        if array_frame.region_info.qis_triggered {
-                            for (name, _) in &array_frame.region_info.captures {
-                                state.skip_fields.remove(name);
-                            }
-
-                            // Skip type creation for root-level QIS (handled in infer_definition)
-                            if !is_root_qis {
-                                // QIS: create element struct from pre-computed captures
-                                let captures = &array_frame.region_info.captures;
-                                if !captures.is_empty() {
-                                    let element_name = self.generate_qis_element_name(None);
-                                    let element_type_id =
-                                        self.create_qis_struct_type(element_name, captures);
-                                    let array_type_id =
-                                        self.wrap_with_cardinality(element_type_id, array_card);
-
-                                    state.pending = Some(PendingType {
-                                        shape: TypeShape::Composite(array_type_id),
-                                        base_type: array_type_id,
-                                        cardinality: Cardinality::One,
-                                    });
-                                }
+                BuildEffect::PushElement => {
+                    if let Some(pending) = state.pending.take() {
+                        if let Some(frame) = state.array_stack.last_mut() {
+                            frame.element_type = Some(pending.base_type);
+                            frame.push_called = true;
+                            // Update shared map so other branches (exit path) see the element type
+                            if let Some(start_id) = frame.start_node {
+                                self.array_element_types.insert(start_id, pending.base_type);
                             }
                         }
-                        // Non-QIS arrays: fields were already added to parent scope
-                        // with cardinality applied in the Field handler
+                    }
+                }
+                BuildEffect::EndArray => {
+                    if let Some(frame) = state.array_stack.pop() {
+                        // Check if PushElement was actually called (either in this branch or another)
+                        let push_was_called = frame.push_called
+                            || frame
+                                .start_node
+                                .map_or(false, |id| self.array_element_types.contains_key(&id));
+
+                        if push_was_called {
+                            // Get element type from shared map (set by loop body's PushElement)
+                            let element_type = frame
+                                .start_node
+                                .and_then(|id| self.array_element_types.get(&id).copied())
+                                .or(frame.element_type)
+                                .unwrap_or(TYPE_NODE);
+
+                            let array_type =
+                                self.wrap_with_cardinality(element_type, frame.cardinality);
+                            state.pending = Some(PendingType {
+                                base_type: array_type,
+                                cardinality: Cardinality::One,
+                            });
+                        }
                     }
                 }
                 BuildEffect::StartObject => {
+                    state.object_depth += 1;
                     let entry = ScopeStackEntry::new_object(state.pending.take());
                     scope_stack.push(entry);
                 }
                 BuildEffect::EndObject => {
+                    state.object_depth = state.object_depth.saturating_sub(1);
                     if let Some(finished_entry) = scope_stack.pop() {
                         if finished_entry.is_object {
                             let finished_scope = finished_entry.scope;
 
                             if !finished_scope.is_empty() {
                                 let type_name = self.generate_scope_name();
-                                let type_id = self.create_struct_type(type_name, &finished_scope);
-
-                                let field_types: Vec<(&'src str, TypeId)> = finished_scope
-                                    .fields
-                                    .iter()
-                                    .map(|(name, info)| (*name, info.base_type))
-                                    .collect();
+                                let type_id = if finished_scope.has_variants
+                                    && !finished_scope.variants.is_empty()
+                                {
+                                    self.create_enum_type(type_name, &finished_scope)
+                                } else {
+                                    self.create_struct_type(type_name, &finished_scope)
+                                };
 
                                 state.pending = Some(PendingType {
-                                    shape: TypeShape::Composite(type_id),
                                     base_type: type_id,
                                     cardinality: Cardinality::One,
                                 });
-
-                                if !field_types.is_empty() {
-                                    if let Some(ref mut p) = state.pending {
-                                        p.shape = TypeShape::Struct(field_types);
-                                    }
-                                }
                             } else {
                                 state.pending = finished_entry.outer_pending;
                             }
@@ -686,7 +556,9 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                     }
                 }
                 BuildEffect::StartVariant(tag) => {
-                    state.current_variant = Some(*tag);
+                    // SAFETY: tag comes from source with 'src lifetime
+                    let tag: &'static str = unsafe { std::mem::transmute(*tag) };
+                    state.current_variant = Some(tag);
                     let current_scope = scope_stack
                         .last_mut()
                         .map(|e| &mut e.scope)
@@ -695,6 +567,8 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
                 BuildEffect::EndVariant => {
                     if let Some(tag) = state.current_variant.take() {
+                        // SAFETY: tag comes from source with 'src lifetime
+                        let tag: &'src str = unsafe { std::mem::transmute(tag) };
                         let current_scope = scope_stack
                             .last_mut()
                             .map(|e| &mut e.scope)
@@ -705,6 +579,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             }
         }
 
+        // Process successors
         let live_successors: Vec<_> = node
             .successors
             .iter()
@@ -713,9 +588,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             .collect();
 
         if live_successors.is_empty() {
-            // Terminal node
-        } else if live_successors.len() == 1 {
-            self.traverse(
+            return state.pending;
+        }
+
+        if live_successors.len() == 1 {
+            return self.traverse(
                 live_successors[0],
                 state,
                 visited,
@@ -723,86 +600,57 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 errors,
                 scope_stack,
             );
-        } else {
-            // Branching: collect results from all branches, then merge
-            let total_branches = live_successors.len();
-            let initial_scope_len = scope_stack.len();
-            let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
+        }
 
-            for succ in &live_successors {
-                let mut branch_stack = scope_stack.clone();
+        // Branching: explore all paths and merge results
+        // For loops (greedy quantifiers), the first branch is the loop body.
+        // We explore it first and propagate array element types to subsequent branches.
+        let total_branches = live_successors.len();
+        let initial_scope_len = scope_stack.len();
+        let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
+        let mut result_pending: Option<PendingType> = None;
 
-                self.traverse(
-                    *succ,
-                    state.clone(),
-                    &mut visited.clone(),
-                    depth + 1,
-                    errors,
-                    &mut branch_stack,
-                );
+        for succ in &live_successors {
+            let mut branch_stack = scope_stack.clone();
+            let mut branch_visited = visited.clone();
 
-                while branch_stack.len() > initial_scope_len {
-                    branch_stack.pop();
-                }
-                if let Some(entry) = branch_stack.last() {
-                    branch_scopes.push(entry.scope.clone());
-                }
+            let branch_pending = self.traverse(
+                *succ,
+                state.clone(),
+                &mut branch_visited,
+                depth + 1,
+                errors,
+                &mut branch_stack,
+            );
+
+            // Merge pending from branches (take first non-None)
+            if result_pending.is_none() {
+                result_pending = branch_pending;
             }
 
-            if let Some(main_entry) = scope_stack.last_mut() {
-                for branch_scope in branch_scopes {
-                    let merge_errs = main_entry.scope.merge_from(branch_scope);
-                    errors.extend(merge_errs);
-                }
-                main_entry.scope.apply_optionality(total_branches);
+            while branch_stack.len() > initial_scope_len {
+                branch_stack.pop();
+            }
+            if let Some(entry) = branch_stack.last() {
+                branch_scopes.push(entry.scope.clone());
             }
         }
+
+        // Merge branch scopes into main scope
+        if let Some(main_entry) = scope_stack.last_mut() {
+            for branch_scope in branch_scopes {
+                let merge_errs = main_entry.scope.merge_from(branch_scope);
+                errors.extend(merge_errs);
+            }
+            main_entry.scope.apply_optionality(total_branches);
+        }
+
+        result_pending
     }
 
     fn generate_scope_name(&self) -> &'src str {
         let name = format!("{}Scope{}", self.current_def_name, self.next_type_id);
         Box::leak(name.into_boxed_str())
-    }
-
-    fn generate_qis_element_name(&self, capture_name: Option<&'src str>) -> &'src str {
-        let name = if let Some(cap) = capture_name {
-            // Explicit capture: {Def}{Capture} with PascalCase
-            let cap_pascal = to_pascal_case(cap);
-            format!("{}{}", self.current_def_name, cap_pascal)
-        } else if self.at_definition_root {
-            // At definition root: {Def}Item
-            format!("{}Item", self.current_def_name)
-        } else {
-            // Not at root and no capture - use synthetic name
-            format!("{}Item{}", self.current_def_name, self.next_type_id)
-        };
-        Box::leak(name.into_boxed_str())
-    }
-
-    /// Create a struct type from QIS captures (all fields are Node type).
-    fn create_qis_struct_type(
-        &mut self,
-        name: &'src str,
-        captures: &[(&'src str, TextRange)],
-    ) -> TypeId {
-        let members: Vec<_> = captures
-            .iter()
-            .map(|(field_name, _span)| InferredMember {
-                name: field_name,
-                ty: TYPE_NODE, // QIS captures are always Node (could enhance later)
-            })
-            .collect();
-
-        let type_id = self.alloc_type_id();
-
-        self.type_defs.push(InferredTypeDef {
-            kind: TypeKind::Record,
-            name: Some(name),
-            members,
-            inner_type: None,
-        });
-
-        type_id
     }
 
     fn create_struct_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
@@ -896,114 +744,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Array region analysis for QIS detection
+// Query integration
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Pre-analyze all array regions to determine QIS triggering.
-fn analyze_array_regions<'src>(
-    graph: &BuildGraph<'src>,
-    dead_nodes: &HashSet<NodeId>,
-) -> HashMap<NodeId, ArrayRegionInfo<'src>> {
-    let mut regions = HashMap::new();
-
-    for (id, node) in graph.iter() {
-        if dead_nodes.contains(&id) {
-            continue;
-        }
-        let has_start_array = node
-            .effects
-            .iter()
-            .any(|e| matches!(e, BuildEffect::StartArray));
-        if has_start_array {
-            let info = find_array_region_captures(graph, dead_nodes, id);
-            regions.insert(id, info);
-        }
-    }
-
-    regions
-}
-
-/// Find all captures within an array region (between StartArray and EndArray).
-fn find_array_region_captures<'src>(
-    graph: &BuildGraph<'src>,
-    dead_nodes: &HashSet<NodeId>,
-    start_id: NodeId,
-) -> ArrayRegionInfo<'src> {
-    let mut captures = Vec::new();
-    let mut visited = HashSet::new();
-    let mut stack = Vec::new();
-
-    // Start from successors of the StartArray node
-    let start_node = graph.node(start_id);
-    for &succ in &start_node.successors {
-        stack.push(succ);
-    }
-
-    while let Some(id) = stack.pop() {
-        if dead_nodes.contains(&id) || !visited.insert(id) {
-            continue;
-        }
-
-        let node = graph.node(id);
-
-        // Check for EndArray - stop this path and record the ID
-        let has_end_array = node
-            .effects
-            .iter()
-            .any(|e| matches!(e, BuildEffect::EndArray));
-        if has_end_array {
-            continue;
-        }
-
-        // Check for nested StartArray - skip its contents
-        let has_start_array = node
-            .effects
-            .iter()
-            .any(|e| matches!(e, BuildEffect::StartArray));
-        if has_start_array {
-            continue;
-        }
-
-        // Collect Field captures with their spans
-        for effect in &node.effects {
-            if let BuildEffect::Field { name, span } = effect {
-                if !captures.iter().any(|(n, _)| n == name) {
-                    captures.push((*name, *span));
-                }
-            }
-        }
-
-        // Continue to successors
-        for &succ in &node.successors {
-            stack.push(succ);
-        }
-    }
-
-    let qis_triggered = captures.len() >= 2;
-    ArrayRegionInfo {
-        captures,
-        qis_triggered,
-    }
-}
-
-fn to_pascal_case(s: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = true;
-    for c in s.chars() {
-        if c == '_' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(c.to_ascii_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
-
 impl<'a> Query<'a> {
-    /// Run type inference on the graph.
+    /// Run type inference on the built graph.
     pub(super) fn infer_types(&mut self) {
         let mut ctx = InferenceContext::new(&self.graph, &self.dead_nodes);
 
@@ -1019,7 +764,7 @@ impl<'a> Query<'a> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dump helpers
+// Display and helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 impl TypeInferenceResult<'_> {
@@ -1034,41 +779,59 @@ impl TypeInferenceResult<'_> {
         if !self.type_defs.is_empty() {
             out.push_str("\n=== Types ===\n");
             for (idx, def) in self.type_defs.iter().enumerate() {
-                let type_id = idx as TypeId + 3;
+                let type_id = 3 + idx as TypeId;
                 let name = def.name.unwrap_or("<anon>");
-                out.push_str(&format!("T{}: {:?} {}", type_id, def.kind, name));
-
-                if let Some(inner) = def.inner_type {
-                    out.push_str(&format!(" → {}", format_type_id(inner)));
-                }
-
-                if !def.members.is_empty() {
-                    out.push_str(" {\n");
-                    for member in &def.members {
-                        out.push_str(&format!(
-                            "    {}: {}\n",
-                            member.name,
-                            format_type_id(member.ty)
-                        ));
+                match def.kind {
+                    TypeKind::Record => {
+                        out.push_str(&format!("T{}: Record {} {{\n", type_id, name));
+                        for member in &def.members {
+                            out.push_str(&format!(
+                                "    {}: {}\n",
+                                member.name,
+                                format_type_id(member.ty)
+                            ));
+                        }
+                        out.push_str("}\n");
                     }
-                    out.push('}');
+                    TypeKind::Enum => {
+                        out.push_str(&format!("T{}: Enum {} {{\n", type_id, name));
+                        for member in &def.members {
+                            out.push_str(&format!(
+                                "    {}: {}\n",
+                                member.name,
+                                format_type_id(member.ty)
+                            ));
+                        }
+                        out.push_str("}\n");
+                    }
+                    TypeKind::Optional => {
+                        let inner = def.inner_type.map(format_type_id).unwrap_or_default();
+                        out.push_str(&format!("T{}: Optional {} → {}\n", type_id, name, inner));
+                    }
+                    TypeKind::ArrayStar => {
+                        let inner = def.inner_type.map(format_type_id).unwrap_or_default();
+                        out.push_str(&format!("T{}: ArrayStar {} → {}\n", type_id, name, inner));
+                    }
+                    TypeKind::ArrayPlus => {
+                        let inner = def.inner_type.map(format_type_id).unwrap_or_default();
+                        out.push_str(&format!("T{}: ArrayPlus {} → {}\n", type_id, name, inner));
+                    }
                 }
-                out.push('\n');
             }
         }
 
         if !self.errors.is_empty() {
             out.push_str("\n=== Errors ===\n");
             for err in &self.errors {
+                let types = err
+                    .types_found
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 out.push_str(&format!(
                     "field `{}` in `{}`: incompatible types [{}]\n",
-                    err.field,
-                    err.definition,
-                    err.types_found
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    err.field, err.definition, types
                 ));
             }
         }
@@ -1081,18 +844,15 @@ impl TypeInferenceResult<'_> {
     }
 
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.has_errors()
+        !self.errors.is_empty()
     }
 }
 
 fn format_type_id(id: TypeId) -> String {
-    if id == TYPE_VOID {
-        "Void".to_string()
-    } else if id == TYPE_NODE {
-        "Node".to_string()
-    } else if id == TYPE_STR {
-        "String".to_string()
-    } else {
-        format!("T{}", id)
+    match id {
+        TYPE_VOID => "Void".to_string(),
+        TYPE_NODE => "Node".to_string(),
+        TYPE_STR => "String".to_string(),
+        _ => format!("T{}", id),
     }
 }

@@ -188,19 +188,19 @@ fn qis_graph_has_object_effects() {
         .unwrap()
         .build_graph_with_pre_opt_dump();
 
-    // QIS adds StartObj/EndObj around each iteration (in addition to sequence's pair)
-    // So we expect 2 of each: one from sequence, one from QIS loop
+    // QIS adds StartObj/EndObj around each iteration to keep captures coupled.
+    // Sequences themselves don't add object scope (captures propagate to parent).
     let start_count = pre_opt.matches("StartObj").count();
     let end_count = pre_opt.matches("EndObj").count();
 
     assert_eq!(
-        start_count, 2,
-        "QIS graph should have 2 StartObj (sequence + QIS):\n{}",
+        start_count, 1,
+        "QIS graph should have 1 StartObj (from QIS loop):\n{}",
         pre_opt
     );
     assert_eq!(
-        end_count, 2,
-        "QIS graph should have 2 EndObj (sequence + QIS):\n{}",
+        end_count, 1,
+        "QIS graph should have 1 EndObj (from QIS loop):\n{}",
         pre_opt
     );
 }
@@ -213,18 +213,19 @@ fn non_qis_graph_no_object_effects() {
         .unwrap()
         .build_graph_with_pre_opt_dump();
 
-    // Count in pre-optimization graph to avoid optimizer noise
-    // The inner sequence { (a) @x } adds StartObj/EndObj once
-    // QIS would add another pair per iteration in the loop structure
+    // Non-QIS quantifiers don't need object scope - captures propagate with array cardinality.
+    // Sequences themselves don't add object scope either.
     let start_count = pre_opt.matches("StartObj").count();
     let end_count = pre_opt.matches("EndObj").count();
 
     assert_eq!(
-        start_count, 1,
-        "Non-QIS graph should have only sequence's StartObj"
+        start_count, 0,
+        "Non-QIS graph should have no StartObj:\n{}",
+        pre_opt
     );
     assert_eq!(
-        end_count, 1,
-        "Non-QIS graph should have only sequence's EndObj"
+        end_count, 0,
+        "Non-QIS graph should have no EndObj:\n{}",
+        pre_opt
     );
 }

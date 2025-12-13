@@ -41,7 +41,7 @@ pub fn eliminate_epsilons(graph: &mut BuildGraph) -> (HashSet<NodeId>, OptimizeS
     let mut stats = OptimizeStats::default();
     let mut dead_nodes: HashSet<NodeId> = HashSet::new();
 
-    let predecessors = build_predecessor_map(graph);
+    let mut predecessors = build_predecessor_map(graph);
 
     // Process nodes in reverse order to handle chains
     let node_count = graph.len() as NodeId;
@@ -100,6 +100,12 @@ pub fn eliminate_epsilons(graph: &mut BuildGraph) -> (HashSet<NodeId>, OptimizeS
                     *succ = successor_id;
                 }
             }
+            // Update predecessor map: pred is now a predecessor of successor
+            predecessors.entry(successor_id).or_default().push(*pred_id);
+        }
+        // Remove eliminated node from successor's predecessors
+        if let Some(succ_preds) = predecessors.get_mut(&successor_id) {
+            succ_preds.retain(|&p| p != id);
         }
 
         redirect_definitions(graph, id, successor_id);
