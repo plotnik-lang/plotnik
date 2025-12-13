@@ -17,9 +17,9 @@ fn whitespace_preserved() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
+          Whitespace "  "
           At "@"
           Id "name"
-      Whitespace "  "
       Newline "\n"
     "#);
 }
