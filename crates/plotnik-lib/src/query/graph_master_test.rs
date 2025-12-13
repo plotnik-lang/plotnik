@@ -523,12 +523,12 @@ fn golden_master_comprehensive() {
     MultiCapture → T42
     EmptyBranch → T43
     DeepNest → T44
-    Complex → T46
-    CardinalityJoin → T48
-    CapturedSeq → T50
-    AnchorSibling → T51
-    AnchorLast → T52
-    AnchorFirst → T53
+    Complex → T54
+    CardinalityJoin → T56
+    CapturedSeq → T58
+    AnchorSibling → T59
+    AnchorLast → T60
+    AnchorFirst → T61
 
     === Types ===
     T3: Record Identifier {
@@ -646,30 +646,46 @@ fn golden_master_comprehensive() {
     T44: Record DeepNest {
         deep: Node
     }
-    T45: ArrayStar <anon> → Node
-    T46: Record Complex {
+    T45: Optional <anon> → String
+    T46: ArrayStar <anon> → Node
+    T47: ArrayStar <anon> → Node
+    T48: Optional <anon> → Node
+    T49: Optional <anon> → String
+    T50: Optional <anon> → Node
+    T51: Record ComplexScope45 {
+        fn_name: T45
+        p: T46
+        params: T47
+        fn_body: T48
+        cls_name: T49
+        cls_body: T50
+    }
+    T52: ArrayStar <anon> → T51
+    T53: ArrayStar <anon> → Node
+    T54: Record Complex {
         mod_name: String
-        imports: T45
+        imports: T53
+        items: T52
     }
-    T47: ArrayPlus <anon> → Node
-    T48: Record CardinalityJoin {
-        item: T47
+    T55: ArrayPlus <anon> → Node
+    T56: Record CardinalityJoin {
+        item: T55
     }
-    T49: Record CapturedSeqScope49 {
+    T57: Record CapturedSeqScope57 {
         x: Node
         y: Node
     }
-    T50: Record CapturedSeq {
-        nested: T49
+    T58: Record CapturedSeq {
+        nested: T57
     }
-    T51: Record AnchorSibling {
+    T59: Record AnchorSibling {
         left: Node
         right: Node
     }
-    T52: Record AnchorLast {
+    T60: Record AnchorLast {
         last: Node
     }
-    T53: Record AnchorFirst {
+    T61: Record AnchorFirst {
         first: Node
     }
     "#);

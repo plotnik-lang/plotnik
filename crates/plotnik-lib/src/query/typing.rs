@@ -1,25 +1,30 @@
-//! Type inference for Query's BuildGraph.
+//! AST-based type inference for Plotnik queries.
 //!
-//! Analyzes the graph structure statically to determine output types.
-//! Follows rules from ADR-0006, ADR-0007 and ADR-0009.
+//! Analyzes query AST to determine output types.
+//! Rules follow ADR-0009 (Type System).
 //!
-//! # Algorithm Overview
+//! # Design
 //!
-//! 1. Traverse graph to collect all scope boundaries (StartObject/EndObject, StartArray/EndArray)
-//! 2. Associate Field effects with their containing object scope
-//! 3. Build types bottom-up from scope hierarchy
-//! 4. Handle branching by merging fields with optionality rules
+//! Unlike graph-based inference which must reconstruct structure from CFG traversal,
+//! AST-based inference directly walks the tree structure:
+//! - Sequences → `SeqExpr`
+//! - Alternations → `AltExpr` with `.kind()` for tagged/untagged
+//! - Quantifiers → `QuantifiedExpr`
+//! - Captures → `CapturedExpr`
+//!
+//! This eliminates dry-run traversal, reconvergence detection, and scope stack management.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use rowan::TextRange;
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
+use crate::parser::ast::{self, AltKind, Expr};
+use crate::parser::token_src;
 
 use super::Query;
-use super::graph::{BuildEffect, BuildGraph, BuildNode, NodeId, RefMarker};
 
 /// Result of type inference.
 #[derive(Debug, Default)]
@@ -89,6 +94,7 @@ enum Cardinality {
 }
 
 impl Cardinality {
+    /// Join cardinalities when merging alternation branches.
     fn join(self, other: Cardinality) -> Cardinality {
         use Cardinality::*;
         match (self, other) {
@@ -108,10 +114,22 @@ impl Cardinality {
             x => x,
         }
     }
+
+    /// Multiply cardinalities (outer * inner).
+    fn multiply(self, inner: Cardinality) -> Cardinality {
+        use Cardinality::*;
+        match (self, inner) {
+            (One, x) => x,
+            (x, One) => x,
+            (Optional, Optional) => Optional,
+            (Plus, Plus) => Plus,
+            _ => Star,
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Field and Scope tracking
+// Type shape for unification checking
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,6 +147,10 @@ impl TypeShape {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Field tracking within a scope
+// ─────────────────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone)]
 struct FieldInfo {
     base_type: TypeId,
@@ -136,13 +158,14 @@ struct FieldInfo {
     cardinality: Cardinality,
     branch_count: usize,
     spans: Vec<TextRange>,
-    is_array_type: bool,
 }
 
 #[derive(Debug, Clone, Default)]
 struct ScopeInfo<'src> {
     fields: IndexMap<&'src str, FieldInfo>,
+    #[allow(dead_code)] // May be used for future enum variant tracking
     variants: IndexMap<&'src str, ScopeInfo<'src>>,
+    #[allow(dead_code)]
     has_variants: bool,
 }
 
@@ -153,14 +176,12 @@ impl<'src> ScopeInfo<'src> {
         base_type: TypeId,
         cardinality: Cardinality,
         span: TextRange,
-        is_array_type: bool,
     ) {
         let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
             existing.spans.push(span);
-            existing.is_array_type = existing.is_array_type || is_array_type;
         } else {
             self.fields.insert(
                 name,
@@ -170,7 +191,6 @@ impl<'src> ScopeInfo<'src> {
                     cardinality,
                     branch_count: 1,
                     spans: vec![span],
-                    is_array_type,
                 },
             );
         }
@@ -181,7 +201,6 @@ impl<'src> ScopeInfo<'src> {
 
         for (name, other_info) in other.fields {
             if let Some(existing) = self.fields.get_mut(name) {
-                // Check type compatibility
                 if existing.shape != other_info.shape {
                     errors.push(MergeError {
                         field: name,
@@ -202,28 +221,18 @@ impl<'src> ScopeInfo<'src> {
             }
         }
 
-        for (tag, other_variant) in other.variants {
-            let variant = self.variants.entry(tag).or_default();
-            errors.extend(variant.merge_from(other_variant));
-        }
-
-        if other.has_variants {
-            self.has_variants = true;
-        }
-
         errors
     }
 
     fn apply_optionality(&mut self, total_branches: usize) {
         for info in self.fields.values_mut() {
-            // Skip optionality for array-typed fields: arrays already encode
-            // zero-or-more semantics, so Optional wrapper would be redundant
-            if info.branch_count < total_branches && !info.is_array_type {
+            if info.branch_count < total_branches {
                 info.cardinality = info.cardinality.make_optional();
             }
         }
     }
 
+    #[allow(dead_code)] // May be useful for future scope analysis
     fn is_empty(&self) -> bool {
         self.fields.is_empty() && self.variants.is_empty()
     }
@@ -237,133 +246,58 @@ struct MergeError<'src> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scope stack for traversal
+// Inference result from expression
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[derive(Clone)]
-struct ScopeStackEntry<'src> {
-    scope: ScopeInfo<'src>,
-    is_object: bool,
-    outer_pending: Option<PendingType>,
-}
-
-impl<'src> ScopeStackEntry<'src> {
-    fn new_root() -> Self {
-        Self {
-            scope: ScopeInfo::default(),
-            is_object: false,
-            outer_pending: None,
-        }
-    }
-
-    fn new_object(outer_pending: Option<PendingType>) -> Self {
-        Self {
-            scope: ScopeInfo::default(),
-            is_object: true,
-            outer_pending,
-        }
-    }
-}
-
+/// What an expression produces when evaluated.
 #[derive(Debug, Clone)]
-struct PendingType {
+struct ExprResult {
+    /// Base type (before cardinality wrapping).
     base_type: TypeId,
+    /// Cardinality modifier.
     cardinality: Cardinality,
-    is_array: bool,
+    /// True if this result represents a meaningful type (not just default Node).
+    /// Used to distinguish QIS array results from simple uncaptured expressions.
+    is_meaningful: bool,
 }
 
-impl PendingType {
-    fn primitive(base_type: TypeId) -> Self {
+impl ExprResult {
+    fn node() -> Self {
         Self {
-            base_type,
+            base_type: TYPE_NODE,
             cardinality: Cardinality::One,
-            is_array: false,
+            is_meaningful: false,
         }
     }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Traversal state
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[derive(Clone, Default)]
-struct ArrayFrame {
-    cardinality: Cardinality,
-    element_type: Option<TypeId>,
-    /// Node ID where this array started (for lookup in precomputed map)
-    start_node: Option<NodeId>,
-    /// Whether PushElement was actually called (vs prepass placeholder)
-    push_called: bool,
-}
-
-#[derive(Clone)]
-struct TraversalState {
-    pending: Option<PendingType>,
-    current_variant: Option<&'static str>,
-    array_stack: Vec<ArrayFrame>,
-    object_depth: usize,
-    /// Stack tracking whether each object scope is for a captured alternation.
-    /// Tags only create enums when inside an object opened for_alternation=true.
-    object_alt_stack: Vec<bool>,
-    /// When true, skip EndObject type creation at the dry_run_depth level.
-    /// Used during alternation branch exploration to collect variants before creating enum.
-    dry_run: bool,
-    /// The object_depth at which dry_run was enabled. EndObject is only skipped
-    /// when object_depth matches this value (after decrement), allowing nested
-    /// objects to be processed normally.
-    dry_run_depth: usize,
-    /// True when we're still at the definition root (no structural context entered).
-    /// Used to determine if tagged alternations should create enums (ADR-0009 §Case 1 vs §Case 3).
-    at_definition_root: bool,
-}
-
-impl Default for TraversalState {
-    fn default() -> Self {
+    fn void() -> Self {
         Self {
-            pending: None,
-            current_variant: None,
-            array_stack: Vec::new(),
-            object_depth: 0,
-            object_alt_stack: Vec::new(),
-            dry_run: false,
-            dry_run_depth: 0,
-            at_definition_root: true,
+            base_type: TYPE_VOID,
+            cardinality: Cardinality::One,
+            is_meaningful: false,
         }
     }
-}
 
-impl TraversalState {
-    /// Check if we're inside an object scope opened for a captured alternation.
-    fn in_alternation_object(&self) -> bool {
-        self.object_alt_stack.last().copied().unwrap_or(false)
-    }
-}
-
-impl TraversalState {
-    fn effective_array_cardinality(&self) -> Cardinality {
-        // Inside object scope, array cardinality doesn't apply to fields
-        if self.object_depth > 0 {
-            return Cardinality::One;
+    fn meaningful(type_id: TypeId) -> Self {
+        Self {
+            base_type: type_id,
+            cardinality: Cardinality::One,
+            is_meaningful: true,
         }
-        self.array_stack
-            .iter()
-            .fold(Cardinality::One, |acc, frame| {
-                acc.multiply(frame.cardinality)
-            })
     }
-}
 
-impl Cardinality {
-    fn multiply(self, other: Cardinality) -> Cardinality {
-        use Cardinality::*;
-        match (self, other) {
-            (One, x) | (x, One) => x,
-            (Optional, Optional) => Optional,
-            (Optional, Plus) | (Plus, Optional) => Star,
-            (Optional, Star) | (Star, Optional) => Star,
-            (Star, _) | (_, Star) => Star,
-            (Plus, Plus) => Plus,
+    /// Type is known but doesn't contribute to definition result (e.g., opaque references).
+    fn opaque(type_id: TypeId) -> Self {
+        Self {
+            base_type: type_id,
+            cardinality: Cardinality::One,
+            is_meaningful: false,
         }
+    }
+
+    fn with_cardinality(mut self, card: Cardinality) -> Self {
+        self.cardinality = card;
+        self
     }
 }
 
@@ -371,31 +305,28 @@ impl Cardinality {
 // Inference context
 // ─────────────────────────────────────────────────────────────────────────────
 
-struct InferenceContext<'src, 'g> {
-    graph: &'g BuildGraph<'src>,
-    dead_nodes: &'g HashSet<NodeId>,
+struct InferenceContext<'src> {
+    source: &'src str,
+    qis_triggers: HashSet<ast::QuantifiedExpr>,
     type_defs: Vec<InferredTypeDef<'src>>,
     next_type_id: TypeId,
     diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
     current_def_name: &'src str,
-    /// Shared map for array element types across branches in loops.
-    array_element_types: HashMap<NodeId, TypeId>,
-    /// Map from definition name to its computed type (for reference lookups).
+    /// Map from definition name to its computed type.
     definition_types: HashMap<&'src str, TypeId>,
 }
 
-impl<'src, 'g> InferenceContext<'src, 'g> {
-    fn new(graph: &'g BuildGraph<'src>, dead_nodes: &'g HashSet<NodeId>) -> Self {
+impl<'src> InferenceContext<'src> {
+    fn new(source: &'src str, qis_triggers: HashSet<ast::QuantifiedExpr>) -> Self {
         Self {
-            graph,
-            dead_nodes,
+            source,
+            qis_triggers,
             type_defs: Vec::new(),
             next_type_id: 3, // 0=void, 1=node, 2=str
             diagnostics: Diagnostics::default(),
             errors: Vec::new(),
             current_def_name: "",
-            array_element_types: HashMap::new(),
             definition_types: HashMap::new(),
         }
     }
@@ -406,471 +337,323 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         id
     }
 
-    fn infer_definition(&mut self, def_name: &'src str, entry_id: NodeId) -> TypeId {
+    // ─────────────────────────────────────────────────────────────────────────
+    // Definition inference
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fn infer_definition(&mut self, def_name: &'src str, body: &Expr) -> TypeId {
         self.current_def_name = def_name;
-        let mut visited = HashSet::new();
+
+        let mut scope = ScopeInfo::default();
         let mut merge_errors = Vec::new();
-        let mut scope_stack = vec![ScopeStackEntry::new_root()];
 
-        let (final_pending, _) = self.traverse(
-            entry_id,
-            TraversalState::default(),
-            &mut visited,
-            0,
-            &mut merge_errors,
-            &mut scope_stack,
-        );
-
-        let root_entry = scope_stack.pop().unwrap_or_else(ScopeStackEntry::new_root);
-        let scope = root_entry.scope;
-
-        // Report merge errors
-        for err in merge_errors {
-            let types_str = err
-                .shapes
-                .iter()
-                .map(|s| s.to_description().to_string())
-                .collect::<Vec<_>>()
-                .join(" vs ");
-
-            let primary_span = err.spans.first().copied().unwrap_or_default();
-            let mut builder = self
-                .diagnostics
-                .report(DiagnosticKind::IncompatibleTypes, primary_span)
-                .message(types_str);
-
-            for span in err.spans.iter().skip(1) {
-                builder = builder.related_to("also captured here", *span);
+        // Special case: tagged alternation at definition root creates enum
+        if let Expr::AltExpr(alt) = body {
+            if alt.kind() == AltKind::Tagged {
+                return self.infer_tagged_alternation_as_enum(def_name, alt, &mut merge_errors);
             }
-            builder
-                .hint(format!(
-                    "capture `{}` has incompatible types across branches",
-                    err.field
-                ))
-                .emit();
-
-            self.errors.push(UnificationError {
-                field: err.field,
-                definition: def_name,
-                types_found: err.shapes.iter().map(|s| s.to_description()).collect(),
-                spans: err.spans,
-            });
         }
 
-        // Determine result type
-        if scope.has_variants && !scope.variants.is_empty() {
-            self.create_enum_type(def_name, &scope)
-        } else if !scope.fields.is_empty() {
+        // General case: infer expression and collect captures into scope
+        let result = self.infer_expr(body, &mut scope, Cardinality::One, &mut merge_errors);
+
+        self.report_merge_errors(&merge_errors);
+
+        // Build result type from scope
+        if !scope.fields.is_empty() {
             self.create_struct_type(def_name, &scope)
-        } else if let Some(pending) = final_pending {
-            // Wrap with cardinality for array types (from EndArray effect)
-            if pending.is_array {
-                self.wrap_with_cardinality(pending.base_type, pending.cardinality)
-            } else {
-                pending.base_type
-            }
+        } else if result.is_meaningful {
+            // QIS or other expressions that produce a meaningful type without populating scope
+            result.base_type
         } else {
             TYPE_VOID
         }
     }
 
-    /// Returns (pending_type, stopped_at_node) where stopped_at_node is Some if
-    /// traversal stopped at an already-visited node (reconvergence point).
-    fn traverse(
+    // ─────────────────────────────────────────────────────────────────────────
+    // Expression inference
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fn infer_expr(
         &mut self,
-        node_id: NodeId,
-        mut state: TraversalState,
-        visited: &mut HashSet<NodeId>,
-        depth: usize,
+        expr: &Expr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
         errors: &mut Vec<MergeError<'src>>,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) -> (Option<PendingType>, Option<NodeId>) {
-        if self.dead_nodes.contains(&node_id) || depth > 200 {
-            return (state.pending, None);
+    ) -> ExprResult {
+        match expr {
+            Expr::CapturedExpr(c) => self.infer_captured(c, scope, outer_card, errors),
+            Expr::QuantifiedExpr(q) => self.infer_quantified(q, scope, outer_card, errors),
+            Expr::SeqExpr(s) => self.infer_sequence(s, scope, outer_card, errors),
+            Expr::AltExpr(a) => self.infer_alternation(a, scope, outer_card, errors),
+            Expr::NamedNode(n) => self.infer_named_node(n, scope, outer_card, errors),
+            Expr::FieldExpr(f) => self.infer_field_expr(f, scope, outer_card, errors),
+            Expr::Ref(r) => self.infer_ref(r),
+            Expr::AnonymousNode(_) => ExprResult::node(),
         }
-
-        if !visited.insert(node_id) {
-            return (state.pending, Some(node_id));
-        }
-
-        let node = self.graph.node(node_id);
-
-        // Clear definition root flag when we enter structural context (non-epsilon matchers)
-        if !node.is_epsilon() {
-            state.at_definition_root = false;
-        }
-
-        for effect in &node.effects {
-            self.process_effect(effect, node_id, &node.ref_marker, &mut state, scope_stack);
-        }
-
-        // Process successors
-        let live_successors = self.get_live_successors(node);
-        if live_successors.is_empty() {
-            return (state.pending, None);
-        }
-
-        if live_successors.len() == 1 {
-            return self.traverse(
-                live_successors[0],
-                state,
-                visited,
-                depth + 1,
-                errors,
-                scope_stack,
-            );
-        }
-
-        self.explore_branches(live_successors, state, visited, depth, errors, scope_stack)
     }
 
-    /// Process a single effect, updating state and scope_stack.
-    fn process_effect(
+    fn infer_captured(
         &mut self,
-        effect: &BuildEffect<'src>,
-        node_id: NodeId,
-        ref_marker: &RefMarker,
-        state: &mut TraversalState,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) {
-        match effect {
-            BuildEffect::CaptureNode => {
-                let capture_type = match ref_marker {
-                    RefMarker::Exit { ref_id } => self.find_ref_type(*ref_id).unwrap_or(TYPE_NODE),
-                    _ => TYPE_NODE,
-                };
-                state.pending = Some(PendingType::primitive(capture_type));
-            }
-            BuildEffect::ClearCurrent => {
-                state.pending = None;
-            }
-            BuildEffect::ToString => {
-                state.pending = Some(PendingType::primitive(TYPE_STR));
-            }
-            BuildEffect::Field { name, span } => {
-                self.process_field_effect(name, *span, state, scope_stack);
-            }
-            BuildEffect::StartArray { is_plus } => {
-                let cardinality = if *is_plus {
-                    Cardinality::Plus
-                } else {
-                    Cardinality::Star
-                };
-                state.array_stack.push(ArrayFrame {
-                    cardinality,
-                    element_type: None,
-                    start_node: Some(node_id),
-                    push_called: false,
-                });
-            }
-            BuildEffect::PushElement => {
-                self.process_push_element(state);
-            }
-            BuildEffect::EndArray => {
-                self.process_end_array(state);
-            }
-            BuildEffect::StartObject { for_alternation } => {
-                // Entering an object scope means we're no longer at definition root
-                state.at_definition_root = false;
-                state.object_depth += 1;
-                state.object_alt_stack.push(*for_alternation);
-                scope_stack.push(ScopeStackEntry::new_object(state.pending.take()));
-            }
-            BuildEffect::EndObject => {
-                // Only skip EndObject processing when closing the scope that was open at dry_run time.
-                // Check BEFORE decrementing to correctly identify which scope we're closing.
-                let skip_for_dry_run = state.dry_run && state.object_depth == state.dry_run_depth;
-                state.object_depth = state.object_depth.saturating_sub(1);
-                state.object_alt_stack.pop();
-                if !skip_for_dry_run {
-                    self.process_end_object(state, scope_stack);
-                }
-            }
-            BuildEffect::StartVariant(tag) => {
-                // SAFETY: tag comes from source with 'src lifetime
-                let tag: &'static str = unsafe { std::mem::transmute(*tag) };
-                state.current_variant = Some(tag);
-                // Create enum for:
-                // - Definition root tagged alternations (ADR-0009 §Case 3)
-                // - Captured tagged alternations inside objects with for_alternation=true
-                // Uncaptured inline tagged alternations (including inside QIS objects)
-                // behave like untagged (ADR-0009 §Case 1).
-                if state.at_definition_root || state.in_alternation_object() {
-                    if let Some(entry) = scope_stack.last_mut() {
-                        entry.scope.has_variants = true;
-                    }
-                }
-            }
-            BuildEffect::EndVariant => {
-                self.process_end_variant(state, scope_stack);
-            }
-        }
-    }
+        c: &ast::CapturedExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        let capture_name = c.name().map(|t| token_src(&t, self.source)).unwrap_or("_");
+        let span = c.text_range();
+        let has_string_annotation = c
+            .type_annotation()
+            .and_then(|t| t.name())
+            .is_some_and(|n| n.text() == "string");
 
-    fn process_field_effect(
-        &self,
-        name: &str,
-        span: TextRange,
-        state: &mut TraversalState,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) {
-        let Some(pending) = state.pending.take() else {
-            return;
+        let Some(inner) = c.inner() else {
+            return ExprResult::node();
         };
 
-        // SAFETY: name comes from source with 'src lifetime
-        let name: &'src str = unsafe { std::mem::transmute(name) };
-        let current_variant: Option<&'src str> = state
-            .current_variant
-            .map(|v| unsafe { std::mem::transmute(v) });
+        // Check if inner is a scope container (seq/alt)
+        let is_scope_container = matches!(inner, Expr::SeqExpr(_) | Expr::AltExpr(_));
 
-        let effective_card = pending
-            .cardinality
-            .multiply(state.effective_array_cardinality());
-        let Some(entry) = scope_stack.last_mut() else {
-            return;
-        };
-
-        // Route fields to variant scope only when:
-        // 1. We're in a variant context (current_variant is set)
-        // 2. Either at definition root OR inside an alternation-capturing object
-        // 3. The scope is creating an enum (has_variants is true)
-        // Otherwise, fields go to the main scope (for uncaptured inline alternations).
-        let in_variant_context =
-            (state.object_depth == 0 || state.in_alternation_object()) && entry.scope.has_variants;
-        let target_scope = match current_variant.filter(|_| in_variant_context) {
-            Some(tag) => entry.scope.variants.entry(tag).or_default(),
-            None => &mut entry.scope,
-        };
-        target_scope.add_field(
-            name,
-            pending.base_type,
-            effective_card,
-            span,
-            pending.is_array,
-        );
-    }
-
-    fn process_push_element(&mut self, state: &mut TraversalState) {
-        let Some(pending) = state.pending.take() else {
-            return;
-        };
-        let Some(frame) = state.array_stack.last_mut() else {
-            return;
-        };
-
-        frame.element_type = Some(pending.base_type);
-        frame.push_called = true;
-        if let Some(start_id) = frame.start_node {
-            self.array_element_types.insert(start_id, pending.base_type);
-        }
-    }
-
-    fn process_end_array(&mut self, state: &mut TraversalState) {
-        let Some(frame) = state.array_stack.pop() else {
-            return;
-        };
-
-        // Get element type from recorded types or default to Node.
-        // For lazy quantifiers (*?, +?), the exit path may not execute the loop body,
-        // but we still need to produce an array type (empty array case).
-        let element_type = frame
-            .start_node
-            .and_then(|id| self.array_element_types.get(&id).copied())
-            .or(frame.element_type)
-            .unwrap_or(TYPE_NODE);
-
-        // Keep element type with cardinality (not wrapped array type) to enable
-        // proper cardinality join in alternations (ADR-0009 §Cardinality Lifting Coercion).
-        // The array wrapper is applied later in create_struct_type via wrap_with_cardinality.
-        state.pending = Some(PendingType {
-            base_type: element_type,
-            cardinality: frame.cardinality,
-            is_array: true,
-        });
-    }
-
-    fn process_end_object(
-        &mut self,
-        state: &mut TraversalState,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) {
-        let Some(finished_entry) = scope_stack.pop() else {
-            return;
-        };
-        if !finished_entry.is_object {
-            scope_stack.push(finished_entry);
-            return;
-        }
-
-        let finished_scope = finished_entry.scope;
-        if finished_scope.is_empty() {
-            // If current pending exists (from nested EndObject), keep it.
-            // Otherwise restore what was pending before this object started.
-            if state.pending.is_none() {
-                state.pending = finished_entry.outer_pending;
-            }
-            return;
-        }
-
-        let type_name = self.generate_scope_name();
-        let type_id = if finished_scope.has_variants && !finished_scope.variants.is_empty() {
-            self.create_enum_type(type_name, &finished_scope)
+        if is_scope_container {
+            // Captured scope container: creates nested type
+            let nested_type = self.infer_captured_container(capture_name, &inner, errors);
+            let result = ExprResult::meaningful(nested_type);
+            let effective_card = outer_card.multiply(result.cardinality);
+            scope.add_field(capture_name, result.base_type, effective_card, span);
+            result
         } else {
-            self.create_struct_type(type_name, &finished_scope)
-        };
-
-        state.pending = Some(PendingType {
-            base_type: type_id,
-            cardinality: Cardinality::One,
-            is_array: false,
-        });
-    }
-
-    fn process_end_variant(
-        &self,
-        state: &mut TraversalState,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) {
-        let Some(tag) = state.current_variant.take() else {
-            return;
-        };
-        // SAFETY: tag comes from source with 'src lifetime
-        let tag: &'src str = unsafe { std::mem::transmute(tag) };
-
-        let Some(entry) = scope_stack.last_mut() else {
-            return;
-        };
-        let variant_scope = entry.scope.variants.entry(tag).or_default();
-
-        // Single-capture flattening (ADR-0007)
-        if variant_scope.fields.is_empty() {
-            if let Some(pending) = state.pending.take() {
-                variant_scope.add_field(
-                    "$value",
-                    pending.base_type,
-                    pending.cardinality,
-                    rowan::TextRange::default(),
-                    pending.is_array,
-                );
-            }
+            // Simple capture: just capture the result
+            let result = self.infer_expr(&inner, scope, outer_card, errors);
+            let base_type = if has_string_annotation {
+                TYPE_STR
+            } else {
+                result.base_type
+            };
+            let effective_card = outer_card.multiply(result.cardinality);
+            scope.add_field(capture_name, base_type, effective_card, span);
+            ExprResult::meaningful(base_type).with_cardinality(result.cardinality)
         }
     }
 
-    /// Get live successors, filtering dead nodes and ref entry points.
-    fn get_live_successors(&self, node: &BuildNode<'src>) -> Vec<NodeId> {
-        let def_entry_to_skip = match &node.ref_marker {
-            RefMarker::Enter { .. } => node.ref_name.and_then(|name| self.graph.definition(name)),
-            _ => None,
-        };
-
-        node.successors
-            .iter()
-            .copied()
-            .filter(|s| !self.dead_nodes.contains(s))
-            .filter(|s| def_entry_to_skip.map_or(true, |def| *s != def))
-            .collect()
-    }
-
-    /// Explore multiple branches, merge scopes, handle reconvergence.
-    fn explore_branches(
+    fn infer_captured_container(
         &mut self,
-        successors: Vec<NodeId>,
-        state: TraversalState,
-        visited: &mut HashSet<NodeId>,
-        depth: usize,
+        _capture_name: &'src str,
+        inner: &Expr,
         errors: &mut Vec<MergeError<'src>>,
-        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) -> (Option<PendingType>, Option<NodeId>) {
-        let total_branches = successors.len();
-        let initial_scope_len = scope_stack.len();
-        let use_dry_run = state.object_depth > 0;
-
-        let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
-        let mut branch_visited_sets: Vec<HashSet<NodeId>> = Vec::new();
-        let mut result_pending: Option<PendingType> = None;
-
-        // Phase 1: explore branches independently
-        for succ in &successors {
-            let mut branch_stack = scope_stack.clone();
-            let mut branch_visited = visited.clone();
-            let mut branch_state = state.clone();
-            branch_state.dry_run = use_dry_run;
-            if use_dry_run {
-                branch_state.dry_run_depth = state.object_depth;
-            }
-
-            let (branch_pending, _) = self.traverse(
-                *succ,
-                branch_state,
-                &mut branch_visited,
-                depth + 1,
-                errors,
-                &mut branch_stack,
-            );
-
-            if result_pending.is_none() {
-                result_pending = branch_pending;
-            }
-
-            let new_nodes: HashSet<NodeId> = branch_visited.difference(visited).copied().collect();
-            branch_visited_sets.push(new_nodes);
-
-            while branch_stack.len() > initial_scope_len {
-                branch_stack.pop();
-            }
-            if let Some(entry) = branch_stack.last() {
-                branch_scopes.push(entry.scope.clone());
-            }
-        }
-
-        // Merge branch scopes
-        if let Some(main_entry) = scope_stack.last_mut() {
-            for branch_scope in branch_scopes {
-                errors.extend(main_entry.scope.merge_from(branch_scope));
-            }
-            main_entry.scope.apply_optionality(total_branches);
-        }
-
-        // Find and process reconvergence
-        let reconverge_nodes = self.find_reconvergence(&branch_visited_sets);
-
-        if use_dry_run && !reconverge_nodes.is_empty() {
-            if let Some(entry_node) = reconverge_nodes.iter().min().copied() {
-                for branch_set in &branch_visited_sets {
-                    for &nid in branch_set {
-                        if !reconverge_nodes.contains(&nid) {
-                            visited.insert(nid);
-                        }
-                    }
+    ) -> TypeId {
+        match inner {
+            Expr::SeqExpr(s) => {
+                let mut nested_scope = ScopeInfo::default();
+                for child in s.children() {
+                    self.infer_expr(&child, &mut nested_scope, Cardinality::One, errors);
                 }
-                let mut cont_state = state;
-                cont_state.dry_run = false;
-                cont_state.pending = result_pending;
-                return self.traverse(
-                    entry_node,
-                    cont_state,
-                    visited,
-                    depth + 1,
-                    errors,
-                    scope_stack,
-                );
+                let type_name = self.generate_scope_name();
+                self.create_struct_type(type_name, &nested_scope)
+            }
+            Expr::AltExpr(a) => {
+                if a.kind() == AltKind::Tagged {
+                    // Captured tagged alternation → Enum
+                    let type_name = self.generate_scope_name();
+                    self.infer_tagged_alternation_as_enum(type_name, a, errors)
+                } else {
+                    // Captured untagged alternation → Struct with merged fields
+                    let mut nested_scope = ScopeInfo::default();
+                    self.infer_untagged_alternation(a, &mut nested_scope, Cardinality::One, errors);
+                    let type_name = self.generate_scope_name();
+                    self.create_struct_type(type_name, &nested_scope)
+                }
+            }
+            _ => {
+                // Not a container - shouldn't reach here
+                TYPE_NODE
             }
         }
-
-        for branch_set in branch_visited_sets {
-            visited.extend(branch_set);
-        }
-        (result_pending, None)
     }
 
-    fn find_reconvergence(&self, branch_sets: &[HashSet<NodeId>]) -> HashSet<NodeId> {
-        if branch_sets.len() < 2 {
-            return HashSet::new();
+    fn infer_quantified(
+        &mut self,
+        q: &ast::QuantifiedExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        let Some(inner) = q.inner() else {
+            return ExprResult::node();
+        };
+
+        let quant_card = self.quantifier_cardinality(q);
+        let is_qis = self.qis_triggers.contains(q);
+
+        if is_qis {
+            // QIS: create implicit scope for multiple captures
+            let mut nested_scope = ScopeInfo::default();
+            self.infer_expr(&inner, &mut nested_scope, Cardinality::One, errors);
+
+            let element_type = if !nested_scope.fields.is_empty() {
+                let type_name = self.generate_scope_name();
+                self.create_struct_type(type_name, &nested_scope)
+            } else {
+                TYPE_NODE
+            };
+
+            // Wrap with array type - this is a meaningful result
+            let array_type = self.wrap_with_cardinality(element_type, quant_card);
+            ExprResult::meaningful(array_type)
+        } else {
+            // No QIS: captures propagate with multiplied cardinality
+            let combined_card = outer_card.multiply(quant_card);
+            let result = self.infer_expr(&inner, scope, combined_card, errors);
+            // Return result with quantifier's cardinality so captured quantifiers work correctly
+            ExprResult {
+                base_type: result.base_type,
+                cardinality: quant_card.multiply(result.cardinality),
+                is_meaningful: result.is_meaningful,
+            }
         }
-        let mut iter = branch_sets.iter();
-        let first = iter.next().unwrap().clone();
-        iter.fold(first, |acc, set| acc.intersection(set).copied().collect())
+    }
+
+    fn infer_sequence(
+        &mut self,
+        s: &ast::SeqExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        // Uncaptured sequence: captures propagate to parent scope
+        let mut last_result = ExprResult::void();
+        for child in s.children() {
+            last_result = self.infer_expr(&child, scope, outer_card, errors);
+        }
+        last_result
+    }
+
+    fn infer_alternation(
+        &mut self,
+        a: &ast::AltExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        // Uncaptured alternation (tagged or untagged): captures propagate with optionality
+        self.infer_untagged_alternation(a, scope, outer_card, errors)
+    }
+
+    fn infer_untagged_alternation(
+        &mut self,
+        a: &ast::AltExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        let branches: Vec<_> = a.branches().collect();
+        let total_branches = branches.len();
+
+        if total_branches == 0 {
+            return ExprResult::void();
+        }
+
+        let mut merged_scope = ScopeInfo::default();
+
+        for branch in &branches {
+            let Some(body) = branch.body() else {
+                continue;
+            };
+            let mut branch_scope = ScopeInfo::default();
+            self.infer_expr(&body, &mut branch_scope, outer_card, errors);
+            errors.extend(merged_scope.merge_from(branch_scope));
+        }
+
+        // Apply optionality for fields not present in all branches
+        merged_scope.apply_optionality(total_branches);
+
+        // Merge into parent scope
+        errors.extend(scope.merge_from(merged_scope));
+
+        ExprResult::node()
+    }
+
+    fn infer_tagged_alternation_as_enum(
+        &mut self,
+        type_name: &'src str,
+        a: &ast::AltExpr,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> TypeId {
+        let mut variants = IndexMap::new();
+
+        for branch in a.branches() {
+            let tag = branch
+                .label()
+                .map(|t| token_src(&t, self.source))
+                .unwrap_or("_");
+            let Some(body) = branch.body() else {
+                variants.insert(tag, ScopeInfo::default());
+                continue;
+            };
+
+            let mut variant_scope = ScopeInfo::default();
+            self.infer_expr(&body, &mut variant_scope, Cardinality::One, errors);
+            variants.insert(tag, variant_scope);
+        }
+
+        self.create_enum_type_from_variants(type_name, &variants)
+    }
+
+    fn infer_named_node(
+        &mut self,
+        n: &ast::NamedNode,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        // Named nodes have children - recurse into them
+        for child in n.children() {
+            self.infer_expr(&child, scope, outer_card, errors);
+        }
+        ExprResult::node()
+    }
+
+    fn infer_field_expr(
+        &mut self,
+        f: &ast::FieldExpr,
+        scope: &mut ScopeInfo<'src>,
+        outer_card: Cardinality,
+        errors: &mut Vec<MergeError<'src>>,
+    ) -> ExprResult {
+        // Field constraint (name: expr) - just recurse
+        if let Some(value) = f.value() {
+            return self.infer_expr(&value, scope, outer_card, errors);
+        }
+        ExprResult::node()
+    }
+
+    fn infer_ref(&self, r: &ast::Ref) -> ExprResult {
+        // References are opaque - captures don't propagate from referenced definition.
+        // Return the type (for use when captured) but mark as not meaningful
+        // so uncaptured refs don't affect definition's result type.
+        let ref_name = r.name().map(|t| t.text().to_string());
+        if let Some(name) = ref_name {
+            if let Some(&type_id) = self.definition_types.get(name.as_str()) {
+                return ExprResult::opaque(type_id);
+            }
+        }
+        ExprResult::node()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fn quantifier_cardinality(&self, q: &ast::QuantifiedExpr) -> Cardinality {
+        let Some(op) = q.operator() else {
+            return Cardinality::One;
+        };
+        use crate::parser::cst::SyntaxKind;
+        match op.kind() {
+            SyntaxKind::Star | SyntaxKind::StarQuestion => Cardinality::Star,
+            SyntaxKind::Plus | SyntaxKind::PlusQuestion => Cardinality::Plus,
+            SyntaxKind::Question | SyntaxKind::QuestionQuestion => Cardinality::Optional,
+            _ => Cardinality::One,
+        }
     }
 
     fn generate_scope_name(&self) -> &'src str {
@@ -903,19 +686,23 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         type_id
     }
 
-    fn create_enum_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
+    fn create_enum_type_from_variants(
+        &mut self,
+        name: &'src str,
+        variants: &IndexMap<&'src str, ScopeInfo<'src>>,
+    ) -> TypeId {
         let mut members = Vec::new();
-        for (tag, variant_scope) in &scope.variants {
+
+        for (tag, variant_scope) in variants {
             let variant_type = if variant_scope.fields.is_empty() {
                 TYPE_VOID
             } else if variant_scope.fields.len() == 1 {
-                // Single-capture variant: flatten to capture's type directly (ADR-0007)
+                // Single-capture variant: flatten (ADR-0007)
                 let (_, info) = variant_scope.fields.iter().next().unwrap();
                 self.wrap_with_cardinality(info.base_type, info.cardinality)
             } else {
-                let variant_name = format!("{}{}", name, tag);
-                let leaked: &'src str = Box::leak(variant_name.into_boxed_str());
-                self.create_struct_type(leaked, variant_scope)
+                let variant_name = self.generate_scope_name();
+                self.create_struct_type(variant_name, variant_scope)
             };
             members.push(InferredMember {
                 name: tag,
@@ -933,21 +720,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         });
 
         type_id
-    }
-
-    /// Find the type for a reference by looking up the Enter node with matching ref_id.
-    fn find_ref_type(&self, ref_id: u32) -> Option<TypeId> {
-        // Find the Enter node with this ref_id to get the definition name
-        for (_, node) in self.graph.iter() {
-            if let RefMarker::Enter { ref_id: enter_id } = &node.ref_marker {
-                if *enter_id == ref_id {
-                    if let Some(name) = node.ref_name {
-                        return self.definition_types.get(name).copied();
-                    }
-                }
-            }
-        }
-        None
     }
 
     fn wrap_with_cardinality(&mut self, base: TypeId, card: Cardinality) -> TypeId {
@@ -985,6 +757,40 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             }
         }
     }
+
+    fn report_merge_errors(&mut self, merge_errors: &[MergeError<'src>]) {
+        for err in merge_errors {
+            let types_str = err
+                .shapes
+                .iter()
+                .map(|s| s.to_description().to_string())
+                .collect::<Vec<_>>()
+                .join(" vs ");
+
+            let primary_span = err.spans.first().copied().unwrap_or_default();
+            let mut builder = self
+                .diagnostics
+                .report(DiagnosticKind::IncompatibleTypes, primary_span)
+                .message(types_str);
+
+            for span in err.spans.iter().skip(1) {
+                builder = builder.related_to("also captured here", *span);
+            }
+            builder
+                .hint(format!(
+                    "capture `{}` has incompatible types across branches",
+                    err.field
+                ))
+                .emit();
+
+            self.errors.push(UnificationError {
+                field: err.field,
+                definition: self.current_def_name,
+                types_found: err.shapes.iter().map(|s| s.to_description()).collect(),
+                spans: err.spans.clone(),
+            });
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -992,40 +798,52 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 impl<'a> Query<'a> {
-    /// Run type inference on the built graph.
+    /// Run type inference on the query AST.
     pub(super) fn infer_types(&mut self) {
-        let mut ctx = InferenceContext::new(&self.graph, &self.dead_nodes);
+        // Collect QIS triggers upfront to avoid borrowing issues
+        let qis_triggers: HashSet<_> = self.qis_triggers.keys().cloned().collect();
+        let sorted = self.topological_sort_definitions_ast();
 
-        // Process definitions in dependency order (referenced definitions first)
-        let sorted = self.topological_sort_definitions();
-        for name in sorted {
-            if let Some(entry_id) = self.graph.definition(name) {
-                let type_id = ctx.infer_definition(name, entry_id);
-                ctx.definition_types.insert(name, type_id);
-                self.type_info.entrypoint_types.insert(name, type_id);
-            }
+        let mut ctx = InferenceContext::new(self.source, qis_triggers);
+
+        // Process definitions in dependency order
+        for (name, body) in &sorted {
+            let type_id = ctx.infer_definition(*name, body);
+            ctx.definition_types.insert(name, type_id);
         }
 
+        // Preserve symbol table order for entrypoints
+        for (name, _) in &sorted {
+            if let Some(&type_id) = ctx.definition_types.get(name) {
+                self.type_info.entrypoint_types.insert(*name, type_id);
+            }
+        }
         self.type_info.type_defs = ctx.type_defs;
         self.type_info.diagnostics = ctx.diagnostics;
         self.type_info.errors = ctx.errors;
     }
 
-    /// Topologically sort definitions so referenced definitions are processed first.
-    fn topological_sort_definitions(&self) -> Vec<&'a str> {
-        let definitions: Vec<_> = self.graph.definitions().collect();
+    /// Topologically sort definitions for processing order.
+    fn topological_sort_definitions_ast(&self) -> Vec<(&'a str, ast::Expr)> {
+        use std::collections::{HashSet, VecDeque};
+
+        let definitions: Vec<_> = self
+            .symbol_table
+            .iter()
+            .map(|(&name, body)| (name, body.clone()))
+            .collect();
         let def_names: HashSet<&str> = definitions.iter().map(|(name, _)| *name).collect();
 
-        // Build dependency graph: which definitions does each definition reference?
+        // Build dependency graph from AST references
         let mut deps: HashMap<&str, Vec<&str>> = HashMap::new();
-        for &(name, entry_id) in &definitions {
-            let refs = self.collect_references(entry_id, &def_names);
+        for (name, body) in &definitions {
+            let refs = Self::collect_ast_references(body, &def_names);
             deps.insert(name, refs);
         }
 
-        // Kahn's algorithm for topological sort
+        // Kahn's algorithm
         let mut in_degree: HashMap<&str, usize> = HashMap::new();
-        for &(name, _) in &definitions {
+        for (name, _) in &definitions {
             in_degree.insert(name, 0);
         }
         for refs in deps.values() {
@@ -1042,9 +860,9 @@ impl<'a> Query<'a> {
         zero_degree.sort();
         let mut queue: VecDeque<&str> = zero_degree.into_iter().collect();
 
-        let mut sorted = Vec::new();
+        let mut sorted_names = Vec::new();
         while let Some(name) = queue.pop_front() {
-            sorted.push(name);
+            sorted_names.push(name);
             if let Some(refs) = deps.get(name) {
                 for &dep in refs {
                     if let Some(deg) = in_degree.get_mut(dep) {
@@ -1058,53 +876,52 @@ impl<'a> Query<'a> {
         }
 
         // Reverse so dependencies come first
-        sorted.reverse();
+        sorted_names.reverse();
 
         // Add any remaining (cyclic) definitions
-        for &(name, _) in &definitions {
-            if !sorted.contains(&name) {
-                sorted.push(name);
+        for (name, _) in &definitions {
+            if !sorted_names.contains(name) {
+                sorted_names.push(name);
             }
         }
 
-        sorted
+        // Build result with bodies
+        sorted_names
+            .into_iter()
+            .filter_map(|name| self.symbol_table.get(name).map(|body| (name, body.clone())))
+            .collect()
     }
 
-    /// Collect all definition names referenced from a given node.
-    fn collect_references(&self, start: NodeId, def_names: &HashSet<&str>) -> Vec<&'a str> {
+    /// Collect references from an AST expression.
+    fn collect_ast_references<'b>(expr: &Expr, def_names: &HashSet<&'b str>) -> Vec<&'b str> {
         let mut refs = Vec::new();
-        let mut visited = HashSet::new();
-        let mut stack = vec![start];
+        Self::collect_ast_references_impl(expr, def_names, &mut refs);
+        refs
+    }
 
-        while let Some(node_id) = stack.pop() {
-            if !visited.insert(node_id) {
-                continue;
-            }
-            let node = self.graph.node(node_id);
-
-            // Check if this is an Enter node referencing another definition
-            if let RefMarker::Enter { .. } = &node.ref_marker {
-                if let Some(name) = node.ref_name {
-                    if def_names.contains(name) && !refs.contains(&name) {
-                        refs.push(name);
+    fn collect_ast_references_impl<'b>(
+        expr: &Expr,
+        def_names: &HashSet<&'b str>,
+        refs: &mut Vec<&'b str>,
+    ) {
+        match expr {
+            Expr::Ref(r) => {
+                if let Some(name_token) = r.name() {
+                    let name = name_token.text();
+                    if def_names.contains(name) && !refs.iter().any(|&r| r == name) {
+                        // Find the actual &'b str from the set
+                        if let Some(&found) = def_names.iter().find(|&&n| n == name) {
+                            refs.push(found);
+                        }
                     }
                 }
             }
-
-            // Don't follow into referenced definitions (they're opaque)
-            let skip_def = match &node.ref_marker {
-                RefMarker::Enter { .. } => node.ref_name.and_then(|n| self.graph.definition(n)),
-                _ => None,
-            };
-
-            for &succ in &node.successors {
-                if skip_def.map_or(true, |def| succ != def) {
-                    stack.push(succ);
+            _ => {
+                for child in expr.children() {
+                    Self::collect_ast_references_impl(&child, def_names, refs);
                 }
             }
         }
-
-        refs
     }
 }
 
