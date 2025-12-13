@@ -1,6 +1,6 @@
 # ADR-0009: Type System
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2025-01-14
 
 ## Context
@@ -118,7 +118,6 @@ Despite tags, this is uncaptured. Behavior:
 - `@x` appears only in branch A → propagates as `Optional(Node)`
 - `@y` appears only in branch B → propagates as `Optional(Node)`
 - Result: `Foo { x: Optional(Node), y: Optional(Node) }`
-- Diagnostic (warning): asymmetric captures
 
 ```plotnik
 Bar = [ (a) @v  (b) @v ]
@@ -168,16 +167,60 @@ Foo = [ A: (a) @x  B: (b) @y ] @z
   }
   ```
 
-### Unification Rules (for merging)
+### Unification Rules (1-Level Merge)
 
-When merging captures across untagged alternation branches:
+When merging captures across untagged alternation branches, we apply **1-level merge semantics**. This balances flexibility with type safety: top-level fields merge with optionality, but nested struct mismatches are errors.
+
+**Design rationale**: Plotnik's purpose is typed extraction. Deep recursive merging would produce heavily-optional types (`{ a?: { b?: { c?: Node } } }`), forcing users back to defensive checking—undermining the library's value. Tagged+captured alternations exist when precise discrimination is needed.
+
+**Base type compatibility**:
 
 ```
-unify(τ, τ) = τ
 unify(Node, Node) = Node
 unify(String, String) = String
-unify(Struct(f₁), Struct(f₂)) = Struct(f₁) if f₁ = f₂
-unify(τ₁, τ₂) = ⊥ (error)
+unify(Node, String) = ⊥ (error: incompatible primitives)
+unify(Node, Struct) = ⊥ (error: primitive vs composite)
+unify(String, Struct) = ⊥ (error: primitive vs composite)
+```
+
+**Struct merging** (1-level only):
+
+```
+unify(Struct(f₁), Struct(f₂)) = Struct(merged_fields)
+  where merged_fields:
+    - fields in both f₁ and f₂: unify types (must be compatible)
+    - fields only in f₁: become Optional
+    - fields only in f₂: become Optional
+```
+
+Nested structs are compared by **structural identity**, not recursively merged. If a field has type `Struct` in both branches but the structs differ, it's an error.
+
+**Cardinality interaction**: Cardinality join happens first, then type unification. If `T` and `T[]` appear at the same field, lift to array, then unify element types.
+
+**Error reporting**: When unification fails, the compiler reports ALL incompatibilities across all branches, not just the first. This helps users fix multiple issues in one iteration.
+
+**Examples**:
+
+```
+// OK: top-level field merge
+Branch 1: { x: Node, y: Node }
+Branch 2: { x: Node, z: String }
+Result:   { x: Node, y?: Node, z?: String }
+
+// OK: nested structs identical
+Branch 1: { data: { a: Node }, extra: Node }
+Branch 2: { data: { a: Node } }
+Result:   { data: { a: Node }, extra?: Node }
+
+// ERROR: nested structs differ (no deep merge)
+Branch 1: { data: { a: Node } }
+Branch 2: { data: { b: Node } }
+→ Error: field `data` has incompatible struct types
+
+// ERROR: primitive vs primitive mismatch
+Branch 1: { val: String }
+Branch 2: { val: Node }
+→ Error: field `val` has incompatible types: `String` vs `Node`
 ```
 
 ### Cardinality Join (for merging)
@@ -334,13 +377,30 @@ Collision resolution: append numeric suffix (`Foo`, `Foo2`, `Foo3`, ...).
 
 | Condition                            | Severity | Recovery                      | Diagnostic Kind (future)       |
 | ------------------------------------ | -------- | ----------------------------- | ------------------------------ |
-| Type mismatch in untagged alt        | Error    | Use `TYPE_INVALID`, continue  | `TypeMismatchInAlt`            |
+| Incompatible primitives in alt       | Error    | Use `TYPE_INVALID`, continue  | `TypeMismatchInAlt`            |
+| Primitive vs Struct in alt           | Error    | Use `TYPE_INVALID`, continue  | `TypeMismatchInAlt`            |
+| Nested struct mismatch in alt        | Error    | Use `TYPE_INVALID`, continue  | `StructMismatchInAlt`          |
 | Duplicate capture in same scope      | Error    | Keep first, ignore duplicates | `DuplicateCapture`             |
 | Empty definition (no captures)       | Info     | Type is `Void` (TypeId = 0)   | (no diagnostic)                |
 | Inline uncaptured tagged alternation | Warning  | Treat as untagged             | `UnusedBranchLabels`           |
 | QIS without capture (not at root)    | Error    | Cannot infer element type     | `MultiCaptureQuantifierNoName` |
 
 The last warning applies only to literal tagged alternations, not references. If `Foo = [ A: ... ]` is used as `(Foo)`, no warning—the user intentionally reuses a definition. But `(parent [ A: ... B: ... ])` inline without capture likely indicates a forgotten `@name`.
+
+**Exhaustive error reporting**: When type unification fails, the compiler explores all branches and reports all incompatibilities. Example diagnostic:
+
+```
+error: incompatible types in alternation branches
+  --> query.plot:3:5
+   |
+ 3 |     (a { (x) @val ::string }) @data
+   |              ^^^ `String` here
+ 4 |     (b { (x { (y) @inner }) @val }) @data
+   |                            ^^^ `Node` here
+   |
+   = note: capture `val` has incompatible types across branches
+   = help: use tagged alternation `[ A: ... B: ... ]` for precise discrimination
+```
 
 ## Examples
 
@@ -397,7 +457,7 @@ Foo = (parent [
 - `@msg` only in Err branch → `Optional(String)`
 - Types:
   - `Foo: { val: Optional(Node), msg: Optional(String) }`
-- Diagnostic: warning (inline uncaptured tagged alternation)
+- Diagnostic: warning `UnusedBranchLabels` (inline uncaptured tagged alternation)
 
 ### Example 5: Cardinality in Alternation
 
@@ -428,14 +488,19 @@ Funcs = (module { (function)* @fns })
 
 - Explicit rules enable deterministic inference
 - "Tags only matter when captured" is a simple mental model
-- Warning on asymmetric captures catches likely bugs
+- 1-level merge provides flexibility while preserving type safety
+- Asymmetric fields becoming Optional is intuitive ("match any branch, get what's available")
 - Definition root inherits type naturally—no wrapper structs for top-level enums
+- Exhaustive error reporting helps users fix all issues in one iteration
 
 **Negative**:
 
 - LUB cardinality join can lose precision
+- 1-level merge is less flexible than deep merge (intentional trade-off)
 
 **Alternatives Considered**:
 
 - Error on uncaptured tagged alternations (rejected: too restrictive for incremental development)
 - Definition root always Struct (rejected: forces wrapper types for enums, e.g., `struct Expr { val: ExprEnum }` instead of `enum Expr`)
+- Deep recursive merge for nested structs (rejected: produces heavily-optional types that defeat the purpose of typed extraction; users who need flexibility at depth should use tagged+captured alternations for precision)
+- Strict struct equality for merging (rejected: too restrictive for common patterns like `[ (a) @x  (b) @y ]`)

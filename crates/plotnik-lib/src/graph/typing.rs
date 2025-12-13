@@ -8,12 +8,19 @@
 //! 1. Walk graph from each definition entry point
 //! 2. Track "pending value" - the captured value waiting for a Field assignment
 //! 3. When Field(name) is encountered, record the pending value as a field
-//! 4. Handle branching by merging field sets from all branches
+//! 4. Handle branching by merging field sets from all branches (1-level merge)
 //! 5. Handle quantifiers via array cardinality markers
+//!
+//! # 1-Level Merge Semantics
+//!
+//! When merging captures across alternation branches:
+//! - Top-level fields merge with optionality for asymmetric captures
+//! - Base types (Node, String) must match exactly
+//! - Nested structs must be structurally identical (not recursively merged)
+//! - All incompatibilities are reported, not just the first
 
 use super::{BuildEffect, BuildGraph, NodeId};
-use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID};
-use crate::ir::{TypeId, TypeKind};
+use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -24,6 +31,39 @@ pub struct TypeInferenceResult<'src> {
     pub type_defs: Vec<InferredTypeDef<'src>>,
     /// Mapping from definition name to its result TypeId.
     pub entrypoint_types: IndexMap<&'src str, TypeId>,
+    /// Type unification errors (incompatible types in alternation branches).
+    pub errors: Vec<UnificationError<'src>>,
+}
+
+/// Error when types cannot be unified in alternation branches.
+#[derive(Debug, Clone)]
+pub struct UnificationError<'src> {
+    /// The field name where incompatibility was detected.
+    pub field: &'src str,
+    /// Definition context where the error occurred.
+    pub definition: &'src str,
+    /// Types found across branches (for error message).
+    pub types_found: Vec<TypeDescription>,
+}
+
+/// Human-readable type description for error messages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypeDescription {
+    Node,
+    String,
+    Struct(Vec<String>), // field names for identification
+}
+
+impl std::fmt::Display for TypeDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeDescription::Node => write!(f, "Node"),
+            TypeDescription::String => write!(f, "String"),
+            TypeDescription::Struct(fields) => {
+                write!(f, "Struct {{ {} }}", fields.join(", "))
+            }
+        }
+    }
 }
 
 /// An inferred type definition (before emission).
@@ -77,19 +117,49 @@ impl Cardinality {
     }
 }
 
+/// Type shape for 1-level merge comparison.
+/// Tracks enough information to detect incompatibilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)] // Struct variant is infrastructure for captured sequence support
+enum TypeShape<'src> {
+    /// Primitive: Node or String
+    Primitive(TypeId),
+    /// Struct with known field names (for structural identity check)
+    Struct(Vec<&'src str>),
+}
+
+impl<'src> TypeShape<'src> {
+    fn to_description(&self) -> TypeDescription {
+        match self {
+            TypeShape::Primitive(TYPE_NODE) => TypeDescription::Node,
+            TypeShape::Primitive(TYPE_STR) => TypeDescription::String,
+            TypeShape::Primitive(_) => TypeDescription::Node, // fallback
+            TypeShape::Struct(fields) => {
+                TypeDescription::Struct(fields.iter().map(|s| s.to_string()).collect())
+            }
+        }
+    }
+}
+
 /// Inferred field information collected during traversal.
 #[derive(Debug, Clone)]
-struct FieldInfo {
+struct FieldInfo<'src> {
+    /// The inferred type shape (for compatibility checking).
+    shape: TypeShape<'src>,
+    /// Base TypeId (TYPE_NODE or TYPE_STR for primitives, placeholder for structs).
     base_type: TypeId,
+    /// Cardinality from quantifiers.
     cardinality: Cardinality,
     /// Number of branches this field appears in (for optional detection).
     branch_count: usize,
+    /// All shapes seen at this field (for error reporting).
+    all_shapes: Vec<TypeShape<'src>>,
 }
 
 /// Collected scope information from traversal.
 #[derive(Debug, Clone, Default)]
 struct ScopeInfo<'src> {
-    fields: IndexMap<&'src str, FieldInfo>,
+    fields: IndexMap<&'src str, FieldInfo<'src>>,
     /// Variants for tagged alternations.
     variants: IndexMap<&'src str, ScopeInfo<'src>>,
     /// Whether we've seen variant markers (StartVariant/EndVariant).
@@ -98,24 +168,45 @@ struct ScopeInfo<'src> {
 
 impl<'src> ScopeInfo<'src> {
     fn add_field(&mut self, name: &'src str, base_type: TypeId, cardinality: Cardinality) {
+        let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
+            if !existing.all_shapes.contains(&shape) {
+                existing.all_shapes.push(shape);
+            }
         } else {
             self.fields.insert(
                 name,
                 FieldInfo {
+                    shape: shape.clone(),
                     base_type,
                     cardinality,
                     branch_count: 1,
+                    all_shapes: vec![shape],
                 },
             );
         }
     }
 
-    fn merge_from(&mut self, other: ScopeInfo<'src>, total_branches: usize) {
+    /// Merge another scope into this one, applying 1-level merge semantics.
+    /// Returns errors for incompatible types.
+    /// Note: Does NOT apply optionality - call `apply_optionality` after all branches merged.
+    fn merge_from(&mut self, other: ScopeInfo<'src>) -> Vec<MergeError<'src>> {
+        let mut errors = Vec::new();
+
         for (name, info) in other.fields {
             if let Some(existing) = self.fields.get_mut(name) {
+                // Check type compatibility (1-level merge)
+                if let Some(err) = check_compatibility(&existing.shape, &info.shape, name) {
+                    errors.push(err);
+                    // Collect all shapes for error reporting
+                    for shape in &info.all_shapes {
+                        if !existing.all_shapes.contains(shape) {
+                            existing.all_shapes.push(shape.clone());
+                        }
+                    }
+                }
                 existing.cardinality = existing.cardinality.join(info.cardinality);
                 existing.branch_count += info.branch_count;
             } else {
@@ -123,29 +214,70 @@ impl<'src> ScopeInfo<'src> {
             }
         }
 
-        // Merge variants - don't overwrite, merge fields into existing
+        // Merge variants
         for (tag, variant_info) in other.variants {
             if let Some(existing) = self.variants.get_mut(tag) {
-                // Merge fields from child scope into existing variant
-                for (name, info) in variant_info.fields {
-                    if let Some(existing_field) = existing.fields.get_mut(name) {
-                        existing_field.cardinality =
-                            existing_field.cardinality.join(info.cardinality);
-                        existing_field.branch_count += info.branch_count;
-                    } else {
-                        existing.fields.insert(name, info);
-                    }
-                }
+                let variant_errors = existing.merge_from(variant_info);
+                errors.extend(variant_errors);
             } else {
                 self.variants.insert(tag, variant_info);
             }
             self.has_variants = true;
         }
 
-        // Mark fields as optional if they don't appear in all branches
+        errors
+    }
+
+    /// Apply optionality to fields that don't appear in all branches.
+    /// Must be called after all branches have been merged.
+    fn apply_optionality(&mut self, total_branches: usize) {
         for info in self.fields.values_mut() {
             if info.branch_count < total_branches {
                 info.cardinality = info.cardinality.make_optional();
+            }
+        }
+    }
+}
+
+/// Internal error during merge (before conversion to UnificationError).
+#[derive(Debug)]
+struct MergeError<'src> {
+    field: &'src str,
+    shapes: Vec<TypeShape<'src>>,
+}
+
+/// Check if two type shapes are compatible under 1-level merge semantics.
+fn check_compatibility<'src>(
+    a: &TypeShape<'src>,
+    b: &TypeShape<'src>,
+    field: &'src str,
+) -> Option<MergeError<'src>> {
+    match (a, b) {
+        // Same primitive types are compatible
+        (TypeShape::Primitive(t1), TypeShape::Primitive(t2)) if t1 == t2 => None,
+
+        // Different primitives (Node vs String) are incompatible
+        (TypeShape::Primitive(_), TypeShape::Primitive(_)) => Some(MergeError {
+            field,
+            shapes: vec![a.clone(), b.clone()],
+        }),
+
+        // Struct vs Primitive is incompatible
+        (TypeShape::Struct(_), TypeShape::Primitive(_))
+        | (TypeShape::Primitive(_), TypeShape::Struct(_)) => Some(MergeError {
+            field,
+            shapes: vec![a.clone(), b.clone()],
+        }),
+
+        // Structs: must have identical field sets (1-level, no deep merge)
+        (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
+            if fields_a == fields_b {
+                None
+            } else {
+                Some(MergeError {
+                    field,
+                    shapes: vec![a.clone(), b.clone()],
+                })
             }
         }
     }
@@ -181,6 +313,7 @@ struct InferenceContext<'src, 'g> {
     dead_nodes: &'g HashSet<NodeId>,
     type_defs: Vec<InferredTypeDef<'src>>,
     next_type_id: TypeId,
+    errors: Vec<UnificationError<'src>>,
 }
 
 impl<'src, 'g> InferenceContext<'src, 'g> {
@@ -190,6 +323,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             dead_nodes,
             type_defs: Vec::new(),
             next_type_id: 3, // TYPE_COMPOSITE_START
+            errors: Vec::new(),
         }
     }
 
@@ -201,7 +335,23 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
     fn infer_definition(&mut self, def_name: &'src str, entry_id: NodeId) -> TypeId {
         let mut visited = HashSet::new();
-        let scope = self.traverse(entry_id, TraversalState::default(), &mut visited, 0);
+        let mut merge_errors = Vec::new();
+        let scope = self.traverse(
+            entry_id,
+            TraversalState::default(),
+            &mut visited,
+            0,
+            &mut merge_errors,
+        );
+
+        // Convert merge errors to unification errors
+        for err in merge_errors {
+            self.errors.push(UnificationError {
+                field: err.field,
+                definition: def_name,
+                types_found: err.shapes.iter().map(|s| s.to_description()).collect(),
+            });
+        }
 
         if scope.has_variants && !scope.variants.is_empty() {
             self.create_enum_type(def_name, &scope)
@@ -218,6 +368,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         mut state: TraversalState<'src>,
         visited: &mut HashSet<NodeId>,
         depth: usize,
+        errors: &mut Vec<MergeError<'src>>,
     ) -> ScopeInfo<'src> {
         if self.dead_nodes.contains(&node_id) || depth > 200 {
             return ScopeInfo::default();
@@ -292,15 +443,19 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             // Terminal node
         } else if live_successors.len() == 1 {
             // Linear path - continue with same state
-            let child_scope = self.traverse(live_successors[0], state, visited, depth + 1);
-            scope.merge_from(child_scope, 1);
+            let child_scope = self.traverse(live_successors[0], state, visited, depth + 1, errors);
+            let merge_errors = scope.merge_from(child_scope);
+            errors.extend(merge_errors);
         } else {
             // Branching - traverse each branch and merge results
             let total_branches = live_successors.len();
             for succ in live_successors {
-                let child_scope = self.traverse(succ, state.clone(), visited, depth + 1);
-                scope.merge_from(child_scope, total_branches);
+                let child_scope = self.traverse(succ, state.clone(), visited, depth + 1, errors);
+                let merge_errors = scope.merge_from(child_scope);
+                errors.extend(merge_errors);
             }
+            // Apply optionality after all branches merged
+            scope.apply_optionality(total_branches);
         }
 
         scope
@@ -417,6 +572,7 @@ pub fn infer_types<'src>(
     TypeInferenceResult {
         type_defs: ctx.type_defs,
         entrypoint_types,
+        errors: ctx.errors,
     }
 }
 
@@ -452,6 +608,22 @@ pub fn dump_types(result: &TypeInferenceResult) -> String {
                 out.push('}');
             }
             out.push('\n');
+        }
+    }
+
+    if !result.errors.is_empty() {
+        out.push_str("\n=== Errors ===\n");
+        for err in &result.errors {
+            out.push_str(&format!(
+                "field `{}` in `{}`: incompatible types [{}]\n",
+                err.field,
+                err.definition,
+                err.types_found
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
     }
 

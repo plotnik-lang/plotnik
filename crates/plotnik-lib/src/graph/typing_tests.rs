@@ -141,12 +141,11 @@ fn untagged_alternation_symmetric() {
     let result = infer("Foo = [ (a) @x  (b) @x ]");
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T4
+    Foo → T3
 
     === Types ===
-    T3: Optional <anon> → Node
-    T4: Record Foo {
-        x: T3
+    T3: Record Foo {
+        x: Node
     }
     ");
 }
@@ -286,4 +285,149 @@ fn graph_structure_tagged_alternation() {
     N8: Field("err") → [9]
     N9: EndVariant → [1]
     "#);
+}
+
+// =============================================================================
+// 1-Level Merge Semantics Tests (ADR-0009)
+// =============================================================================
+
+#[test]
+fn merge_incompatible_primitives_node_vs_string() {
+    // Same field with Node in one branch, String in another
+    let result = infer("Foo = [ (a) @val  (b) @val ::string ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T3
+
+    === Types ===
+    T3: Record Foo {
+        val: Node
+    }
+
+    === Errors ===
+    field `val` in `Foo`: incompatible types [Node, String]
+    ");
+}
+
+#[test]
+fn merge_compatible_same_type_node() {
+    // Same field with Node in both branches - should merge without error
+    let result = infer("Foo = [ (a) @val  (b) @val ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T3
+
+    === Types ===
+    T3: Record Foo {
+        val: Node
+    }
+    ");
+}
+
+#[test]
+fn merge_compatible_same_type_string() {
+    // Same field with String in both branches - should merge without error
+    let result = infer("Foo = [ (a) @val ::string  (b) @val ::string ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T3
+
+    === Types ===
+    T3: Record Foo {
+        val: String
+    }
+    ");
+}
+
+#[test]
+fn merge_asymmetric_fields_become_optional() {
+    // Different fields in each branch - both become optional (the feature)
+    let result = infer("Foo = [ (a) @x  (b) @y ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T5
+
+    === Types ===
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record Foo {
+        x: T3
+        y: T4
+    }
+    ");
+}
+
+#[test]
+fn merge_mixed_compatible_and_asymmetric() {
+    // @common in both branches (compatible), @x and @y asymmetric
+    // Note: flat scoping means nested captures propagate to root
+    let result = infer("Foo = [ { (a) @common (b) @x }  { (a) @common (c) @y } ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T5
+
+    === Types ===
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record Foo {
+        common: Node
+        x: T3
+        y: T4
+    }
+    ");
+}
+
+#[test]
+fn merge_multiple_incompatible_fields_reports_all() {
+    // Multiple fields with type mismatches - should report all errors
+    let result = infer("Foo = [ (a) @x (b) @y  (c) @x ::string (d) @y ::string ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T5
+
+    === Types ===
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record Foo {
+        x: T3
+        y: T4
+    }
+
+    === Errors ===
+    field `x` in `Foo`: incompatible types [Node, String]
+    field `y` in `Foo`: incompatible types [Node, String]
+    ");
+}
+
+#[test]
+fn merge_three_branches_all_compatible() {
+    // Three branches, all with same type - no error
+    let result = infer("Foo = [ (a) @val  (b) @val  (c) @val ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T3
+
+    === Types ===
+    T3: Record Foo {
+        val: Node
+    }
+    ");
+}
+
+#[test]
+fn merge_three_branches_one_incompatible() {
+    // Three branches, one has different type
+    let result = infer("Foo = [ (a) @val  (b) @val  (c) @val ::string ]");
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T3
+
+    === Types ===
+    T3: Record Foo {
+        val: Node
+    }
+
+    === Errors ===
+    field `val` in `Foo`: incompatible types [Node, String]
+    ");
 }
