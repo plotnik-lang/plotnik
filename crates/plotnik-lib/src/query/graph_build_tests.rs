@@ -89,12 +89,12 @@ fn alternation_tagged() {
     N1: ε → ∅
     N2: ε [Variant(A)] → N3
     N3: (a) [Variant(A)] [Capture] → N5
-    N4: ε [Field(x)] → N5
-    N5: ε [Field(x)] [EndVariant] → N1
+    N4: ε → N5
+    N5: ε [EndVariant] → N1
     N6: ε [Variant(B)] → N7
     N7: (b) [Variant(B)] [Capture] → N9
-    N8: ε [Field(y)] → N9
-    N9: ε [Field(y)] [EndVariant] → N1
+    N8: ε → N9
+    N9: ε [EndVariant] → N1
     ");
 }
 

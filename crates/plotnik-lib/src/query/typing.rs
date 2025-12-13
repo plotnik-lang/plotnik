@@ -477,7 +477,9 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                             .map(|e| &mut e.scope)
                             .expect("scope stack should not be empty");
 
-                        if let Some(tag) = current_variant {
+                        // When inside an object scope (object_depth > 0), fields go to the
+                        // object, not to a variant scope. The object becomes the variant payload.
+                        if let Some(tag) = current_variant.filter(|_| state.object_depth == 0) {
                             let variant_scope = current_scope.variants.entry(tag).or_default();
                             variant_scope.add_field(
                                 name,
@@ -600,7 +602,23 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                             .last_mut()
                             .map(|e| &mut e.scope)
                             .expect("scope stack should not be empty");
-                        current_scope.variants.entry(tag).or_default();
+
+                        let variant_scope = current_scope.variants.entry(tag).or_default();
+
+                        // Single-capture flattening (ADR-0007): if there's a pending capture
+                        // but no fields were added (Field effect was removed), store the
+                        // captured type directly as a synthetic field for flattening.
+                        if variant_scope.fields.is_empty() {
+                            if let Some(pending) = state.pending.take() {
+                                variant_scope.add_field(
+                                    "$value", // synthetic name, will be flattened away
+                                    pending.base_type,
+                                    pending.cardinality,
+                                    rowan::TextRange::default(),
+                                    pending.is_array,
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -710,6 +728,10 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         for (tag, variant_scope) in &scope.variants {
             let variant_type = if variant_scope.fields.is_empty() {
                 TYPE_VOID
+            } else if variant_scope.fields.len() == 1 {
+                // Single-capture variant: flatten to capture's type directly (ADR-0007)
+                let (_, info) = variant_scope.fields.iter().next().unwrap();
+                self.wrap_with_cardinality(info.base_type, info.cardinality)
             } else {
                 let variant_name = format!("{}{}", name, tag);
                 let leaked: &'src str = Box::leak(variant_name.into_boxed_str());

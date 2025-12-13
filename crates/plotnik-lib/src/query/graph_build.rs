@@ -353,7 +353,25 @@ impl<'a> Query<'a> {
 
         let body_frag = self.construct_expr(&body, NavContext::Root);
 
+        // Count Field effects to determine flattening (ADR-0007)
+        let field_count = self.count_field_effects(body_frag.entry);
+
+        if field_count == 1 {
+            // Single capture: flatten by removing the Field effect
+            self.remove_field_effects(body_frag.entry);
+        } else if field_count > 1 {
+            // Multiple captures: wrap with StartObject/EndObject
+            self.graph
+                .node_mut(start_id)
+                .add_effect(BuildEffect::StartObject);
+        }
+
         let end_id = self.graph.add_epsilon();
+        if field_count > 1 {
+            self.graph
+                .node_mut(end_id)
+                .add_effect(BuildEffect::EndObject);
+        }
         self.graph
             .node_mut(end_id)
             .add_effect(BuildEffect::EndVariant);
@@ -547,6 +565,73 @@ impl<'a> Query<'a> {
 
         for &succ in &node.successors {
             self.collect_matchers(succ, result, visited);
+        }
+    }
+    /// Count Field effects reachable from a node (for variant flattening).
+    fn count_field_effects(&self, start: NodeId) -> usize {
+        let mut count = 0;
+        let mut visited = HashSet::new();
+        self.count_field_effects_recursive(start, &mut count, &mut visited);
+        count
+    }
+
+    fn count_field_effects_recursive(
+        &self,
+        node_id: NodeId,
+        count: &mut usize,
+        visited: &mut HashSet<NodeId>,
+    ) {
+        if !visited.insert(node_id) {
+            return;
+        }
+
+        let node = self.graph.node(node_id);
+        for effect in &node.effects {
+            if matches!(effect, BuildEffect::Field { .. }) {
+                *count += 1;
+            }
+        }
+
+        for &succ in &node.successors {
+            self.count_field_effects_recursive(succ, count, visited);
+        }
+    }
+
+    /// Remove all Field effects reachable from a node (for single-capture variant flattening).
+    fn remove_field_effects(&mut self, start: NodeId) {
+        let mut visited = HashSet::new();
+        let mut to_clean = Vec::new();
+        self.collect_nodes_with_field_effects(start, &mut to_clean, &mut visited);
+
+        for node_id in to_clean {
+            self.graph
+                .node_mut(node_id)
+                .effects
+                .retain(|e| !matches!(e, BuildEffect::Field { .. }));
+        }
+    }
+
+    fn collect_nodes_with_field_effects(
+        &self,
+        node_id: NodeId,
+        result: &mut Vec<NodeId>,
+        visited: &mut HashSet<NodeId>,
+    ) {
+        if !visited.insert(node_id) {
+            return;
+        }
+
+        let node = self.graph.node(node_id);
+        if node
+            .effects
+            .iter()
+            .any(|e| matches!(e, BuildEffect::Field { .. }))
+        {
+            result.push(node_id);
+        }
+
+        for &succ in &node.successors {
+            self.collect_nodes_with_field_effects(succ, result, visited);
         }
     }
 }

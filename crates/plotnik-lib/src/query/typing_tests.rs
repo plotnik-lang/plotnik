@@ -313,18 +313,12 @@ fn tagged_alternation_uncaptured_propagates() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T3
 
     === Types ===
-    T3: Record FooA {
-        x: Node
-    }
-    T4: Record FooB {
-        y: Node
-    }
-    T5: Enum Foo {
-        A: T3
-        B: T4
+    T3: Enum Foo {
+        A: Node
+        B: Node
     }
     ");
 }
@@ -338,23 +332,17 @@ fn tagged_alternation_captured_creates_enum() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T7
+    Foo → T5
 
     === Types ===
-    T3: Record FooScope3A {
-        x: Node
+    T3: Enum FooScope3 {
+        A: Node
     }
-    T4: Enum FooScope3 {
-        A: T3
+    T4: Enum FooScope4 {
+        B: Node
     }
-    T5: Record FooScope5B {
-        y: Node
-    }
-    T6: Enum FooScope5 {
-        B: T5
-    }
-    T7: Record Foo {
-        choice: T4
+    T5: Record Foo {
+        choice: T3
     }
 
     === Errors ===
