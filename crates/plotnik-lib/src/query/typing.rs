@@ -19,7 +19,7 @@ use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
 
 use super::Query;
-use super::graph::{BuildEffect, BuildGraph, NodeId};
+use super::graph::{BuildEffect, BuildGraph, NodeId, RefMarker};
 
 /// Result of type inference.
 #[derive(Debug, Default)]
@@ -625,10 +625,18 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         }
 
         // Process successors
+        // References are opaque: when entering a reference, skip the definition body
+        // and only follow return transitions (successors that aren't the def entry)
+        let def_entry_to_skip: Option<NodeId> = match &node.ref_marker {
+            RefMarker::Enter { .. } => node.ref_name.and_then(|name| self.graph.definition(name)),
+            _ => None,
+        };
+
         let live_successors: Vec<_> = node
             .successors
             .iter()
             .filter(|s| !self.dead_nodes.contains(s))
+            .filter(|s| def_entry_to_skip.map_or(true, |def| **s != def))
             .copied()
             .collect();
 

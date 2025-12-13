@@ -87,6 +87,29 @@ Result type: `Struct { val: Node }` — the `(a ...)` and `(b ...)` wrappers con
 
 Only explicit scope markers (`{...} @x`, `[...] @x` with tags) introduce nesting in the output type.
 
+### Reference Opacity
+
+References are opaque to captures: calling `(Foo)` does NOT inherit captures from `Foo`.
+
+```plotnik
+A = (identifier) @name
+B = (A)
+C = (A) @node
+```
+
+Types:
+
+- `A { name: Node }` — has the capture
+- `B {}` (Void) — calling A produces no fields in B
+- `C { node: Node }` — captures the reference itself, not A's internals
+
+To access A's captures, you must either:
+
+1. Inline A's pattern into B
+2. Capture the reference: `(A) @a` yields `{ a: A }` where `a` has type `A`
+
+This matches runtime semantics ([ADR-0006](ADR-0006-dynamic-query-execution.md)): Enter pushes a frame and jumps to the definition; Exit pops and returns. The caller only sees what it explicitly captures.
+
 ### Type Inference for Captures
 
 | Pattern                       | Inferred Type        |

@@ -558,6 +558,14 @@ impl<'a> Query<'a> {
         }
 
         let node = self.graph.node(node_id);
+
+        // References are opaque to captures: don't traverse into definition body.
+        // Treat the Enter node itself as the capture point.
+        if matches!(node.ref_marker, RefMarker::Enter { .. }) {
+            result.push(node_id);
+            return;
+        }
+
         if !node.is_epsilon() {
             result.push(node_id);
             return;
