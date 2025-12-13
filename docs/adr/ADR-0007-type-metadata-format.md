@@ -50,28 +50,34 @@ The handle provides access to node metadata (kind, span, text) without copying t
 ```rust
 #[repr(C)]
 struct TypeDef {
-    kind: TypeKind,      // 1
-    _pad: u8,            // 1
-    name: StringId,      // 2 - synthetic or explicit, 0xFFFF for wrappers
-    data: u32,           // 4 - TypeId for wrappers, slice offset for composites
-    data_len: u16,       // 2 - 0 for wrappers, member count for composites
-    _pad2: u16,          // 2
+    kind: TypeKind,              // 1
+    _pad: u8,                    // 1
+    name: StringId,              // 2 - synthetic or explicit, 0xFFFF for wrappers
+    members: Slice<TypeMember>,  // 6 - see interpretation below
+    _pad2: u16,                  // 2
 }
 // 12 bytes, align 4
 ```
 
-Uses `u16` for `data_len` instead of `Slice<T>`'s `u32` — no type has 65k members. Saves 2 bytes per TypeDef.
+The `members` field has dual semantics based on `kind`:
+
+| Kind                               | `members.start_index`   | `members.len` |
+| ---------------------------------- | ----------------------- | ------------- |
+| Wrappers (Optional/Array\*/Array+) | Inner `TypeId` (as u32) | 0             |
+| Composites (Record/Enum)           | Index into type_members | Member count  |
+
+This reuses `Slice<T>` for consistency with [ADR-0005](ADR-0005-transition-graph-format.md), while keeping TypeDef compact.
 
 ### TypeKind
 
 ```rust
 #[repr(C, u8)]
 enum TypeKind {
-    Optional = 0,   // T?  — data: inner TypeId
-    ArrayStar = 1,  // T*  — data: element TypeId
-    ArrayPlus = 2,  // T+  — data: element TypeId
-    Record = 3,     // struct — data/data_len: slice into type_members
-    Enum = 4,       // tagged union — data/data_len: slice into type_members
+    Optional = 0,   // T?  — members.start = inner TypeId
+    ArrayStar = 1,  // T*  — members.start = element TypeId
+    ArrayPlus = 2,  // T+  — members.start = element TypeId
+    Record = 3,     // struct — members = slice into type_members
+    Enum = 4,       // tagged union — members = slice into type_members
 }
 ```
 
@@ -164,7 +170,7 @@ enum FuncBody {
 Optional runtime check for debugging:
 
 ```rust
-fn validate(value: &Value, expected: TypeId, ir: &QueryIR) -> Result<(), TypeError>;
+fn validate(value: &Value, expected: TypeId, query: &CompiledQuery) -> Result<(), TypeError>;
 ```
 
 Walk the `Value` tree, verify shape matches `TypeId`. Mismatch indicates IR construction bug—panic in debug, skip in release.

@@ -1,4 +1,4 @@
-# ADR-0006: Dynamic Query Execution
+# ADR-0006: Query Execution
 
 - **Status**: Accepted
 - **Date**: 2024-12-12
@@ -6,7 +6,7 @@
 
 ## Context
 
-Runtime interpretation of the transition graph ([ADR-0005](ADR-0005-transition-graph-format.md)). Proc-macro compilation is a future ADR.
+Runtime execution of the transition graph ([ADR-0005](ADR-0005-transition-graph-format.md)). Proc-macro compilation is a future ADR.
 
 ## Decision
 
@@ -14,18 +14,18 @@ Runtime interpretation of the transition graph ([ADR-0005](ADR-0005-transition-g
 
 For each transition:
 
-1. Execute `pre_nav` initial movement (e.g., goto_first_child, goto_next_sibling)
+1. Execute `nav` initial movement (e.g., goto_first_child, goto_next_sibling)
 2. Search loop: try matcher, on fail apply skip policy (advance or fail)
 3. On match success: store matched node, execute `effects` sequentially
 4. Process successors with backtracking
 
 For `Up*` variants, step 2 becomes: validate exit constraint, ascend N levels (no search loop).
 
-Navigation is fully determined by `pre_nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for detailed semantics.
+Navigation is fully determined by `nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for detailed semantics.
 
 The matched node is stored in a temporary slot (`matched_node`) accessible to `CaptureNode` effect. Effects execute in order—`CaptureNode` reads from this slot and sets `executor.current`.
 
-**Slot invariant**: The `matched_node` slot is cleared (set to `None`) at the start of each transition execution, before `pre_nav`. This prevents stale captures if a transition path has `Epsilon → CaptureNode` without a preceding match—such a path indicates a graph construction bug, and the clear-on-entry invariant ensures it manifests as a predictable panic rather than silently capturing a wrong node.
+**Slot invariant**: The `matched_node` slot is cleared (set to `None`) at the start of each transition execution, before `nav`. This prevents stale captures if a transition path has `Epsilon → CaptureNode` without a preceding match—such a path indicates a graph construction bug, and the clear-on-entry invariant ensures it manifests as a predictable panic rather than silently capturing a wrong node.
 
 ### Effect Stream
 
@@ -40,12 +40,12 @@ Effects are **recorded**, not eagerly executed. On match success, the transition
 
 On backtrack, both vectors truncate to their watermarks. On full match success, the executor replays `ops` sequentially, consuming from `nodes` for each `CaptureNode`.
 
-### Executor
+### Materializer
 
-Converts effect stream to output value.
+Materializes effect stream into output value.
 
 ```rust
-struct Executor<'a> {
+struct Materializer<'a> {
     current: Option<Value<'a>>,
     stack: Vec<Container<'a>>,
 }
@@ -80,13 +80,13 @@ enum Container<'a> {
 
 Invalid state = IR bug → panic.
 
-### Interpreter
+### QueryInterpreter
 
 ```rust
-struct Interpreter<'a> {
-    query_ir: &'a QueryIR,
-    backtrack_stack: BacktrackStack,
-    frame_arena: CallFrameArena,
+struct QueryInterpreter<'a> {
+    query: &'a CompiledQuery,
+    checkpoints: CheckpointStack,
+    frames: FrameArena,
     cursor: TreeCursor<'a>,  // created at tree root, never reset
     effects: EffectStream<'a>,
 }
@@ -94,24 +94,25 @@ struct Interpreter<'a> {
 
 **Cursor constraint**: The cursor must be created once at the tree root and never call `reset()`. This preserves `descendant_index` validity for backtracking checkpoints.
 
-No `prev_matcher` tracking needed—each transition's `pre_nav` encodes the exact navigation to perform.
+No `prev_matcher` tracking needed—each transition's `nav` encodes the exact navigation to perform.
 
-Two stacks interact: backtracking can restore to a point inside a previously-exited call, so the frame arena must preserve frames.
+Two structures interact: backtracking can restore to a point inside a previously-exited call, so the frame arena must preserve frames.
 
-### Backtracking
+### Checkpoints
 
 ```rust
-struct BacktrackStack {
-    points: Vec<BacktrackPoint>,
+struct CheckpointStack {
+    points: Vec<Checkpoint>,
     max_frame_watermark: Option<u32>,  // highest frame index referenced by any point
 }
 
-struct BacktrackPoint {
+struct Checkpoint {
     cursor_checkpoint: u32,          // tree-sitter descendant_index
     effect_watermark: u32,
     recursion_frame: Option<u32>,    // saved frame index
+    prev_max_watermark: Option<u32>, // restore on pop for O(1) maintenance
     transition_id: TransitionId,     // source transition for alternatives
-    next_alt: u32,                    // index of next alternative to try
+    next_alt: u32,                   // index of next alternative to try
 }
 ```
 
@@ -131,12 +132,12 @@ Restore also truncates `effects` to `effect_watermark` and sets `frame_arena.cur
 **Solution**: Store returns in call frame at `Enter`, retrieve at `Exit`. O(1), no filtering.
 
 ```rust
-struct CallFrameArena {
-    frames: Vec<CallFrame>,  // append-only, pruned by watermark
+struct FrameArena {
+    frames: Vec<Frame>,      // append-only, pruned by watermark
     current: Option<u32>,    // index into frames (the "stack pointer")
 }
 
-struct CallFrame {
+struct Frame {
     parent: Option<u32>,          // index of caller's frame
     ref_id: RefId,                // verify Exit matches Enter
     enter_transition: TransitionId,  // to retrieve returns via successors()[1..]
@@ -147,18 +148,19 @@ Returns are retrieved via `TransitionView::successors()[1..]` on the `enter_tran
 
 **Append-only invariant**: Frames persist for backtracking correctness. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
 
-**Frame pruning**: After `Exit`, frames at the stack top may be reclaimed if:
+**Frame pruning**: After `Exit`, frames at the arena top may be reclaimed if:
 
 1. Not the current frame (already exited)
 2. Not referenced by any live backtrack point
 
 This bounds memory by `max(recursion_depth, backtrack_depth)` rather than total call count. Without pruning, `(Rule)*` over N items allocates N frames; with pruning, it remains O(1) for non-backtracking iteration.
 
-**O(1) watermark tracking**: The `max_frame_watermark` is maintained incrementally:
+**O(1) watermark tracking**: Each checkpoint stores the previous `max_frame_watermark`, enabling O(1) restore on pop:
 
 ```rust
-impl BacktrackStack {
-    fn push(&mut self, point: BacktrackPoint) {
+impl CheckpointStack {
+    fn push(&mut self, mut point: Checkpoint) {
+        point.prev_max_watermark = self.max_frame_watermark;
         if let Some(frame) = point.recursion_frame {
             self.max_frame_watermark = Some(match self.max_frame_watermark {
                 Some(max) => max.max(frame),
@@ -168,23 +170,18 @@ impl BacktrackStack {
         self.points.push(point);
     }
 
-    fn pop(&mut self) -> Option<BacktrackPoint> {
+    fn pop(&mut self) -> Option<Checkpoint> {
         let point = self.points.pop()?;
-        // Recompute watermark only if popped point held the max
-        if point.recursion_frame == self.max_frame_watermark {
-            self.max_frame_watermark = self.points.iter()
-                .filter_map(|p| p.recursion_frame)
-                .max();
-        }
+        self.max_frame_watermark = point.prev_max_watermark;
         Some(point)
-    }WS
+    }
 }
 
 fn prune_high_water_mark(
     current: Option<u32>,
-    backtrack_stack: &BacktrackStack,
+    checkpoints: &CheckpointStack,
 ) -> Option<u32> {
-    match (current, backtrack_stack.max_frame_watermark) {
+    match (current, checkpoints.max_frame_watermark) {
         (None, None) => None,
         (Some(c), None) => Some(c),
         (None, Some(m)) => Some(m),
@@ -207,14 +204,14 @@ Frames with index > high-water mark can be truncated.
 # Checking only last point would incorrectly allow pruning F0
 ```
 
-The `max_frame_watermark` tracks the true maximum across all live points. Push is O(1). Pop is amortized O(1)—the O(n) rescan only triggers when popping the point that held the maximum, which can happen at most once per frame
+The `max_frame_watermark` tracks the true maximum across all live points. Both push and pop are O(1)—each checkpoint stores the previous max, so pop simply restores it without scanning.
 
-| Operation         | Action                                                                         |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `Enter(ref_id)`   | Push frame (parent = `current`), set `current = len-1`, follow `successors[0]` |
-| `Exit(ref_id)`    | Verify ref_id, set `current = frame.parent`, continue with `frame.returns`     |
-| Save backtrack    | Store `current`                                                                |
-| Restore backtrack | Set `current` to saved value                                                   |
+| Operation          | Action                                                                         |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `Enter(ref_id)`    | Push frame (parent = `current`), set `current = len-1`, follow `successors[0]` |
+| `Exit(ref_id)`     | Verify ref_id, set `current = frame.parent`, continue with `frame.returns`     |
+| Save checkpoint    | Store `current`                                                                |
+| Restore checkpoint | Set `current` to saved value                                                   |
 
 **Why index instead of depth?** Using logical depth breaks on Enter-Exit-Enter sequences:
 
@@ -243,11 +240,11 @@ Input: boolean
 7. frames[current] = FB ✓
 ```
 
-Frames form a forest of call chains. Each backtrack point references an exact frame, not a depth.
+Frames form a forest of call chains. Each checkpoint references an exact frame, not a depth.
 
 ### Atomic Groups (Future)
 
-Cut/commit (discard backtrack points) works correctly: unreachable frames become garbage but cause no issues.
+Cut/commit (discard checkpoints) works correctly: unreachable frames become garbage but cause no issues.
 
 ### Variant Serialization
 
@@ -266,7 +263,7 @@ Details deferred.
 
 ## Consequences
 
-**Positive**: Append-only stacks make backtracking trivial. O(1) exit via stored returns. Navigation fully determined by `pre_nav`—no state tracking between transitions.
+**Positive**: Append-only stacks make backtracking trivial. O(1) exit via stored returns. Navigation fully determined by `nav`—no state tracking between transitions.
 
 **Negative**: Interpretation overhead. Recursion stack memory grows monotonically (bounded by `recursion_fuel`).
 

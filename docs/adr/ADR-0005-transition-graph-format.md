@@ -27,11 +27,14 @@ Relative range within a segment:
 ```rust
 #[repr(C)]
 struct Slice<T> {
-    start: u32,
-    len: u32,
+    start_index: u32,  // element index into segment array (NOT byte offset)
+    len: u16,          // 65k elements per slice is sufficient
     _phantom: PhantomData<T>,
 }
+// 6 bytes, align 4
 ```
+
+`start_index` is an **element index**, not a byte offset. This naming distinguishes it from byte offsets like `StringRef.offset` and `CompiledQuery.*_offset`. The distinction matters for typed array access.
 
 ### Transition
 
@@ -39,20 +42,19 @@ struct Slice<T> {
 #[repr(C, align(64))]
 struct Transition {
     // --- 32 bytes metadata ---
-    matcher: Matcher,              // 16
-    pre_nav: PreNav,               // 2 (see ADR-0008)
-    _pad1: [u8; 2],                // 2
-    effects: Slice<EffectOp>,      // 8
-    ref_marker: RefTransition,     // 4
+    matcher: Matcher,              // 16 (offset 0)
+    ref_marker: RefTransition,     // 4  (offset 16)
+    successor_count: u32,          // 4  (offset 20)
+    effects: Slice<EffectOp>,      // 6  (offset 24, when no effects: start and len are zero)
+    nav: Nav,                      // 2  (offset 30, see ADR-0008)
 
     // --- 32 bytes control flow ---
-    successor_count: u32,          // 4
-    successor_data: [u32; 7],      // 28
+    successor_data: [u32; 8],      // 32 (offset 32)
 }
 // 64 bytes, align 64 (cache-line aligned)
 ```
 
-Navigation is fully determined by `pre_nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for `PreNav` definition and semantics.
+Navigation is fully determined by `nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for `Nav` definition and semantics.
 
 Single `ref_marker` slot—sequences like `Enter(A) → Enter(B)` remain as epsilon chains.
 
@@ -62,18 +64,18 @@ Successors use a small-size optimization to avoid indirection for the common cas
 
 | `successor_count` | Layout                                                                              |
 | ----------------- | ----------------------------------------------------------------------------------- |
-| 0–7               | `successor_data[0..count]` contains `TransitionId` values directly                  |
-| > 7               | `successor_data[0]` is index into `successors` segment, `successor_count` is length |
+| 0–8               | `successor_data[0..count]` contains `TransitionId` values directly                  |
+| > 8               | `successor_data[0]` is index into `successors` segment, `successor_count` is length |
 
-Why 7 slots: 32 available bytes / 4 bytes per `TransitionId` = 8 slots, minus 1 for the count field leaves 7.
+Why 8 slots: Moving `successor_count` into the metadata block frees 32 bytes for `successor_data`, giving 32 / 4 = 8 inline slots.
 
 Coverage:
 
 - Linear sequences: 1 successor
 - Simple branches, quantifiers: 2 successors
-- Most alternations: 2–7 branches
+- Most alternations: 2–8 branches
 
-Only massive alternations (8+ branches) spill to the external buffer.
+Only massive alternations (9+ branches) spill to the external buffer.
 
 Cache benefits:
 
@@ -104,7 +106,7 @@ enum Matcher {
 
 `Option<NodeFieldId>` uses 0 for `None` (niche optimization).
 
-Navigation (descend/ascend) is handled by `PreNav`, not matchers. Matchers are purely for node matching.
+Navigation (descend/ascend) is handled by `Nav`, not matchers. Matchers are purely for node matching.
 
 ### RefTransition
 
@@ -167,20 +169,18 @@ enum EffectOp {
 // 4 bytes, align 2
 ```
 
-`CaptureNode` is explicit—graph construction places it at the correct position relative to container effects.
-
-**Invariant**: The interpreter clears `matched_node` slot on `Enter` and backtrack restore. This prevents stale captures if a graph construction bug produces `Epsilon → CaptureNode` without a preceding `Match`. With proper graphs, `CaptureNode` always follows a successful match that populates the slot.
+**Graph construction invariant**: `CaptureNode` may only appear in the effects list of a transition where `matcher` is `Node`, `Anonymous`, or `Wildcard`. Placing `CaptureNode` on an `Epsilon` transition is illegal—graph construction must enforce this at build time.
 
 ### View Types
 
 ```rust
 struct TransitionView<'a> {
-    query_ir: &'a QueryIR,
+    query: &'a CompiledQuery,
     raw: &'a Transition,
 }
 
 struct MatcherView<'a> {
-    query_ir: &'a QueryIR,
+    query: &'a CompiledQuery,
     raw: &'a Matcher,
 }
 
@@ -191,7 +191,7 @@ Views resolve `Slice<T>` to `&[T]`. `TransitionView::successors()` returns `&[Tr
 
 ### Quantifiers
 
-Examples in this section show graph structure and effects. Navigation (`pre_nav`) is omitted for brevity—see [ADR-0008](ADR-0008-tree-navigation.md) for full transition examples with navigation.
+Examples in this section show graph structure and effects. Navigation (`nav`) is omitted for brevity—see [ADR-0008](ADR-0008-tree-navigation.md) for full transition examples with navigation.
 
 **Greedy `*`**:
 
@@ -228,8 +228,8 @@ Before elimination:
 ```
 T0: ε [StartArray]                    → [T1]
 T1: ε (branch)                        → [T2, T4]
-T2: Match(identifier)                 → [T3]
-T3: ε [CaptureNode, PushElement]      → [T1]
+T2: Match(identifier) [CaptureNode]   → [T3]
+T3: ε [PushElement]                   → [T1]
 T4: ε [EndArray]                      → [T5]
 T5: ε [Field("params")]               → [...]
 ```
@@ -277,7 +277,7 @@ Partial—full elimination impossible due to single `ref_marker` and effect orde
 
 **Execution order** (all transitions, including epsilon):
 
-1. Execute `pre_nav` and matcher
+1. Execute `nav` and matcher
 2. On success: emit `effects` in order
 
 With explicit `CaptureNode`, effect order is unambiguous. When eliminating epsilon chains, concatenate effect lists in traversal order.
