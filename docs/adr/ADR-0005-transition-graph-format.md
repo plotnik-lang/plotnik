@@ -25,14 +25,16 @@ type RefId = u16;
 Relative range within a segment:
 
 ```rust
-#[repr(C)]
+#[repr(C, packed)]
 struct Slice<T> {
     start_index: u32,  // element index into segment array (NOT byte offset)
     len: u16,          // 65k elements per slice is sufficient
-    _phantom: PhantomData<T>,
+    _phantom: PhantomData<fn() -> T>,
 }
-// 6 bytes, align 4
+// 6 bytes, align 1 (packed to avoid padding)
 ```
+
+**Note**: `repr(C, packed)` is required to achieve 6 bytes. Standard `repr(C)` would pad to 8 bytes for alignment. The packed repr means field access may be unaligned on some platforms—accessors should copy values out rather than returning references.
 
 `start_index` is an **element index**, not a byte offset. This naming distinguishes it from byte offsets like `StringRef.offset` and `CompiledQuery.*_offset`. The distinction matters for typed array access.
 
