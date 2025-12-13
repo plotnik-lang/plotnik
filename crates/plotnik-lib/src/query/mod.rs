@@ -48,6 +48,8 @@ mod recursion_tests;
 mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
+#[cfg(test)]
+mod typing_tests;
 
 use std::collections::{HashMap, HashSet};
 
@@ -183,8 +185,8 @@ impl<'a> Query<'a> {
             return self;
         }
         self.construct_graph();
+        self.infer_types(); // Run before optimization to avoid merged effects
         self.optimize_graph();
-        self.infer_types();
         self
     }
 

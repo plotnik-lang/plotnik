@@ -5,11 +5,11 @@
 //!
 //! # Algorithm Overview
 //!
-//! 1. Walk graph from each definition entry point
-//! 2. Track "pending value" - the captured value waiting for a Field assignment
-//! 3. When Field(name) is encountered, record the pending value as a field
-//! 4. Handle branching by merging field sets from all branches (1-level merge)
-//! 5. Handle quantifiers via array cardinality markers
+//! 1. Walk graph from each definition entry point using stack-based scope tracking
+//! 2. StartObject/EndObject delimit scopes that may become composite types
+//! 3. When EndObject is hit, the scope is resolved into a pending type
+//! 4. QIS (Quantifier-Induced Scope) creates implicit structs for multi-capture quantifiers
+//! 5. Field(name) consumes pending type and records it in current scope
 
 use std::collections::HashSet;
 
@@ -104,13 +104,26 @@ impl Cardinality {
             x => x,
         }
     }
+
+    fn multiply(self, other: Cardinality) -> Cardinality {
+        use Cardinality::*;
+        match (self, other) {
+            (One, x) | (x, One) => x,
+            (Optional, Optional) => Optional,
+            (Optional, Plus) | (Plus, Optional) => Star,
+            (Optional, Star) | (Star, Optional) => Star,
+            (Star, _) | (_, Star) => Star,
+            (Plus, Plus) => Plus,
+        }
+    }
 }
 
+/// Shape includes type information for proper compatibility checking.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 enum TypeShape<'src> {
     Primitive(TypeId),
-    Struct(Vec<&'src str>),
+    Struct(Vec<(&'src str, TypeId)>),
+    Composite(TypeId),
 }
 
 impl<'src> TypeShape<'src> {
@@ -120,8 +133,9 @@ impl<'src> TypeShape<'src> {
             TypeShape::Primitive(TYPE_STR) => TypeDescription::String,
             TypeShape::Primitive(_) => TypeDescription::Node,
             TypeShape::Struct(fields) => {
-                TypeDescription::Struct(fields.iter().map(|s| s.to_string()).collect())
+                TypeDescription::Struct(fields.iter().map(|(n, _)| n.to_string()).collect())
             }
+            TypeShape::Composite(_) => TypeDescription::Struct(vec!["...".to_string()]),
         }
     }
 }
@@ -148,15 +162,15 @@ impl<'src> ScopeInfo<'src> {
         &mut self,
         name: &'src str,
         base_type: TypeId,
+        shape: TypeShape<'src>,
         cardinality: Cardinality,
         span: TextRange,
     ) {
-        let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
             if !existing.all_shapes.contains(&shape) {
-                existing.all_shapes.push(shape.clone());
+                existing.all_shapes.push(shape);
             }
             existing.spans.push(span);
         } else {
@@ -217,6 +231,10 @@ impl<'src> ScopeInfo<'src> {
             }
         }
     }
+
+    fn is_empty(&self) -> bool {
+        self.fields.is_empty() && self.variants.is_empty()
+    }
 }
 
 #[derive(Debug)]
@@ -238,42 +256,104 @@ fn check_compatibility<'src>(
             shapes: vec![a.clone(), b.clone()],
             spans: vec![],
         }),
-        (TypeShape::Struct(_), TypeShape::Primitive(_))
-        | (TypeShape::Primitive(_), TypeShape::Struct(_)) => Some(MergeError {
+        (TypeShape::Composite(t1), TypeShape::Composite(t2)) if t1 == t2 => None,
+        (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
+            // Compare field names AND types
+            if fields_a.len() != fields_b.len() {
+                return Some(MergeError {
+                    field,
+                    shapes: vec![a.clone(), b.clone()],
+                    spans: vec![],
+                });
+            }
+            for ((name_a, type_a), (name_b, type_b)) in fields_a.iter().zip(fields_b.iter()) {
+                if name_a != name_b || type_a != type_b {
+                    return Some(MergeError {
+                        field,
+                        shapes: vec![a.clone(), b.clone()],
+                        spans: vec![],
+                    });
+                }
+            }
+            None
+        }
+        // Struct vs Primitive or Composite mismatch
+        _ => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
             spans: vec![],
         }),
-        (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
-            if fields_a == fields_b {
-                None
-            } else {
-                Some(MergeError {
-                    field,
-                    shapes: vec![a.clone(), b.clone()],
-                    spans: vec![],
-                })
-            }
+    }
+}
+
+/// Entry on the scope stack during traversal.
+#[derive(Debug, Clone)]
+struct ScopeStackEntry<'src> {
+    scope: ScopeInfo<'src>,
+    is_object: bool,
+    /// Captures pending type before StartObject (for sequences captured as a whole)
+    outer_pending: Option<PendingType<'src>>,
+}
+
+impl<'src> ScopeStackEntry<'src> {
+    fn new_root() -> Self {
+        Self {
+            scope: ScopeInfo::default(),
+            is_object: false,
+            outer_pending: None,
+        }
+    }
+
+    fn new_object(outer_pending: Option<PendingType<'src>>) -> Self {
+        Self {
+            scope: ScopeInfo::default(),
+            is_object: true,
+            outer_pending,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct TraversalState<'src> {
-    pending_type: Option<TypeId>,
+/// Pending type waiting for a Field assignment.
+#[derive(Debug, Clone)]
+struct PendingType<'src> {
+    shape: TypeShape<'src>,
+    base_type: TypeId,
     cardinality: Cardinality,
+}
+
+impl<'src> PendingType<'src> {
+    fn primitive(ty: TypeId) -> Self {
+        Self {
+            shape: TypeShape::Primitive(ty),
+            base_type: ty,
+            cardinality: Cardinality::One,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TraversalState<'src> {
+    pending: Option<PendingType<'src>>,
     current_variant: Option<&'src str>,
-    object_depth: u32,
+    /// Stack of array cardinalities (for nested arrays)
+    array_cardinality_stack: Vec<Cardinality>,
 }
 
 impl Default for TraversalState<'_> {
     fn default() -> Self {
         Self {
-            pending_type: None,
-            cardinality: Cardinality::One,
+            pending: None,
             current_variant: None,
-            object_depth: 0,
+            array_cardinality_stack: Vec::new(),
         }
+    }
+}
+
+impl TraversalState<'_> {
+    fn current_array_cardinality(&self) -> Cardinality {
+        self.array_cardinality_stack
+            .iter()
+            .fold(Cardinality::One, |acc, c| acc.multiply(*c))
     }
 }
 
@@ -284,6 +364,7 @@ struct InferenceContext<'src, 'g> {
     next_type_id: TypeId,
     diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
+    current_def_name: &'src str,
 }
 
 impl<'src, 'g> InferenceContext<'src, 'g> {
@@ -295,6 +376,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             next_type_id: 3, // TYPE_COMPOSITE_START
             diagnostics: Diagnostics::new(),
             errors: Vec::new(),
+            current_def_name: "",
         }
     }
 
@@ -305,15 +387,25 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
     }
 
     fn infer_definition(&mut self, def_name: &'src str, entry_id: NodeId) -> TypeId {
+        self.current_def_name = def_name;
         let mut visited = HashSet::new();
         let mut merge_errors = Vec::new();
-        let scope = self.traverse(
+        let mut scope_stack = vec![ScopeStackEntry::new_root()];
+
+        self.traverse(
             entry_id,
             TraversalState::default(),
             &mut visited,
             0,
             &mut merge_errors,
+            &mut scope_stack,
         );
+
+        // Pop to get final root scope
+        let root_entry = scope_stack
+            .pop()
+            .unwrap_or_else(|| ScopeStackEntry::new_root());
+        let scope = root_entry.scope;
 
         for err in merge_errors {
             let types_str = err
@@ -363,55 +455,127 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         visited: &mut HashSet<NodeId>,
         depth: usize,
         errors: &mut Vec<MergeError<'src>>,
-    ) -> ScopeInfo<'src> {
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) {
         if self.dead_nodes.contains(&node_id) || depth > 200 {
-            return ScopeInfo::default();
+            return;
         }
 
-        if !visited.insert(node_id) && depth > 50 {
-            return ScopeInfo::default();
+        // Don't re-visit nodes - each node's effects should only be processed once
+        if !visited.insert(node_id) {
+            return;
         }
 
         let node = self.graph.node(node_id);
-        let mut scope = ScopeInfo::default();
 
         for effect in &node.effects {
             match effect {
                 BuildEffect::CaptureNode => {
-                    state.pending_type = Some(TYPE_NODE);
+                    state.pending = Some(PendingType::primitive(TYPE_NODE));
                 }
                 BuildEffect::ToString => {
-                    state.pending_type = Some(TYPE_STR);
+                    state.pending = Some(PendingType::primitive(TYPE_STR));
                 }
                 BuildEffect::Field { name, span } => {
-                    if let Some(base_type) = state.pending_type.take() {
+                    if let Some(pending) = state.pending.take() {
+                        let current_scope = scope_stack
+                            .last_mut()
+                            .map(|e| &mut e.scope)
+                            .expect("scope stack should not be empty");
+
+                        let effective_cardinality = pending
+                            .cardinality
+                            .multiply(state.current_array_cardinality());
                         if let Some(tag) = state.current_variant {
-                            let variant_scope = scope.variants.entry(tag).or_default();
-                            variant_scope.add_field(*name, base_type, state.cardinality, *span);
+                            let variant_scope = current_scope.variants.entry(tag).or_default();
+                            variant_scope.add_field(
+                                *name,
+                                pending.base_type,
+                                pending.shape,
+                                effective_cardinality,
+                                *span,
+                            );
                         } else {
-                            scope.add_field(*name, base_type, state.cardinality, *span);
+                            current_scope.add_field(
+                                *name,
+                                pending.base_type,
+                                pending.shape,
+                                effective_cardinality,
+                                *span,
+                            );
                         }
                     }
-                    state.cardinality = Cardinality::One;
                 }
-                BuildEffect::StartArray => {}
+                BuildEffect::StartArray => {
+                    // Push Star cardinality onto the stack when entering an array
+                    state.array_cardinality_stack.push(Cardinality::Star);
+                }
                 BuildEffect::PushElement => {}
                 BuildEffect::EndArray => {
-                    state.cardinality = Cardinality::Star;
+                    // Pop cardinality when exiting array
+                    state.array_cardinality_stack.pop();
                 }
                 BuildEffect::StartObject => {
-                    state.object_depth += 1;
+                    // Push new object scope, saving outer pending type
+                    let entry = ScopeStackEntry::new_object(state.pending.take());
+                    scope_stack.push(entry);
                 }
                 BuildEffect::EndObject => {
-                    state.object_depth = state.object_depth.saturating_sub(1);
+                    // Pop the object scope
+                    if let Some(finished_entry) = scope_stack.pop() {
+                        if finished_entry.is_object {
+                            let finished_scope = finished_entry.scope;
+
+                            if !finished_scope.is_empty() {
+                                // Create a struct type for this scope
+                                let type_name = self.generate_scope_name();
+                                let type_id = self.create_struct_type(type_name, &finished_scope);
+
+                                // Collect field info for shape
+                                let field_types: Vec<(&'src str, TypeId)> = finished_scope
+                                    .fields
+                                    .iter()
+                                    .map(|(name, info)| (*name, info.base_type))
+                                    .collect();
+
+                                state.pending = Some(PendingType {
+                                    shape: TypeShape::Composite(type_id),
+                                    base_type: type_id,
+                                    cardinality: Cardinality::One,
+                                });
+
+                                // If there were fields, update shape to include them
+                                if !field_types.is_empty() {
+                                    if let Some(ref mut p) = state.pending {
+                                        p.shape = TypeShape::Struct(field_types);
+                                    }
+                                }
+                            } else {
+                                // Empty object - restore outer pending if any
+                                state.pending = finished_entry.outer_pending;
+                            }
+                        } else {
+                            // Shouldn't happen - mismatched StartObject/EndObject
+                            // Put it back
+                            scope_stack.push(finished_entry);
+                        }
+                    }
                 }
                 BuildEffect::StartVariant(tag) => {
                     state.current_variant = Some(*tag);
-                    scope.has_variants = true;
+                    let current_scope = scope_stack
+                        .last_mut()
+                        .map(|e| &mut e.scope)
+                        .expect("scope stack should not be empty");
+                    current_scope.has_variants = true;
                 }
                 BuildEffect::EndVariant => {
                     if let Some(tag) = state.current_variant.take() {
-                        scope.variants.entry(tag).or_default();
+                        let current_scope = scope_stack
+                            .last_mut()
+                            .map(|e| &mut e.scope)
+                            .expect("scope stack should not be empty");
+                        current_scope.variants.entry(tag).or_default();
                     }
                 }
             }
@@ -427,20 +591,58 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         if live_successors.is_empty() {
             // Terminal node
         } else if live_successors.len() == 1 {
-            let child_scope = self.traverse(live_successors[0], state, visited, depth + 1, errors);
-            let merge_errors = scope.merge_from(child_scope);
-            errors.extend(merge_errors);
+            self.traverse(
+                live_successors[0],
+                state,
+                visited,
+                depth + 1,
+                errors,
+                scope_stack,
+            );
         } else {
+            // Branching: collect results from all branches, then merge
             let total_branches = live_successors.len();
-            for succ in live_successors {
-                let child_scope = self.traverse(succ, state, visited, depth + 1, errors);
-                let merge_errors = scope.merge_from(child_scope);
-                errors.extend(merge_errors);
-            }
-            scope.apply_optionality(total_branches);
-        }
+            let initial_scope_len = scope_stack.len();
+            let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
 
-        scope
+            // Traverse each branch independently
+            for succ in &live_successors {
+                let mut branch_stack = scope_stack.clone();
+
+                self.traverse(
+                    *succ,
+                    state.clone(),
+                    &mut visited.clone(),
+                    depth + 1,
+                    errors,
+                    &mut branch_stack,
+                );
+
+                // Extract scope from this branch (pop any nested scopes first)
+                while branch_stack.len() > initial_scope_len {
+                    branch_stack.pop();
+                }
+                if let Some(entry) = branch_stack.last() {
+                    branch_scopes.push(entry.scope.clone());
+                }
+            }
+
+            // Merge all branch scopes into main scope
+            if let Some(main_entry) = scope_stack.last_mut() {
+                for branch_scope in branch_scopes {
+                    let merge_errs = main_entry.scope.merge_from(branch_scope);
+                    errors.extend(merge_errs);
+                }
+                // Apply optionality for fields not present in all branches
+                main_entry.scope.apply_optionality(total_branches);
+            }
+        }
+    }
+
+    fn generate_scope_name(&self) -> &'src str {
+        // Generate synthetic name - leak for simplicity
+        let name = format!("{}Scope{}", self.current_def_name, self.next_type_id);
+        Box::leak(name.into_boxed_str())
     }
 
     fn create_struct_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
