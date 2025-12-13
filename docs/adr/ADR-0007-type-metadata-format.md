@@ -56,7 +56,7 @@ struct TypeDef {
     members: Slice<TypeMember>,  // 6 - see interpretation below
     _pad2: u16,                  // 2
 }
-// 12 bytes, align 4
+// 12 bytes, align 2 (due to packed Slice having align 1)
 ```
 
 The `members` field has dual semantics based on `kind`:
