@@ -1,4 +1,4 @@
-# ADR-0004: Query IR Binary Format
+# ADR-0004: Compiled Query Binary Format
 
 - **Status**: Accepted
 - **Date**: 2024-12-12
@@ -6,15 +6,15 @@
 
 ## Context
 
-The Query IR lives in a single contiguous allocation—cache-friendly, zero fragmentation, portable to WASM. This ADR defines the binary layout. Graph structures are in [ADR-0005](ADR-0005-transition-graph-format.md). Type metadata is in [ADR-0007](ADR-0007-type-metadata-format.md).
+The compiled query lives in a single contiguous allocation—cache-friendly, zero fragmentation, portable to WASM. This ADR defines the binary layout. Graph structures are in [ADR-0005](ADR-0005-transition-graph-format.md). Type metadata is in [ADR-0007](ADR-0007-type-metadata-format.md).
 
 ## Decision
 
 ### Container
 
 ```rust
-struct QueryIR {
-    ir_buffer: QueryIRBuffer,
+struct CompiledQuery {
+    buffer: CompiledQueryBuffer,
     successors_offset: u32,
     effects_offset: u32,
     negated_fields_offset: u32,
@@ -23,18 +23,18 @@ struct QueryIR {
     type_defs_offset: u32,
     type_members_offset: u32,
     entrypoints_offset: u32,
-    ignored_kinds_offset: u32,  // 0 = no ignored kinds
+    trivia_kinds_offset: u32,  // 0 = no trivia kinds
 }
 ```
 
-Transitions start at offset 0. Default entrypoint is always at offset 0.
+Transitions start at buffer offset 0. The default entrypoint is **Transition 0** (the root of the graph). The `entrypoints` table provides named exports for multi-definition queries; it does not affect the default entrypoint.
 
-### QueryIRBuffer
+### CompiledQueryBuffer
 
 ```rust
 const BUFFER_ALIGN: usize = 64;  // cache-line alignment for transitions
 
-struct QueryIRBuffer {
+struct CompiledQueryBuffer {
     ptr: *mut u8,
     len: usize,
     owned: bool,  // true if allocated, false if mmap'd
@@ -50,7 +50,7 @@ Allocated via `Layout::from_size_align(len, BUFFER_ALIGN)`. Standard `Box<[u8]>`
 | `true`  | `std::alloc::alloc` | Reconstruct `Layout`, call `std::alloc::dealloc` |
 | `false` | `mmap` / external   | No-op (caller manages lifetime)                  |
 
-For mmap'd queries, the OS maps file pages directly into address space. The 64-byte header ensures buffer data starts aligned. `QueryIRBuffer` with `owned: false` provides a view without taking ownership—the backing file mapping must outlive the `QueryIR`.
+For mmap'd queries, the OS maps file pages directly into address space. The 64-byte header ensures buffer data starts aligned. `CompiledQueryBuffer` with `owned: false` provides a view without taking ownership—the backing file mapping must outlive the `CompiledQuery`.
 
 **Deallocation**: When `owned: true`, `Drop` must reconstruct the exact `Layout` (size + 64-byte alignment) and call `std::alloc::dealloc`. Using `Box::from_raw` or similar would assume align=1 and cause undefined behavior.
 
@@ -67,7 +67,7 @@ For mmap'd queries, the OS maps file pages directly into address space. The 64-b
 | Type Defs      | `[TypeDef; T]`      | `type_defs_offset`      | 4     |
 | Type Members   | `[TypeMember; U]`   | `type_members_offset`   | 2     |
 | Entrypoints    | `[Entrypoint; V]`   | `entrypoints_offset`    | 4     |
-| Ignored Kinds  | `[NodeTypeId; W]`   | `ignored_kinds_offset`  | 2     |
+| Trivia Kinds   | `[NodeTypeId; W]`   | `trivia_kinds_offset`   | 2     |
 
 Each offset is aligned: `(offset + align - 1) & !(align - 1)`.
 
@@ -82,7 +82,7 @@ type StringId = u16;
 
 #[repr(C)]
 struct StringRef {
-    offset: u32,  // into string_bytes
+    offset: u32,  // byte offset into string_bytes (NOT element index)
     len: u16,
     _pad: u16,
 }
@@ -128,7 +128,7 @@ Header (64 bytes):
   type_defs_offset: u32
   type_members_offset: u32
   entrypoints_offset: u32
-  ignored_kinds_offset: u32
+  trivia_kinds_offset: u32
   _pad: [u8; 12]           reserved, zero-filled
 
 Buffer Data (buffer_len bytes)
@@ -169,6 +169,7 @@ Buffer layout:
 0x0300  Type Defs      [Record{...}, Enum{...}, ...]
 0x0340  Type Members   [{name,Str}, {Ident,Ty5}, ...]
 0x0380  Entrypoints    [{name=Func, target=Tr0, type=Ty3}, ...]
+0x03A0  Trivia Kinds   [comment, ...]
 ```
 
 `"name"` stored once, used by both `@name` captures.

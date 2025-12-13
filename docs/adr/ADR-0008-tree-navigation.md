@@ -8,10 +8,10 @@
 Plotnik's query execution engine ([ADR-0006](ADR-0006-dynamic-query-execution.md)) navigates tree-sitter syntax trees. This ADR covers:
 
 1. Which tree-sitter API to use (TreeCursor vs Node)
-2. How `PreNav` encodes navigation and anchor constraints
+2. How `Nav` encodes navigation and anchor constraints
 3. How transitions execute navigation deterministically
 
-Key insight: navigation decisions can be resolved at graph construction time, not runtime. Each transition carries its own `PreNav` instruction—no need to track previous matcher state.
+Key insight: navigation decisions can be resolved at graph construction time, not runtime. Each transition carries its own `Nav` instruction—no need to track previous matcher state.
 
 ## Decision
 
@@ -30,20 +30,20 @@ struct BacktrackCheckpoint {
 
 **Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root—`reset(node)` invalidates all checkpoints.
 
-### PreNav
+### Nav
 
 Navigation and anchor constraints unified into a single enum:
 
 ```rust
 #[repr(C)]
-struct PreNav {
-    kind: PreNavKind,  // 1 byte
-    level: u8,         // 1 byte - ascent level count for Up*, ignored otherwise
+struct Nav {
+    kind: NavKind,  // 1 byte
+    level: u8,      // 1 byte - ascent level count for Up*, ignored otherwise
 }
 // 2 bytes total
 
 #[repr(u8)]
-enum PreNavKind {
+enum NavKind {
     // No movement (first transition only, cursor at root)
     Stay = 0,
 
@@ -70,15 +70,15 @@ For non-Up variants, `level` is ignored (conventionally 0). For Up variants, `le
 
 ### Trivia
 
-**Trivia** = anonymous nodes + language-specific ignored named nodes (e.g., `comment`).
+**Trivia** = anonymous nodes + language-specific trivia named nodes (e.g., `comment`).
 
-The ignored kinds list is populated from the `Lang` binding during IR construction and stored in the `ignored_kinds` segment ([ADR-0004](ADR-0004-query-ir-binary-format.md)). Zero offset means no ignored kinds.
+The trivia kinds list is populated from the `Lang` binding during IR construction and stored in the `trivia_kinds` segment ([ADR-0004](ADR-0004-query-ir-binary-format.md)). Zero offset means no trivia kinds.
 
 **Skip invariant**: A node is never skipped if its kind matches the current transition's matcher target. This ensures `(comment)` explicitly in a query still matches comment nodes, even though comments are typically ignored.
 
 ### Execution Semantics
 
-Navigation and matching are intertwined in a search loop. The `PreNav` determines initial movement and skip policy for the loop.
+Navigation and matching are intertwined in a search loop. The `Nav` determines initial movement and skip policy for the loop.
 
 **Stay**: No cursor movement. Used only for the first transition when cursor is already positioned at root. Then attempt match.
 
@@ -119,17 +119,17 @@ Example: `(foo (bar))` matching `(foo (foo) (foo) (bar))`:
 
 ### Anchor Lowering
 
-The anchor operator (`.`) in the query language compiles to `PreNav` variants:
+The anchor operator (`.`) in the query language compiles to `Nav` variants:
 
-| Query Pattern        | PreNav on Following Transition |
-| -------------------- | ------------------------------ |
-| `(foo) (bar)`        | `Next`                         |
-| `(foo) . (bar)`      | `NextSkipTrivia`               |
-| `"x" . (bar)`        | `NextExact`                    |
-| `(parent (child))`   | `Down` on child's transition   |
-| `(parent . (child))` | `DownSkipTrivia`               |
-| `(parent (child) .)` | `UpSkipTrivia` on exit         |
-| `(parent "x" .)`     | `UpExact` on exit              |
+| Query Pattern        | Nav on Following Transition  |
+| -------------------- | ---------------------------- |
+| `(foo) (bar)`        | `Next`                       |
+| `(foo) . (bar)`      | `NextSkipTrivia`             |
+| `"x" . (bar)`        | `NextExact`                  |
+| `(parent (child))`   | `Down` on child's transition |
+| `(parent . (child))` | `DownSkipTrivia`             |
+| `(parent (child) .)` | `UpSkipTrivia` on exit       |
+| `(parent "x" .)`     | `UpExact` on exit            |
 
 Mode determined by what **precedes** the anchor:
 
@@ -161,7 +161,7 @@ Cannot combine into `UpSkipTrivia(2)` because constraints apply at each level.
 ### Execution Flow
 
 ```
-1. MOVE        pre_nav → initial cursor movement
+1. MOVE        nav → initial cursor movement
 2. SEARCH      loop: try matcher, on fail check skip policy, advance or fail
 3. EFFECTS     on match success: execute effects list (including explicit CaptureNode)
 ```
@@ -319,7 +319,7 @@ Previous design had `post_anchor` field validated after match. Rejected:
 
 - O(1) sibling traversal
 - 4-byte checkpoints
-- No `prev_matcher` tracking—navigation fully determined by `PreNav`
+- No `prev_matcher` tracking—navigation fully determined by `Nav`
 - Simpler execution loop: navigate → search → match (no post-validation)
 - Anchor constraints resolved at graph construction time
 
