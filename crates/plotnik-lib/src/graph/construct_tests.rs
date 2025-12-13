@@ -1,7 +1,6 @@
 //! Tests for AST-to-graph construction.
 
-use crate::graph::{BuildEffect, BuildGraph, BuildMatcher, RefMarker};
-use crate::ir::{Nav, NavKind};
+use crate::graph::BuildGraph;
 use crate::parser::Parser;
 use crate::parser::lexer::lex;
 
@@ -14,112 +13,6 @@ fn parse_and_construct(source: &str) -> BuildGraph<'_> {
     construct_graph(source, &result.root)
 }
 
-fn dump_graph(graph: &BuildGraph) -> String {
-    let mut out = String::new();
-
-    for (name, entry) in graph.definitions() {
-        out.push_str(&format!("{} = N{}\n", name, entry));
-    }
-    if graph.definitions().next().is_some() {
-        out.push('\n');
-    }
-
-    for (id, node) in graph.iter() {
-        out.push_str(&format!("N{}: ", id));
-
-        // Nav (skip Stay as it's the default)
-        if !node.nav.is_stay() {
-            let nav_str = format_nav(&node.nav);
-            out.push_str(&format!("[{}] ", nav_str));
-        }
-
-        // Matcher
-        match &node.matcher {
-            BuildMatcher::Epsilon => out.push('ε'),
-            BuildMatcher::Node {
-                kind,
-                field,
-                negated_fields,
-            } => {
-                out.push_str(&format!("({})", kind));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-                for neg in negated_fields {
-                    out.push_str(&format!(" !{}", neg));
-                }
-            }
-            BuildMatcher::Anonymous { literal, field } => {
-                out.push_str(&format!("\"{}\"", literal));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-            BuildMatcher::Wildcard { field } => {
-                out.push('_');
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-        }
-
-        // Ref marker
-        match &node.ref_marker {
-            RefMarker::None => {}
-            RefMarker::Enter { ref_id } => {
-                let name = node.ref_name.unwrap_or("?");
-                out.push_str(&format!(" +Enter({}, {})", ref_id, name));
-            }
-            RefMarker::Exit { ref_id } => out.push_str(&format!(" +Exit({})", ref_id)),
-        }
-
-        // Effects
-        for effect in &node.effects {
-            let eff = match effect {
-                BuildEffect::CaptureNode => "Capture".to_string(),
-                BuildEffect::StartArray => "StartArray".to_string(),
-                BuildEffect::PushElement => "Push".to_string(),
-                BuildEffect::EndArray => "EndArray".to_string(),
-                BuildEffect::StartObject => "StartObj".to_string(),
-                BuildEffect::EndObject => "EndObj".to_string(),
-                BuildEffect::Field(f) => format!("Field({})", f),
-                BuildEffect::StartVariant(v) => format!("Variant({})", v),
-                BuildEffect::EndVariant => "EndVariant".to_string(),
-                BuildEffect::ToString => "ToString".to_string(),
-            };
-            out.push_str(&format!(" [{}]", eff));
-        }
-
-        // Successors
-        if node.successors.is_empty() {
-            out.push_str(" → ∅");
-        } else {
-            out.push_str(" → ");
-            let succs: Vec<_> = node.successors.iter().map(|s| format!("N{}", s)).collect();
-            out.push_str(&succs.join(", "));
-        }
-
-        out.push('\n');
-    }
-
-    out
-}
-
-fn format_nav(nav: &Nav) -> String {
-    match nav.kind {
-        NavKind::Stay => "Stay".to_string(),
-        NavKind::Next => "Next".to_string(),
-        NavKind::NextSkipTrivia => "Next.".to_string(),
-        NavKind::NextExact => "Next!".to_string(),
-        NavKind::Down => "Down".to_string(),
-        NavKind::DownSkipTrivia => "Down.".to_string(),
-        NavKind::DownExact => "Down!".to_string(),
-        NavKind::Up => format!("Up({})", nav.level),
-        NavKind::UpSkipTrivia => format!("Up.({})", nav.level),
-        NavKind::UpExact => format!("Up!({})", nav.level),
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Basic Expressions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,7 +21,7 @@ fn format_nav(nav: &Nav) -> String {
 fn simple_named_node() {
     let g = parse_and_construct("Foo = (identifier)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (identifier) → ∅
@@ -139,7 +32,7 @@ fn simple_named_node() {
 fn anonymous_string() {
     let g = parse_and_construct(r#"Op = "+""#);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     Op = N0
 
     N0: "+" → ∅
@@ -150,7 +43,7 @@ fn anonymous_string() {
 fn wildcard() {
     let g = parse_and_construct("Any = (_)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Any = N0
 
     N0: _ → ∅
@@ -161,7 +54,7 @@ fn wildcard() {
 fn wildcard_underscore_literal() {
     let g = parse_and_construct("Any = _");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Any = N0
 
     N0: _ → ∅
@@ -176,7 +69,7 @@ fn wildcard_underscore_literal() {
 fn nested_node() {
     let g = parse_and_construct("Foo = (call (identifier))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) → N1
@@ -189,7 +82,7 @@ fn nested_node() {
 fn deeply_nested() {
     let g = parse_and_construct("Foo = (a (b (c)))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (a) → N1
@@ -204,7 +97,7 @@ fn deeply_nested() {
 fn sibling_nodes() {
     let g = parse_and_construct("Foo = (call (identifier) (arguments))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) → N1
@@ -223,7 +116,7 @@ fn anchor_first_child() {
     // . before first child → DownSkipTrivia
     let g = parse_and_construct("Foo = (block . (statement))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (block) → N1
@@ -237,7 +130,7 @@ fn anchor_last_child() {
     // . after last child → UpSkipTrivia
     let g = parse_and_construct("Foo = (block (statement) .)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (block) → N1
@@ -251,7 +144,7 @@ fn anchor_adjacent_siblings() {
     // . between siblings → NextSkipTrivia
     let g = parse_and_construct("Foo = (block (a) . (b))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (block) → N1
@@ -266,7 +159,7 @@ fn anchor_both_ends() {
     // . at start and end
     let g = parse_and_construct("Foo = (array . (element) .)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (array) → N1
@@ -280,7 +173,7 @@ fn anchor_string_literal_first() {
     // . before string literal → DownExact
     let g = parse_and_construct(r#"Foo = (pair . ":" (value))"#);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     Foo = N0
 
     N0: (pair) → N1
@@ -296,7 +189,7 @@ fn anchor_string_literal_adjacent() {
     // Actually the anchor affects the FOLLOWING node, so ":" has Down, "=" has Next!
     let g = parse_and_construct(r#"Foo = (assignment (id) "=" . (value))"#);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     Foo = N0
 
     N0: (assignment) → N1
@@ -312,7 +205,7 @@ fn anchor_string_literal_last() {
     // . after string literal at end → UpExact
     let g = parse_and_construct(r#"Foo = (semi (stmt) ";" .)"#);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     Foo = N0
 
     N0: (semi) → N1
@@ -330,7 +223,7 @@ fn anchor_string_literal_last() {
 fn field_constraint() {
     let g = parse_and_construct("Foo = (call name: (identifier))");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) → N1
@@ -343,7 +236,7 @@ fn field_constraint() {
 fn negated_field() {
     let g = parse_and_construct("Foo = (call !arguments)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) !arguments → ∅
@@ -354,7 +247,7 @@ fn negated_field() {
 fn multiple_negated_fields() {
     let g = parse_and_construct("Foo = (call !arguments !type_arguments)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) !arguments !type_arguments → ∅
@@ -369,7 +262,7 @@ fn multiple_negated_fields() {
 fn sequence_expr() {
     let g = parse_and_construct("Foo = { (a) (b) }");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: ε [StartObj] → N1
@@ -383,7 +276,7 @@ fn sequence_expr() {
 fn empty_sequence() {
     let g = parse_and_construct("Foo = { }");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: ε [StartObj] → N1
@@ -400,7 +293,7 @@ fn empty_sequence() {
 fn untagged_alternation() {
     let g = parse_and_construct("Foo = [(identifier) (number)]");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: ε → N2, N3
@@ -414,7 +307,7 @@ fn untagged_alternation() {
 fn tagged_alternation() {
     let g = parse_and_construct("Foo = [Ident: (identifier) Num: (number)]");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: ε → N2, N5
@@ -432,7 +325,7 @@ fn tagged_alternation() {
 fn single_branch_alt() {
     let g = parse_and_construct("Foo = [(identifier)]");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: ε → N2
@@ -449,7 +342,7 @@ fn single_branch_alt() {
 fn simple_capture() {
     let g = parse_and_construct("Foo = (identifier) @name");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (identifier) [Capture] → N1
@@ -461,7 +354,7 @@ fn simple_capture() {
 fn capture_with_string_type() {
     let g = parse_and_construct("Foo = (identifier) @name ::string");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (identifier) [Capture] [ToString] → N1
@@ -473,7 +366,7 @@ fn capture_with_string_type() {
 fn nested_capture() {
     let g = parse_and_construct("Foo = (call name: (identifier) @fn_name)");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N0
 
     N0: (call) → N1
@@ -491,7 +384,7 @@ fn nested_capture() {
 fn zero_or_more() {
     let g = parse_and_construct("Foo = (identifier)*");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N1
 
     N0: (identifier) → N3
@@ -506,7 +399,7 @@ fn zero_or_more() {
 fn one_or_more() {
     let g = parse_and_construct("Foo = (identifier)+");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N1
 
     N0: (identifier) → N2
@@ -521,7 +414,7 @@ fn one_or_more() {
 fn optional() {
     let g = parse_and_construct("Foo = (identifier)?");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N1
 
     N0: (identifier) → N2
@@ -534,7 +427,7 @@ fn optional() {
 fn lazy_zero_or_more() {
     let g = parse_and_construct("Foo = (identifier)*?");
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Foo = N1
 
     N0: (identifier) → N3
@@ -558,7 +451,7 @@ fn simple_reference() {
         ",
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Ident = N0
     Foo = N1
 
@@ -579,7 +472,7 @@ fn multiple_references() {
         ",
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Expr = N0
     Foo = N4
 
@@ -610,7 +503,7 @@ fn multiple_definitions() {
         ",
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Ident = N0
     Num = N1
     Str = N2
@@ -636,7 +529,7 @@ fn function_pattern() {
         ",
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r"
+    insta::assert_snapshot!(g.dump(), @r"
     Func = N0
 
     N0: (function_definition) → N1
@@ -666,7 +559,7 @@ fn binary_expression_pattern() {
         "#,
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     BinOp = N0
 
     N0: (binary_expression) → N1

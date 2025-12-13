@@ -5,8 +5,6 @@ use crate::parser::Parser;
 use crate::parser::lexer::lex;
 use std::collections::HashSet;
 
-use super::dump_types;
-
 fn infer(source: &str) -> String {
     let tokens = lex(source);
     let parser = Parser::new(source, tokens);
@@ -15,7 +13,7 @@ fn infer(source: &str) -> String {
     let dead_nodes = HashSet::new();
 
     let inference = infer_types(&graph, &dead_nodes);
-    dump_types(&inference)
+    inference.dump()
 }
 
 #[test]

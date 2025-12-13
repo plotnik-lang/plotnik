@@ -1,152 +1,7 @@
 //! Tests for epsilon elimination optimization pass.
 
-use std::collections::HashSet;
-
 use super::*;
-use crate::graph::{BuildEffect, BuildMatcher, NodeId, RefMarker};
-
-fn dump_graph(graph: &BuildGraph) -> String {
-    let mut out = String::new();
-
-    for (name, entry) in graph.definitions() {
-        out.push_str(&format!("{} = N{}\n", name, entry));
-    }
-    if graph.definitions().next().is_some() {
-        out.push('\n');
-    }
-
-    for (id, node) in graph.iter() {
-        out.push_str(&format!("N{}: ", id));
-
-        match &node.matcher {
-            BuildMatcher::Epsilon => out.push('ε'),
-            BuildMatcher::Node {
-                kind,
-                field,
-                negated_fields,
-            } => {
-                out.push_str(&format!("({})", kind));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-                for neg in negated_fields {
-                    out.push_str(&format!(" !{}", neg));
-                }
-            }
-            BuildMatcher::Anonymous { literal, field } => {
-                out.push_str(&format!("\"{}\"", literal));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-            BuildMatcher::Wildcard { field } => {
-                out.push('_');
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-        }
-
-        match &node.ref_marker {
-            RefMarker::None => {}
-            RefMarker::Enter { ref_id } => out.push_str(&format!(" +Enter({})", ref_id)),
-            RefMarker::Exit { ref_id } => out.push_str(&format!(" +Exit({})", ref_id)),
-        }
-
-        for effect in &node.effects {
-            let eff = match effect {
-                BuildEffect::CaptureNode => "Capture".to_string(),
-                BuildEffect::StartArray => "StartArray".to_string(),
-                BuildEffect::PushElement => "Push".to_string(),
-                BuildEffect::EndArray => "EndArray".to_string(),
-                BuildEffect::StartObject => "StartObj".to_string(),
-                BuildEffect::EndObject => "EndObj".to_string(),
-                BuildEffect::Field(f) => format!("Field({})", f),
-                BuildEffect::StartVariant(v) => format!("Variant({})", v),
-                BuildEffect::EndVariant => "EndVariant".to_string(),
-                BuildEffect::ToString => "ToString".to_string(),
-            };
-            out.push_str(&format!(" [{}]", eff));
-        }
-
-        if node.successors.is_empty() {
-            out.push_str(" → ∅");
-        } else {
-            out.push_str(" → ");
-            let succs: Vec<_> = node.successors.iter().map(|s| format!("N{}", s)).collect();
-            out.push_str(&succs.join(", "));
-        }
-
-        out.push('\n');
-    }
-
-    out
-}
-
-fn dump_live_graph(graph: &BuildGraph, dead: &HashSet<NodeId>) -> String {
-    let mut out = String::new();
-
-    for (name, entry) in graph.definitions() {
-        out.push_str(&format!("{} = N{}\n", name, entry));
-    }
-    if graph.definitions().next().is_some() {
-        out.push('\n');
-    }
-
-    for (id, node) in graph.iter() {
-        if dead.contains(&id) {
-            continue;
-        }
-
-        out.push_str(&format!("N{}: ", id));
-
-        match &node.matcher {
-            BuildMatcher::Epsilon => out.push('ε'),
-            BuildMatcher::Node { kind, .. } => out.push_str(&format!("({})", kind)),
-            BuildMatcher::Anonymous { literal, .. } => out.push_str(&format!("\"{}\"", literal)),
-            BuildMatcher::Wildcard { .. } => out.push('_'),
-        }
-
-        match &node.ref_marker {
-            RefMarker::None => {}
-            RefMarker::Enter { ref_id } => out.push_str(&format!(" +Enter({})", ref_id)),
-            RefMarker::Exit { ref_id } => out.push_str(&format!(" +Exit({})", ref_id)),
-        }
-
-        for effect in &node.effects {
-            let eff = match effect {
-                BuildEffect::CaptureNode => "Capture".to_string(),
-                BuildEffect::StartArray => "StartArray".to_string(),
-                BuildEffect::PushElement => "Push".to_string(),
-                BuildEffect::EndArray => "EndArray".to_string(),
-                BuildEffect::StartObject => "StartObj".to_string(),
-                BuildEffect::EndObject => "EndObj".to_string(),
-                BuildEffect::Field(f) => format!("Field({})", f),
-                BuildEffect::StartVariant(v) => format!("Variant({})", v),
-                BuildEffect::EndVariant => "EndVariant".to_string(),
-                BuildEffect::ToString => "ToString".to_string(),
-            };
-            out.push_str(&format!(" [{}]", eff));
-        }
-
-        if node.successors.is_empty() {
-            out.push_str(" → ∅");
-        } else {
-            out.push_str(" → ");
-            let succs: Vec<_> = node
-                .successors
-                .iter()
-                .filter(|s| !dead.contains(s))
-                .map(|s| format!("N{}", s))
-                .collect();
-            out.push_str(&succs.join(", "));
-        }
-
-        out.push('\n');
-    }
-
-    out
-}
+use crate::graph::{BuildEffect, BuildMatcher, RefMarker};
 
 #[test]
 fn eliminates_simple_epsilon_chain() {
@@ -159,18 +14,18 @@ fn eliminates_simple_epsilon_chain() {
     g.connect(e2, e1);
     g.connect(e1, id);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → ∅
     N1: ε → N0
     N2: ε → N1
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     assert_eq!(stats.epsilons_eliminated, 2);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (identifier) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -184,21 +39,21 @@ fn keeps_branch_point_epsilon() {
     g.connect(branch, a);
     g.connect(branch, b);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (a) → ∅
     N1: (b) → ∅
     N2: ε → N0, N1
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     assert_eq!(stats.epsilons_eliminated, 0);
     assert_eq!(stats.epsilons_kept, 1);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (a) → ∅
     N1: (b) → ∅
     N2: ε → N0, N1
-    "#);
+    ");
 }
 
 #[test]
@@ -210,19 +65,19 @@ fn keeps_epsilon_with_enter_marker() {
     g.node_mut(enter).set_ref_marker(RefMarker::enter(0));
     g.connect(enter, target);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (target) → ∅
-    N1: ε +Enter(0) → N0
-    "#);
+    N1: ε +Enter(0, ?) → N0
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     assert_eq!(stats.epsilons_eliminated, 0);
     assert_eq!(stats.epsilons_kept, 1);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (target) → ∅
-    N1: ε +Enter(0) → N0
-    "#);
+    N1: ε +Enter(0, ?) → N0
+    ");
 }
 
 #[test]
@@ -257,18 +112,18 @@ fn merges_effects_into_successor() {
     g.node_mut(start_arr).add_effect(BuildEffect::StartArray);
     g.connect(start_arr, end_arr);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) [Capture] → ∅
     N1: ε [EndArray] → N0
     N2: ε [StartArray] → N1
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     assert_eq!(stats.epsilons_eliminated, 2);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (identifier) [StartArray] [EndArray] [Capture] → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -286,21 +141,21 @@ fn redirects_multiple_predecessors() {
     g.connect(a, eps);
     g.connect(b, eps);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (c) → ∅
     N1: ε → N0
     N2: (a) → N1
     N3: (b) → N1
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     assert_eq!(stats.epsilons_eliminated, 1);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (c) → ∅
     N2: (a) → N0
     N3: (b) → N0
-    "#);
+    ");
 }
 
 #[test]
@@ -313,22 +168,22 @@ fn updates_definition_entry_point() {
     g.connect(eps, id);
     g.add_definition("Def", eps);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     Def = N1
 
     N0: (identifier) → ∅
     N1: ε → N0
-    "#);
+    ");
 
     let (dead, _stats) = eliminate_epsilons(&mut g);
 
     // Definition should now point to identifier node
     assert_eq!(g.definition("Def"), Some(0));
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     Def = N0
 
     N0: (identifier) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -355,22 +210,22 @@ fn quantifier_preserves_branch_structure() {
     let inner = g.matcher_fragment(BuildMatcher::node("item"));
     let _frag = g.zero_or_more(inner);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N1
     N1: ε → N0, N2
     N2: ε → ∅
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     // Branch (N1) must remain, exit (N2) can't be eliminated (no successor)
     assert_eq!(stats.epsilons_kept, 2);
     assert_eq!(stats.epsilons_eliminated, 0);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (item) → N1
     N1: ε → N0, N2
     N2: ε → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -385,25 +240,25 @@ fn alternation_exit_epsilon_eliminated() {
     let final_node = g.add_matcher(BuildMatcher::node("end"));
     g.connect(frag.exit, final_node);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (a) → N3
     N1: (b) → N3
     N2: ε → N0, N1
     N3: ε → N4
     N4: (end) → ∅
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     // Exit epsilon (N3) should be eliminated, branch (N2) kept
     assert_eq!(stats.epsilons_eliminated, 1);
     assert_eq!(stats.epsilons_kept, 1);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (a) → N4
     N1: (b) → N4
     N2: ε → N0, N1
     N4: (end) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -420,22 +275,22 @@ fn does_not_merge_effects_into_ref_marker() {
     g.node_mut(field_eps).add_effect(BuildEffect::Field("name"));
     g.connect(field_eps, exit);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (target) → ∅
     N1: ε +Exit(0) → N0
     N2: ε [Field(name)] → N1
-    "#);
+    ");
 
     let (dead, stats) = eliminate_epsilons(&mut g);
 
     // Should NOT merge Field effect into Exit node
     assert_eq!(stats.epsilons_kept, 2);
     assert_eq!(stats.epsilons_eliminated, 0);
-    insta::assert_snapshot!(dump_live_graph(&g, &dead), @r#"
+    insta::assert_snapshot!(g.dump_live(&dead), @r"
     N0: (target) → ∅
     N1: ε +Exit(0) → N0
     N2: ε [Field(name)] → N1
-    "#);
+    ");
 }
 
 #[test]

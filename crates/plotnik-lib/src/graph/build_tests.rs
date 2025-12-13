@@ -2,88 +2,6 @@
 
 use super::*;
 
-fn dump_graph(graph: &BuildGraph) -> String {
-    let mut out = String::new();
-
-    for (name, entry) in graph.definitions() {
-        out.push_str(&format!("{} = N{}\n", name, entry));
-    }
-    if graph.definitions().next().is_some() {
-        out.push('\n');
-    }
-
-    for (id, node) in graph.iter() {
-        out.push_str(&format!("N{}: ", id));
-
-        // Matcher
-        match &node.matcher {
-            BuildMatcher::Epsilon => out.push('ε'),
-            BuildMatcher::Node {
-                kind,
-                field,
-                negated_fields,
-            } => {
-                out.push_str(&format!("({})", kind));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-                for neg in negated_fields {
-                    out.push_str(&format!(" !{}", neg));
-                }
-            }
-            BuildMatcher::Anonymous { literal, field } => {
-                out.push_str(&format!("\"{}\"", literal));
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-            BuildMatcher::Wildcard { field } => {
-                out.push('_');
-                if let Some(f) = field {
-                    out.push_str(&format!(" @{}", f));
-                }
-            }
-        }
-
-        // Ref marker
-        match &node.ref_marker {
-            RefMarker::None => {}
-            RefMarker::Enter { ref_id } => out.push_str(&format!(" +Enter({})", ref_id)),
-            RefMarker::Exit { ref_id } => out.push_str(&format!(" +Exit({})", ref_id)),
-        }
-
-        // Effects
-        for effect in &node.effects {
-            let eff = match effect {
-                BuildEffect::CaptureNode => "Capture".to_string(),
-                BuildEffect::StartArray => "StartArray".to_string(),
-                BuildEffect::PushElement => "Push".to_string(),
-                BuildEffect::EndArray => "EndArray".to_string(),
-                BuildEffect::StartObject => "StartObj".to_string(),
-                BuildEffect::EndObject => "EndObj".to_string(),
-                BuildEffect::Field(f) => format!("Field({})", f),
-                BuildEffect::StartVariant(v) => format!("Variant({})", v),
-                BuildEffect::EndVariant => "EndVariant".to_string(),
-                BuildEffect::ToString => "ToString".to_string(),
-            };
-            out.push_str(&format!(" [{}]", eff));
-        }
-
-        // Successors
-        if node.successors.is_empty() {
-            out.push_str(" → ∅");
-        } else {
-            out.push_str(" → ");
-            let succs: Vec<_> = node.successors.iter().map(|s| format!("N{}", s)).collect();
-            out.push_str(&succs.join(", "));
-        }
-
-        out.push('\n');
-    }
-
-    out
-}
-
 #[test]
 fn single_matcher() {
     let mut g = BuildGraph::new();
@@ -91,9 +9,9 @@ fn single_matcher() {
     let frag = g.matcher_fragment(BuildMatcher::node("identifier"));
 
     assert_eq!(frag.entry, frag.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -103,9 +21,9 @@ fn epsilon_fragment() {
     let frag = g.epsilon_fragment();
 
     assert_eq!(frag.entry, frag.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: ε → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -115,9 +33,9 @@ fn sequence_empty() {
     let frag = g.sequence(&[]);
 
     assert_eq!(frag.entry, frag.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: ε → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -128,9 +46,9 @@ fn sequence_single() {
     let frag = g.sequence(&[f1]);
 
     assert_eq!(frag, f1);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -143,10 +61,10 @@ fn sequence_two() {
 
     assert_eq!(frag.entry, f1.entry);
     assert_eq!(frag.exit, f2.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → N1
     N1: (number) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -160,11 +78,11 @@ fn sequence_three() {
 
     assert_eq!(frag.entry, f1.entry);
     assert_eq!(frag.exit, f3.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (a) → N1
     N1: (b) → N2
     N2: (c) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -174,9 +92,9 @@ fn alternation_empty() {
     let frag = g.alternation(&[]);
 
     assert_eq!(frag.entry, frag.exit);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: ε → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -187,9 +105,9 @@ fn alternation_single() {
     let frag = g.alternation(&[f1]);
 
     assert_eq!(frag, f1);
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -201,12 +119,12 @@ fn alternation_two() {
     let frag = g.alternation(&[f1, f2]);
 
     // Entry connects to both branches, both branches connect to exit
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) → N3
     N1: (number) → N3
     N2: ε → N0, N1
     N3: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 2);
     assert_eq!(frag.exit, 3);
 }
@@ -219,11 +137,11 @@ fn zero_or_more_greedy() {
     let frag = g.zero_or_more(inner);
 
     // Greedy: branch tries inner first, then exit
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N1
     N1: ε → N0, N2
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 1); // branch node
     assert_eq!(frag.exit, 2);
 }
@@ -236,11 +154,11 @@ fn zero_or_more_lazy() {
     let frag = g.zero_or_more_lazy(inner);
 
     // Non-greedy: branch tries exit first, then inner
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N1
     N1: ε → N2, N0
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 1);
     assert_eq!(frag.exit, 2);
 }
@@ -253,11 +171,11 @@ fn one_or_more_greedy() {
     let frag = g.one_or_more(inner);
 
     // Entry is inner, greedy branch after
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N1
     N1: ε → N0, N2
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 0); // inner node
     assert_eq!(frag.exit, 2);
 }
@@ -270,11 +188,11 @@ fn one_or_more_lazy() {
     let frag = g.one_or_more_lazy(inner);
 
     // Entry is inner, non-greedy branch after
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N1
     N1: ε → N2, N0
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 0);
     assert_eq!(frag.exit, 2);
 }
@@ -287,11 +205,11 @@ fn optional_greedy() {
     let frag = g.optional(inner);
 
     // Greedy: branch tries inner first
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N2
     N1: ε → N0, N2
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 1);
     assert_eq!(frag.exit, 2);
 }
@@ -304,11 +222,11 @@ fn optional_lazy() {
     let frag = g.optional_lazy(inner);
 
     // Non-greedy: branch skips first
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (item) → N2
     N1: ε → N2, N0
     N2: ε → ∅
-    "#);
+    ");
     assert_eq!(frag.entry, 1);
     assert_eq!(frag.exit, 2);
 }
@@ -319,9 +237,9 @@ fn matcher_with_field() {
 
     g.matcher_fragment(BuildMatcher::node("identifier").with_field("name"));
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) @name → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -334,9 +252,9 @@ fn matcher_with_negated_fields() {
             .with_negated_field("type_arguments"),
     );
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (call) !arguments !type_arguments → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -345,7 +263,7 @@ fn anonymous_matcher() {
 
     g.matcher_fragment(BuildMatcher::anonymous("+"));
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r#"
     N0: "+" → ∅
     "#);
 }
@@ -356,9 +274,9 @@ fn wildcard_matcher() {
 
     g.matcher_fragment(BuildMatcher::wildcard());
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: _ → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -368,9 +286,9 @@ fn node_with_effects() {
     g.node_mut(id).add_effect(BuildEffect::CaptureNode);
     g.node_mut(id).add_effect(BuildEffect::Field("name"));
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) [Capture] [Field(name)] → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -384,10 +302,10 @@ fn node_with_ref_marker() {
 
     g.connect(enter, exit);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
-    N0: ε +Enter(0) → N1
+    insta::assert_snapshot!(g.dump(), @r"
+    N0: ε +Enter(0, ?) → N1
     N1: ε +Exit(0) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -403,13 +321,13 @@ fn definition_registration() {
     assert_eq!(g.definition("Num"), Some(1));
     assert_eq!(g.definition("Unknown"), None);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     Ident = N0
     Num = N1
 
     N0: (identifier) → ∅
     N1: (number) → ∅
-    "#);
+    ");
 }
 
 #[test]
@@ -428,7 +346,7 @@ fn complex_nested_structure() {
 
     g.add_definition("Func", func.entry);
 
-    insta::assert_snapshot!(dump_graph(&g), @r#"
+    insta::assert_snapshot!(g.dump(), @r"
     Func = N4
 
     N0: (identifier) → N1
@@ -436,5 +354,5 @@ fn complex_nested_structure() {
     N2: ε → N3
     N3: (block) → ∅
     N4: (func) → N0
-    "#);
+    ");
 }

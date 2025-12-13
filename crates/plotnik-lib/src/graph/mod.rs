@@ -16,6 +16,7 @@
 mod analysis;
 mod build;
 mod construct;
+mod dump;
 mod optimize;
 mod typing;
 
@@ -33,8 +34,9 @@ mod typing_tests;
 pub use analysis::{AnalysisResult, StringInterner, analyze};
 pub use build::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use construct::{GraphConstructor, construct_graph};
+pub use dump::GraphPrinter;
 pub use optimize::{OptimizeStats, eliminate_epsilons};
 pub use typing::{
     InferredMember, InferredTypeDef, TypeDescription, TypeInferenceResult, UnificationError,
-    dump_types, infer_types,
+    infer_types,
 };
