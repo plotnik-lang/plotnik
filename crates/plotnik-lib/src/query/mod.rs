@@ -1,33 +1,32 @@
 //! Query processing pipeline.
 //!
-//! Stages: parse → alt_kinds → symbol_table → recursion → shapes → [build_graph].
+//! Stages: parse → alt_kinds → symbol_table → recursion → shapes → [qis → build_graph].
 //! Each stage populates its own diagnostics. Use `is_valid()` to check
 //! if any stage produced errors.
 //!
 //! The `build_graph` stage is optional and constructs the transition graph
-//! for compilation to binary IR.
+//! for compilation to binary IR. QIS detection runs as part of this stage.
 
 mod dump;
+mod graph_qis;
 mod invariants;
 mod printer;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
-pub mod build_graph;
-mod construct;
+pub mod graph;
+mod graph_build;
 mod graph_dump;
+mod graph_optimize;
 #[cfg(feature = "plotnik-langs")]
 pub mod link;
-mod optimize;
 pub mod recursion;
 pub mod shapes;
 pub mod symbol_table;
 pub mod typing;
 
-pub use build_graph::{
-    BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker,
-};
-pub use optimize::OptimizeStats;
+pub use graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
+pub use graph_optimize::OptimizeStats;
 pub use typing::{
     InferredMember, InferredTypeDef, TypeDescription, TypeInferenceResult, UnificationError,
 };
@@ -35,7 +34,9 @@ pub use typing::{
 #[cfg(test)]
 mod alt_kinds_tests;
 #[cfg(test)]
-mod construct_tests;
+mod graph_build_tests;
+#[cfg(test)]
+mod graph_qis_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
@@ -79,6 +80,16 @@ use symbol_table::SymbolTable;
 ///
 /// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
 /// to determine if the query has syntax/semantic issues.
+/// Quantifier-Induced Scope trigger info.
+///
+/// When a quantified expression has ≥2 propagating captures, QIS creates
+/// an implicit object scope so captures stay coupled per-iteration.
+#[derive(Debug, Clone)]
+pub struct QisTrigger<'a> {
+    /// Capture names that propagate from this quantified expression.
+    pub captures: Vec<&'a str>,
+}
+
 #[derive(Debug)]
 pub struct Query<'a> {
     source: &'a str,
@@ -103,6 +114,10 @@ pub struct Query<'a> {
     graph: BuildGraph<'a>,
     dead_nodes: HashSet<NodeId>,
     type_info: TypeInferenceResult<'a>,
+    /// QIS triggers: quantified expressions with ≥2 propagating captures.
+    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+    /// Counter for generating unique ref IDs during graph construction.
+    next_ref_id: u32,
 }
 
 fn empty_root() -> Root {
@@ -140,6 +155,8 @@ impl<'a> Query<'a> {
             graph: BuildGraph::default(),
             dead_nodes: HashSet::new(),
             type_info: TypeInferenceResult::default(),
+            qis_triggers: HashMap::new(),
+            next_ref_id: 0,
         }
     }
 
@@ -176,18 +193,33 @@ impl<'a> Query<'a> {
 
     /// Build the transition graph for compilation.
     ///
-    /// This is an optional step after `exec`. It constructs the graph,
-    /// runs epsilon elimination, and infers types.
+    /// This is an optional step after `exec`. It detects QIS triggers,
+    /// constructs the graph, runs epsilon elimination, and infers types.
     ///
     /// Only runs if the query is valid (no errors from previous passes).
     pub fn build_graph(mut self) -> Self {
         if !self.is_valid() {
             return self;
         }
+        self.detect_qis();
         self.construct_graph();
         self.infer_types(); // Run before optimization to avoid merged effects
         self.optimize_graph();
         self
+    }
+
+    /// Build graph and return dump of graph before optimization (for debugging).
+    #[cfg(test)]
+    pub fn build_graph_with_pre_opt_dump(mut self) -> (Self, String) {
+        if !self.is_valid() {
+            return (self, String::new());
+        }
+        self.detect_qis();
+        self.construct_graph();
+        let pre_opt_dump = self.graph.dump();
+        self.infer_types();
+        self.optimize_graph();
+        (self, pre_opt_dump)
     }
 
     fn try_parse(&mut self) -> Result<()> {

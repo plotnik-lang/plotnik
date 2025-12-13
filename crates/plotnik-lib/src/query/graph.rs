@@ -312,6 +312,183 @@ impl<'src> BuildGraph<'src> {
 
         Fragment::new(start, end)
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // QIS-Aware Array Combinators (wrap each iteration with object scope)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// Zero or more with QIS object wrapping (greedy): inner*
+    ///
+    /// Each iteration is wrapped in StartObject/EndObject to keep
+    /// multiple captures coupled per-iteration.
+    pub fn zero_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
+        let start = self.add_epsilon();
+        self.node_mut(start).add_effect(BuildEffect::StartArray);
+
+        let branch = self.add_epsilon();
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let push = self.add_epsilon();
+        self.node_mut(push).add_effect(BuildEffect::PushElement);
+
+        let end = self.add_epsilon();
+        self.node_mut(end).add_effect(BuildEffect::EndArray);
+
+        self.connect(start, branch);
+        self.connect(branch, obj_start);
+        self.connect(branch, end);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, push);
+        self.connect(push, branch);
+
+        Fragment::new(start, end)
+    }
+
+    /// Zero or more with QIS object wrapping (non-greedy): inner*?
+    pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
+        let start = self.add_epsilon();
+        self.node_mut(start).add_effect(BuildEffect::StartArray);
+
+        let branch = self.add_epsilon();
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let push = self.add_epsilon();
+        self.node_mut(push).add_effect(BuildEffect::PushElement);
+
+        let end = self.add_epsilon();
+        self.node_mut(end).add_effect(BuildEffect::EndArray);
+
+        self.connect(start, branch);
+        self.connect(branch, end);
+        self.connect(branch, obj_start);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, push);
+        self.connect(push, branch);
+
+        Fragment::new(start, end)
+    }
+
+    /// One or more with QIS object wrapping (greedy): inner+
+    pub fn one_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
+        let start = self.add_epsilon();
+        self.node_mut(start).add_effect(BuildEffect::StartArray);
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let push = self.add_epsilon();
+        self.node_mut(push).add_effect(BuildEffect::PushElement);
+
+        let branch = self.add_epsilon();
+
+        let end = self.add_epsilon();
+        self.node_mut(end).add_effect(BuildEffect::EndArray);
+
+        self.connect(start, obj_start);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, push);
+        self.connect(push, branch);
+        self.connect(branch, obj_start);
+        self.connect(branch, end);
+
+        Fragment::new(start, end)
+    }
+
+    /// One or more with QIS object wrapping (non-greedy): inner+?
+    pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
+        let start = self.add_epsilon();
+        self.node_mut(start).add_effect(BuildEffect::StartArray);
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let push = self.add_epsilon();
+        self.node_mut(push).add_effect(BuildEffect::PushElement);
+
+        let branch = self.add_epsilon();
+
+        let end = self.add_epsilon();
+        self.node_mut(end).add_effect(BuildEffect::EndArray);
+
+        self.connect(start, obj_start);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, push);
+        self.connect(push, branch);
+        self.connect(branch, end);
+        self.connect(branch, obj_start);
+
+        Fragment::new(start, end)
+    }
+
+    /// Optional with QIS object wrapping: inner?
+    ///
+    /// Wraps the optional value in an object scope.
+    pub fn optional_qis(&mut self, inner: Fragment) -> Fragment {
+        let branch = self.add_epsilon();
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let exit = self.add_epsilon();
+
+        self.connect(branch, obj_start);
+        self.connect(branch, exit);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, exit);
+
+        Fragment::new(branch, exit)
+    }
+
+    /// Optional with QIS object wrapping (non-greedy): inner??
+    pub fn optional_qis_lazy(&mut self, inner: Fragment) -> Fragment {
+        let branch = self.add_epsilon();
+
+        let obj_start = self.add_epsilon();
+        self.node_mut(obj_start)
+            .add_effect(BuildEffect::StartObject);
+
+        let obj_end = self.add_epsilon();
+        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+        let exit = self.add_epsilon();
+
+        self.connect(branch, exit);
+        self.connect(branch, obj_start);
+        self.connect(obj_start, inner.entry);
+        self.connect(inner.exit, obj_end);
+        self.connect(obj_end, exit);
+
+        Fragment::new(branch, exit)
+    }
 }
 
 impl Default for BuildGraph<'_> {

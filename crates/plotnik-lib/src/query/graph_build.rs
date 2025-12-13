@@ -1,7 +1,7 @@
 //! Graph construction integrated with Query pipeline.
 //!
 //! Constructs a `BuildGraph` from the parsed AST, reusing the `symbol_table`
-//! populated by earlier passes.
+//! and `qis_triggers` populated by earlier passes.
 
 use std::collections::HashSet;
 
@@ -12,7 +12,7 @@ use crate::parser::{
 };
 
 use super::Query;
-use super::build_graph::{BuildEffect, BuildGraph, BuildMatcher, Fragment, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildMatcher, Fragment, NodeId, RefMarker};
 
 /// Context for navigation determination.
 #[derive(Debug, Clone, Copy)]
@@ -68,46 +68,32 @@ impl ExitContext {
 impl<'a> Query<'a> {
     /// Build the graph from the already-populated symbol_table.
     ///
-    /// This method reuses the symbol_table from name resolution,
-    /// avoiding duplicate iteration over definitions.
+    /// This method reuses the symbol_table from name resolution and
+    /// qis_triggers from QIS detection.
     pub(super) fn construct_graph(&mut self) {
-        let mut constructor = GraphConstructor::new(self.source);
+        self.next_ref_id = 0;
 
-        // Reuse symbol_table: iterate name -> body pairs
-        for (name, body) in &self.symbol_table {
-            let fragment = constructor.construct_expr(body, NavContext::Root);
-            constructor.graph.add_definition(name, fragment.entry);
+        let entries: Vec<_> = self
+            .symbol_table
+            .iter()
+            .map(|(name, body)| (*name, body.clone()))
+            .collect();
+        for (name, body) in entries {
+            let fragment = self.construct_expr(&body, NavContext::Root);
+            self.graph.add_definition(name, fragment.entry);
         }
 
-        constructor.link_references();
-        self.graph = constructor.graph;
-    }
-}
-
-/// Internal constructor that builds the graph.
-struct GraphConstructor<'src> {
-    source: &'src str,
-    graph: BuildGraph<'src>,
-    next_ref_id: u32,
-}
-
-impl<'src> GraphConstructor<'src> {
-    fn new(source: &'src str) -> Self {
-        Self {
-            source,
-            graph: BuildGraph::new(),
-            next_ref_id: 0,
-        }
+        self.link_references();
     }
 
     /// Link Enter nodes to their definition entry points.
     fn link_references(&mut self) {
-        let mut links: Vec<(NodeId, &'src str, Vec<NodeId>)> = Vec::new();
+        let mut links: Vec<(NodeId, &'a str, Vec<NodeId>)> = Vec::new();
 
         for (id, node) in self.graph.iter() {
-            if let RefMarker::Enter { ref_id } = &node.ref_marker {
+            if let RefMarker::Enter { .. } = &node.ref_marker {
                 if let Some(name) = node.ref_name {
-                    let exit_successors = self.find_exit_successors(*ref_id);
+                    let exit_successors = self.find_exit_successors_for_enter(id);
                     links.push((id, name, exit_successors));
                 }
             }
@@ -123,7 +109,12 @@ impl<'src> GraphConstructor<'src> {
         }
     }
 
-    fn find_exit_successors(&self, ref_id: u32) -> Vec<NodeId> {
+    fn find_exit_successors_for_enter(&self, enter_id: NodeId) -> Vec<NodeId> {
+        let enter_node = self.graph.node(enter_id);
+        let RefMarker::Enter { ref_id } = enter_node.ref_marker else {
+            return Vec::new();
+        };
+
         for (_, node) in self.graph.iter() {
             if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker {
                 if *exit_id == ref_id {
@@ -222,13 +213,13 @@ impl<'src> GraphConstructor<'src> {
         (fragments, exit_ctx)
     }
 
-    fn build_named_matcher(&mut self, node: &NamedNode) -> BuildMatcher<'src> {
+    fn build_named_matcher(&self, node: &NamedNode) -> BuildMatcher<'a> {
         let kind = node
             .node_type()
             .map(|t| token_src(&t, self.source))
             .unwrap_or("_");
 
-        let negated_fields: Vec<&'src str> = node
+        let negated_fields: Vec<&'a str> = node
             .as_cst()
             .children()
             .filter_map(NegatedField::cast)
@@ -450,13 +441,22 @@ impl<'src> GraphConstructor<'src> {
         };
 
         let inner_frag = self.construct_expr(&inner_expr, ctx);
+        let is_qis = self.qis_triggers.contains_key(quant);
 
         match op.kind() {
+            SyntaxKind::Star if is_qis => self.graph.zero_or_more_array_qis(inner_frag),
             SyntaxKind::Star => self.graph.zero_or_more_array(inner_frag),
+            SyntaxKind::StarQuestion if is_qis => {
+                self.graph.zero_or_more_array_qis_lazy(inner_frag)
+            }
             SyntaxKind::StarQuestion => self.graph.zero_or_more_array_lazy(inner_frag),
+            SyntaxKind::Plus if is_qis => self.graph.one_or_more_array_qis(inner_frag),
             SyntaxKind::Plus => self.graph.one_or_more_array(inner_frag),
+            SyntaxKind::PlusQuestion if is_qis => self.graph.one_or_more_array_qis_lazy(inner_frag),
             SyntaxKind::PlusQuestion => self.graph.one_or_more_array_lazy(inner_frag),
+            SyntaxKind::Question if is_qis => self.graph.optional_qis(inner_frag),
             SyntaxKind::Question => self.graph.optional(inner_frag),
+            SyntaxKind::QuestionQuestion if is_qis => self.graph.optional_qis_lazy(inner_frag),
             SyntaxKind::QuestionQuestion => self.graph.optional_lazy(inner_frag),
             _ => inner_frag,
         }
@@ -469,7 +469,7 @@ impl<'src> GraphConstructor<'src> {
         self.construct_expr(&value_expr, ctx)
     }
 
-    fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'src str> {
+    fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'a str> {
         let parent = node.parent()?;
         let field_expr = FieldExpr::cast(parent)?;
         let name_token = field_expr.name()?;

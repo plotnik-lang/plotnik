@@ -24,6 +24,53 @@ fn infer_with_graph(source: &str) -> String {
 }
 
 #[test]
+fn debug_star_quantifier_graph() {
+    // See graph BEFORE optimization (what type inference actually sees)
+    let (query, pre_opt_dump) = Query::try_from("Foo = ((item) @items)*")
+        .expect("parse should succeed")
+        .build_graph_with_pre_opt_dump();
+    let mut out = String::new();
+    out.push_str("=== Graph (before optimization - what type inference sees) ===\n");
+    out.push_str(&pre_opt_dump);
+    out.push_str("\n=== Graph (after optimization) ===\n");
+    out.push_str(&query.graph().dump_live(query.dead_nodes()));
+    out.push_str("\n");
+    out.push_str(&query.type_info().dump());
+    insta::assert_snapshot!(out, @r"
+    === Graph (before optimization - what type inference sees) ===
+    Foo = N4
+
+    N0: (_) → N1
+    N1: [Down] (item) [Capture] → N2
+    N2: ε [Field(items)] → N3
+    N3: [Up(1)] ε → N6
+    N4: ε [StartArray] → N5
+    N5: ε → N0, N7
+    N6: ε [Push] → N5
+    N7: ε [EndArray] → ∅
+
+    === Graph (after optimization) ===
+    Foo = N4
+
+    N0: (_) → N1
+    N1: [Down] (item) [Capture] → N6
+    N4: ε [StartArray] → N5
+    N5: ε → N0, N7
+    N6: [Up(1)] ε [Field(items)] [Push] → N5
+    N7: ε [EndArray] → ∅
+
+    === Entrypoints ===
+    Foo → T4
+
+    === Types ===
+    T3: ArrayStar <anon> → Node
+    T4: Record Foo {
+        items: T3
+    }
+    ");
+}
+
+#[test]
 fn debug_graph_structure() {
     let result = infer_with_graph("Foo = (identifier) @name");
     insta::assert_snapshot!(result, @r"
@@ -66,11 +113,13 @@ fn debug_incompatible_types_graph() {
     Foo = N0
 
     N0: ε → N2, N4
-    N1: ε [Field(v)] [Field(v)] → ∅
-    N2: (a) [Capture] → N1
-    N4: (b) [Capture] [ToString] → N1
+    N1: ε → ∅
+    N2: (a) [Capture] → N3
+    N3: ε [Field(v)] → N1
+    N4: (b) [Capture] [ToString] → N5
+    N5: ε [Field(v)] → N1
 
-    === Dead nodes count: 2 ===
+    === Dead nodes count: 0 ===
 
     === Entrypoints ===
     Foo → T3
@@ -376,6 +425,7 @@ fn optional_quantifier() {
 
 #[test]
 fn quantifier_on_sequence() {
+    // QIS triggered: ≥2 captures inside quantified expression
     let input = indoc! {r#"
         Foo = { (a) @x (b) @y }*
     "#};
@@ -383,15 +433,63 @@ fn quantifier_on_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → Void
+    Foo → T4
+
+    === Types ===
+    T3: Record FooItem {
+        x: Node
+        y: Node
+    }
+    T4: ArrayStar <anon> → T3
+    ");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QIS: Additional cases from ADR-0009
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn qis_single_capture_no_trigger() {
+    // Single capture inside sequence - no QIS
+    // Note: The sequence creates its own scope, so the capture goes there.
+    // Without explicit capture on the sequence, the struct is orphaned.
+    let input = indoc! {r#"
+        Single = { (a) @item }*
+    "#};
+
+    let result = infer(input);
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Single → Void
 
     === Types ===
     T3: ArrayStar <anon> → Node
-    T4: ArrayStar <anon> → Node
-    T5: Record FooScope3 {
-        x: T3
-        y: T4
+    T4: Record SingleScope3 {
+        item: T3
     }
+    ");
+}
+
+#[test]
+fn qis_alternation_in_sequence() {
+    // Alternation with asymmetric captures inside quantified sequence
+    // QIS triggered (2 captures), creates element struct
+    // Note: Current impl doesn't apply optionality for alternation branches in QIS
+    let input = indoc! {r#"
+        Foo = { [ (a) @x (b) @y ] }*
+    "#};
+
+    let result = infer(input);
+    insta::assert_snapshot!(result, @r"
+    === Entrypoints ===
+    Foo → T4
+
+    === Types ===
+    T3: Record FooItem {
+        y: Node
+        x: Node
+    }
+    T4: ArrayStar <anon> → T3
     ");
 }
 
@@ -421,9 +519,11 @@ fn incompatible_types_in_alternation() {
     Foo = N0
 
     N0: ε → N2, N4
-    N1: ε [Field(v)] [Field(v)] → ∅
-    N2: (a) [Capture] → N1
-    N4: (b) [Capture] [ToString] → N1
+    N1: ε → ∅
+    N2: (a) [Capture] → N3
+    N3: ε [Field(v)] → N1
+    N4: (b) [Capture] [ToString] → N5
+    N5: ε [Field(v)] → N1
 
     === Entrypoints ===
     Foo → T3

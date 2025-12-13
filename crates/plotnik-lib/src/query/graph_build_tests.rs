@@ -88,26 +88,26 @@ fn alternation_tagged() {
     Q = N0
 
     N0: ε → N3, N7
-    N1: ε [Field(x)] [EndVariant] [Field(y)] [EndVariant] → ∅
+    N1: ε → ∅
     N2: ε [Variant(A)] → N3
-    N3: (a) [Variant(A)] [Capture] → N1
-    N4: ε [Field(x)] → N1
-    N5: ε [EndVariant] → N1
+    N3: (a) [Variant(A)] [Capture] → N5
+    N4: ε [Field(x)] → N5
+    N5: ε [Field(x)] [EndVariant] → N1
     N6: ε [Variant(B)] → N7
-    N7: (b) [Variant(B)] [Capture] → N1
-    N8: ε [Field(y)] → N1
-    N9: ε [EndVariant] → N1
+    N7: (b) [Variant(B)] [Capture] → N9
+    N8: ε [Field(y)] → N9
+    N9: ε [Field(y)] [EndVariant] → N1
     ");
 }
 
 #[test]
 fn quantifier_star() {
     insta::assert_snapshot!(snapshot("Q = (identifier)*"), @r"
-    Q = N2
+    Q = N1
 
-    N0: (identifier) → N2
+    N0: (identifier) → N3
     N1: ε [StartArray] → N2
-    N2: ε [StartArray] [Push] → N0, N4
+    N2: ε → N0, N4
     N3: ε [Push] → N2
     N4: ε [EndArray] → ∅
     ");
@@ -116,9 +116,9 @@ fn quantifier_star() {
 #[test]
 fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
-    Q = N0
+    Q = N1
 
-    N0: (identifier) [StartArray] → N3
+    N0: (identifier) → N3
     N1: ε [StartArray] → N0
     N2: ε [Push] → N3
     N3: ε [Push] → N0, N4

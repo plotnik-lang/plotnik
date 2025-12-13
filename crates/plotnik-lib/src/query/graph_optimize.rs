@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ir::{Nav, NavKind};
 
 use super::Query;
-use super::build_graph::{BuildGraph, BuildMatcher, NodeId};
+use super::graph::{BuildGraph, BuildMatcher, NodeId};
 
 /// Statistics from epsilon elimination.
 #[derive(Debug, Default)]
@@ -51,7 +51,7 @@ pub fn eliminate_epsilons(graph: &mut BuildGraph) -> (HashSet<NodeId>, OptimizeS
         }
 
         let node = graph.node(id);
-        if !is_eliminable_epsilon(node, graph) {
+        if !is_eliminable_epsilon(node, graph, &predecessors) {
             if node.is_epsilon() {
                 stats.epsilons_kept += 1;
             }
@@ -111,7 +111,11 @@ pub fn eliminate_epsilons(graph: &mut BuildGraph) -> (HashSet<NodeId>, OptimizeS
     (dead_nodes, stats)
 }
 
-fn is_eliminable_epsilon(node: &super::build_graph::BuildNode, graph: &BuildGraph) -> bool {
+fn is_eliminable_epsilon(
+    node: &super::graph::BuildNode,
+    graph: &BuildGraph,
+    predecessors: &HashMap<NodeId, Vec<NodeId>>,
+) -> bool {
     if !matches!(node.matcher, BuildMatcher::Epsilon) {
         return false;
     }
@@ -135,6 +139,15 @@ fn is_eliminable_epsilon(node: &super::build_graph::BuildNode, graph: &BuildGrap
 
     if !node.effects.is_empty() && !successor.ref_marker.is_none() {
         return false;
+    }
+
+    // Don't eliminate if node has effects and successor is a join point.
+    // Merging effects onto a join point changes execution count (e.g., loop entry vs per-iteration).
+    if !node.effects.is_empty() {
+        let succ_pred_count = predecessors.get(&successor_id).map_or(0, |p| p.len());
+        if succ_pred_count > 1 {
+            return false;
+        }
     }
 
     true

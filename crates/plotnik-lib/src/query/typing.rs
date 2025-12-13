@@ -5,13 +5,13 @@
 //!
 //! # Algorithm Overview
 //!
-//! 1. Walk graph from each definition entry point using stack-based scope tracking
-//! 2. StartObject/EndObject delimit scopes that may become composite types
-//! 3. When EndObject is hit, the scope is resolved into a pending type
-//! 4. QIS (Quantifier-Induced Scope) creates implicit structs for multi-capture quantifiers
+//! 1. Pre-analyze array regions to detect QIS (Quantifier-Induced Scope)
+//! 2. Walk graph from each definition entry point using stack-based scope tracking
+//! 3. StartObject/EndObject delimit scopes that may become composite types
+//! 4. QIS creates implicit structs when quantified expressions have ≥2 captures
 //! 5. Field(name) consumes pending type and records it in current scope
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use rowan::TextRange;
@@ -20,7 +20,7 @@ use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
 
 use super::Query;
-use super::build_graph::{BuildEffect, BuildGraph, NodeId};
+use super::graph::{BuildEffect, BuildGraph, NodeId};
 
 /// Result of type inference.
 #[derive(Debug, Default)]
@@ -258,7 +258,6 @@ fn check_compatibility<'src>(
         }),
         (TypeShape::Composite(t1), TypeShape::Composite(t2)) if t1 == t2 => None,
         (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
-            // Compare field names AND types
             if fields_a.len() != fields_b.len() {
                 return Some(MergeError {
                     field,
@@ -277,7 +276,6 @@ fn check_compatibility<'src>(
             }
             None
         }
-        // Struct vs Primitive or Composite mismatch
         _ => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
@@ -331,29 +329,55 @@ impl<'src> PendingType<'src> {
     }
 }
 
+/// Pre-computed info about an array region for QIS detection.
+#[derive(Debug, Clone)]
+struct ArrayRegionInfo<'src> {
+    /// Field names captured within this array region (excluding nested arrays)
+    captures: Vec<(&'src str, TextRange)>,
+    /// Whether QIS is triggered (≥2 captures)
+    qis_triggered: bool,
+}
+
+/// Tracks state within a quantified (array) region.
+#[derive(Debug, Clone)]
+struct ArrayFrame<'src> {
+    /// Node ID of the StartArray
+    start_id: NodeId,
+    /// Cardinality of this array (Star or Plus)
+    cardinality: Cardinality,
+    /// Pre-computed region info (captures, QIS status)
+    region_info: ArrayRegionInfo<'src>,
+}
+
 #[derive(Debug, Clone)]
 struct TraversalState<'src> {
     pending: Option<PendingType<'src>>,
     current_variant: Option<&'src str>,
-    /// Stack of array cardinalities (for nested arrays)
-    array_cardinality_stack: Vec<Cardinality>,
+    /// Stack of array frames (tracking array nesting)
+    array_stack: Vec<ArrayFrame<'src>>,
+    /// Set of fields that should be skipped (handled by QIS)
+    skip_fields: HashSet<&'src str>,
 }
 
-impl Default for TraversalState<'_> {
+impl<'src> Default for TraversalState<'src> {
     fn default() -> Self {
         Self {
             pending: None,
             current_variant: None,
-            array_cardinality_stack: Vec::new(),
+            array_stack: Vec::new(),
+            skip_fields: HashSet::new(),
         }
     }
 }
 
-impl TraversalState<'_> {
+impl<'src> TraversalState<'src> {
     fn current_array_cardinality(&self) -> Cardinality {
-        self.array_cardinality_stack
+        self.array_stack
             .iter()
-            .fold(Cardinality::One, |acc, c| acc.multiply(*c))
+            .filter(|f| !f.region_info.qis_triggered)
+            .fold(Cardinality::One, |acc, frame| {
+                acc.multiply(frame.cardinality)
+            })
     }
 }
 
@@ -365,10 +389,17 @@ struct InferenceContext<'src, 'g> {
     diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
     current_def_name: &'src str,
+    /// Whether we're at definition root level (no fields assigned yet at root scope)
+    at_definition_root: bool,
+    /// Pre-computed array region info for QIS detection
+    array_regions: HashMap<NodeId, ArrayRegionInfo<'src>>,
+    /// Node ID of root-level QIS array (skip type creation in traverse for this)
+    root_qis_node: Option<NodeId>,
 }
 
 impl<'src, 'g> InferenceContext<'src, 'g> {
     fn new(graph: &'g BuildGraph<'src>, dead_nodes: &'g HashSet<NodeId>) -> Self {
+        let array_regions = analyze_array_regions(graph, dead_nodes);
         Self {
             graph,
             dead_nodes,
@@ -377,6 +408,9 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             diagnostics: Diagnostics::new(),
             errors: Vec::new(),
             current_def_name: "",
+            at_definition_root: true,
+            array_regions,
+            root_qis_node: None,
         }
     }
 
@@ -388,9 +422,16 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
     fn infer_definition(&mut self, def_name: &'src str, entry_id: NodeId) -> TypeId {
         self.current_def_name = def_name;
+        self.at_definition_root = true;
         let mut visited = HashSet::new();
         let mut merge_errors = Vec::new();
         let mut scope_stack = vec![ScopeStackEntry::new_root()];
+
+        // Check if definition starts with a QIS array (array at root with ≥2 captures)
+        let root_qis_info = self.check_root_qis(entry_id);
+        if root_qis_info.is_some() {
+            self.root_qis_node = Some(entry_id);
+        }
 
         self.traverse(
             entry_id,
@@ -401,7 +442,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             &mut scope_stack,
         );
 
-        // Pop to get final root scope
         let root_entry = scope_stack
             .pop()
             .unwrap_or_else(|| ScopeStackEntry::new_root());
@@ -439,6 +479,16 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             });
         }
 
+        // Check for QIS at definition root
+        if let Some((captures, cardinality)) = root_qis_info {
+            if !captures.is_empty() {
+                let element_name = format!("{}Item", def_name);
+                let element_name: &'src str = Box::leak(element_name.into_boxed_str());
+                let element_type_id = self.create_qis_struct_type(element_name, &captures);
+                return self.wrap_with_cardinality(element_type_id, cardinality);
+            }
+        }
+
         if scope.has_variants && !scope.variants.is_empty() {
             self.create_enum_type(def_name, &scope)
         } else if !scope.fields.is_empty() {
@@ -446,6 +496,30 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         } else {
             TYPE_VOID
         }
+    }
+
+    /// Check if definition root has a QIS array (returns captures and cardinality if so).
+    fn check_root_qis(
+        &self,
+        entry_id: NodeId,
+    ) -> Option<(Vec<(&'src str, TextRange)>, Cardinality)> {
+        let node = self.graph.node(entry_id);
+        let has_start_array = node
+            .effects
+            .iter()
+            .any(|e| matches!(e, BuildEffect::StartArray));
+
+        if !has_start_array {
+            return None;
+        }
+
+        let region_info = self.array_regions.get(&entry_id)?;
+        if !region_info.qis_triggered {
+            return None;
+        }
+
+        // TODO: Determine actual cardinality (Star vs Plus) from graph structure
+        Some((region_info.captures.clone(), Cardinality::Star))
     }
 
     fn traverse(
@@ -461,7 +535,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             return;
         }
 
-        // Don't re-visit nodes - each node's effects should only be processed once
         if !visited.insert(node_id) {
             return;
         }
@@ -478,6 +551,14 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
                 BuildEffect::Field { name, span } => {
                     if let Some(pending) = state.pending.take() {
+                        self.at_definition_root = false;
+
+                        // Skip fields that are handled by QIS
+                        if state.skip_fields.contains(name) {
+                            continue;
+                        }
+
+                        let current_variant = state.current_variant;
                         let current_scope = scope_stack
                             .last_mut()
                             .map(|e| &mut e.scope)
@@ -486,7 +567,8 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                         let effective_cardinality = pending
                             .cardinality
                             .multiply(state.current_array_cardinality());
-                        if let Some(tag) = state.current_variant {
+
+                        if let Some(tag) = current_variant {
                             let variant_scope = current_scope.variants.entry(tag).or_default();
                             variant_scope.add_field(
                                 *name,
@@ -507,31 +589,77 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                     }
                 }
                 BuildEffect::StartArray => {
-                    // Push Star cardinality onto the stack when entering an array
-                    state.array_cardinality_stack.push(Cardinality::Star);
+                    // Look up pre-computed region info for this StartArray node
+                    let region_info =
+                        self.array_regions
+                            .get(&node_id)
+                            .cloned()
+                            .unwrap_or_else(|| ArrayRegionInfo {
+                                captures: Vec::new(),
+                                qis_triggered: false,
+                            });
+
+                    // If QIS triggered, mark these fields to skip during traversal
+                    if region_info.qis_triggered {
+                        for (name, _) in &region_info.captures {
+                            state.skip_fields.insert(*name);
+                        }
+                    }
+
+                    state.array_stack.push(ArrayFrame {
+                        start_id: node_id,
+                        cardinality: Cardinality::Star,
+                        region_info,
+                    });
                 }
                 BuildEffect::PushElement => {}
                 BuildEffect::EndArray => {
-                    // Pop cardinality when exiting array
-                    state.array_cardinality_stack.pop();
+                    if let Some(array_frame) = state.array_stack.pop() {
+                        let array_card = array_frame.cardinality;
+                        let is_root_qis = self.root_qis_node == Some(array_frame.start_id);
+
+                        // Remove skip_fields for this array's captures
+                        if array_frame.region_info.qis_triggered {
+                            for (name, _) in &array_frame.region_info.captures {
+                                state.skip_fields.remove(name);
+                            }
+
+                            // Skip type creation for root-level QIS (handled in infer_definition)
+                            if !is_root_qis {
+                                // QIS: create element struct from pre-computed captures
+                                let captures = &array_frame.region_info.captures;
+                                if !captures.is_empty() {
+                                    let element_name = self.generate_qis_element_name(None);
+                                    let element_type_id =
+                                        self.create_qis_struct_type(element_name, captures);
+                                    let array_type_id =
+                                        self.wrap_with_cardinality(element_type_id, array_card);
+
+                                    state.pending = Some(PendingType {
+                                        shape: TypeShape::Composite(array_type_id),
+                                        base_type: array_type_id,
+                                        cardinality: Cardinality::One,
+                                    });
+                                }
+                            }
+                        }
+                        // Non-QIS arrays: fields were already added to parent scope
+                        // with cardinality applied in the Field handler
+                    }
                 }
                 BuildEffect::StartObject => {
-                    // Push new object scope, saving outer pending type
                     let entry = ScopeStackEntry::new_object(state.pending.take());
                     scope_stack.push(entry);
                 }
                 BuildEffect::EndObject => {
-                    // Pop the object scope
                     if let Some(finished_entry) = scope_stack.pop() {
                         if finished_entry.is_object {
                             let finished_scope = finished_entry.scope;
 
                             if !finished_scope.is_empty() {
-                                // Create a struct type for this scope
                                 let type_name = self.generate_scope_name();
                                 let type_id = self.create_struct_type(type_name, &finished_scope);
 
-                                // Collect field info for shape
                                 let field_types: Vec<(&'src str, TypeId)> = finished_scope
                                     .fields
                                     .iter()
@@ -544,19 +672,15 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                                     cardinality: Cardinality::One,
                                 });
 
-                                // If there were fields, update shape to include them
                                 if !field_types.is_empty() {
                                     if let Some(ref mut p) = state.pending {
                                         p.shape = TypeShape::Struct(field_types);
                                     }
                                 }
                             } else {
-                                // Empty object - restore outer pending if any
                                 state.pending = finished_entry.outer_pending;
                             }
                         } else {
-                            // Shouldn't happen - mismatched StartObject/EndObject
-                            // Put it back
                             scope_stack.push(finished_entry);
                         }
                     }
@@ -605,7 +729,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             let initial_scope_len = scope_stack.len();
             let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
 
-            // Traverse each branch independently
             for succ in &live_successors {
                 let mut branch_stack = scope_stack.clone();
 
@@ -618,7 +741,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                     &mut branch_stack,
                 );
 
-                // Extract scope from this branch (pop any nested scopes first)
                 while branch_stack.len() > initial_scope_len {
                     branch_stack.pop();
                 }
@@ -627,22 +749,60 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
             }
 
-            // Merge all branch scopes into main scope
             if let Some(main_entry) = scope_stack.last_mut() {
                 for branch_scope in branch_scopes {
                     let merge_errs = main_entry.scope.merge_from(branch_scope);
                     errors.extend(merge_errs);
                 }
-                // Apply optionality for fields not present in all branches
                 main_entry.scope.apply_optionality(total_branches);
             }
         }
     }
 
     fn generate_scope_name(&self) -> &'src str {
-        // Generate synthetic name - leak for simplicity
         let name = format!("{}Scope{}", self.current_def_name, self.next_type_id);
         Box::leak(name.into_boxed_str())
+    }
+
+    fn generate_qis_element_name(&self, capture_name: Option<&'src str>) -> &'src str {
+        let name = if let Some(cap) = capture_name {
+            // Explicit capture: {Def}{Capture} with PascalCase
+            let cap_pascal = to_pascal_case(cap);
+            format!("{}{}", self.current_def_name, cap_pascal)
+        } else if self.at_definition_root {
+            // At definition root: {Def}Item
+            format!("{}Item", self.current_def_name)
+        } else {
+            // Not at root and no capture - use synthetic name
+            format!("{}Item{}", self.current_def_name, self.next_type_id)
+        };
+        Box::leak(name.into_boxed_str())
+    }
+
+    /// Create a struct type from QIS captures (all fields are Node type).
+    fn create_qis_struct_type(
+        &mut self,
+        name: &'src str,
+        captures: &[(&'src str, TextRange)],
+    ) -> TypeId {
+        let members: Vec<_> = captures
+            .iter()
+            .map(|(field_name, _span)| InferredMember {
+                name: field_name,
+                ty: TYPE_NODE, // QIS captures are always Node (could enhance later)
+            })
+            .collect();
+
+        let type_id = self.alloc_type_id();
+
+        self.type_defs.push(InferredTypeDef {
+            kind: TypeKind::Record,
+            name: Some(name),
+            members,
+            inner_type: None,
+        });
+
+        type_id
     }
 
     fn create_struct_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
@@ -733,6 +893,113 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Array region analysis for QIS detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Pre-analyze all array regions to determine QIS triggering.
+fn analyze_array_regions<'src>(
+    graph: &BuildGraph<'src>,
+    dead_nodes: &HashSet<NodeId>,
+) -> HashMap<NodeId, ArrayRegionInfo<'src>> {
+    let mut regions = HashMap::new();
+
+    for (id, node) in graph.iter() {
+        if dead_nodes.contains(&id) {
+            continue;
+        }
+        let has_start_array = node
+            .effects
+            .iter()
+            .any(|e| matches!(e, BuildEffect::StartArray));
+        if has_start_array {
+            let info = find_array_region_captures(graph, dead_nodes, id);
+            regions.insert(id, info);
+        }
+    }
+
+    regions
+}
+
+/// Find all captures within an array region (between StartArray and EndArray).
+fn find_array_region_captures<'src>(
+    graph: &BuildGraph<'src>,
+    dead_nodes: &HashSet<NodeId>,
+    start_id: NodeId,
+) -> ArrayRegionInfo<'src> {
+    let mut captures = Vec::new();
+    let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+
+    // Start from successors of the StartArray node
+    let start_node = graph.node(start_id);
+    for &succ in &start_node.successors {
+        stack.push(succ);
+    }
+
+    while let Some(id) = stack.pop() {
+        if dead_nodes.contains(&id) || !visited.insert(id) {
+            continue;
+        }
+
+        let node = graph.node(id);
+
+        // Check for EndArray - stop this path and record the ID
+        let has_end_array = node
+            .effects
+            .iter()
+            .any(|e| matches!(e, BuildEffect::EndArray));
+        if has_end_array {
+            continue;
+        }
+
+        // Check for nested StartArray - skip its contents
+        let has_start_array = node
+            .effects
+            .iter()
+            .any(|e| matches!(e, BuildEffect::StartArray));
+        if has_start_array {
+            continue;
+        }
+
+        // Collect Field captures with their spans
+        for effect in &node.effects {
+            if let BuildEffect::Field { name, span } = effect {
+                if !captures.iter().any(|(n, _)| n == name) {
+                    captures.push((*name, *span));
+                }
+            }
+        }
+
+        // Continue to successors
+        for &succ in &node.successors {
+            stack.push(succ);
+        }
+    }
+
+    let qis_triggered = captures.len() >= 2;
+    ArrayRegionInfo {
+        captures,
+        qis_triggered,
+    }
+}
+
+fn to_pascal_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if c == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(c.to_ascii_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }
 
 impl<'a> Query<'a> {

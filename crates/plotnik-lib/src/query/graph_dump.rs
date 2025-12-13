@@ -5,7 +5,7 @@ use std::fmt::Write;
 
 use crate::ir::{Nav, NavKind};
 
-use super::build_graph::{BuildEffect, BuildGraph, BuildMatcher, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildGraph, BuildMatcher, NodeId, RefMarker};
 
 /// Printer for `BuildGraph` with configurable output options.
 pub struct GraphPrinter<'a, 'src> {
