@@ -315,15 +315,20 @@ impl<'src> BuildGraph<'src> {
             let obj_end = self.add_epsilon();
             self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
 
+            // Skip path needs ClearCurrent to indicate "nothing captured"
+            let skip = self.add_epsilon();
+            self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
+
             self.connect(obj_start, inner.entry);
             self.connect(inner.exit, obj_end);
             self.connect(obj_end, exit);
+            self.connect(skip, exit);
 
             if greedy {
                 self.connect(branch, obj_start);
-                self.connect(branch, exit);
+                self.connect(branch, skip);
             } else {
-                self.connect(branch, exit);
+                self.connect(branch, skip);
                 self.connect(branch, obj_start);
             }
         } else {

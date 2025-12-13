@@ -305,9 +305,13 @@ struct TraversalState {
     /// Stack tracking whether each object scope is for a captured alternation.
     /// Tags only create enums when inside an object opened for_alternation=true.
     object_alt_stack: Vec<bool>,
-    /// When true, skip EndObject type creation.
+    /// When true, skip EndObject type creation at the dry_run_depth level.
     /// Used during alternation branch exploration to collect variants before creating enum.
     dry_run: bool,
+    /// The object_depth at which dry_run was enabled. EndObject is only skipped
+    /// when object_depth matches this value (after decrement), allowing nested
+    /// objects to be processed normally.
+    dry_run_depth: usize,
     /// True when we're still at the definition root (no structural context entered).
     /// Used to determine if tagged alternations should create enums (ADR-0009 §Case 1 vs §Case 3).
     at_definition_root: bool,
@@ -322,6 +326,7 @@ impl Default for TraversalState {
             object_depth: 0,
             object_alt_stack: Vec::new(),
             dry_run: false,
+            dry_run_depth: 0,
             at_definition_root: true,
         }
     }
@@ -458,7 +463,12 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         } else if !scope.fields.is_empty() {
             self.create_struct_type(def_name, &scope)
         } else if let Some(pending) = final_pending {
-            pending.base_type
+            // Wrap with cardinality for array types (from EndArray effect)
+            if pending.is_array {
+                self.wrap_with_cardinality(pending.base_type, pending.cardinality)
+            } else {
+                pending.base_type
+            }
         } else {
             TYPE_VOID
         }
@@ -567,9 +577,12 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 scope_stack.push(ScopeStackEntry::new_object(state.pending.take()));
             }
             BuildEffect::EndObject => {
+                // Only skip EndObject processing when closing the scope that was open at dry_run time.
+                // Check BEFORE decrementing to correctly identify which scope we're closing.
+                let skip_for_dry_run = state.dry_run && state.object_depth == state.dry_run_depth;
                 state.object_depth = state.object_depth.saturating_sub(1);
                 state.object_alt_stack.pop();
-                if !state.dry_run {
+                if !skip_for_dry_run {
                     self.process_end_object(state, scope_stack);
                 }
             }
@@ -692,7 +705,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
         let finished_scope = finished_entry.scope;
         if finished_scope.is_empty() {
-            state.pending = finished_entry.outer_pending;
+            // If current pending exists (from nested EndObject), keep it.
+            // Otherwise restore what was pending before this object started.
+            if state.pending.is_none() {
+                state.pending = finished_entry.outer_pending;
+            }
             return;
         }
 
@@ -779,6 +796,9 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             let mut branch_visited = visited.clone();
             let mut branch_state = state.clone();
             branch_state.dry_run = use_dry_run;
+            if use_dry_run {
+                branch_state.dry_run_depth = state.object_depth;
+            }
 
             let (branch_pending, _) = self.traverse(
                 *succ,

@@ -428,13 +428,14 @@ fn quantifier_on_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T3
+    Foo → T4
 
     === Types ===
     T3: Record FooScope3 {
         x: Node
         y: Node
     }
+    T4: ArrayStar <anon> → T3
     ");
 }
 
@@ -476,7 +477,7 @@ fn qis_alternation_in_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T6
 
     === Types ===
     T3: Optional <anon> → Node
@@ -485,6 +486,7 @@ fn qis_alternation_in_sequence() {
         x: T3
         y: T4
     }
+    T6: ArrayStar <anon> → T5
     ");
 }
 

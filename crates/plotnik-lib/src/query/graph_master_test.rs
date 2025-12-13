@@ -512,23 +512,23 @@ fn golden_master_comprehensive() {
     SimpleCapture → T23
     RefChain → Void
     RefCaptured → T24
-    QisSequence → T25
-    QisNode → T26
-    PlusQuant → T28
-    OptQuant → T30
-    NoQis → T32
+    QisSequence → T26
+    QisNode → T28
+    PlusQuant → T30
+    OptQuant → T32
+    NoQis → T34
     NoCaptures → Void
-    NestedScopes → T36
-    NestedQuant → T39
-    MultiCapture → T40
-    EmptyBranch → T41
-    DeepNest → T42
-    Complex → T44
-    CardinalityJoin → T46
-    CapturedSeq → T48
-    AnchorSibling → T49
-    AnchorLast → T50
-    AnchorFirst → T51
+    NestedScopes → T38
+    NestedQuant → T41
+    MultiCapture → T42
+    EmptyBranch → T43
+    DeepNest → T44
+    Complex → T46
+    CardinalityJoin → T48
+    CapturedSeq → T50
+    AnchorSibling → T51
+    AnchorLast → T52
+    AnchorFirst → T53
 
     === Types ===
     T3: Record Identifier {
@@ -598,76 +598,78 @@ fn golden_master_comprehensive() {
         key: Node
         value: Node
     }
-    T26: Record QisNodeScope26 {
+    T26: ArrayStar <anon> → T25
+    T27: Record QisNodeScope27 {
         name: Node
         body: Node
     }
-    T27: ArrayPlus <anon> → Node
-    T28: Record PlusQuant {
-        items: T27
+    T28: ArrayStar <anon> → T27
+    T29: ArrayPlus <anon> → Node
+    T30: Record PlusQuant {
+        items: T29
     }
-    T29: Optional <anon> → Node
-    T30: Record OptQuant {
-        maybe_item: T29
+    T31: Optional <anon> → Node
+    T32: Record OptQuant {
+        maybe_item: T31
     }
-    T31: ArrayStar <anon> → Node
-    T32: Record NoQis {
-        item: T31
-    }
-    T33: Record NestedScopesScope33 {
-        a: Node
-    }
-    T34: Record NestedScopesScope34 {
-        b: Node
+    T33: ArrayStar <anon> → Node
+    T34: Record NoQis {
+        item: T33
     }
     T35: Record NestedScopesScope35 {
-        inner1: T33
-        inner2: T34
+        a: Node
     }
-    T36: Record NestedScopes {
-        outer: T35
+    T36: Record NestedScopesScope36 {
+        b: Node
     }
-    T37: ArrayStar <anon> → Node
-    T38: ArrayPlus <anon> → Node
-    T39: Record NestedQuant {
-        inner: T37
-        outer: T38
+    T37: Record NestedScopesScope37 {
+        inner1: T35
+        inner2: T36
     }
-    T40: Record MultiCapture {
+    T38: Record NestedScopes {
+        outer: T37
+    }
+    T39: ArrayStar <anon> → Node
+    T40: ArrayPlus <anon> → Node
+    T41: Record NestedQuant {
+        inner: T39
+        outer: T40
+    }
+    T42: Record MultiCapture {
         fn_name: String
         fn_body: Node
     }
-    T41: Enum EmptyBranch {
+    T43: Enum EmptyBranch {
         Some: Node
         None: Void
     }
-    T42: Record DeepNest {
+    T44: Record DeepNest {
         deep: Node
     }
-    T43: ArrayStar <anon> → Node
-    T44: Record Complex {
+    T45: ArrayStar <anon> → Node
+    T46: Record Complex {
         mod_name: String
-        imports: T43
+        imports: T45
     }
-    T45: ArrayPlus <anon> → Node
-    T46: Record CardinalityJoin {
-        item: T45
+    T47: ArrayPlus <anon> → Node
+    T48: Record CardinalityJoin {
+        item: T47
     }
-    T47: Record CapturedSeqScope47 {
+    T49: Record CapturedSeqScope49 {
         x: Node
         y: Node
     }
-    T48: Record CapturedSeq {
-        nested: T47
+    T50: Record CapturedSeq {
+        nested: T49
     }
-    T49: Record AnchorSibling {
+    T51: Record AnchorSibling {
         left: Node
         right: Node
     }
-    T50: Record AnchorLast {
+    T52: Record AnchorLast {
         last: Node
     }
-    T51: Record AnchorFirst {
+    T53: Record AnchorFirst {
         first: Node
     }
     "#);
@@ -948,11 +950,11 @@ fn golden_type_inference() {
     SyntheticNames → T9
     RefOpaque → Void
     RefCaptured → T10
-    QisTwo → T11
-    NoQisOne → T13
-    MissingField → T15
-    FlatScope → T16
-    CardMult → T18
+    QisTwo → T12
+    NoQisOne → T14
+    MissingField → T16
+    FlatScope → T17
+    CardMult → T19
 
     === Types ===
     T3: Record BaseWithCapture {
@@ -981,25 +983,26 @@ fn golden_type_inference() {
         x: Node
         y: Node
     }
-    T12: ArrayStar <anon> → Node
-    T13: Record NoQisOne {
-        x: T12
+    T12: ArrayStar <anon> → T11
+    T13: ArrayStar <anon> → Node
+    T14: Record NoQisOne {
+        x: T13
     }
-    T14: Record MissingFieldScope14 {
+    T15: Record MissingFieldScope15 {
         a: Node
         b: Node
         c: Node
     }
-    T15: Enum MissingField {
-        Full: T14
+    T16: Enum MissingField {
+        Full: T15
         Partial: Node
     }
-    T16: Record FlatScope {
+    T17: Record FlatScope {
         val: Node
     }
-    T17: ArrayStar <anon> → Node
-    T18: Record CardMult {
-        items: T17
+    T18: ArrayStar <anon> → Node
+    T19: Record CardMult {
+        items: T18
     }
     ");
 }
@@ -1196,44 +1199,45 @@ fn golden_quantifier_graphs() {
     ═══════════════════════════════════════════════════════════════════════════════
 
     === Entrypoints ===
-    QuantSeq → T3
-    Optional → T5
-    NestedQuant → T8
-    LazyStar → T10
-    LazyPlus → T12
-    GreedyStar → T14
-    GreedyPlus → T16
+    QuantSeq → T4
+    Optional → T6
+    NestedQuant → T9
+    LazyStar → T11
+    LazyPlus → T13
+    GreedyStar → T15
+    GreedyPlus → T17
 
     === Types ===
     T3: Record QuantSeqScope3 {
         x: Node
         y: Node
     }
-    T4: Optional <anon> → Node
-    T5: Record Optional {
-        maybe: T4
+    T4: ArrayStar <anon> → T3
+    T5: Optional <anon> → Node
+    T6: Record Optional {
+        maybe: T5
     }
-    T6: ArrayStar <anon> → Node
-    T7: ArrayPlus <anon> → Node
-    T8: Record NestedQuant {
-        inners: T6
-        outers: T7
+    T7: ArrayStar <anon> → Node
+    T8: ArrayPlus <anon> → Node
+    T9: Record NestedQuant {
+        inners: T7
+        outers: T8
     }
-    T9: ArrayStar <anon> → Node
-    T10: Record LazyStar {
-        items: T9
+    T10: ArrayStar <anon> → Node
+    T11: Record LazyStar {
+        items: T10
     }
-    T11: ArrayPlus <anon> → Node
-    T12: Record LazyPlus {
-        items: T11
+    T12: ArrayPlus <anon> → Node
+    T13: Record LazyPlus {
+        items: T12
     }
-    T13: ArrayStar <anon> → Node
-    T14: Record GreedyStar {
-        items: T13
+    T14: ArrayStar <anon> → Node
+    T15: Record GreedyStar {
+        items: T14
     }
-    T15: ArrayPlus <anon> → Node
-    T16: Record GreedyPlus {
-        items: T15
+    T16: ArrayPlus <anon> → Node
+    T17: Record GreedyPlus {
+        items: T16
     }
     ");
 }
