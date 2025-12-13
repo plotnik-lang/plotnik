@@ -706,6 +706,7 @@ impl Parser<'_> {
     fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
         if self.peek() == SyntaxKind::At {
             self.start_node_at(checkpoint, SyntaxKind::Capture);
+            self.drain_trivia();
             self.parse_capture_suffix();
             self.finish_node();
         }
