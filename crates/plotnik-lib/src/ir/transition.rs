@@ -14,35 +14,61 @@ pub const MAX_INLINE_SUCCESSORS: usize = 8;
 /// Transitions use SSO (small-size optimization) for successors:
 /// - 0-8 successors: stored inline in `successor_data`
 /// - 9+ successors: `successor_data[0]` is index into successors segment
+///
+/// Layout (64 bytes total, 64-byte aligned):
+/// ```text
+/// offset 0:  matcher (16 bytes)
+/// offset 16: ref_marker (4 bytes)
+/// offset 20: nav (2 bytes)
+/// offset 22: effects_len (2 bytes)
+/// offset 24: successor_count (4 bytes)
+/// offset 28: effects_start (4 bytes)
+/// offset 32: successor_data (32 bytes)
+/// ```
 #[repr(C, align(64))]
 #[derive(Clone, Copy)]
 pub struct Transition {
     // --- 32 bytes metadata ---
     /// What this transition matches (node kind, wildcard, epsilon).
-    pub matcher: Matcher, // 16 bytes
+    pub matcher: Matcher, // 16 bytes, offset 0
 
     /// Reference call/return marker for recursive definitions.
-    pub ref_marker: RefTransition, // 4 bytes
-
-    /// Number of successor transitions.
-    pub successor_count: u32, // 4 bytes
-
-    /// Effects to execute on successful match.
-    /// When empty: start_index=0, len=0.
-    pub effects: Slice<EffectOp>, // 6 bytes
+    pub ref_marker: RefTransition, // 4 bytes, offset 16
 
     /// Navigation instruction (descend/ascend/sibling traversal).
-    pub nav: Nav, // 2 bytes
+    pub nav: Nav, // 2 bytes, offset 20
+
+    /// Number of effect operations (inlined from Slice for alignment).
+    effects_len: u16, // 2 bytes, offset 22
+
+    /// Number of successor transitions.
+    pub successor_count: u32, // 4 bytes, offset 24
+
+    /// Start index into effects segment (inlined from Slice for alignment).
+    effects_start: u32, // 4 bytes, offset 28
 
     // --- 32 bytes control flow ---
     /// Successor storage (inline or spilled index).
     ///
     /// - If `successor_count <= 8`: contains `TransitionId` values directly
     /// - If `successor_count > 8`: `successor_data[0]` is index into successors segment
-    pub successor_data: [u32; MAX_INLINE_SUCCESSORS], // 32 bytes
+    pub successor_data: [u32; MAX_INLINE_SUCCESSORS], // 32 bytes, offset 32
 }
 
 impl Transition {
+    /// Returns the effects slice.
+    #[inline]
+    pub fn effects(&self) -> Slice<EffectOp> {
+        Slice::new(self.effects_start, self.effects_len)
+    }
+
+    /// Sets the effects slice.
+    #[inline]
+    pub fn set_effects(&mut self, effects: Slice<EffectOp>) {
+        self.effects_start = effects.start_index();
+        self.effects_len = effects.len();
+    }
+
     /// Returns `true` if successors are stored inline.
     #[inline]
     pub fn has_inline_successors(&self) -> bool {

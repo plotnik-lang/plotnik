@@ -53,10 +53,9 @@ struct TypeDef {
     kind: TypeKind,              // 1
     _pad: u8,                    // 1
     name: StringId,              // 2 - synthetic or explicit, 0xFFFF for wrappers
-    members: Slice<TypeMember>,  // 6 - see interpretation below
-    _pad2: u16,                  // 2
+    members: Slice<TypeMember>,  // 8 - see interpretation below
 }
-// 12 bytes, align 2 (due to packed Slice having align 1)
+// 12 bytes, align 4
 ```
 
 The `members` field has dual semantics based on `kind`:
@@ -64,7 +63,7 @@ The `members` field has dual semantics based on `kind`:
 | Kind                               | `members.start_index`   | `members.len` |
 | ---------------------------------- | ----------------------- | ------------- |
 | Wrappers (Optional/Array\*/Array+) | Inner `TypeId` (as u32) | 0             |
-| Composites (Record/Enum)           | Index into type_members | Member count  |
+| Composites (Struct/Enum)           | Index into type_members | Member count  |
 
 This reuses `Slice<T>` for consistency with [ADR-0005](ADR-0005-transition-graph-format.md), while keeping TypeDef compact.
 
@@ -76,7 +75,7 @@ enum TypeKind {
     Optional = 0,   // T?  — members.start = inner TypeId
     ArrayStar = 1,  // T*  — members.start = element TypeId
     ArrayPlus = 2,  // T+  — members.start = element TypeId
-    Record = 3,     // struct — members = slice into type_members
+    Struct = 3,     // struct — members = slice into type_members
     Enum = 4,       // tagged union — members = slice into type_members
 }
 ```
@@ -86,12 +85,12 @@ enum TypeKind {
 | Optional  | `expr?`             | Nullable wrapper                 |
 | ArrayStar | `expr*`             | Zero or more elements            |
 | ArrayPlus | `expr+`             | One or more elements (non-empty) |
-| Record    | `{ ... } @name`     | Named fields                     |
+| Struct    | `{ ... } @name`     | Named fields                     |
 | Enum      | `[ A: ... B: ... ]` | Tagged union (discriminated)     |
 
 ### TypeMember
 
-Shared structure for Record fields and Enum variants:
+Shared structure for Struct fields and Enum variants:
 
 ```rust
 #[repr(C)]
@@ -132,10 +131,10 @@ Func = (function_declaration
 Type graph:
 
 ```
-T3: Record "Func"         → [name: Str, body: T4]
+T3: Struct "Func"         → [name: Str, body: T4]
 T4: Enum "FuncBody"       → [Stmt: T5, Expr: T6]
-T5: Record "FuncBodyStmt" → [stmt: Node]
-T6: Record "FuncBodyExpr" → [expr: Node]
+T5: Struct "FuncBodyStmt" → [stmt: Node]
+T6: Struct "FuncBodyExpr" → [expr: Node]
 
 Entrypoint: Func → result_type: T3
 ```

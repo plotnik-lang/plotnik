@@ -1,0 +1,546 @@
+//! AST-to-graph construction.
+//!
+//! Translates the parsed and analyzed AST into a `BuildGraph`.
+//! This is the bridge between `parser::ast` and `graph::BuildGraph`.
+
+use crate::ir::Nav;
+use crate::parser::{
+    AltExpr, AltKind, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
+    NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, SeqItem, SyntaxKind, token_src,
+};
+
+use super::{BuildEffect, BuildGraph, BuildMatcher, Fragment, NodeId, RefMarker};
+
+/// Constructs a `BuildGraph` from a parsed query AST.
+pub struct GraphConstructor<'src> {
+    source: &'src str,
+    graph: BuildGraph<'src>,
+    next_ref_id: u32,
+}
+
+/// Context for navigation determination.
+#[derive(Debug, Clone, Copy)]
+enum NavContext {
+    /// First expression at definition root level.
+    Root,
+    /// First child inside a parent node.
+    FirstChild { anchored: bool },
+    /// Sibling after previous expression.
+    Sibling { anchored: bool },
+}
+
+impl NavContext {
+    /// Determine the Nav based on context and expression type.
+    fn to_nav(self, is_anonymous: bool) -> Nav {
+        match self {
+            NavContext::Root => Nav::stay(),
+            NavContext::FirstChild { anchored: false } => Nav::down(),
+            NavContext::FirstChild { anchored: true } => {
+                if is_anonymous {
+                    Nav::down_exact()
+                } else {
+                    Nav::down_skip_trivia()
+                }
+            }
+            NavContext::Sibling { anchored: false } => Nav::next(),
+            NavContext::Sibling { anchored: true } => {
+                if is_anonymous {
+                    Nav::next_exact()
+                } else {
+                    Nav::next_skip_trivia()
+                }
+            }
+        }
+    }
+}
+
+/// Tracks trailing anchor state for Up navigation.
+#[derive(Debug, Clone, Copy)]
+struct ExitContext {
+    /// Whether there's a trailing anchor before exit.
+    has_trailing_anchor: bool,
+    /// Whether the last expression was anonymous (for Exact vs SkipTrivia).
+    last_was_anonymous: bool,
+}
+
+impl ExitContext {
+    fn to_up_nav(self, level: u8) -> Nav {
+        if !self.has_trailing_anchor {
+            Nav::up(level)
+        } else if self.last_was_anonymous {
+            Nav::up_exact(level)
+        } else {
+            Nav::up_skip_trivia(level)
+        }
+    }
+}
+
+impl<'src> GraphConstructor<'src> {
+    pub fn new(source: &'src str) -> Self {
+        Self {
+            source,
+            graph: BuildGraph::new(),
+            next_ref_id: 0,
+        }
+    }
+
+    /// Construct graph from a parsed Root AST.
+    pub fn construct(mut self, root: &Root) -> BuildGraph<'src> {
+        for def in root.defs() {
+            self.construct_def(&def);
+        }
+        self.link_references();
+        self.graph
+    }
+
+    /// Link Enter nodes to their definition entry points.
+    ///
+    /// Per ADR-0005, Enter's successors should be:
+    /// - successors[0]: definition entry point
+    /// - successors[1..]: return transitions (the Exit node's successor)
+    fn link_references(&mut self) {
+        // Collect all Enter nodes with their ref_name and corresponding Exit successors
+        let mut links: Vec<(NodeId, &'src str, Vec<NodeId>)> = Vec::new();
+
+        for (id, node) in self.graph.iter() {
+            if let RefMarker::Enter { ref_id } = &node.ref_marker {
+                if let Some(name) = node.ref_name {
+                    // Find the corresponding Exit node and its successors
+                    let exit_successors = self.find_exit_successors(*ref_id);
+                    links.push((id, name, exit_successors));
+                }
+            }
+        }
+
+        // Apply links
+        for (enter_id, name, return_transitions) in links {
+            if let Some(def_entry) = self.graph.definition(name) {
+                // Connect Enter to definition entry point
+                self.graph.connect(enter_id, def_entry);
+                // Add return transitions
+                for ret in return_transitions {
+                    self.graph.connect(enter_id, ret);
+                }
+            }
+        }
+    }
+
+    /// Find successors of the Exit node matching the given ref_id.
+    fn find_exit_successors(&self, ref_id: u32) -> Vec<NodeId> {
+        for (_, node) in self.graph.iter() {
+            if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker {
+                if *exit_id == ref_id {
+                    return node.successors.clone();
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn construct_def(&mut self, def: &Def) {
+        let Some(name_token) = def.name() else {
+            return;
+        };
+        let Some(body) = def.body() else {
+            return;
+        };
+
+        let name = token_src(&name_token, self.source);
+        let fragment = self.construct_expr(&body, NavContext::Root);
+        self.graph.add_definition(name, fragment.entry);
+    }
+
+    fn construct_expr(&mut self, expr: &Expr, ctx: NavContext) -> Fragment {
+        match expr {
+            Expr::NamedNode(node) => self.construct_named_node(node, ctx),
+            Expr::AnonymousNode(node) => self.construct_anonymous_node(node, ctx),
+            Expr::Ref(r) => self.construct_ref(r, ctx),
+            Expr::AltExpr(alt) => self.construct_alt(alt, ctx),
+            Expr::SeqExpr(seq) => self.construct_seq(seq, ctx),
+            Expr::CapturedExpr(cap) => self.construct_capture(cap, ctx),
+            Expr::QuantifiedExpr(quant) => self.construct_quantifier(quant, ctx),
+            Expr::FieldExpr(field) => self.construct_field(field, ctx),
+        }
+    }
+
+    fn construct_named_node(&mut self, node: &NamedNode, ctx: NavContext) -> Fragment {
+        let matcher = self.build_named_matcher(node);
+        let nav = ctx.to_nav(false);
+        let node_id = self.graph.add_matcher(matcher);
+        self.graph.node_mut(node_id).set_nav(nav);
+
+        // Process children with anchor tracking
+        let items: Vec<_> = node.items().collect();
+        if items.is_empty() {
+            return Fragment::single(node_id);
+        }
+
+        let (child_fragments, exit_ctx) = self.construct_item_sequence(&items, true);
+        if child_fragments.is_empty() {
+            return Fragment::single(node_id);
+        }
+
+        let inner = self.graph.sequence(&child_fragments);
+        self.graph.connect(node_id, inner.entry);
+
+        // Add exit transition with appropriate Up nav
+        let exit_id = self.graph.add_epsilon();
+        self.graph.node_mut(exit_id).set_nav(exit_ctx.to_up_nav(1));
+        self.graph.connect(inner.exit, exit_id);
+
+        Fragment::new(node_id, exit_id)
+    }
+
+    /// Construct a sequence of items (expressions and anchors).
+    /// Returns fragments and exit context for trailing anchor handling.
+    fn construct_item_sequence(
+        &mut self,
+        items: &[SeqItem],
+        is_children: bool,
+    ) -> (Vec<Fragment>, ExitContext) {
+        let mut fragments = Vec::new();
+        let mut pending_anchor = false;
+        let mut last_was_anonymous = false;
+        let mut is_first = true;
+
+        for item in items {
+            match item {
+                SeqItem::Anchor(_) => {
+                    pending_anchor = true;
+                }
+                SeqItem::Expr(expr) => {
+                    let ctx = if is_first {
+                        is_first = false;
+                        if is_children {
+                            NavContext::FirstChild {
+                                anchored: pending_anchor,
+                            }
+                        } else {
+                            // For sequences at root level, first item inherits parent context
+                            NavContext::Sibling {
+                                anchored: pending_anchor,
+                            }
+                        }
+                    } else {
+                        NavContext::Sibling {
+                            anchored: pending_anchor,
+                        }
+                    };
+
+                    last_was_anonymous = is_anonymous_expr(expr);
+                    let frag = self.construct_expr(expr, ctx);
+                    fragments.push(frag);
+                    pending_anchor = false;
+                }
+            }
+        }
+
+        let exit_ctx = ExitContext {
+            has_trailing_anchor: pending_anchor,
+            last_was_anonymous,
+        };
+
+        (fragments, exit_ctx)
+    }
+
+    fn build_named_matcher(&mut self, node: &NamedNode) -> BuildMatcher<'src> {
+        let kind = node
+            .node_type()
+            .map(|t| token_src(&t, self.source))
+            .unwrap_or("_");
+
+        let negated_fields: Vec<&'src str> = node
+            .as_cst()
+            .children()
+            .filter_map(NegatedField::cast)
+            .filter_map(|nf| nf.name())
+            .map(|t| token_src(&t, self.source))
+            .collect();
+
+        let field = self.find_field_constraint(node.as_cst());
+
+        if node.is_any() {
+            BuildMatcher::Wildcard { field }
+        } else {
+            BuildMatcher::Node {
+                kind,
+                field,
+                negated_fields,
+            }
+        }
+    }
+
+    fn construct_anonymous_node(&mut self, node: &AnonymousNode, ctx: NavContext) -> Fragment {
+        let field = self.find_field_constraint(node.as_cst());
+        let nav = ctx.to_nav(true);
+
+        let matcher = if node.is_any() {
+            BuildMatcher::Wildcard { field }
+        } else {
+            let literal = node
+                .value()
+                .map(|t| token_src(&t, self.source))
+                .unwrap_or("");
+            BuildMatcher::Anonymous { literal, field }
+        };
+
+        let node_id = self.graph.add_matcher(matcher);
+        self.graph.node_mut(node_id).set_nav(nav);
+        Fragment::single(node_id)
+    }
+
+    fn construct_ref(&mut self, r: &Ref, ctx: NavContext) -> Fragment {
+        let Some(name_token) = r.name() else {
+            return self.graph.epsilon_fragment();
+        };
+
+        let ref_id = self.next_ref_id;
+        self.next_ref_id += 1;
+
+        // Create Enter node with navigation from context
+        let enter_id = self.graph.add_epsilon();
+        let nav = ctx.to_nav(false);
+        self.graph.node_mut(enter_id).set_nav(nav);
+        self.graph
+            .node_mut(enter_id)
+            .set_ref_marker(RefMarker::enter(ref_id));
+
+        // Create Exit node (nav will be set during linking based on definition structure)
+        let exit_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(exit_id)
+            .set_ref_marker(RefMarker::exit(ref_id));
+
+        // Store ref name for later resolution
+        let name = token_src(&name_token, self.source);
+        self.graph.node_mut(enter_id).ref_name = Some(name);
+
+        Fragment::new(enter_id, exit_id)
+    }
+
+    fn construct_alt(&mut self, alt: &AltExpr, ctx: NavContext) -> Fragment {
+        match alt.kind() {
+            AltKind::Tagged => self.construct_tagged_alt(alt, ctx),
+            AltKind::Untagged | AltKind::Mixed => self.construct_untagged_alt(alt, ctx),
+        }
+    }
+
+    fn construct_tagged_alt(&mut self, alt: &AltExpr, ctx: NavContext) -> Fragment {
+        let branches: Vec<_> = alt.branches().collect();
+        if branches.is_empty() {
+            return self.graph.epsilon_fragment();
+        }
+
+        // Branch node inherits context nav
+        let branch_id = self.graph.add_epsilon();
+        self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
+
+        let exit_id = self.graph.add_epsilon();
+
+        for branch in &branches {
+            let frag = self.construct_tagged_branch(branch);
+            self.graph.connect(branch_id, frag.entry);
+            self.graph.connect(frag.exit, exit_id);
+        }
+
+        Fragment::new(branch_id, exit_id)
+    }
+
+    fn construct_tagged_branch(&mut self, branch: &Branch) -> Fragment {
+        let Some(label_token) = branch.label() else {
+            return branch
+                .body()
+                .map(|b| self.construct_expr(&b, NavContext::Root))
+                .unwrap_or_else(|| self.graph.epsilon_fragment());
+        };
+        let Some(body) = branch.body() else {
+            return self.graph.epsilon_fragment();
+        };
+
+        let label = token_src(&label_token, self.source);
+
+        // StartVariant (epsilon, no nav change)
+        let start_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(start_id)
+            .add_effect(BuildEffect::StartVariant(label));
+
+        // Body inherits root context (alternation resets nav context)
+        let body_frag = self.construct_expr(&body, NavContext::Root);
+
+        let end_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(end_id)
+            .add_effect(BuildEffect::EndVariant);
+
+        self.graph.connect(start_id, body_frag.entry);
+        self.graph.connect(body_frag.exit, end_id);
+
+        Fragment::new(start_id, end_id)
+    }
+
+    fn construct_untagged_alt(&mut self, alt: &AltExpr, ctx: NavContext) -> Fragment {
+        let branches: Vec<_> = alt.branches().filter_map(|b| b.body()).collect();
+
+        if branches.is_empty() {
+            return self.graph.epsilon_fragment();
+        }
+
+        // Branch node inherits context nav
+        let branch_id = self.graph.add_epsilon();
+        self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
+
+        let exit_id = self.graph.add_epsilon();
+
+        for body in &branches {
+            // Each branch resets to root context
+            let frag = self.construct_expr(body, NavContext::Root);
+            self.graph.connect(branch_id, frag.entry);
+            self.graph.connect(frag.exit, exit_id);
+        }
+
+        Fragment::new(branch_id, exit_id)
+    }
+
+    fn construct_seq(&mut self, seq: &SeqExpr, ctx: NavContext) -> Fragment {
+        let items: Vec<_> = seq.items().collect();
+
+        // Wrap sequence in StartObject/EndObject
+        let start_id = self.graph.add_epsilon();
+        self.graph.node_mut(start_id).set_nav(ctx.to_nav(false));
+        self.graph
+            .node_mut(start_id)
+            .add_effect(BuildEffect::StartObject);
+
+        let (child_fragments, _exit_ctx) = self.construct_item_sequence(&items, false);
+        let inner = self.graph.sequence(&child_fragments);
+
+        let end_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(end_id)
+            .add_effect(BuildEffect::EndObject);
+
+        self.graph.connect(start_id, inner.entry);
+        self.graph.connect(inner.exit, end_id);
+
+        Fragment::new(start_id, end_id)
+    }
+
+    fn construct_capture(&mut self, cap: &CapturedExpr, ctx: NavContext) -> Fragment {
+        let Some(inner_expr) = cap.inner() else {
+            return self.graph.epsilon_fragment();
+        };
+
+        let inner_frag = self.construct_expr(&inner_expr, ctx);
+
+        let capture_name = cap.name().map(|t| token_src(&t, self.source));
+
+        let has_to_string = cap
+            .type_annotation()
+            .and_then(|t| t.name())
+            .map(|n| n.text() == "string")
+            .unwrap_or(false);
+
+        // Attach CaptureNode to all reachable matchers
+        let matchers = self.find_all_matchers(inner_frag.entry);
+        for matcher_id in matchers {
+            self.graph
+                .node_mut(matcher_id)
+                .add_effect(BuildEffect::CaptureNode);
+
+            if has_to_string {
+                self.graph
+                    .node_mut(matcher_id)
+                    .add_effect(BuildEffect::ToString);
+            }
+        }
+
+        // Add Field effect at exit
+        if let Some(name) = capture_name {
+            let field_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(field_id)
+                .add_effect(BuildEffect::Field(name));
+            self.graph.connect(inner_frag.exit, field_id);
+            Fragment::new(inner_frag.entry, field_id)
+        } else {
+            inner_frag
+        }
+    }
+
+    fn construct_quantifier(&mut self, quant: &QuantifiedExpr, ctx: NavContext) -> Fragment {
+        let Some(inner_expr) = quant.inner() else {
+            return self.graph.epsilon_fragment();
+        };
+        let Some(op) = quant.operator() else {
+            return self.construct_expr(&inner_expr, ctx);
+        };
+
+        // First iteration uses parent context, subsequent use Sibling
+        let inner_frag = self.construct_expr(&inner_expr, ctx);
+
+        match op.kind() {
+            SyntaxKind::Star => self.graph.zero_or_more_array(inner_frag),
+            SyntaxKind::StarQuestion => self.graph.zero_or_more_array_lazy(inner_frag),
+            SyntaxKind::Plus => self.graph.one_or_more_array(inner_frag),
+            SyntaxKind::PlusQuestion => self.graph.one_or_more_array_lazy(inner_frag),
+            SyntaxKind::Question => self.graph.optional(inner_frag),
+            SyntaxKind::QuestionQuestion => self.graph.optional_lazy(inner_frag),
+            _ => inner_frag,
+        }
+    }
+
+    fn construct_field(&mut self, field: &FieldExpr, ctx: NavContext) -> Fragment {
+        let Some(value_expr) = field.value() else {
+            return self.graph.epsilon_fragment();
+        };
+        self.construct_expr(&value_expr, ctx)
+    }
+
+    /// Find field constraint from parent FieldExpr.
+    fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'src str> {
+        let parent = node.parent()?;
+        let field_expr = FieldExpr::cast(parent)?;
+        let name_token = field_expr.name()?;
+        Some(token_src(&name_token, self.source))
+    }
+
+    /// Find all non-epsilon matcher nodes reachable from start.
+    fn find_all_matchers(&self, start: NodeId) -> Vec<NodeId> {
+        let mut result = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        self.collect_matchers(start, &mut result, &mut visited);
+        result
+    }
+
+    fn collect_matchers(
+        &self,
+        node_id: NodeId,
+        result: &mut Vec<NodeId>,
+        visited: &mut std::collections::HashSet<NodeId>,
+    ) {
+        if !visited.insert(node_id) {
+            return;
+        }
+
+        let node = self.graph.node(node_id);
+        if !node.is_epsilon() {
+            result.push(node_id);
+            return;
+        }
+
+        for &succ in &node.successors {
+            self.collect_matchers(succ, result, visited);
+        }
+    }
+}
+
+/// Returns true if expression is an anonymous node (string literal).
+fn is_anonymous_expr(expr: &Expr) -> bool {
+    matches!(expr, Expr::AnonymousNode(n) if !n.is_any())
+}
+
+/// Convenience function to construct a graph from source and AST.
+pub fn construct_graph<'src>(source: &'src str, root: &Root) -> BuildGraph<'src> {
+    GraphConstructor::new(source).construct(root)
+}

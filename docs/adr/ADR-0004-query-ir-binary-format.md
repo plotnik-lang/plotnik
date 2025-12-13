@@ -79,6 +79,7 @@ Single pool for all strings (field names, variant tags, entrypoint names, type n
 
 ```rust
 type StringId = u16;
+const STRING_NONE: StringId = 0xFFFF;  // sentinel for unnamed types
 
 #[repr(C)]
 struct StringRef {
@@ -118,7 +119,7 @@ struct Entrypoint {
 Header (64 bytes):
   magic: [u8; 4]           b"PLNK"
   version: u32             format version + ABI hash
-  checksum: u32            CRC32(offsets || buffer_data)
+  checksum: u32            CRC32(header[12..64] || buffer_data)
   buffer_len: u32
   successors_offset: u32
   effects_offset: u32
@@ -137,6 +138,8 @@ Buffer Data (buffer_len bytes)
 Header is 64 bytes to ensure buffer data starts at a 64-byte aligned offset. This enables true zero-copy `mmap` usage where transitions at offset 0 within the buffer are correctly aligned.
 
 Little-endian always. UTF-8 strings. Version mismatch or checksum failure → recompile.
+
+**Checksum coverage**: The checksum covers bytes 12–63 of the header (everything after the checksum field) plus all buffer data. The magic and version are verified independently before checksum validation—a version mismatch triggers recompile without checking the checksum.
 
 ### Construction
 
@@ -166,7 +169,7 @@ Buffer layout:
 0x0280  Negated Fields []
 0x0280  String Refs    [{0,4}, {4,5}, {9,5}, ...]
 0x02C0  String Bytes   "namevalueIdentNumFuncExpr"
-0x0300  Type Defs      [Record{...}, Enum{...}, ...]
+0x0300  Type Defs      [Struct{...}, Enum{...}, ...]
 0x0340  Type Members   [{name,Str}, {Ident,Ty5}, ...]
 0x0380  Entrypoints    [{name=Func, target=Tr0, type=Ty3}, ...]
 0x03A0  Trivia Kinds   [comment, ...]

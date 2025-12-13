@@ -17,9 +17,16 @@ For each transition:
 1. Execute `nav` initial movement (e.g., goto_first_child, goto_next_sibling)
 2. Search loop: try matcher, on fail apply skip policy (advance or fail)
 3. On match success: store matched node, execute `effects` sequentially
-4. Process successors with backtracking
+4. Process `ref_marker` (see below)
+5. Process successors with backtracking
 
 For `Up*` variants, step 2 becomes: validate exit constraint, ascend N levels (no search loop).
+
+**RefTransition handling** (step 4):
+
+- `None`: no action, proceed to step 5
+- `Enter(ref_id)`: push frame onto `FrameArena`, store `successors()[1..]` as returns, then jump to `successors()[0]` (definition entry)—step 5 is skipped
+- `Exit(ref_id)`: verify `ref_id` matches current frame, pop frame, use stored returns as successors—step 5 uses these instead of the transition's own successors
 
 Navigation is fully determined by `nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for detailed semantics.
 
