@@ -36,6 +36,8 @@ mod alt_kinds_tests;
 #[cfg(test)]
 mod graph_build_tests;
 #[cfg(test)]
+mod graph_master_test;
+#[cfg(test)]
 mod graph_qis_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
