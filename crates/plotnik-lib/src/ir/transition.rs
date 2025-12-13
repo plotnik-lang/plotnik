@@ -56,6 +56,27 @@ pub struct Transition {
 }
 
 impl Transition {
+    /// Creates a new transition with all fields.
+    #[inline]
+    pub fn new(
+        matcher: Matcher,
+        ref_marker: RefTransition,
+        nav: Nav,
+        effects: Slice<EffectOp>,
+        successor_count: u32,
+        successor_data: [u32; MAX_INLINE_SUCCESSORS],
+    ) -> Self {
+        Self {
+            matcher,
+            ref_marker,
+            nav,
+            effects_len: effects.len(),
+            successor_count,
+            effects_start: effects.start_index(),
+            successor_data,
+        }
+    }
+
     /// Returns the effects slice.
     #[inline]
     pub fn effects(&self) -> Slice<EffectOp> {
