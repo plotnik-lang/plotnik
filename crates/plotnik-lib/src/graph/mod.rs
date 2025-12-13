@@ -17,6 +17,7 @@ mod analysis;
 mod build;
 mod construct;
 mod optimize;
+mod typing;
 
 #[cfg(test)]
 mod analysis_tests;
@@ -26,8 +27,11 @@ mod build_tests;
 mod construct_tests;
 #[cfg(test)]
 mod optimize_tests;
+#[cfg(test)]
+mod typing_tests;
 
 pub use analysis::{AnalysisResult, StringInterner, analyze};
 pub use build::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use construct::{GraphConstructor, construct_graph};
 pub use optimize::{OptimizeStats, eliminate_epsilons};
+pub use typing::{InferredMember, InferredTypeDef, TypeInferenceResult, dump_types, infer_types};
