@@ -10,7 +10,7 @@
 //! 3. Build types bottom-up from scope hierarchy
 //! 4. Handle branching by merging fields with optionality rules
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use indexmap::IndexMap;
 use rowan::TextRange;
@@ -302,6 +302,9 @@ struct TraversalState {
     current_variant: Option<&'static str>,
     array_stack: Vec<ArrayFrame>,
     object_depth: usize,
+    /// When true, skip EndObject type creation.
+    /// Used during alternation branch exploration to collect variants before creating enum.
+    dry_run: bool,
 }
 
 impl TraversalState {
@@ -344,8 +347,10 @@ struct InferenceContext<'src, 'g> {
     diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
     current_def_name: &'src str,
-    /// Precomputed array element types: StartArray node ID -> element TypeId
+    /// Shared map for array element types across branches in loops.
     array_element_types: HashMap<NodeId, TypeId>,
+    /// Map from definition name to its computed type (for reference lookups).
+    definition_types: HashMap<&'src str, TypeId>,
 }
 
 impl<'src, 'g> InferenceContext<'src, 'g> {
@@ -354,11 +359,12 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             graph,
             dead_nodes,
             type_defs: Vec::new(),
-            next_type_id: 3, // TYPE_COMPOSITE_START
-            diagnostics: Diagnostics::new(),
+            next_type_id: 3, // 0=void, 1=node, 2=str
+            diagnostics: Diagnostics::default(),
             errors: Vec::new(),
             current_def_name: "",
             array_element_types: HashMap::new(),
+            definition_types: HashMap::new(),
         }
     }
 
@@ -374,7 +380,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         let mut merge_errors = Vec::new();
         let mut scope_stack = vec![ScopeStackEntry::new_root()];
 
-        let final_pending = self.traverse(
+        let (final_pending, _) = self.traverse(
             entry_id,
             TraversalState::default(),
             &mut visited,
@@ -431,6 +437,8 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         }
     }
 
+    /// Returns (pending_type, stopped_at_node) where stopped_at_node is Some if
+    /// traversal stopped at an already-visited node (reconvergence point).
     fn traverse(
         &mut self,
         node_id: NodeId,
@@ -439,13 +447,14 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         depth: usize,
         errors: &mut Vec<MergeError<'src>>,
         scope_stack: &mut Vec<ScopeStackEntry<'src>>,
-    ) -> Option<PendingType> {
+    ) -> (Option<PendingType>, Option<NodeId>) {
         if self.dead_nodes.contains(&node_id) || depth > 200 {
-            return state.pending;
+            return (state.pending, None);
         }
 
         if !visited.insert(node_id) {
-            return state.pending;
+            // Already visited - this is a reconvergence point
+            return (state.pending, Some(node_id));
         }
 
         let node = self.graph.node(node_id);
@@ -454,7 +463,13 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         for effect in &node.effects {
             match effect {
                 BuildEffect::CaptureNode => {
-                    state.pending = Some(PendingType::primitive(TYPE_NODE));
+                    // At Exit nodes, use the referenced definition's type if available
+                    let capture_type = if let RefMarker::Exit { ref_id } = &node.ref_marker {
+                        self.find_ref_type(*ref_id).unwrap_or(TYPE_NODE)
+                    } else {
+                        TYPE_NODE
+                    };
+                    state.pending = Some(PendingType::primitive(capture_type));
                 }
                 BuildEffect::ClearCurrent => {
                     state.pending = None;
@@ -528,6 +543,8 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                     }
                 }
                 BuildEffect::EndArray => {
+                    // Note: EndArray processes even in dry_run mode because loops need
+                    // element type tracking. Only EndObject is skipped in dry_run.
                     if let Some(frame) = state.array_stack.pop() {
                         // Check if PushElement was actually called (either in this branch or another)
                         let push_was_called = frame.push_called
@@ -560,6 +577,10 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
                 BuildEffect::EndObject => {
                     state.object_depth = state.object_depth.saturating_sub(1);
+                    // In dry_run mode, don't pop scope or create types - just collect info
+                    if state.dry_run {
+                        continue;
+                    }
                     if let Some(finished_entry) = scope_stack.pop() {
                         if finished_entry.is_object {
                             let finished_scope = finished_entry.scope;
@@ -644,7 +665,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             .collect();
 
         if live_successors.is_empty() {
-            return state.pending;
+            return (state.pending, None);
         }
 
         if live_successors.len() == 1 {
@@ -658,21 +679,36 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             );
         }
 
-        // Branching: explore all paths and merge results
-        // For loops (greedy quantifiers), the first branch is the loop body.
-        // We explore it first and propagate array element types to subsequent branches.
+        // Branching: two-phase approach to handle reconvergence correctly.
+        //
+        // Phase 1: Explore each branch with its OWN visited set to:
+        //   - Collect scope modifications from each branch
+        //   - Find where branches reconverge (common nodes)
+        //
+        // Phase 2: Merge branch scopes, then continue from reconvergence point
+        //          with the merged scope (processing shared suffix once).
         let total_branches = live_successors.len();
         let initial_scope_len = scope_stack.len();
         let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
+        let mut branch_visited_sets: Vec<HashSet<NodeId>> = Vec::new();
         let mut result_pending: Option<PendingType> = None;
+
+        // Phase 1: explore branches independently
+        // Use dry_run only when inside object scope (alternation-like branching).
+        // For loop entry/exit (object_depth=0), process normally so EndArray works.
+        let use_dry_run = state.object_depth > 0;
 
         for succ in &live_successors {
             let mut branch_stack = scope_stack.clone();
             let mut branch_visited = visited.clone();
+            let mut branch_state = state.clone();
+            if use_dry_run {
+                branch_state.dry_run = true;
+            }
 
-            let branch_pending = self.traverse(
+            let (branch_pending, _) = self.traverse(
                 *succ,
-                state.clone(),
+                branch_state,
                 &mut branch_visited,
                 depth + 1,
                 errors,
@@ -684,6 +720,10 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 result_pending = branch_pending;
             }
 
+            // Collect nodes newly visited by this branch
+            let new_nodes: HashSet<NodeId> = branch_visited.difference(visited).copied().collect();
+            branch_visited_sets.push(new_nodes);
+
             while branch_stack.len() > initial_scope_len {
                 branch_stack.pop();
             }
@@ -691,6 +731,15 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 branch_scopes.push(entry.scope.clone());
             }
         }
+
+        // Find reconvergence: nodes visited by ALL branches (shared suffix)
+        let reconverge_nodes: HashSet<NodeId> = if branch_visited_sets.len() >= 2 {
+            let mut iter = branch_visited_sets.iter();
+            let first = iter.next().unwrap().clone();
+            iter.fold(first, |acc, set| acc.intersection(set).copied().collect())
+        } else {
+            HashSet::new()
+        };
 
         // Merge branch scopes into main scope
         if let Some(main_entry) = scope_stack.last_mut() {
@@ -701,7 +750,43 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             main_entry.scope.apply_optionality(total_branches);
         }
 
-        result_pending
+        // Phase 2: if dry_run was used and there's a reconvergence point,
+        // continue from there with merged scope
+        if use_dry_run && !reconverge_nodes.is_empty() {
+            // Find the "entry" reconvergence node: the one with minimum ID
+            // (nodes are created in traversal order, so first shared node has lowest ID)
+            let reconverge_entry = reconverge_nodes.iter().min().copied();
+
+            if let Some(entry_node) = reconverge_entry {
+                // Mark branch-specific nodes as visited, but NOT reconverge nodes
+                for branch_set in &branch_visited_sets {
+                    for &nid in branch_set {
+                        if !reconverge_nodes.contains(&nid) {
+                            visited.insert(nid);
+                        }
+                    }
+                }
+                // Continue from reconvergence with merged scope (dry_run = false)
+                let mut cont_state = state.clone();
+                cont_state.dry_run = false;
+                cont_state.pending = result_pending;
+                return self.traverse(
+                    entry_node,
+                    cont_state,
+                    visited,
+                    depth + 1,
+                    errors,
+                    scope_stack,
+                );
+            }
+        }
+
+        // No reconvergence or couldn't find entry point - mark all visited
+        for branch_set in branch_visited_sets {
+            visited.extend(branch_set);
+        }
+
+        (result_pending, None)
     }
 
     fn generate_scope_name(&self) -> &'src str {
@@ -766,6 +851,21 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         type_id
     }
 
+    /// Find the type for a reference by looking up the Enter node with matching ref_id.
+    fn find_ref_type(&self, ref_id: u32) -> Option<TypeId> {
+        // Find the Enter node with this ref_id to get the definition name
+        for (_, node) in self.graph.iter() {
+            if let RefMarker::Enter { ref_id: enter_id } = &node.ref_marker {
+                if *enter_id == ref_id {
+                    if let Some(name) = node.ref_name {
+                        return self.definition_types.get(name).copied();
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn wrap_with_cardinality(&mut self, base: TypeId, card: Cardinality) -> TypeId {
         match card {
             Cardinality::One => base,
@@ -812,14 +912,115 @@ impl<'a> Query<'a> {
     pub(super) fn infer_types(&mut self) {
         let mut ctx = InferenceContext::new(&self.graph, &self.dead_nodes);
 
-        for (name, entry_id) in self.graph.definitions() {
-            let type_id = ctx.infer_definition(name, entry_id);
-            self.type_info.entrypoint_types.insert(name, type_id);
+        // Process definitions in dependency order (referenced definitions first)
+        let sorted = self.topological_sort_definitions();
+        for name in sorted {
+            if let Some(entry_id) = self.graph.definition(name) {
+                let type_id = ctx.infer_definition(name, entry_id);
+                ctx.definition_types.insert(name, type_id);
+                self.type_info.entrypoint_types.insert(name, type_id);
+            }
         }
 
         self.type_info.type_defs = ctx.type_defs;
         self.type_info.diagnostics = ctx.diagnostics;
         self.type_info.errors = ctx.errors;
+    }
+
+    /// Topologically sort definitions so referenced definitions are processed first.
+    fn topological_sort_definitions(&self) -> Vec<&'a str> {
+        let definitions: Vec<_> = self.graph.definitions().collect();
+        let def_names: HashSet<&str> = definitions.iter().map(|(name, _)| *name).collect();
+
+        // Build dependency graph: which definitions does each definition reference?
+        let mut deps: HashMap<&str, Vec<&str>> = HashMap::new();
+        for &(name, entry_id) in &definitions {
+            let refs = self.collect_references(entry_id, &def_names);
+            deps.insert(name, refs);
+        }
+
+        // Kahn's algorithm for topological sort
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        for &(name, _) in &definitions {
+            in_degree.insert(name, 0);
+        }
+        for refs in deps.values() {
+            for &dep in refs {
+                *in_degree.entry(dep).or_insert(0) += 1;
+            }
+        }
+
+        let mut zero_degree: Vec<&str> = in_degree
+            .iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(&name, _)| name)
+            .collect();
+        zero_degree.sort();
+        let mut queue: VecDeque<&str> = zero_degree.into_iter().collect();
+
+        let mut sorted = Vec::new();
+        while let Some(name) = queue.pop_front() {
+            sorted.push(name);
+            if let Some(refs) = deps.get(name) {
+                for &dep in refs {
+                    if let Some(deg) = in_degree.get_mut(dep) {
+                        *deg = deg.saturating_sub(1);
+                        if *deg == 0 {
+                            queue.push_back(dep);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reverse so dependencies come first
+        sorted.reverse();
+
+        // Add any remaining (cyclic) definitions
+        for &(name, _) in &definitions {
+            if !sorted.contains(&name) {
+                sorted.push(name);
+            }
+        }
+
+        sorted
+    }
+
+    /// Collect all definition names referenced from a given node.
+    fn collect_references(&self, start: NodeId, def_names: &HashSet<&str>) -> Vec<&'a str> {
+        let mut refs = Vec::new();
+        let mut visited = HashSet::new();
+        let mut stack = vec![start];
+
+        while let Some(node_id) = stack.pop() {
+            if !visited.insert(node_id) {
+                continue;
+            }
+            let node = self.graph.node(node_id);
+
+            // Check if this is an Enter node referencing another definition
+            if let RefMarker::Enter { .. } = &node.ref_marker {
+                if let Some(name) = node.ref_name {
+                    if def_names.contains(name) && !refs.contains(&name) {
+                        refs.push(name);
+                    }
+                }
+            }
+
+            // Don't follow into referenced definitions (they're opaque)
+            let skip_def = match &node.ref_marker {
+                RefMarker::Enter { .. } => node.ref_name.and_then(|n| self.graph.definition(n)),
+                _ => None,
+            };
+
+            for &succ in &node.successors {
+                if skip_def.map_or(true, |def| succ != def) {
+                    stack.push(succ);
+                }
+            }
+        }
+
+        refs
     }
 }
 

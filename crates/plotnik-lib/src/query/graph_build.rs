@@ -106,41 +106,42 @@ impl<'a> Query<'a> {
 
     /// Link Enter nodes to their definition entry points.
     fn link_references(&mut self) {
-        let mut links: Vec<(NodeId, &'a str, Vec<NodeId>)> = Vec::new();
+        let mut links: Vec<(NodeId, &'a str, Option<NodeId>)> = Vec::new();
 
         for (id, node) in self.graph.iter() {
             if let RefMarker::Enter { .. } = &node.ref_marker {
                 if let Some(name) = node.ref_name {
-                    let exit_successors = self.find_exit_successors_for_enter(id);
-                    links.push((id, name, exit_successors));
+                    let exit_node = self.find_exit_for_enter(id);
+                    links.push((id, name, exit_node));
                 }
             }
         }
 
-        for (enter_id, name, return_transitions) in links {
+        for (enter_id, name, exit_id) in links {
             if let Some(def_entry) = self.graph.definition(name) {
                 self.graph.connect(enter_id, def_entry);
-                for ret in return_transitions {
-                    self.graph.connect(enter_id, ret);
+                // Connect Enter → Exit so Exit node (with Capture effect) is traversed
+                if let Some(exit) = exit_id {
+                    self.graph.connect(enter_id, exit);
                 }
             }
         }
     }
 
-    fn find_exit_successors_for_enter(&self, enter_id: NodeId) -> Vec<NodeId> {
+    fn find_exit_for_enter(&self, enter_id: NodeId) -> Option<NodeId> {
         let enter_node = self.graph.node(enter_id);
         let RefMarker::Enter { ref_id } = enter_node.ref_marker else {
-            return Vec::new();
+            return None;
         };
 
-        for (_, node) in self.graph.iter() {
+        for (id, node) in self.graph.iter() {
             if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker {
                 if *exit_id == ref_id {
-                    return node.successors.clone();
+                    return Some(id);
                 }
             }
         }
-        Vec::new()
+        None
     }
 
     fn construct_expr(&mut self, expr: &Expr, ctx: NavContext) -> Fragment {

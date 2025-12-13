@@ -332,21 +332,16 @@ fn tagged_alternation_captured_creates_enum() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T4
 
     === Types ===
     T3: Enum FooScope3 {
         A: Node
-    }
-    T4: Enum FooScope4 {
         B: Node
     }
-    T5: Record Foo {
+    T4: Record Foo {
         choice: T3
     }
-
-    === Errors ===
-    field `choice` in `Foo`: incompatible types [Node, Node]
     ");
 }
 
@@ -359,21 +354,18 @@ fn captured_untagged_alternation_creates_struct() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T6
 
     === Types ===
-    T3: Record FooScope3 {
-        x: Node
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record FooScope3 {
+        x: T3
+        y: T4
     }
-    T4: Record FooScope4 {
-        y: Node
+    T6: Record Foo {
+        val: T5
     }
-    T5: Record Foo {
-        val: T3
-    }
-
-    === Errors ===
-    field `val` in `Foo`: incompatible types [Node, Node]
     ");
 }
 
@@ -485,16 +477,16 @@ fn qis_alternation_in_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T5
+    Foo → T6
 
     === Types ===
-    T3: Record FooScope3 {
-        x: Node
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record FooScope3 {
+        x: T3
+        y: T4
     }
-    T4: Record FooScope4 {
-        y: Node
-    }
-    T5: ArrayStar <anon> → T4
+    T6: ArrayStar <anon> → T5
     ");
 }
 

@@ -147,7 +147,7 @@ fn reference() {
     B = N1
 
     N0: (identifier) → ∅
-    N1: ε +Enter(0, A) → N0
+    N1: ε +Enter(0, A) → N0, N2
     N2: ε +Exit(0) → ∅
     ");
 }
@@ -259,9 +259,9 @@ fn symbol_table_reuse() {
     Baz = N3
 
     N0: (identifier) → ∅
-    N1: ε +Enter(0, Foo) → N0
+    N1: ε +Enter(0, Foo) → N0, N2
     N2: ε +Exit(0) → ∅
-    N3: ε +Enter(1, Bar) → N1
+    N3: ε +Enter(1, Bar) → N1, N4
     N4: ε +Exit(1) → ∅
     ");
 }
