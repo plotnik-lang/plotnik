@@ -311,21 +311,21 @@ fn golden_master_comprehensive() {
     N31: [Up(3)] ε → ∅
     N32: (container) → N34
     N33: [Down] (item) [Capture] → N36
-    N34: ε [StartArray] → N35
-    N35: ε → N33, N38
-    N36: ε [Push] → N35
+    N34: ε [StartArray] → N37
+    N36: ε [Push] → N37
+    N37: ε → N33, N38
     N38: ε [EndArray] [Field(items)] → N39
     N39: [Up(1)] ε → ∅
     N40: (container) → N42
-    N41: [Down] (item) [Capture] → N44
+    N41: [Down] (item) [Capture] → N45
     N42: ε [StartArray] → N41
-    N44: ε [Push] → N41, N46
+    N45: ε [Push] → N41, N46
     N46: ε [EndArray] [Field(items)] → N47
     N47: [Up(1)] ε → ∅
     N48: (container) → N50
     N49: [Down] (item) [Capture] → N53
-    N50: ε → N49, N51
-    N51: ε [Clear] → N53
+    N50: ε → N49, N52
+    N52: ε [Clear] → N53
     N53: ε [Field(maybe_item)] → N54
     N54: [Up(1)] ε → ∅
     N55: (function) [StartObj] → N56
@@ -333,23 +333,23 @@ fn golden_master_comprehensive() {
     N57: ε [Field(name)] → N58
     N58: [Next] (block) @body [Capture] → N59
     N59: ε [Field(body)] → N65
-    N61: ε [StartArray] → N62
-    N62: ε → N55, N66
-    N65: [Up(1)] ε [EndObj] [Push] → N62
-    N66: ε [EndArray] → ∅
+    N61: ε [StartArray] → N66
+    N62: ε [EndArray] → ∅
+    N65: [Up(1)] ε [EndObj] [Push] → N66
+    N66: ε → N55, N62
     N67: ε [StartObj] → N68
     N68: [Next] (key) [Capture] → N69
     N69: ε [Field(key)] → N70
     N70: [Next] (value) [Capture] → N76
-    N72: ε [StartArray] → N73
-    N73: ε → N67, N77
-    N76: ε [Field(value)] [EndObj] [Push] → N73
-    N77: ε [EndArray] → ∅
+    N72: ε [StartArray] → N77
+    N73: ε [EndArray] → ∅
+    N76: ε [Field(value)] [EndObj] [Push] → N77
+    N77: ε → N67, N73
     N79: [Next] (item) [Capture] → N83
-    N81: ε [StartArray] → N82
-    N82: ε → N79, N84
-    N83: ε [Field(item)] [Push] → N82
-    N84: ε [EndArray] → ∅
+    N81: ε [StartArray] → N84
+    N82: ε [EndArray] → ∅
+    N83: ε [Field(item)] [Push] → N84
+    N84: ε → N79, N82
     N85: ε → N88, N92
     N86: ε → ∅
     N88: (success) [Variant(Ok)] [Capture] → N90
@@ -429,25 +429,25 @@ fn golden_master_comprehensive() {
     N189: (single) [Capture] → N190
     N190: ε [Field(item)] → N188
     N191: (multi) → N193
-    N192: [Down] (x) [Capture] → N195
+    N192: [Down] (x) [Capture] → N196
     N193: ε [StartArray] → N192
-    N195: ε [Push] → N192, N197
+    N196: ε [Push] → N192, N197
     N197: ε [EndArray] [Field(item)] → N188
     N199: (_) [Capture] → N201
     N200: [Down] (item) [Capture] → N203
-    N201: ε [StartArray] → N202
-    N202: ε → N200, N205
-    N203: ε [Push] → N202
-    N205: ε [EndArray] [Field(inner)] → N209
+    N201: ε [StartArray] → N204
+    N203: ε [Push] → N204
+    N204: ε → N200, N205
+    N205: ε [EndArray] [Field(inner)] → N210
     N207: ε [StartArray] → N199
-    N209: [Up(1)] ε [Push] → N199, N211
+    N210: [Up(1)] ε [Push] → N199, N211
     N211: ε [EndArray] [Field(outer)] → ∅
     N212: (module) → N213
     N213: [Down] (identifier) @name [Capture] [ToString] → N216
     N215: [Next.] (import) [Capture] → N218
-    N216: ε [Field(mod_name)] [StartArray] → N217
-    N217: ε → N215, N220
-    N218: ε [Push] → N217
+    N216: ε [Field(mod_name)] [StartArray] → N219
+    N218: ε [Push] → N219
+    N219: ε → N215, N220
     N220: ε [EndArray] [Field(imports)] → N221
     N221: [Next] (block) @body → N251
     N222: [Down] ε → N223
@@ -458,9 +458,9 @@ fn golden_master_comprehensive() {
     N229: [Next] (parameters) @params → N233
     N230: [Down] ε → N231
     N231: [Next] (param) [Capture] [Capture] → N235
-    N233: ε [StartArray] → N234
-    N234: ε → N230, N237
-    N235: ε [Field(p)] [Push] → N234
+    N233: ε [StartArray] → N236
+    N235: ε [Field(p)] [Push] → N236
+    N236: ε → N230, N237
     N237: ε [EndArray] [Field(params)] → N238
     N238: [Up(1)] ε → N239
     N239: [Next] (block) @body [Capture] → N240
@@ -472,10 +472,10 @@ fn golden_master_comprehensive() {
     N247: [Next] (class_body) @body [Capture] → N248
     N248: ε [Field(cls_body)] → N250
     N250: [Up(1)] ε [EndObj] [EndVariant] → N255
-    N251: ε [StartObj] [StartArray] → N252
-    N252: ε → N253, N259
+    N251: ε [StartObj] [StartArray] → N256
     N253: ε [StartObj] → N222
-    N255: ε [EndObj] [Push] → N252
+    N255: ε [EndObj] [Push] → N256
+    N256: ε → N253, N259
     N259: ε [EndArray] [EndObj] [Field(items)] → N260
     N260: [Up(1)] ε → N261
     N261: [Up.(1)] ε → ∅
@@ -899,27 +899,27 @@ fn golden_type_inference() {
     N35: ε [EndVariant] → N36
     N36: [Up(1)] ε → ∅
     N37: (_) → N39
-    N38: [Down] (item) [Capture] → N41
+    N38: [Down] (item) [Capture] → N42
     N39: ε [StartArray] → N38
-    N41: ε [Push] → N38, N43
+    N42: ε [Push] → N38, N43
     N43: ε [EndArray] [Field(items)] → N47
-    N45: ε [StartArray] → N46
-    N46: ε → N37, N48
-    N47: [Up(1)] ε [Push] → N46
-    N48: ε [EndArray] → ∅
+    N45: ε [StartArray] → N48
+    N46: ε [EndArray] → ∅
+    N47: [Up(1)] ε [Push] → N48
+    N48: ε → N37, N46
     N49: ε [StartObj] → N50
     N50: [Next] (a) [Capture] → N51
     N51: ε [Field(x)] → N52
     N52: [Next] (b) [Capture] → N58
-    N54: ε [StartArray] → N55
-    N55: ε → N49, N59
-    N58: ε [Field(y)] [EndObj] [Push] → N55
-    N59: ε [EndArray] → ∅
+    N54: ε [StartArray] → N59
+    N55: ε [EndArray] → ∅
+    N58: ε [Field(y)] [EndObj] [Push] → N59
+    N59: ε → N49, N55
     N61: [Next] (a) [Capture] → N65
-    N63: ε [StartArray] → N64
-    N64: ε → N61, N66
-    N65: ε [Field(x)] [Push] → N64
-    N66: ε [EndArray] → ∅
+    N63: ε [StartArray] → N66
+    N64: ε [EndArray] → ∅
+    N65: ε [Field(x)] [Push] → N66
+    N66: ε → N61, N64
     N67: ε → N70, N80
     N68: ε → ∅
     N70: (full) [Variant(Full)] [StartObj] → N71
@@ -1048,9 +1048,9 @@ fn golden_effect_patterns() {
     N3: ε [Field(name)] → ∅
     N4: (container) → N6
     N5: [Down] (item) [Capture] → N8
-    N6: ε [StartArray] → N7
-    N7: ε → N5, N10
-    N8: ε [Push] → N7
+    N6: ε [StartArray] → N9
+    N8: ε [Push] → N9
+    N9: ε → N5, N10
     N10: ε [EndArray] [Field(items)] → N11
     N11: [Up(1)] ε → ∅
     N12: ε [StartObj] → N13
@@ -1066,8 +1066,8 @@ fn golden_effect_patterns() {
     N32: ε [EndObj] [Field(choice)] → ∅
     N33: (container) → N35
     N34: [Down] (item) [Capture] → N38
-    N35: ε → N34, N36
-    N36: ε [Clear] → N38
+    N35: ε → N34, N37
+    N37: ε [Clear] → N38
     N38: ε [Field(maybe)] → N39
     N39: [Up(1)] ε → ∅
 
@@ -1155,43 +1155,43 @@ fn golden_quantifier_graphs() {
     NestedQuant = N48
 
     N0: (a) [Capture] → N3
-    N1: ε [StartArray] → N2
-    N2: ε → N0, N5
-    N3: ε [Push] → N2
+    N1: ε [StartArray] → N4
+    N3: ε [Push] → N4
+    N4: ε → N0, N5
     N5: ε [EndArray] [Field(items)] → ∅
-    N6: (a) [Capture] → N9
+    N6: (a) [Capture] → N10
     N7: ε [StartArray] → N6
-    N9: ε [Push] → N6, N11
+    N10: ε [Push] → N6, N11
     N11: ε [EndArray] [Field(items)] → ∅
     N12: (a) [Capture] → N16
-    N13: ε → N12, N14
-    N14: ε [Clear] → N16
+    N13: ε → N12, N15
+    N15: ε [Clear] → N16
     N16: ε [Field(maybe)] → ∅
     N17: (a) [Capture] → N20
-    N18: ε [StartArray] → N19
-    N19: ε → N22, N17
-    N20: ε [Push] → N19
+    N18: ε [StartArray] → N21
+    N20: ε [Push] → N21
+    N21: ε → N22, N17
     N22: ε [EndArray] [Field(items)] → ∅
-    N23: (a) [Capture] → N26
+    N23: (a) [Capture] → N27
     N24: ε [StartArray] → N23
-    N26: ε [Push] → N28, N23
+    N27: ε [Push] → N28, N23
     N28: ε [EndArray] [Field(items)] → ∅
     N29: ε [StartObj] → N30
     N30: [Next] (a) [Capture] → N31
     N31: ε [Field(x)] → N32
     N32: [Next] (b) [Capture] → N38
-    N34: ε [StartArray] → N35
-    N35: ε → N29, N39
-    N38: ε [Field(y)] [EndObj] [Push] → N35
-    N39: ε [EndArray] → ∅
+    N34: ε [StartArray] → N39
+    N35: ε [EndArray] → ∅
+    N38: ε [Field(y)] [EndObj] [Push] → N39
+    N39: ε → N29, N35
     N40: (outer) [Capture] → N42
     N41: [Down] (inner) [Capture] → N44
-    N42: ε [StartArray] → N43
-    N43: ε → N41, N46
-    N44: ε [Push] → N43
-    N46: ε [EndArray] [Field(inners)] → N50
+    N42: ε [StartArray] → N45
+    N44: ε [Push] → N45
+    N45: ε → N41, N46
+    N46: ε [EndArray] [Field(inners)] → N51
     N48: ε [StartArray] → N40
-    N50: [Up(1)] ε [Push] → N40, N52
+    N51: [Up(1)] ε [Push] → N40, N52
     N52: ε [EndArray] [Field(outers)] → ∅
 
     ═══════════════════════════════════════════════════════════════════════════════

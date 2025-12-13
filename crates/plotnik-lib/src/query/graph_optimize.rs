@@ -59,13 +59,6 @@ pub fn eliminate_epsilons(graph: &mut BuildGraph) -> (HashSet<NodeId>, OptimizeS
         }
 
         let successor_id = node.successors[0];
-
-        let successor = graph.node(successor_id);
-        if !successor.ref_marker.is_none() && !node.effects.is_empty() {
-            stats.epsilons_kept += 1;
-            continue;
-        }
-
         let effects_to_prepend = graph.node(id).effects.clone();
         let nav_to_transfer = graph.node(id).nav;
         let preds = predecessors.get(&id).cloned().unwrap_or_default();
@@ -126,7 +119,7 @@ fn is_eliminable_epsilon(
         return false;
     }
 
-    if !node.ref_marker.is_none() {
+    if node.ref_marker.is_some() {
         return false;
     }
 
@@ -143,7 +136,7 @@ fn is_eliminable_epsilon(
         }
     }
 
-    if !node.effects.is_empty() && !successor.ref_marker.is_none() {
+    if !node.effects.is_empty() && successor.ref_marker.is_some() {
         return false;
     }
 

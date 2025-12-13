@@ -19,7 +19,7 @@ use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
 
 use super::Query;
-use super::graph::{BuildEffect, BuildGraph, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildGraph, BuildNode, NodeId, RefMarker};
 
 /// Result of type inference.
 #[derive(Debug, Default)]
@@ -453,217 +453,17 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         }
 
         if !visited.insert(node_id) {
-            // Already visited - this is a reconvergence point
             return (state.pending, Some(node_id));
         }
 
         let node = self.graph.node(node_id);
 
-        // Process effects
         for effect in &node.effects {
-            match effect {
-                BuildEffect::CaptureNode => {
-                    // At Exit nodes, use the referenced definition's type if available
-                    let capture_type = if let RefMarker::Exit { ref_id } = &node.ref_marker {
-                        self.find_ref_type(*ref_id).unwrap_or(TYPE_NODE)
-                    } else {
-                        TYPE_NODE
-                    };
-                    state.pending = Some(PendingType::primitive(capture_type));
-                }
-                BuildEffect::ClearCurrent => {
-                    state.pending = None;
-                }
-                BuildEffect::ToString => {
-                    state.pending = Some(PendingType::primitive(TYPE_STR));
-                }
-                BuildEffect::Field { name, span } => {
-                    if let Some(pending) = state.pending.take() {
-                        // SAFETY: name comes from source with 'src lifetime
-                        let name: &'src str = unsafe { std::mem::transmute(*name) };
-                        let current_variant = state.current_variant.map(|v| {
-                            let v: &'src str = unsafe { std::mem::transmute(v) };
-                            v
-                        });
-
-                        let effective_card = pending
-                            .cardinality
-                            .multiply(state.effective_array_cardinality());
-
-                        let current_scope = scope_stack
-                            .last_mut()
-                            .map(|e| &mut e.scope)
-                            .expect("scope stack should not be empty");
-
-                        // When inside an object scope (object_depth > 0), fields go to the
-                        // object, not to a variant scope. The object becomes the variant payload.
-                        if let Some(tag) = current_variant.filter(|_| state.object_depth == 0) {
-                            let variant_scope = current_scope.variants.entry(tag).or_default();
-                            variant_scope.add_field(
-                                name,
-                                pending.base_type,
-                                effective_card,
-                                *span,
-                                pending.is_array,
-                            );
-                        } else {
-                            current_scope.add_field(
-                                name,
-                                pending.base_type,
-                                effective_card,
-                                *span,
-                                pending.is_array,
-                            );
-                        }
-                    }
-                }
-                BuildEffect::StartArray { is_plus } => {
-                    let cardinality = if *is_plus {
-                        Cardinality::Plus
-                    } else {
-                        Cardinality::Star
-                    };
-                    state.array_stack.push(ArrayFrame {
-                        cardinality,
-                        element_type: None,
-                        start_node: Some(node_id),
-                        push_called: false,
-                    });
-                }
-                BuildEffect::PushElement => {
-                    if let Some(pending) = state.pending.take() {
-                        if let Some(frame) = state.array_stack.last_mut() {
-                            frame.element_type = Some(pending.base_type);
-                            frame.push_called = true;
-                            // Update shared map so other branches (exit path) see the element type
-                            if let Some(start_id) = frame.start_node {
-                                self.array_element_types.insert(start_id, pending.base_type);
-                            }
-                        }
-                    }
-                }
-                BuildEffect::EndArray => {
-                    // Note: EndArray processes even in dry_run mode because loops need
-                    // element type tracking. Only EndObject is skipped in dry_run.
-                    if let Some(frame) = state.array_stack.pop() {
-                        // Check if PushElement was actually called (either in this branch or another)
-                        let push_was_called = frame.push_called
-                            || frame
-                                .start_node
-                                .map_or(false, |id| self.array_element_types.contains_key(&id));
-
-                        if push_was_called {
-                            // Get element type from shared map (set by loop body's PushElement)
-                            let element_type = frame
-                                .start_node
-                                .and_then(|id| self.array_element_types.get(&id).copied())
-                                .or(frame.element_type)
-                                .unwrap_or(TYPE_NODE);
-
-                            let array_type =
-                                self.wrap_with_cardinality(element_type, frame.cardinality);
-                            state.pending = Some(PendingType {
-                                base_type: array_type,
-                                cardinality: Cardinality::One,
-                                is_array: true,
-                            });
-                        }
-                    }
-                }
-                BuildEffect::StartObject => {
-                    state.object_depth += 1;
-                    let entry = ScopeStackEntry::new_object(state.pending.take());
-                    scope_stack.push(entry);
-                }
-                BuildEffect::EndObject => {
-                    state.object_depth = state.object_depth.saturating_sub(1);
-                    // In dry_run mode, don't pop scope or create types - just collect info
-                    if state.dry_run {
-                        continue;
-                    }
-                    if let Some(finished_entry) = scope_stack.pop() {
-                        if finished_entry.is_object {
-                            let finished_scope = finished_entry.scope;
-
-                            if !finished_scope.is_empty() {
-                                let type_name = self.generate_scope_name();
-                                let type_id = if finished_scope.has_variants
-                                    && !finished_scope.variants.is_empty()
-                                {
-                                    self.create_enum_type(type_name, &finished_scope)
-                                } else {
-                                    self.create_struct_type(type_name, &finished_scope)
-                                };
-
-                                state.pending = Some(PendingType {
-                                    base_type: type_id,
-                                    cardinality: Cardinality::One,
-                                    is_array: false,
-                                });
-                            } else {
-                                state.pending = finished_entry.outer_pending;
-                            }
-                        } else {
-                            scope_stack.push(finished_entry);
-                        }
-                    }
-                }
-                BuildEffect::StartVariant(tag) => {
-                    // SAFETY: tag comes from source with 'src lifetime
-                    let tag: &'static str = unsafe { std::mem::transmute(*tag) };
-                    state.current_variant = Some(tag);
-                    let current_scope = scope_stack
-                        .last_mut()
-                        .map(|e| &mut e.scope)
-                        .expect("scope stack should not be empty");
-                    current_scope.has_variants = true;
-                }
-                BuildEffect::EndVariant => {
-                    if let Some(tag) = state.current_variant.take() {
-                        // SAFETY: tag comes from source with 'src lifetime
-                        let tag: &'src str = unsafe { std::mem::transmute(tag) };
-                        let current_scope = scope_stack
-                            .last_mut()
-                            .map(|e| &mut e.scope)
-                            .expect("scope stack should not be empty");
-
-                        let variant_scope = current_scope.variants.entry(tag).or_default();
-
-                        // Single-capture flattening (ADR-0007): if there's a pending capture
-                        // but no fields were added (Field effect was removed), store the
-                        // captured type directly as a synthetic field for flattening.
-                        if variant_scope.fields.is_empty() {
-                            if let Some(pending) = state.pending.take() {
-                                variant_scope.add_field(
-                                    "$value", // synthetic name, will be flattened away
-                                    pending.base_type,
-                                    pending.cardinality,
-                                    rowan::TextRange::default(),
-                                    pending.is_array,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
+            self.process_effect(effect, node_id, &node.ref_marker, &mut state, scope_stack);
         }
 
         // Process successors
-        // References are opaque: when entering a reference, skip the definition body
-        // and only follow return transitions (successors that aren't the def entry)
-        let def_entry_to_skip: Option<NodeId> = match &node.ref_marker {
-            RefMarker::Enter { .. } => node.ref_name.and_then(|name| self.graph.definition(name)),
-            _ => None,
-        };
-
-        let live_successors: Vec<_> = node
-            .successors
-            .iter()
-            .filter(|s| !self.dead_nodes.contains(s))
-            .filter(|s| def_entry_to_skip.map_or(true, |def| **s != def))
-            .copied()
-            .collect();
-
+        let live_successors = self.get_live_successors(node);
         if live_successors.is_empty() {
             return (state.pending, None);
         }
@@ -679,32 +479,261 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             );
         }
 
-        // Branching: two-phase approach to handle reconvergence correctly.
-        //
-        // Phase 1: Explore each branch with its OWN visited set to:
-        //   - Collect scope modifications from each branch
-        //   - Find where branches reconverge (common nodes)
-        //
-        // Phase 2: Merge branch scopes, then continue from reconvergence point
-        //          with the merged scope (processing shared suffix once).
-        let total_branches = live_successors.len();
+        self.explore_branches(live_successors, state, visited, depth, errors, scope_stack)
+    }
+
+    /// Process a single effect, updating state and scope_stack.
+    fn process_effect(
+        &mut self,
+        effect: &BuildEffect<'src>,
+        node_id: NodeId,
+        ref_marker: &RefMarker,
+        state: &mut TraversalState,
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) {
+        match effect {
+            BuildEffect::CaptureNode => {
+                let capture_type = match ref_marker {
+                    RefMarker::Exit { ref_id } => self.find_ref_type(*ref_id).unwrap_or(TYPE_NODE),
+                    _ => TYPE_NODE,
+                };
+                state.pending = Some(PendingType::primitive(capture_type));
+            }
+            BuildEffect::ClearCurrent => {
+                state.pending = None;
+            }
+            BuildEffect::ToString => {
+                state.pending = Some(PendingType::primitive(TYPE_STR));
+            }
+            BuildEffect::Field { name, span } => {
+                self.process_field_effect(name, *span, state, scope_stack);
+            }
+            BuildEffect::StartArray { is_plus } => {
+                let cardinality = if *is_plus {
+                    Cardinality::Plus
+                } else {
+                    Cardinality::Star
+                };
+                state.array_stack.push(ArrayFrame {
+                    cardinality,
+                    element_type: None,
+                    start_node: Some(node_id),
+                    push_called: false,
+                });
+            }
+            BuildEffect::PushElement => {
+                self.process_push_element(state);
+            }
+            BuildEffect::EndArray => {
+                self.process_end_array(state);
+            }
+            BuildEffect::StartObject => {
+                state.object_depth += 1;
+                scope_stack.push(ScopeStackEntry::new_object(state.pending.take()));
+            }
+            BuildEffect::EndObject => {
+                state.object_depth = state.object_depth.saturating_sub(1);
+                if !state.dry_run {
+                    self.process_end_object(state, scope_stack);
+                }
+            }
+            BuildEffect::StartVariant(tag) => {
+                // SAFETY: tag comes from source with 'src lifetime
+                let tag: &'static str = unsafe { std::mem::transmute(*tag) };
+                state.current_variant = Some(tag);
+                if let Some(entry) = scope_stack.last_mut() {
+                    entry.scope.has_variants = true;
+                }
+            }
+            BuildEffect::EndVariant => {
+                self.process_end_variant(state, scope_stack);
+            }
+        }
+    }
+
+    fn process_field_effect(
+        &self,
+        name: &str,
+        span: TextRange,
+        state: &mut TraversalState,
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) {
+        let Some(pending) = state.pending.take() else {
+            return;
+        };
+
+        // SAFETY: name comes from source with 'src lifetime
+        let name: &'src str = unsafe { std::mem::transmute(name) };
+        let current_variant: Option<&'src str> = state
+            .current_variant
+            .map(|v| unsafe { std::mem::transmute(v) });
+
+        let effective_card = pending
+            .cardinality
+            .multiply(state.effective_array_cardinality());
+        let Some(entry) = scope_stack.last_mut() else {
+            return;
+        };
+
+        // Inside object scope, fields go to object, not variant scope
+        let target_scope = match current_variant.filter(|_| state.object_depth == 0) {
+            Some(tag) => entry.scope.variants.entry(tag).or_default(),
+            None => &mut entry.scope,
+        };
+        target_scope.add_field(
+            name,
+            pending.base_type,
+            effective_card,
+            span,
+            pending.is_array,
+        );
+    }
+
+    fn process_push_element(&mut self, state: &mut TraversalState) {
+        let Some(pending) = state.pending.take() else {
+            return;
+        };
+        let Some(frame) = state.array_stack.last_mut() else {
+            return;
+        };
+
+        frame.element_type = Some(pending.base_type);
+        frame.push_called = true;
+        if let Some(start_id) = frame.start_node {
+            self.array_element_types.insert(start_id, pending.base_type);
+        }
+    }
+
+    fn process_end_array(&mut self, state: &mut TraversalState) {
+        let Some(frame) = state.array_stack.pop() else {
+            return;
+        };
+
+        let push_was_called = frame.push_called
+            || frame
+                .start_node
+                .map_or(false, |id| self.array_element_types.contains_key(&id));
+
+        if !push_was_called {
+            return;
+        }
+
+        let element_type = frame
+            .start_node
+            .and_then(|id| self.array_element_types.get(&id).copied())
+            .or(frame.element_type)
+            .unwrap_or(TYPE_NODE);
+
+        let array_type = self.wrap_with_cardinality(element_type, frame.cardinality);
+        state.pending = Some(PendingType {
+            base_type: array_type,
+            cardinality: Cardinality::One,
+            is_array: true,
+        });
+    }
+
+    fn process_end_object(
+        &mut self,
+        state: &mut TraversalState,
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) {
+        let Some(finished_entry) = scope_stack.pop() else {
+            return;
+        };
+        if !finished_entry.is_object {
+            scope_stack.push(finished_entry);
+            return;
+        }
+
+        let finished_scope = finished_entry.scope;
+        if finished_scope.is_empty() {
+            state.pending = finished_entry.outer_pending;
+            return;
+        }
+
+        let type_name = self.generate_scope_name();
+        let type_id = if finished_scope.has_variants && !finished_scope.variants.is_empty() {
+            self.create_enum_type(type_name, &finished_scope)
+        } else {
+            self.create_struct_type(type_name, &finished_scope)
+        };
+
+        state.pending = Some(PendingType {
+            base_type: type_id,
+            cardinality: Cardinality::One,
+            is_array: false,
+        });
+    }
+
+    fn process_end_variant(
+        &self,
+        state: &mut TraversalState,
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) {
+        let Some(tag) = state.current_variant.take() else {
+            return;
+        };
+        // SAFETY: tag comes from source with 'src lifetime
+        let tag: &'src str = unsafe { std::mem::transmute(tag) };
+
+        let Some(entry) = scope_stack.last_mut() else {
+            return;
+        };
+        let variant_scope = entry.scope.variants.entry(tag).or_default();
+
+        // Single-capture flattening (ADR-0007)
+        if variant_scope.fields.is_empty() {
+            if let Some(pending) = state.pending.take() {
+                variant_scope.add_field(
+                    "$value",
+                    pending.base_type,
+                    pending.cardinality,
+                    rowan::TextRange::default(),
+                    pending.is_array,
+                );
+            }
+        }
+    }
+
+    /// Get live successors, filtering dead nodes and ref entry points.
+    fn get_live_successors(&self, node: &BuildNode<'src>) -> Vec<NodeId> {
+        let def_entry_to_skip = match &node.ref_marker {
+            RefMarker::Enter { .. } => node.ref_name.and_then(|name| self.graph.definition(name)),
+            _ => None,
+        };
+
+        node.successors
+            .iter()
+            .copied()
+            .filter(|s| !self.dead_nodes.contains(s))
+            .filter(|s| def_entry_to_skip.map_or(true, |def| *s != def))
+            .collect()
+    }
+
+    /// Explore multiple branches, merge scopes, handle reconvergence.
+    fn explore_branches(
+        &mut self,
+        successors: Vec<NodeId>,
+        state: TraversalState,
+        visited: &mut HashSet<NodeId>,
+        depth: usize,
+        errors: &mut Vec<MergeError<'src>>,
+        scope_stack: &mut Vec<ScopeStackEntry<'src>>,
+    ) -> (Option<PendingType>, Option<NodeId>) {
+        let total_branches = successors.len();
         let initial_scope_len = scope_stack.len();
+        let use_dry_run = state.object_depth > 0;
+
         let mut branch_scopes: Vec<ScopeInfo<'src>> = Vec::new();
         let mut branch_visited_sets: Vec<HashSet<NodeId>> = Vec::new();
         let mut result_pending: Option<PendingType> = None;
 
         // Phase 1: explore branches independently
-        // Use dry_run only when inside object scope (alternation-like branching).
-        // For loop entry/exit (object_depth=0), process normally so EndArray works.
-        let use_dry_run = state.object_depth > 0;
-
-        for succ in &live_successors {
+        for succ in &successors {
             let mut branch_stack = scope_stack.clone();
             let mut branch_visited = visited.clone();
             let mut branch_state = state.clone();
-            if use_dry_run {
-                branch_state.dry_run = true;
-            }
+            branch_state.dry_run = use_dry_run;
 
             let (branch_pending, _) = self.traverse(
                 *succ,
@@ -715,12 +744,10 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 &mut branch_stack,
             );
 
-            // Merge pending from branches (take first non-None)
             if result_pending.is_none() {
                 result_pending = branch_pending;
             }
 
-            // Collect nodes newly visited by this branch
             let new_nodes: HashSet<NodeId> = branch_visited.difference(visited).copied().collect();
             branch_visited_sets.push(new_nodes);
 
@@ -732,33 +759,19 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             }
         }
 
-        // Find reconvergence: nodes visited by ALL branches (shared suffix)
-        let reconverge_nodes: HashSet<NodeId> = if branch_visited_sets.len() >= 2 {
-            let mut iter = branch_visited_sets.iter();
-            let first = iter.next().unwrap().clone();
-            iter.fold(first, |acc, set| acc.intersection(set).copied().collect())
-        } else {
-            HashSet::new()
-        };
-
-        // Merge branch scopes into main scope
+        // Merge branch scopes
         if let Some(main_entry) = scope_stack.last_mut() {
             for branch_scope in branch_scopes {
-                let merge_errs = main_entry.scope.merge_from(branch_scope);
-                errors.extend(merge_errs);
+                errors.extend(main_entry.scope.merge_from(branch_scope));
             }
             main_entry.scope.apply_optionality(total_branches);
         }
 
-        // Phase 2: if dry_run was used and there's a reconvergence point,
-        // continue from there with merged scope
-        if use_dry_run && !reconverge_nodes.is_empty() {
-            // Find the "entry" reconvergence node: the one with minimum ID
-            // (nodes are created in traversal order, so first shared node has lowest ID)
-            let reconverge_entry = reconverge_nodes.iter().min().copied();
+        // Find and process reconvergence
+        let reconverge_nodes = self.find_reconvergence(&branch_visited_sets);
 
-            if let Some(entry_node) = reconverge_entry {
-                // Mark branch-specific nodes as visited, but NOT reconverge nodes
+        if use_dry_run && !reconverge_nodes.is_empty() {
+            if let Some(entry_node) = reconverge_nodes.iter().min().copied() {
                 for branch_set in &branch_visited_sets {
                     for &nid in branch_set {
                         if !reconverge_nodes.contains(&nid) {
@@ -766,8 +779,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                         }
                     }
                 }
-                // Continue from reconvergence with merged scope (dry_run = false)
-                let mut cont_state = state.clone();
+                let mut cont_state = state;
                 cont_state.dry_run = false;
                 cont_state.pending = result_pending;
                 return self.traverse(
@@ -781,12 +793,19 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             }
         }
 
-        // No reconvergence or couldn't find entry point - mark all visited
         for branch_set in branch_visited_sets {
             visited.extend(branch_set);
         }
-
         (result_pending, None)
+    }
+
+    fn find_reconvergence(&self, branch_sets: &[HashSet<NodeId>]) -> HashSet<NodeId> {
+        if branch_sets.len() < 2 {
+            return HashSet::new();
+        }
+        let mut iter = branch_sets.iter();
+        let first = iter.next().unwrap().clone();
+        iter.fold(first, |acc, set| acc.intersection(set).copied().collect())
     }
 
     fn generate_scope_name(&self) -> &'src str {

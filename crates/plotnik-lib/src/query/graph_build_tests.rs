@@ -104,10 +104,10 @@ fn quantifier_star() {
     Q = N1
 
     N0: (identifier) → N3
-    N1: ε [StartArray] → N2
-    N2: ε → N0, N4
-    N3: ε [Push] → N2
-    N4: ε [EndArray] → ∅
+    N1: ε [StartArray] → N4
+    N2: ε [EndArray] → ∅
+    N3: ε [Push] → N4
+    N4: ε → N0, N2
     ");
 }
 
@@ -116,11 +116,11 @@ fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
     Q = N1
 
-    N0: (identifier) → N3
+    N0: (identifier) → N4
     N1: ε [StartArray] → N0
-    N2: ε [Push] → N3
-    N3: ε [Push] → N0, N4
-    N4: ε [EndArray] → ∅
+    N2: ε [EndArray] → ∅
+    N3: ε [Push] → N4
+    N4: ε [Push] → N0, N2
     ");
 }
 
@@ -129,10 +129,10 @@ fn quantifier_optional() {
     insta::assert_snapshot!(snapshot("Q = (identifier)?"), @r"
     Q = N1
 
-    N0: (identifier) → N3
-    N1: ε → N0, N2
-    N2: ε [Clear] → N3
-    N3: ε → ∅
+    N0: (identifier) → N2
+    N1: ε → N0, N3
+    N2: ε → ∅
+    N3: ε [Clear] → N2
     ");
 }
 

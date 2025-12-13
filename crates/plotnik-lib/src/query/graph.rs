@@ -33,6 +33,17 @@ impl Fragment {
     }
 }
 
+/// Array collection mode for loop combinators.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrayMode {
+    /// No array collection (simple repetition)
+    None,
+    /// Collect elements into array (StartArray/PushElement/EndArray)
+    Simple,
+    /// Collect with object scope per iteration (for QIS)
+    Qis,
+}
+
 /// Build-time graph for query compilation.
 ///
 /// Nodes are stored in a flat vector, referenced by `NodeId`.
@@ -151,82 +162,217 @@ impl<'src> BuildGraph<'src> {
         Fragment::new(entry, exit)
     }
 
-    /// Zero or more (greedy): inner*
-    pub fn zero_or_more(&mut self, inner: Fragment) -> Fragment {
+    // ─────────────────────────────────────────────────────────────────────
+    // Generic Loop/Optional Builders
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// Generic loop combinator for * and + quantifiers.
+    ///
+    /// - `at_least_one`: true for + (one or more), false for * (zero or more)
+    /// - `greedy`: true for greedy (try match first), false for lazy (try exit first)
+    /// - `mode`: array collection mode
+    fn build_repetition(
+        &mut self,
+        inner: Fragment,
+        at_least_one: bool,
+        greedy: bool,
+        mode: ArrayMode,
+    ) -> Fragment {
+        let has_array = mode != ArrayMode::None;
+        let has_qis = mode == ArrayMode::Qis;
+
+        // Array wrapper nodes
+        let start = if has_array {
+            let s = self.add_epsilon();
+            self.node_mut(s).add_effect(BuildEffect::StartArray {
+                is_plus: at_least_one,
+            });
+            Some(s)
+        } else {
+            None
+        };
+
+        let end = if has_array {
+            let e = self.add_epsilon();
+            self.node_mut(e).add_effect(BuildEffect::EndArray);
+            Some(e)
+        } else {
+            None
+        };
+
+        // QIS object wrapper nodes
+        let (obj_start, obj_end) = if has_qis {
+            let os = self.add_epsilon();
+            self.node_mut(os).add_effect(BuildEffect::StartObject);
+            let oe = self.add_epsilon();
+            self.node_mut(oe).add_effect(BuildEffect::EndObject);
+            (Some(os), Some(oe))
+        } else {
+            (None, None)
+        };
+
+        // Push node for array modes
+        let push = if has_array {
+            let p = self.add_epsilon();
+            self.node_mut(p).add_effect(BuildEffect::PushElement);
+            Some(p)
+        } else {
+            None
+        };
+
+        // Branch node (decision point for loop continuation)
+        let branch = self.add_epsilon();
+
+        // Exit node for non-array modes
+        let exit = if !has_array {
+            Some(self.add_epsilon())
+        } else {
+            None
+        };
+
+        // Determine the effective inner entry/exit (with QIS wrapping if needed)
+        let (loop_body_entry, loop_body_exit) = if has_qis {
+            self.connect(obj_start.unwrap(), inner.entry);
+            self.connect(inner.exit, obj_end.unwrap());
+            (obj_start.unwrap(), obj_end.unwrap())
+        } else {
+            (inner.entry, inner.exit)
+        };
+
+        // Wire up the graph based on at_least_one and greedy
+        if at_least_one {
+            // + pattern: must match at least once
+            // Entry → body → push/branch → (loop back or exit)
+            let entry_point = start.unwrap_or(loop_body_entry);
+            let exit_point = end.or(exit).unwrap();
+
+            if let Some(s) = start {
+                self.connect(s, loop_body_entry);
+            }
+
+            if let Some(p) = push {
+                self.connect(loop_body_exit, p);
+                self.connect(p, branch);
+            } else {
+                self.connect(loop_body_exit, branch);
+            }
+
+            if greedy {
+                self.connect(branch, loop_body_entry);
+                self.connect(branch, exit_point);
+            } else {
+                self.connect(branch, exit_point);
+                self.connect(branch, loop_body_entry);
+            }
+
+            Fragment::new(entry_point, exit_point)
+        } else {
+            // * pattern: zero or more
+            // Entry → branch → (body → push → branch) or exit
+            let entry_point = start.unwrap_or(branch);
+            let exit_point = end.or(exit).unwrap();
+
+            if let Some(s) = start {
+                self.connect(s, branch);
+            }
+
+            if greedy {
+                self.connect(branch, loop_body_entry);
+                self.connect(branch, exit_point);
+            } else {
+                self.connect(branch, exit_point);
+                self.connect(branch, loop_body_entry);
+            }
+
+            if let Some(p) = push {
+                self.connect(loop_body_exit, p);
+                self.connect(p, branch);
+            } else {
+                self.connect(loop_body_exit, branch);
+            }
+
+            Fragment::new(entry_point, exit_point)
+        }
+    }
+
+    /// Generic optional combinator for ? quantifier.
+    ///
+    /// - `greedy`: true for greedy (try match first), false for lazy (try skip first)
+    /// - `qis`: true to wrap the optional value in an object scope
+    fn build_optional(&mut self, inner: Fragment, greedy: bool, qis: bool) -> Fragment {
         let branch = self.add_epsilon();
         let exit = self.add_epsilon();
 
-        self.connect(branch, inner.entry);
-        self.connect(branch, exit);
-        self.connect(inner.exit, branch);
+        if qis {
+            let obj_start = self.add_epsilon();
+            self.node_mut(obj_start)
+                .add_effect(BuildEffect::StartObject);
+
+            let obj_end = self.add_epsilon();
+            self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
+
+            self.connect(obj_start, inner.entry);
+            self.connect(inner.exit, obj_end);
+            self.connect(obj_end, exit);
+
+            if greedy {
+                self.connect(branch, obj_start);
+                self.connect(branch, exit);
+            } else {
+                self.connect(branch, exit);
+                self.connect(branch, obj_start);
+            }
+        } else {
+            let skip = self.add_epsilon();
+            self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
+
+            self.connect(skip, exit);
+            self.connect(inner.exit, exit);
+
+            if greedy {
+                self.connect(branch, inner.entry);
+                self.connect(branch, skip);
+            } else {
+                self.connect(branch, skip);
+                self.connect(branch, inner.entry);
+            }
+        }
 
         Fragment::new(branch, exit)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Simple Loop Combinators (no array collection)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// Zero or more (greedy): inner*
+    pub fn zero_or_more(&mut self, inner: Fragment) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::None)
     }
 
     /// Zero or more (non-greedy): inner*?
     pub fn zero_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-        let exit = self.add_epsilon();
-
-        self.connect(branch, exit);
-        self.connect(branch, inner.entry);
-        self.connect(inner.exit, branch);
-
-        Fragment::new(branch, exit)
+        self.build_repetition(inner, false, false, ArrayMode::None)
     }
 
     /// One or more (greedy): inner+
     pub fn one_or_more(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-        let exit = self.add_epsilon();
-
-        self.connect(inner.exit, branch);
-        self.connect(branch, inner.entry);
-        self.connect(branch, exit);
-
-        Fragment::new(inner.entry, exit)
+        self.build_repetition(inner, true, true, ArrayMode::None)
     }
 
     /// One or more (non-greedy): inner+?
     pub fn one_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-        let exit = self.add_epsilon();
-
-        self.connect(inner.exit, branch);
-        self.connect(branch, exit);
-        self.connect(branch, inner.entry);
-
-        Fragment::new(inner.entry, exit)
+        self.build_repetition(inner, true, false, ArrayMode::None)
     }
 
     /// Optional (greedy): inner?
     pub fn optional(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-        let skip = self.add_epsilon();
-        self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
-        let exit = self.add_epsilon();
-
-        self.connect(branch, inner.entry);
-        self.connect(branch, skip);
-        self.connect(skip, exit);
-        self.connect(inner.exit, exit);
-
-        Fragment::new(branch, exit)
+        self.build_optional(inner, true, false)
     }
 
     /// Optional (non-greedy): inner??
     pub fn optional_lazy(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-        let skip = self.add_epsilon();
-        self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
-        let exit = self.add_epsilon();
-
-        self.connect(branch, skip);
-        self.connect(skip, exit);
-        self.connect(branch, inner.entry);
-        self.connect(inner.exit, exit);
-
-        Fragment::new(branch, exit)
+        self.build_optional(inner, false, false)
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -235,92 +381,22 @@ impl<'src> BuildGraph<'src> {
 
     /// Zero or more with array collection (greedy): inner*
     pub fn zero_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: false });
-
-        let branch = self.add_epsilon();
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, branch);
-        self.connect(branch, inner.entry);
-        self.connect(branch, end);
-        self.connect(inner.exit, push);
-        self.connect(push, branch);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, false, true, ArrayMode::Simple)
     }
 
     /// Zero or more with array collection (non-greedy): inner*?
     pub fn zero_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: false });
-
-        let branch = self.add_epsilon();
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, branch);
-        self.connect(branch, end);
-        self.connect(branch, inner.entry);
-        self.connect(inner.exit, push);
-        self.connect(push, branch);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, false, false, ArrayMode::Simple)
     }
 
     /// One or more with array collection (greedy): inner+
     pub fn one_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: true });
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let branch = self.add_epsilon();
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, inner.entry);
-        self.connect(inner.exit, push);
-        self.connect(push, branch);
-        self.connect(branch, inner.entry);
-        self.connect(branch, end);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, true, true, ArrayMode::Simple)
     }
 
     /// One or more with array collection (non-greedy): inner+?
     pub fn one_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: true });
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let branch = self.add_epsilon();
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, inner.entry);
-        self.connect(inner.exit, push);
-        self.connect(push, branch);
-        self.connect(branch, end);
-        self.connect(branch, inner.entry);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, true, false, ArrayMode::Simple)
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -332,176 +408,34 @@ impl<'src> BuildGraph<'src> {
     /// Each iteration is wrapped in StartObject/EndObject to keep
     /// multiple captures coupled per-iteration.
     pub fn zero_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: false });
-
-        let branch = self.add_epsilon();
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, branch);
-        self.connect(branch, obj_start);
-        self.connect(branch, end);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, push);
-        self.connect(push, branch);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, false, true, ArrayMode::Qis)
     }
 
     /// Zero or more with QIS object wrapping (non-greedy): inner*?
     pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: false });
-
-        let branch = self.add_epsilon();
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, branch);
-        self.connect(branch, end);
-        self.connect(branch, obj_start);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, push);
-        self.connect(push, branch);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, false, false, ArrayMode::Qis)
     }
 
     /// One or more with QIS object wrapping (greedy): inner+
     pub fn one_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: true });
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let branch = self.add_epsilon();
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, obj_start);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, push);
-        self.connect(push, branch);
-        self.connect(branch, obj_start);
-        self.connect(branch, end);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, true, true, ArrayMode::Qis)
     }
 
     /// One or more with QIS object wrapping (non-greedy): inner+?
     pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        let start = self.add_epsilon();
-        self.node_mut(start)
-            .add_effect(BuildEffect::StartArray { is_plus: true });
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let push = self.add_epsilon();
-        self.node_mut(push).add_effect(BuildEffect::PushElement);
-
-        let branch = self.add_epsilon();
-
-        let end = self.add_epsilon();
-        self.node_mut(end).add_effect(BuildEffect::EndArray);
-
-        self.connect(start, obj_start);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, push);
-        self.connect(push, branch);
-        self.connect(branch, end);
-        self.connect(branch, obj_start);
-
-        Fragment::new(start, end)
+        self.build_repetition(inner, true, false, ArrayMode::Qis)
     }
 
     /// Optional with QIS object wrapping: inner?
     ///
     /// Wraps the optional value in an object scope.
     pub fn optional_qis(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let exit = self.add_epsilon();
-
-        self.connect(branch, obj_start);
-        self.connect(branch, exit);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, exit);
-
-        Fragment::new(branch, exit)
+        self.build_optional(inner, true, true)
     }
 
     /// Optional with QIS object wrapping (non-greedy): inner??
     pub fn optional_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        let branch = self.add_epsilon();
-
-        let obj_start = self.add_epsilon();
-        self.node_mut(obj_start)
-            .add_effect(BuildEffect::StartObject);
-
-        let obj_end = self.add_epsilon();
-        self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
-
-        let exit = self.add_epsilon();
-
-        self.connect(branch, exit);
-        self.connect(branch, obj_start);
-        self.connect(obj_start, inner.entry);
-        self.connect(inner.exit, obj_end);
-        self.connect(obj_end, exit);
-
-        Fragment::new(branch, exit)
+        self.build_optional(inner, false, true)
     }
 }
 
@@ -665,6 +599,10 @@ impl RefMarker {
 
     pub fn is_none(&self) -> bool {
         matches!(self, RefMarker::None)
+    }
+
+    pub fn is_some(&self) -> bool {
+        !matches!(self, RefMarker::None)
     }
 
     pub fn is_enter(&self) -> bool {

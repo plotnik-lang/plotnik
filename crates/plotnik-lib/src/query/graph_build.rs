@@ -505,25 +505,23 @@ impl<'a> Query<'a> {
             return self.construct_expr(&inner_expr, ctx);
         };
 
-        let inner_frag = self.construct_expr(&inner_expr, ctx);
-        let is_qis = self.qis_triggers.contains_key(quant);
+        let f = self.construct_expr(&inner_expr, ctx);
+        let qis = self.qis_triggers.contains_key(quant);
 
-        match op.kind() {
-            SyntaxKind::Star if is_qis => self.graph.zero_or_more_array_qis(inner_frag),
-            SyntaxKind::Star => self.graph.zero_or_more_array(inner_frag),
-            SyntaxKind::StarQuestion if is_qis => {
-                self.graph.zero_or_more_array_qis_lazy(inner_frag)
-            }
-            SyntaxKind::StarQuestion => self.graph.zero_or_more_array_lazy(inner_frag),
-            SyntaxKind::Plus if is_qis => self.graph.one_or_more_array_qis(inner_frag),
-            SyntaxKind::Plus => self.graph.one_or_more_array(inner_frag),
-            SyntaxKind::PlusQuestion if is_qis => self.graph.one_or_more_array_qis_lazy(inner_frag),
-            SyntaxKind::PlusQuestion => self.graph.one_or_more_array_lazy(inner_frag),
-            SyntaxKind::Question if is_qis => self.graph.optional_qis(inner_frag),
-            SyntaxKind::Question => self.graph.optional(inner_frag),
-            SyntaxKind::QuestionQuestion if is_qis => self.graph.optional_qis_lazy(inner_frag),
-            SyntaxKind::QuestionQuestion => self.graph.optional_lazy(inner_frag),
-            _ => inner_frag,
+        match (op.kind(), qis) {
+            (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f),
+            (SyntaxKind::Star, true) => self.graph.zero_or_more_array_qis(f),
+            (SyntaxKind::StarQuestion, false) => self.graph.zero_or_more_array_lazy(f),
+            (SyntaxKind::StarQuestion, true) => self.graph.zero_or_more_array_qis_lazy(f),
+            (SyntaxKind::Plus, false) => self.graph.one_or_more_array(f),
+            (SyntaxKind::Plus, true) => self.graph.one_or_more_array_qis(f),
+            (SyntaxKind::PlusQuestion, false) => self.graph.one_or_more_array_lazy(f),
+            (SyntaxKind::PlusQuestion, true) => self.graph.one_or_more_array_qis_lazy(f),
+            (SyntaxKind::Question, false) => self.graph.optional(f),
+            (SyntaxKind::Question, true) => self.graph.optional_qis(f),
+            (SyntaxKind::QuestionQuestion, false) => self.graph.optional_lazy(f),
+            (SyntaxKind::QuestionQuestion, true) => self.graph.optional_qis_lazy(f),
+            _ => f,
         }
     }
 
@@ -585,41 +583,16 @@ impl<'a> Query<'a> {
     }
     /// Count Field effects reachable from a node (for variant flattening).
     fn count_field_effects(&self, start: NodeId) -> usize {
-        let mut count = 0;
-        let mut visited = HashSet::new();
-        self.count_field_effects_recursive(start, &mut count, &mut visited);
-        count
-    }
-
-    fn count_field_effects_recursive(
-        &self,
-        node_id: NodeId,
-        count: &mut usize,
-        visited: &mut HashSet<NodeId>,
-    ) {
-        if !visited.insert(node_id) {
-            return;
-        }
-
-        let node = self.graph.node(node_id);
-        for effect in &node.effects {
-            if matches!(effect, BuildEffect::Field { .. }) {
-                *count += 1;
-            }
-        }
-
-        for &succ in &node.successors {
-            self.count_field_effects_recursive(succ, count, visited);
-        }
+        self.nodes_with_field_effects(start)
+            .iter()
+            .flat_map(|&id| &self.graph.node(id).effects)
+            .filter(|e| matches!(e, BuildEffect::Field { .. }))
+            .count()
     }
 
     /// Remove all Field effects reachable from a node (for single-capture variant flattening).
     fn remove_field_effects(&mut self, start: NodeId) {
-        let mut visited = HashSet::new();
-        let mut to_clean = Vec::new();
-        self.collect_nodes_with_field_effects(start, &mut to_clean, &mut visited);
-
-        for node_id in to_clean {
+        for node_id in self.nodes_with_field_effects(start) {
             self.graph
                 .node_mut(node_id)
                 .effects
@@ -627,28 +600,26 @@ impl<'a> Query<'a> {
         }
     }
 
-    fn collect_nodes_with_field_effects(
-        &self,
-        node_id: NodeId,
-        result: &mut Vec<NodeId>,
-        visited: &mut HashSet<NodeId>,
-    ) {
-        if !visited.insert(node_id) {
-            return;
-        }
+    fn nodes_with_field_effects(&self, start: NodeId) -> Vec<NodeId> {
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        let mut stack = vec![start];
 
-        let node = self.graph.node(node_id);
-        if node
-            .effects
-            .iter()
-            .any(|e| matches!(e, BuildEffect::Field { .. }))
-        {
-            result.push(node_id);
+        while let Some(node_id) = stack.pop() {
+            if !visited.insert(node_id) {
+                continue;
+            }
+            let node = self.graph.node(node_id);
+            if node
+                .effects
+                .iter()
+                .any(|e| matches!(e, BuildEffect::Field { .. }))
+            {
+                result.push(node_id);
+            }
+            stack.extend(&node.successors);
         }
-
-        for &succ in &node.successors {
-            self.collect_nodes_with_field_effects(succ, result, visited);
-        }
+        result
     }
 }
 
