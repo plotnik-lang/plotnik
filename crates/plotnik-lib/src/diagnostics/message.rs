@@ -61,6 +61,9 @@ pub enum DiagnosticKind {
     DirectRecursion,
     FieldSequenceValue,
 
+    // Type inference errors
+    IncompatibleTypes,
+
     // Link pass - grammar validation
     UnknownNodeType,
     UnknownField,
@@ -166,6 +169,9 @@ impl DiagnosticKind {
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field must match exactly one node",
 
+            // Type inference
+            Self::IncompatibleTypes => "incompatible types in alternation branches",
+
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",
             Self::UnknownField => "unknown field",
@@ -192,6 +198,7 @@ impl DiagnosticKind {
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
+            Self::IncompatibleTypes => "incompatible types: {}".to_string(),
 
             // Link pass errors with context
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),

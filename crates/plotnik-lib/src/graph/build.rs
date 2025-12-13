@@ -5,6 +5,7 @@
 
 use crate::ir::Nav;
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 /// Index into `BuildGraph::nodes`.
 pub type NodeId = u32;
@@ -533,7 +534,7 @@ pub enum BuildEffect<'src> {
     EndObject,
 
     /// Move current value into top object at field.
-    Field(&'src str),
+    Field { name: &'src str, span: TextRange },
 
     /// Push variant container with tag onto stack.
     StartVariant(&'src str),

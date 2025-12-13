@@ -180,7 +180,7 @@ fn format_effect(effect: &BuildEffect) -> String {
         BuildEffect::EndArray => "EndArray".to_string(),
         BuildEffect::StartObject => "StartObj".to_string(),
         BuildEffect::EndObject => "EndObj".to_string(),
-        BuildEffect::Field(f) => format!("Field({})", f),
+        BuildEffect::Field { name, .. } => format!("Field({})", name),
         BuildEffect::StartVariant(v) => format!("Variant({})", v),
         BuildEffect::EndVariant => "EndVariant".to_string(),
         BuildEffect::ToString => "ToString".to_string(),
@@ -274,6 +274,16 @@ impl TypeInferenceResult<'_> {
 
         out
     }
+
+    /// Render diagnostics for display (used in tests and CLI).
+    pub fn dump_diagnostics(&self, source: &str) -> String {
+        self.diagnostics.render_filtered(source)
+    }
+
+    /// Check if inference produced any errors.
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics.has_errors()
+    }
 }
 
 fn format_type_id(id: TypeId) -> String {
@@ -312,11 +322,6 @@ mod test_helpers {
         /// Dump types for snapshot tests.
         pub fn dump_types(&self) -> String {
             self.dump()
-        }
-
-        /// Check if inference has errors.
-        pub fn has_errors(&self) -> bool {
-            !self.errors.is_empty()
         }
     }
 }

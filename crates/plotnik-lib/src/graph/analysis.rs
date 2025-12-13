@@ -162,7 +162,7 @@ pub fn analyze<'src>(
         // Intern strings from effects
         for effect in &node.effects {
             match effect {
-                BuildEffect::Field(name) => {
+                BuildEffect::Field { name, .. } => {
                     strings.intern(name);
                 }
                 BuildEffect::StartVariant(tag) => {

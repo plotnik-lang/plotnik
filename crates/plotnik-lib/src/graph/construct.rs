@@ -433,7 +433,8 @@ impl<'src> GraphConstructor<'src> {
 
         let inner_frag = self.construct_expr(&inner_expr, ctx);
 
-        let capture_name = cap.name().map(|t| token_src(&t, self.source));
+        let capture_token = cap.name();
+        let capture_name = capture_token.as_ref().map(|t| token_src(t, self.source));
 
         let has_to_string = cap
             .type_annotation()
@@ -457,10 +458,14 @@ impl<'src> GraphConstructor<'src> {
 
         // Add Field effect at exit
         if let Some(name) = capture_name {
+            let span = capture_token
+                .as_ref()
+                .map(|t| t.text_range())
+                .unwrap_or_default();
             let field_id = self.graph.add_epsilon();
             self.graph
                 .node_mut(field_id)
-                .add_effect(BuildEffect::Field(name));
+                .add_effect(BuildEffect::Field { name, span });
             self.graph.connect(inner_frag.exit, field_id);
             Fragment::new(inner_frag.entry, field_id)
         } else {

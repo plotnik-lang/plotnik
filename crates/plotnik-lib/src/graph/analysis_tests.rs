@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use rowan::TextRange;
+
 use super::*;
 use crate::graph::{BuildEffect, BuildGraph, BuildMatcher, RefMarker};
 
@@ -94,7 +96,10 @@ fn analyze_counts_effects() {
     let mut g = BuildGraph::new();
     let id = g.add_matcher(BuildMatcher::node("identifier"));
     g.node_mut(id).add_effect(BuildEffect::CaptureNode);
-    g.node_mut(id).add_effect(BuildEffect::Field("name"));
+    g.node_mut(id).add_effect(BuildEffect::Field {
+        name: "name",
+        span: TextRange::default(),
+    });
     g.node_mut(id).add_effect(BuildEffect::ToString);
 
     let dead = HashSet::new();
@@ -190,7 +195,10 @@ fn analyze_deduplicates_across_sources() {
 
     // "name" appears as: node kind, field constraint, effect field, definition name
     let n0 = g.add_matcher(BuildMatcher::node("name").with_field("name"));
-    g.node_mut(n0).add_effect(BuildEffect::Field("name"));
+    g.node_mut(n0).add_effect(BuildEffect::Field {
+        name: "name",
+        span: TextRange::default(),
+    });
     g.add_definition("name", n0);
 
     let dead = HashSet::new();

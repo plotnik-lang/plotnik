@@ -1,5 +1,7 @@
 //! Tests for BuildGraph construction and fragment combinators.
 
+use rowan::TextRange;
+
 use super::*;
 
 #[test]
@@ -284,7 +286,10 @@ fn node_with_effects() {
     let mut g = BuildGraph::new();
     let id = g.add_matcher(BuildMatcher::node("identifier"));
     g.node_mut(id).add_effect(BuildEffect::CaptureNode);
-    g.node_mut(id).add_effect(BuildEffect::Field("name"));
+    g.node_mut(id).add_effect(BuildEffect::Field {
+        name: "name",
+        span: TextRange::default(),
+    });
 
     insta::assert_snapshot!(g.dump(), @r"
     N0: (identifier) [Capture] [Field(name)] → ∅

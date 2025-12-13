@@ -1,6 +1,6 @@
 //! Tests for type inference.
 
-use crate::graph::{construct_graph, infer_types};
+use crate::graph::{TypeInferenceResult, construct_graph, infer_types};
 use crate::parser::Parser;
 use crate::parser::lexer::lex;
 use std::collections::HashSet;
@@ -14,6 +14,21 @@ fn infer(source: &str) -> String {
 
     let inference = infer_types(&graph, &dead_nodes);
     inference.dump()
+}
+
+fn infer_full(source: &str) -> TypeInferenceResult<'_> {
+    let tokens = lex(source);
+    let parser = Parser::new(source, tokens);
+    let result = parser.parse().expect("parse should succeed");
+    let graph = construct_graph(source, &result.root);
+    let dead_nodes = HashSet::new();
+
+    infer_types(&graph, &dead_nodes)
+}
+
+fn infer_diagnostics(source: &str) -> String {
+    let inference = infer_full(source);
+    inference.dump_diagnostics(source)
 }
 
 #[test]
@@ -231,22 +246,16 @@ fn graph_structure_captured_plus() {
     let result = parser.parse().expect("parse should succeed");
     let graph = construct_graph(source, &result.root);
 
-    let mut out = String::new();
-    for (id, node) in graph.iter() {
-        out.push_str(&format!("N{}: ", id));
-        for effect in &node.effects {
-            out.push_str(&format!("{:?} ", effect));
-        }
-        out.push_str(&format!("→ {:?}\n", node.successors));
-    }
-    insta::assert_snapshot!(out, @r#"
-    N0: CaptureNode → [2]
-    N1: StartArray → [0]
-    N2: PushElement → [3]
-    N3: → [0, 4]
-    N4: EndArray → [5]
-    N5: Field("names") → []
-    "#);
+    insta::assert_snapshot!(graph.dump(), @r"
+    Foo = N1
+
+    N0: (identifier) [Capture] → N2
+    N1: ε [StartArray] → N0
+    N2: ε [Push] → N3
+    N3: ε → N0, N4
+    N4: ε [EndArray] → N5
+    N5: ε [Field(names)] → ∅
+    ");
 }
 
 /// Documents the graph structure for a tagged alternation.
@@ -263,26 +272,20 @@ fn graph_structure_tagged_alternation() {
     let result = parser.parse().expect("parse should succeed");
     let graph = construct_graph(source, &result.root);
 
-    let mut out = String::new();
-    for (id, node) in graph.iter() {
-        out.push_str(&format!("N{}: ", id));
-        for effect in &node.effects {
-            out.push_str(&format!("{:?} ", effect));
-        }
-        out.push_str(&format!("→ {:?}\n", node.successors));
-    }
-    insta::assert_snapshot!(out, @r#"
-    N0: → [2, 6]
-    N1: → []
-    N2: StartVariant("Ok") → [3]
-    N3: CaptureNode → [4]
-    N4: Field("val") → [5]
-    N5: EndVariant → [1]
-    N6: StartVariant("Err") → [7]
-    N7: CaptureNode → [8]
-    N8: Field("err") → [9]
-    N9: EndVariant → [1]
-    "#);
+    insta::assert_snapshot!(graph.dump(), @r"
+    Foo = N0
+
+    N0: ε → N2, N6
+    N1: ε → ∅
+    N2: ε [Variant(Ok)] → N3
+    N3: (value) [Capture] → N4
+    N4: ε [Field(val)] → N5
+    N5: ε [EndVariant] → N1
+    N6: ε [Variant(Err)] → N7
+    N7: (error) [Capture] → N8
+    N8: ε [Field(err)] → N9
+    N9: ε [EndVariant] → N1
+    ");
 }
 
 // =============================================================================
@@ -292,7 +295,8 @@ fn graph_structure_tagged_alternation() {
 #[test]
 fn merge_incompatible_primitives_node_vs_string() {
     // Same field with Node in one branch, String in another
-    let result = infer("Foo = [ (a) @val  (b) @val ::string ]");
+    let source = "Foo = [ (a) @val  (b) @val ::string ]";
+    let result = infer(source);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
     Foo → T3
@@ -304,6 +308,16 @@ fn merge_incompatible_primitives_node_vs_string() {
 
     === Errors ===
     field `val` in `Foo`: incompatible types [Node, String]
+    ");
+
+    // Verify diagnostic output with proper spans
+    insta::assert_snapshot!(infer_diagnostics(source), @r"
+    error: incompatible types: Node vs String
+      |
+    1 | Foo = [ (a) @val  (b) @val ::string ]
+      |              ^^^       --- also captured here
+      |
+    help: capture `val` has incompatible types across branches
     ");
 }
 

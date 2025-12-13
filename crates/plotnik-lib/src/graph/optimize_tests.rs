@@ -1,5 +1,7 @@
 //! Tests for epsilon elimination optimization pass.
 
+use rowan::TextRange;
+
 use super::*;
 use crate::graph::{BuildEffect, BuildMatcher, RefMarker};
 
@@ -272,7 +274,10 @@ fn does_not_merge_effects_into_ref_marker() {
     g.connect(exit, target);
 
     let field_eps = g.add_epsilon();
-    g.node_mut(field_eps).add_effect(BuildEffect::Field("name"));
+    g.node_mut(field_eps).add_effect(BuildEffect::Field {
+        name: "name",
+        span: TextRange::default(),
+    });
     g.connect(field_eps, exit);
 
     insta::assert_snapshot!(g.dump(), @r"

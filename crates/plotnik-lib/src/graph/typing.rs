@@ -20,8 +20,10 @@
 //! - All incompatibilities are reported, not just the first
 
 use super::{BuildEffect, BuildGraph, NodeId};
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
 use indexmap::IndexMap;
+use rowan::TextRange;
 use std::collections::HashSet;
 
 /// Result of type inference on a BuildGraph.
@@ -31,7 +33,10 @@ pub struct TypeInferenceResult<'src> {
     pub type_defs: Vec<InferredTypeDef<'src>>,
     /// Mapping from definition name to its result TypeId.
     pub entrypoint_types: IndexMap<&'src str, TypeId>,
+    /// Type inference diagnostics.
+    pub diagnostics: Diagnostics,
     /// Type unification errors (incompatible types in alternation branches).
+    /// Kept for backward compatibility; diagnostics is the primary error channel.
     pub errors: Vec<UnificationError<'src>>,
 }
 
@@ -44,6 +49,8 @@ pub struct UnificationError<'src> {
     pub definition: &'src str,
     /// Types found across branches (for error message).
     pub types_found: Vec<TypeDescription>,
+    /// Spans of the conflicting captures.
+    pub spans: Vec<TextRange>,
 }
 
 /// Human-readable type description for error messages.
@@ -154,6 +161,8 @@ struct FieldInfo<'src> {
     branch_count: usize,
     /// All shapes seen at this field (for error reporting).
     all_shapes: Vec<TypeShape<'src>>,
+    /// Spans where this field was captured (for error reporting).
+    spans: Vec<TextRange>,
 }
 
 /// Collected scope information from traversal.
@@ -167,14 +176,21 @@ struct ScopeInfo<'src> {
 }
 
 impl<'src> ScopeInfo<'src> {
-    fn add_field(&mut self, name: &'src str, base_type: TypeId, cardinality: Cardinality) {
+    fn add_field(
+        &mut self,
+        name: &'src str,
+        base_type: TypeId,
+        cardinality: Cardinality,
+        span: TextRange,
+    ) {
         let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
             if !existing.all_shapes.contains(&shape) {
-                existing.all_shapes.push(shape);
+                existing.all_shapes.push(shape.clone());
             }
+            existing.spans.push(span);
         } else {
             self.fields.insert(
                 name,
@@ -184,6 +200,7 @@ impl<'src> ScopeInfo<'src> {
                     cardinality,
                     branch_count: 1,
                     all_shapes: vec![shape],
+                    spans: vec![span],
                 },
             );
         }
@@ -198,7 +215,10 @@ impl<'src> ScopeInfo<'src> {
         for (name, info) in other.fields {
             if let Some(existing) = self.fields.get_mut(name) {
                 // Check type compatibility (1-level merge)
-                if let Some(err) = check_compatibility(&existing.shape, &info.shape, name) {
+                if let Some(mut err) = check_compatibility(&existing.shape, &info.shape, name) {
+                    // Attach spans from both sides
+                    err.spans = existing.spans.clone();
+                    err.spans.extend(info.spans.iter().cloned());
                     errors.push(err);
                     // Collect all shapes for error reporting
                     for shape in &info.all_shapes {
@@ -207,6 +227,8 @@ impl<'src> ScopeInfo<'src> {
                         }
                     }
                 }
+                // Always merge spans
+                existing.spans.extend(info.spans);
                 existing.cardinality = existing.cardinality.join(info.cardinality);
                 existing.branch_count += info.branch_count;
             } else {
@@ -244,6 +266,7 @@ impl<'src> ScopeInfo<'src> {
 struct MergeError<'src> {
     field: &'src str,
     shapes: Vec<TypeShape<'src>>,
+    spans: Vec<TextRange>,
 }
 
 /// Check if two type shapes are compatible under 1-level merge semantics.
@@ -260,6 +283,7 @@ fn check_compatibility<'src>(
         (TypeShape::Primitive(_), TypeShape::Primitive(_)) => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
+            spans: vec![], // Filled in by caller
         }),
 
         // Struct vs Primitive is incompatible
@@ -267,6 +291,7 @@ fn check_compatibility<'src>(
         | (TypeShape::Primitive(_), TypeShape::Struct(_)) => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
+            spans: vec![], // Filled in by caller
         }),
 
         // Structs: must have identical field sets (1-level, no deep merge)
@@ -277,6 +302,7 @@ fn check_compatibility<'src>(
                 Some(MergeError {
                     field,
                     shapes: vec![a.clone(), b.clone()],
+                    spans: vec![], // Filled in by caller
                 })
             }
         }
@@ -313,6 +339,7 @@ struct InferenceContext<'src, 'g> {
     dead_nodes: &'g HashSet<NodeId>,
     type_defs: Vec<InferredTypeDef<'src>>,
     next_type_id: TypeId,
+    diagnostics: Diagnostics,
     errors: Vec<UnificationError<'src>>,
 }
 
@@ -323,6 +350,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             dead_nodes,
             type_defs: Vec::new(),
             next_type_id: 3, // TYPE_COMPOSITE_START
+            diagnostics: Diagnostics::new(),
             errors: Vec::new(),
         }
     }
@@ -344,12 +372,39 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             &mut merge_errors,
         );
 
-        // Convert merge errors to unification errors
+        // Convert merge errors to unification errors and diagnostics
         for err in merge_errors {
+            let types_str = err
+                .shapes
+                .iter()
+                .map(|s| s.to_description().to_string())
+                .collect::<Vec<_>>()
+                .join(" vs ");
+
+            // Use first span as primary, others as related
+            let primary_span = err.spans.first().copied().unwrap_or_default();
+            let mut builder = self
+                .diagnostics
+                .report(DiagnosticKind::IncompatibleTypes, primary_span)
+                .message(types_str);
+
+            // Add related spans
+            for span in err.spans.iter().skip(1) {
+                builder = builder.related_to("also captured here", *span);
+            }
+            builder
+                .hint(format!(
+                    "capture `{}` has incompatible types across branches",
+                    err.field
+                ))
+                .emit();
+
+            // Keep legacy error for backward compat
             self.errors.push(UnificationError {
                 field: err.field,
                 definition: def_name,
                 types_found: err.shapes.iter().map(|s| s.to_description()).collect(),
+                spans: err.spans,
             });
         }
 
@@ -391,14 +446,14 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 BuildEffect::ToString => {
                     state.pending_type = Some(TYPE_STR);
                 }
-                BuildEffect::Field(name) => {
+                BuildEffect::Field { name, span } => {
                     if let Some(base_type) = state.pending_type.take() {
                         if let Some(tag) = state.current_variant {
                             // Inside a variant - add to variant scope
                             let variant_scope = scope.variants.entry(tag).or_default();
-                            variant_scope.add_field(*name, base_type, state.cardinality);
+                            variant_scope.add_field(*name, base_type, state.cardinality, *span);
                         } else {
-                            scope.add_field(*name, base_type, state.cardinality);
+                            scope.add_field(*name, base_type, state.cardinality, *span);
                         }
                     }
                     state.cardinality = Cardinality::One;
@@ -572,6 +627,7 @@ pub fn infer_types<'src>(
     TypeInferenceResult {
         type_defs: ctx.type_defs,
         entrypoint_types,
+        diagnostics: ctx.diagnostics,
         errors: ctx.errors,
     }
 }
