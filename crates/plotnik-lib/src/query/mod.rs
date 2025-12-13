@@ -1,8 +1,11 @@
 //! Query processing pipeline.
 //!
-//! Stages: parse → alt_kinds → symbol_table → recursion → shapes.
+//! Stages: parse → alt_kinds → symbol_table → recursion → shapes → [build_graph].
 //! Each stage populates its own diagnostics. Use `is_valid()` to check
 //! if any stage produced errors.
+//!
+//! The `build_graph` stage is optional and constructs the transition graph
+//! for compilation to binary IR.
 
 mod dump;
 mod invariants;
@@ -10,14 +13,29 @@ mod printer;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
+pub mod build_graph;
+mod construct;
+mod graph_dump;
 #[cfg(feature = "plotnik-langs")]
 pub mod link;
+mod optimize;
 pub mod recursion;
 pub mod shapes;
 pub mod symbol_table;
+pub mod typing;
+
+pub use build_graph::{
+    BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker,
+};
+pub use optimize::OptimizeStats;
+pub use typing::{
+    InferredMember, InferredTypeDef, TypeDescription, TypeInferenceResult, UnificationError,
+};
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(test)]
+mod construct_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
@@ -31,7 +49,7 @@ mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "plotnik-langs")]
 use plotnik_langs::{NodeFieldId, NodeTypeId};
@@ -55,9 +73,11 @@ use symbol_table::SymbolTable;
 /// Create with [`new`](Self::new), optionally configure fuel limits,
 /// then call [`exec`](Self::exec) to run analysis.
 ///
+/// For compilation, call [`build_graph`](Self::build_graph) after `exec`.
+///
 /// Check [`is_valid`](Self::is_valid) or [`diagnostics`](Self::diagnostics)
 /// to determine if the query has syntax/semantic issues.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Query<'a> {
     source: &'a str,
     ast: Root,
@@ -77,6 +97,10 @@ pub struct Query<'a> {
     shapes_diagnostics: Diagnostics,
     #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
+    // Graph compilation fields
+    graph: BuildGraph<'a>,
+    dead_nodes: HashSet<NodeId>,
+    type_info: TypeInferenceResult<'a>,
 }
 
 fn empty_root() -> Root {
@@ -111,6 +135,9 @@ impl<'a> Query<'a> {
             shapes_diagnostics: Diagnostics::new(),
             #[cfg(feature = "plotnik-langs")]
             link_diagnostics: Diagnostics::new(),
+            graph: BuildGraph::default(),
+            dead_nodes: HashSet::new(),
+            type_info: TypeInferenceResult::default(),
         }
     }
 
@@ -145,6 +172,22 @@ impl<'a> Query<'a> {
         Ok(self)
     }
 
+    /// Build the transition graph for compilation.
+    ///
+    /// This is an optional step after `exec`. It constructs the graph,
+    /// runs epsilon elimination, and infers types.
+    ///
+    /// Only runs if the query is valid (no errors from previous passes).
+    pub fn build_graph(mut self) -> Self {
+        if !self.is_valid() {
+            return self;
+        }
+        self.construct_graph();
+        self.optimize_graph();
+        self.infer_types();
+        self
+    }
+
     fn try_parse(&mut self) -> Result<()> {
         let tokens = lex(self.source);
         let parser = Parser::new(self.source, tokens)
@@ -168,6 +211,21 @@ impl<'a> Query<'a> {
 
     pub(crate) fn root(&self) -> &Root {
         &self.ast
+    }
+
+    /// Access the constructed graph.
+    pub fn graph(&self) -> &BuildGraph<'a> {
+        &self.graph
+    }
+
+    /// Access the set of dead nodes (eliminated by optimization).
+    pub fn dead_nodes(&self) -> &HashSet<NodeId> {
+        &self.dead_nodes
+    }
+
+    /// Access the type inference result.
+    pub fn type_info(&self) -> &TypeInferenceResult<'a> {
+        &self.type_info
     }
 
     pub(crate) fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
@@ -220,6 +278,7 @@ impl<'a> Query<'a> {
         all.extend(self.shapes_diagnostics.clone());
         #[cfg(feature = "plotnik-langs")]
         all.extend(self.link_diagnostics.clone());
+        all.extend(self.type_info.diagnostics.clone());
         all
     }
 
@@ -250,6 +309,11 @@ impl<'a> Query<'a> {
             && !self.resolve_diagnostics.has_errors()
             && !self.recursion_diagnostics.has_errors()
             && !self.shapes_diagnostics.has_errors()
+    }
+
+    /// Check if graph compilation produced type errors.
+    pub fn has_type_errors(&self) -> bool {
+        self.type_info.has_errors()
     }
 }
 

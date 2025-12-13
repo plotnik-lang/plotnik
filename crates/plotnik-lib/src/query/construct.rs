@@ -1,36 +1,28 @@
-//! AST-to-graph construction.
+//! Graph construction integrated with Query pipeline.
 //!
-//! Translates the parsed and analyzed AST into a `BuildGraph`.
-//! This is the bridge between `parser::ast` and `graph::BuildGraph`.
+//! Constructs a `BuildGraph` from the parsed AST, reusing the `symbol_table`
+//! populated by earlier passes.
+
+use std::collections::HashSet;
 
 use crate::ir::Nav;
 use crate::parser::{
-    AltExpr, AltKind, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
-    NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, SeqItem, SyntaxKind, token_src,
+    AltExpr, AltKind, AnonymousNode, Branch, CapturedExpr, Expr, FieldExpr, NamedNode,
+    NegatedField, QuantifiedExpr, Ref, SeqExpr, SeqItem, SyntaxKind, token_src,
 };
 
-use super::{BuildEffect, BuildGraph, BuildMatcher, Fragment, NodeId, RefMarker};
-
-/// Constructs a `BuildGraph` from a parsed query AST.
-pub struct GraphConstructor<'src> {
-    source: &'src str,
-    graph: BuildGraph<'src>,
-    next_ref_id: u32,
-}
+use super::Query;
+use super::build_graph::{BuildEffect, BuildGraph, BuildMatcher, Fragment, NodeId, RefMarker};
 
 /// Context for navigation determination.
 #[derive(Debug, Clone, Copy)]
 enum NavContext {
-    /// First expression at definition root level.
     Root,
-    /// First child inside a parent node.
     FirstChild { anchored: bool },
-    /// Sibling after previous expression.
     Sibling { anchored: bool },
 }
 
 impl NavContext {
-    /// Determine the Nav based on context and expression type.
     fn to_nav(self, is_anonymous: bool) -> Nav {
         match self {
             NavContext::Root => Nav::stay(),
@@ -57,9 +49,7 @@ impl NavContext {
 /// Tracks trailing anchor state for Up navigation.
 #[derive(Debug, Clone, Copy)]
 struct ExitContext {
-    /// Whether there's a trailing anchor before exit.
     has_trailing_anchor: bool,
-    /// Whether the last expression was anonymous (for Exact vs SkipTrivia).
     last_was_anonymous: bool,
 }
 
@@ -75,8 +65,34 @@ impl ExitContext {
     }
 }
 
+impl<'a> Query<'a> {
+    /// Build the graph from the already-populated symbol_table.
+    ///
+    /// This method reuses the symbol_table from name resolution,
+    /// avoiding duplicate iteration over definitions.
+    pub(super) fn construct_graph(&mut self) {
+        let mut constructor = GraphConstructor::new(self.source);
+
+        // Reuse symbol_table: iterate name -> body pairs
+        for (name, body) in &self.symbol_table {
+            let fragment = constructor.construct_expr(body, NavContext::Root);
+            constructor.graph.add_definition(name, fragment.entry);
+        }
+
+        constructor.link_references();
+        self.graph = constructor.graph;
+    }
+}
+
+/// Internal constructor that builds the graph.
+struct GraphConstructor<'src> {
+    source: &'src str,
+    graph: BuildGraph<'src>,
+    next_ref_id: u32,
+}
+
 impl<'src> GraphConstructor<'src> {
-    pub fn new(source: &'src str) -> Self {
+    fn new(source: &'src str) -> Self {
         Self {
             source,
             graph: BuildGraph::new(),
@@ -84,40 +100,22 @@ impl<'src> GraphConstructor<'src> {
         }
     }
 
-    /// Construct graph from a parsed Root AST.
-    pub fn construct(mut self, root: &Root) -> BuildGraph<'src> {
-        for def in root.defs() {
-            self.construct_def(&def);
-        }
-        self.link_references();
-        self.graph
-    }
-
     /// Link Enter nodes to their definition entry points.
-    ///
-    /// Per ADR-0005, Enter's successors should be:
-    /// - successors[0]: definition entry point
-    /// - successors[1..]: return transitions (the Exit node's successor)
     fn link_references(&mut self) {
-        // Collect all Enter nodes with their ref_name and corresponding Exit successors
         let mut links: Vec<(NodeId, &'src str, Vec<NodeId>)> = Vec::new();
 
         for (id, node) in self.graph.iter() {
             if let RefMarker::Enter { ref_id } = &node.ref_marker {
                 if let Some(name) = node.ref_name {
-                    // Find the corresponding Exit node and its successors
                     let exit_successors = self.find_exit_successors(*ref_id);
                     links.push((id, name, exit_successors));
                 }
             }
         }
 
-        // Apply links
         for (enter_id, name, return_transitions) in links {
             if let Some(def_entry) = self.graph.definition(name) {
-                // Connect Enter to definition entry point
                 self.graph.connect(enter_id, def_entry);
-                // Add return transitions
                 for ret in return_transitions {
                     self.graph.connect(enter_id, ret);
                 }
@@ -125,7 +123,6 @@ impl<'src> GraphConstructor<'src> {
         }
     }
 
-    /// Find successors of the Exit node matching the given ref_id.
     fn find_exit_successors(&self, ref_id: u32) -> Vec<NodeId> {
         for (_, node) in self.graph.iter() {
             if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker {
@@ -135,19 +132,6 @@ impl<'src> GraphConstructor<'src> {
             }
         }
         Vec::new()
-    }
-
-    fn construct_def(&mut self, def: &Def) {
-        let Some(name_token) = def.name() else {
-            return;
-        };
-        let Some(body) = def.body() else {
-            return;
-        };
-
-        let name = token_src(&name_token, self.source);
-        let fragment = self.construct_expr(&body, NavContext::Root);
-        self.graph.add_definition(name, fragment.entry);
     }
 
     fn construct_expr(&mut self, expr: &Expr, ctx: NavContext) -> Fragment {
@@ -169,7 +153,6 @@ impl<'src> GraphConstructor<'src> {
         let node_id = self.graph.add_matcher(matcher);
         self.graph.node_mut(node_id).set_nav(nav);
 
-        // Process children with anchor tracking
         let items: Vec<_> = node.items().collect();
         if items.is_empty() {
             return Fragment::single(node_id);
@@ -183,7 +166,6 @@ impl<'src> GraphConstructor<'src> {
         let inner = self.graph.sequence(&child_fragments);
         self.graph.connect(node_id, inner.entry);
 
-        // Add exit transition with appropriate Up nav
         let exit_id = self.graph.add_epsilon();
         self.graph.node_mut(exit_id).set_nav(exit_ctx.to_up_nav(1));
         self.graph.connect(inner.exit, exit_id);
@@ -191,8 +173,6 @@ impl<'src> GraphConstructor<'src> {
         Fragment::new(node_id, exit_id)
     }
 
-    /// Construct a sequence of items (expressions and anchors).
-    /// Returns fragments and exit context for trailing anchor handling.
     fn construct_item_sequence(
         &mut self,
         items: &[SeqItem],
@@ -216,7 +196,6 @@ impl<'src> GraphConstructor<'src> {
                                 anchored: pending_anchor,
                             }
                         } else {
-                            // For sequences at root level, first item inherits parent context
                             NavContext::Sibling {
                                 anchored: pending_anchor,
                             }
@@ -297,7 +276,6 @@ impl<'src> GraphConstructor<'src> {
         let ref_id = self.next_ref_id;
         self.next_ref_id += 1;
 
-        // Create Enter node with navigation from context
         let enter_id = self.graph.add_epsilon();
         let nav = ctx.to_nav(false);
         self.graph.node_mut(enter_id).set_nav(nav);
@@ -305,13 +283,11 @@ impl<'src> GraphConstructor<'src> {
             .node_mut(enter_id)
             .set_ref_marker(RefMarker::enter(ref_id));
 
-        // Create Exit node (nav will be set during linking based on definition structure)
         let exit_id = self.graph.add_epsilon();
         self.graph
             .node_mut(exit_id)
             .set_ref_marker(RefMarker::exit(ref_id));
 
-        // Store ref name for later resolution
         let name = token_src(&name_token, self.source);
         self.graph.node_mut(enter_id).ref_name = Some(name);
 
@@ -331,7 +307,6 @@ impl<'src> GraphConstructor<'src> {
             return self.graph.epsilon_fragment();
         }
 
-        // Branch node inherits context nav
         let branch_id = self.graph.add_epsilon();
         self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
 
@@ -359,13 +334,11 @@ impl<'src> GraphConstructor<'src> {
 
         let label = token_src(&label_token, self.source);
 
-        // StartVariant (epsilon, no nav change)
         let start_id = self.graph.add_epsilon();
         self.graph
             .node_mut(start_id)
             .add_effect(BuildEffect::StartVariant(label));
 
-        // Body inherits root context (alternation resets nav context)
         let body_frag = self.construct_expr(&body, NavContext::Root);
 
         let end_id = self.graph.add_epsilon();
@@ -386,14 +359,12 @@ impl<'src> GraphConstructor<'src> {
             return self.graph.epsilon_fragment();
         }
 
-        // Branch node inherits context nav
         let branch_id = self.graph.add_epsilon();
         self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
 
         let exit_id = self.graph.add_epsilon();
 
         for body in &branches {
-            // Each branch resets to root context
             let frag = self.construct_expr(body, NavContext::Root);
             self.graph.connect(branch_id, frag.entry);
             self.graph.connect(frag.exit, exit_id);
@@ -405,7 +376,6 @@ impl<'src> GraphConstructor<'src> {
     fn construct_seq(&mut self, seq: &SeqExpr, ctx: NavContext) -> Fragment {
         let items: Vec<_> = seq.items().collect();
 
-        // Wrap sequence in StartObject/EndObject
         let start_id = self.graph.add_epsilon();
         self.graph.node_mut(start_id).set_nav(ctx.to_nav(false));
         self.graph
@@ -442,7 +412,6 @@ impl<'src> GraphConstructor<'src> {
             .map(|n| n.text() == "string")
             .unwrap_or(false);
 
-        // Attach CaptureNode to all reachable matchers
         let matchers = self.find_all_matchers(inner_frag.entry);
         for matcher_id in matchers {
             self.graph
@@ -456,7 +425,6 @@ impl<'src> GraphConstructor<'src> {
             }
         }
 
-        // Add Field effect at exit
         if let Some(name) = capture_name {
             let span = capture_token
                 .as_ref()
@@ -481,7 +449,6 @@ impl<'src> GraphConstructor<'src> {
             return self.construct_expr(&inner_expr, ctx);
         };
 
-        // First iteration uses parent context, subsequent use Sibling
         let inner_frag = self.construct_expr(&inner_expr, ctx);
 
         match op.kind() {
@@ -502,7 +469,6 @@ impl<'src> GraphConstructor<'src> {
         self.construct_expr(&value_expr, ctx)
     }
 
-    /// Find field constraint from parent FieldExpr.
     fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'src str> {
         let parent = node.parent()?;
         let field_expr = FieldExpr::cast(parent)?;
@@ -510,10 +476,9 @@ impl<'src> GraphConstructor<'src> {
         Some(token_src(&name_token, self.source))
     }
 
-    /// Find all non-epsilon matcher nodes reachable from start.
     fn find_all_matchers(&self, start: NodeId) -> Vec<NodeId> {
         let mut result = Vec::new();
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = HashSet::new();
         self.collect_matchers(start, &mut result, &mut visited);
         result
     }
@@ -522,7 +487,7 @@ impl<'src> GraphConstructor<'src> {
         &self,
         node_id: NodeId,
         result: &mut Vec<NodeId>,
-        visited: &mut std::collections::HashSet<NodeId>,
+        visited: &mut HashSet<NodeId>,
     ) {
         if !visited.insert(node_id) {
             return;
@@ -540,12 +505,6 @@ impl<'src> GraphConstructor<'src> {
     }
 }
 
-/// Returns true if expression is an anonymous node (string literal).
 fn is_anonymous_expr(expr: &Expr) -> bool {
     matches!(expr, Expr::AnonymousNode(n) if !n.is_any())
-}
-
-/// Convenience function to construct a graph from source and AST.
-pub fn construct_graph<'src>(source: &'src str, root: &Root) -> BuildGraph<'src> {
-    GraphConstructor::new(source).construct(root)
 }

@@ -1,12 +1,11 @@
 //! Dump helpers for graph inspection and testing.
-//!
-//! Provides formatted output for `BuildGraph` and `TypeInferenceResult`
-//! suitable for snapshot testing and debugging.
 
-use super::{BuildEffect, BuildGraph, BuildMatcher, NodeId, RefMarker, TypeInferenceResult};
-use crate::ir::{Nav, NavKind, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId};
 use std::collections::HashSet;
 use std::fmt::Write;
+
+use crate::ir::{Nav, NavKind};
+
+use super::build_graph::{BuildEffect, BuildGraph, BuildMatcher, NodeId, RefMarker};
 
 /// Printer for `BuildGraph` with configurable output options.
 pub struct GraphPrinter<'a, 'src> {
@@ -24,21 +23,13 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
         }
     }
 
-    /// Mark nodes as dead (from optimization pass).
     pub fn with_dead_nodes(mut self, dead: &'a HashSet<NodeId>) -> Self {
         self.dead_nodes = Some(dead);
         self
     }
 
-    /// Show dead nodes (struck through or marked).
     pub fn show_dead(mut self, show: bool) -> Self {
         self.show_dead = show;
-        self
-    }
-
-    /// Filter dead nodes from successor lists.
-    pub fn filter_dead_successors(self) -> Self {
-        // This is controlled by dead_nodes being set
         self
     }
 
@@ -49,7 +40,6 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
     }
 
     fn format(&self, w: &mut String) -> std::fmt::Result {
-        // Definitions header
         for (name, entry) in self.graph.definitions() {
             writeln!(w, "{} = N{}", name, entry)?;
         }
@@ -57,7 +47,6 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
             writeln!(w)?;
         }
 
-        // Nodes
         for (id, node) in self.graph.iter() {
             let is_dead = self.dead_nodes.map(|d| d.contains(&id)).unwrap_or(false);
 
@@ -65,22 +54,18 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
                 continue;
             }
 
-            // Node header
             if is_dead {
                 write!(w, "N{}: ✗ ", id)?;
             } else {
                 write!(w, "N{}: ", id)?;
             }
 
-            // Navigation (skip Stay)
             if !node.nav.is_stay() {
                 write!(w, "[{}] ", format_nav(&node.nav))?;
             }
 
-            // Matcher
             self.format_matcher(w, &node.matcher)?;
 
-            // Ref marker
             match &node.ref_marker {
                 RefMarker::None => {}
                 RefMarker::Enter { ref_id } => {
@@ -92,12 +77,10 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
                 }
             }
 
-            // Effects
             for effect in &node.effects {
                 write!(w, " [{}]", format_effect(effect))?;
             }
 
-            // Successors (filter dead nodes from list)
             self.format_successors(w, &node.successors)?;
 
             writeln!(w)?;
@@ -141,7 +124,6 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
     }
 
     fn format_successors(&self, w: &mut String, successors: &[NodeId]) -> std::fmt::Result {
-        // Filter out dead nodes from successor list
         let live_succs: Vec<_> = successors
             .iter()
             .filter(|s| self.dead_nodes.map(|d| !d.contains(s)).unwrap_or(true))
@@ -187,22 +169,15 @@ fn format_effect(effect: &BuildEffect) -> String {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BuildGraph dump methods
-// ─────────────────────────────────────────────────────────────────────────────
-
 impl<'src> BuildGraph<'src> {
-    /// Create a printer for this graph.
     pub fn printer(&self) -> GraphPrinter<'_, 'src> {
         GraphPrinter::new(self)
     }
 
-    /// Dump graph in default format.
     pub fn dump(&self) -> String {
         self.printer().dump()
     }
 
-    /// Dump graph showing dead nodes from optimization.
     pub fn dump_with_dead(&self, dead_nodes: &HashSet<NodeId>) -> String {
         self.printer()
             .with_dead_nodes(dead_nodes)
@@ -210,118 +185,7 @@ impl<'src> BuildGraph<'src> {
             .dump()
     }
 
-    /// Dump only live nodes (dead nodes filtered out completely).
     pub fn dump_live(&self, dead_nodes: &HashSet<NodeId>) -> String {
         self.printer().with_dead_nodes(dead_nodes).dump()
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TypeInferenceResult dump
-// ─────────────────────────────────────────────────────────────────────────────
-
-impl TypeInferenceResult<'_> {
-    /// Dump inferred types for debugging/testing.
-    pub fn dump(&self) -> String {
-        let mut out = String::new();
-
-        out.push_str("=== Entrypoints ===\n");
-        for (name, type_id) in &self.entrypoint_types {
-            out.push_str(&format!("{} → {}\n", name, format_type_id(*type_id)));
-        }
-
-        if !self.type_defs.is_empty() {
-            out.push_str("\n=== Types ===\n");
-            for (idx, def) in self.type_defs.iter().enumerate() {
-                let type_id = idx as TypeId + 3;
-                let name = def.name.unwrap_or("<anon>");
-                out.push_str(&format!("T{}: {:?} {}", type_id, def.kind, name));
-
-                if let Some(inner) = def.inner_type {
-                    out.push_str(&format!(" → {}", format_type_id(inner)));
-                }
-
-                if !def.members.is_empty() {
-                    out.push_str(" {\n");
-                    for member in &def.members {
-                        out.push_str(&format!(
-                            "    {}: {}\n",
-                            member.name,
-                            format_type_id(member.ty)
-                        ));
-                    }
-                    out.push('}');
-                }
-                out.push('\n');
-            }
-        }
-
-        if !self.errors.is_empty() {
-            out.push_str("\n=== Errors ===\n");
-            for err in &self.errors {
-                out.push_str(&format!(
-                    "field `{}` in `{}`: incompatible types [{}]\n",
-                    err.field,
-                    err.definition,
-                    err.types_found
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-        }
-
-        out
-    }
-
-    /// Render diagnostics for display (used in tests and CLI).
-    pub fn dump_diagnostics(&self, source: &str) -> String {
-        self.diagnostics.render_filtered(source)
-    }
-
-    /// Check if inference produced any errors.
-    pub fn has_errors(&self) -> bool {
-        self.diagnostics.has_errors()
-    }
-}
-
-fn format_type_id(id: TypeId) -> String {
-    if id == TYPE_VOID {
-        "Void".to_string()
-    } else if id == TYPE_NODE {
-        "Node".to_string()
-    } else if id == TYPE_STR {
-        "String".to_string()
-    } else {
-        format!("T{}", id)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Test-only dump helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod test_helpers {
-    use super::*;
-
-    impl<'src> BuildGraph<'src> {
-        /// Dump graph for snapshot tests.
-        pub fn dump_graph(&self) -> String {
-            self.dump()
-        }
-
-        /// Dump graph with optimization info.
-        pub fn dump_optimized(&self, dead_nodes: &HashSet<NodeId>) -> String {
-            self.printer().with_dead_nodes(dead_nodes).dump()
-        }
-    }
-
-    impl TypeInferenceResult<'_> {
-        /// Dump types for snapshot tests.
-        pub fn dump_types(&self) -> String {
-            self.dump()
-        }
     }
 }

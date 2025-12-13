@@ -63,6 +63,8 @@ pub enum DiagnosticKind {
 
     // Type inference errors
     IncompatibleTypes,
+    MultiCaptureQuantifierNoName,
+    UnusedBranchLabels,
 
     // Link pass - grammar validation
     UnknownNodeType,
@@ -78,7 +80,10 @@ pub enum DiagnosticKind {
 impl DiagnosticKind {
     /// Default severity for this kind. Can be overridden by policy.
     pub fn default_severity(&self) -> Severity {
-        Severity::Error
+        match self {
+            Self::UnusedBranchLabels => Severity::Warning,
+            _ => Severity::Error,
+        }
     }
 
     /// Whether this kind suppresses `other` when spans overlap.
@@ -171,6 +176,10 @@ impl DiagnosticKind {
 
             // Type inference
             Self::IncompatibleTypes => "incompatible types in alternation branches",
+            Self::MultiCaptureQuantifierNoName => {
+                "quantified expression with multiple captures requires `@name`"
+            }
+            Self::UnusedBranchLabels => "branch labels have no effect without capture",
 
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",

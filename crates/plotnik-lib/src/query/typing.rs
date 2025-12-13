@@ -1,7 +1,7 @@
-//! Type inference for BuildGraph.
+//! Type inference for Query's BuildGraph.
 //!
-//! This module analyzes a BuildGraph and infers the output type structure
-//! for each definition. The inference follows rules from ADR-0007 and ADR-0009.
+//! Analyzes the graph and infers output type structure for each definition.
+//! Follows rules from ADR-0007 and ADR-0009.
 //!
 //! # Algorithm Overview
 //!
@@ -10,46 +10,33 @@
 //! 3. When Field(name) is encountered, record the pending value as a field
 //! 4. Handle branching by merging field sets from all branches (1-level merge)
 //! 5. Handle quantifiers via array cardinality markers
-//!
-//! # 1-Level Merge Semantics
-//!
-//! When merging captures across alternation branches:
-//! - Top-level fields merge with optionality for asymmetric captures
-//! - Base types (Node, String) must match exactly
-//! - Nested structs must be structurally identical (not recursively merged)
-//! - All incompatibilities are reported, not just the first
 
-use super::{BuildEffect, BuildGraph, NodeId};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
-use indexmap::IndexMap;
-use rowan::TextRange;
 use std::collections::HashSet;
 
-/// Result of type inference on a BuildGraph.
-#[derive(Debug)]
+use indexmap::IndexMap;
+use rowan::TextRange;
+
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::ir::{TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeKind};
+
+use super::Query;
+use super::build_graph::{BuildEffect, BuildGraph, NodeId};
+
+/// Result of type inference.
+#[derive(Debug, Default)]
 pub struct TypeInferenceResult<'src> {
-    /// All inferred type definitions (composite types only).
     pub type_defs: Vec<InferredTypeDef<'src>>,
-    /// Mapping from definition name to its result TypeId.
     pub entrypoint_types: IndexMap<&'src str, TypeId>,
-    /// Type inference diagnostics.
     pub diagnostics: Diagnostics,
-    /// Type unification errors (incompatible types in alternation branches).
-    /// Kept for backward compatibility; diagnostics is the primary error channel.
     pub errors: Vec<UnificationError<'src>>,
 }
 
 /// Error when types cannot be unified in alternation branches.
 #[derive(Debug, Clone)]
 pub struct UnificationError<'src> {
-    /// The field name where incompatibility was detected.
     pub field: &'src str,
-    /// Definition context where the error occurred.
     pub definition: &'src str,
-    /// Types found across branches (for error message).
     pub types_found: Vec<TypeDescription>,
-    /// Spans of the conflicting captures.
     pub spans: Vec<TextRange>,
 }
 
@@ -58,7 +45,7 @@ pub struct UnificationError<'src> {
 pub enum TypeDescription {
     Node,
     String,
-    Struct(Vec<String>), // field names for identification
+    Struct(Vec<String>),
 }
 
 impl std::fmt::Display for TypeDescription {
@@ -73,14 +60,12 @@ impl std::fmt::Display for TypeDescription {
     }
 }
 
-/// An inferred type definition (before emission).
+/// An inferred type definition.
 #[derive(Debug, Clone)]
 pub struct InferredTypeDef<'src> {
     pub kind: TypeKind,
     pub name: Option<&'src str>,
-    /// For Record/Enum: fields or variants. For wrappers: empty.
     pub members: Vec<InferredMember<'src>>,
-    /// For wrapper types: the inner TypeId.
     pub inner_type: Option<TypeId>,
 }
 
@@ -91,7 +76,6 @@ pub struct InferredMember<'src> {
     pub ty: TypeId,
 }
 
-/// Cardinality of a capture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cardinality {
     One,
@@ -101,7 +85,6 @@ enum Cardinality {
 }
 
 impl Cardinality {
-    /// Join cardinalities (for alternation branches).
     fn join(self, other: Cardinality) -> Cardinality {
         use Cardinality::*;
         match (self, other) {
@@ -113,7 +96,6 @@ impl Cardinality {
         }
     }
 
-    /// Make optional (for fields missing in some alternation branches).
     fn make_optional(self) -> Cardinality {
         use Cardinality::*;
         match self {
@@ -124,14 +106,10 @@ impl Cardinality {
     }
 }
 
-/// Type shape for 1-level merge comparison.
-/// Tracks enough information to detect incompatibilities.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // Struct variant is infrastructure for captured sequence support
+#[allow(dead_code)]
 enum TypeShape<'src> {
-    /// Primitive: Node or String
     Primitive(TypeId),
-    /// Struct with known field names (for structural identity check)
     Struct(Vec<&'src str>),
 }
 
@@ -140,7 +118,7 @@ impl<'src> TypeShape<'src> {
         match self {
             TypeShape::Primitive(TYPE_NODE) => TypeDescription::Node,
             TypeShape::Primitive(TYPE_STR) => TypeDescription::String,
-            TypeShape::Primitive(_) => TypeDescription::Node, // fallback
+            TypeShape::Primitive(_) => TypeDescription::Node,
             TypeShape::Struct(fields) => {
                 TypeDescription::Struct(fields.iter().map(|s| s.to_string()).collect())
             }
@@ -148,30 +126,20 @@ impl<'src> TypeShape<'src> {
     }
 }
 
-/// Inferred field information collected during traversal.
 #[derive(Debug, Clone)]
 struct FieldInfo<'src> {
-    /// The inferred type shape (for compatibility checking).
     shape: TypeShape<'src>,
-    /// Base TypeId (TYPE_NODE or TYPE_STR for primitives, placeholder for structs).
     base_type: TypeId,
-    /// Cardinality from quantifiers.
     cardinality: Cardinality,
-    /// Number of branches this field appears in (for optional detection).
     branch_count: usize,
-    /// All shapes seen at this field (for error reporting).
     all_shapes: Vec<TypeShape<'src>>,
-    /// Spans where this field was captured (for error reporting).
     spans: Vec<TextRange>,
 }
 
-/// Collected scope information from traversal.
 #[derive(Debug, Clone, Default)]
 struct ScopeInfo<'src> {
     fields: IndexMap<&'src str, FieldInfo<'src>>,
-    /// Variants for tagged alternations.
     variants: IndexMap<&'src str, ScopeInfo<'src>>,
-    /// Whether we've seen variant markers (StartVariant/EndVariant).
     has_variants: bool,
 }
 
@@ -206,28 +174,21 @@ impl<'src> ScopeInfo<'src> {
         }
     }
 
-    /// Merge another scope into this one, applying 1-level merge semantics.
-    /// Returns errors for incompatible types.
-    /// Note: Does NOT apply optionality - call `apply_optionality` after all branches merged.
     fn merge_from(&mut self, other: ScopeInfo<'src>) -> Vec<MergeError<'src>> {
         let mut errors = Vec::new();
 
         for (name, info) in other.fields {
             if let Some(existing) = self.fields.get_mut(name) {
-                // Check type compatibility (1-level merge)
                 if let Some(mut err) = check_compatibility(&existing.shape, &info.shape, name) {
-                    // Attach spans from both sides
                     err.spans = existing.spans.clone();
                     err.spans.extend(info.spans.iter().cloned());
                     errors.push(err);
-                    // Collect all shapes for error reporting
                     for shape in &info.all_shapes {
                         if !existing.all_shapes.contains(shape) {
                             existing.all_shapes.push(shape.clone());
                         }
                     }
                 }
-                // Always merge spans
                 existing.spans.extend(info.spans);
                 existing.cardinality = existing.cardinality.join(info.cardinality);
                 existing.branch_count += info.branch_count;
@@ -236,7 +197,6 @@ impl<'src> ScopeInfo<'src> {
             }
         }
 
-        // Merge variants
         for (tag, variant_info) in other.variants {
             if let Some(existing) = self.variants.get_mut(tag) {
                 let variant_errors = existing.merge_from(variant_info);
@@ -250,8 +210,6 @@ impl<'src> ScopeInfo<'src> {
         errors
     }
 
-    /// Apply optionality to fields that don't appear in all branches.
-    /// Must be called after all branches have been merged.
     fn apply_optionality(&mut self, total_branches: usize) {
         for info in self.fields.values_mut() {
             if info.branch_count < total_branches {
@@ -261,7 +219,6 @@ impl<'src> ScopeInfo<'src> {
     }
 }
 
-/// Internal error during merge (before conversion to UnificationError).
 #[derive(Debug)]
 struct MergeError<'src> {
     field: &'src str,
@@ -269,32 +226,24 @@ struct MergeError<'src> {
     spans: Vec<TextRange>,
 }
 
-/// Check if two type shapes are compatible under 1-level merge semantics.
 fn check_compatibility<'src>(
     a: &TypeShape<'src>,
     b: &TypeShape<'src>,
     field: &'src str,
 ) -> Option<MergeError<'src>> {
     match (a, b) {
-        // Same primitive types are compatible
         (TypeShape::Primitive(t1), TypeShape::Primitive(t2)) if t1 == t2 => None,
-
-        // Different primitives (Node vs String) are incompatible
         (TypeShape::Primitive(_), TypeShape::Primitive(_)) => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
-            spans: vec![], // Filled in by caller
+            spans: vec![],
         }),
-
-        // Struct vs Primitive is incompatible
         (TypeShape::Struct(_), TypeShape::Primitive(_))
         | (TypeShape::Primitive(_), TypeShape::Struct(_)) => Some(MergeError {
             field,
             shapes: vec![a.clone(), b.clone()],
-            spans: vec![], // Filled in by caller
+            spans: vec![],
         }),
-
-        // Structs: must have identical field sets (1-level, no deep merge)
         (TypeShape::Struct(fields_a), TypeShape::Struct(fields_b)) => {
             if fields_a == fields_b {
                 None
@@ -302,23 +251,18 @@ fn check_compatibility<'src>(
                 Some(MergeError {
                     field,
                     shapes: vec![a.clone(), b.clone()],
-                    spans: vec![], // Filled in by caller
+                    spans: vec![],
                 })
             }
         }
     }
 }
 
-/// State during graph traversal.
 #[derive(Debug, Clone, Copy)]
 struct TraversalState<'src> {
-    /// The type of the current pending value (after CaptureNode).
     pending_type: Option<TypeId>,
-    /// Current cardinality wrapper (from array effects).
     cardinality: Cardinality,
-    /// Current variant tag (inside StartVariant..EndVariant).
     current_variant: Option<&'src str>,
-    /// Depth counter for nested objects.
     object_depth: u32,
 }
 
@@ -333,7 +277,6 @@ impl Default for TraversalState<'_> {
     }
 }
 
-/// Context for type inference.
 struct InferenceContext<'src, 'g> {
     graph: &'g BuildGraph<'src>,
     dead_nodes: &'g HashSet<NodeId>,
@@ -372,7 +315,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             &mut merge_errors,
         );
 
-        // Convert merge errors to unification errors and diagnostics
         for err in merge_errors {
             let types_str = err
                 .shapes
@@ -381,14 +323,12 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 .collect::<Vec<_>>()
                 .join(" vs ");
 
-            // Use first span as primary, others as related
             let primary_span = err.spans.first().copied().unwrap_or_default();
             let mut builder = self
                 .diagnostics
                 .report(DiagnosticKind::IncompatibleTypes, primary_span)
                 .message(types_str);
 
-            // Add related spans
             for span in err.spans.iter().skip(1) {
                 builder = builder.related_to("also captured here", *span);
             }
@@ -399,7 +339,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 ))
                 .emit();
 
-            // Keep legacy error for backward compat
             self.errors.push(UnificationError {
                 field: err.field,
                 definition: def_name,
@@ -429,7 +368,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             return ScopeInfo::default();
         }
 
-        // Cycle detection - but allow revisiting at different depths for quantifiers
         if !visited.insert(node_id) && depth > 50 {
             return ScopeInfo::default();
         }
@@ -437,7 +375,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         let node = self.graph.node(node_id);
         let mut scope = ScopeInfo::default();
 
-        // Process effects on this node
         for effect in &node.effects {
             match effect {
                 BuildEffect::CaptureNode => {
@@ -449,7 +386,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 BuildEffect::Field { name, span } => {
                     if let Some(base_type) = state.pending_type.take() {
                         if let Some(tag) = state.current_variant {
-                            // Inside a variant - add to variant scope
                             let variant_scope = scope.variants.entry(tag).or_default();
                             variant_scope.add_field(*name, base_type, state.cardinality, *span);
                         } else {
@@ -458,12 +394,8 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                     }
                     state.cardinality = Cardinality::One;
                 }
-                BuildEffect::StartArray => {
-                    // Mark that we're collecting into an array
-                }
-                BuildEffect::PushElement => {
-                    // Element pushed to array
-                }
+                BuildEffect::StartArray => {}
+                BuildEffect::PushElement => {}
                 BuildEffect::EndArray => {
                     state.cardinality = Cardinality::Star;
                 }
@@ -479,14 +411,12 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 }
                 BuildEffect::EndVariant => {
                     if let Some(tag) = state.current_variant.take() {
-                        // Ensure variant exists even if empty
                         scope.variants.entry(tag).or_default();
                     }
                 }
             }
         }
 
-        // Process successors
         let live_successors: Vec<_> = node
             .successors
             .iter()
@@ -497,19 +427,16 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
         if live_successors.is_empty() {
             // Terminal node
         } else if live_successors.len() == 1 {
-            // Linear path - continue with same state
             let child_scope = self.traverse(live_successors[0], state, visited, depth + 1, errors);
             let merge_errors = scope.merge_from(child_scope);
             errors.extend(merge_errors);
         } else {
-            // Branching - traverse each branch and merge results
             let total_branches = live_successors.len();
             for succ in live_successors {
-                let child_scope = self.traverse(succ, state.clone(), visited, depth + 1, errors);
+                let child_scope = self.traverse(succ, state, visited, depth + 1, errors);
                 let merge_errors = scope.merge_from(child_scope);
                 errors.extend(merge_errors);
             }
-            // Apply optionality after all branches merged
             scope.apply_optionality(total_branches);
         }
 
@@ -517,7 +444,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
     }
 
     fn create_struct_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
-        // Create members first - this may allocate wrapper types
         let members: Vec<_> = scope
             .fields
             .iter()
@@ -530,7 +456,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             })
             .collect();
 
-        // Now allocate struct type_id - this ensures proper ordering
         let type_id = self.alloc_type_id();
 
         self.type_defs.push(InferredTypeDef {
@@ -544,13 +469,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
     }
 
     fn create_enum_type(&mut self, name: &'src str, scope: &ScopeInfo<'src>) -> TypeId {
-        // Create variant payloads first - this may allocate nested types
         let mut members = Vec::new();
         for (tag, variant_scope) in &scope.variants {
             let variant_type = if variant_scope.fields.is_empty() {
                 TYPE_VOID
             } else {
-                // Create synthetic name for variant payload
                 let variant_name = format!("{}{}", name, tag);
                 let leaked: &'src str = Box::leak(variant_name.into_boxed_str());
                 self.create_struct_type(leaked, variant_scope)
@@ -561,7 +484,6 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             });
         }
 
-        // Now allocate enum type_id - this ensures proper ordering
         let type_id = self.alloc_type_id();
 
         self.type_defs.push(InferredTypeDef {
@@ -611,23 +533,97 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
     }
 }
 
-/// Infer types for all definitions in a BuildGraph.
-pub fn infer_types<'src>(
-    graph: &BuildGraph<'src>,
-    dead_nodes: &HashSet<NodeId>,
-) -> TypeInferenceResult<'src> {
-    let mut ctx = InferenceContext::new(graph, dead_nodes);
-    let mut entrypoint_types = IndexMap::new();
+impl<'a> Query<'a> {
+    /// Run type inference on the graph.
+    pub(super) fn infer_types(&mut self) {
+        let mut ctx = InferenceContext::new(&self.graph, &self.dead_nodes);
 
-    for (name, entry_id) in graph.definitions() {
-        let type_id = ctx.infer_definition(name, entry_id);
-        entrypoint_types.insert(name, type_id);
+        for (name, entry_id) in self.graph.definitions() {
+            let type_id = ctx.infer_definition(name, entry_id);
+            self.type_info.entrypoint_types.insert(name, type_id);
+        }
+
+        self.type_info.type_defs = ctx.type_defs;
+        self.type_info.diagnostics = ctx.diagnostics;
+        self.type_info.errors = ctx.errors;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dump helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+impl TypeInferenceResult<'_> {
+    pub fn dump(&self) -> String {
+        let mut out = String::new();
+
+        out.push_str("=== Entrypoints ===\n");
+        for (name, type_id) in &self.entrypoint_types {
+            out.push_str(&format!("{} → {}\n", name, format_type_id(*type_id)));
+        }
+
+        if !self.type_defs.is_empty() {
+            out.push_str("\n=== Types ===\n");
+            for (idx, def) in self.type_defs.iter().enumerate() {
+                let type_id = idx as TypeId + 3;
+                let name = def.name.unwrap_or("<anon>");
+                out.push_str(&format!("T{}: {:?} {}", type_id, def.kind, name));
+
+                if let Some(inner) = def.inner_type {
+                    out.push_str(&format!(" → {}", format_type_id(inner)));
+                }
+
+                if !def.members.is_empty() {
+                    out.push_str(" {\n");
+                    for member in &def.members {
+                        out.push_str(&format!(
+                            "    {}: {}\n",
+                            member.name,
+                            format_type_id(member.ty)
+                        ));
+                    }
+                    out.push('}');
+                }
+                out.push('\n');
+            }
+        }
+
+        if !self.errors.is_empty() {
+            out.push_str("\n=== Errors ===\n");
+            for err in &self.errors {
+                out.push_str(&format!(
+                    "field `{}` in `{}`: incompatible types [{}]\n",
+                    err.field,
+                    err.definition,
+                    err.types_found
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+
+        out
     }
 
-    TypeInferenceResult {
-        type_defs: ctx.type_defs,
-        entrypoint_types,
-        diagnostics: ctx.diagnostics,
-        errors: ctx.errors,
+    pub fn dump_diagnostics(&self, source: &str) -> String {
+        self.diagnostics.render_filtered(source)
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics.has_errors()
+    }
+}
+
+fn format_type_id(id: TypeId) -> String {
+    if id == TYPE_VOID {
+        "Void".to_string()
+    } else if id == TYPE_NODE {
+        "Node".to_string()
+    } else if id == TYPE_STR {
+        "String".to_string()
+    } else {
+        format!("T{}", id)
     }
 }
