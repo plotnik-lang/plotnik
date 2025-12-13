@@ -1,7 +1,7 @@
 # ADR-0006: Dynamic Query Execution
 
 - **Status**: Accepted
-- **Date**: 2025-12-12
+- **Date**: 2024-12-12
 - **Supersedes**: Parts of ADR-0003
 
 ## Context
@@ -14,23 +14,31 @@ Runtime interpretation of the transition graph ([ADR-0005](ADR-0005-transition-g
 
 For each transition:
 
-1. Emit `pre_effects`
-2. Match (epsilon always succeeds)
-3. On success: emit `CaptureNode`, emit `post_effects`
+1. Execute `pre_nav` initial movement (e.g., goto_first_child, goto_next_sibling)
+2. Search loop: try matcher, on fail apply skip policy (advance or fail)
+3. On match success: store matched node, execute `effects` sequentially
 4. Process successors with backtracking
+
+For `Up*` variants, step 2 becomes: validate exit constraint, ascend N levels (no search loop).
+
+Navigation is fully determined by `pre_nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for detailed semantics.
+
+The matched node is stored in a temporary slot (`matched_node`) accessible to `CaptureNode` effect. Effects execute in order—`CaptureNode` reads from this slot and sets `executor.current`.
+
+**Slot invariant**: The `matched_node` slot is cleared (set to `None`) at the start of each transition execution, before `pre_nav`. This prevents stale captures if a transition path has `Epsilon → CaptureNode` without a preceding match—such a path indicates a graph construction bug, and the clear-on-entry invariant ensures it manifests as a predictable panic rather than silently capturing a wrong node.
 
 ### Effect Stream
 
 ```rust
 struct EffectStream<'a> {
-    effects: Vec<RuntimeEffect<'a>>,  // append-only, backtrack via truncate
-}
-
-enum RuntimeEffect<'a> {
-    Op(EffectOp),
-    CaptureNode(Node<'a>),  // implicit on match, never in IR
+    ops: Vec<EffectOp>,           // effect log, backtrack via truncate
+    nodes: Vec<Node<'a>>,         // captured nodes, one per CaptureNode op
 }
 ```
+
+Effects are **recorded**, not eagerly executed. On match success, the transition's `effects` list is appended to `ops`. For each `CaptureNode`, the `matched_node` is also appended to `nodes`.
+
+On backtrack, both vectors truncate to their watermarks. On full match success, the executor replays `ops` sequentially, consuming from `nodes` for each `CaptureNode`.
 
 ### Executor
 
@@ -57,18 +65,18 @@ enum Container<'a> {
 }
 ```
 
-| Effect              | Action                               |
-| ------------------- | ------------------------------------ |
-| `CaptureNode(n)`    | `current = Node(n)`                  |
-| `StartArray`        | push `Array([])` onto stack          |
-| `PushElement`       | move `current` into top array        |
-| `EndArray`          | pop array into `current`             |
-| `StartObject`       | push `Object({})` onto stack         |
-| `Field(id)`         | move `current` into top object field |
-| `EndObject`         | pop object into `current`            |
-| `StartVariant(tag)` | push `Variant(tag)` onto stack       |
-| `EndVariant`        | pop, wrap `current`, set as current  |
-| `ToString`          | replace `current` Node with text     |
+| Effect              | Action                                    |
+| ------------------- | ----------------------------------------- |
+| `CaptureNode`       | `current = Node(nodes.next())` (consumes) |
+| `StartArray`        | push `Array([])` onto stack               |
+| `PushElement`       | move `current` into top array             |
+| `EndArray`          | pop array into `current`                  |
+| `StartObject`       | push `Object({})` onto stack              |
+| `Field(id)`         | move `current` into top object field      |
+| `EndObject`         | pop object into `current`                 |
+| `StartVariant(tag)` | push `Variant(tag)` onto stack            |
+| `EndVariant`        | pop, wrap `current`, set as current       |
+| `ToString`          | replace `current` Node with text          |
 
 Invalid state = IR bug → panic.
 
@@ -78,7 +86,7 @@ Invalid state = IR bug → panic.
 struct Interpreter<'a> {
     query_ir: &'a QueryIR,
     backtrack_stack: BacktrackStack,
-    recursion_stack: RecursionStack,
+    frame_arena: CallFrameArena,
     cursor: TreeCursor<'a>,  // created at tree root, never reset
     effects: EffectStream<'a>,
 }
@@ -86,31 +94,35 @@ struct Interpreter<'a> {
 
 **Cursor constraint**: The cursor must be created once at the tree root and never call `reset()`. This preserves `descendant_index` validity for backtracking checkpoints.
 
-Two stacks interact: backtracking can restore to a point inside a previously-exited call, so the recursion stack must preserve frames.
+No `prev_matcher` tracking needed—each transition's `pre_nav` encodes the exact navigation to perform.
+
+Two stacks interact: backtracking can restore to a point inside a previously-exited call, so the frame arena must preserve frames.
 
 ### Backtracking
 
 ```rust
 struct BacktrackStack {
     points: Vec<BacktrackPoint>,
+    max_frame_watermark: Option<u32>,  // highest frame index referenced by any point
 }
 
 struct BacktrackPoint {
     cursor_checkpoint: u32,          // tree-sitter descendant_index
     effect_watermark: u32,
     recursion_frame: Option<u32>,    // saved frame index
-    alternatives: Slice<TransitionId>,  // view into IR successors, not owned
+    transition_id: TransitionId,     // source transition for alternatives
+    next_alt: u32,                    // index of next alternative to try
 }
 ```
 
-`alternatives` references the IR's successor data (inline or spilled)—no runtime allocation per backtrack point.
+Alternatives are retrieved via `TransitionView::successors()[next_alt..]`. This avoids the `Slice` incompatibility with inline successors (SSO stores successors inside the `Transition` struct, not in the `Successors` segment).
 
 | Operation | Action                                                 |
 | --------- | ------------------------------------------------------ |
 | Save      | `cursor_checkpoint = cursor.descendant_index()` — O(1) |
 | Restore   | `cursor.goto_descendant(cursor_checkpoint)` — O(depth) |
 
-Restore also truncates `effects` to `effect_watermark` and sets `recursion_stack.current` to `recursion_frame`.
+Restore also truncates `effects` to `effect_watermark` and sets `frame_arena.current` to `recursion_frame`.
 
 ### Recursion
 
@@ -119,17 +131,19 @@ Restore also truncates `effects` to `effect_watermark` and sets `recursion_stack
 **Solution**: Store returns in call frame at `Enter`, retrieve at `Exit`. O(1), no filtering.
 
 ```rust
-struct RecursionStack {
-    frames: Vec<CallFrame>,  // append-only
-    current: Option<u32>,    // index into frames, not depth
+struct CallFrameArena {
+    frames: Vec<CallFrame>,  // append-only, pruned by watermark
+    current: Option<u32>,    // index into frames (the "stack pointer")
 }
 
 struct CallFrame {
     parent: Option<u32>,          // index of caller's frame
     ref_id: RefId,                // verify Exit matches Enter
-    returns: Slice<TransitionId>, // from Enter.successors()[1..]
+    enter_transition: TransitionId,  // to retrieve returns via successors()[1..]
 }
 ```
+
+Returns are retrieved via `TransitionView::successors()[1..]` on the `enter_transition`. Same rationale as `BacktrackPoint`—avoids `Slice` incompatibility with inline successors.
 
 **Append-only invariant**: Frames persist for backtracking correctness. On `Exit`, set `current` to parent index. Backtracking restores `current`; the original frame is still accessible via its index.
 
@@ -140,7 +154,60 @@ struct CallFrame {
 
 This bounds memory by `max(recursion_depth, backtrack_depth)` rather than total call count. Without pruning, `(Rule)*` over N items allocates N frames; with pruning, it remains O(1) for non-backtracking iteration.
 
-The `BacktrackPoint.recursion_frame` field establishes a "high-water mark"—the minimum frame index that must be preserved. Frames above this mark with no active reference can be popped.
+**O(1) watermark tracking**: The `max_frame_watermark` is maintained incrementally:
+
+```rust
+impl BacktrackStack {
+    fn push(&mut self, point: BacktrackPoint) {
+        if let Some(frame) = point.recursion_frame {
+            self.max_frame_watermark = Some(match self.max_frame_watermark {
+                Some(max) => max.max(frame),
+                None => frame,
+            });
+        }
+        self.points.push(point);
+    }
+
+    fn pop(&mut self) -> Option<BacktrackPoint> {
+        let point = self.points.pop()?;
+        // Recompute watermark only if popped point held the max
+        if point.recursion_frame == self.max_frame_watermark {
+            self.max_frame_watermark = self.points.iter()
+                .filter_map(|p| p.recursion_frame)
+                .max();
+        }
+        Some(point)
+    }WS
+}
+
+fn prune_high_water_mark(
+    current: Option<u32>,
+    backtrack_stack: &BacktrackStack,
+) -> Option<u32> {
+    match (current, backtrack_stack.max_frame_watermark) {
+        (None, None) => None,
+        (Some(c), None) => Some(c),
+        (None, Some(m)) => Some(m),
+        (Some(c), Some(m)) => Some(c.max(m)),
+    }
+}
+```
+
+Frames with index > high-water mark can be truncated.
+
+**Why not just check the last backtrack point?** Backtrack points are _not_ chronologically ordered by frame depth. After an Enter-Exit sequence, a new backtrack point may reference a shallower frame than earlier points:
+
+```
+1. Enter(A)     → frames=[F0], current=0
+2. Save BP1     → BP1.recursion_frame = Some(0)
+3. Exit(A)      → current = None
+4. Save BP2     → BP2.recursion_frame = None
+
+# BP2 is last, but BP1 still references F0
+# Checking only last point would incorrectly allow pruning F0
+```
+
+The `max_frame_watermark` tracks the true maximum across all live points. Push is O(1). Pop is amortized O(1)—the O(n) rescan only triggers when popping the point that held the maximum, which can happen at most once per frame
 
 | Operation         | Action                                                                         |
 | ----------------- | ------------------------------------------------------------------------------ |
@@ -199,7 +266,7 @@ Details deferred.
 
 ## Consequences
 
-**Positive**: Append-only stacks make backtracking trivial. O(1) exit via stored returns. Two-phase separation is clean.
+**Positive**: Append-only stacks make backtracking trivial. O(1) exit via stored returns. Navigation fully determined by `pre_nav`—no state tracking between transitions.
 
 **Negative**: Interpretation overhead. Recursion stack memory grows monotonically (bounded by `recursion_fuel`).
 
@@ -208,3 +275,4 @@ Details deferred.
 - [ADR-0004: Query IR Binary Format](ADR-0004-query-ir-binary-format.md)
 - [ADR-0005: Transition Graph Format](ADR-0005-transition-graph-format.md)
 - [ADR-0007: Type Metadata Format](ADR-0007-type-metadata-format.md)
+- [ADR-0008: Tree Navigation](ADR-0008-tree-navigation.md)
