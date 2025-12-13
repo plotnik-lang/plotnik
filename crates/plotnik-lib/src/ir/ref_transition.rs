@@ -10,10 +10,11 @@ use super::RefId;
 /// `Enter(A) → Enter(B)` require epsilon chains.
 ///
 /// Layout: 1-byte discriminant + 1-byte padding + 2-byte RefId = 4 bytes, align 2.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(C, u8)]
 pub enum RefTransition {
     /// No definition boundary crossing.
+    #[default]
     None,
 
     /// Push call frame with return transitions.
@@ -43,11 +44,5 @@ impl RefTransition {
             Self::None => None,
             Self::Enter(id) | Self::Exit(id) => Some(id),
         }
-    }
-}
-
-impl Default for RefTransition {
-    fn default() -> Self {
-        Self::None
     }
 }
