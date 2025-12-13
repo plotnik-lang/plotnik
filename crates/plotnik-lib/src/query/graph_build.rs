@@ -560,9 +560,16 @@ impl<'a> Query<'a> {
         let node = self.graph.node(node_id);
 
         // References are opaque to captures: don't traverse into definition body.
-        // Treat the Enter node itself as the capture point.
-        if matches!(node.ref_marker, RefMarker::Enter { .. }) {
-            result.push(node_id);
+        // Capture should happen at Exit (after reference executes, cursor at matched node).
+        if let RefMarker::Enter { ref_id } = node.ref_marker {
+            for (id, n) in self.graph.iter() {
+                if let RefMarker::Exit { ref_id: exit_id } = n.ref_marker {
+                    if exit_id == ref_id {
+                        result.push(id);
+                        return;
+                    }
+                }
+            }
             return;
         }
 

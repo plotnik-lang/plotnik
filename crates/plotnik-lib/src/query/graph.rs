@@ -202,10 +202,13 @@ impl<'src> BuildGraph<'src> {
     /// Optional (greedy): inner?
     pub fn optional(&mut self, inner: Fragment) -> Fragment {
         let branch = self.add_epsilon();
+        let skip = self.add_epsilon();
+        self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
         let exit = self.add_epsilon();
 
         self.connect(branch, inner.entry);
-        self.connect(branch, exit);
+        self.connect(branch, skip);
+        self.connect(skip, exit);
         self.connect(inner.exit, exit);
 
         Fragment::new(branch, exit)
@@ -214,9 +217,12 @@ impl<'src> BuildGraph<'src> {
     /// Optional (non-greedy): inner??
     pub fn optional_lazy(&mut self, inner: Fragment) -> Fragment {
         let branch = self.add_epsilon();
+        let skip = self.add_epsilon();
+        self.node_mut(skip).add_effect(BuildEffect::ClearCurrent);
         let exit = self.add_epsilon();
 
-        self.connect(branch, exit);
+        self.connect(branch, skip);
+        self.connect(skip, exit);
         self.connect(branch, inner.entry);
         self.connect(inner.exit, exit);
 
@@ -616,6 +622,8 @@ impl<'src> BuildMatcher<'src> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuildEffect<'src> {
     CaptureNode,
+    /// Clear current value (set to None). Used on skip paths for optional captures.
+    ClearCurrent,
     /// Start array collection. `is_plus` distinguishes `+` (true) from `*` (false).
     StartArray {
         is_plus: bool,

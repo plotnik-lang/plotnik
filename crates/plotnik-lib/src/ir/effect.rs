@@ -16,6 +16,10 @@ pub enum EffectOp {
     /// Only valid on transitions with Node/Anonymous/Wildcard matcher.
     CaptureNode,
 
+    /// Clear current value (set to None).
+    /// Used on skip paths for optional captures.
+    ClearCurrent,
+
     /// Push empty array onto stack.
     StartArray,
 

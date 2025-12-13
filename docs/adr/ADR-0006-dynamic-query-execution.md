@@ -75,6 +75,7 @@ enum Container<'a> {
 | Effect              | Action                                    |
 | ------------------- | ----------------------------------------- |
 | `CaptureNode`       | `current = Node(nodes.next())` (consumes) |
+| `ClearCurrent`      | `current = None`                          |
 | `StartArray`        | push `Array([])` onto stack               |
 | `PushElement`       | move `current` into top array             |
 | `EndArray`          | pop array into `current`                  |
@@ -84,6 +85,8 @@ enum Container<'a> {
 | `StartVariant(tag)` | push `Variant(tag)` onto stack            |
 | `EndVariant`        | pop, wrap `current`, set as current       |
 | `ToString`          | replace `current` Node with text          |
+
+`ClearCurrent` is emitted on skip paths for optional captures (`expr? @name`). When the optional is skipped, `ClearCurrent` ensures `current = None` before `Field(id)` executes, producing the correct `None` value for the optional field.
 
 Invalid state = IR bug → panic.
 

@@ -157,6 +157,7 @@ fn format_nav(nav: &Nav) -> String {
 fn format_effect(effect: &BuildEffect) -> String {
     match effect {
         BuildEffect::CaptureNode => "Capture".to_string(),
+        BuildEffect::ClearCurrent => "Clear".to_string(),
         BuildEffect::StartArray { .. } => "StartArray".to_string(),
         BuildEffect::PushElement => "Push".to_string(),
         BuildEffect::EndArray => "EndArray".to_string(),

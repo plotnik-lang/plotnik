@@ -456,6 +456,9 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 BuildEffect::CaptureNode => {
                     state.pending = Some(PendingType::primitive(TYPE_NODE));
                 }
+                BuildEffect::ClearCurrent => {
+                    state.pending = None;
+                }
                 BuildEffect::ToString => {
                     state.pending = Some(PendingType::primitive(TYPE_STR));
                 }

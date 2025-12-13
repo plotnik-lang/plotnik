@@ -129,9 +129,10 @@ fn quantifier_optional() {
     insta::assert_snapshot!(snapshot("Q = (identifier)?"), @r"
     Q = N1
 
-    N0: (identifier) → N2
+    N0: (identifier) → N3
     N1: ε → N0, N2
-    N2: ε → ∅
+    N2: ε [Clear] → N3
+    N3: ε → ∅
     ");
 }
 
