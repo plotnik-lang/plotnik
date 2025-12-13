@@ -150,7 +150,7 @@ Bar = [ (a) @v  (b) @v ] @z
 
 #### Case 3: Captured Tagged Alternation
 
-Creates an Enum. Each variant has its own independent scope.
+Creates an Enum. Each variant has its own independent scope, subject to **Single-Capture Variant Flattening** (see below).
 
 ```plotnik
 Foo = [ A: (a) @x  B: (b) @y ] @z
@@ -159,13 +159,55 @@ Foo = [ A: (a) @x  B: (b) @y ] @z
 - `@z` creates an Enum because tags are present AND alternation is captured
 - Variant `A` has scope with `@x: Node`
 - Variant `B` has scope with `@y: Node`
+- Both variants have exactly 1 capture → flattened
 - Result: `Foo { z: FooZ }` where `FooZ` is:
   ```
-  Enum FooZ {
-      A: FooZA { x: Node }
-      B: FooZB { y: Node }
-  }
+  Enum FooZ { A(Node), B(Node) }
   ```
+
+#### Single-Capture Variant Flattening
+
+When a tagged alternation variant has exactly one capture, the wrapper struct is eliminated—the variant payload becomes the capture's type directly.
+
+| Branch Captures | Variant Payload       | Rust Syntax        |
+| --------------- | --------------------- | ------------------ |
+| 0               | Unit (Void)           | `A`                |
+| 1               | Capture's type (flat) | `A(T)`             |
+| ≥2              | Struct (named fields) | `A { x: T, y: U }` |
+
+**Rationale**: The field name is redundant when it's the only capture—the variant tag already provides discrimination. This produces idiomatic types matching `Option<T>`, `Result<T,E>`.
+
+**Formalization**:
+
+```
+VariantPayload(branch) =
+  let captures = propagating_captures(branch)
+  match captures.len():
+    0 → Void
+    1 → captures[0].type  // flatten: discard field name
+    _ → Struct(captures)  // preserve field names
+```
+
+**Examples**:
+
+```plotnik
+// Single capture per branch → flatten
+Foo = [ A: (a) @x  B: (b) @y ] @z
+// → Enum FooZ { A(Node), B(Node) }
+
+// Mixed: one branch single, other multi → partial flatten
+Bar = [ A: (a) @x  B: (b) @y (c) @z ] @result
+// → Enum BarResult { A(Node), B { y: Node, z: Node } }
+
+// Single capture with type annotation → flatten preserves type
+Baz = [ Ok: (val) @v  Err: (msg) @e ::string ] @result
+// → Enum BazResult { Ok(Node), Err(String) }
+
+// Single capture of nested struct → flatten to that struct
+Qux = [ A: { (x) @x (y) @y } @data  B: (b) @b ] @choice
+// → Enum QuxChoice { A(QuxChoiceData), B(Node) }
+// → QuxChoiceData = { x: Node, y: Node }
+```
 
 ### Unification Rules (1-Level Merge)
 
@@ -438,10 +480,9 @@ Result = [
 ```
 
 - Tagged alternation at definition root → `Result` is an Enum
+- Each variant has exactly 1 capture → flattened (no wrapper structs)
 - Types:
-  - `Result: Enum { Ok: ResultOk, Err: ResultErr }`
-  - `ResultOk: { val: Node }`
-  - `ResultErr: { msg: String }`
+  - `Result: Enum { Ok(Node), Err(String) }`
 
 ### Example 4: Tagged Alternation (Inline, Uncaptured)
 

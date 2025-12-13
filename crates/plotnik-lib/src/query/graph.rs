@@ -230,7 +230,8 @@ impl<'src> BuildGraph<'src> {
     /// Zero or more with array collection (greedy): inner*
     pub fn zero_or_more_array(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: false });
 
         let branch = self.add_epsilon();
         let push = self.add_epsilon();
@@ -251,7 +252,8 @@ impl<'src> BuildGraph<'src> {
     /// Zero or more with array collection (non-greedy): inner*?
     pub fn zero_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: false });
 
         let branch = self.add_epsilon();
         let push = self.add_epsilon();
@@ -272,7 +274,8 @@ impl<'src> BuildGraph<'src> {
     /// One or more with array collection (greedy): inner+
     pub fn one_or_more_array(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: true });
 
         let push = self.add_epsilon();
         self.node_mut(push).add_effect(BuildEffect::PushElement);
@@ -294,7 +297,8 @@ impl<'src> BuildGraph<'src> {
     /// One or more with array collection (non-greedy): inner+?
     pub fn one_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: true });
 
         let push = self.add_epsilon();
         self.node_mut(push).add_effect(BuildEffect::PushElement);
@@ -323,7 +327,8 @@ impl<'src> BuildGraph<'src> {
     /// multiple captures coupled per-iteration.
     pub fn zero_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: false });
 
         let branch = self.add_epsilon();
 
@@ -354,7 +359,8 @@ impl<'src> BuildGraph<'src> {
     /// Zero or more with QIS object wrapping (non-greedy): inner*?
     pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: false });
 
         let branch = self.add_epsilon();
 
@@ -385,7 +391,8 @@ impl<'src> BuildGraph<'src> {
     /// One or more with QIS object wrapping (greedy): inner+
     pub fn one_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: true });
 
         let obj_start = self.add_epsilon();
         self.node_mut(obj_start)
@@ -416,7 +423,8 @@ impl<'src> BuildGraph<'src> {
     /// One or more with QIS object wrapping (non-greedy): inner+?
     pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
         let start = self.add_epsilon();
-        self.node_mut(start).add_effect(BuildEffect::StartArray);
+        self.node_mut(start)
+            .add_effect(BuildEffect::StartArray { is_plus: true });
 
         let obj_start = self.add_epsilon();
         self.node_mut(obj_start)
@@ -608,12 +616,18 @@ impl<'src> BuildMatcher<'src> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuildEffect<'src> {
     CaptureNode,
-    StartArray,
+    /// Start array collection. `is_plus` distinguishes `+` (true) from `*` (false).
+    StartArray {
+        is_plus: bool,
+    },
     PushElement,
     EndArray,
     StartObject,
     EndObject,
-    Field { name: &'src str, span: TextRange },
+    Field {
+        name: &'src str,
+        span: TextRange,
+    },
     StartVariant(&'src str),
     EndVariant,
     ToString,

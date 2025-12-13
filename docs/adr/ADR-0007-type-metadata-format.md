@@ -114,6 +114,18 @@ When no explicit `:: TypeName` annotation exists, names are synthesized:
 
 Collisions resolved by numeric suffix: `FuncBody`, `FuncBody2`, etc.
 
+### Single-Capture Variant Flattening
+
+When an enum variant's branch has exactly one capture, the variant payload flattens to that capture's type directly—no wrapper struct.
+
+| Branch Captures | Variant Payload            |
+| --------------- | -------------------------- |
+| 0               | Unit (Void)                |
+| 1               | Capture's type (flattened) |
+| ≥2              | Struct with named fields   |
+
+Rationale: The variant tag already discriminates; a single-field wrapper struct adds verbosity without information.
+
 ### Example
 
 Query:
@@ -131,10 +143,8 @@ Func = (function_declaration
 Type graph:
 
 ```
-T3: Struct "Func"         → [name: Str, body: T4]
-T4: Enum "FuncBody"       → [Stmt: T5, Expr: T6]
-T5: Struct "FuncBodyStmt" → [stmt: Node]
-T6: Struct "FuncBodyExpr" → [expr: Node]
+T3: Struct "Func"   → [name: Str, body: T4]
+T4: Enum "FuncBody" → [Stmt: Node, Expr: Node]  // flattened: 1 capture per branch
 
 Entrypoint: Func → result_type: T3
 ```
@@ -144,23 +154,16 @@ Generated TypeScript:
 ```typescript
 interface Func {
   name: string;
-  body:
-    | { $tag: "Stmt"; $data: { stmt: Node } }
-    | { $tag: "Expr"; $data: { expr: Node } };
+  body: { $tag: "Stmt"; $data: Node } | { $tag: "Expr"; $data: Node };
 }
 ```
 
 Generated Rust:
 
 ```rust
-struct Func {
-    name: String,
-    body: FuncBody,
-}
-
 enum FuncBody {
-    Stmt { stmt: Node },
-    Expr { expr: Node },
+    Stmt(Node),
+    Expr(Node),
 }
 ```
 

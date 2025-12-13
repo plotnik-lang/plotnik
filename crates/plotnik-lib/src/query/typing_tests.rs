@@ -53,10 +53,11 @@ fn debug_star_quantifier_graph() {
     Foo = N4
 
     N0: (_) → N1
-    N1: [Down] (item) [Capture] → N6
+    N1: [Down] (item) [Capture] → N2
+    N2: ε [Field(items)] → N6
     N4: ε [StartArray] → N5
     N5: ε → N0, N7
-    N6: [Up(1)] ε [Field(items)] [Push] → N5
+    N6: [Up(1)] ε [Push] → N5
     N7: ε [EndArray] → ∅
 
     === Entrypoints ===
@@ -415,7 +416,7 @@ fn plus_quantifier() {
     Foo → T4
 
     === Types ===
-    T3: ArrayStar <anon> → Node
+    T3: ArrayPlus <anon> → Node
     T4: Record Foo {
         items: T3
     }

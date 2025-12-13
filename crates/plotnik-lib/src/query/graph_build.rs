@@ -15,28 +15,46 @@ use super::Query;
 use super::graph::{BuildEffect, BuildMatcher, Fragment, NodeId, RefMarker};
 
 /// Context for navigation determination.
+/// When `anchored` is true, `prev_anonymous` indicates whether the preceding
+/// expression was anonymous (string literal), which determines Exact vs SkipTrivia mode.
 #[derive(Debug, Clone, Copy)]
 enum NavContext {
     Root,
-    FirstChild { anchored: bool },
-    Sibling { anchored: bool },
+    FirstChild {
+        anchored: bool,
+        prev_anonymous: bool,
+    },
+    Sibling {
+        anchored: bool,
+        prev_anonymous: bool,
+    },
 }
 
 impl NavContext {
-    fn to_nav(self, is_anonymous: bool) -> Nav {
+    fn to_nav(self) -> Nav {
         match self {
             NavContext::Root => Nav::stay(),
-            NavContext::FirstChild { anchored: false } => Nav::down(),
-            NavContext::FirstChild { anchored: true } => {
-                if is_anonymous {
+            NavContext::FirstChild {
+                anchored: false, ..
+            } => Nav::down(),
+            NavContext::FirstChild {
+                anchored: true,
+                prev_anonymous,
+            } => {
+                if prev_anonymous {
                     Nav::down_exact()
                 } else {
                     Nav::down_skip_trivia()
                 }
             }
-            NavContext::Sibling { anchored: false } => Nav::next(),
-            NavContext::Sibling { anchored: true } => {
-                if is_anonymous {
+            NavContext::Sibling {
+                anchored: false, ..
+            } => Nav::next(),
+            NavContext::Sibling {
+                anchored: true,
+                prev_anonymous,
+            } => {
+                if prev_anonymous {
                     Nav::next_exact()
                 } else {
                     Nav::next_skip_trivia()
@@ -140,7 +158,7 @@ impl<'a> Query<'a> {
 
     fn construct_named_node(&mut self, node: &NamedNode, ctx: NavContext) -> Fragment {
         let matcher = self.build_named_matcher(node);
-        let nav = ctx.to_nav(false);
+        let nav = ctx.to_nav();
         let node_id = self.graph.add_matcher(matcher);
         self.graph.node_mut(node_id).set_nav(nav);
 
@@ -185,15 +203,18 @@ impl<'a> Query<'a> {
                         if is_children {
                             NavContext::FirstChild {
                                 anchored: pending_anchor,
+                                prev_anonymous: last_was_anonymous,
                             }
                         } else {
                             NavContext::Sibling {
                                 anchored: pending_anchor,
+                                prev_anonymous: last_was_anonymous,
                             }
                         }
                     } else {
                         NavContext::Sibling {
                             anchored: pending_anchor,
+                            prev_anonymous: last_was_anonymous,
                         }
                     };
 
@@ -242,7 +263,7 @@ impl<'a> Query<'a> {
 
     fn construct_anonymous_node(&mut self, node: &AnonymousNode, ctx: NavContext) -> Fragment {
         let field = self.find_field_constraint(node.as_cst());
-        let nav = ctx.to_nav(true);
+        let nav = ctx.to_nav();
 
         let matcher = if node.is_any() {
             BuildMatcher::Wildcard { field }
@@ -268,7 +289,7 @@ impl<'a> Query<'a> {
         self.next_ref_id += 1;
 
         let enter_id = self.graph.add_epsilon();
-        let nav = ctx.to_nav(false);
+        let nav = ctx.to_nav();
         self.graph.node_mut(enter_id).set_nav(nav);
         self.graph
             .node_mut(enter_id)
@@ -299,7 +320,7 @@ impl<'a> Query<'a> {
         }
 
         let branch_id = self.graph.add_epsilon();
-        self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
+        self.graph.node_mut(branch_id).set_nav(ctx.to_nav());
 
         let exit_id = self.graph.add_epsilon();
 
@@ -351,7 +372,7 @@ impl<'a> Query<'a> {
         }
 
         let branch_id = self.graph.add_epsilon();
-        self.graph.node_mut(branch_id).set_nav(ctx.to_nav(false));
+        self.graph.node_mut(branch_id).set_nav(ctx.to_nav());
 
         let exit_id = self.graph.add_epsilon();
 
@@ -373,7 +394,7 @@ impl<'a> Query<'a> {
         // - QIS quantifiers that wrap loop body with StartObject/EndObject
 
         let start_id = self.graph.add_epsilon();
-        self.graph.node_mut(start_id).set_nav(ctx.to_nav(false));
+        self.graph.node_mut(start_id).set_nav(ctx.to_nav());
 
         let (child_fragments, _exit_ctx) = self.construct_item_sequence(&items, false);
         let inner = self.graph.sequence(&child_fragments);

@@ -147,6 +147,13 @@ fn is_eliminable_epsilon(
         return false;
     }
 
+    // Don't eliminate if epsilon has effects and successor has navigation.
+    // Effects must execute BEFORE successor's nav/match, but prepending to effects list
+    // would execute them AFTER nav/match.
+    if !node.effects.is_empty() && !successor.nav.is_stay() {
+        return false;
+    }
+
     // Don't eliminate if node has effects and successor is a join point.
     // Merging effects onto a join point changes execution count (e.g., loop entry vs per-iteration).
     if !node.effects.is_empty() {

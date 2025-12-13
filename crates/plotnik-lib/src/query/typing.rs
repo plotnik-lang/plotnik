@@ -136,6 +136,7 @@ struct FieldInfo {
     cardinality: Cardinality,
     branch_count: usize,
     spans: Vec<TextRange>,
+    is_array_type: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -152,12 +153,14 @@ impl<'src> ScopeInfo<'src> {
         base_type: TypeId,
         cardinality: Cardinality,
         span: TextRange,
+        is_array_type: bool,
     ) {
         let shape = TypeShape::Primitive(base_type);
         if let Some(existing) = self.fields.get_mut(name) {
             existing.cardinality = existing.cardinality.join(cardinality);
             existing.branch_count += 1;
             existing.spans.push(span);
+            existing.is_array_type = existing.is_array_type || is_array_type;
         } else {
             self.fields.insert(
                 name,
@@ -167,6 +170,7 @@ impl<'src> ScopeInfo<'src> {
                     cardinality,
                     branch_count: 1,
                     spans: vec![span],
+                    is_array_type,
                 },
             );
         }
@@ -212,7 +216,9 @@ impl<'src> ScopeInfo<'src> {
 
     fn apply_optionality(&mut self, total_branches: usize) {
         for info in self.fields.values_mut() {
-            if info.branch_count < total_branches {
+            // Skip optionality for array-typed fields: arrays already encode
+            // zero-or-more semantics, so Optional wrapper would be redundant
+            if info.branch_count < total_branches && !info.is_array_type {
                 info.cardinality = info.cardinality.make_optional();
             }
         }
@@ -263,13 +269,15 @@ impl<'src> ScopeStackEntry<'src> {
 struct PendingType {
     base_type: TypeId,
     cardinality: Cardinality,
+    is_array: bool,
 }
 
 impl PendingType {
-    fn primitive(type_id: TypeId) -> Self {
+    fn primitive(base_type: TypeId) -> Self {
         Self {
-            base_type: type_id,
+            base_type,
             cardinality: Cardinality::One,
+            is_array: false,
         }
     }
 }
@@ -471,15 +479,32 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
                         if let Some(tag) = current_variant {
                             let variant_scope = current_scope.variants.entry(tag).or_default();
-                            variant_scope.add_field(name, pending.base_type, effective_card, *span);
+                            variant_scope.add_field(
+                                name,
+                                pending.base_type,
+                                effective_card,
+                                *span,
+                                pending.is_array,
+                            );
                         } else {
-                            current_scope.add_field(name, pending.base_type, effective_card, *span);
+                            current_scope.add_field(
+                                name,
+                                pending.base_type,
+                                effective_card,
+                                *span,
+                                pending.is_array,
+                            );
                         }
                     }
                 }
-                BuildEffect::StartArray => {
+                BuildEffect::StartArray { is_plus } => {
+                    let cardinality = if *is_plus {
+                        Cardinality::Plus
+                    } else {
+                        Cardinality::Star
+                    };
                     state.array_stack.push(ArrayFrame {
-                        cardinality: Cardinality::Star,
+                        cardinality,
                         element_type: None,
                         start_node: Some(node_id),
                         push_called: false,
@@ -518,6 +543,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                             state.pending = Some(PendingType {
                                 base_type: array_type,
                                 cardinality: Cardinality::One,
+                                is_array: true,
                             });
                         }
                     }
@@ -546,6 +572,7 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                                 state.pending = Some(PendingType {
                                     base_type: type_id,
                                     cardinality: Cardinality::One,
+                                    is_array: false,
                                 });
                             } else {
                                 state.pending = finished_entry.outer_pending;
