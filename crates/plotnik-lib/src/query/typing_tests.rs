@@ -428,14 +428,13 @@ fn quantifier_on_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T4
+    Foo → T3
 
     === Types ===
     T3: Record FooScope3 {
         x: Node
         y: Node
     }
-    T4: ArrayStar <anon> → T3
     ");
 }
 
@@ -477,7 +476,7 @@ fn qis_alternation_in_sequence() {
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
     === Entrypoints ===
-    Foo → T6
+    Foo → T5
 
     === Types ===
     T3: Optional <anon> → Node
@@ -486,7 +485,48 @@ fn qis_alternation_in_sequence() {
         x: T3
         y: T4
     }
+    ");
+}
+
+#[test]
+fn quantified_seq_with_inline_tagged_alt() {
+    // Issue #5: captures from inline tagged alternation inside quantified sequence
+    // The tagged alternation is uncaptured, so it should behave like untagged.
+    // All captures should propagate with Optional cardinality.
+    let input = indoc! {r#"
+        Test = { [ A: (a) @x  B: (b) @y ] }* @items
+    "#};
+
+    let result = infer_with_graph(input);
+    insta::assert_snapshot!(result, @r"
+    === Graph ===
+    Test = N11
+
+    N0: ε [StartObj] → N1
+    N1: [Next] ε → N4, N8
+    N4: (a) [Variant(A)] [Capture] [Capture] → N6
+    N6: ε [Field(x)] [EndVariant] → N15
+    N8: (b) [Variant(B)] [Capture] [Capture] → N10
+    N10: ε [Field(y)] [EndVariant] → N15
+    N11: ε [StartObj] [StartArray] → N16
+    N15: ε [EndObj] [Push] → N16
+    N16: ε → N0, N19
+    N19: ε [EndArray] [EndObj] [Field(items)] → ∅
+
+    === Entrypoints ===
+    Test → T7
+
+    === Types ===
+    T3: Optional <anon> → Node
+    T4: Optional <anon> → Node
+    T5: Record TestScope3 {
+        x: T3
+        y: T4
+    }
     T6: ArrayStar <anon> → T5
+    T7: Record Test {
+        items: T6
+    }
     ");
 }
 

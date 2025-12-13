@@ -353,22 +353,22 @@ fn golden_master_comprehensive() {
     N85: ε → N88, N92
     N86: ε → ∅
     N88: (success) [Variant(Ok)] [Capture] → N90
-    N90: ε [EndVariant] → N86
+    N90: ε [Field(val)] [EndVariant] → N86
     N92: (error) [Variant(Err)] [Capture] [ToString] → N94
-    N94: ε [EndVariant] → N86
+    N94: ε [Field(msg)] [EndVariant] → N86
     N95: (wrapper) → N106
     N96: [Down] ε → N99, N103
     N99: (left_node) [Variant(Left)] [Capture] [Capture] → N101
-    N101: ε [EndVariant] → N108
+    N101: ε [Field(l)] [EndVariant] → N108
     N103: (right_node) [Variant(Right)] [Capture] [Capture] → N105
-    N105: ε [EndVariant] → N108
+    N105: ε [Field(r)] [EndVariant] → N108
     N106: ε [StartObj] → N96
     N108: ε [EndObj] [Field(choice)] → N109
     N109: [Up(1)] ε → ∅
     N110: ε → N113, N117
     N111: ε → ∅
     N113: (node) [Variant(Simple)] [Capture] → N115
-    N115: ε [EndVariant] → N111
+    N115: ε [Field(val)] [EndVariant] → N111
     N117: (pair) [Variant(Complex)] [StartObj] → N118
     N118: [Down] (key) [Capture] → N119
     N119: ε [Field(k)] → N120
@@ -487,7 +487,7 @@ fn golden_master_comprehensive() {
     N267: ε → N270, N274
     N268: ε → ∅
     N270: (value) [Variant(Some)] [Capture] → N272
-    N272: ε [EndVariant] → N268
+    N272: ε [Field(val)] [EndVariant] → N268
     N274: (none_marker) [Variant(None)] → N275
     N275: ε [EndVariant] → N268
 
@@ -512,23 +512,23 @@ fn golden_master_comprehensive() {
     SimpleCapture → T23
     RefChain → Void
     RefCaptured → T24
-    QisSequence → T26
-    QisNode → T28
-    PlusQuant → T30
-    OptQuant → T32
-    NoQis → T34
+    QisSequence → T25
+    QisNode → T26
+    PlusQuant → T28
+    OptQuant → T30
+    NoQis → T32
     NoCaptures → Void
-    NestedScopes → T38
-    NestedQuant → T41
-    MultiCapture → T42
-    EmptyBranch → T43
-    DeepNest → T44
-    Complex → T46
-    CardinalityJoin → T48
-    CapturedSeq → T50
-    AnchorSibling → T51
-    AnchorLast → T52
-    AnchorFirst → T53
+    NestedScopes → T36
+    NestedQuant → T39
+    MultiCapture → T40
+    EmptyBranch → T41
+    DeepNest → T42
+    Complex → T44
+    CardinalityJoin → T46
+    CapturedSeq → T48
+    AnchorSibling → T49
+    AnchorLast → T50
+    AnchorFirst → T51
 
     === Types ===
     T3: Record Identifier {
@@ -598,82 +598,78 @@ fn golden_master_comprehensive() {
         key: Node
         value: Node
     }
-    T26: ArrayStar <anon> → T25
-    T27: Record QisNodeScope27 {
+    T26: Record QisNodeScope26 {
         name: Node
         body: Node
     }
-    T28: ArrayStar <anon> → T27
-    T29: ArrayPlus <anon> → Node
-    T30: Record PlusQuant {
-        items: T29
+    T27: ArrayPlus <anon> → Node
+    T28: Record PlusQuant {
+        items: T27
     }
-    T31: Optional <anon> → Node
-    T32: Record OptQuant {
-        maybe_item: T31
+    T29: Optional <anon> → Node
+    T30: Record OptQuant {
+        maybe_item: T29
     }
-    T33: ArrayStar <anon> → Node
-    T34: Record NoQis {
-        item: T33
+    T31: ArrayStar <anon> → Node
+    T32: Record NoQis {
+        item: T31
     }
-    T35: Record NestedScopesScope35 {
+    T33: Record NestedScopesScope33 {
         a: Node
     }
-    T36: Record NestedScopesScope36 {
+    T34: Record NestedScopesScope34 {
         b: Node
     }
-    T37: Record NestedScopesScope37 {
-        inner1: T35
-        inner2: T36
+    T35: Record NestedScopesScope35 {
+        inner1: T33
+        inner2: T34
     }
-    T38: Record NestedScopes {
-        outer: T37
+    T36: Record NestedScopes {
+        outer: T35
     }
-    T39: ArrayStar <anon> → Node
-    T40: ArrayPlus <anon> → T39
-    T41: Record NestedQuant {
-        inner: T40
+    T37: ArrayStar <anon> → Node
+    T38: ArrayPlus <anon> → Node
+    T39: Record NestedQuant {
+        inner: T37
+        outer: T38
     }
-    T42: Record MultiCapture {
+    T40: Record MultiCapture {
         fn_name: String
         fn_body: Node
     }
-    T43: Enum EmptyBranch {
+    T41: Enum EmptyBranch {
         Some: Node
         None: Void
     }
-    T44: Record DeepNest {
+    T42: Record DeepNest {
         deep: Node
     }
-    T45: ArrayStar <anon> → Node
-    T46: Record Complex {
+    T43: ArrayStar <anon> → Node
+    T44: Record Complex {
         mod_name: String
-        imports: T45
+        imports: T43
     }
-    T47: ArrayPlus <anon> → Node
-    T48: Record CardinalityJoin {
-        item: Node
+    T45: ArrayPlus <anon> → Node
+    T46: Record CardinalityJoin {
+        item: T45
     }
-    T49: Record CapturedSeqScope49 {
+    T47: Record CapturedSeqScope47 {
         x: Node
         y: Node
     }
-    T50: Record CapturedSeq {
-        nested: T49
+    T48: Record CapturedSeq {
+        nested: T47
     }
-    T51: Record AnchorSibling {
+    T49: Record AnchorSibling {
         left: Node
         right: Node
     }
-    T52: Record AnchorLast {
+    T50: Record AnchorLast {
         last: Node
     }
-    T53: Record AnchorFirst {
+    T51: Record AnchorFirst {
         first: Node
     }
-
-    === Errors ===
-    field `item` in `CardinalityJoin`: incompatible types [Node, Node]
     "#);
 }
 
@@ -888,15 +884,15 @@ fn golden_type_inference() {
     N15: ε → N18, N22
     N16: ε → ∅
     N18: (a) [Variant(A)] [Capture] → N20
-    N20: ε [EndVariant] → N16
+    N20: ε [Field(x)] [EndVariant] → N16
     N22: (b) [Variant(B)] [Capture] → N24
-    N24: ε [EndVariant] → N16
+    N24: ε [Field(y)] [EndVariant] → N16
     N25: (wrapper) → N26
     N26: [Down] ε → N29, N33
     N29: (a) [Variant(A)] [Capture] → N31
-    N31: ε [EndVariant] → N36
+    N31: ε [Field(x)] [EndVariant] → N36
     N33: (b) [Variant(B)] [Capture] → N35
-    N35: ε [EndVariant] → N36
+    N35: ε [Field(y)] [EndVariant] → N36
     N36: [Up(1)] ε → ∅
     N37: (_) → N39
     N38: [Down] (item) [Capture] → N42
@@ -931,7 +927,8 @@ fn golden_type_inference() {
     N76: ε [Field(c)] → N78
     N78: [Up(1)] ε [EndObj] [EndVariant] → N68
     N80: (partial) [Variant(Partial)] → N81
-    N81: [Down] (a) [Capture] → N84
+    N81: [Down] (a) [Capture] → N82
+    N82: ε [Field(a)] → N84
     N84: [Up(1)] ε [EndVariant] → N68
     N85: (foo) → N89
     N86: [Down] ε → N87
@@ -946,61 +943,61 @@ fn golden_type_inference() {
 
     === Entrypoints ===
     BaseWithCapture → T3
-    TaggedInline → T4
-    TaggedAtRoot → T5
-    SyntheticNames → T7
+    TaggedInline → T6
+    TaggedAtRoot → T7
+    SyntheticNames → T9
     RefOpaque → Void
-    RefCaptured → T8
-    QisTwo → T10
-    NoQisOne → T12
-    MissingField → T14
-    FlatScope → T15
+    RefCaptured → T10
+    QisTwo → T11
+    NoQisOne → T13
+    MissingField → T15
+    FlatScope → T16
     CardMult → T18
 
     === Types ===
     T3: Record BaseWithCapture {
         name: Node
     }
-    T4: Enum TaggedInline {
+    T4: Optional <anon> → Node
+    T5: Optional <anon> → Node
+    T6: Record TaggedInline {
+        x: T4
+        y: T5
+    }
+    T7: Enum TaggedAtRoot {
         A: Node
         B: Node
     }
-    T5: Enum TaggedAtRoot {
-        A: Node
-        B: Node
-    }
-    T6: Record SyntheticNamesScope6 {
+    T8: Record SyntheticNamesScope8 {
         bar: Node
     }
-    T7: Record SyntheticNames {
-        baz: T6
+    T9: Record SyntheticNames {
+        baz: T8
     }
-    T8: Record RefCaptured {
+    T10: Record RefCaptured {
         result: T3
     }
-    T9: Record QisTwoScope9 {
+    T11: Record QisTwoScope11 {
         x: Node
         y: Node
     }
-    T10: ArrayStar <anon> → T9
-    T11: ArrayStar <anon> → Node
-    T12: Record NoQisOne {
-        x: T11
+    T12: ArrayStar <anon> → Node
+    T13: Record NoQisOne {
+        x: T12
     }
-    T13: Record MissingFieldScope13 {
+    T14: Record MissingFieldScope14 {
         a: Node
         b: Node
         c: Node
     }
-    T14: Enum MissingField {
-        Full: T13
+    T15: Enum MissingField {
+        Full: T14
         Partial: Node
     }
-    T15: Record FlatScope {
+    T16: Record FlatScope {
         val: Node
     }
-    T16: ArrayPlus <anon> → Node
-    T17: ArrayStar <anon> → T16
+    T17: ArrayStar <anon> → Node
     T18: Record CardMult {
         items: T17
     }
@@ -1060,9 +1057,9 @@ fn golden_effect_patterns() {
     N19: ε [Field(y)] [EndObj] [Field(obj)] → ∅
     N20: ε [StartObj] → N23, N27
     N23: (a) [Variant(A)] [Capture] [Capture] → N25
-    N25: ε [EndVariant] → N32
+    N25: ε [Field(x)] [EndVariant] → N32
     N27: (b) [Variant(B)] [Capture] [Capture] → N29
-    N29: ε [EndVariant] → N32
+    N29: ε [Field(y)] [EndVariant] → N32
     N32: ε [EndObj] [Field(choice)] → ∅
     N33: (container) → N35
     N34: [Down] (item) [Capture] → N38
@@ -1199,40 +1196,44 @@ fn golden_quantifier_graphs() {
     ═══════════════════════════════════════════════════════════════════════════════
 
     === Entrypoints ===
-    QuantSeq → T4
-    Optional → T6
-    NestedQuant → T9
-    LazyStar → Void
-    LazyPlus → T11
-    GreedyStar → T13
-    GreedyPlus → T15
+    QuantSeq → T3
+    Optional → T5
+    NestedQuant → T8
+    LazyStar → T10
+    LazyPlus → T12
+    GreedyStar → T14
+    GreedyPlus → T16
 
     === Types ===
     T3: Record QuantSeqScope3 {
         x: Node
         y: Node
     }
-    T4: ArrayStar <anon> → T3
-    T5: Optional <anon> → Node
-    T6: Record Optional {
-        maybe: T5
+    T4: Optional <anon> → Node
+    T5: Record Optional {
+        maybe: T4
     }
-    T7: ArrayStar <anon> → Node
-    T8: ArrayPlus <anon> → T7
-    T9: Record NestedQuant {
-        inners: T8
+    T6: ArrayStar <anon> → Node
+    T7: ArrayPlus <anon> → Node
+    T8: Record NestedQuant {
+        inners: T6
+        outers: T7
     }
-    T10: ArrayPlus <anon> → Node
-    T11: Record LazyPlus {
-        items: T10
+    T9: ArrayStar <anon> → Node
+    T10: Record LazyStar {
+        items: T9
     }
-    T12: ArrayStar <anon> → Node
-    T13: Record GreedyStar {
-        items: T12
+    T11: ArrayPlus <anon> → Node
+    T12: Record LazyPlus {
+        items: T11
     }
-    T14: ArrayPlus <anon> → Node
-    T15: Record GreedyPlus {
-        items: T14
+    T13: ArrayStar <anon> → Node
+    T14: Record GreedyStar {
+        items: T13
+    }
+    T15: ArrayPlus <anon> → Node
+    T16: Record GreedyPlus {
+        items: T15
     }
     ");
 }

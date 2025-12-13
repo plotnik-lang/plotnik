@@ -161,7 +161,7 @@ fn format_effect(effect: &BuildEffect) -> String {
         BuildEffect::StartArray { .. } => "StartArray".to_string(),
         BuildEffect::PushElement => "Push".to_string(),
         BuildEffect::EndArray => "EndArray".to_string(),
-        BuildEffect::StartObject => "StartObj".to_string(),
+        BuildEffect::StartObject { .. } => "StartObj".to_string(),
         BuildEffect::EndObject => "EndObj".to_string(),
         BuildEffect::Field { name, .. } => format!("Field({})", name),
         BuildEffect::StartVariant(v) => format!("Variant({})", v),

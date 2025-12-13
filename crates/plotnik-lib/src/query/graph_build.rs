@@ -354,17 +354,20 @@ impl<'a> Query<'a> {
 
         let body_frag = self.construct_expr(&body, NavContext::Root);
 
-        // Count Field effects to determine flattening (ADR-0007)
+        // Count Field effects to determine object wrapping.
+        // Note: Single-capture flattening (ADR-0007) is handled in type inference,
+        // not here, because we don't know if the alternation is captured yet.
+        // Uncaptured inline tagged alternations need Field effects preserved.
         let field_count = self.count_field_effects(body_frag.entry);
 
-        if field_count == 1 {
-            // Single capture: flatten by removing the Field effect
-            self.remove_field_effects(body_frag.entry);
-        } else if field_count > 1 {
+        if field_count > 1 {
             // Multiple captures: wrap with StartObject/EndObject
+            // This is NOT the alternation capture object - it's the variant's scope
             self.graph
                 .node_mut(start_id)
-                .add_effect(BuildEffect::StartObject);
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: false,
+                });
         }
 
         let end_id = self.graph.add_epsilon();
@@ -467,12 +470,17 @@ impl<'a> Query<'a> {
                 .map(|t| t.text_range())
                 .unwrap_or_default();
 
+            // Check if we're capturing an alternation (for enum vs struct distinction)
+            let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
+
             let (entry, exit) = if needs_object_wrapper {
                 // Wrap with StartObject/EndObject for composite captures
                 let start_id = self.graph.add_epsilon();
                 self.graph
                     .node_mut(start_id)
-                    .add_effect(BuildEffect::StartObject);
+                    .add_effect(BuildEffect::StartObject {
+                        for_alternation: is_alternation_capture,
+                    });
                 self.graph.connect(start_id, inner_frag.entry);
 
                 let end_id = self.graph.add_epsilon();
@@ -588,16 +596,6 @@ impl<'a> Query<'a> {
             .flat_map(|&id| &self.graph.node(id).effects)
             .filter(|e| matches!(e, BuildEffect::Field { .. }))
             .count()
-    }
-
-    /// Remove all Field effects reachable from a node (for single-capture variant flattening).
-    fn remove_field_effects(&mut self, start: NodeId) {
-        for node_id in self.nodes_with_field_effects(start) {
-            self.graph
-                .node_mut(node_id)
-                .effects
-                .retain(|e| !matches!(e, BuildEffect::Field { .. }));
-        }
     }
 
     fn nodes_with_field_effects(&self, start: NodeId) -> Vec<NodeId> {

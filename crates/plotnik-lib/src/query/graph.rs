@@ -203,7 +203,9 @@ impl<'src> BuildGraph<'src> {
         // QIS object wrapper nodes
         let (obj_start, obj_end) = if has_qis {
             let os = self.add_epsilon();
-            self.node_mut(os).add_effect(BuildEffect::StartObject);
+            self.node_mut(os).add_effect(BuildEffect::StartObject {
+                for_alternation: false,
+            });
             let oe = self.add_epsilon();
             self.node_mut(oe).add_effect(BuildEffect::EndObject);
             (Some(os), Some(oe))
@@ -306,7 +308,9 @@ impl<'src> BuildGraph<'src> {
         if qis {
             let obj_start = self.add_epsilon();
             self.node_mut(obj_start)
-                .add_effect(BuildEffect::StartObject);
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: false,
+                });
 
             let obj_end = self.add_epsilon();
             self.node_mut(obj_end).add_effect(BuildEffect::EndObject);
@@ -564,7 +568,12 @@ pub enum BuildEffect<'src> {
     },
     PushElement,
     EndArray,
-    StartObject,
+    /// Start object scope. `for_alternation` is true when this object wraps a captured
+    /// tagged alternation (tags should create enum), false for QIS/sequence objects
+    /// (tags in inner alternations should be ignored).
+    StartObject {
+        for_alternation: bool,
+    },
     EndObject,
     Field {
         name: &'src str,

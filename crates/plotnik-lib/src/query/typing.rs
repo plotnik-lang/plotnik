@@ -296,15 +296,42 @@ struct ArrayFrame {
     push_called: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct TraversalState {
     pending: Option<PendingType>,
     current_variant: Option<&'static str>,
     array_stack: Vec<ArrayFrame>,
     object_depth: usize,
+    /// Stack tracking whether each object scope is for a captured alternation.
+    /// Tags only create enums when inside an object opened for_alternation=true.
+    object_alt_stack: Vec<bool>,
     /// When true, skip EndObject type creation.
     /// Used during alternation branch exploration to collect variants before creating enum.
     dry_run: bool,
+    /// True when we're still at the definition root (no structural context entered).
+    /// Used to determine if tagged alternations should create enums (ADR-0009 §Case 1 vs §Case 3).
+    at_definition_root: bool,
+}
+
+impl Default for TraversalState {
+    fn default() -> Self {
+        Self {
+            pending: None,
+            current_variant: None,
+            array_stack: Vec::new(),
+            object_depth: 0,
+            object_alt_stack: Vec::new(),
+            dry_run: false,
+            at_definition_root: true,
+        }
+    }
+}
+
+impl TraversalState {
+    /// Check if we're inside an object scope opened for a captured alternation.
+    fn in_alternation_object(&self) -> bool {
+        self.object_alt_stack.last().copied().unwrap_or(false)
+    }
 }
 
 impl TraversalState {
@@ -458,6 +485,11 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
 
         let node = self.graph.node(node_id);
 
+        // Clear definition root flag when we enter structural context (non-epsilon matchers)
+        if !node.is_epsilon() {
+            state.at_definition_root = false;
+        }
+
         for effect in &node.effects {
             self.process_effect(effect, node_id, &node.ref_marker, &mut state, scope_stack);
         }
@@ -527,12 +559,16 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             BuildEffect::EndArray => {
                 self.process_end_array(state);
             }
-            BuildEffect::StartObject => {
+            BuildEffect::StartObject { for_alternation } => {
+                // Entering an object scope means we're no longer at definition root
+                state.at_definition_root = false;
                 state.object_depth += 1;
+                state.object_alt_stack.push(*for_alternation);
                 scope_stack.push(ScopeStackEntry::new_object(state.pending.take()));
             }
             BuildEffect::EndObject => {
                 state.object_depth = state.object_depth.saturating_sub(1);
+                state.object_alt_stack.pop();
                 if !state.dry_run {
                     self.process_end_object(state, scope_stack);
                 }
@@ -541,8 +577,15 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
                 // SAFETY: tag comes from source with 'src lifetime
                 let tag: &'static str = unsafe { std::mem::transmute(*tag) };
                 state.current_variant = Some(tag);
-                if let Some(entry) = scope_stack.last_mut() {
-                    entry.scope.has_variants = true;
+                // Create enum for:
+                // - Definition root tagged alternations (ADR-0009 §Case 3)
+                // - Captured tagged alternations inside objects with for_alternation=true
+                // Uncaptured inline tagged alternations (including inside QIS objects)
+                // behave like untagged (ADR-0009 §Case 1).
+                if state.at_definition_root || state.in_alternation_object() {
+                    if let Some(entry) = scope_stack.last_mut() {
+                        entry.scope.has_variants = true;
+                    }
                 }
             }
             BuildEffect::EndVariant => {
@@ -575,8 +618,14 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             return;
         };
 
-        // Inside object scope, fields go to object, not variant scope
-        let target_scope = match current_variant.filter(|_| state.object_depth == 0) {
+        // Route fields to variant scope only when:
+        // 1. We're in a variant context (current_variant is set)
+        // 2. Either at definition root OR inside an alternation-capturing object
+        // 3. The scope is creating an enum (has_variants is true)
+        // Otherwise, fields go to the main scope (for uncaptured inline alternations).
+        let in_variant_context =
+            (state.object_depth == 0 || state.in_alternation_object()) && entry.scope.has_variants;
+        let target_scope = match current_variant.filter(|_| in_variant_context) {
             Some(tag) => entry.scope.variants.entry(tag).or_default(),
             None => &mut entry.scope,
         };
@@ -609,25 +658,21 @@ impl<'src, 'g> InferenceContext<'src, 'g> {
             return;
         };
 
-        let push_was_called = frame.push_called
-            || frame
-                .start_node
-                .map_or(false, |id| self.array_element_types.contains_key(&id));
-
-        if !push_was_called {
-            return;
-        }
-
+        // Get element type from recorded types or default to Node.
+        // For lazy quantifiers (*?, +?), the exit path may not execute the loop body,
+        // but we still need to produce an array type (empty array case).
         let element_type = frame
             .start_node
             .and_then(|id| self.array_element_types.get(&id).copied())
             .or(frame.element_type)
             .unwrap_or(TYPE_NODE);
 
-        let array_type = self.wrap_with_cardinality(element_type, frame.cardinality);
+        // Keep element type with cardinality (not wrapped array type) to enable
+        // proper cardinality join in alternations (ADR-0009 §Cardinality Lifting Coercion).
+        // The array wrapper is applied later in create_struct_type via wrap_with_cardinality.
         state.pending = Some(PendingType {
-            base_type: array_type,
-            cardinality: Cardinality::One,
+            base_type: element_type,
+            cardinality: frame.cardinality,
             is_array: true,
         });
     }
