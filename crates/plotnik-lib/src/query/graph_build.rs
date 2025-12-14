@@ -12,7 +12,7 @@ use crate::parser::{
 };
 
 use super::Query;
-use super::graph::{BuildEffect, BuildMatcher, Fragment, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 
 /// Context for navigation determination.
 /// When `anchored` is true, `prev_anonymous` indicates whether the preceding
@@ -201,6 +201,31 @@ impl<'a> Query<'a> {
 
         let exit_id = self.graph.add_epsilon();
         self.graph.node_mut(exit_id).set_nav(exit_ctx.to_up_nav(1));
+
+        // Trailing anchor retry loop: when UpSkipTrivia fails, try next sibling
+        if exit_ctx.has_trailing_anchor && !child_fragments.is_empty() {
+            let last_frag = child_fragments.last().unwrap();
+            let last_entry = self.graph.node(last_frag.entry);
+            let last_matcher = last_entry.matcher.clone();
+            let last_effects = last_entry.effects.clone();
+
+            // Choice point: epsilon with 2 successors (won't be eliminated)
+            let choice_id = self.graph.add_epsilon();
+            self.graph.connect(inner.exit, choice_id);
+            self.graph.connect(choice_id, exit_id); // First: try UpSkipTrivia
+
+            // Retry node: Nav::next() + same matcher + same effects
+            let retry_id = self.graph.add_node(BuildNode::with_matcher(last_matcher));
+            self.graph.node_mut(retry_id).set_nav(Nav::next());
+            for effect in last_effects {
+                self.graph.node_mut(retry_id).add_effect(effect);
+            }
+            self.graph.connect(choice_id, retry_id); // Second: try next sibling
+            self.graph.connect(retry_id, choice_id); // Loop back to choice
+
+            return Fragment::new(node_id, exit_id);
+        }
+
         self.graph.connect(inner.exit, exit_id);
 
         Fragment::new(node_id, exit_id)

@@ -51,13 +51,13 @@ impl<'a> Query<'a> {
                 // to wrap each iteration with StartObject/EndObject for proper field scoping.
                 if let Some(inner) = c.inner() {
                     // Check if this capture wraps a quantifier with nested captures
-                    if let ast::Expr::QuantifiedExpr(q) = &inner {
-                        if let Some(quant_inner) = q.inner() {
-                            let captures = self.collect_propagating_captures(&quant_inner);
-                            // Trigger QIS if there's at least 1 capture (not already covered by ≥2 rule)
-                            if !captures.is_empty() && !self.qis_triggers.contains_key(q) {
-                                self.qis_triggers.insert(q.clone(), QisTrigger { captures });
-                            }
+                    if let ast::Expr::QuantifiedExpr(q) = &inner
+                        && let Some(quant_inner) = q.inner()
+                    {
+                        let captures = self.collect_propagating_captures(&quant_inner);
+                        // Trigger QIS if there's at least 1 capture (not already covered by ≥2 rule)
+                        if !captures.is_empty() && !self.qis_triggers.contains_key(q) {
+                            self.qis_triggers.insert(q.clone(), QisTrigger { captures });
                         }
                     }
                     self.detect_qis_in_expr(&inner);

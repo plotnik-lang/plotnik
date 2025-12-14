@@ -74,10 +74,10 @@ pub fn run(args: ExecArgs) {
     }
 
     // Auto-wrap definitions with root node if available
-    if let Some(root_id) = lang.root() {
-        if let Some(root_kind) = lang.node_type_name(root_id) {
-            query = query.wrap_with_root(root_kind);
-        }
+    if let Some(root_id) = lang.root()
+        && let Some(root_kind) = lang.node_type_name(root_id)
+    {
+        query = query.wrap_with_root(root_kind);
     }
 
     // Emit compiled query
@@ -139,7 +139,10 @@ fn load_query(args: &ExecArgs) -> String {
                 .expect("failed to read stdin");
             return buf;
         }
-        return fs::read_to_string(path).expect("failed to read query file");
+        return fs::read_to_string(path).unwrap_or_else(|_| {
+            eprintln!("error: query file not found: {}", path.display());
+            std::process::exit(1);
+        });
     }
     unreachable!("validation ensures query input exists")
 }
@@ -152,7 +155,10 @@ fn load_source(args: &ExecArgs) -> String {
         if path.as_os_str() == "-" {
             panic!("cannot read both query and source from stdin");
         }
-        return fs::read_to_string(path).expect("failed to read source file");
+        return fs::read_to_string(path).unwrap_or_else(|_| {
+            eprintln!("error: file not found: {}", path.display());
+            std::process::exit(1);
+        });
     }
     unreachable!("validation ensures source input exists")
 }

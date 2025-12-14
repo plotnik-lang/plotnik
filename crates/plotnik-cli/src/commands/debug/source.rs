@@ -16,7 +16,10 @@ pub fn load_source(text: &Option<String>, file: &Option<PathBuf>) -> String {
                 .expect("failed to read stdin");
             return buf;
         }
-        return fs::read_to_string(path).expect("failed to read source file");
+        return fs::read_to_string(path).unwrap_or_else(|_| {
+            eprintln!("error: file not found: {}", path.display());
+            std::process::exit(1);
+        });
     }
     unreachable!()
 }

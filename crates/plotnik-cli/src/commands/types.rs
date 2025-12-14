@@ -73,10 +73,10 @@ pub fn run(args: TypesArgs) {
     }
 
     // Auto-wrap definitions with root node if available
-    if let Some(root_id) = lang.root() {
-        if let Some(root_kind) = lang.node_type_name(root_id) {
-            query = query.wrap_with_root(root_kind);
-        }
+    if let Some(root_id) = lang.root()
+        && let Some(root_kind) = lang.node_type_name(root_id)
+    {
+        query = query.wrap_with_root(root_kind);
     }
 
     // Emit compiled query (IR)
