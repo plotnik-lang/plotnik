@@ -220,10 +220,6 @@ impl<'src, 'g, R: NodeKindResolver> QueryEmitter<'src, 'g, R> {
         self.emit_buffer(layout)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Pass 1: Analysis
-    // ─────────────────────────────────────────────────────────────────────
-
     fn analyze(&mut self) -> EmitResult<()> {
         // Pre-intern definition names for entrypoints
         for (name, _) in self.ctx.graph.definitions() {
@@ -314,10 +310,6 @@ impl<'src, 'g, R: NodeKindResolver> QueryEmitter<'src, 'g, R> {
         })
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Pass 2: Layout
-    // ─────────────────────────────────────────────────────────────────────
-
     fn compute_layout(&self) -> EmitResult<LayoutInfo> {
         let transition_count = self.ctx.graph.len() as u32;
         let successor_count = self.ctx.spilled_successors.len() as u32;
@@ -407,10 +399,6 @@ impl<'src, 'g, R: NodeKindResolver> QueryEmitter<'src, 'g, R> {
             trivia_kind_count,
         })
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Pass 3: Emission
-    // ─────────────────────────────────────────────────────────────────────
 
     fn emit_buffer(self, layout: LayoutInfo) -> EmitResult<CompiledQuery> {
         let mut buffer = CompiledQueryBuffer::allocate(layout.buffer_len);

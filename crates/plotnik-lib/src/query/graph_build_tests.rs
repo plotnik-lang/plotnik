@@ -214,10 +214,6 @@ fn anchor_sibling() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Optimization tests
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn optimized_simple() {
     insta::assert_snapshot!(snapshot_optimized("Q = (identifier) @id"), @r"

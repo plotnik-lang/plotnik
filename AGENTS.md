@@ -181,11 +181,22 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output (inferred from input): `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
+Output flags:
+
+- `--only-symbols` — Show only symbol table (requires query)
+- `--cst` — Show query CST instead of AST
+- `--raw` — Include trivia tokens (whitespace, comments)
+- `--spans` — Show source spans
+- `--cardinalities` — Show inferred cardinalities
+- `--graph` — Show compiled transition graph
+- `--graph-raw` — Show unoptimized graph (before epsilon elimination)
+- `--types` — Show inferred types
 
 ```sh
 cargo run -p plotnik-cli -- debug -q '(identifier) @id'
 cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --graph -l javascript
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --types -l javascript
 cargo run -p plotnik-cli -- debug -s app.ts
 cargo run -p plotnik-cli -- debug -s app.ts --raw
 cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript

@@ -110,10 +110,6 @@ fn debug_incompatible_types_graph() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Basic captures
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn single_node_capture() {
     let result = infer("Foo = (identifier) @name");
@@ -142,10 +138,6 @@ fn no_captures_void() {
     let result = infer("Foo = (identifier)");
     insta::assert_snapshot!(result, @"Foo = ()");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Captured sequences (composite types)
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn captured_sequence_creates_struct() {
@@ -194,10 +186,6 @@ fn sequence_without_capture_propagates() {
     }
     ");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Alternations
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn untagged_alternation_symmetric() {
@@ -271,10 +259,6 @@ fn captured_untagged_alternation_creates_struct() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Quantifiers
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn star_quantifier() {
     let result = infer("Foo = ((item) @items)*");
@@ -311,10 +295,6 @@ fn quantifier_on_sequence() {
     T4 = [FooScope3]
     ");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// QIS: Additional cases from ADR-0009
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn qis_single_capture_no_trigger() {
@@ -383,10 +363,6 @@ fn quantified_seq_with_inline_tagged_alt() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Type compatibility
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn compatible_types_in_alternation() {
     let input = indoc! {r#"
@@ -421,10 +397,6 @@ fn incompatible_types_in_alternation() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Multiple definitions
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn multiple_definitions() {
     let input = indoc! {r#"
@@ -441,10 +413,6 @@ fn multiple_definitions() {
     }
     ");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Edge cases
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn deeply_nested_node() {

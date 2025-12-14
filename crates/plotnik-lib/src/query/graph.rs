@@ -116,10 +116,6 @@ impl<'src> BuildGraph<'src> {
         self.connect(fragment.exit, to);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Fragment Combinators
-    // ─────────────────────────────────────────────────────────────────────
-
     pub fn matcher_fragment(&mut self, matcher: BuildMatcher<'src>) -> Fragment {
         Fragment::single(self.add_matcher(matcher))
     }
@@ -161,10 +157,6 @@ impl<'src> BuildGraph<'src> {
 
         Fragment::new(entry, exit)
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Generic Loop/Optional Builders
-    // ─────────────────────────────────────────────────────────────────────
 
     /// Generic loop combinator for * and + quantifiers.
     ///
@@ -350,10 +342,6 @@ impl<'src> BuildGraph<'src> {
         Fragment::new(branch, exit)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Simple Loop Combinators (no array collection)
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Zero or more (greedy): inner*
     pub fn zero_or_more(&mut self, inner: Fragment) -> Fragment {
         self.build_repetition(inner, false, true, ArrayMode::None)
@@ -384,10 +372,6 @@ impl<'src> BuildGraph<'src> {
         self.build_optional(inner, false, false)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Array-Collecting Loop Combinators
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Zero or more with array collection (greedy): inner*
     pub fn zero_or_more_array(&mut self, inner: Fragment) -> Fragment {
         self.build_repetition(inner, false, true, ArrayMode::Simple)
@@ -407,10 +391,6 @@ impl<'src> BuildGraph<'src> {
     pub fn one_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
         self.build_repetition(inner, true, false, ArrayMode::Simple)
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // QIS-Aware Array Combinators (wrap each iteration with object scope)
-    // ─────────────────────────────────────────────────────────────────────
 
     /// Zero or more with QIS object wrapping (greedy): inner*
     ///

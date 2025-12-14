@@ -80,10 +80,6 @@ pub struct InferredMember<'src> {
     pub ty: TypeId,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Cardinality
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum Cardinality {
     #[default]
@@ -128,10 +124,6 @@ impl Cardinality {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Type shape for unification checking
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TypeShape {
     Primitive(TypeId),
@@ -146,10 +138,6 @@ impl TypeShape {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Field tracking within a scope
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
 struct FieldInfo {
@@ -245,10 +233,6 @@ struct MergeError<'src> {
     spans: Vec<TextRange>,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inference result from expression
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// What an expression produces when evaluated.
 #[derive(Debug, Clone)]
 struct ExprResult {
@@ -301,10 +285,6 @@ impl ExprResult {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inference context
-// ─────────────────────────────────────────────────────────────────────────────
-
 struct InferenceContext<'src> {
     source: &'src str,
     qis_triggers: HashSet<ast::QuantifiedExpr>,
@@ -337,10 +317,6 @@ impl<'src> InferenceContext<'src> {
         id
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Definition inference
-    // ─────────────────────────────────────────────────────────────────────────
-
     fn infer_definition(&mut self, def_name: &'src str, body: &Expr) -> TypeId {
         self.current_def_name = def_name;
 
@@ -369,10 +345,6 @@ impl<'src> InferenceContext<'src> {
             TYPE_VOID
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Expression inference
-    // ─────────────────────────────────────────────────────────────────────────
 
     fn infer_expr(
         &mut self,
@@ -639,10 +611,6 @@ impl<'src> InferenceContext<'src> {
         ExprResult::node()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
     fn quantifier_cardinality(&self, q: &ast::QuantifiedExpr) -> Cardinality {
         let Some(op) = q.operator() else {
             return Cardinality::One;
@@ -792,10 +760,6 @@ impl<'src> InferenceContext<'src> {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Query integration
-// ─────────────────────────────────────────────────────────────────────────────
 
 impl<'a> Query<'a> {
     /// Run type inference on the query AST.
