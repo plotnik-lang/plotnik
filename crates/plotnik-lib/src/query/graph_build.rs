@@ -672,7 +672,7 @@ impl<'a> Query<'a> {
 
         if !node.is_epsilon() {
             result.push(node_id);
-            return;
+            // Continue through to find all matchers in loops (e.g., try_next in quantifiers)
         }
 
         for &succ in &node.successors {

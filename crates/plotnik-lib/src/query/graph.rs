@@ -72,6 +72,21 @@ impl<'src> BuildGraph<'src> {
         self.add_node(BuildNode::epsilon())
     }
 
+    /// Clone a node, creating a new node with the same matcher, effects, and ref_marker,
+    /// but with the specified nav and copying the successors list.
+    pub fn clone_node_with_nav(&mut self, node_id: NodeId, nav: Nav) -> NodeId {
+        let original = &self.nodes[node_id as usize];
+        let cloned = BuildNode {
+            matcher: original.matcher.clone(),
+            effects: original.effects.clone(),
+            ref_marker: original.ref_marker.clone(),
+            successors: original.successors.clone(),
+            nav,
+            ref_name: original.ref_name,
+        };
+        self.add_node(cloned)
+    }
+
     pub fn add_matcher(&mut self, matcher: BuildMatcher<'src>) -> NodeId {
         self.add_node(BuildNode::with_matcher(matcher))
     }
@@ -234,53 +249,68 @@ impl<'src> BuildGraph<'src> {
             (inner.entry, inner.exit)
         };
 
-        // Create first-entry node with initial navigation (e.g., Down for first child)
-        let first_entry = self.add_epsilon();
-        self.node_mut(first_entry).set_nav(initial_nav);
-        self.connect(first_entry, loop_body_entry);
+        // Set initial navigation on inner.entry (the actual matcher).
+        // In QIS mode, this is distinct from loop_body_entry (the object wrapper).
+        self.node_mut(inner.entry).set_nav(initial_nav);
 
-        // Create try_next node with Next navigation for subsequent iterations
-        // This is separate from re_entry so that Next failure triggers backtracking
-        // to re_entry's branch point, not to before the loop started
-        let try_next = self.add_epsilon();
-        self.node_mut(try_next).set_nav(Nav::next());
-        self.connect(try_next, loop_body_entry);
+        // For re-entry (subsequent iterations), clone inner.entry with Next nav.
+        // This creates a separate path for re-entry that can skip non-matching siblings.
+        // In QIS mode, we clone inner.entry (not obj_start) to avoid duplicating the wrapper.
+        let try_next = self.clone_node_with_nav(inner.entry, Nav::next());
+
+        // QIS object wrapper for try_next re-entry path
+        let (try_next_entry, try_next_exit) = if has_qis {
+            let os = self.add_epsilon();
+            self.node_mut(os).add_effect(BuildEffect::StartObject {
+                for_alternation: false,
+            });
+            let oe = self.add_epsilon();
+            self.node_mut(oe).add_effect(BuildEffect::EndObject);
+            self.connect(os, try_next);
+            self.connect(try_next, oe);
+            (os, oe)
+        } else {
+            (try_next, try_next)
+        };
 
         // Wire up the graph based on at_least_one and greedy
         if at_least_one {
             // + pattern: must match at least once
-            // Entry → first_entry → body → push → re_entry → (try_next → body or exit)
-            let entry_point = start.unwrap_or(first_entry);
+            // Entry → loop_body_entry → body → push → re_entry → (try_next → body or exit)
+            let entry_point = start.unwrap_or(loop_body_entry);
             let exit_point = end.or(exit).unwrap();
 
             // re_entry is a branch point (no nav) that chooses: try more or exit
             let re_entry = self.add_epsilon();
 
             if let Some(s) = start {
-                self.connect(s, first_entry);
+                self.connect(s, loop_body_entry);
             }
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
+                // try_next also needs to connect to push after matching
+                self.connect(try_next_exit, p);
                 self.connect(p, re_entry);
             } else {
                 self.connect(loop_body_exit, re_entry);
+                self.connect(try_next_exit, re_entry);
             }
 
             // re_entry branches: try_next (Next nav) or exit
             // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
             if greedy {
-                self.connect(re_entry, try_next);
+                self.connect(re_entry, try_next_entry);
                 self.connect(re_entry, exit_point);
             } else {
                 self.connect(re_entry, exit_point);
-                self.connect(re_entry, try_next);
+                self.connect(re_entry, try_next_entry);
             }
 
             Fragment::new(entry_point, exit_point)
         } else {
             // * pattern: zero or more
-            // Entry → branch → (first_entry → body → push → re_entry → try_next → body) or exit
+            // Entry → branch → (loop_body_entry → body → push → re_entry → try_next → body) or exit
             let entry_point = start.unwrap_or(branch);
             let exit_point = end.or(exit).unwrap();
 
@@ -292,28 +322,31 @@ impl<'src> BuildGraph<'src> {
             }
 
             if greedy {
-                self.connect(branch, first_entry);
+                self.connect(branch, loop_body_entry);
                 self.connect(branch, exit_point);
             } else {
                 self.connect(branch, exit_point);
-                self.connect(branch, first_entry);
+                self.connect(branch, loop_body_entry);
             }
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
+                // try_next also needs to connect to push after matching
+                self.connect(try_next_exit, p);
                 self.connect(p, re_entry);
             } else {
                 self.connect(loop_body_exit, re_entry);
+                self.connect(try_next_exit, re_entry);
             }
 
             // re_entry branches: try_next (Next nav) or exit
             // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
             if greedy {
-                self.connect(re_entry, try_next);
+                self.connect(re_entry, try_next_entry);
                 self.connect(re_entry, exit_point);
             } else {
                 self.connect(re_entry, exit_point);
-                self.connect(re_entry, try_next);
+                self.connect(re_entry, try_next_entry);
             }
 
             Fragment::new(entry_point, exit_point)

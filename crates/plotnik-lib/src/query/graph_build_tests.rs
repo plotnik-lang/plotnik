@@ -106,30 +106,28 @@ fn quantifier_star() {
     insta::assert_snapshot!(snapshot("Q = (identifier)*"), @r"
     Q = (4)
 
-    (0) —(identifier)→ (7)
+    (0) —(identifier)→ (6)
     (1) —𝜀—[StartArray]→ (4)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (7)
+    (3) —𝜀—[PushElement]→ (6)
     (4) —𝜀—[StartArray]→ (0), (2)
-    (5) —𝜀→ (0)
-    (6) —{→}—𝜀→ (0)
-    (7) —𝜀—[PushElement]→ (6), (2)
+    (5) —{→}—(identifier)→ (6)
+    (6) —𝜀—[PushElement]→ (5), (2)
     ");
 }
 
 #[test]
 fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
-    Q = (1)
+    Q = (0)
 
-    (0) —(identifier)→ (7)
+    (0) —(identifier)—[StartArray]→ (6)
     (1) —𝜀—[StartArray]→ (0)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (7)
+    (3) —𝜀—[PushElement]→ (6)
     (4) —𝜀→ (✓)
-    (5) —𝜀→ (0)
-    (6) —{→}—𝜀→ (0)
-    (7) —𝜀—[PushElement]→ (6), (2)
+    (5) —{→}—(identifier)→ (6)
+    (6) —𝜀—[PushElement]→ (5), (2)
     ");
 }
 

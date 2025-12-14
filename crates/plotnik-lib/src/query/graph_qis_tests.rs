@@ -190,18 +190,19 @@ fn qis_graph_has_object_effects() {
 
     // QIS adds StartObj/EndObj around each iteration to keep captures coupled.
     // Multi-capture definitions also get wrapped in StartObj/EndObj at root.
+    // The loop has separate wrappers for initial entry and re-entry paths.
     let start_count = pre_opt.matches("StartObj").count();
     let end_count = pre_opt.matches("EndObj").count();
 
-    // 1 from multi-capture def wrapper + 1 from QIS loop = 2
+    // 1 from multi-capture def wrapper + 1 for initial loop entry + 1 for re-entry = 3
     assert_eq!(
-        start_count, 2,
-        "QIS graph should have 2 StartObj (multi-capture def + QIS loop):\n{}",
+        start_count, 3,
+        "QIS graph should have 3 StartObj (def wrapper + initial loop + re-entry):\n{}",
         pre_opt
     );
     assert_eq!(
-        end_count, 2,
-        "QIS graph should have 2 EndObj (multi-capture def + QIS loop):\n{}",
+        end_count, 3,
+        "QIS graph should have 3 EndObj (def wrapper + initial loop + re-entry):\n{}",
         pre_opt
     );
 }
