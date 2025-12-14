@@ -264,6 +264,17 @@ impl<'a> Query<'a> {
         &self.graph
     }
 
+    /// Wrap definitions that don't already match the root node kind.
+    ///
+    /// Call this after `build_graph()` to allow queries like `(function_declaration)`
+    /// to work when the interpreter starts at tree root (e.g., `program`).
+    ///
+    /// The `root_kind` should be the language's root node kind (e.g., "program" for JS).
+    pub fn wrap_with_root(mut self, root_kind: &'a str) -> Self {
+        self.graph.wrap_definitions_with_root(root_kind);
+        self
+    }
+
     /// Access the set of dead nodes (eliminated by optimization).
     pub fn dead_nodes(&self) -> &HashSet<NodeId> {
         &self.dead_nodes

@@ -457,6 +457,43 @@ impl<'src> BuildGraph<'src> {
     pub fn optional_qis_lazy(&mut self, inner: Fragment) -> Fragment {
         self.build_optional(inner, false, true)
     }
+
+    /// Wrap definitions that don't already match the root node kind.
+    ///
+    /// For each definition whose entry matcher doesn't match `root_kind`,
+    /// prepends a transition that matches the root and descends into children.
+    /// This allows queries like `(function_declaration)` to work when the
+    /// interpreter starts at tree root (e.g., `program`).
+    pub fn wrap_definitions_with_root(&mut self, root_kind: &'src str) {
+        let def_names: Vec<&'src str> = self.definitions.keys().copied().collect();
+
+        for name in def_names {
+            let entry = self.definitions[name];
+            let entry_node = &self.nodes[entry as usize];
+
+            // Check if entry already matches root
+            let already_matches_root = match &entry_node.matcher {
+                BuildMatcher::Node { kind, .. } => *kind == root_kind,
+                _ => false,
+            };
+
+            if already_matches_root {
+                continue;
+            }
+
+            // Create wrapper: (root_kind) with Nav::stay, then connect to original with Nav::down
+            let wrapper = self.add_node(BuildNode::with_matcher(BuildMatcher::node(root_kind)));
+
+            // Set original entry's nav to descend from root
+            self.nodes[entry as usize].nav = Nav::down();
+
+            // Connect wrapper to original entry
+            self.connect(wrapper, entry);
+
+            // Update definition to point to wrapper
+            self.definitions.insert(name, wrapper);
+        }
+    }
 }
 
 impl Default for BuildGraph<'_> {

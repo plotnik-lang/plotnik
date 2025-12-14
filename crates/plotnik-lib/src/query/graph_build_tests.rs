@@ -269,3 +269,80 @@ fn symbol_table_reuse() {
     (4) —𝜀—<Bar>→ (✓)
     ");
 }
+
+// ============================================================================
+// wrap_definitions_with_root
+// ============================================================================
+
+#[test]
+fn wrap_with_root_simple() {
+    let query = Query::try_from("Q = (identifier)")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (1)
+
+    (0) —{↘}—(identifier)→ (✓)
+    (1) —(program)→ (0)
+    ");
+}
+
+#[test]
+fn wrap_with_root_already_matches() {
+    // Definition already starts with root - no wrapping needed
+    let query = Query::try_from("Q = (program (identifier))")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (0)
+
+    (0) —(program)→ (1)
+    (1) —{↘}—(identifier)→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
+    ");
+}
+
+#[test]
+fn wrap_with_root_multiple_definitions() {
+    let input = indoc! {r#"
+        Foo = (identifier)
+        Bar = (program (string))
+    "#};
+    let query = Query::try_from(input)
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    // Foo gets wrapped, Bar already matches root
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Foo = (4)
+    Bar = (1)
+
+    (0) —{↘}—(identifier)→ (✓)
+    (1) —(program)→ (2)
+    (2) —{↘}—(string)→ (3)
+    (3) —{↗¹}—𝜀→ (✓)
+    (4) —(program)→ (0)
+    ");
+}
+
+#[test]
+fn wrap_with_root_with_captures() {
+    let query = Query::try_from("Q = (function_declaration name: (identifier) @name)")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (3)
+
+    (0) —{↘}—(function_declaration)→ (1)
+    (1) —{↘}—(identifier)@name—[CaptureNode]→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
+    (3) —(program)→ (0)
+    ");
+}

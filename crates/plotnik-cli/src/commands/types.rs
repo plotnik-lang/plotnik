@@ -62,10 +62,17 @@ pub fn run(args: TypesArgs) {
     }
 
     // Build transition graph and type info
-    let query = query.build_graph();
+    let mut query = query.build_graph();
     if query.has_type_errors() {
         eprint!("{}", query.diagnostics().render(&query_source));
         std::process::exit(1);
+    }
+
+    // Auto-wrap definitions with root node if available
+    if let Some(root_id) = lang.root() {
+        if let Some(root_kind) = lang.node_type_name(root_id) {
+            query = query.wrap_with_root(root_kind);
+        }
     }
 
     // Emit compiled query (IR)
