@@ -180,7 +180,11 @@ fn entry_point_reference() {
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @"Expr");
+    insta::assert_snapshot!(query.dump_symbols(), @r"
+    Expr
+    _
+      Expr
+    ");
 }
 
 #[test]
@@ -202,7 +206,7 @@ fn no_definitions() {
     let input = "(identifier)";
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @"");
+    insta::assert_snapshot!(query.dump_symbols(), @"_");
 }
 
 #[test]

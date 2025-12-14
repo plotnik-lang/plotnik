@@ -61,6 +61,11 @@ pub enum DiagnosticKind {
     DirectRecursion,
     FieldSequenceValue,
 
+    // Type inference errors
+    IncompatibleTypes,
+    MultiCaptureQuantifierNoName,
+    UnusedBranchLabels,
+
     // Link pass - grammar validation
     UnknownNodeType,
     UnknownField,
@@ -75,7 +80,10 @@ pub enum DiagnosticKind {
 impl DiagnosticKind {
     /// Default severity for this kind. Can be overridden by policy.
     pub fn default_severity(&self) -> Severity {
-        Severity::Error
+        match self {
+            Self::UnusedBranchLabels => Severity::Warning,
+            _ => Severity::Error,
+        }
     }
 
     /// Whether this kind suppresses `other` when spans overlap.
@@ -166,6 +174,13 @@ impl DiagnosticKind {
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field must match exactly one node",
 
+            // Type inference
+            Self::IncompatibleTypes => "incompatible types in alternation branches",
+            Self::MultiCaptureQuantifierNoName => {
+                "quantified expression with multiple captures requires `@name`"
+            }
+            Self::UnusedBranchLabels => "branch labels have no effect without capture",
+
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",
             Self::UnknownField => "unknown field",
@@ -192,6 +207,7 @@ impl DiagnosticKind {
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
+            Self::IncompatibleTypes => "incompatible types: {}".to_string(),
 
             // Link pass errors with context
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),

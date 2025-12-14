@@ -160,6 +160,9 @@ fn printer_symbols_with_cardinalities() {
     insta::assert_snapshot!(q.printer().only_symbols(true).with_cardinalities(true).dump(), @r"
     A¹
     B⁺
+    _
+      A¹
+      B⁺
     ");
 }
 
@@ -175,6 +178,9 @@ fn printer_symbols_with_refs() {
     A
     B
       A
+    _
+      B
+        A
     ");
 }
 
@@ -193,6 +199,10 @@ fn printer_symbols_cycle() {
     B
       A
         B (cycle)
+    _
+      A
+        B
+          A (cycle)
     ");
 }
 
@@ -200,7 +210,10 @@ fn printer_symbols_cycle() {
 fn printer_symbols_undefined_ref() {
     let input = "(call (Undefined))";
     let q = Query::try_from(input).unwrap();
-    insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @"");
+    insta::assert_snapshot!(q.printer().only_symbols(true).dump(), @r"
+    _
+      Undefined?
+    ");
 }
 
 #[test]

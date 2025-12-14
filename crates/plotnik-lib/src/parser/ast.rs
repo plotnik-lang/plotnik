@@ -98,6 +98,39 @@ ast_node!(FieldExpr, Field);
 ast_node!(NegatedField, NegatedField);
 ast_node!(Anchor, Anchor);
 
+/// Either an expression or an anchor in a sequence.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SeqItem {
+    Expr(Expr),
+    Anchor(Anchor),
+}
+
+impl SeqItem {
+    pub fn cast(node: SyntaxNode) -> Option<Self> {
+        if let Some(expr) = Expr::cast(node.clone()) {
+            return Some(SeqItem::Expr(expr));
+        }
+        if let Some(anchor) = Anchor::cast(node) {
+            return Some(SeqItem::Anchor(anchor));
+        }
+        None
+    }
+
+    pub fn as_anchor(&self) -> Option<&Anchor> {
+        match self {
+            SeqItem::Anchor(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn as_expr(&self) -> Option<&Expr> {
+        match self {
+            SeqItem::Expr(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 /// Anonymous node: string literal (`"+"`) or wildcard (`_`).
 /// Maps from CST `Str` or `Wildcard`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -204,6 +237,16 @@ impl NamedNode {
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
     }
+
+    /// Returns all anchors in this node.
+    pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
+        self.0.children().filter_map(Anchor::cast)
+    }
+
+    /// Returns children interleaved with anchors, preserving order.
+    pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
+        self.0.children().filter_map(SeqItem::cast)
+    }
 }
 
 impl Ref {
@@ -265,6 +308,16 @@ impl Branch {
 impl SeqExpr {
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
+    }
+
+    /// Returns all anchors in this sequence.
+    pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
+        self.0.children().filter_map(Anchor::cast)
+    }
+
+    /// Returns children interleaved with anchors, preserving order.
+    pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
+        self.0.children().filter_map(SeqItem::cast)
     }
 }
 

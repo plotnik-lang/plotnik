@@ -18,6 +18,9 @@ pub struct DebugArgs {
     pub cst: bool,
     pub spans: bool,
     pub cardinalities: bool,
+    pub graph: bool,
+    pub graph_raw: bool,
+    pub types: bool,
     pub color: bool,
 }
 
@@ -51,7 +54,7 @@ pub fn run(args: DebugArgs) {
         q.link(&lang);
     }
 
-    let show_query = has_query_input && !args.symbols;
+    let show_query = has_query_input && !args.symbols && !args.graph && !args.types;
     let show_source = has_source_input;
     let show_headers = (show_query || args.symbols) && show_source;
 
@@ -83,6 +86,26 @@ pub fn run(args: DebugArgs) {
                 .with_cardinalities(args.cardinalities)
                 .dump()
         );
+    }
+
+    // Build graph if needed for --graph, --graph-raw, or --types
+    if (args.graph || args.graph_raw || args.types)
+        && let Some(q) = query.take()
+    {
+        let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump();
+        if args.graph_raw {
+            println!("=== GRAPH (raw) ===");
+            print!("{}", pre_opt_dump);
+        }
+        if args.graph {
+            println!("=== GRAPH ===");
+            print!("{}", q.graph().dump_live(q.dead_nodes()));
+        }
+        if args.types {
+            println!("=== TYPES ===");
+            print!("{}", q.type_info().dump());
+        }
+        return;
     }
 
     if show_source {

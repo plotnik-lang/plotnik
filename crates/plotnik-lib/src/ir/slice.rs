@@ -3,7 +3,7 @@
 //! `start_index` is an **element index**, not a byte offset. This naming
 //! distinguishes it from byte offsets like `StringRef.offset`.
 //!
-//! This struct is 6 bytes to fit the Transition layout requirements.
+//! This struct is 8 bytes with 4-byte alignment for efficient access.
 //! Type safety is provided through generic methods, not stored PhantomData.
 
 use std::marker::PhantomData;
@@ -13,20 +13,21 @@ use std::marker::PhantomData;
 /// Used for variable-length data (successors, effects, negated fields, type members).
 /// The slice references elements by index into the corresponding segment array.
 ///
-/// Layout: 6 bytes (4 + 2), no padding due to `repr(C, packed)`.
-/// Alignment is 1 due to packing, so reads may be unaligned on some platforms.
-#[repr(C, packed)]
+/// Layout: 8 bytes (4 + 2 + 2), align 4.
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Slice<T> {
     /// Element index into the segment array (NOT byte offset).
     start_index: u32,
     /// Number of elements. 65k elements per slice is sufficient.
     len: u16,
+    _pad: u16,
     _phantom: PhantomData<fn() -> T>,
 }
 
-// Compile-time size verification
-const _: () = assert!(size_of::<Slice<u8>>() == 6);
+// Compile-time size/alignment verification
+const _: () = assert!(size_of::<Slice<u8>>() == 8);
+const _: () = assert!(align_of::<Slice<u8>>() == 4);
 
 impl<T> Slice<T> {
     /// Creates a new slice.
@@ -35,6 +36,7 @@ impl<T> Slice<T> {
         Self {
             start_index,
             len,
+            _pad: 0,
             _phantom: PhantomData,
         }
     }
@@ -48,7 +50,6 @@ impl<T> Slice<T> {
     /// Returns the start index (element index, not byte offset).
     #[inline]
     pub fn start_index(&self) -> u32 {
-        // Packed struct - field may be unaligned, so copy out
         self.start_index
     }
 
@@ -80,7 +81,7 @@ impl<T> Default for Slice<T> {
 
 impl<T> PartialEq for Slice<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.start_index() == other.start_index() && self.len() == other.len()
+        self.start_index == other.start_index && self.len == other.len
     }
 }
 
@@ -89,8 +90,8 @@ impl<T> Eq for Slice<T> {}
 impl<T> std::fmt::Debug for Slice<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Slice")
-            .field("start_index", &self.start_index())
-            .field("len", &self.len())
+            .field("start_index", &self.start_index)
+            .field("len", &self.len)
             .finish()
     }
 }

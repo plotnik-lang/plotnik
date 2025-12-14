@@ -9,14 +9,18 @@
 //! Note: This module contains only type definitions. Query execution
 //! lives elsewhere.
 
+mod compiled;
 mod effect;
+mod emit;
 mod entrypoint;
 mod ids;
 mod matcher;
 mod nav;
 mod ref_transition;
+mod serialize;
 mod slice;
 mod string_ref;
+mod strings;
 mod transition;
 mod type_metadata;
 
@@ -33,7 +37,8 @@ mod string_ref_tests;
 
 // Re-export ID types
 pub use ids::{
-    DataFieldId, NodeFieldId, NodeTypeId, RefId, StringId, TransitionId, TypeId, VariantTagId,
+    DataFieldId, NodeFieldId, NodeTypeId, RefId, STRING_NONE, StringId, TransitionId, TypeId,
+    VariantTagId,
 };
 
 // Re-export TypeId constants
@@ -65,3 +70,20 @@ pub use string_ref::StringRef;
 
 // Re-export entrypoint
 pub use entrypoint::Entrypoint;
+
+// Re-export compiled query types
+pub use compiled::{
+    BUFFER_ALIGN, CompiledQuery, CompiledQueryBuffer, CompiledQueryOffsets, FORMAT_VERSION, MAGIC,
+    MatcherView, TransitionView, align_up,
+};
+
+// Re-export string interner
+pub use strings::StringInterner;
+
+// Re-export emitter
+pub use emit::{EmitError, EmitResult, MapResolver, NodeKindResolver, NullResolver, QueryEmitter};
+
+// Re-export serialization
+pub use serialize::{
+    HEADER_SIZE, SerializeError, SerializeResult, deserialize, from_bytes, serialize, to_bytes,
+};
