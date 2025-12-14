@@ -187,16 +187,21 @@ impl<'q, 'tree> QueryInterpreter<'q, 'tree> {
     }
 
     /// Run the query and return the result.
-    pub fn run(mut self) -> Result<Value<'tree>, RuntimeError> {
-        // Get the entry transition from the first entrypoint
+    pub fn run(self) -> Result<Value<'tree>, RuntimeError> {
+        // Get the entry transition from the last entrypoint (main definition)
         let start_transition = self
             .query
             .entrypoints()
-            .first()
+            .last()
             .map(|ep| ep.target())
             .unwrap_or(0);
 
-        match self.execute(start_transition) {
+        self.run_from(start_transition)
+    }
+
+    /// Run the query from a specific transition and return the result.
+    pub fn run_from(mut self, start: TransitionId) -> Result<Value<'tree>, RuntimeError> {
+        match self.execute(start) {
             Ok(true) => Ok(Materializer::materialize(&self.effects)),
             Ok(false) => Ok(Value::Null), // No match
             Err(e) => Err(e),

@@ -51,6 +51,7 @@ fn main() {
                 source_text: source.source_text,
                 source_file: source.source_file,
                 lang,
+                entry: output.entry,
                 pretty: output.pretty,
                 verbose_nodes: output.verbose_nodes,
                 check: output.check,

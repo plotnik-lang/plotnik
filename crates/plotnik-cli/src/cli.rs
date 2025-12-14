@@ -66,7 +66,8 @@ pub enum Command {
   plotnik exec -q '(identifier) @id' -s app.js
   plotnik exec -q '(identifier) @id' -s app.js --pretty
   plotnik exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
-  plotnik exec -q '(identifier) @id' -s app.js --check"#)]
+  plotnik exec -q '(identifier) @id' -s app.js --check
+  plotnik exec --query-file query.plnk -s app.js --entry FunctionDef"#)]
     Exec {
         #[command(flatten)]
         query: QueryArgs,
@@ -117,6 +118,10 @@ pub struct ExecOutputArgs {
     /// Validate output against inferred types
     #[arg(long)]
     pub check: bool,
+
+    /// Entry point name (definition to match from)
+    #[arg(long, value_name = "NAME")]
+    pub entry: Option<String>,
 }
 
 #[derive(Args)]

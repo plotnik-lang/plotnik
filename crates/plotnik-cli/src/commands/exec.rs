@@ -20,6 +20,7 @@ pub struct ExecArgs {
     pub pretty: bool,
     pub verbose_nodes: bool,
     pub check: bool,
+    pub entry: Option<String>,
 }
 
 struct LangResolver(Lang);
@@ -92,16 +93,43 @@ pub fn run(args: ExecArgs) {
     let tree = lang.parse(&source_code);
     let cursor = tree.walk();
 
+    // Find entry point
+    let entrypoint = match &args.entry {
+        Some(name) => compiled
+            .entrypoints()
+            .iter()
+            .find(|ep| compiled.string(ep.name_id()) == name)
+            .unwrap_or_else(|| {
+                let available: Vec<_> = compiled
+                    .entrypoints()
+                    .iter()
+                    .map(|ep| compiled.string(ep.name_id()))
+                    .collect();
+                eprintln!(
+                    "error: entry point '{}' not found. Available: {}",
+                    name,
+                    available.join(", ")
+                );
+                std::process::exit(1);
+            }),
+        None => compiled.entrypoints().last().unwrap_or_else(|| {
+            eprintln!("error: no entry points in query");
+            std::process::exit(1);
+        }),
+    };
+
     // Run interpreter
     let interpreter = QueryInterpreter::new(&compiled, cursor, &source_code);
-    let result = interpreter.run().unwrap_or_else(|e| {
-        eprintln!("error: {}", e);
-        std::process::exit(1);
-    });
+    let result = interpreter
+        .run_from(entrypoint.target())
+        .unwrap_or_else(|e| {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        });
 
     // Type checking against inferred types
     if args.check {
-        let expected_type = compiled.entrypoints().first().map(|e| e.result_type());
+        let expected_type = Some(entrypoint.result_type());
         if let Some(type_id) = expected_type
             && let Err(e) = validate_result(&result, type_id, &compiled)
         {
