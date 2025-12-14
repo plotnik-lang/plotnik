@@ -122,6 +122,8 @@ pub struct Query<'a> {
     qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
     /// Definitions with exactly 1 propagating capture (unwrap at root).
     single_capture_defs: HashSet<&'a str>,
+    /// Definitions with 2+ propagating captures (need struct wrapping at root).
+    multi_capture_defs: HashSet<&'a str>,
     /// Current definition name during graph construction.
     current_def_name: &'a str,
     /// Counter for generating unique ref IDs during graph construction.
@@ -165,6 +167,7 @@ impl<'a> Query<'a> {
             type_info: TypeInferenceResult::default(),
             qis_triggers: HashMap::new(),
             single_capture_defs: HashSet::new(),
+            multi_capture_defs: HashSet::new(),
             current_def_name: "",
             next_ref_id: 0,
         }

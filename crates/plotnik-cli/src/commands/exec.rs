@@ -6,7 +6,7 @@ use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
 use plotnik_lib::Query;
 use plotnik_lib::engine::interpreter::QueryInterpreter;
 use plotnik_lib::engine::validate::validate as validate_result;
-use plotnik_lib::engine::value::VerboseValue;
+use plotnik_lib::engine::value::{ResolvedValue, VerboseResolvedValue};
 use plotnik_lib::ir::{NodeKindResolver, QueryEmitter};
 
 use super::debug::source::resolve_lang;
@@ -101,10 +101,10 @@ pub fn run(args: ExecArgs) {
 
     // Output JSON
     let output = match (args.verbose_nodes, args.pretty) {
-        (true, true) => serde_json::to_string_pretty(&VerboseValue(&result)),
-        (true, false) => serde_json::to_string(&VerboseValue(&result)),
-        (false, true) => serde_json::to_string_pretty(&result),
-        (false, false) => serde_json::to_string(&result),
+        (true, true) => serde_json::to_string_pretty(&VerboseResolvedValue(&result, &compiled)),
+        (true, false) => serde_json::to_string(&VerboseResolvedValue(&result, &compiled)),
+        (false, true) => serde_json::to_string_pretty(&ResolvedValue(&result, &compiled)),
+        (false, false) => serde_json::to_string(&ResolvedValue(&result, &compiled)),
     };
 
     match output {

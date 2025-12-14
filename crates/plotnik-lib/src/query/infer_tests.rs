@@ -91,14 +91,14 @@ fn debug_incompatible_types_graph() {
     insta::assert_snapshot!(out, @r"
     Foo = (0)
 
-    (0) —𝜀→ (2), (4)
-    (1) —𝜀→ (✓)
+    (0) —𝜀—[StartObject]→ (2), (4)
     (2) —(a)—[CaptureNode]→ (3)
-    (3) —𝜀—[Field(v)]→ (1)
+    (3) —𝜀—[Field(v)]→ (7)
     (4) —(b)—[CaptureNode, ToString]→ (5)
-    (5) —𝜀—[Field(v)]→ (1)
+    (5) —𝜀—[Field(v)]→ (7)
+    (7) —𝜀—[EndObject]→ (✓)
 
-    (dead nodes: 0)
+    (dead nodes: 2)
 
     Foo = Node
 
@@ -385,12 +385,12 @@ fn incompatible_types_in_alternation() {
     insta::assert_snapshot!(result, @r"
     Foo = (0)
 
-    (0) —𝜀→ (2), (4)
-    (1) —𝜀→ (✓)
+    (0) —𝜀—[StartObject]→ (2), (4)
     (2) —(a)—[CaptureNode]→ (3)
-    (3) —𝜀—[Field(v)]→ (1)
+    (3) —𝜀—[Field(v)]→ (7)
     (4) —(b)—[CaptureNode, ToString]→ (5)
-    (5) —𝜀—[Field(v)]→ (1)
+    (5) —𝜀—[Field(v)]→ (7)
+    (7) —𝜀—[EndObject]→ (✓)
 
     Foo = Node
 

@@ -99,7 +99,29 @@ impl<'a> Query<'a> {
         for (name, body) in entries {
             self.current_def_name = name;
             let fragment = self.construct_expr(&body, NavContext::Root);
-            self.graph.add_definition(name, fragment.entry);
+
+            // Multi-capture definitions need struct wrapping at root
+            let entry = if self.multi_capture_defs.contains(name) {
+                let start_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(start_id)
+                    .add_effect(BuildEffect::StartObject {
+                        for_alternation: false,
+                    });
+                self.graph.connect(start_id, fragment.entry);
+
+                let end_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(end_id)
+                    .add_effect(BuildEffect::EndObject);
+                self.graph.connect(fragment.exit, end_id);
+
+                start_id
+            } else {
+                fragment.entry
+            };
+
+            self.graph.add_definition(name, entry);
         }
 
         self.link_references();

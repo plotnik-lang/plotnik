@@ -57,13 +57,15 @@ fn sequence() {
 #[test]
 fn sequence_with_captures() {
     insta::assert_snapshot!(snapshot("Q = { (a) @x (b) @y }"), @r"
-    Q = (1)
+    Q = (0)
 
-    (0) —𝜀→ (1)
+    (0) —𝜀—[StartObject]→ (1)
     (1) —{→}—(a)—[CaptureNode]→ (2)
     (2) —𝜀—[Field(x)]→ (3)
-    (3) —{→}—(b)—[CaptureNode]→ (4)
-    (4) —𝜀—[Field(y)]→ (✓)
+    (3) —{→}—(b)—[CaptureNode]→ (6)
+    (4) —𝜀—[Field(y)]→ (6)
+    (5) —𝜀—[StartObject]→ (0)
+    (6) —𝜀—[Field(y), EndObject]→ (✓)
     ");
 }
 
@@ -82,18 +84,20 @@ fn alternation_untagged() {
 #[test]
 fn alternation_tagged() {
     insta::assert_snapshot!(snapshot("Q = [ A: (a) @x  B: (b) @y ]"), @r"
-    Q = (0)
+    Q = (00)
 
-    (0) —𝜀→ (3), (7)
-    (1) —𝜀→ (✓)
-    (2) —𝜀—[StartVariant(A)]→ (3)
-    (3) —(a)—[StartVariant(A), CaptureNode]→ (5)
-    (4) —𝜀—[Field(x)]→ (5)
-    (5) —𝜀—[Field(x), EndVariant]→ (1)
-    (6) —𝜀—[StartVariant(B)]→ (7)
-    (7) —(b)—[StartVariant(B), CaptureNode]→ (9)
-    (8) —𝜀—[Field(y)]→ (9)
-    (9) —𝜀—[Field(y), EndVariant]→ (1)
+    (00) —𝜀—[StartObject]→ (03), (07)
+    (01) —𝜀→ (11)
+    (02) —𝜀—[StartVariant(A)]→ (03)
+    (03) —(a)—[StartVariant(A), CaptureNode]→ (05)
+    (04) —𝜀—[Field(x)]→ (05)
+    (05) —𝜀—[Field(x), EndVariant]→ (11)
+    (06) —𝜀—[StartVariant(B)]→ (07)
+    (07) —(b)—[StartVariant(B), CaptureNode]→ (09)
+    (08) —𝜀—[Field(y)]→ (09)
+    (09) —𝜀—[Field(y), EndVariant]→ (11)
+    (10) —𝜀—[StartObject]→ (00)
+    (11) —𝜀—[EndObject]→ (✓)
     ");
 }
 
@@ -224,12 +228,13 @@ fn optimized_simple() {
 #[test]
 fn optimized_sequence() {
     insta::assert_snapshot!(snapshot_optimized("Q = { (a) @x (b) @y }"), @r"
-    Q = (1)
+    Q = (0)
 
+    (0) —𝜀—[StartObject]→ (1)
     (1) —{→}—(a)—[CaptureNode]→ (2)
     (2) —𝜀—[Field(x)]→ (3)
-    (3) —{→}—(b)—[CaptureNode]→ (4)
-    (4) —𝜀—[Field(y)]→ (✓)
+    (3) —{→}—(b)—[CaptureNode]→ (6)
+    (6) —𝜀—[Field(y), EndObject]→ (✓)
     ");
 }
 

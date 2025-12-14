@@ -21,10 +21,12 @@ impl<'a> Query<'a> {
             .map(|(n, b)| (*n, b.clone()))
             .collect();
         for (name, body) in &entries {
-            // Detect single-capture definitions
+            // Detect single-capture and multi-capture definitions
             let captures = self.collect_propagating_captures(body);
             if captures.len() == 1 {
                 self.single_capture_defs.insert(*name);
+            } else if captures.len() >= 2 {
+                self.multi_capture_defs.insert(*name);
             }
             // Detect QIS within this definition
             self.detect_qis_in_expr(body);
@@ -118,5 +120,10 @@ impl<'a> Query<'a> {
     /// Check if definition has exactly 1 propagating capture (should unwrap).
     pub fn is_single_capture_def(&self, name: &str) -> bool {
         self.single_capture_defs.contains(name)
+    }
+
+    /// Check if definition has 2+ propagating captures (needs struct wrapping).
+    pub fn is_multi_capture_def(&self, name: &str) -> bool {
+        self.multi_capture_defs.contains(name)
     }
 }
