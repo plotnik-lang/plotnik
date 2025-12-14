@@ -91,11 +91,11 @@ pub fn run(args: ExecArgs) {
     // Type checking against inferred types
     if args.check {
         let expected_type = compiled.entrypoints().first().map(|e| e.result_type());
-        if let Some(type_id) = expected_type {
-            if let Err(e) = validate_result(&result, type_id, &compiled) {
-                eprintln!("type error: {}", e);
-                std::process::exit(1);
-            }
+        if let Some(type_id) = expected_type
+            && let Err(e) = validate_result(&result, type_id, &compiled)
+        {
+            eprintln!("type error: {}", e);
+            std::process::exit(1);
         }
     }
 
