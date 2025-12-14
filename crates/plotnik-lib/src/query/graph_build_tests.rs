@@ -17,122 +17,122 @@ fn snapshot_optimized(input: &str) -> String {
 #[test]
 fn simple_named_node() {
     insta::assert_snapshot!(snapshot("Q = (identifier)"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (identifier) → ∅
+    (0) —(identifier)→ (✓)
     ");
 }
 
 #[test]
 fn named_node_with_capture() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @id"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (identifier) [Capture] → N1
-    N1: ε [Field(id)] → ∅
+    (0) —(identifier)—[CaptureNode]→ (1)
+    (1) —𝜀—[Field(id)]→ (✓)
     ");
 }
 
 #[test]
 fn named_node_with_children() {
     insta::assert_snapshot!(snapshot("Q = (function_definition (identifier))"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (function_definition) → N1
-    N1: [Down] (identifier) → N2
-    N2: [Up(1)] ε → ∅
+    (0) —(function_definition)→ (1)
+    (1) —{↘}—(identifier)→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
     ");
 }
 
 #[test]
 fn sequence() {
     insta::assert_snapshot!(snapshot("Q = { (a) (b) }"), @r"
-    Q = N1
+    Q = (1)
 
-    N0: ε → N1
-    N1: [Next] (a) → N2
-    N2: [Next] (b) → ∅
+    (0) —𝜀→ (1)
+    (1) —{→}—(a)→ (2)
+    (2) —{→}—(b)→ (✓)
     ");
 }
 
 #[test]
 fn sequence_with_captures() {
     insta::assert_snapshot!(snapshot("Q = { (a) @x (b) @y }"), @r"
-    Q = N1
+    Q = (1)
 
-    N0: ε → N1
-    N1: [Next] (a) [Capture] → N2
-    N2: ε [Field(x)] → N3
-    N3: [Next] (b) [Capture] → N4
-    N4: ε [Field(y)] → ∅
+    (0) —𝜀→ (1)
+    (1) —{→}—(a)—[CaptureNode]→ (2)
+    (2) —𝜀—[Field(x)]→ (3)
+    (3) —{→}—(b)—[CaptureNode]→ (4)
+    (4) —𝜀—[Field(y)]→ (✓)
     ");
 }
 
 #[test]
 fn alternation_untagged() {
     insta::assert_snapshot!(snapshot("Q = [ (a) (b) ]"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: ε → N2, N3
-    N1: ε → ∅
-    N2: (a) → N1
-    N3: (b) → N1
+    (0) —𝜀→ (2), (3)
+    (1) —𝜀→ (✓)
+    (2) —(a)→ (1)
+    (3) —(b)→ (1)
     ");
 }
 
 #[test]
 fn alternation_tagged() {
     insta::assert_snapshot!(snapshot("Q = [ A: (a) @x  B: (b) @y ]"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: ε → N3, N7
-    N1: ε → ∅
-    N2: ε [Variant(A)] → N3
-    N3: (a) [Variant(A)] [Capture] → N5
-    N4: ε [Field(x)] → N5
-    N5: ε [Field(x)] [EndVariant] → N1
-    N6: ε [Variant(B)] → N7
-    N7: (b) [Variant(B)] [Capture] → N9
-    N8: ε [Field(y)] → N9
-    N9: ε [Field(y)] [EndVariant] → N1
+    (0) —𝜀→ (3), (7)
+    (1) —𝜀→ (✓)
+    (2) —𝜀—[StartVariant(A)]→ (3)
+    (3) —(a)—[StartVariant(A), CaptureNode]→ (5)
+    (4) —𝜀—[Field(x)]→ (5)
+    (5) —𝜀—[Field(x), EndVariant]→ (1)
+    (6) —𝜀—[StartVariant(B)]→ (7)
+    (7) —(b)—[StartVariant(B), CaptureNode]→ (9)
+    (8) —𝜀—[Field(y)]→ (9)
+    (9) —𝜀—[Field(y), EndVariant]→ (1)
     ");
 }
 
 #[test]
 fn quantifier_star() {
     insta::assert_snapshot!(snapshot("Q = (identifier)*"), @r"
-    Q = N1
+    Q = (1)
 
-    N0: (identifier) → N3
-    N1: ε [StartArray] → N4
-    N2: ε [EndArray] → ∅
-    N3: ε [Push] → N4
-    N4: ε → N0, N2
+    (0) —(identifier)→ (3)
+    (1) —𝜀—[StartArray]→ (4)
+    (2) —𝜀—[EndArray]→ (✓)
+    (3) —𝜀—[PushElement]→ (4)
+    (4) —𝜀→ (0), (2)
     ");
 }
 
 #[test]
 fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
-    Q = N1
+    Q = (1)
 
-    N0: (identifier) → N4
-    N1: ε [StartArray] → N0
-    N2: ε [EndArray] → ∅
-    N3: ε [Push] → N4
-    N4: ε [Push] → N0, N2
+    (0) —(identifier)→ (4)
+    (1) —𝜀—[StartArray]→ (0)
+    (2) —𝜀—[EndArray]→ (✓)
+    (3) —𝜀—[PushElement]→ (4)
+    (4) —𝜀—[PushElement]→ (0), (2)
     ");
 }
 
 #[test]
 fn quantifier_optional() {
     insta::assert_snapshot!(snapshot("Q = (identifier)?"), @r"
-    Q = N1
+    Q = (1)
 
-    N0: (identifier) → N2
-    N1: ε → N0, N3
-    N2: ε → ∅
-    N3: ε [Clear] → N2
+    (0) —(identifier)→ (2)
+    (1) —𝜀→ (0), (3)
+    (2) —𝜀→ (✓)
+    (3) —𝜀—[ClearCurrent]→ (2)
     ");
 }
 
@@ -143,74 +143,74 @@ fn reference() {
         B = (A)
     "#};
     insta::assert_snapshot!(snapshot(input), @r"
-    A = N0
-    B = N1
+    A = (0)
+    B = (1)
 
-    N0: (identifier) → ∅
-    N1: ε +Enter(0, A) → N0, N2
-    N2: ε +Exit(0) → ∅
+    (0) —(identifier)→ (✓)
+    (1) —<A>—𝜀→ (0), (2)
+    (2) —𝜀—<A>→ (✓)
     ");
 }
 
 #[test]
 fn anonymous_node() {
     insta::assert_snapshot!(snapshot(r#"Q = "hello""#), @r#"
-    Q = N0
+    Q = (0)
 
-    N0: "hello" → ∅
+    (0) —"hello"→ (✓)
     "#);
 }
 
 #[test]
 fn wildcard() {
     insta::assert_snapshot!(snapshot("Q = (_)"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: _ → ∅
+    (0) —(🞵)→ (✓)
     ");
 }
 
 #[test]
 fn field_constraint() {
     insta::assert_snapshot!(snapshot("Q = (function name: (identifier))"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (function) → N1
-    N1: [Down] (identifier) @name → N2
-    N2: [Up(1)] ε → ∅
+    (0) —(function)→ (1)
+    (1) —{↘}—(identifier)@name→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
     ");
 }
 
 #[test]
 fn to_string_annotation() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @name ::string"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (identifier) [Capture] [ToString] → N1
-    N1: ε [Field(name)] → ∅
+    (0) —(identifier)—[CaptureNode, ToString]→ (1)
+    (1) —𝜀—[Field(name)]→ (✓)
     ");
 }
 
 #[test]
 fn anchor_first_child() {
     insta::assert_snapshot!(snapshot("Q = (parent . (child))"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (parent) → N1
-    N1: [Down.] (child) → N2
-    N2: [Up(1)] ε → ∅
+    (0) —(parent)→ (1)
+    (1) —{↘.}—(child)→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
     ");
 }
 
 #[test]
 fn anchor_sibling() {
     insta::assert_snapshot!(snapshot("Q = (parent (a) . (b))"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (parent) → N1
-    N1: [Down] (a) → N2
-    N2: [Next.] (b) → N3
-    N3: [Up(1)] ε → ∅
+    (0) —(parent)→ (1)
+    (1) —{↘}—(a)→ (2)
+    (2) —{→·}—(b)→ (3)
+    (3) —{↗¹}—𝜀→ (✓)
     ");
 }
 
@@ -221,22 +221,22 @@ fn anchor_sibling() {
 #[test]
 fn optimized_simple() {
     insta::assert_snapshot!(snapshot_optimized("Q = (identifier) @id"), @r"
-    Q = N0
+    Q = (0)
 
-    N0: (identifier) [Capture] → N1
-    N1: ε [Field(id)] → ∅
+    (0) —(identifier)—[CaptureNode]→ (1)
+    (1) —𝜀—[Field(id)]→ (✓)
     ");
 }
 
 #[test]
 fn optimized_sequence() {
     insta::assert_snapshot!(snapshot_optimized("Q = { (a) @x (b) @y }"), @r"
-    Q = N1
+    Q = (1)
 
-    N1: [Next] (a) [Capture] → N2
-    N2: ε [Field(x)] → N3
-    N3: [Next] (b) [Capture] → N4
-    N4: ε [Field(y)] → ∅
+    (1) —{→}—(a)—[CaptureNode]→ (2)
+    (2) —𝜀—[Field(x)]→ (3)
+    (3) —{→}—(b)—[CaptureNode]→ (4)
+    (4) —𝜀—[Field(y)]→ (✓)
     ");
 }
 
@@ -254,14 +254,14 @@ fn symbol_table_reuse() {
     assert!(query.graph().definition("Baz").is_some());
 
     insta::assert_snapshot!(query.graph().dump(), @r"
-    Foo = N0
-    Bar = N1
-    Baz = N3
+    Foo = (0)
+    Bar = (1)
+    Baz = (3)
 
-    N0: (identifier) → ∅
-    N1: ε +Enter(0, Foo) → N0, N2
-    N2: ε +Exit(0) → ∅
-    N3: ε +Enter(1, Bar) → N1, N4
-    N4: ε +Exit(1) → ∅
+    (0) —(identifier)→ (✓)
+    (1) —<Foo>—𝜀→ (0), (2)
+    (2) —𝜀—<Foo>→ (✓)
+    (3) —<Bar>—𝜀→ (1), (4)
+    (4) —𝜀—<Bar>→ (✓)
     ");
 }
