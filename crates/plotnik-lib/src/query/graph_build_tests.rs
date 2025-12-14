@@ -28,8 +28,7 @@ fn named_node_with_capture() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @id"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode]→ (1)
-    (1) —𝜀—[Field(id)]→ (✓)
+    (0) —(identifier)—[CaptureNode]→ (✓)
     ");
 }
 
@@ -186,8 +185,7 @@ fn to_string_annotation() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @name ::string"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode, ToString]→ (1)
-    (1) —𝜀—[Field(name)]→ (✓)
+    (0) —(identifier)—[CaptureNode, ToString]→ (✓)
     ");
 }
 
@@ -219,8 +217,7 @@ fn optimized_simple() {
     insta::assert_snapshot!(snapshot_optimized("Q = (identifier) @id"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode]→ (1)
-    (1) —𝜀—[Field(id)]→ (✓)
+    (0) —(identifier)—[CaptureNode]→ (✓)
     ");
 }
 

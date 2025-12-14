@@ -37,29 +37,27 @@ fn debug_star_quantifier_graph() {
     out.push_str(&query.type_info().dump());
     insta::assert_snapshot!(out, @r"
     (pre-optimization)
-    Foo = (4)
+    Foo = (3)
 
     (0) —(_)→ (1)
     (1) —{↘}—(item)—[CaptureNode]→ (2)
-    (2) —𝜀—[Field(items)]→ (3)
-    (3) —{↗¹}—𝜀→ (6)
-    (4) —𝜀—[StartArray]→ (7)
-    (5) —𝜀—[EndArray]→ (✓)
-    (6) —𝜀—[PushElement]→ (7)
-    (7) —𝜀→ (0), (5)
+    (2) —{↗¹}—𝜀→ (5)
+    (3) —𝜀—[StartArray]→ (6)
+    (4) —𝜀—[EndArray]→ (✓)
+    (5) —𝜀—[PushElement]→ (6)
+    (6) —𝜀→ (0), (4)
 
     (post-optimization)
-    Foo = (4)
+    Foo = (3)
 
     (0) —(_)→ (1)
-    (1) —{↘}—(item)—[CaptureNode]→ (2)
-    (2) —𝜀—[Field(items)]→ (6)
-    (4) —𝜀—[StartArray]→ (7)
-    (5) —𝜀—[EndArray]→ (✓)
-    (6) —{↗¹}—𝜀—[PushElement]→ (7)
-    (7) —𝜀→ (0), (5)
+    (1) —{↘}—(item)—[CaptureNode]→ (5)
+    (3) —𝜀—[StartArray]→ (6)
+    (4) —𝜀—[EndArray]→ (✓)
+    (5) —{↗¹}—𝜀—[PushElement]→ (6)
+    (6) —𝜀→ (0), (4)
 
-    Foo = { items: [Node] }
+    Foo = [Node]
     ");
 }
 
@@ -69,10 +67,9 @@ fn debug_graph_structure() {
     insta::assert_snapshot!(result, @r"
     Foo = (0)
 
-    (0) —(identifier)—[CaptureNode]→ (1)
-    (1) —𝜀—[Field(name)]→ (✓)
+    (0) —(identifier)—[CaptureNode]→ (✓)
 
-    Foo = { name: Node }
+    Foo = Node
     ");
 }
 
@@ -103,7 +100,7 @@ fn debug_incompatible_types_graph() {
 
     (dead nodes: 0)
 
-    Foo = { v: Node }
+    Foo = Node
 
     Errors:
       field `v` in `Foo`: incompatible types [Node, String]
@@ -113,13 +110,13 @@ fn debug_incompatible_types_graph() {
 #[test]
 fn single_node_capture() {
     let result = infer("Foo = (identifier) @name");
-    insta::assert_snapshot!(result, @"Foo = { name: Node }");
+    insta::assert_snapshot!(result, @"Foo = Node");
 }
 
 #[test]
 fn string_capture() {
     let result = infer("Foo = (identifier) @name ::string");
-    insta::assert_snapshot!(result, @"Foo = { name: str }");
+    insta::assert_snapshot!(result, @"Foo = str");
 }
 
 #[test]
@@ -147,11 +144,12 @@ fn captured_sequence_creates_struct() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
+    Foo = FooScope3
+
     FooScope3 = {
       x: Node
       y: Node
     }
-    Foo = { z: FooScope3 }
     ");
 }
 
@@ -163,12 +161,13 @@ fn nested_captured_sequence() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
+    Foo = FooScope4
+
     FooScope3 = { b: Node }
     FooScope4 = {
       a: Node
       nested: FooScope3
     }
-    Foo = { root: FooScope4 }
     ");
 }
 
@@ -194,7 +193,7 @@ fn untagged_alternation_symmetric() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @"Foo = { v: Node }");
+    insta::assert_snapshot!(result, @"Foo = Node");
 }
 
 #[test]
@@ -235,11 +234,12 @@ fn tagged_alternation_captured_creates_enum() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
+    Foo = FooScope3
+
     FooScope3 = {
       A => Node
       B => Node
     }
-    Foo = { choice: FooScope3 }
     ");
 }
 
@@ -251,30 +251,31 @@ fn captured_untagged_alternation_creates_struct() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
+    Foo = FooScope3
+
     FooScope3 = {
       x: Node?
       y: Node?
     }
-    Foo = { val: FooScope3 }
     ");
 }
 
 #[test]
 fn star_quantifier() {
     let result = infer("Foo = ((item) @items)*");
-    insta::assert_snapshot!(result, @"Foo = { items: [Node] }");
+    insta::assert_snapshot!(result, @"Foo = [Node]");
 }
 
 #[test]
 fn plus_quantifier() {
     let result = infer("Foo = ((item) @items)+");
-    insta::assert_snapshot!(result, @"Foo = { items: [Node]⁺ }");
+    insta::assert_snapshot!(result, @"Foo = [Node]⁺");
 }
 
 #[test]
 fn optional_quantifier() {
     let result = infer("Foo = ((item) @maybe)?");
-    insta::assert_snapshot!(result, @"Foo = { maybe: Node? }");
+    insta::assert_snapshot!(result, @"Foo = Node?");
 }
 
 #[test]
@@ -306,7 +307,7 @@ fn qis_single_capture_no_trigger() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @"Single = { item: [Node] }");
+    insta::assert_snapshot!(result, @"Single = [Node]");
 }
 
 #[test]
@@ -341,25 +342,26 @@ fn quantified_seq_with_inline_tagged_alt() {
 
     let result = infer_with_graph(input);
     insta::assert_snapshot!(result, @r"
-    Test = (11)
+    Test = (09)
 
     (00) —𝜀—[StartObject]→ (01)
-    (01) —{→}—𝜀→ (04), (08)
-    (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (06)
-    (06) —𝜀—[Field(x), EndVariant]→ (15)
-    (08) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (10)
-    (10) —𝜀—[Field(y), EndVariant]→ (15)
-    (11) —𝜀—[StartObject, StartArray]→ (16)
-    (15) —𝜀—[EndObject, PushElement]→ (16)
-    (16) —𝜀→ (00), (19)
-    (19) —𝜀—[EndArray, EndObject, Field(items)]→ (✓)
+    (01) —{→}—𝜀→ (04), (07)
+    (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (05)
+    (05) —𝜀—[EndVariant]→ (13)
+    (07) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (08)
+    (08) —𝜀—[EndVariant]→ (13)
+    (09) —𝜀—[StartArray]→ (14)
+    (10) —𝜀—[EndArray]→ (✓)
+    (13) —𝜀—[EndObject, PushElement]→ (14)
+    (14) —𝜀→ (00), (10)
+
+    Test = T6
 
     TestScope3 = {
       x: Node?
       y: Node?
     }
     T6 = [TestScope3]
-    Test = { items: T6 }
     ");
 }
 
@@ -390,7 +392,7 @@ fn incompatible_types_in_alternation() {
     (4) —(b)—[CaptureNode, ToString]→ (5)
     (5) —𝜀—[Field(v)]→ (1)
 
-    Foo = { v: Node }
+    Foo = Node
 
     Errors:
       field `v` in `Foo`: incompatible types [Node, String]
@@ -406,7 +408,8 @@ fn multiple_definitions() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    Func = { name: Node }
+    Func = Node
+
     Class = {
       name: Node
       body: Node
@@ -421,17 +424,17 @@ fn deeply_nested_node() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @"Foo = { val: Node }");
+    insta::assert_snapshot!(result, @"Foo = Node");
 }
 
 #[test]
 fn wildcard_capture() {
     let result = infer("Foo = _ @any");
-    insta::assert_snapshot!(result, @"Foo = { any: Node }");
+    insta::assert_snapshot!(result, @"Foo = Node");
 }
 
 #[test]
 fn string_literal_capture() {
     let result = infer(r#"Foo = "+" @op"#);
-    insta::assert_snapshot!(result, @"Foo = { op: Node }");
+    insta::assert_snapshot!(result, @"Foo = Node");
 }

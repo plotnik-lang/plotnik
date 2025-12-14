@@ -335,14 +335,25 @@ impl<'src> InferenceContext<'src> {
 
         self.report_merge_errors(&merge_errors);
 
-        // Build result type from scope
-        if !scope.fields.is_empty() {
-            self.create_struct_type(def_name, &scope)
-        } else if result.is_meaningful {
-            // QIS or other expressions that produce a meaningful type without populating scope
-            result.base_type
-        } else {
-            TYPE_VOID
+        // Build result type from scope (Payload Rule from ADR-0009)
+        match scope.fields.len() {
+            0 => {
+                if result.is_meaningful {
+                    // QIS or other expressions that produce a meaningful type without populating scope
+                    result.base_type
+                } else {
+                    TYPE_VOID
+                }
+            }
+            1 => {
+                // Single capture at definition root: unwrap to capture's type
+                let (_, info) = scope.fields.iter().next().unwrap();
+                self.wrap_with_cardinality(info.base_type, info.cardinality)
+            }
+            _ => {
+                // Multiple captures: create struct
+                self.create_struct_type(def_name, &scope)
+            }
         }
     }
 

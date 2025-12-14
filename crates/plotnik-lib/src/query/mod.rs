@@ -120,6 +120,10 @@ pub struct Query<'a> {
     type_info: TypeInferenceResult<'a>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
     qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+    /// Definitions with exactly 1 propagating capture (unwrap at root).
+    single_capture_defs: HashSet<&'a str>,
+    /// Current definition name during graph construction.
+    current_def_name: &'a str,
     /// Counter for generating unique ref IDs during graph construction.
     next_ref_id: u32,
 }
@@ -160,6 +164,8 @@ impl<'a> Query<'a> {
             dead_nodes: HashSet::new(),
             type_info: TypeInferenceResult::default(),
             qis_triggers: HashMap::new(),
+            single_capture_defs: HashSet::new(),
+            current_def_name: "",
             next_ref_id: 0,
         }
     }
@@ -205,7 +211,7 @@ impl<'a> Query<'a> {
         if !self.is_valid() {
             return self;
         }
-        self.detect_qis();
+        self.detect_capture_scopes();
         self.construct_graph();
         self.infer_types(); // Run before optimization to avoid merged effects
         self.optimize_graph();
@@ -217,7 +223,7 @@ impl<'a> Query<'a> {
         if !self.is_valid() {
             return (self, String::new());
         }
-        self.detect_qis();
+        self.detect_capture_scopes();
         self.construct_graph();
         let pre_opt_dump = self.graph.dump();
         self.infer_types();

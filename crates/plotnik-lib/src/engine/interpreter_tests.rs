@@ -69,7 +69,16 @@ fn capture_identifier() {
 
     let result = run(query, src);
 
-    insta::assert_snapshot!(result, @"");
+    insta::assert_snapshot!(result, @r#"
+    {
+      "kind": "identifier",
+      "text": "x",
+      "range": [
+        0,
+        1
+      ]
+    }
+    "#);
 }
 
 #[test]
@@ -80,7 +89,16 @@ fn capture_number() {
 
     let result = run(query, src);
 
-    insta::assert_snapshot!(result, @"");
+    insta::assert_snapshot!(result, @r#"
+    {
+      "kind": "number",
+      "text": "42",
+      "range": [
+        0,
+        2
+      ]
+    }
+    "#);
 }
 
 #[test]

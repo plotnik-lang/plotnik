@@ -97,6 +97,7 @@ impl<'a> Query<'a> {
             .map(|(name, body)| (*name, body.clone()))
             .collect();
         for (name, body) in entries {
+            self.current_def_name = name;
             let fragment = self.construct_expr(&body, NavContext::Root);
             self.graph.add_definition(name, fragment.entry);
         }
@@ -464,45 +465,50 @@ impl<'a> Query<'a> {
             }
         }
 
-        if let Some(name) = capture_name {
-            let span = capture_token
-                .as_ref()
-                .map(|t| t.text_range())
-                .unwrap_or_default();
+        let Some(name) = capture_name else {
+            return inner_frag;
+        };
 
-            // Check if we're capturing an alternation (for enum vs struct distinction)
-            let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
-
-            let (entry, exit) = if needs_object_wrapper {
-                // Wrap with StartObject/EndObject for composite captures
-                let start_id = self.graph.add_epsilon();
-                self.graph
-                    .node_mut(start_id)
-                    .add_effect(BuildEffect::StartObject {
-                        for_alternation: is_alternation_capture,
-                    });
-                self.graph.connect(start_id, inner_frag.entry);
-
-                let end_id = self.graph.add_epsilon();
-                self.graph
-                    .node_mut(end_id)
-                    .add_effect(BuildEffect::EndObject);
-                self.graph.connect(inner_frag.exit, end_id);
-
-                (start_id, end_id)
-            } else {
-                (inner_frag.entry, inner_frag.exit)
-            };
-
-            let field_id = self.graph.add_epsilon();
-            self.graph
-                .node_mut(field_id)
-                .add_effect(BuildEffect::Field { name, span });
-            self.graph.connect(exit, field_id);
-            Fragment::new(entry, field_id)
-        } else {
-            inner_frag
+        // Single-capture definitions unwrap: no Field effect, type is capture's type directly
+        if self.single_capture_defs.contains(self.current_def_name) {
+            return inner_frag;
         }
+
+        let span = capture_token
+            .as_ref()
+            .map(|t| t.text_range())
+            .unwrap_or_default();
+
+        // Check if we're capturing an alternation (for enum vs struct distinction)
+        let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
+
+        let (entry, exit) = if needs_object_wrapper {
+            // Wrap with StartObject/EndObject for composite captures
+            let start_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(start_id)
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: is_alternation_capture,
+                });
+            self.graph.connect(start_id, inner_frag.entry);
+
+            let end_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(end_id)
+                .add_effect(BuildEffect::EndObject);
+            self.graph.connect(inner_frag.exit, end_id);
+
+            (start_id, end_id)
+        } else {
+            (inner_frag.entry, inner_frag.exit)
+        };
+
+        let field_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(field_id)
+            .add_effect(BuildEffect::Field { name, span });
+        self.graph.connect(exit, field_id);
+        Fragment::new(entry, field_id)
     }
 
     fn construct_quantifier(&mut self, quant: &QuantifiedExpr, ctx: NavContext) -> Fragment {

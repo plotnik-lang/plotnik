@@ -1,7 +1,7 @@
-//! Quantifier-Induced Scope (QIS) detection.
+//! Capture scope detection: QIS and single-capture definitions.
 //!
-//! QIS triggers when a quantified expression has ≥2 propagating captures.
-//! This creates an implicit object scope so captures stay coupled per-iteration.
+//! - QIS triggers when a quantified expression has ≥2 propagating captures.
+//! - Single-capture definitions unwrap to their capture's type directly.
 //!
 //! See ADR-0009 for full specification.
 
@@ -10,13 +10,23 @@ use crate::parser::{ast, token_src};
 use super::{QisTrigger, Query};
 
 impl<'a> Query<'a> {
-    /// Detect Quantifier-Induced Scope triggers.
+    /// Detect capture scopes: QIS triggers and single-capture definitions.
     ///
-    /// QIS triggers when a quantified expression has ≥2 propagating captures
-    /// (captures not absorbed by inner scopes like `{...} @x` or `[A: ...] @x`).
-    pub(super) fn detect_qis(&mut self) {
-        let bodies: Vec<_> = self.symbol_table.values().cloned().collect();
-        for body in &bodies {
+    /// - QIS triggers when quantified expression has ≥2 propagating captures
+    /// - Single-capture definitions unwrap (no Field effect, type is capture's type)
+    pub(super) fn detect_capture_scopes(&mut self) {
+        let entries: Vec<_> = self
+            .symbol_table
+            .iter()
+            .map(|(n, b)| (*n, b.clone()))
+            .collect();
+        for (name, body) in &entries {
+            // Detect single-capture definitions
+            let captures = self.collect_propagating_captures(body);
+            if captures.len() == 1 {
+                self.single_capture_defs.insert(*name);
+            }
+            // Detect QIS within this definition
             self.detect_qis_in_expr(body);
         }
     }
@@ -48,7 +58,7 @@ impl<'a> Query<'a> {
     }
 
     /// Collect captures that propagate out of an expression (not absorbed by inner scopes).
-    fn collect_propagating_captures(&self, expr: &ast::Expr) -> Vec<&'a str> {
+    pub(super) fn collect_propagating_captures(&self, expr: &ast::Expr) -> Vec<&'a str> {
         let mut captures = Vec::new();
         self.collect_propagating_captures_impl(expr, &mut captures);
         captures
@@ -103,5 +113,10 @@ impl<'a> Query<'a> {
     /// Get QIS trigger info for a quantified expression.
     pub fn qis_trigger(&self, q: &ast::QuantifiedExpr) -> Option<&QisTrigger<'a>> {
         self.qis_triggers.get(q)
+    }
+
+    /// Check if definition has exactly 1 propagating capture (should unwrap).
+    pub fn is_single_capture_def(&self, name: &str) -> bool {
+        self.single_capture_defs.contains(name)
     }
 }
