@@ -499,16 +499,20 @@ impl<'a> Query<'a> {
             _ => false,
         };
 
-        let matchers = self.find_all_matchers(inner_frag.entry);
-        for matcher_id in matchers {
-            self.graph
-                .node_mut(matcher_id)
-                .add_effect(BuildEffect::CaptureNode);
-
-            if has_to_string {
+        // Only add CaptureNode to inner matchers when capturing a node directly.
+        // Captured containers (seq/alt) capture structure, not individual nodes.
+        if !needs_object_wrapper {
+            let matchers = self.find_all_matchers(inner_frag.entry);
+            for matcher_id in matchers {
                 self.graph
                     .node_mut(matcher_id)
-                    .add_effect(BuildEffect::ToString);
+                    .add_effect(BuildEffect::CaptureNode);
+
+                if has_to_string {
+                    self.graph
+                        .node_mut(matcher_id)
+                        .add_effect(BuildEffect::ToString);
+                }
             }
         }
 
@@ -518,7 +522,37 @@ impl<'a> Query<'a> {
 
         // Single-capture definitions unwrap: no Field effect, type is capture's type directly.
         // Only the specific propagating capture should unwrap, not nested captures.
-        if self.is_single_capture(self.current_def_name, name) {
+        let is_single_capture = self.is_single_capture(self.current_def_name, name);
+
+        if is_single_capture && needs_object_wrapper {
+            // Captured container at single-capture definition root
+            let inner_captures = self.collect_propagating_captures(&inner_expr);
+            if inner_captures.is_empty() {
+                // No inner captures → Void (per ADR-0009 Payload Rule).
+                // Return epsilon for matching only, discard inner effects.
+                return self.graph.epsilon_fragment();
+            }
+            // Has inner captures → wrap with StartObject/EndObject but skip outer Field
+            let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
+            let start_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(start_id)
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: is_alternation_capture,
+                });
+            self.graph.connect(start_id, inner_frag.entry);
+
+            let end_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(end_id)
+                .add_effect(BuildEffect::EndObject);
+            self.graph.connect(inner_frag.exit, end_id);
+
+            return Fragment::new(start_id, end_id);
+        }
+
+        if is_single_capture {
+            // Non-container single capture: unwrap directly
             return inner_frag;
         }
 

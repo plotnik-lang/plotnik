@@ -430,6 +430,10 @@ impl<'src> InferenceContext<'src> {
                 for child in s.children() {
                     self.infer_expr(&child, &mut nested_scope, Cardinality::One, errors);
                 }
+                // Per ADR-0009 Payload Rule: 0 captures → Void
+                if nested_scope.is_empty() {
+                    return TYPE_VOID;
+                }
                 let type_name = self.generate_scope_name();
                 self.create_struct_type(type_name, &nested_scope)
             }
@@ -442,6 +446,10 @@ impl<'src> InferenceContext<'src> {
                     // Captured untagged alternation → Struct with merged fields
                     let mut nested_scope = ScopeInfo::default();
                     self.infer_untagged_alternation(a, &mut nested_scope, Cardinality::One, errors);
+                    // Per ADR-0009 Payload Rule: 0 captures → Void
+                    if nested_scope.is_empty() {
+                        return TYPE_VOID;
+                    }
                     let type_name = self.generate_scope_name();
                     self.create_struct_type(type_name, &nested_scope)
                 }
