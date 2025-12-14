@@ -5,91 +5,88 @@
 
 ## Context
 
-Type inference transforms a `BuildGraph` into `TypeDef`/`TypeMember` structures (ADR-0007). This ADR formalizes the inference rules, particularly the semantics of alternations.
+Type inference transforms a query into typed structures. This ADR formalizes the inference rules with a unified conceptual model.
 
 ## Decision
+
+### Core Principle
+
+The type system reduces to two orthogonal concepts:
+
+1. **Scope boundaries** — where captures land
+2. **Payload rule** — what type a scope produces
+
+> Captures bubble up to the nearest scope boundary; each scope's type is determined by its capture count and scope kind.
 
 ### Type Universe
 
 ```
-τ ::= Void              -- definition with no captures (TypeId = 0)
+τ ::= Void              -- no captures (TypeId = 0)
     | Node              -- AST node reference (TypeId = 1)
     | String            -- extracted source text (TypeId = 2)
-    | Optional(τ)       -- nullable wrapper
+    | Optional(τ)       -- zero or one
     | ArrayStar(τ)      -- zero or more
     | ArrayPlus(τ)      -- one or more
-    | Struct(fields)    -- struct with named fields
+    | Struct(fields)    -- named fields
     | Enum(variants)    -- tagged union
 ```
 
-### Cardinality
+### Captures
 
-Cardinality describes how many values a capture produces:
+A capture `@name` creates a field that bubbles up to the nearest enclosing scope.
 
-| Cardinality | Notation | Wrapper     | Semantics    |
-| ----------- | -------- | ----------- | ------------ |
-| Required    | `1`      | none        | exactly one  |
-| Optional    | `?`      | `Optional`  | zero or one  |
-| Star        | `*`      | `ArrayStar` | zero or more |
-| Plus        | `+`      | `ArrayPlus` | one or more  |
+| Pattern         | Field Type           |
+| --------------- | -------------------- |
+| `(node) @x`     | `Node`               |
+| `"literal" @x`  | `Node`               |
+| `@x ::string`   | `String`             |
+| `@x ::TypeName` | `TypeName` (nominal) |
+| `{...} @x`      | scope payload        |
+| `[...] @x`      | scope payload        |
 
-Cardinality propagates through nesting:
+### Scope Boundaries
 
-```
-outer * inner = result
-──────────────────────
-  1   *   1   =   1
-  1   *   ?   =   ?
-  1   *   *   =   *
-  1   *   +   =   +
-  ?   *   1   =   ?
-  ?   *   ?   =   ?
-  ?   *   *   =   *
-  ?   *   +   =   *
-  *   *   1   =   *
-  *   *   ?   =   *
-  *   *   *   =   *
-  *   *   +   =   *
-  +   *   1   =   +
-  +   *   ?   =   *
-  +   *   *   =   *
-  +   *   +   =   +
-```
-
-### Scope Rules
-
-A **scope** is a container that collects captures into fields.
+**Golden rule**: `{}` and `[]` create a scope **only when captured**.
 
 Scopes are created by:
 
-1. **Definition root**: inherits the scope type of its root expression (see below)
-2. **Captured sequence**: `{...} @name` creates a nested Struct scope
-3. **Captured tagged alternation**: `[A: ... B: ...] @name` creates an Enum; each variant has its own scope
-4. **Captured untagged alternation**: `[...] @name` creates a Struct; captures from branches merge
+1. **Definition root**: `Def = expr` — always a scope
+2. **Captured sequence**: `{...} @name` — creates Struct scope
+3. **Captured tagged alternation**: `[A: ... B: ...] @name` — creates Enum scope
+4. **Captured untagged alternation**: `[...] @name` — creates Struct scope (merged fields)
+5. **QIS** (Quantifier-Induced Scope): auto-created when quantifier has ≥2 captures
+6. **Reference**: `(Def)` is opaque — blocks propagation entirely
 
-**Definition root semantics**: A definition `Foo = expr` is equivalent to capturing the root expression with the definition name. Therefore:
+**Uncaptured containers are transparent**:
 
-- `Foo = [ A: ... B: ... ]` → `Foo` is an Enum (tagged alternation at root)
-- `Foo = { ... }` or `Foo = (node ...)` → `Foo` is a Struct (captures propagate to root scope)
-- `Foo = (node) @x` → `Foo` is a Struct with field `x`
+- `{...}` without `@name` — captures pass through to outer scope
+- `[...]` without `@name` — captures pass through (asymmetric ones become Optional)
+- `[A: ... B: ...]` without `@name` — **tags ignored**, behaves like untagged
 
-**Critical rule**: Tags only have effect when the alternation is captured. An _inline_ uncaptured tagged alternation behaves identically to an untagged one—captures propagate to parent scope.
+### Payload Rule
 
-### Flat Scoping Principle
+| Captures | Payload Type            |
+| -------- | ----------------------- |
+| 0        | `Void`                  |
+| 1        | unwrap OR `Struct`      |
+| ≥2       | `Struct { field, ... }` |
 
-Query nesting does NOT create data nesting. Intermediate structure is invisible:
+**Unwrap applies to** (1 capture → capture's type directly):
 
-```plotnik
-Query = (a (b (c) @val))
-```
+- Definition roots
+- Enum variants
+- QIS element types
 
-Result type: `Struct { val: Node }` — the `(a ...)` and `(b ...)` wrappers contribute nothing.
+**Always Struct** (1 capture → `Struct { field }`):
 
-Only explicit scope markers (`{...} @x`, `[...] @x` with tags) introduce nesting in the output type.
+- Captured sequences `{...} @name`
+- Captured untagged alternations `[...] @name`
+
+**Rationale**: Explicit `@name` on a container signals intent to preserve structure. Definition roots and enum variants unwrap because the container name (def name / variant tag) already provides context.
 
 ### Reference Opacity
 
-References are opaque to captures: calling `(Foo)` does NOT inherit captures from `Foo`.
+References are opaque barriers. Calling `(Foo)` does NOT inherit `Foo`'s captures.
 
 ```plotnik
 A = (identifier) @name
@@ -99,401 +96,128 @@ C = (A) @node
 
 Types:
 
-- `A { name: Node }` — has the capture
-- `B {}` (Void) — calling A produces no fields in B
-- `C { node: Node }` — captures the reference itself, not A's internals
+- `A` → `Node` (1 capture, unwrapped)
+- `B` → `Void` (0 captures — A's captures don't leak)
+- `C` → `Node` (1 capture of type `A`, which is `Node`)
 
-To access A's captures, you must either:
+To access a definition's structure, capture it: `(Foo) @foo` yields a field of type `Foo`.
 
-1. Inline A's pattern into B
-2. Capture the reference: `(A) @a` yields `{ a: A }` where `a` has type `A`
+### Flat Scoping Principle
 
-This matches runtime semantics ([ADR-0006](ADR-0006-dynamic-query-execution.md)): Enter pushes a frame and jumps to the definition; Exit pops and returns. The caller only sees what it explicitly captures.
-
-### Type Inference for Captures
-
-| Pattern                       | Inferred Type        |
-| ----------------------------- | -------------------- |
-| `(node) @x`                   | `Node`               |
-| `"literal" @x`                | `Node`               |
-| `@x ::string`                 | `String`             |
-| `@x ::TypeName`               | `TypeName` (nominal) |
-| `{...} @x`                    | synthetic Struct     |
-| `[A: ... B: ...] @x` (tagged) | Enum with variants   |
-| `[...] @x` (untagged)         | merged Struct        |
-
-### Alternation Semantics
-
-This is the most complex part of type inference. The key insight:
-
-> **Tags only matter when the alternation is captured.**
-
-#### Case 1: Uncaptured Alternation (Tagged or Untagged)
-
-Captures propagate to the parent scope. Asymmetric captures become Optional.
+Query nesting does NOT create data nesting. Only scope boundaries matter:
 
 ```plotnik
-Foo = [ A: (a) @x  B: (b) @y ]
+Query = (a (b (c) @val))
 ```
 
-Despite tags, this is uncaptured. Behavior:
-
-- `@x` appears only in branch A → propagates as `Optional(Node)`
-- `@y` appears only in branch B → propagates as `Optional(Node)`
-- Result: `Foo { x: Optional(Node), y: Optional(Node) }`
+Result: `Node` — the `(a ...)` and `(b ...)` wrappers contribute nothing. Single capture at def root unwraps.
 
 ```plotnik
-Bar = [ (a) @v  (b) @v ]
+Query = (a (b (c) @x (d) @y))
 ```
 
-Untagged, uncaptured. Both branches have `@v`:
+Result: `Struct { x: Node, y: Node }` — two captures form a struct.
 
-- `@v` appears in all branches with type `Node` → propagates as `Node`
-- Result: `Bar { v: Node }`
+### Cardinality
 
-#### Case 2: Captured Untagged Alternation
+Cardinality describes how many values a capture produces:
 
-Creates a Struct scope. Captures from branches merge into it.
+| Cardinality | Notation | Wrapper     |
+| ----------- | -------- | ----------- |
+| Required    | `1`      | none        |
+| Optional    | `?`      | `Optional`  |
+| Star        | `*`      | `ArrayStar` |
+| Plus        | `+`      | `ArrayPlus` |
 
-```plotnik
-Foo = [ (a) @x  (b) @y ] @z
-```
-
-- `@z` creates a Struct scope
-- `@x` and `@y` are asymmetric → both become Optional within `@z`'s scope
-- Result: `Foo { z: FooZ }` where `FooZ { x: Optional(Node), y: Optional(Node) }`
-
-```plotnik
-Bar = [ (a) @v  (b) @v ] @z
-```
-
-- `@z` creates a Struct scope
-- `@v` appears in all branches → required within `@z`'s scope
-- Result: `Bar { z: BarZ }` where `BarZ { v: Node }`
-
-#### Case 3: Captured Tagged Alternation
-
-Creates an Enum. Each variant has its own independent scope, subject to **Single-Capture Variant Flattening** (see below).
-
-```plotnik
-Foo = [ A: (a) @x  B: (b) @y ] @z
-```
-
-- `@z` creates an Enum because tags are present AND alternation is captured
-- Variant `A` has scope with `@x: Node`
-- Variant `B` has scope with `@y: Node`
-- Both variants have exactly 1 capture → flattened
-- Result: `Foo { z: FooZ }` where `FooZ` is:
-  ```
-  Enum FooZ { A(Node), B(Node) }
-  ```
-
-#### Single-Capture Variant Flattening
-
-When a tagged alternation variant has exactly one capture, the wrapper struct is eliminated—the variant payload becomes the capture's type directly.
-
-| Branch Captures | Variant Payload       | Rust Syntax        |
-| --------------- | --------------------- | ------------------ |
-| 0               | Unit (Void)           | `A`                |
-| 1               | Capture's type (flat) | `A(T)`             |
-| ≥2              | Struct (named fields) | `A { x: T, y: U }` |
-
-**Rationale**: The field name is redundant when it's the only capture—the variant tag already provides discrimination. This produces idiomatic types matching `Option<T>`, `Result<T,E>`.
-
-**Formalization**:
+**Propagation through nesting** (outer × inner):
 
 ```
-VariantPayload(branch) =
-  let captures = propagating_captures(branch)
-  match captures.len():
-    0 → Void
-    1 → captures[0].type  // flatten: discard field name
-    _ → Struct(captures)  // preserve field names
+  1 × 1 = 1    ? × 1 = ?    * × 1 = *    + × 1 = +
+  1 × ? = ?    ? × ? = ?    * × ? = *    + × ? = *
+  1 × * = *    ? × * = *    * × * = *    + × * = *
+  1 × + = +    ? × + = *    * × + = *    + × + = +
 ```
 
-**Examples**:
-
-```plotnik
-// Single capture per branch → flatten
-Foo = [ A: (a) @x  B: (b) @y ] @z
-// → Enum FooZ { A(Node), B(Node) }
-
-// Mixed: one branch single, other multi → partial flatten
-Bar = [ A: (a) @x  B: (b) @y (c) @z ] @result
-// → Enum BarResult { A(Node), B { y: Node, z: Node } }
-
-// Single capture with type annotation → flatten preserves type
-Baz = [ Ok: (val) @v  Err: (msg) @e ::string ] @result
-// → Enum BazResult { Ok(Node), Err(String) }
-
-// Single capture of nested struct → flatten to that struct
-Qux = [ A: { (x) @x (y) @y } @data  B: (b) @b ] @choice
-// → Enum QuxChoice { A(QuxChoiceData), B(Node) }
-// → QuxChoiceData = { x: Node, y: Node }
-```
-
-### Unification Rules (1-Level Merge)
-
-When merging captures across untagged alternation branches, we apply **1-level merge semantics**. This balances flexibility with type safety: top-level fields merge with optionality, but nested struct mismatches are errors.
-
-**Design rationale**: Plotnik's purpose is typed extraction. Deep recursive merging would produce heavily-optional types (`{ a?: { b?: { c?: Node } } }`), forcing users back to defensive checking—undermining the library's value. Tagged+captured alternations exist when precise discrimination is needed.
-
-**Base type compatibility**:
-
-```
-unify(Node, Node) = Node
-unify(String, String) = String
-unify(Node, String) = ⊥ (error: incompatible primitives)
-unify(Node, Struct) = ⊥ (error: primitive vs composite)
-unify(String, Struct) = ⊥ (error: primitive vs composite)
-```
-
-**Struct merging** (1-level only):
-
-```
-unify(Struct(f₁), Struct(f₂)) = Struct(merged_fields)
-  where merged_fields:
-    - fields in both f₁ and f₂: unify types (must be compatible)
-    - fields only in f₁: become Optional
-    - fields only in f₂: become Optional
-```
-
-Nested structs are compared by **structural identity**, not recursively merged. If a field has type `Struct` in both branches but the structs differ, it's an error.
-
-**Cardinality interaction**: Cardinality join happens first, then type unification. If `T` and `T[]` appear at the same field, lift to array, then unify element types.
-
-**Error reporting**: When unification fails, the compiler reports ALL incompatibilities across all branches, not just the first. This helps users fix multiple issues in one iteration.
-
-**Examples**:
-
-```
-// OK: top-level field merge
-Branch 1: { x: Node, y: Node }
-Branch 2: { x: Node, z: String }
-Result:   { x: Node, y?: Node, z?: String }
-
-// OK: nested structs identical
-Branch 1: { data: { a: Node }, extra: Node }
-Branch 2: { data: { a: Node } }
-Result:   { data: { a: Node }, extra?: Node }
-
-// ERROR: nested structs differ (no deep merge)
-Branch 1: { data: { a: Node } }
-Branch 2: { data: { b: Node } }
-→ Error: field `data` has incompatible struct types
-
-// ERROR: primitive vs primitive mismatch
-Branch 1: { val: String }
-Branch 2: { val: Node }
-→ Error: field `val` has incompatible types: `String` vs `Node`
-```
-
-### Cardinality Join (for merging)
-
-When the same capture appears in multiple branches with different cardinalities:
+**Join** (merging branches with same capture):
 
 ```
         +
        /|\
-      * | (arrays collapse to *)
+      * |
        \|
         ?
         |
         1
 ```
 
-| Left | Right | Join |
-| ---- | ----- | ---- |
-| 1    | 1     | 1    |
-| 1    | ?     | ?    |
-| 1    | \*    | \*   |
-| 1    | +     | +    |
-| ?    | ?     | ?    |
-| ?    | \*    | \*   |
-| ?    | +     | \*   |
-| \*   | \*    | \*   |
-| \*   | +     | \*   |
-| +    | +     | +    |
+When join produces array (`*`/`+`) but branch has scalar (`1`/`?`), compiler inserts lifting coercion to wrap in singleton array.
 
-### Cardinality Lifting Coercion
+### Alternation Semantics
 
-When cardinality join produces an array type (`*` or `+`) but a branch has scalar cardinality (`1` or `?`), the compiler inserts coercion effects to wrap the scalar in a singleton array.
+**Key insight**: Tags only matter when the alternation is captured.
 
-| Original | Lifted to  | Effect transformation                                                                       |
-| -------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `1`      | `*` or `+` | `CaptureNode` → `StartArray, CaptureNode, PushElement, EndArray`                            |
-| `?`      | `*`        | absent → `StartArray, EndArray`; present → `StartArray, CaptureNode, PushElement, EndArray` |
+#### Uncaptured Alternation
 
-This ensures the materializer always receives homogeneous values matching the declared type.
-
-Example:
+Captures propagate to parent scope. Asymmetric captures become `Optional`. Tags are ignored.
 
 ```plotnik
-Items = [ (single) @item  (multi { (x)+ @item }) ]
+// Tagged but uncaptured — tags ignored
+Foo = [ A: (a) @x  B: (b) @y ]
 ```
 
-Branch 1 has `@item: 1`, branch 2 has `@item: +`. Join is `+`. Branch 1's effects are lifted:
-
-```
-// Before lifting:
-CaptureNode, Field("item")
-
-// After lifting:
-StartArray, CaptureNode, PushElement, EndArray, Field("item")
-```
-
-### Quantifier-Induced Scope (QIS)
-
-When a quantified expression contains multiple captures, they must stay coupled per-iteration. QIS creates an implicit scope to preserve this structural relationship.
-
-**Trigger**: Quantifier `Q ∈ {*, +, ?}` applied to expression `E`, where `E` has **≥2 propagating captures** (captures not absorbed by inner scopes).
-
-**Mechanism**: QIS creates an implicit scope around `E`. Captures propagate to this scope (not the parent), forming a struct element type.
-
-**Containers**: Any expression can trigger QIS:
-
-- Node: `(node ...)Q`
-- Sequence: `{...}Q`
-- Alternation: `[...]Q`
-
-**Naming**:
-
-| Context                      | Element Type Name                   |
-| ---------------------------- | ----------------------------------- |
-| At definition root           | `{Def}Item`                         |
-| Explicit capture `E Q @name` | `{Parent}{Name}`                    |
-| Neither                      | **Error**: require explicit `@name` |
-
-**Result Type**:
-
-| Q   | Result                   |
-| --- | ------------------------ |
-| `*` | `ArrayStar(ElementType)` |
-| `+` | `ArrayPlus(ElementType)` |
-| `?` | `Optional(ElementType)`  |
-
-**Interior rules**: Standard type inference within the implicit scope:
-
-- Uncaptured alternations (tagged or not): asymmetric captures → Optional
-- Captured tagged alternations: Enum with variant scopes
-
-**Non-trigger** (≤1 propagating capture): No QIS. Single capture propagates with cardinality multiplication `Q × innerCard`.
-
-**Examples**:
+- `@x` only in A → `Optional(Node)`
+- `@y` only in B → `Optional(Node)`
+- Result: `Struct { x: Optional(Node), y: Optional(Node) }`
 
 ```plotnik
-// Node as container - keeps name/body paired
-Functions = (function_declaration
-    name: (identifier) @name
-    body: (block) @body
-)*
-// → Functions = ArrayStar(FunctionsItem)
-// → FunctionsItem = { name: Node, body: Node }
-
-// Alternation in quantified sequence
-Foo = { [ (a) @x  (b) @y ] }*
-// → Foo = ArrayStar(FooItem)
-// → FooItem = { x: Optional(Node), y: Optional(Node) }
-
-// Tagged but uncaptured (tags ignored, same result)
-Bar = { [ A: (a) @x  B: (b) @y ] }*
-// → Bar = ArrayStar(BarItem)
-// → BarItem = { x: Optional(Node), y: Optional(Node) }
-
-// Tagged AND captured (no QIS - single propagating capture)
-Baz = { [ A: (a) @x  B: (b) @y ] @choice }*
-// → Baz = ArrayStar(BazChoice)
-// → BazChoice = Enum { A: { x: Node }, B: { y: Node } }
-
-// Nested with explicit capture
-Outer = (parent { [ (a) @x  (b) @y ] }* @items)
-// → Outer = { items: ArrayStar(OuterItems) }
-// → OuterItems = { x: Optional(Node), y: Optional(Node) }
-
-// Single capture - no QIS, standard rules
-Single = { (a) @item }*
-// → Single = { item: ArrayStar(Node) }
-
-// Error: QIS triggered but no capture, not at root
-Bad = (parent { [ (a) @x  (b) @y ] }* (other) @z)
-// → Error: quantified expression with multiple captures requires @name
+// Symmetric captures
+Bar = [ (a) @v  (b) @v ]
 ```
 
-### Missing Field Rule
+- `@v` in all branches → `Node` (not Optional)
+- Result: `Node` (1 capture at def root, unwraps)
 
-If a capture appears in some branches but not all, the field becomes `Optional` (or `*` if original was array).
+Diagnostic: warning for inline uncaptured tagged alternation (likely forgot `@name`).
 
-This is intentional: users can have common fields be required across all branches, while branch-specific fields become optional.
+#### Captured Untagged Alternation
 
-### Synthetic Naming
-
-Types without explicit `::Name` receive synthetic names:
-
-| Context              | Pattern           | Example      |
-| -------------------- | ----------------- | ------------ |
-| Definition root      | `{DefName}`       | `Func`       |
-| Captured sequence    | `{Def}{Capture}`  | `FuncParams` |
-| Captured alternation | `{Def}{Capture}`  | `FuncBody`   |
-| Enum variant payload | `{Enum}{Variant}` | `FuncBodyOk` |
-
-Collision resolution: append numeric suffix (`Foo`, `Foo2`, `Foo3`, ...).
-
-### Error Conditions
-
-| Condition                            | Severity | Recovery                      | Diagnostic Kind (future)       |
-| ------------------------------------ | -------- | ----------------------------- | ------------------------------ |
-| Incompatible primitives in alt       | Error    | Use `TYPE_INVALID`, continue  | `TypeMismatchInAlt`            |
-| Primitive vs Struct in alt           | Error    | Use `TYPE_INVALID`, continue  | `TypeMismatchInAlt`            |
-| Nested struct mismatch in alt        | Error    | Use `TYPE_INVALID`, continue  | `StructMismatchInAlt`          |
-| Duplicate capture in same scope      | Error    | Keep first, ignore duplicates | `DuplicateCapture`             |
-| Empty definition (no captures)       | Info     | Type is `Void` (TypeId = 0)   | (no diagnostic)                |
-| Inline uncaptured tagged alternation | Warning  | Treat as untagged             | `UnusedBranchLabels`           |
-| QIS without capture (not at root)    | Error    | Cannot infer element type     | `MultiCaptureQuantifierNoName` |
-
-The last warning applies only to literal tagged alternations, not references. If `Foo = [ A: ... ]` is used as `(Foo)`, no warning—the user intentionally reuses a definition. But `(parent [ A: ... B: ... ])` inline without capture likely indicates a forgotten `@name`.
-
-**Exhaustive error reporting**: When type unification fails, the compiler explores all branches and reports all incompatibilities. Example diagnostic:
-
-```
-error: incompatible types in alternation branches
-  --> query.plot:3:5
-   |
- 3 |     (a { (x) @val ::string }) @data
-   |              ^^^ `String` here
- 4 |     (b { (x { (y) @inner }) @val }) @data
-   |                            ^^^ `Node` here
-   |
-   = note: capture `val` has incompatible types across branches
-   = help: use tagged alternation `[ A: ... B: ... ]` for precise discrimination
-```
-
-## Examples
-
-### Example 1: Captured Sequence
+Creates Struct scope. Branches merge. No unwrapping.
 
 ```plotnik
-Foo = (foo {(bar) @bar} @baz)
+Foo = [ (a) @x  (b) @y ] @z
 ```
 
-- `@bar` captures `(bar)` → `Node`
-- `@baz` captures the sequence containing `@bar` → creates scope
-- Types:
-  - `@bar: Node`
-  - `@baz: FooBaz { bar: Node }`
-  - `Foo: { baz: FooBaz }`
-
-### Example 2: Uncaptured Sequence
+- `@z` creates Struct scope
+- Merge: `{ x: Optional(Node), y: Optional(Node) }`
+- Result: `Struct { z: Struct { x: Optional(Node), y: Optional(Node) } }`
 
 ```plotnik
-Foo = (foo {(bar) @bar})
+Bar = [ (a) @v  (b) @v ] @z
 ```
 
-- `@bar` captures `(bar)` → `Node`
-- Sequence `{...}` is NOT captured → `@bar` propagates to `Foo`'s scope
-- Types:
-  - `Foo: { bar: Node }`
+- `@z` creates Struct scope
+- Merge: `{ v: Node }`
+- Always Struct (no unwrap): `Struct { v: Node }`
+- Result: `Struct { z: Struct { v: Node } }`
 
-### Example 3: Tagged Alternation at Definition Root
+#### Captured Tagged Alternation
+
+Creates Enum scope. Each variant is independent, follows payload rule.
+
+```plotnik
+Result = [
+    Ok: (value) @val
+    Err: (error) @msg ::string
+] @result
+```
+
+- Variant `Ok`: 1 capture → `Node` (unwrap)
+- Variant `Err`: 1 capture → `String` (unwrap)
+- Result: `Struct { result: Enum { Ok(Node), Err(String) } }`
+
+#### Tagged Alternation at Definition Root
+
+Special case: tagged alternation directly at definition root makes the definition itself an Enum.
 
 ```plotnik
 Result = [
@@ -502,69 +226,201 @@ Result = [
 ]
 ```
 
-- Tagged alternation at definition root → `Result` is an Enum
-- Each variant has exactly 1 capture → flattened (no wrapper structs)
-- Types:
-  - `Result: Enum { Ok(Node), Err(String) }`
+- Result: `Enum Result { Ok(Node), Err(String) }`
 
-### Example 4: Tagged Alternation (Inline, Uncaptured)
+No wrapper struct — the definition IS the enum.
 
-```plotnik
-Foo = (parent [
-    Ok: (value) @val
-    Err: (error) @msg ::string
-])
+### Unification Rules (Branch Merge)
+
+When merging captures across untagged alternation branches:
+
+**1-level merge semantics**: Top-level fields merge with optionality; nested struct mismatches are errors.
+
+```
+// OK: top-level field merge
+Branch 1: { x: Node, y: Node }
+Branch 2: { x: Node, z: String }
+Result:   { x: Node, y: Optional(Node), z: Optional(String) }
+
+// OK: nested structs identical
+Branch 1: { data: { a: Node }, extra: Node }
+Branch 2: { data: { a: Node } }
+Result:   { data: { a: Node }, extra: Optional(Node) }
+
+// ERROR: nested structs differ
+Branch 1: { data: { a: Node } }
+Branch 2: { data: { b: Node } }
+→ Error: field `data` has incompatible struct types
+
+// ERROR: primitive mismatch
+Branch 1: { val: String }
+Branch 2: { val: Node }
+→ Error: field `val` has incompatible types
 ```
 
-- Tagged alternation is inline and uncaptured → tags ignored, behaves like untagged
-- `@val` only in Ok branch → `Optional(Node)`
-- `@msg` only in Err branch → `Optional(String)`
-- Types:
-  - `Foo: { val: Optional(Node), msg: Optional(String) }`
-- Diagnostic: warning `UnusedBranchLabels` (inline uncaptured tagged alternation)
+**Rationale**: Deep recursive merging produces heavily-optional types, defeating typed extraction's purpose. Use tagged alternations for precise discrimination.
 
-### Example 5: Cardinality in Alternation
+### Quantifier-Induced Scope (QIS)
+
+When a quantified expression has **≥2 propagating captures**, QIS auto-creates a scope to keep values paired per-iteration.
 
 ```plotnik
-Items = [ (single) @item  (multi { (x)+ @item }) ]
+// 2 captures under quantifier → QIS triggers
+Functions = (function
+    name: (identifier) @name
+    body: (block) @body
+)*
 ```
 
-- Branch 1: `@item` cardinality `1`, type `Node`
-- Branch 2: `@item` cardinality `+`, type `Node`
-- Join: cardinality `+` (both present, LUB of `1` and `+`)
-- Types:
-  - `Items: { item: ArrayPlus(Node) }`
-
-### Example 6: Nested Quantifier
+- QIS creates element scope with 2 captures → Struct (always, by payload rule)
+- Result: `ArrayStar(FunctionsItem)` where `FunctionsItem { name: Node, body: Node }`
+- Definition has 1 propagating capture (the array) → unwrap
+- Final: `Functions` is `ArrayStar(FunctionsItem)`
 
 ```plotnik
-Funcs = (module { (function)* @fns })
+// 1 capture → no QIS, standard cardinality multiplication
+Items = { (item) @item }*
 ```
 
-- `@fns` has cardinality `*` from quantifier
-- Sequence not captured → propagates to root
-- Types:
-  - `Funcs: { fns: ArrayStar(Node) }`
+- No QIS (only 1 capture)
+- `@item` gets cardinality `*`
+- Result: `Node` would be wrong... actually 1 capture at def root
+- Wait, the capture is `ArrayStar(Node)`, so def root has 1 "field"
+- Result: `ArrayStar(Node)` (unwrapped)
+
+**Naming**:
+
+- At definition root: `{Def}Item`
+- With explicit capture `E* @name`: `{Parent}{Name}`
+- Neither (not at root, no capture): Error — require explicit `@name`
+
+### Synthetic Naming
+
+Types without explicit `::Name` receive synthetic names:
+
+| Context              | Pattern           |
+| -------------------- | ----------------- |
+| Definition root      | `{DefName}`       |
+| Captured sequence    | `{Def}{Capture}`  |
+| Captured alternation | `{Def}{Capture}`  |
+| Enum variant payload | `{Enum}{Variant}` |
+| QIS element          | `{Def}Item`       |
+
+Collision resolution: append numeric suffix (`Foo`, `Foo2`, `Foo3`).
+
+### Error Conditions
+
+| Condition                         | Severity | Recovery                   |
+| --------------------------------- | -------- | -------------------------- |
+| Incompatible types in alternation | Error    | Use invalid type, continue |
+| Nested struct mismatch            | Error    | Use invalid type, continue |
+| Duplicate capture in same scope   | Error    | Keep first                 |
+| Inline uncaptured tagged alt      | Warning  | Treat as untagged          |
+| QIS without capture (not at root) | Error    | Cannot infer element type  |
+
+Error reporting is exhaustive: all incompatibilities across all branches are reported, not just the first.
+
+## Examples
+
+### Single Capture at Definition Root
+
+```plotnik
+Name = (identifier) @name
+```
+
+- 1 capture at def root → unwrap
+- Result: `Name` is `Node`
+
+### Multiple Captures at Definition Root
+
+```plotnik
+Binding = (variable_declaration
+    name: (identifier) @name
+    value: (expression) @value
+)
+```
+
+- 2 captures → Struct
+- Result: `Binding { name: Node, value: Node }`
+
+### Captured vs Uncaptured Sequence
+
+```plotnik
+// Captured sequence — creates scope, always Struct
+Foo = { (bar) @bar } @baz
+```
+
+- `@bar` stays in `@baz`'s scope
+- Captured sequence: always Struct
+- Result: `Struct { baz: Struct { bar: Node } }`
+
+```plotnik
+// Uncaptured sequence — transparent, captures pass through
+Foo = { (bar) @bar }
+```
+
+- `{...}` without `@name` is transparent
+- `@bar` bubbles up to definition root
+- 1 capture at def root → unwrap
+- Result: `Foo` is `Node`
+
+### Enum at Definition Root
+
+```plotnik
+Boolean = [
+    True: "true"
+    False: "false"
+]
+```
+
+- Tagged alt at root, 0 captures per variant → Void
+- Result: `Enum Boolean { True, False }`
+
+### Mixed Variant Payloads
+
+```plotnik
+Expr = [
+    Lit: (number) @value
+    Bin: (binary left: (_) @left right: (_) @right)
+]
+```
+
+- `Lit`: 1 capture → unwrap → `Node`
+- `Bin`: 2 captures → Struct
+- Result: `Enum Expr { Lit(Node), Bin { left: Node, right: Node } }`
+
+### QIS with Multiple Captures
+
+```plotnik
+Module = (module {
+    (function
+        name: (identifier) @name
+        params: (parameters) @params
+    )*
+})
+```
+
+- 2 captures under `*` → QIS triggers
+- Element type: `ModuleItem { name: Node, params: Node }`
+- Array propagates to def root (1 capture) → unwrap
+- Result: `Module` is `ArrayStar(ModuleItem)`
 
 ## Consequences
 
 **Positive**:
 
-- Explicit rules enable deterministic inference
-- "Tags only matter when captured" is a simple mental model
-- 1-level merge provides flexibility while preserving type safety
-- Asymmetric fields becoming Optional is intuitive ("match any branch, get what's available")
-- Definition root inherits type naturally—no wrapper structs for top-level enums
-- Exhaustive error reporting helps users fix all issues in one iteration
+- Golden rule ("only captured containers create scopes") is easy to remember
+- Payload rule is uniform: 0→void, 1→unwrap, 2+→struct
+- Exception for captured containers (always Struct) matches user intent
+- "Tags only matter when captured" eliminates confusion
 
 **Negative**:
 
-- LUB cardinality join can lose precision
+- Field name loss on single-capture unwrap (mitigated by `::Type` annotation)
 - 1-level merge is less flexible than deep merge (intentional trade-off)
 
 **Alternatives Considered**:
 
-- Error on uncaptured tagged alternations (rejected: too restrictive for incremental development)
-- Definition root always Struct (rejected: forces wrapper types for enums, e.g., `struct Expr { val: ExprEnum }` instead of `enum Expr`)
-- Deep recursive merge for nested structs (rejected: produces heavily-optional types that defeat the purpose of typed extraction; users who need flexibility at depth should use tagged+captured alternations for precision)
-- Strict struct equality for merging (rejected: too restrictive for common patterns like `[ (a) @x  (b) @y ]`)
+- Always wrap in struct (rejected: verbose types like `{ val: Node }` instead of `Node`)
+- Deep recursive merge (rejected: heavily-optional types defeat typed extraction)
+- Error on uncaptured tagged alternations (rejected: too restrictive)
