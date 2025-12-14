@@ -27,7 +27,7 @@
 <br/>
 
 <p align="center">
-  ⚠️ <a href="#roadmap">EARLY STAGE</a>: THERE IS NOTHING TO INSTALL OR RUN YET ⚠️<br/>
+  ⚠️ <a href="#roadmap">ALPHA STAGE</a>: not for production use ⚠️<br/>
 </p>
 
 <br/>
@@ -206,28 +206,26 @@ Additional languages and dynamic loading are planned.
 
 The foundation is complete: a resilient parser that recovers from errors and keeps going.
 
-- [x] Resilient lexer ([`logos`](https://github.com/maciejhirsz/logos)) and parser ([`rowan`](https://github.com/rust-analyzer/rowan)) with error recovery
-- [x] Typed AST layer over concrete syntax tree
-- [x] Rich diagnostics with spans, colored output, related locations, and suggested fixes
-- [x] Name resolution with two-pass symbol table construction
-- [x] Recursion validation via Tarjan SCC analysis (escape path detection)
-- [x] Shape cardinality inference (One vs Many) for field constraint validation
-- [x] Alternation validation (mixed tagged/untagged detection)
+- [x] Resilient parser
+- [x] Rich diagnostics
+- [x] Name resolution
+- [x] Recursion validation
+- [x] Structural validation
 
 ### Liftoff: type inference
 
 The schema infrastructure is built. Type inference is next.
 
-- [x] `node-types.json` parsing and schema representation (`plotnik-core`)
-- [x] Proc macro for compile-time schema embedding (`plotnik-macros`)
-- [x] 26 languages bundled with static node type tables (`plotnik-langs`)
-- [x] Query validation against language schemas (node types, fields, children)
-- [ ] Full type inference: query → output shape → generated structs
+- [x] `node-types.json` parsing and schema representation
+- [x] Proc macro for compile-time schema embedding
+- [x] Statically bundled languages with node type info
+- [x] Query validation against language schemas (unstable)
+- [x] Type inference
 
 ### Acceleration: query engine
 
-- [ ] Thompson NFA construction for query IR
-- [ ] Runtime execution with backtracking cursor walker
+- [x] Runtime execution with backtracking cursor walker
+- [x] Query IR
 - [ ] Advanced validation powered by `grammar.json` (production rules, precedence)
 - [ ] Match result API with typed accessors
 
@@ -235,9 +233,11 @@ The schema infrastructure is built. Type inference is next.
 
 The CLI foundation exists. The full developer experience is ahead.
 
-- [x] CLI framework with `debug`, `docs`, `langs` commands
-- [x] Query inspection: AST dump, symbol table, cardinalities, spans
+- [x] CLI framework with `debug`, `docs`, `langs`, `exec`, `types` commands
+- [x] Query inspection: AST dump, symbol table, cardinalities, spans, transition graph, inferred types
 - [x] Source inspection: Tree-sitter parse tree visualization
+- [x] Execute queries against source code and output JSON (`exec`)
+- [x] Generate TypeScript types from queries (`types`)
 - [ ] CLI distribution: Homebrew, cargo-binstall, npm wrapper
 - [ ] Compiled queries via Rust proc macros (zero-cost: query → native code)
 - [ ] Language bindings: TypeScript (WASM), Python, Ruby
