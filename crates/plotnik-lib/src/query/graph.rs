@@ -469,29 +469,42 @@ impl<'src> BuildGraph<'src> {
 
         for name in def_names {
             let entry = self.definitions[name];
-            let entry_node = &self.nodes[entry as usize];
 
-            // Check if entry already matches root
-            let already_matches_root = match &entry_node.matcher {
-                BuildMatcher::Node { kind, .. } => *kind == root_kind,
-                _ => false,
-            };
-
-            if already_matches_root {
+            // Check if entry already matches root (directly or first reachable matcher)
+            if self.entry_matches_root(entry, root_kind) {
                 continue;
             }
 
-            // Create wrapper: (root_kind) with Nav::stay, then connect to original with Nav::down
+            // Create wrapper: (root_kind) with Nav::stay
             let wrapper = self.add_node(BuildNode::with_matcher(BuildMatcher::node(root_kind)));
 
-            // Set original entry's nav to descend from root
-            self.nodes[entry as usize].nav = Nav::down();
+            // Add epsilon node with Nav::down between wrapper and original entry
+            let down_nav = self.add_epsilon();
+            self.node_mut(down_nav).set_nav(Nav::down());
 
-            // Connect wrapper to original entry
-            self.connect(wrapper, entry);
+            // Connect wrapper → down_nav → original entry
+            self.connect(wrapper, down_nav);
+            self.connect(down_nav, entry);
 
             // Update definition to point to wrapper
             self.definitions.insert(name, wrapper);
+        }
+    }
+
+    /// Check if entry (or first reachable node matcher) already matches root kind.
+    fn entry_matches_root(&self, entry: NodeId, root_kind: &str) -> bool {
+        match &self.nodes[entry as usize].matcher {
+            BuildMatcher::Node { kind, .. } => *kind == root_kind,
+            BuildMatcher::Epsilon => {
+                // For epsilon entries, check first reachable node matchers
+                for &target in &self.nodes[entry as usize].successors {
+                    if self.entry_matches_root(target, root_kind) {
+                        return true;
+                    }
+                }
+                false
+            }
+            _ => false,
         }
     }
 }

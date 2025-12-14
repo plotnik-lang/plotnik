@@ -86,7 +86,17 @@ pub fn run(args: DebugArgs) {
     if (args.graph || args.graph_raw || args.types)
         && let Some(q) = query.take()
     {
-        let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump();
+        let (mut q, pre_opt_dump) = q.build_graph_with_pre_opt_dump();
+
+        // Auto-wrap definitions with root node if language is available
+        if let Some(ref lang_name) = args.lang {
+            let lang = resolve_lang_for_link(&Some(lang_name.clone()));
+            if let Some(root_id) = lang.root()
+                && let Some(root_kind) = lang.node_type_name(root_id)
+            {
+                q = q.wrap_with_root(root_kind);
+            }
+        }
         let mut needs_separator = false;
         if args.graph_raw {
             if show_both_graphs {

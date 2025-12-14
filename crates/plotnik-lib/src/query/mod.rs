@@ -272,6 +272,9 @@ impl<'a> Query<'a> {
     /// The `root_kind` should be the language's root node kind (e.g., "program" for JS).
     pub fn wrap_with_root(mut self, root_kind: &'a str) -> Self {
         self.graph.wrap_definitions_with_root(root_kind);
+        // Re-run type inference and optimization on wrapped graph
+        self.infer_types();
+        self.optimize_graph();
         self
     }
 

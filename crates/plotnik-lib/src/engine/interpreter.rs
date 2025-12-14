@@ -188,8 +188,13 @@ impl<'q, 'tree> QueryInterpreter<'q, 'tree> {
 
     /// Run the query and return the result.
     pub fn run(mut self) -> Result<Value<'tree>, RuntimeError> {
-        // Start at transition 0 (default entrypoint)
-        let start_transition = 0;
+        // Get the entry transition from the first entrypoint
+        let start_transition = self
+            .query
+            .entrypoints()
+            .first()
+            .map(|ep| ep.target())
+            .unwrap_or(0);
 
         match self.execute(start_transition) {
             Ok(true) => Ok(Materializer::materialize(&self.effects)),

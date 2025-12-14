@@ -286,6 +286,7 @@ fn wrap_with_root_simple() {
 
     (0) —{↘}—(identifier)→ (✓)
     (1) —(program)→ (0)
+    (2) —{↘}—𝜀→ (0)
     ");
 }
 
@@ -327,6 +328,7 @@ fn wrap_with_root_multiple_definitions() {
     (2) —{↘}—(string)→ (3)
     (3) —{↗¹}—𝜀→ (✓)
     (4) —(program)→ (0)
+    (5) —{↘}—𝜀→ (0)
     ");
 }
 
@@ -344,5 +346,6 @@ fn wrap_with_root_with_captures() {
     (1) —{↘}—(identifier)@name—[CaptureNode]→ (2)
     (2) —{↗¹}—𝜀→ (✓)
     (3) —(program)→ (0)
+    (4) —{↘}—𝜀→ (0)
     ");
 }
