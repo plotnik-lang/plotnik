@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
 use plotnik_lib::Query;
 use plotnik_lib::engine::interpreter::QueryInterpreter;
+use plotnik_lib::engine::validate::validate as validate_result;
+use plotnik_lib::engine::value::VerboseValue;
 use plotnik_lib::ir::{NodeKindResolver, QueryEmitter};
 
 use super::debug::source::resolve_lang;
@@ -88,16 +90,21 @@ pub fn run(args: ExecArgs) {
 
     // Type checking against inferred types
     if args.check {
-        todo!("validate result against compiled.type_metadata()")
+        let expected_type = compiled.entrypoints().first().map(|e| e.result_type());
+        if let Some(type_id) = expected_type {
+            if let Err(e) = validate_result(&result, type_id, &compiled) {
+                eprintln!("type error: {}", e);
+                std::process::exit(1);
+            }
+        }
     }
 
     // Output JSON
-    let output = if args.verbose_nodes {
-        todo!("serialize with VerboseNode instead of CapturedNode")
-    } else if args.pretty {
-        serde_json::to_string_pretty(&result)
-    } else {
-        serde_json::to_string(&result)
+    let output = match (args.verbose_nodes, args.pretty) {
+        (true, true) => serde_json::to_string_pretty(&VerboseValue(&result)),
+        (true, false) => serde_json::to_string(&VerboseValue(&result)),
+        (false, true) => serde_json::to_string_pretty(&result),
+        (false, false) => serde_json::to_string(&result),
     };
 
     match output {

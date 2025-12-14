@@ -210,12 +210,14 @@ cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l t
 
 - `--pretty` — Pretty-print JSON output
 - `--verbose-nodes` — Include line/column positions in nodes
-- `--check` — Validate output against inferred types (TODO)
+- `--check` — Validate output against inferred types
 
 ```sh
 cargo run -p plotnik-cli -- exec -q '(program (expression_statement (identifier) @name))' --source 'x' -l javascript
 cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --pretty
 cargo run -p plotnik-cli -- exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --check
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --verbose-nodes --pretty
 ```
 
 ### `types` output flags
