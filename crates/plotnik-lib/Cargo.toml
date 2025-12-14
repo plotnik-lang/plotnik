@@ -25,6 +25,7 @@ plotnik-langs = { version = "0.1", path = "../plotnik-langs", optional = true }
 
 [features]
 default = ["plotnik-langs"]
+unstable-child-type-validation = []
 
 [dev-dependencies]
 insta = { version = "=1.44.3", features = ["yaml"] }
