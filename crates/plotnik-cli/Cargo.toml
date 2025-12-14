@@ -11,6 +11,10 @@ categories = ["command-line-utilities", "development-tools"]
 readme = "../../README.md"
 include = ["src/**/*", "Cargo.toml", "docs/REFERENCE.md"]
 
+[[bin]]
+name = "plotnik"
+path = "src/main.rs"
+
 [features]
 default = [
     "bash",
