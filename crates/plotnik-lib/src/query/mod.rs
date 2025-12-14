@@ -222,12 +222,17 @@ impl<'a> Query<'a> {
     }
 
     /// Build graph and return dump of graph before optimization (for debugging).
-    pub fn build_graph_with_pre_opt_dump(mut self) -> (Self, String) {
+    ///
+    /// If `root_kind` is provided, definitions are wrapped before dumping.
+    pub fn build_graph_with_pre_opt_dump(mut self, root_kind: Option<&'a str>) -> (Self, String) {
         if !self.is_valid() {
             return (self, String::new());
         }
         self.detect_capture_scopes();
         self.construct_graph();
+        if let Some(root) = root_kind {
+            self.graph.wrap_definitions_with_root(root);
+        }
         let pre_opt_dump = self.graph.dump();
         self.infer_types();
         self.optimize_graph();

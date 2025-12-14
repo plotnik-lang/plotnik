@@ -186,7 +186,7 @@ fn qis_graph_has_object_effects() {
     let source = "Foo = { (a) @x (b) @y }*";
     let (_query, pre_opt) = Query::try_from(source)
         .unwrap()
-        .build_graph_with_pre_opt_dump();
+        .build_graph_with_pre_opt_dump(None);
 
     // QIS adds StartObj/EndObj around each iteration to keep captures coupled.
     // Multi-capture definitions also get wrapped in StartObj/EndObj at root.
@@ -212,7 +212,7 @@ fn non_qis_graph_no_object_effects() {
     let source = "Foo = { (a) @x }*";
     let (_query, pre_opt) = Query::try_from(source)
         .unwrap()
-        .build_graph_with_pre_opt_dump();
+        .build_graph_with_pre_opt_dump(None);
 
     // Non-QIS quantifiers don't need object scope - captures propagate with array cardinality.
     // Sequences themselves don't add object scope either.

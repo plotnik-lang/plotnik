@@ -27,7 +27,7 @@ fn debug_star_quantifier_graph() {
     // See graph BEFORE optimization (what type inference actually sees)
     let (query, pre_opt_dump) = Query::try_from("Foo = ((item) @items)*")
         .expect("parse should succeed")
-        .build_graph_with_pre_opt_dump();
+        .build_graph_with_pre_opt_dump(None);
     let mut out = String::new();
     out.push_str("(pre-optimization)\n");
     out.push_str(&pre_opt_dump);
