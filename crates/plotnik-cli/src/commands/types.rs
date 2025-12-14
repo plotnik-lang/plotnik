@@ -41,6 +41,10 @@ pub fn run(args: TypesArgs) {
     }
 
     let query_source = load_query(&args);
+    if query_source.trim().is_empty() {
+        eprintln!("error: query cannot be empty");
+        std::process::exit(1);
+    }
     let lang = resolve_lang_required(&args.lang);
 
     // Parse and validate query

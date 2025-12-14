@@ -41,6 +41,10 @@ pub fn run(args: ExecArgs) {
     }
 
     let query_source = load_query(&args);
+    if query_source.trim().is_empty() {
+        eprintln!("error: query cannot be empty");
+        std::process::exit(1);
+    }
     let source_code = load_source(&args);
     let lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
 
