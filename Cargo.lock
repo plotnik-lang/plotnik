@@ -339,6 +339,7 @@ dependencies = [
  "clap",
  "plotnik-langs",
  "plotnik-lib",
+ "serde_json",
  "tree-sitter",
 ]
 

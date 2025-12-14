@@ -3,6 +3,7 @@ mod commands;
 
 use cli::{Cli, Command};
 use commands::debug::DebugArgs;
+use commands::exec::ExecArgs;
 
 fn main() {
     let cli = <Cli as clap::Parser>::parse();
@@ -36,6 +37,23 @@ fn main() {
         }
         Command::Langs => {
             commands::langs::run();
+        }
+        Command::Exec {
+            query,
+            source,
+            lang,
+            output,
+        } => {
+            commands::exec::run(ExecArgs {
+                query_text: query.query_text,
+                query_file: query.query_file,
+                source_text: source.source_text,
+                source_file: source.source_file,
+                lang,
+                pretty: output.pretty,
+                verbose_nodes: output.verbose_nodes,
+                check: output.check,
+            });
         }
     }
 }

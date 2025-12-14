@@ -1,4 +1,4 @@
-mod source;
+pub mod source;
 
 use std::fs;
 use std::io::{self, Read};

@@ -60,6 +60,42 @@ pub enum Command {
 
     /// List supported languages
     Langs,
+
+    /// Execute a query against source code and output JSON
+    #[command(after_help = r#"EXAMPLES:
+  plotnik exec -q '(identifier) @id' -s app.js
+  plotnik exec -q '(identifier) @id' -s app.js --pretty
+  plotnik exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+  plotnik exec -q '(identifier) @id' -s app.js --check"#)]
+    Exec {
+        #[command(flatten)]
+        query: QueryArgs,
+
+        #[command(flatten)]
+        source: SourceArgs,
+
+        /// Language for source (required for inline text, inferred from extension otherwise)
+        #[arg(long, short = 'l', value_name = "LANG")]
+        lang: Option<String>,
+
+        #[command(flatten)]
+        output: ExecOutputArgs,
+    },
+}
+
+#[derive(Args)]
+pub struct ExecOutputArgs {
+    /// Pretty-print JSON output
+    #[arg(long)]
+    pub pretty: bool,
+
+    /// Include verbose node information (line/column positions)
+    #[arg(long)]
+    pub verbose_nodes: bool,
+
+    /// Validate output against inferred types
+    #[arg(long)]
+    pub check: bool,
 }
 
 #[derive(Args)]

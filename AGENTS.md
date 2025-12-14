@@ -157,7 +157,7 @@ Boolean = [
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, docs, langs)
+    src/commands/      # Subcommands (debug, docs, exec, langs)
   plotnik-core/        # Common code
   plotnik-lib/         # Plotnik as library
     src/
@@ -177,11 +177,13 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 - `debug` — Inspect queries and source file ASTs
   - Example: `cargo run -p plotnik-cli -- debug -q '(foo) @bar'`
+- `exec` — Execute query against source, output JSON
+  - Example: `cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js`
 - `langs` — List supported languages
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output flags:
+### `debug` output flags
 
 - `--only-symbols` — Show only symbol table (requires query)
 - `--cst` — Show query CST instead of AST
@@ -200,6 +202,18 @@ cargo run -p plotnik-cli -- debug -q '(identifier) @id' --types -l javascript
 cargo run -p plotnik-cli -- debug -s app.ts
 cargo run -p plotnik-cli -- debug -s app.ts --raw
 cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript
+```
+
+### `exec` output flags
+
+- `--pretty` — Pretty-print JSON output
+- `--verbose-nodes` — Include line/column positions in nodes
+- `--check` — Validate output against inferred types (TODO)
+
+```sh
+cargo run -p plotnik-cli -- exec -q '(program (expression_statement (identifier) @name))' --source 'x' -l javascript
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --pretty
+cargo run -p plotnik-cli -- exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
 ```
 
 # Coding rules
