@@ -260,24 +260,24 @@ fn golden_master_comprehensive() {
     NoQis = (095)
     TaggedRoot = (099)
     TaggedCaptured = (111)
-    TaggedMulti = (121)
-    UntaggedSymmetric = (137)
-    UntaggedAsymmetric = (145)
-    UntaggedCaptured = (153)
-    CapturedSeq = (157)
-    UncapturedSeq = (162)
-    NestedScopes = (172)
-    Identifier = (176)
-    RefSimple = (177)
-    RefCaptured = (179)
-    RefChain = (181)
-    CardinalityJoin = (183)
-    NestedQuant = (211)
-    Complex = (221)
-    WildcardCapture = (282)
-    StringLiteral = (283)
-    NoCaptures = (284)
-    EmptyBranch = (285)
+    TaggedMulti = (123)
+    UntaggedSymmetric = (139)
+    UntaggedAsymmetric = (147)
+    UntaggedCaptured = (155)
+    CapturedSeq = (161)
+    UncapturedSeq = (168)
+    NestedScopes = (181)
+    Identifier = (190)
+    RefSimple = (191)
+    RefCaptured = (193)
+    RefChain = (195)
+    CardinalityJoin = (197)
+    NestedQuant = (225)
+    Complex = (234)
+    WildcardCapture = (295)
+    StringLiteral = (296)
+    NoCaptures = (297)
+    EmptyBranch = (298)
 
     (000) —(identifier)—[CaptureNode]→ (✓)
     (001) —(identifier)—[CaptureNode, ToString]→ (✓)
@@ -355,133 +355,141 @@ fn golden_master_comprehensive() {
     (108) —𝜀—[Field(msg), EndVariant]→ (110)
     (110) —𝜀—[EndObject]→ (✓)
     (111) —(wrapper)→ (112)
-    (112) —{↘}—𝜀→ (115), (118)
-    (115) —(left_node)—[StartVariant(Left), CaptureNode, CaptureNode]→ (116)
-    (116) —𝜀—[EndVariant]→ (120)
-    (118) —(right_node)—[StartVariant(Right), CaptureNode, CaptureNode]→ (119)
-    (119) —𝜀—[EndVariant]→ (120)
-    (120) —{↗¹}—𝜀→ (✓)
-    (121) —𝜀—[StartObject]→ (124), (128)
-    (124) —(node)—[StartVariant(Simple), CaptureNode]→ (126)
-    (126) —𝜀—[Field(val), EndVariant]→ (136)
-    (128) —(pair)—[StartVariant(Complex), StartObject]→ (129)
-    (129) —{↘}—(key)—[CaptureNode]→ (130)
-    (130) —𝜀—[Field(k)]→ (131)
-    (131) —{→}—(value)—[CaptureNode]→ (132)
-    (132) —𝜀—[Field(v)]→ (134)
-    (134) —{↗¹}—𝜀—[EndObject, EndVariant]→ (136)
-    (136) —𝜀—[EndObject]→ (✓)
-    (137) —𝜀—[StartObject]→ (139), (141)
-    (139) —(a)—[CaptureNode]→ (140)
-    (140) —𝜀—[Field(val)]→ (144)
-    (141) —(b)—[CaptureNode]→ (142)
-    (142) —𝜀—[Field(val)]→ (144)
-    (144) —𝜀—[EndObject]→ (✓)
-    (145) —𝜀—[StartObject]→ (147), (149)
-    (147) —(a)—[CaptureNode]→ (148)
-    (148) —𝜀—[Field(x)]→ (152)
-    (149) —(b)—[CaptureNode]→ (150)
-    (150) —𝜀—[Field(y)]→ (152)
-    (152) —𝜀—[EndObject]→ (✓)
-    (153) —𝜀→ (155), (156)
-    (154) —𝜀→ (✓)
-    (155) —(a)—[CaptureNode, CaptureNode]→ (154)
-    (156) —(b)—[CaptureNode, CaptureNode]→ (154)
-    (157) —(outer)→ (158)
-    (158) —{↘}—𝜀→ (159)
-    (159) —{→}—(inner)—[CaptureNode, CaptureNode]→ (160)
-    (160) —{→}—(inner2)—[CaptureNode]→ (161)
-    (161) —{↗¹}—𝜀→ (✓)
-    (162) —(outer)—[StartObject]→ (163)
-    (163) —{↘}—𝜀→ (164)
-    (164) —{→}—(inner)—[CaptureNode]→ (165)
-    (165) —𝜀—[Field(x)]→ (166)
-    (166) —{→}—(inner2)—[CaptureNode]→ (167)
-    (167) —𝜀—[Field(y)]→ (170)
-    (170) —{↗¹}—𝜀—[EndObject]→ (✓)
-    (172) —{→}—𝜀→ (173)
-    (173) —{→}—(a)—[CaptureNode, CaptureNode, CaptureNode]→ (174)
-    (174) —{→}—𝜀→ (175)
-    (175) —{→}—(b)—[CaptureNode, CaptureNode]→ (✓)
-    (176) —(identifier)—[CaptureNode]→ (✓)
-    (177) —<Identifier>—𝜀→ (176), (178)
-    (178) —𝜀—<Identifier>→ (✓)
-    (179) —<Identifier>—𝜀→ (176), (180)
-    (180) —𝜀—<Identifier>—[CaptureNode]→ (✓)
-    (181) —<RefSimple>—𝜀→ (177), (182)
-    (182) —𝜀—<RefSimple>→ (✓)
-    (183) —𝜀—[StartObject]→ (185), (187)
-    (185) —(single)—[CaptureNode]→ (186)
-    (186) —𝜀—[Field(item)]→ (199)
-    (187) —(multi)→ (189)
-    (188) —(x)—[CaptureNode]→ (195)
-    (189) —𝜀—[StartArray]→ (193)
-    (192) —𝜀→ (✓)
-    (193) —{↘}—𝜀→ (188)
-    (194) —{→}—𝜀→ (188)
-    (195) —𝜀—[PushElement]→ (194), (196)
-    (196) —𝜀—[EndArray, Field(item)]→ (197)
-    (197) —{↗¹}—𝜀→ (199)
-    (199) —𝜀—[EndObject]→ (✓)
-    (200) —(_)—[CaptureNode]→ (205)
-    (201) —(item)—[CaptureNode]→ (208)
-    (205) —𝜀—[StartArray]→ (206), (209)
-    (206) —{↘}—𝜀→ (201)
-    (207) —{→}—𝜀→ (201)
-    (208) —𝜀—[PushElement]→ (207), (209)
-    (209) —𝜀—[EndArray, Field(inner)]→ (217)
-    (211) —𝜀—[StartObject, StartArray]→ (200)
-    (214) —𝜀→ (✓)
-    (216) —{→}—𝜀→ (200)
-    (217) —{↗¹}—𝜀—[PushElement]→ (216), (220)
-    (220) —𝜀—[EndArray, Field(outer), EndObject]→ (✓)
-    (221) —(module)—[StartObject]→ (222)
-    (222) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (228)
-    (224) —(import)—[CaptureNode]→ (231)
-    (228) —𝜀—[Field(mod_name), StartArray]→ (229), (232)
-    (229) —{→·}—𝜀→ (224)
-    (230) —{→}—𝜀→ (224)
-    (231) —𝜀—[PushElement]→ (230), (232)
-    (232) —𝜀—[EndArray, Field(imports)]→ (233)
-    (233) —{→}—(block)@body→ (271)
-    (234) —𝜀—[StartObject]→ (235)
-    (235) —{→}—𝜀→ (238), (259)
-    (238) —(function)—[StartVariant(Func), StartObject, CaptureNode]→ (239)
-    (239) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (240)
-    (240) —𝜀—[Field(fn_name)]→ (241)
-    (241) —{→}—(parameters)@params→ (248)
-    (243) —{→}—(param)—[CaptureNode, CaptureNode]→ (251)
-    (248) —𝜀—[StartArray]→ (249), (252)
-    (249) —{↘}—𝜀→ (243)
-    (250) —{→}—𝜀→ (243)
-    (251) —𝜀—[Field(p), PushElement]→ (250), (252)
-    (252) —𝜀—[EndArray, Field(params)]→ (253)
-    (253) —{↗¹}—𝜀→ (254)
-    (254) —{→}—(block)@body—[CaptureNode]→ (255)
-    (255) —𝜀—[Field(fn_body)]→ (257)
-    (257) —{↗¹}—𝜀—[EndObject, EndVariant]→ (274)
-    (259) —(class)—[StartVariant(Class), StartObject, CaptureNode]→ (260)
-    (260) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (261)
-    (261) —𝜀—[Field(cls_name)]→ (262)
-    (262) —{→}—(class_body)@body—[CaptureNode]→ (263)
-    (263) —𝜀—[Field(cls_body)]→ (265)
-    (265) —{↗¹}—𝜀—[EndObject, EndVariant]→ (274)
-    (271) —𝜀—[StartObject, StartArray]→ (272), (277)
-    (272) —{↘}—𝜀→ (234)
-    (273) —{→}—𝜀→ (234)
-    (274) —𝜀—[EndObject, PushElement]→ (273), (277)
-    (277) —𝜀—[EndArray, EndObject, Field(items)]→ (278)
-    (278) —{↗¹}—𝜀→ (281)
-    (281) —{↗·¹}—𝜀—[EndObject]→ (✓)
-    (282) —(🞵)—[CaptureNode]→ (✓)
-    (283) —"+"—[CaptureNode]→ (✓)
-    (284) —(identifier)→ (✓)
-    (285) —𝜀→ (288), (291)
-    (286) —𝜀→ (✓)
-    (288) —(value)—[StartVariant(Some), CaptureNode]→ (289)
-    (289) —𝜀—[EndVariant]→ (286)
-    (291) —(none_marker)—[StartVariant(None)]→ (292)
-    (292) —𝜀—[EndVariant]→ (286)
+    (112) —{↘}—𝜀→ (115), (119)
+    (115) —(left_node)—[StartVariant(Left), CaptureNode, CaptureNode]→ (117)
+    (117) —𝜀—[Field(l), EndVariant]→ (122)
+    (119) —(right_node)—[StartVariant(Right), CaptureNode, CaptureNode]→ (121)
+    (121) —𝜀—[Field(r), EndVariant]→ (122)
+    (122) —{↗¹}—𝜀→ (✓)
+    (123) —𝜀—[StartObject]→ (126), (130)
+    (126) —(node)—[StartVariant(Simple), CaptureNode]→ (128)
+    (128) —𝜀—[Field(val), EndVariant]→ (138)
+    (130) —(pair)—[StartVariant(Complex), StartObject]→ (131)
+    (131) —{↘}—(key)—[CaptureNode]→ (132)
+    (132) —𝜀—[Field(k)]→ (133)
+    (133) —{→}—(value)—[CaptureNode]→ (134)
+    (134) —𝜀—[Field(v)]→ (136)
+    (136) —{↗¹}—𝜀—[EndObject, EndVariant]→ (138)
+    (138) —𝜀—[EndObject]→ (✓)
+    (139) —𝜀—[StartObject]→ (141), (143)
+    (141) —(a)—[CaptureNode]→ (142)
+    (142) —𝜀—[Field(val)]→ (146)
+    (143) —(b)—[CaptureNode]→ (144)
+    (144) —𝜀—[Field(val)]→ (146)
+    (146) —𝜀—[EndObject]→ (✓)
+    (147) —𝜀—[StartObject]→ (149), (151)
+    (149) —(a)—[CaptureNode]→ (150)
+    (150) —𝜀—[Field(x)]→ (154)
+    (151) —(b)—[CaptureNode]→ (152)
+    (152) —𝜀—[Field(y)]→ (154)
+    (154) —𝜀—[EndObject]→ (✓)
+    (155) —𝜀→ (157), (159)
+    (156) —𝜀→ (✓)
+    (157) —(a)—[CaptureNode, CaptureNode]→ (158)
+    (158) —𝜀—[Field(x)]→ (156)
+    (159) —(b)—[CaptureNode, CaptureNode]→ (160)
+    (160) —𝜀—[Field(y)]→ (156)
+    (161) —(outer)→ (162)
+    (162) —{↘}—𝜀→ (163)
+    (163) —{→}—(inner)—[CaptureNode, CaptureNode]→ (164)
+    (164) —𝜀—[Field(x)]→ (165)
+    (165) —{→}—(inner2)—[CaptureNode]→ (166)
+    (166) —𝜀—[Field(y)]→ (167)
+    (167) —{↗¹}—𝜀→ (✓)
+    (168) —(outer)—[StartObject]→ (169)
+    (169) —{↘}—𝜀→ (170)
+    (170) —{→}—(inner)—[CaptureNode]→ (171)
+    (171) —𝜀—[Field(x)]→ (172)
+    (172) —{→}—(inner2)—[CaptureNode]→ (173)
+    (173) —𝜀—[Field(y)]→ (176)
+    (176) —{↗¹}—𝜀—[EndObject]→ (✓)
+    (178) —{→}—𝜀→ (179)
+    (179) —{→}—(a)—[CaptureNode, CaptureNode, CaptureNode]→ (187)
+    (181) —𝜀—[StartObject]→ (178)
+    (184) —{→}—𝜀→ (185)
+    (185) —{→}—(b)—[CaptureNode, CaptureNode]→ (189)
+    (187) —𝜀—[Field(a), EndObject, Field(inner1), StartObject]→ (184)
+    (189) —𝜀—[Field(b), EndObject, Field(inner2)]→ (✓)
+    (190) —(identifier)—[CaptureNode]→ (✓)
+    (191) —<Identifier>—𝜀→ (190), (192)
+    (192) —𝜀—<Identifier>→ (✓)
+    (193) —<Identifier>—𝜀→ (190), (194)
+    (194) —𝜀—<Identifier>—[CaptureNode]→ (✓)
+    (195) —<RefSimple>—𝜀→ (191), (196)
+    (196) —𝜀—<RefSimple>→ (✓)
+    (197) —𝜀—[StartObject]→ (199), (201)
+    (199) —(single)—[CaptureNode]→ (200)
+    (200) —𝜀—[Field(item)]→ (213)
+    (201) —(multi)→ (203)
+    (202) —(x)—[CaptureNode]→ (209)
+    (203) —𝜀—[StartArray]→ (207)
+    (206) —𝜀→ (✓)
+    (207) —{↘}—𝜀→ (202)
+    (208) —{→}—𝜀→ (202)
+    (209) —𝜀—[PushElement]→ (208), (210)
+    (210) —𝜀—[EndArray, Field(item)]→ (211)
+    (211) —{↗¹}—𝜀→ (213)
+    (213) —𝜀—[EndObject]→ (✓)
+    (214) —(_)—[StartObject, CaptureNode]→ (219)
+    (215) —(item)—[CaptureNode]→ (222)
+    (219) —𝜀—[StartArray]→ (220), (223)
+    (220) —{↘}—𝜀→ (215)
+    (221) —{→}—𝜀→ (215)
+    (222) —𝜀—[PushElement]→ (221), (223)
+    (223) —𝜀—[EndArray, Field(inner)]→ (233)
+    (225) —𝜀—[StartArray]→ (214)
+    (226) —𝜀—[EndArray]→ (✓)
+    (230) —𝜀→ (✓)
+    (232) —{→}—𝜀→ (214)
+    (233) —{↗¹}—𝜀—[EndObject, PushElement]→ (232), (226)
+    (234) —(module)—[StartObject]→ (235)
+    (235) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (241)
+    (237) —(import)—[CaptureNode]→ (244)
+    (241) —𝜀—[Field(mod_name), StartArray]→ (242), (245)
+    (242) —{→·}—𝜀→ (237)
+    (243) —{→}—𝜀→ (237)
+    (244) —𝜀—[PushElement]→ (243), (245)
+    (245) —𝜀—[EndArray, Field(imports)]→ (246)
+    (246) —{→}—(block)@body→ (286)
+    (247) —𝜀—[StartObject]→ (248)
+    (248) —{→}—𝜀→ (251), (274)
+    (251) —(function)—[StartVariant(Func), StartObject, CaptureNode]→ (252)
+    (252) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (253)
+    (253) —𝜀—[Field(fn_name)]→ (254)
+    (254) —{→}—(parameters)@params→ (263)
+    (255) —𝜀—[StartObject]→ (256)
+    (256) —{→}—(param)—[CaptureNode, CaptureNode]→ (266)
+    (263) —𝜀—[StartArray]→ (264), (267)
+    (264) —{↘}—𝜀→ (255)
+    (265) —{→}—𝜀→ (255)
+    (266) —𝜀—[Field(p), EndObject, PushElement]→ (265), (267)
+    (267) —𝜀—[EndArray, Field(params)]→ (268)
+    (268) —{↗¹}—𝜀→ (269)
+    (269) —{→}—(block)@body—[CaptureNode]→ (270)
+    (270) —𝜀—[Field(fn_body)]→ (272)
+    (272) —{↗¹}—𝜀—[EndObject, EndVariant]→ (289)
+    (274) —(class)—[StartVariant(Class), StartObject, CaptureNode]→ (275)
+    (275) —{↘}—(identifier)@name—[CaptureNode, ToString]→ (276)
+    (276) —𝜀—[Field(cls_name)]→ (277)
+    (277) —{→}—(class_body)@body—[CaptureNode]→ (278)
+    (278) —𝜀—[Field(cls_body)]→ (280)
+    (280) —{↗¹}—𝜀—[EndObject, EndVariant]→ (289)
+    (286) —𝜀—[StartArray]→ (287), (290)
+    (287) —{↘}—𝜀→ (247)
+    (288) —{→}—𝜀→ (247)
+    (289) —𝜀—[EndObject, PushElement]→ (288), (290)
+    (290) —𝜀—[EndArray, Field(items)]→ (291)
+    (291) —{↗¹}—𝜀→ (294)
+    (294) —{↗·¹}—𝜀—[EndObject]→ (✓)
+    (295) —(🞵)—[CaptureNode]→ (✓)
+    (296) —"+"—[CaptureNode]→ (✓)
+    (297) —(identifier)→ (✓)
+    (298) —𝜀→ (301), (304)
+    (299) —𝜀→ (✓)
+    (301) —(value)—[StartVariant(Some), CaptureNode]→ (302)
+    (302) —𝜀—[EndVariant]→ (299)
+    (304) —(none_marker)—[StartVariant(None)]→ (305)
+    (305) —𝜀—[EndVariant]→ (299)
 
     ═══════════════════════════════════════════════════════════════════════════════
                                   TYPE INFERENCE
@@ -506,9 +514,10 @@ fn golden_master_comprehensive() {
     NoQis = [Node]
     NoCaptures = ()
     NestedScopes = NestedScopesScope24
+    NestedQuant = T27
     DeepNest = Node
     CardinalityJoin = [Node]⁺
-    CapturedSeq = CapturedSeqScope41
+    CapturedSeq = CapturedSeqScope42
     AnchorLast = Node
     AnchorFirst = Node
 
@@ -556,10 +565,8 @@ fn golden_master_comprehensive() {
       inner1: NestedScopesScope22
       inner2: NestedScopesScope23
     }
-    NestedQuant = {
-      inner: [Node]
-      outer: [Node]⁺
-    }
+    NestedQuantScope25 = { inner: [Node] }
+    T27 = [NestedQuantScope25]⁺
     MultiCapture = {
       fn_name: str
       fn_body: Node
@@ -568,21 +575,23 @@ fn golden_master_comprehensive() {
       Some => Node
       None => ()
     }
-    ComplexScope30 = {
+    ComplexScope30 = { p: Node }
+    T31 = [ComplexScope30]
+    T33 = T31?
+    ComplexScope32 = {
       fn_name: str?
-      p: [Node]
-      params: [Node]
+      params: T33
       fn_body: Node?
       cls_name: str?
       cls_body: Node?
     }
-    T37 = [ComplexScope30]
+    T38 = [ComplexScope32]
     Complex = {
       mod_name: str
       imports: [Node]
-      items: T37
+      items: T38
     }
-    CapturedSeqScope41 = {
+    CapturedSeqScope42 = {
       x: Node
       y: Node
     }
@@ -824,7 +833,8 @@ fn golden_type_inference() {
     (100) —(foo)→ (101)
     (101) —{↘}—𝜀→ (102)
     (102) —{→}—(bar)—[CaptureNode, CaptureNode]→ (103)
-    (103) —{↗¹}—𝜀→ (✓)
+    (103) —𝜀—[Field(bar)]→ (104)
+    (104) —{↗¹}—𝜀→ (✓)
 
     ═══════════════════════════════════════════════════════════════════════════════
                                   TYPE INFERENCE
@@ -897,8 +907,8 @@ fn golden_effect_patterns() {
     EffToString = (01)
     EffArray = (02)
     EffObject = (13)
-    EffVariant = (15)
-    EffClear = (23)
+    EffVariant = (17)
+    EffClear = (27)
 
     (00) —(node)—[CaptureNode]→ (✓)
     (01) —(node)—[CaptureNode, ToString]→ (✓)
@@ -911,18 +921,20 @@ fn golden_effect_patterns() {
     (10) —𝜀—[PushElement]→ (09), (05)
     (11) —{↗¹}—𝜀→ (✓)
     (13) —{→}—(a)—[CaptureNode, CaptureNode]→ (14)
-    (14) —{→}—(b)—[CaptureNode]→ (✓)
-    (15) —𝜀→ (18), (21)
-    (16) —𝜀→ (✓)
-    (18) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (19)
-    (19) —𝜀—[EndVariant]→ (16)
-    (21) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (22)
-    (22) —𝜀—[EndVariant]→ (16)
-    (23) —(container)→ (25)
-    (24) —(item)—[CaptureNode]→ (28)
-    (25) —𝜀→ (24), (27)
-    (27) —𝜀—[ClearCurrent]→ (28)
-    (28) —{↗¹}—𝜀→ (✓)
+    (14) —𝜀—[Field(x)]→ (15)
+    (15) —{→}—(b)—[CaptureNode]→ (16)
+    (16) —𝜀—[Field(y)]→ (✓)
+    (17) —𝜀→ (20), (24)
+    (18) —𝜀→ (✓)
+    (20) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (22)
+    (22) —𝜀—[Field(x), EndVariant]→ (18)
+    (24) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (26)
+    (26) —𝜀—[Field(y), EndVariant]→ (18)
+    (27) —(container)→ (29)
+    (28) —(item)—[CaptureNode]→ (32)
+    (29) —𝜀→ (28), (31)
+    (31) —𝜀—[ClearCurrent]→ (32)
+    (32) —{↗¹}—𝜀→ (✓)
 
     ═══════════════════════════════════════════════════════════════════════════════
                                   TYPE INFERENCE
@@ -1019,18 +1031,18 @@ fn golden_quantifier_graphs() {
     (48) —{→}—𝜀→ (36)
     (49) —𝜀—[Field(y), EndObject, PushElement]→ (48), (51)
     (51) —𝜀—[EndArray, EndObject]→ (✓)
-    (52) —(outer)—[CaptureNode]→ (57)
+    (52) —(outer)—[StartObject, CaptureNode]→ (57)
     (53) —(inner)—[CaptureNode]→ (60)
     (57) —𝜀—[StartArray]→ (58), (61)
     (58) —{↘}—𝜀→ (53)
     (59) —{→}—𝜀→ (53)
     (60) —𝜀—[PushElement]→ (59), (61)
-    (61) —𝜀—[EndArray, Field(inners)]→ (69)
-    (63) —𝜀—[StartObject, StartArray]→ (52)
-    (66) —𝜀→ (✓)
-    (68) —{→}—𝜀→ (52)
-    (69) —{↗¹}—𝜀—[PushElement]→ (68), (72)
-    (72) —𝜀—[EndArray, Field(outers), EndObject]→ (✓)
+    (61) —𝜀—[EndArray, Field(inners)]→ (71)
+    (63) —𝜀—[StartArray]→ (52)
+    (64) —𝜀—[EndArray]→ (✓)
+    (68) —𝜀→ (✓)
+    (70) —{→}—𝜀→ (52)
+    (71) —{↗¹}—𝜀—[EndObject, PushElement]→ (70), (64)
 
     ═══════════════════════════════════════════════════════════════════════════════
                                   TYPE INFERENCE
@@ -1038,6 +1050,7 @@ fn golden_quantifier_graphs() {
 
     QuantSeq = T04
     Optional = Node?
+    NestedQuant = T08
     LazyStar = [Node]
     LazyPlus = [Node]⁺
     GreedyStar = [Node]
@@ -1048,9 +1061,7 @@ fn golden_quantifier_graphs() {
       y: Node
     }
     T04 = [QuantSeqScope3]
-    NestedQuant = {
-      inners: [Node]
-      outers: [Node]⁺
-    }
+    NestedQuantScope6 = { inners: [Node] }
+    T08 = [NestedQuantScope6]⁺
     ");
 }

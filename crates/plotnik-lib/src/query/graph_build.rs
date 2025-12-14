@@ -467,10 +467,10 @@ impl<'a> Query<'a> {
 
         // Captured sequence/alternation creates object scope for nested fields.
         // Tagged alternations use variants instead (handled in construct_tagged_alt).
-        // Quantifiers only need wrapper if QIS (2+ captures) - otherwise the array is the direct value.
+        // Quantifiers never need outer wrapper - QIS handles per-element wrapping inside the array.
         let needs_object_wrapper = match &inner_expr {
             Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
-            Expr::QuantifiedExpr(q) => self.qis_triggers.contains_key(q),
+            Expr::QuantifiedExpr(_) => false,
             _ => false,
         };
 
@@ -491,8 +491,9 @@ impl<'a> Query<'a> {
             return inner_frag;
         };
 
-        // Single-capture definitions unwrap: no Field effect, type is capture's type directly
-        if self.single_capture_defs.contains(self.current_def_name) {
+        // Single-capture definitions unwrap: no Field effect, type is capture's type directly.
+        // Only the specific propagating capture should unwrap, not nested captures.
+        if self.is_single_capture(self.current_def_name, name) {
             return inner_frag;
         }
 

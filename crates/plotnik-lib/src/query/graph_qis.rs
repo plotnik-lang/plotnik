@@ -24,7 +24,7 @@ impl<'a> Query<'a> {
             // Detect single-capture and multi-capture definitions
             let captures = self.collect_propagating_captures(body);
             if captures.len() == 1 {
-                self.single_capture_defs.insert(*name);
+                self.single_capture_defs.insert(*name, captures[0]);
             } else if captures.len() >= 2 {
                 self.multi_capture_defs.insert(*name);
             }
@@ -46,8 +46,20 @@ impl<'a> Query<'a> {
             }
             ast::Expr::CapturedExpr(c) => {
                 // Captures on sequences/alternations absorb inner captures,
-                // but we still recurse to find nested quantifiers
+                // but we still recurse to find nested quantifiers.
+                // Special case: captured quantifier with ≥1 nested capture needs QIS
+                // to wrap each iteration with StartObject/EndObject for proper field scoping.
                 if let Some(inner) = c.inner() {
+                    // Check if this capture wraps a quantifier with nested captures
+                    if let ast::Expr::QuantifiedExpr(q) = &inner {
+                        if let Some(quant_inner) = q.inner() {
+                            let captures = self.collect_propagating_captures(&quant_inner);
+                            // Trigger QIS if there's at least 1 capture (not already covered by ≥2 rule)
+                            if !captures.is_empty() && !self.qis_triggers.contains_key(q) {
+                                self.qis_triggers.insert(q.clone(), QisTrigger { captures });
+                            }
+                        }
+                    }
                     self.detect_qis_in_expr(&inner);
                 }
             }
@@ -74,9 +86,9 @@ impl<'a> Query<'a> {
                     out.push(name);
                 }
                 // Captured sequence/alternation absorbs inner captures.
-                // Need to look through quantifiers to find the actual container.
+                // Captured quantifiers with nested captures also absorb (they become QIS).
                 if let Some(inner) = c.inner()
-                    && !Self::is_scope_container(&inner)
+                    && !self.is_scope_container(&inner)
                 {
                     self.collect_propagating_captures_impl(&inner, out);
                 }
@@ -95,14 +107,26 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// Check if an expression is a scope container (seq/alt), looking through quantifiers.
-    fn is_scope_container(expr: &ast::Expr) -> bool {
+    /// Check if an expression is a scope container that absorbs inner captures.
+    /// - Sequences and alternations always absorb
+    /// - Quantifiers absorb if they have nested captures (will become QIS)
+    fn is_scope_container(&self, expr: &ast::Expr) -> bool {
         match expr {
             ast::Expr::SeqExpr(_) | ast::Expr::AltExpr(_) => true,
-            ast::Expr::QuantifiedExpr(q) => q
-                .inner()
-                .map(|i| Self::is_scope_container(&i))
-                .unwrap_or(false),
+            ast::Expr::QuantifiedExpr(q) => {
+                if let Some(inner) = q.inner() {
+                    // Quantifier with nested captures acts as scope container
+                    // (will be treated as QIS, wrapping each element in an object)
+                    let nested_captures = self.collect_propagating_captures(&inner);
+                    if !nested_captures.is_empty() {
+                        return true;
+                    }
+                    // Otherwise check if inner is a scope container
+                    self.is_scope_container(&inner)
+                } else {
+                    false
+                }
+            }
             _ => false,
         }
     }
@@ -117,9 +141,13 @@ impl<'a> Query<'a> {
         self.qis_triggers.get(q)
     }
 
-    /// Check if definition has exactly 1 propagating capture (should unwrap).
-    pub fn is_single_capture_def(&self, name: &str) -> bool {
-        self.single_capture_defs.contains(name)
+    /// Check if this capture is the single propagating capture for its definition.
+    /// Only that specific capture should unwrap (skip Field effect).
+    pub fn is_single_capture(&self, def_name: &str, capture_name: &str) -> bool {
+        self.single_capture_defs
+            .get(def_name)
+            .map(|c| *c == capture_name)
+            .unwrap_or(false)
     }
 
     /// Check if definition has 2+ propagating captures (needs struct wrapping).

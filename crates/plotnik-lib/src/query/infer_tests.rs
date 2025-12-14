@@ -345,18 +345,18 @@ fn quantified_seq_with_inline_tagged_alt() {
 
     let result = infer_with_graph(input);
     insta::assert_snapshot!(result, @r"
-    Test = (14)
+    Test = (16)
 
     (00) —𝜀—[StartObject]→ (01)
-    (01) —{→}—𝜀→ (04), (07)
-    (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (05)
-    (05) —𝜀—[EndVariant]→ (17)
-    (07) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (08)
-    (08) —𝜀—[EndVariant]→ (17)
-    (10) —𝜀—[EndArray]→ (✓)
-    (14) —𝜀—[StartArray]→ (00), (10)
-    (16) —{→}—𝜀→ (00)
-    (17) —𝜀—[EndObject, PushElement]→ (16), (10)
+    (01) —{→}—𝜀→ (04), (08)
+    (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (06)
+    (06) —𝜀—[Field(x), EndVariant]→ (19)
+    (08) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (10)
+    (10) —𝜀—[Field(y), EndVariant]→ (19)
+    (12) —𝜀—[EndArray]→ (✓)
+    (16) —𝜀—[StartArray]→ (00), (12)
+    (18) —{→}—𝜀→ (00)
+    (19) —𝜀—[EndObject, PushElement]→ (18), (12)
 
     Test = T6
 
