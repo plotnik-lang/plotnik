@@ -157,7 +157,7 @@ Boolean = [
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, docs, exec, langs)
+    src/commands/      # Subcommands (debug, docs, exec, langs, types)
   plotnik-core/        # Common code
   plotnik-lib/         # Plotnik as library
     src/
@@ -179,6 +179,8 @@ Run: `cargo run -p plotnik-cli -- <command>`
   - Example: `cargo run -p plotnik-cli -- debug -q '(foo) @bar'`
 - `exec` — Execute query against source, output JSON
   - Example: `cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js`
+- `types` — Generate TypeScript type definitions from query
+  - Example: `cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript`
 - `langs` — List supported languages
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
@@ -214,6 +216,23 @@ cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l t
 cargo run -p plotnik-cli -- exec -q '(program (expression_statement (identifier) @name))' --source 'x' -l javascript
 cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --pretty
 cargo run -p plotnik-cli -- exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+```
+
+### `types` output flags
+
+- `--format <FORMAT>` — Output format: `typescript` or `ts` (default: typescript)
+- `--root-type <NAME>` — Name for root type of anonymous expressions (default: Query)
+- `--verbose-nodes` — Use verbose Node shape (matches `exec --verbose-nodes`)
+- `--no-node-type` — Don't emit Node/Point type definitions
+- `--no-export` — Don't add `export` keyword to types
+- `-o/--output <FILE>` — Write output to file instead of stdout
+
+```sh
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript
+cargo run -p plotnik-cli -- types -q 'Func = (function_declaration name: (identifier) @name body: (statement_block) @body)' -l js
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript --verbose-nodes
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript --no-node-type
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript -o types.d.ts
 ```
 
 # Coding rules

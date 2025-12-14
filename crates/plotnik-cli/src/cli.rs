@@ -81,6 +81,27 @@ pub enum Command {
         #[command(flatten)]
         output: ExecOutputArgs,
     },
+
+    /// Generate type definitions from a query
+    #[command(after_help = r#"EXAMPLES:
+  plotnik types -q '(identifier) @id' -l javascript
+  plotnik types --query-file query.plnk -l typescript
+  plotnik types -q '(function_declaration) @fn' -l js --format ts
+  plotnik types -q '(identifier) @id' -l js --verbose-nodes
+  plotnik types -q '(identifier) @id' -l js -o types.d.ts
+
+NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
+    Types {
+        #[command(flatten)]
+        query: QueryArgs,
+
+        /// Target language (required)
+        #[arg(long, short = 'l', value_name = "LANG")]
+        lang: Option<String>,
+
+        #[command(flatten)]
+        output: TypesOutputArgs,
+    },
 }
 
 #[derive(Args)]
@@ -96,6 +117,33 @@ pub struct ExecOutputArgs {
     /// Validate output against inferred types
     #[arg(long)]
     pub check: bool,
+}
+
+#[derive(Args)]
+pub struct TypesOutputArgs {
+    /// Output format (typescript, ts)
+    #[arg(long, default_value = "typescript", value_name = "FORMAT")]
+    pub format: String,
+
+    /// Name for the root type (for anonymous expressions)
+    #[arg(long, default_value = "Query", value_name = "NAME")]
+    pub root_type: String,
+
+    /// Use verbose node shape (matches exec --verbose-nodes)
+    #[arg(long)]
+    pub verbose_nodes: bool,
+
+    /// Don't emit Node/Point type definitions
+    #[arg(long)]
+    pub no_node_type: bool,
+
+    /// Don't export types
+    #[arg(long)]
+    pub no_export: bool,
+
+    /// Write output to file
+    #[arg(short = 'o', long, value_name = "FILE")]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Args)]
