@@ -56,12 +56,9 @@ pub fn run(args: DebugArgs) {
 
     let show_query = has_query_input && !args.symbols && !args.graph && !args.types;
     let show_source = has_source_input;
-    let show_headers = (show_query || args.symbols) && show_source;
+    let show_both_graphs = args.graph_raw && args.graph;
 
     if show_query && let Some(ref q) = query {
-        if show_headers {
-            println!("=== QUERY ===");
-        }
         print!(
             "{}",
             q.printer()
@@ -76,9 +73,6 @@ pub fn run(args: DebugArgs) {
     if args.symbols
         && let Some(ref q) = query
     {
-        if show_headers {
-            println!("=== SYMBOLS ===");
-        }
         print!(
             "{}",
             q.printer()
@@ -93,28 +87,40 @@ pub fn run(args: DebugArgs) {
         && let Some(q) = query.take()
     {
         let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump();
+        let mut needs_separator = false;
         if args.graph_raw {
-            println!("=== GRAPH (raw) ===");
+            if show_both_graphs {
+                println!("(pre-optimization)");
+            }
             print!("{}", pre_opt_dump);
+            needs_separator = true;
         }
         if args.graph {
-            println!("=== GRAPH ===");
+            if needs_separator {
+                println!();
+            }
+            if show_both_graphs {
+                println!("(post-optimization)");
+            }
             print!("{}", q.graph().dump_live(q.dead_nodes()));
+            needs_separator = true;
         }
         if args.types {
-            println!("=== TYPES ===");
+            if needs_separator {
+                println!();
+            }
             print!("{}", q.type_info().dump());
         }
         return;
     }
 
     if show_source {
+        if show_query || args.symbols {
+            println!();
+        }
         let resolved_lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
         let source_code = load_source(&args.source_text, &args.source_file);
         let tree = parse_tree(&source_code, resolved_lang);
-        if show_headers {
-            println!("=== SOURCE ===");
-        }
         print!("{}", dump_source(&tree, &source_code, args.raw));
     }
 

@@ -17,7 +17,7 @@ use super::{
 };
 
 use crate::query::graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, RefMarker};
-use crate::query::typing::TypeInferenceResult;
+use crate::query::infer::TypeInferenceResult;
 
 /// Callback for resolving node kind names to IDs.
 pub trait NodeKindResolver {
@@ -727,7 +727,7 @@ impl<'src, 'g, R: NodeKindResolver> QueryEmitter<'src, 'g, R> {
 mod tests {
     use super::*;
     use crate::query::graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode};
-    use crate::query::typing::TypeInferenceResult;
+    use crate::query::infer::TypeInferenceResult;
     use std::num::NonZeroU16;
 
     fn make_resolver() -> MapResolver {

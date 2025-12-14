@@ -1,6 +1,6 @@
 //! Dump helpers for graph inspection and testing.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
 use crate::ir::{Nav, NavKind};
@@ -39,9 +39,37 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
         out
     }
 
+    fn node_width(&self) -> usize {
+        let max_id = self.graph.iter().map(|(id, _)| id).max().unwrap_or(0);
+        if max_id == 0 {
+            1
+        } else {
+            ((max_id as f64).log10().floor() as usize) + 1
+        }
+    }
+
+    fn format_node_id(&self, id: NodeId, width: usize) -> String {
+        format!("({:0width$})", id, width = width)
+    }
+
     fn format(&self, w: &mut String) -> std::fmt::Result {
+        let width = self.node_width();
+
+        // Build ref_id → name lookup from Enter nodes
+        let ref_names: HashMap<u32, &str> = self
+            .graph
+            .iter()
+            .filter_map(|(_, node)| {
+                if let RefMarker::Enter { ref_id } = &node.ref_marker {
+                    Some((*ref_id, node.ref_name.unwrap_or("?")))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         for (name, entry) in self.graph.definitions() {
-            writeln!(w, "{} = N{}", name, entry)?;
+            writeln!(w, "{} = {}", name, self.format_node_id(entry, width))?;
         }
         if self.graph.definitions().next().is_some() {
             writeln!(w)?;
@@ -54,34 +82,51 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
                 continue;
             }
 
+            // Source node
+            write!(w, "{}", self.format_node_id(id, width))?;
+
+            // Dead node short-circuit
             if is_dead {
-                write!(w, "N{}: ✗ ", id)?;
-            } else {
-                write!(w, "N{}: ", id)?;
+                writeln!(w, " → (⨯)")?;
+                continue;
             }
 
+            write!(w, " —")?;
+
+            // Navigation (omit for Stay)
             if !node.nav.is_stay() {
-                write!(w, "[{}] ", format_nav(&node.nav))?;
+                write!(w, "{}—", format_nav(&node.nav))?;
             }
 
+            // Enter ref marker (before matcher)
+            if let RefMarker::Enter { .. } = &node.ref_marker {
+                let name = node.ref_name.unwrap_or("?");
+                write!(w, "<{}>—", name)?;
+            }
+
+            // Matcher
             self.format_matcher(w, &node.matcher)?;
 
-            match &node.ref_marker {
-                RefMarker::None => {}
-                RefMarker::Enter { ref_id } => {
-                    let name = node.ref_name.unwrap_or("?");
-                    write!(w, " +Enter({}, {})", ref_id, name)?;
-                }
-                RefMarker::Exit { ref_id } => {
-                    write!(w, " +Exit({})", ref_id)?;
-                }
+            // Exit ref marker (after matcher)
+            if let RefMarker::Exit { ref_id } = &node.ref_marker {
+                let name = ref_names.get(ref_id).copied().unwrap_or("?");
+                write!(w, "—<{}>", name)?;
             }
 
-            for effect in &node.effects {
-                write!(w, " [{}]", format_effect(effect))?;
+            // Effects
+            if !node.effects.is_empty() {
+                write!(w, "—[")?;
+                for (i, effect) in node.effects.iter().enumerate() {
+                    if i > 0 {
+                        write!(w, ", ")?;
+                    }
+                    write!(w, "{}", format_effect(effect))?;
+                }
+                write!(w, "]")?;
             }
 
-            self.format_successors(w, &node.successors)?;
+            // Successors
+            self.format_successors(w, &node.successors, width)?;
 
             writeln!(w)?;
         }
@@ -91,7 +136,7 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
 
     fn format_matcher(&self, w: &mut String, matcher: &BuildMatcher<'src>) -> std::fmt::Result {
         match matcher {
-            BuildMatcher::Epsilon => write!(w, "ε"),
+            BuildMatcher::Epsilon => write!(w, "𝜀"),
             BuildMatcher::Node {
                 kind,
                 field,
@@ -99,72 +144,96 @@ impl<'a, 'src> GraphPrinter<'a, 'src> {
             } => {
                 write!(w, "({})", kind)?;
                 if let Some(f) = field {
-                    write!(w, " @{}", f)?;
+                    write!(w, "@{}", f)?;
                 }
                 for neg in negated_fields {
-                    write!(w, " !{}", neg)?;
+                    write!(w, "!{}", neg)?;
                 }
                 Ok(())
             }
             BuildMatcher::Anonymous { literal, field } => {
                 write!(w, "\"{}\"", literal)?;
                 if let Some(f) = field {
-                    write!(w, " @{}", f)?;
+                    write!(w, "@{}", f)?;
                 }
                 Ok(())
             }
             BuildMatcher::Wildcard { field } => {
-                write!(w, "_")?;
+                write!(w, "(🞵)")?;
                 if let Some(f) = field {
-                    write!(w, " @{}", f)?;
+                    write!(w, "@{}", f)?;
                 }
                 Ok(())
             }
         }
     }
 
-    fn format_successors(&self, w: &mut String, successors: &[NodeId]) -> std::fmt::Result {
+    fn format_successors(
+        &self,
+        w: &mut String,
+        successors: &[NodeId],
+        width: usize,
+    ) -> std::fmt::Result {
         let live_succs: Vec<_> = successors
             .iter()
             .filter(|s| self.dead_nodes.map(|d| !d.contains(s)).unwrap_or(true))
             .collect();
 
         if live_succs.is_empty() {
-            write!(w, " → ∅")
+            write!(w, "→ (✓)")
         } else {
-            write!(w, " → ")?;
-            let succs: Vec<_> = live_succs.iter().map(|s| format!("N{}", s)).collect();
-            write!(w, "{}", succs.join(", "))
+            write!(w, "→ ")?;
+            for (i, s) in live_succs.iter().enumerate() {
+                if i > 0 {
+                    write!(w, ", ")?;
+                }
+                write!(w, "{}", self.format_node_id(**s, width))?;
+            }
+            Ok(())
         }
     }
 }
 
 fn format_nav(nav: &Nav) -> String {
     match nav.kind {
-        NavKind::Stay => "Stay".to_string(),
-        NavKind::Next => "Next".to_string(),
-        NavKind::NextSkipTrivia => "Next.".to_string(),
-        NavKind::NextExact => "Next!".to_string(),
-        NavKind::Down => "Down".to_string(),
-        NavKind::DownSkipTrivia => "Down.".to_string(),
-        NavKind::DownExact => "Down!".to_string(),
-        NavKind::Up => format!("Up({})", nav.level),
-        NavKind::UpSkipTrivia => format!("Up.({})", nav.level),
-        NavKind::UpExact => format!("Up!({})", nav.level),
+        NavKind::Stay => "{˟}".to_string(),
+        NavKind::Next => "{→}".to_string(),
+        NavKind::NextSkipTrivia => "{→·}".to_string(),
+        NavKind::NextExact => "{→!}".to_string(),
+        NavKind::Down => "{↘}".to_string(),
+        NavKind::DownSkipTrivia => "{↘.}".to_string(),
+        NavKind::DownExact => "{↘!}".to_string(),
+        NavKind::Up => format!("{{↗{}}}", to_superscript(nav.level)),
+        NavKind::UpSkipTrivia => format!("{{↗·{}}}", to_superscript(nav.level)),
+        NavKind::UpExact => format!("{{↗!{}}}", to_superscript(nav.level)),
     }
+}
+
+fn to_superscript(n: u8) -> String {
+    const SUPERSCRIPTS: [char; 10] = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+    if n == 0 {
+        return "⁰".to_string();
+    }
+    let mut result = String::new();
+    let mut num = n;
+    while num > 0 {
+        result.insert(0, SUPERSCRIPTS[(num % 10) as usize]);
+        num /= 10;
+    }
+    result
 }
 
 fn format_effect(effect: &BuildEffect) -> String {
     match effect {
-        BuildEffect::CaptureNode => "Capture".to_string(),
-        BuildEffect::ClearCurrent => "Clear".to_string(),
+        BuildEffect::CaptureNode => "CaptureNode".to_string(),
+        BuildEffect::ClearCurrent => "ClearCurrent".to_string(),
         BuildEffect::StartArray { .. } => "StartArray".to_string(),
-        BuildEffect::PushElement => "Push".to_string(),
+        BuildEffect::PushElement => "PushElement".to_string(),
         BuildEffect::EndArray => "EndArray".to_string(),
-        BuildEffect::StartObject { .. } => "StartObj".to_string(),
-        BuildEffect::EndObject => "EndObj".to_string(),
+        BuildEffect::StartObject { .. } => "StartObject".to_string(),
+        BuildEffect::EndObject => "EndObject".to_string(),
         BuildEffect::Field { name, .. } => format!("Field({})", name),
-        BuildEffect::StartVariant(v) => format!("Variant({})", v),
+        BuildEffect::StartVariant(v) => format!("StartVariant({})", v),
         BuildEffect::EndVariant => "EndVariant".to_string(),
         BuildEffect::ToString => "ToString".to_string(),
     }

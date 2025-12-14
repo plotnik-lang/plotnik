@@ -16,7 +16,6 @@ fn infer_with_graph(source: &str) -> String {
         .expect("parse should succeed")
         .build_graph();
     let mut out = String::new();
-    out.push_str("=== Graph ===\n");
     out.push_str(&query.graph().dump_live(query.dead_nodes()));
     out.push('\n');
     out.push_str(&query.type_info().dump());
@@ -30,44 +29,37 @@ fn debug_star_quantifier_graph() {
         .expect("parse should succeed")
         .build_graph_with_pre_opt_dump();
     let mut out = String::new();
-    out.push_str("=== Graph (before optimization - what type inference sees) ===\n");
+    out.push_str("(pre-optimization)\n");
     out.push_str(&pre_opt_dump);
-    out.push_str("\n=== Graph (after optimization) ===\n");
+    out.push_str("\n(post-optimization)\n");
     out.push_str(&query.graph().dump_live(query.dead_nodes()));
     out.push('\n');
     out.push_str(&query.type_info().dump());
     insta::assert_snapshot!(out, @r"
-    === Graph (before optimization - what type inference sees) ===
-    Foo = N4
+    (pre-optimization)
+    Foo = (4)
 
-    N0: (_) → N1
-    N1: [Down] (item) [Capture] → N2
-    N2: ε [Field(items)] → N3
-    N3: [Up(1)] ε → N6
-    N4: ε [StartArray] → N7
-    N5: ε [EndArray] → ∅
-    N6: ε [Push] → N7
-    N7: ε → N0, N5
+    (0) —(_)→ (1)
+    (1) —{↘}—(item)—[CaptureNode]→ (2)
+    (2) —𝜀—[Field(items)]→ (3)
+    (3) —{↗¹}—𝜀→ (6)
+    (4) —𝜀—[StartArray]→ (7)
+    (5) —𝜀—[EndArray]→ (✓)
+    (6) —𝜀—[PushElement]→ (7)
+    (7) —𝜀→ (0), (5)
 
-    === Graph (after optimization) ===
-    Foo = N4
+    (post-optimization)
+    Foo = (4)
 
-    N0: (_) → N1
-    N1: [Down] (item) [Capture] → N2
-    N2: ε [Field(items)] → N6
-    N4: ε [StartArray] → N7
-    N5: ε [EndArray] → ∅
-    N6: [Up(1)] ε [Push] → N7
-    N7: ε → N0, N5
+    (0) —(_)→ (1)
+    (1) —{↘}—(item)—[CaptureNode]→ (2)
+    (2) —𝜀—[Field(items)]→ (6)
+    (4) —𝜀—[StartArray]→ (7)
+    (5) —𝜀—[EndArray]→ (✓)
+    (6) —{↗¹}—𝜀—[PushElement]→ (7)
+    (7) —𝜀→ (0), (5)
 
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: ArrayStar <anon> → Node
-    T4: Record Foo {
-        items: T3
-    }
+    Foo = { items: [Node] }
     ");
 }
 
@@ -75,19 +67,12 @@ fn debug_star_quantifier_graph() {
 fn debug_graph_structure() {
     let result = infer_with_graph("Foo = (identifier) @name");
     insta::assert_snapshot!(result, @r"
-    === Graph ===
-    Foo = N0
+    Foo = (0)
 
-    N0: (identifier) [Capture] → N1
-    N1: ε [Field(name)] → ∅
+    (0) —(identifier)—[CaptureNode]→ (1)
+    (1) —𝜀—[Field(name)]→ (✓)
 
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        name: Node
-    }
+    Foo = { name: Node }
     ");
 }
 
@@ -103,35 +88,25 @@ fn debug_incompatible_types_graph() {
         .build_graph();
 
     let mut out = String::new();
-    out.push_str("=== Graph (after optimization) ===\n");
     out.push_str(&query.graph().dump_live(query.dead_nodes()));
-    out.push_str("\n=== Dead nodes count: ");
-    out.push_str(&query.dead_nodes().len().to_string());
-    out.push_str(" ===\n\n");
+    out.push_str(&format!("\n(dead nodes: {})\n\n", query.dead_nodes().len()));
     out.push_str(&query.type_info().dump());
     insta::assert_snapshot!(out, @r"
-    === Graph (after optimization) ===
-    Foo = N0
+    Foo = (0)
 
-    N0: ε → N2, N4
-    N1: ε → ∅
-    N2: (a) [Capture] → N3
-    N3: ε [Field(v)] → N1
-    N4: (b) [Capture] [ToString] → N5
-    N5: ε [Field(v)] → N1
+    (0) —𝜀→ (2), (4)
+    (1) —𝜀→ (✓)
+    (2) —(a)—[CaptureNode]→ (3)
+    (3) —𝜀—[Field(v)]→ (1)
+    (4) —(b)—[CaptureNode, ToString]→ (5)
+    (5) —𝜀—[Field(v)]→ (1)
 
-    === Dead nodes count: 0 ===
+    (dead nodes: 0)
 
-    === Entrypoints ===
-    Foo → T3
+    Foo = { v: Node }
 
-    === Types ===
-    T3: Record Foo {
-        v: Node
-    }
-
-    === Errors ===
-    field `v` in `Foo`: incompatible types [Node, String]
+    Errors:
+      field `v` in `Foo`: incompatible types [Node, String]
     ");
 }
 
@@ -142,42 +117,22 @@ fn debug_incompatible_types_graph() {
 #[test]
 fn single_node_capture() {
     let result = infer("Foo = (identifier) @name");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        name: Node
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { name: Node }");
 }
 
 #[test]
 fn string_capture() {
     let result = infer("Foo = (identifier) @name ::string");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        name: String
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { name: str }");
 }
 
 #[test]
 fn multiple_captures_flat() {
     let result = infer("Foo = (a (b) @x (c) @y)");
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        x: Node
-        y: Node
+    Foo = {
+      x: Node
+      y: Node
     }
     ");
 }
@@ -185,10 +140,7 @@ fn multiple_captures_flat() {
 #[test]
 fn no_captures_void() {
     let result = infer("Foo = (identifier)");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → Void
-    ");
+    insta::assert_snapshot!(result, @"Foo = ()");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,17 +155,11 @@ fn captured_sequence_creates_struct() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: Record FooScope3 {
-        x: Node
-        y: Node
+    FooScope3 = {
+      x: Node
+      y: Node
     }
-    T4: Record Foo {
-        z: T3
-    }
+    Foo = { z: FooScope3 }
     ");
 }
 
@@ -225,20 +171,12 @@ fn nested_captured_sequence() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T5
-
-    === Types ===
-    T3: Record FooScope3 {
-        b: Node
+    FooScope3 = { b: Node }
+    FooScope4 = {
+      a: Node
+      nested: FooScope3
     }
-    T4: Record FooScope4 {
-        a: Node
-        nested: T3
-    }
-    T5: Record Foo {
-        root: T4
-    }
+    Foo = { root: FooScope4 }
     ");
 }
 
@@ -250,13 +188,9 @@ fn sequence_without_capture_propagates() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        x: Node
-        y: Node
+    Foo = {
+      x: Node
+      y: Node
     }
     ");
 }
@@ -272,15 +206,7 @@ fn untagged_alternation_symmetric() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        v: Node
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { v: Node }");
 }
 
 #[test]
@@ -291,15 +217,9 @@ fn untagged_alternation_asymmetric() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T5
-
-    === Types ===
-    T3: Optional <anon> → Node
-    T4: Optional <anon> → Node
-    T5: Record Foo {
-        x: T3
-        y: T4
+    Foo = {
+      x: Node?
+      y: Node?
     }
     ");
 }
@@ -312,13 +232,9 @@ fn tagged_alternation_uncaptured_propagates() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Enum Foo {
-        A: Node
-        B: Node
+    Foo = {
+      A => Node
+      B => Node
     }
     ");
 }
@@ -331,17 +247,11 @@ fn tagged_alternation_captured_creates_enum() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: Enum FooScope3 {
-        A: Node
-        B: Node
+    FooScope3 = {
+      A => Node
+      B => Node
     }
-    T4: Record Foo {
-        choice: T3
-    }
+    Foo = { choice: FooScope3 }
     ");
 }
 
@@ -353,19 +263,11 @@ fn captured_untagged_alternation_creates_struct() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T6
-
-    === Types ===
-    T3: Optional <anon> → Node
-    T4: Optional <anon> → Node
-    T5: Record FooScope3 {
-        x: T3
-        y: T4
+    FooScope3 = {
+      x: Node?
+      y: Node?
     }
-    T6: Record Foo {
-        val: T5
-    }
+    Foo = { val: FooScope3 }
     ");
 }
 
@@ -376,46 +278,19 @@ fn captured_untagged_alternation_creates_struct() {
 #[test]
 fn star_quantifier() {
     let result = infer("Foo = ((item) @items)*");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: ArrayStar <anon> → Node
-    T4: Record Foo {
-        items: T3
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { items: [Node] }");
 }
 
 #[test]
 fn plus_quantifier() {
     let result = infer("Foo = ((item) @items)+");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: ArrayPlus <anon> → Node
-    T4: Record Foo {
-        items: T3
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { items: [Node]⁺ }");
 }
 
 #[test]
 fn optional_quantifier() {
     let result = infer("Foo = ((item) @maybe)?");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
-
-    === Types ===
-    T3: Optional <anon> → Node
-    T4: Record Foo {
-        maybe: T3
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { maybe: Node? }");
 }
 
 #[test]
@@ -427,15 +302,13 @@ fn quantifier_on_sequence() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T4
+    Foo = T4
 
-    === Types ===
-    T3: Record FooScope3 {
-        x: Node
-        y: Node
+    FooScope3 = {
+      x: Node
+      y: Node
     }
-    T4: ArrayStar <anon> → T3
+    T4 = [FooScope3]
     ");
 }
 
@@ -453,16 +326,7 @@ fn qis_single_capture_no_trigger() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Single → T4
-
-    === Types ===
-    T3: ArrayStar <anon> → Node
-    T4: Record Single {
-        item: T3
-    }
-    ");
+    insta::assert_snapshot!(result, @"Single = { item: [Node] }");
 }
 
 #[test]
@@ -476,17 +340,13 @@ fn qis_alternation_in_sequence() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T6
+    Foo = T6
 
-    === Types ===
-    T3: Optional <anon> → Node
-    T4: Optional <anon> → Node
-    T5: Record FooScope3 {
-        x: T3
-        y: T4
+    FooScope3 = {
+      x: Node?
+      y: Node?
     }
-    T6: ArrayStar <anon> → T5
+    T6 = [FooScope3]
     ");
 }
 
@@ -501,34 +361,25 @@ fn quantified_seq_with_inline_tagged_alt() {
 
     let result = infer_with_graph(input);
     insta::assert_snapshot!(result, @r"
-    === Graph ===
-    Test = N11
+    Test = (11)
 
-    N0: ε [StartObj] → N1
-    N1: [Next] ε → N4, N8
-    N4: (a) [Variant(A)] [Capture] [Capture] → N6
-    N6: ε [Field(x)] [EndVariant] → N15
-    N8: (b) [Variant(B)] [Capture] [Capture] → N10
-    N10: ε [Field(y)] [EndVariant] → N15
-    N11: ε [StartObj] [StartArray] → N16
-    N15: ε [EndObj] [Push] → N16
-    N16: ε → N0, N19
-    N19: ε [EndArray] [EndObj] [Field(items)] → ∅
+    (00) —𝜀—[StartObject]→ (01)
+    (01) —{→}—𝜀→ (04), (08)
+    (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (06)
+    (06) —𝜀—[Field(x), EndVariant]→ (15)
+    (08) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (10)
+    (10) —𝜀—[Field(y), EndVariant]→ (15)
+    (11) —𝜀—[StartObject, StartArray]→ (16)
+    (15) —𝜀—[EndObject, PushElement]→ (16)
+    (16) —𝜀→ (00), (19)
+    (19) —𝜀—[EndArray, EndObject, Field(items)]→ (✓)
 
-    === Entrypoints ===
-    Test → T7
-
-    === Types ===
-    T3: Optional <anon> → Node
-    T4: Optional <anon> → Node
-    T5: Record TestScope3 {
-        x: T3
-        y: T4
+    TestScope3 = {
+      x: Node?
+      y: Node?
     }
-    T6: ArrayStar <anon> → T5
-    T7: Record Test {
-        items: T6
-    }
+    T6 = [TestScope3]
+    Test = { items: T6 }
     ");
 }
 
@@ -554,26 +405,19 @@ fn incompatible_types_in_alternation() {
 
     let result = infer_with_graph(input);
     insta::assert_snapshot!(result, @r"
-    === Graph ===
-    Foo = N0
+    Foo = (0)
 
-    N0: ε → N2, N4
-    N1: ε → ∅
-    N2: (a) [Capture] → N3
-    N3: ε [Field(v)] → N1
-    N4: (b) [Capture] [ToString] → N5
-    N5: ε [Field(v)] → N1
+    (0) —𝜀→ (2), (4)
+    (1) —𝜀→ (✓)
+    (2) —(a)—[CaptureNode]→ (3)
+    (3) —𝜀—[Field(v)]→ (1)
+    (4) —(b)—[CaptureNode, ToString]→ (5)
+    (5) —𝜀—[Field(v)]→ (1)
 
-    === Entrypoints ===
-    Foo → T3
+    Foo = { v: Node }
 
-    === Types ===
-    T3: Record Foo {
-        v: Node
-    }
-
-    === Errors ===
-    field `v` in `Foo`: incompatible types [Node, String]
+    Errors:
+      field `v` in `Foo`: incompatible types [Node, String]
     ");
 }
 
@@ -590,17 +434,10 @@ fn multiple_definitions() {
 
     let result = infer(input);
     insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Func → T3
-    Class → T4
-
-    === Types ===
-    T3: Record Func {
-        name: Node
-    }
-    T4: Record Class {
-        name: Node
-        body: Node
+    Func = { name: Node }
+    Class = {
+      name: Node
+      body: Node
     }
     ");
 }
@@ -616,41 +453,17 @@ fn deeply_nested_node() {
     "#};
 
     let result = infer(input);
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        val: Node
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { val: Node }");
 }
 
 #[test]
 fn wildcard_capture() {
     let result = infer("Foo = _ @any");
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        any: Node
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { any: Node }");
 }
 
 #[test]
 fn string_literal_capture() {
     let result = infer(r#"Foo = "+" @op"#);
-    insta::assert_snapshot!(result, @r"
-    === Entrypoints ===
-    Foo → T3
-
-    === Types ===
-    T3: Record Foo {
-        op: Node
-    }
-    ");
+    insta::assert_snapshot!(result, @"Foo = { op: Node }");
 }

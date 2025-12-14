@@ -18,19 +18,20 @@ pub mod graph;
 mod graph_build;
 mod graph_dump;
 mod graph_optimize;
+pub mod infer;
+mod infer_dump;
 #[cfg(feature = "plotnik-langs")]
 pub mod link;
 pub mod recursion;
 pub mod shapes;
 pub mod symbol_table;
-pub mod typing;
 
 pub use graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use graph_optimize::OptimizeStats;
-pub use symbol_table::UNNAMED_DEF;
-pub use typing::{
+pub use infer::{
     InferredMember, InferredTypeDef, TypeDescription, TypeInferenceResult, UnificationError,
 };
+pub use symbol_table::UNNAMED_DEF;
 
 #[cfg(test)]
 mod alt_kinds_tests;
@@ -40,6 +41,8 @@ mod graph_build_tests;
 mod graph_master_test;
 #[cfg(test)]
 mod graph_qis_tests;
+#[cfg(test)]
+mod infer_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
@@ -52,8 +55,6 @@ mod recursion_tests;
 mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
-#[cfg(test)]
-mod typing_tests;
 
 use std::collections::{HashMap, HashSet};
 
