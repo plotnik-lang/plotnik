@@ -205,10 +205,10 @@ impl<'a> TypeScriptEmitter<'a> {
             TYPE_STR => "string".to_string(),
             _ => {
                 let idx = (type_id - 3) as usize;
-                if let Some(def) = self.ir.type_defs().get(idx) {
-                    if def.name != STRING_NONE {
-                        return self.ir.string(def.name).to_string();
-                    }
+                if let Some(def) = self.ir.type_defs().get(idx)
+                    && def.name != STRING_NONE
+                {
+                    return self.ir.string(def.name).to_string();
                 }
                 // Fallback for anonymous types
                 format!("T{}", type_id)
