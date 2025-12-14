@@ -25,36 +25,41 @@ type RefId = u16;
 Relative range within a segment:
 
 ```rust
-#[repr(C, packed)]
+#[repr(C)]
 struct Slice<T> {
     start_index: u32,  // element index into segment array (NOT byte offset)
     len: u16,          // 65k elements per slice is sufficient
+    _pad: u16,
     _phantom: PhantomData<fn() -> T>,
 }
-// 6 bytes, align 1 (packed to avoid padding)
+// 8 bytes, align 4
 ```
-
-**Note**: `repr(C, packed)` is required to achieve 6 bytes. Standard `repr(C)` would pad to 8 bytes for alignment. The packed repr means field access may be unaligned on some platforms—accessors should copy values out rather than returning references.
 
 `start_index` is an **element index**, not a byte offset. This naming distinguishes it from byte offsets like `StringRef.offset` and `CompiledQuery.*_offset`. The distinction matters for typed array access.
 
 ### Transition
 
 ```rust
+/// Transitions use SSO (small-size optimization) for successors:
+/// - 0-8 successors: stored inline in `successor_data`
+/// - 9+ successors: `successor_data[0]` is index into successors segment
 #[repr(C, align(64))]
 struct Transition {
     // --- 32 bytes metadata ---
     matcher: Matcher,              // 16 (offset 0)
     ref_marker: RefTransition,     // 4  (offset 16)
-    successor_count: u32,          // 4  (offset 20)
-    effects: Slice<EffectOp>,      // 6  (offset 24, when no effects: start and len are zero)
-    nav: Nav,                      // 2  (offset 30, see ADR-0008)
+    nav: Nav,                      // 2  (offset 20, see ADR-0008)
+    effects_len: u16,              // 2  (offset 22, inlined from Slice)
+    successor_count: u32,          // 4  (offset 24)
+    effects_start: u32,            // 4  (offset 28, inlined from Slice)
 
     // --- 32 bytes control flow ---
     successor_data: [u32; 8],      // 32 (offset 32)
 }
 // 64 bytes, align 64 (cache-line aligned)
 ```
+
+The `effects_start` and `effects_len` fields are inlined rather than using `Slice<EffectOp>` to maintain 64-byte alignment without sacrificing inline successor slots. Accessors reconstruct a `Slice` on demand.
 
 Navigation is fully determined by `nav`—no runtime dispatch based on previous matcher. See [ADR-0008](ADR-0008-tree-navigation.md) for `Nav` definition and semantics.
 
@@ -94,16 +99,16 @@ enum Matcher {
     Node {
         kind: NodeTypeId,                   // 2
         field: Option<NodeFieldId>,         // 2
-        negated_fields: Slice<NodeFieldId>, // 8
+        negated_fields: Slice<NodeFieldId>, // 8 (align 4, starts at offset 8)
     },
     Anonymous {
         kind: NodeTypeId,                   // 2
         field: Option<NodeFieldId>,         // 2
-        negated_fields: Slice<NodeFieldId>, // 8
+        negated_fields: Slice<NodeFieldId>, // 8 (align 4, starts at offset 8)
     },
     Wildcard,
 }
-// 16 bytes, align 4
+// 16 bytes, align 4 (discriminant 4 + payload 12, but payload naturally aligns)
 ```
 
 `Option<NodeFieldId>` uses 0 for `None` (niche optimization).
@@ -125,6 +130,8 @@ enum RefTransition {
 Layout: 1-byte discriminant + 1-byte padding + 2-byte `RefId` payload = 4 bytes. Alignment is 2 (from `RefId: u16`). Fits comfortably in the 64-byte `Transition` struct with room to spare.
 
 Explicit `None` ensures stable binary layout (`Option<Enum>` niche is unspecified).
+
+**RefId semantics**: `RefId` is a unique identifier assigned per definition reference during graph construction. It is **not** an index into the `Entrypoints` table (which is for named exports). The actual jump target comes from `successors()[0]}` of the `Enter` transition. `RefId` exists solely to verify that `Exit(id)` matches the corresponding `Enter(id)` at runtime—a mismatch indicates an IR bug.
 
 ### Enter/Exit Semantics
 

@@ -4,7 +4,7 @@
 //! transitions produce, not how they execute.
 
 use super::Slice;
-use super::ids::{StringId, TypeId};
+use super::ids::{STRING_NONE, StringId, TypeId};
 
 /// First composite type ID (after primitives 0-2).
 pub const TYPE_COMPOSITE_START: TypeId = 3;
@@ -19,16 +19,16 @@ pub const TYPE_COMPOSITE_START: TypeId = 3;
 pub struct TypeDef {
     pub kind: TypeKind,
     _pad: u8,
-    /// Synthetic or explicit type name. `0xFFFF` for unnamed wrappers.
+    /// Synthetic or explicit type name. `STRING_NONE` for unnamed wrappers.
     pub name: StringId,
     /// See struct-level docs for dual semantics.
     pub members: Slice<TypeMember>,
-    _pad2: u16,
 }
 
-// Size is 12 bytes: kind(1) + pad(1) + name(2) + members(6) + pad2(2)
-// Alignment is 2 due to packed Slice<T> having align 1
+// Size is 12 bytes: kind(1) + pad(1) + name(2) + members(8) = 12
+// Alignment is 4 due to Slice<T> having align 4
 const _: () = assert!(size_of::<TypeDef>() == 12);
+const _: () = assert!(align_of::<TypeDef>() == 4);
 
 impl TypeDef {
     /// Create a wrapper type (Optional, ArrayStar, ArrayPlus).
@@ -40,9 +40,8 @@ impl TypeDef {
         Self {
             kind,
             _pad: 0,
-            name: 0xFFFF,
+            name: STRING_NONE,
             members: Slice::from_inner_type(inner),
-            _pad2: 0,
         }
     }
 
@@ -54,7 +53,6 @@ impl TypeDef {
             _pad: 0,
             name,
             members,
-            _pad2: 0,
         }
     }
 

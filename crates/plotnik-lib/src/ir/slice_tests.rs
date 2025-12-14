@@ -43,6 +43,7 @@ fn equality() {
 }
 
 #[test]
-fn size_is_6_bytes() {
-    assert_eq!(std::mem::size_of::<Slice<u64>>(), 6);
+fn size_is_8_bytes() {
+    assert_eq!(std::mem::size_of::<Slice<u64>>(), 8);
+    assert_eq!(std::mem::align_of::<Slice<u64>>(), 4);
 }

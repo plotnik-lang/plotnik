@@ -25,6 +25,9 @@ fn main() {
                 cst: output.cst,
                 spans: output.spans,
                 cardinalities: output.cardinalities,
+                graph: output.graph,
+                graph_raw: output.graph_raw,
+                types: output.types,
                 color: output.color.should_colorize(),
             });
         }

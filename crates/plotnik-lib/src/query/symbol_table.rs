@@ -6,6 +6,10 @@
 
 use indexmap::IndexMap;
 
+/// Sentinel name for unnamed definitions (bare expressions at root level).
+/// Code generators can emit whatever name they want for this.
+pub const UNNAMED_DEF: &str = "_";
+
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Expr, Ref, ast, token_src};
 
@@ -17,18 +21,24 @@ impl<'a> Query<'a> {
     pub(super) fn resolve_names(&mut self) {
         // Pass 1: collect definitions
         for def in self.ast.defs() {
-            let Some(name_token) = def.name() else {
-                continue;
+            let (name, is_named) = match def.name() {
+                Some(token) => (token_src(&token, self.source), true),
+                None => (UNNAMED_DEF, false),
             };
 
-            let name = token_src(&name_token, self.source);
-
-            if self.symbol_table.contains_key(name) {
+            // Skip duplicate check for unnamed definitions (already diagnosed by parser)
+            if is_named && self.symbol_table.contains_key(name) {
+                let name_token = def.name().unwrap();
                 self.resolve_diagnostics
                     .report(DiagnosticKind::DuplicateDefinition, name_token.text_range())
                     .message(name)
                     .emit();
                 continue;
+            }
+
+            // For unnamed defs, only keep the last one (parser already warned about others)
+            if !is_named && self.symbol_table.contains_key(name) {
+                self.symbol_table.shift_remove(name);
             }
 
             let Some(body) = def.body() else {

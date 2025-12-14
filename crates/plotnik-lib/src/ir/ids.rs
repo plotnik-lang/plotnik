@@ -18,6 +18,9 @@ pub type NodeFieldId = NonZeroU16;
 /// Index into the string_refs segment.
 pub type StringId = u16;
 
+/// Sentinel value for unnamed types (wrapper types have no explicit name).
+pub const STRING_NONE: StringId = 0xFFFF;
+
 /// Field name in effects (alias for type safety).
 pub type DataFieldId = StringId;
 

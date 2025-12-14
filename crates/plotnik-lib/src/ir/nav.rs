@@ -69,14 +69,26 @@ impl Nav {
         }
     }
 
+    /// Constrained ascent requires `level == 1`. Multi-level ascent with
+    /// intermediate constraints must decompose into separate transitions.
     pub const fn up_skip_trivia(level: u8) -> Self {
+        assert!(
+            level == 1,
+            "UpSkipTrivia requires level == 1; decompose for intermediate constraints"
+        );
         Self {
             kind: NavKind::UpSkipTrivia,
             level,
         }
     }
 
+    /// Constrained ascent requires `level == 1`. Multi-level ascent with
+    /// intermediate constraints must decompose into separate transitions.
     pub const fn up_exact(level: u8) -> Self {
+        assert!(
+            level == 1,
+            "UpExact requires level == 1; decompose for intermediate constraints"
+        );
         Self {
             kind: NavKind::UpExact,
             level,
