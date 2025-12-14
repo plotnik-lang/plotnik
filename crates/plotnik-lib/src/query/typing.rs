@@ -348,10 +348,10 @@ impl<'src> InferenceContext<'src> {
         let mut merge_errors = Vec::new();
 
         // Special case: tagged alternation at definition root creates enum
-        if let Expr::AltExpr(alt) = body {
-            if alt.kind() == AltKind::Tagged {
-                return self.infer_tagged_alternation_as_enum(def_name, alt, &mut merge_errors);
-            }
+        if let Expr::AltExpr(alt) = body
+            && alt.kind() == AltKind::Tagged
+        {
+            return self.infer_tagged_alternation_as_enum(def_name, alt, &mut merge_errors);
         }
 
         // General case: infer expression and collect captures into scope
@@ -631,10 +631,10 @@ impl<'src> InferenceContext<'src> {
         // Return the type (for use when captured) but mark as not meaningful
         // so uncaptured refs don't affect definition's result type.
         let ref_name = r.name().map(|t| t.text().to_string());
-        if let Some(name) = ref_name {
-            if let Some(&type_id) = self.definition_types.get(name.as_str()) {
-                return ExprResult::opaque(type_id);
-            }
+        if let Some(name) = ref_name
+            && let Some(&type_id) = self.definition_types.get(name.as_str())
+        {
+            return ExprResult::opaque(type_id);
         }
         ExprResult::node()
     }
@@ -808,7 +808,7 @@ impl<'a> Query<'a> {
 
         // Process definitions in dependency order
         for (name, body) in &sorted {
-            let type_id = ctx.infer_definition(*name, body);
+            let type_id = ctx.infer_definition(name, body);
             ctx.definition_types.insert(name, type_id);
         }
 
@@ -908,7 +908,7 @@ impl<'a> Query<'a> {
             Expr::Ref(r) => {
                 if let Some(name_token) = r.name() {
                     let name = name_token.text();
-                    if def_names.contains(name) && !refs.iter().any(|&r| r == name) {
+                    if def_names.contains(name) && !refs.contains(&name) {
                         // Find the actual &'b str from the set
                         if let Some(&found) = def_names.iter().find(|&&n| n == name) {
                             refs.push(found);

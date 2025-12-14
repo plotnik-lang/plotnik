@@ -130,10 +130,8 @@ fn is_eliminable_epsilon(
     let successor_id = node.successors[0];
     let successor = graph.node(successor_id);
 
-    if !node.nav.is_stay() && !successor.nav.is_stay() {
-        if !can_merge_up(node.nav, successor.nav) {
-            return false;
-        }
+    if !node.nav.is_stay() && !successor.nav.is_stay() && !can_merge_up(node.nav, successor.nav) {
+        return false;
     }
 
     if !node.effects.is_empty() && successor.ref_marker.is_some() {

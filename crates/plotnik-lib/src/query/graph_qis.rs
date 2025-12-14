@@ -63,10 +63,10 @@ impl<'a> Query<'a> {
                 }
                 // Captured sequence/alternation absorbs inner captures.
                 // Need to look through quantifiers to find the actual container.
-                if let Some(inner) = c.inner() {
-                    if !Self::is_scope_container(&inner) {
-                        self.collect_propagating_captures_impl(&inner, out);
-                    }
+                if let Some(inner) = c.inner()
+                    && !Self::is_scope_container(&inner)
+                {
+                    self.collect_propagating_captures_impl(&inner, out);
                 }
             }
             ast::Expr::QuantifiedExpr(q) => {

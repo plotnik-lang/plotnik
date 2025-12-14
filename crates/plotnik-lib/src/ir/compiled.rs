@@ -66,7 +66,7 @@ impl CompiledQueryBuffer {
     /// - The backing memory must outlive the returned buffer
     pub unsafe fn from_external(ptr: *mut u8, len: usize) -> Self {
         debug_assert!(
-            ptr as usize % BUFFER_ALIGN == 0,
+            (ptr as usize).is_multiple_of(BUFFER_ALIGN),
             "buffer must be 64-byte aligned"
         );
         Self {

@@ -18,7 +18,7 @@ fn infer_with_graph(source: &str) -> String {
     let mut out = String::new();
     out.push_str("=== Graph ===\n");
     out.push_str(&query.graph().dump_live(query.dead_nodes()));
-    out.push_str("\n");
+    out.push('\n');
     out.push_str(&query.type_info().dump());
     out
 }
@@ -34,7 +34,7 @@ fn debug_star_quantifier_graph() {
     out.push_str(&pre_opt_dump);
     out.push_str("\n=== Graph (after optimization) ===\n");
     out.push_str(&query.graph().dump_live(query.dead_nodes()));
-    out.push_str("\n");
+    out.push('\n');
     out.push_str(&query.type_info().dump());
     insta::assert_snapshot!(out, @r"
     === Graph (before optimization - what type inference sees) ===

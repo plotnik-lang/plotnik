@@ -109,11 +109,11 @@ impl<'a> Query<'a> {
         let mut links: Vec<(NodeId, &'a str, Option<NodeId>)> = Vec::new();
 
         for (id, node) in self.graph.iter() {
-            if let RefMarker::Enter { .. } = &node.ref_marker {
-                if let Some(name) = node.ref_name {
-                    let exit_node = self.find_exit_for_enter(id);
-                    links.push((id, name, exit_node));
-                }
+            if let RefMarker::Enter { .. } = &node.ref_marker
+                && let Some(name) = node.ref_name
+            {
+                let exit_node = self.find_exit_for_enter(id);
+                links.push((id, name, exit_node));
             }
         }
 
@@ -135,10 +135,10 @@ impl<'a> Query<'a> {
         };
 
         for (id, node) in self.graph.iter() {
-            if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker {
-                if *exit_id == ref_id {
-                    return Some(id);
-                }
+            if let RefMarker::Exit { ref_id: exit_id } = &node.ref_marker
+                && *exit_id == ref_id
+            {
+                return Some(id);
             }
         }
         None
@@ -570,11 +570,11 @@ impl<'a> Query<'a> {
         // Capture should happen at Exit (after reference executes, cursor at matched node).
         if let RefMarker::Enter { ref_id } = node.ref_marker {
             for (id, n) in self.graph.iter() {
-                if let RefMarker::Exit { ref_id: exit_id } = n.ref_marker {
-                    if exit_id == ref_id {
-                        result.push(id);
-                        return;
-                    }
+                if let RefMarker::Exit { ref_id: exit_id } = n.ref_marker
+                    && exit_id == ref_id
+                {
+                    result.push(id);
+                    return;
                 }
             }
             return;
