@@ -20,10 +20,12 @@ indexmap = "2"
 rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.17"
+tree-sitter = "0.26"
 plotnik-langs = { version = "0.1", path = "../plotnik-langs", optional = true }
 
 [features]
 default = ["plotnik-langs"]
+unstable-child-type-validation = []
 
 [dev-dependencies]
 insta = { version = "=1.44.3", features = ["yaml"] }

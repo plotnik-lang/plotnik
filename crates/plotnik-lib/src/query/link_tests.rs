@@ -331,6 +331,7 @@ fn nested_field_validation() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_child_type_for_field() {
     let input = indoc! {r#"
@@ -382,6 +383,7 @@ fn alternation_with_link_errors() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn sequence_with_link_errors() {
     let input = indoc! {r#"
@@ -496,6 +498,7 @@ fn field_on_node_without_fields() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_child_type_no_children_allowed() {
     let input = indoc! {r#"
@@ -517,6 +520,7 @@ fn invalid_child_type_no_children_allowed() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_child_type_wrong_type() {
     let input = indoc! {r#"
@@ -566,6 +570,7 @@ fn valid_child_via_nested_supertype() {
     assert!(query.is_valid());
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_anonymous_child() {
     let input = indoc! {r#"
@@ -589,6 +594,7 @@ fn invalid_anonymous_child() {
     "#);
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_child_in_alternation() {
     let input = indoc! {r#"
@@ -612,6 +618,7 @@ fn invalid_child_in_alternation() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn invalid_child_in_sequence() {
     let input = indoc! {r#"
@@ -647,6 +654,7 @@ fn deeply_nested_sequences_valid() {
     assert!(query.is_valid());
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn deeply_nested_sequences_invalid() {
     let input = indoc! {r#"
@@ -681,6 +689,7 @@ fn deeply_nested_alternations_in_field_valid() {
     assert!(query.is_valid());
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn deeply_nested_alternations_in_field_invalid() {
     let input = indoc! {r#"
@@ -703,6 +712,7 @@ fn deeply_nested_alternations_in_field_invalid() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn deeply_nested_no_fields_allowed() {
     let input = indoc! {r#"
@@ -723,6 +733,7 @@ fn deeply_nested_no_fields_allowed() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn mixed_nested_with_capture_and_quantifier() {
     let input = indoc! {r#"
@@ -748,6 +759,7 @@ fn mixed_nested_with_capture_and_quantifier() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn field_with_captured_and_quantified_invalid_type() {
     let input = indoc! {r#"
@@ -771,6 +783,7 @@ fn field_with_captured_and_quantified_invalid_type() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn multiple_invalid_types_in_alternation_field() {
     let input = indoc! {r#"
@@ -803,6 +816,7 @@ fn multiple_invalid_types_in_alternation_field() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn multiple_invalid_types_in_sequence_child() {
     let input = indoc! {r#"
@@ -835,6 +849,7 @@ fn multiple_invalid_types_in_sequence_child() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_followed_for_child_validation() {
     let input = indoc! {r#"
@@ -863,6 +878,7 @@ fn ref_followed_for_child_validation() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_followed_for_field_validation() {
     let input = indoc! {r#"
@@ -908,6 +924,7 @@ fn ref_followed_valid_case() {
     assert!(query.is_valid());
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_followed_recursive_with_invalid_type() {
     let input = indoc! {r#"
@@ -959,6 +976,7 @@ fn ref_followed_recursive_valid() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_followed_mutual_recursion() {
     let input = indoc! {r#"
@@ -1003,6 +1021,7 @@ fn ref_followed_mutual_recursion() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_followed_in_sequence() {
     let input = indoc! {r#"
@@ -1035,6 +1054,7 @@ fn ref_followed_in_sequence() {
     ");
 }
 
+#[cfg(feature = "unstable-child-type-validation")]
 #[test]
 fn ref_validated_in_multiple_contexts() {
     let input = indoc! {r#"

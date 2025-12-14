@@ -1,4 +1,4 @@
-mod source;
+pub mod source;
 
 use std::fs;
 use std::io::{self, Read};
@@ -86,7 +86,13 @@ pub fn run(args: DebugArgs) {
     if (args.graph || args.graph_raw || args.types)
         && let Some(q) = query.take()
     {
-        let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump();
+        // Determine root kind for auto-wrapping
+        let root_kind = args.lang.as_ref().and_then(|lang_name| {
+            let lang = resolve_lang_for_link(&Some(lang_name.clone()));
+            lang.root().and_then(|root_id| lang.node_type_name(root_id))
+        });
+
+        let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump(root_kind);
         let mut needs_separator = false;
         if args.graph_raw {
             if show_both_graphs {

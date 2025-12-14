@@ -72,6 +72,21 @@ impl<'src> BuildGraph<'src> {
         self.add_node(BuildNode::epsilon())
     }
 
+    /// Clone a node, creating a new node with the same matcher, effects, and ref_marker,
+    /// but with the specified nav and copying the successors list.
+    pub fn clone_node_with_nav(&mut self, node_id: NodeId, nav: Nav) -> NodeId {
+        let original = &self.nodes[node_id as usize];
+        let cloned = BuildNode {
+            matcher: original.matcher.clone(),
+            effects: original.effects.clone(),
+            ref_marker: original.ref_marker.clone(),
+            successors: original.successors.clone(),
+            nav,
+            ref_name: original.ref_name,
+        };
+        self.add_node(cloned)
+    }
+
     pub fn add_matcher(&mut self, matcher: BuildMatcher<'src>) -> NodeId {
         self.add_node(BuildNode::with_matcher(matcher))
     }
@@ -116,10 +131,6 @@ impl<'src> BuildGraph<'src> {
         self.connect(fragment.exit, to);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Fragment Combinators
-    // ─────────────────────────────────────────────────────────────────────
-
     pub fn matcher_fragment(&mut self, matcher: BuildMatcher<'src>) -> Fragment {
         Fragment::single(self.add_matcher(matcher))
     }
@@ -162,10 +173,6 @@ impl<'src> BuildGraph<'src> {
         Fragment::new(entry, exit)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Generic Loop/Optional Builders
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Generic loop combinator for * and + quantifiers.
     ///
     /// - `at_least_one`: true for + (one or more), false for * (zero or more)
@@ -177,6 +184,7 @@ impl<'src> BuildGraph<'src> {
         at_least_one: bool,
         greedy: bool,
         mode: ArrayMode,
+        initial_nav: Nav,
     ) -> Fragment {
         let has_array = mode != ArrayMode::None;
         let has_qis = mode == ArrayMode::Qis;
@@ -241,12 +249,39 @@ impl<'src> BuildGraph<'src> {
             (inner.entry, inner.exit)
         };
 
+        // Set initial navigation on inner.entry (the actual matcher).
+        // In QIS mode, this is distinct from loop_body_entry (the object wrapper).
+        self.node_mut(inner.entry).set_nav(initial_nav);
+
+        // For re-entry (subsequent iterations), clone inner.entry with Next nav.
+        // This creates a separate path for re-entry that can skip non-matching siblings.
+        // In QIS mode, we clone inner.entry (not obj_start) to avoid duplicating the wrapper.
+        let try_next = self.clone_node_with_nav(inner.entry, Nav::next());
+
+        // QIS object wrapper for try_next re-entry path
+        let (try_next_entry, try_next_exit) = if has_qis {
+            let os = self.add_epsilon();
+            self.node_mut(os).add_effect(BuildEffect::StartObject {
+                for_alternation: false,
+            });
+            let oe = self.add_epsilon();
+            self.node_mut(oe).add_effect(BuildEffect::EndObject);
+            self.connect(os, try_next);
+            self.connect(try_next, oe);
+            (os, oe)
+        } else {
+            (try_next, try_next)
+        };
+
         // Wire up the graph based on at_least_one and greedy
         if at_least_one {
             // + pattern: must match at least once
-            // Entry → body → push/branch → (loop back or exit)
+            // Entry → loop_body_entry → body → push → re_entry → (try_next → body or exit)
             let entry_point = start.unwrap_or(loop_body_entry);
             let exit_point = end.or(exit).unwrap();
+
+            // re_entry is a branch point (no nav) that chooses: try more or exit
+            let re_entry = self.add_epsilon();
 
             if let Some(s) = start {
                 self.connect(s, loop_body_entry);
@@ -254,25 +289,33 @@ impl<'src> BuildGraph<'src> {
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
-                self.connect(p, branch);
+                // try_next also needs to connect to push after matching
+                self.connect(try_next_exit, p);
+                self.connect(p, re_entry);
             } else {
-                self.connect(loop_body_exit, branch);
+                self.connect(loop_body_exit, re_entry);
+                self.connect(try_next_exit, re_entry);
             }
 
+            // re_entry branches: try_next (Next nav) or exit
+            // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
             if greedy {
-                self.connect(branch, loop_body_entry);
-                self.connect(branch, exit_point);
+                self.connect(re_entry, try_next_entry);
+                self.connect(re_entry, exit_point);
             } else {
-                self.connect(branch, exit_point);
-                self.connect(branch, loop_body_entry);
+                self.connect(re_entry, exit_point);
+                self.connect(re_entry, try_next_entry);
             }
 
             Fragment::new(entry_point, exit_point)
         } else {
             // * pattern: zero or more
-            // Entry → branch → (body → push → branch) or exit
+            // Entry → branch → (loop_body_entry → body → push → re_entry → try_next → body) or exit
             let entry_point = start.unwrap_or(branch);
             let exit_point = end.or(exit).unwrap();
+
+            // re_entry is a branch point (no nav) that chooses: try more or exit
+            let re_entry = self.add_epsilon();
 
             if let Some(s) = start {
                 self.connect(s, branch);
@@ -288,9 +331,22 @@ impl<'src> BuildGraph<'src> {
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
-                self.connect(p, branch);
+                // try_next also needs to connect to push after matching
+                self.connect(try_next_exit, p);
+                self.connect(p, re_entry);
             } else {
-                self.connect(loop_body_exit, branch);
+                self.connect(loop_body_exit, re_entry);
+                self.connect(try_next_exit, re_entry);
+            }
+
+            // re_entry branches: try_next (Next nav) or exit
+            // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
+            if greedy {
+                self.connect(re_entry, try_next_entry);
+                self.connect(re_entry, exit_point);
+            } else {
+                self.connect(re_entry, exit_point);
+                self.connect(re_entry, try_next_entry);
             }
 
             Fragment::new(entry_point, exit_point)
@@ -350,28 +406,24 @@ impl<'src> BuildGraph<'src> {
         Fragment::new(branch, exit)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Simple Loop Combinators (no array collection)
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Zero or more (greedy): inner*
-    pub fn zero_or_more(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::None)
+    pub fn zero_or_more(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::None, nav)
     }
 
     /// Zero or more (non-greedy): inner*?
-    pub fn zero_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::None)
+    pub fn zero_or_more_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::None, nav)
     }
 
     /// One or more (greedy): inner+
-    pub fn one_or_more(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::None)
+    pub fn one_or_more(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::None, nav)
     }
 
     /// One or more (non-greedy): inner+?
-    pub fn one_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::None)
+    pub fn one_or_more_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::None, nav)
     }
 
     /// Optional (greedy): inner?
@@ -384,55 +436,47 @@ impl<'src> BuildGraph<'src> {
         self.build_optional(inner, false, false)
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Array-Collecting Loop Combinators
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Zero or more with array collection (greedy): inner*
-    pub fn zero_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::Simple)
+    pub fn zero_or_more_array(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::Simple, nav)
     }
 
     /// Zero or more with array collection (non-greedy): inner*?
-    pub fn zero_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::Simple)
+    pub fn zero_or_more_array_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::Simple, nav)
     }
 
     /// One or more with array collection (greedy): inner+
-    pub fn one_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::Simple)
+    pub fn one_or_more_array(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::Simple, nav)
     }
 
     /// One or more with array collection (non-greedy): inner+?
-    pub fn one_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::Simple)
+    pub fn one_or_more_array_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::Simple, nav)
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // QIS-Aware Array Combinators (wrap each iteration with object scope)
-    // ─────────────────────────────────────────────────────────────────────
 
     /// Zero or more with QIS object wrapping (greedy): inner*
     ///
     /// Each iteration is wrapped in StartObject/EndObject to keep
     /// multiple captures coupled per-iteration.
-    pub fn zero_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::Qis)
+    pub fn zero_or_more_array_qis(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::Qis, nav)
     }
 
     /// Zero or more with QIS object wrapping (non-greedy): inner*?
-    pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::Qis)
+    pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::Qis, nav)
     }
 
     /// One or more with QIS object wrapping (greedy): inner+
-    pub fn one_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::Qis)
+    pub fn one_or_more_array_qis(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::Qis, nav)
     }
 
     /// One or more with QIS object wrapping (non-greedy): inner+?
-    pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::Qis)
+    pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::Qis, nav)
     }
 
     /// Optional with QIS object wrapping: inner?
@@ -445,6 +489,56 @@ impl<'src> BuildGraph<'src> {
     /// Optional with QIS object wrapping (non-greedy): inner??
     pub fn optional_qis_lazy(&mut self, inner: Fragment) -> Fragment {
         self.build_optional(inner, false, true)
+    }
+
+    /// Wrap definitions that don't already match the root node kind.
+    ///
+    /// For each definition whose entry matcher doesn't match `root_kind`,
+    /// prepends a transition that matches the root and descends into children.
+    /// This allows queries like `(function_declaration)` to work when the
+    /// interpreter starts at tree root (e.g., `program`).
+    pub fn wrap_definitions_with_root(&mut self, root_kind: &'src str) {
+        let def_names: Vec<&'src str> = self.definitions.keys().copied().collect();
+
+        for name in def_names {
+            let entry = self.definitions[name];
+
+            // Check if entry already matches root (directly or first reachable matcher)
+            if self.entry_matches_root(entry, root_kind) {
+                continue;
+            }
+
+            // Create wrapper: (root_kind) with Nav::stay
+            let wrapper = self.add_node(BuildNode::with_matcher(BuildMatcher::node(root_kind)));
+
+            // Add epsilon node with Nav::down between wrapper and original entry
+            let down_nav = self.add_epsilon();
+            self.node_mut(down_nav).set_nav(Nav::down());
+
+            // Connect wrapper → down_nav → original entry
+            self.connect(wrapper, down_nav);
+            self.connect(down_nav, entry);
+
+            // Update definition to point to wrapper
+            self.definitions.insert(name, wrapper);
+        }
+    }
+
+    /// Check if entry (or first reachable node matcher) already matches root kind.
+    fn entry_matches_root(&self, entry: NodeId, root_kind: &str) -> bool {
+        match &self.nodes[entry as usize].matcher {
+            BuildMatcher::Node { kind, .. } => *kind == root_kind,
+            BuildMatcher::Epsilon => {
+                // For epsilon entries, check first reachable node matchers
+                for &target in &self.nodes[entry as usize].successors {
+                    if self.entry_matches_root(target, root_kind) {
+                        return true;
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 }
 

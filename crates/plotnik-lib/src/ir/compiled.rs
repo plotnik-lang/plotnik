@@ -215,10 +215,6 @@ impl CompiledQuery {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Segment accessors
-    // ─────────────────────────────────────────────────────────────────────
-
     /// Returns the transitions segment.
     #[inline]
     pub fn transitions(&self) -> &[Transition] {
@@ -344,10 +340,6 @@ impl CompiledQuery {
             )
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // High-level accessors
-    // ─────────────────────────────────────────────────────────────────────
 
     /// Returns a transition by ID.
     #[inline]
@@ -624,10 +616,6 @@ pub struct CompiledQueryOffsets {
     pub trivia_kinds_offset: u32,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// View types
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// A view of a transition with resolved slices.
 ///
 /// Hides offset arithmetic and inline/spilled distinction from callers.
@@ -715,10 +703,6 @@ impl<'a> MatcherView<'a> {
         self.raw.kind()
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Alignment helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 /// Aligns an offset up to the given alignment.
 #[inline]

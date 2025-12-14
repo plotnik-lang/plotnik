@@ -120,6 +120,12 @@ pub struct Query<'a> {
     type_info: TypeInferenceResult<'a>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
     qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+    /// Definitions with exactly 1 propagating capture: def name → capture name.
+    single_capture_defs: HashMap<&'a str, &'a str>,
+    /// Definitions with 2+ propagating captures (need struct wrapping at root).
+    multi_capture_defs: HashSet<&'a str>,
+    /// Current definition name during graph construction.
+    current_def_name: &'a str,
     /// Counter for generating unique ref IDs during graph construction.
     next_ref_id: u32,
 }
@@ -160,6 +166,9 @@ impl<'a> Query<'a> {
             dead_nodes: HashSet::new(),
             type_info: TypeInferenceResult::default(),
             qis_triggers: HashMap::new(),
+            single_capture_defs: HashMap::new(),
+            multi_capture_defs: HashSet::new(),
+            current_def_name: "",
             next_ref_id: 0,
         }
     }
@@ -205,7 +214,7 @@ impl<'a> Query<'a> {
         if !self.is_valid() {
             return self;
         }
-        self.detect_qis();
+        self.detect_capture_scopes();
         self.construct_graph();
         self.infer_types(); // Run before optimization to avoid merged effects
         self.optimize_graph();
@@ -213,12 +222,17 @@ impl<'a> Query<'a> {
     }
 
     /// Build graph and return dump of graph before optimization (for debugging).
-    pub fn build_graph_with_pre_opt_dump(mut self) -> (Self, String) {
+    ///
+    /// If `root_kind` is provided, definitions are wrapped before dumping.
+    pub fn build_graph_with_pre_opt_dump(mut self, root_kind: Option<&'a str>) -> (Self, String) {
         if !self.is_valid() {
             return (self, String::new());
         }
-        self.detect_qis();
+        self.detect_capture_scopes();
         self.construct_graph();
+        if let Some(root) = root_kind {
+            self.graph.wrap_definitions_with_root(root);
+        }
         let pre_opt_dump = self.graph.dump();
         self.infer_types();
         self.optimize_graph();
@@ -253,6 +267,20 @@ impl<'a> Query<'a> {
     /// Access the constructed graph.
     pub fn graph(&self) -> &BuildGraph<'a> {
         &self.graph
+    }
+
+    /// Wrap definitions that don't already match the root node kind.
+    ///
+    /// Call this after `build_graph()` to allow queries like `(function_declaration)`
+    /// to work when the interpreter starts at tree root (e.g., `program`).
+    ///
+    /// The `root_kind` should be the language's root node kind (e.g., "program" for JS).
+    pub fn wrap_with_root(mut self, root_kind: &'a str) -> Self {
+        self.graph.wrap_definitions_with_root(root_kind);
+        // Re-run type inference and optimization on wrapped graph
+        self.infer_types();
+        self.optimize_graph();
+        self
     }
 
     /// Access the set of dead nodes (eliminated by optimization).

@@ -340,8 +340,6 @@ fn diagnostic_kind_message_rendering() {
     );
 }
 
-// === Filtering/suppression tests ===
-
 #[test]
 fn filtered_no_suppression_disjoint_spans() {
     let mut diagnostics = Diagnostics::new();

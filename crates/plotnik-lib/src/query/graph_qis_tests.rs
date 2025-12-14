@@ -186,21 +186,23 @@ fn qis_graph_has_object_effects() {
     let source = "Foo = { (a) @x (b) @y }*";
     let (_query, pre_opt) = Query::try_from(source)
         .unwrap()
-        .build_graph_with_pre_opt_dump();
+        .build_graph_with_pre_opt_dump(None);
 
     // QIS adds StartObj/EndObj around each iteration to keep captures coupled.
-    // Sequences themselves don't add object scope (captures propagate to parent).
+    // Multi-capture definitions also get wrapped in StartObj/EndObj at root.
+    // The loop has separate wrappers for initial entry and re-entry paths.
     let start_count = pre_opt.matches("StartObj").count();
     let end_count = pre_opt.matches("EndObj").count();
 
+    // 1 from multi-capture def wrapper + 1 for initial loop entry + 1 for re-entry = 3
     assert_eq!(
-        start_count, 1,
-        "QIS graph should have 1 StartObj (from QIS loop):\n{}",
+        start_count, 3,
+        "QIS graph should have 3 StartObj (def wrapper + initial loop + re-entry):\n{}",
         pre_opt
     );
     assert_eq!(
-        end_count, 1,
-        "QIS graph should have 1 EndObj (from QIS loop):\n{}",
+        end_count, 3,
+        "QIS graph should have 3 EndObj (def wrapper + initial loop + re-entry):\n{}",
         pre_opt
     );
 }
@@ -211,7 +213,7 @@ fn non_qis_graph_no_object_effects() {
     let source = "Foo = { (a) @x }*";
     let (_query, pre_opt) = Query::try_from(source)
         .unwrap()
-        .build_graph_with_pre_opt_dump();
+        .build_graph_with_pre_opt_dump(None);
 
     // Non-QIS quantifiers don't need object scope - captures propagate with array cardinality.
     // Sequences themselves don't add object scope either.

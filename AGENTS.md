@@ -157,7 +157,7 @@ Boolean = [
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, docs, langs)
+    src/commands/      # Subcommands (debug, docs, exec, langs, types)
   plotnik-core/        # Common code
   plotnik-lib/         # Plotnik as library
     src/
@@ -177,18 +177,66 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 - `debug` — Inspect queries and source file ASTs
   - Example: `cargo run -p plotnik-cli -- debug -q '(foo) @bar'`
+- `exec` — Execute query against source, output JSON
+  - Example: `cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js`
+- `types` — Generate TypeScript type definitions from query
+  - Example: `cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript`
 - `langs` — List supported languages
 
 Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
 
-Output (inferred from input): `--only-symbols`, `--cst`, `--raw`, `--spans`, `--cardinalities`
+### `debug` output flags
+
+- `--only-symbols` — Show only symbol table (requires query)
+- `--cst` — Show query CST instead of AST
+- `--raw` — Include trivia tokens (whitespace, comments)
+- `--spans` — Show source spans
+- `--cardinalities` — Show inferred cardinalities
+- `--graph` — Show compiled transition graph
+- `--graph-raw` — Show unoptimized graph (before epsilon elimination)
+- `--types` — Show inferred types
 
 ```sh
 cargo run -p plotnik-cli -- debug -q '(identifier) @id'
 cargo run -p plotnik-cli -- debug -q '(identifier) @id' --only-symbols
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --graph -l javascript
+cargo run -p plotnik-cli -- debug -q '(identifier) @id' --types -l javascript
 cargo run -p plotnik-cli -- debug -s app.ts
 cargo run -p plotnik-cli -- debug -s app.ts --raw
 cargo run -p plotnik-cli -- debug -q '(function_declaration) @fn' -s app.ts -l typescript
+```
+
+### `exec` output flags
+
+- `--pretty` — Pretty-print JSON output
+- `--verbose-nodes` — Include line/column positions in nodes
+- `--check` — Validate output against inferred types
+- `--entry <NAME>` — Entry point name (definition to match from)
+
+```sh
+cargo run -p plotnik-cli -- exec -q '(program (expression_statement (identifier) @name))' --source 'x' -l javascript
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --pretty
+cargo run -p plotnik-cli -- exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --check
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --verbose-nodes --pretty
+cargo run -p plotnik-cli -- exec -q 'A = (identifier) @id  B = (string) @str' -s app.js --entry B
+```
+
+### `types` output flags
+
+- `--format <FORMAT>` — Output format: `typescript` or `ts` (default: typescript)
+- `--root-type <NAME>` — Name for root type of anonymous expressions (default: Query)
+- `--verbose-nodes` — Use verbose Node shape (matches `exec --verbose-nodes`)
+- `--no-node-type` — Don't emit Node/Point type definitions
+- `--no-export` — Don't add `export` keyword to types
+- `-o/--output <FILE>` — Write output to file instead of stdout
+
+```sh
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript
+cargo run -p plotnik-cli -- types -q 'Func = (function_declaration name: (identifier) @name body: (statement_block) @body)' -l js
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript --verbose-nodes
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript --no-node-type
+cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript -o types.d.ts
 ```
 
 # Coding rules

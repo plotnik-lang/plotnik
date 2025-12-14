@@ -53,6 +53,7 @@ fn find_similar<'a>(name: &str, candidates: &[&'a str], max_distance: usize) -> 
 }
 
 /// Check if `child` is a subtype of `supertype`, recursively handling nested supertypes.
+#[allow(dead_code)]
 fn is_subtype_of(lang: &Lang, child: NodeTypeId, supertype: NodeTypeId) -> bool {
     let subtypes = lang.subtypes(supertype);
     for &subtype in subtypes {
@@ -67,6 +68,7 @@ fn is_subtype_of(lang: &Lang, child: NodeTypeId, supertype: NodeTypeId) -> bool 
 }
 
 /// Check if `child` is a valid non-field child of `parent`, expanding supertypes.
+#[allow(dead_code)]
 fn is_valid_child_expanded(lang: &Lang, parent: NodeTypeId, child: NodeTypeId) -> bool {
     let valid_types = lang.valid_child_types(parent);
     for &allowed in valid_types {
@@ -81,6 +83,7 @@ fn is_valid_child_expanded(lang: &Lang, parent: NodeTypeId, child: NodeTypeId) -
 }
 
 /// Check if `child` is a valid field value type, expanding supertypes.
+#[allow(dead_code)]
 fn is_valid_field_type_expanded(
     lang: &Lang,
     parent: NodeTypeId,
@@ -100,6 +103,7 @@ fn is_valid_field_type_expanded(
 }
 
 /// Format a list of items for display, truncating if too long.
+#[allow(dead_code)]
 fn format_list(items: &[&str], max_items: usize) -> String {
     if items.is_empty() {
         return String::new();
@@ -124,6 +128,7 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 }
 
 /// Context for validating child types.
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 struct ValidationContext<'a> {
     /// The parent node type being validated against.
@@ -136,6 +141,7 @@ struct ValidationContext<'a> {
     field: Option<FieldContext<'a>>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 struct FieldContext<'a> {
     name: &'a str,
@@ -511,6 +517,7 @@ impl<'a> Query<'a> {
     }
 
     /// Validate non-field children. Called for direct children of a NamedNode that aren't fields.
+    #[cfg(feature = "unstable-child-type-validation")]
     fn validate_non_field_children(
         &mut self,
         expr: &Expr,
@@ -564,7 +571,18 @@ impl<'a> Query<'a> {
         }
     }
 
+    #[cfg(not(feature = "unstable-child-type-validation"))]
+    fn validate_non_field_children(
+        &mut self,
+        _expr: &Expr,
+        _ctx: &ValidationContext<'a>,
+        _lang: &Lang,
+        _visited: &mut IndexSet<String>,
+    ) {
+    }
+
     /// Validate a terminal type (NamedNode or AnonymousNode) against the context.
+    #[cfg(feature = "unstable-child-type-validation")]
     fn validate_terminal_type(
         &mut self,
         expr: &Expr,
@@ -625,7 +643,18 @@ impl<'a> Query<'a> {
         // Non-field children are validated by validate_non_field_children
     }
 
+    #[cfg(not(feature = "unstable-child-type-validation"))]
+    fn validate_terminal_type(
+        &mut self,
+        _expr: &Expr,
+        _ctx: &ValidationContext<'a>,
+        _lang: &Lang,
+        _visited: &mut IndexSet<String>,
+    ) {
+    }
+
     /// Collect all terminal types from an expression (traverses through Alt/Seq/Capture/Quantifier/Ref).
+    #[allow(dead_code)]
     fn collect_terminal_types(
         &self,
         expr: &Expr,
@@ -636,6 +665,7 @@ impl<'a> Query<'a> {
         result
     }
 
+    #[allow(dead_code)]
     fn collect_terminal_types_impl(
         &self,
         expr: &Expr,
@@ -690,6 +720,7 @@ impl<'a> Query<'a> {
     }
 
     /// Get type info for a terminal expression (NamedNode or AnonymousNode).
+    #[allow(dead_code)]
     fn get_terminal_type_info(&self, expr: &Expr) -> Option<(NodeTypeId, &'a str, TextRange)> {
         match expr {
             Expr::NamedNode(node) => {

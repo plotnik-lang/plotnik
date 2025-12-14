@@ -80,10 +80,6 @@ pub struct InferredMember<'src> {
     pub ty: TypeId,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Cardinality
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum Cardinality {
     #[default]
@@ -128,10 +124,6 @@ impl Cardinality {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Type shape for unification checking
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TypeShape {
     Primitive(TypeId),
@@ -146,10 +138,6 @@ impl TypeShape {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Field tracking within a scope
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
 struct FieldInfo {
@@ -245,10 +233,6 @@ struct MergeError<'src> {
     spans: Vec<TextRange>,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inference result from expression
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// What an expression produces when evaluated.
 #[derive(Debug, Clone)]
 struct ExprResult {
@@ -301,10 +285,6 @@ impl ExprResult {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inference context
-// ─────────────────────────────────────────────────────────────────────────────
-
 struct InferenceContext<'src> {
     source: &'src str,
     qis_triggers: HashSet<ast::QuantifiedExpr>,
@@ -337,10 +317,6 @@ impl<'src> InferenceContext<'src> {
         id
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Definition inference
-    // ─────────────────────────────────────────────────────────────────────────
-
     fn infer_definition(&mut self, def_name: &'src str, body: &Expr) -> TypeId {
         self.current_def_name = def_name;
 
@@ -359,20 +335,27 @@ impl<'src> InferenceContext<'src> {
 
         self.report_merge_errors(&merge_errors);
 
-        // Build result type from scope
-        if !scope.fields.is_empty() {
-            self.create_struct_type(def_name, &scope)
-        } else if result.is_meaningful {
-            // QIS or other expressions that produce a meaningful type without populating scope
-            result.base_type
-        } else {
-            TYPE_VOID
+        // Build result type from scope (Payload Rule from ADR-0009)
+        match scope.fields.len() {
+            0 => {
+                if result.is_meaningful {
+                    // QIS or other expressions that produce a meaningful type without populating scope
+                    result.base_type
+                } else {
+                    TYPE_VOID
+                }
+            }
+            1 => {
+                // Single capture at definition root: unwrap to capture's type
+                let (_, info) = scope.fields.iter().next().unwrap();
+                self.wrap_with_cardinality(info.base_type, info.cardinality)
+            }
+            _ => {
+                // Multiple captures: create struct
+                self.create_struct_type(def_name, &scope)
+            }
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Expression inference
-    // ─────────────────────────────────────────────────────────────────────────
 
     fn infer_expr(
         &mut self,
@@ -447,6 +430,10 @@ impl<'src> InferenceContext<'src> {
                 for child in s.children() {
                     self.infer_expr(&child, &mut nested_scope, Cardinality::One, errors);
                 }
+                // Per ADR-0009 Payload Rule: 0 captures → Void
+                if nested_scope.is_empty() {
+                    return TYPE_VOID;
+                }
                 let type_name = self.generate_scope_name();
                 self.create_struct_type(type_name, &nested_scope)
             }
@@ -459,6 +446,10 @@ impl<'src> InferenceContext<'src> {
                     // Captured untagged alternation → Struct with merged fields
                     let mut nested_scope = ScopeInfo::default();
                     self.infer_untagged_alternation(a, &mut nested_scope, Cardinality::One, errors);
+                    // Per ADR-0009 Payload Rule: 0 captures → Void
+                    if nested_scope.is_empty() {
+                        return TYPE_VOID;
+                    }
                     let type_name = self.generate_scope_name();
                     self.create_struct_type(type_name, &nested_scope)
                 }
@@ -639,10 +630,6 @@ impl<'src> InferenceContext<'src> {
         ExprResult::node()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
     fn quantifier_cardinality(&self, q: &ast::QuantifiedExpr) -> Cardinality {
         let Some(op) = q.operator() else {
             return Cardinality::One;
@@ -792,10 +779,6 @@ impl<'src> InferenceContext<'src> {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Query integration
-// ─────────────────────────────────────────────────────────────────────────────
 
 impl<'a> Query<'a> {
     /// Run type inference on the query AST.

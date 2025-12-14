@@ -28,8 +28,7 @@ fn named_node_with_capture() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @id"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode]→ (1)
-    (1) —𝜀—[Field(id)]→ (✓)
+    (0) —(identifier)—[CaptureNode]→ (✓)
     ");
 }
 
@@ -58,13 +57,15 @@ fn sequence() {
 #[test]
 fn sequence_with_captures() {
     insta::assert_snapshot!(snapshot("Q = { (a) @x (b) @y }"), @r"
-    Q = (1)
+    Q = (0)
 
-    (0) —𝜀→ (1)
+    (0) —𝜀—[StartObject]→ (1)
     (1) —{→}—(a)—[CaptureNode]→ (2)
     (2) —𝜀—[Field(x)]→ (3)
-    (3) —{→}—(b)—[CaptureNode]→ (4)
-    (4) —𝜀—[Field(y)]→ (✓)
+    (3) —{→}—(b)—[CaptureNode]→ (6)
+    (4) —𝜀—[Field(y)]→ (6)
+    (5) —𝜀—[StartObject]→ (0)
+    (6) —𝜀—[Field(y), EndObject]→ (✓)
     ");
 }
 
@@ -83,44 +84,50 @@ fn alternation_untagged() {
 #[test]
 fn alternation_tagged() {
     insta::assert_snapshot!(snapshot("Q = [ A: (a) @x  B: (b) @y ]"), @r"
-    Q = (0)
+    Q = (00)
 
-    (0) —𝜀→ (3), (7)
-    (1) —𝜀→ (✓)
-    (2) —𝜀—[StartVariant(A)]→ (3)
-    (3) —(a)—[StartVariant(A), CaptureNode]→ (5)
-    (4) —𝜀—[Field(x)]→ (5)
-    (5) —𝜀—[Field(x), EndVariant]→ (1)
-    (6) —𝜀—[StartVariant(B)]→ (7)
-    (7) —(b)—[StartVariant(B), CaptureNode]→ (9)
-    (8) —𝜀—[Field(y)]→ (9)
-    (9) —𝜀—[Field(y), EndVariant]→ (1)
+    (00) —𝜀—[StartObject]→ (03), (07)
+    (01) —𝜀→ (11)
+    (02) —𝜀—[StartVariant(A)]→ (03)
+    (03) —(a)—[StartVariant(A), CaptureNode]→ (05)
+    (04) —𝜀—[Field(x)]→ (05)
+    (05) —𝜀—[Field(x), EndVariant]→ (11)
+    (06) —𝜀—[StartVariant(B)]→ (07)
+    (07) —(b)—[StartVariant(B), CaptureNode]→ (09)
+    (08) —𝜀—[Field(y)]→ (09)
+    (09) —𝜀—[Field(y), EndVariant]→ (11)
+    (10) —𝜀—[StartObject]→ (00)
+    (11) —𝜀—[EndObject]→ (✓)
     ");
 }
 
 #[test]
 fn quantifier_star() {
     insta::assert_snapshot!(snapshot("Q = (identifier)*"), @r"
-    Q = (1)
+    Q = (4)
 
-    (0) —(identifier)→ (3)
+    (0) —(identifier)→ (6)
     (1) —𝜀—[StartArray]→ (4)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (4)
-    (4) —𝜀→ (0), (2)
+    (3) —𝜀—[PushElement]→ (6)
+    (4) —𝜀—[StartArray]→ (0), (2)
+    (5) —{→}—(identifier)→ (6)
+    (6) —𝜀—[PushElement]→ (5), (2)
     ");
 }
 
 #[test]
 fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
-    Q = (1)
+    Q = (0)
 
-    (0) —(identifier)→ (4)
+    (0) —(identifier)—[StartArray]→ (6)
     (1) —𝜀—[StartArray]→ (0)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (4)
-    (4) —𝜀—[PushElement]→ (0), (2)
+    (3) —𝜀—[PushElement]→ (6)
+    (4) —𝜀→ (✓)
+    (5) —{→}—(identifier)→ (6)
+    (6) —𝜀—[PushElement]→ (5), (2)
     ");
 }
 
@@ -186,8 +193,7 @@ fn to_string_annotation() {
     insta::assert_snapshot!(snapshot("Q = (identifier) @name ::string"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode, ToString]→ (1)
-    (1) —𝜀—[Field(name)]→ (✓)
+    (0) —(identifier)—[CaptureNode, ToString]→ (✓)
     ");
 }
 
@@ -214,29 +220,25 @@ fn anchor_sibling() {
     ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Optimization tests
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn optimized_simple() {
     insta::assert_snapshot!(snapshot_optimized("Q = (identifier) @id"), @r"
     Q = (0)
 
-    (0) —(identifier)—[CaptureNode]→ (1)
-    (1) —𝜀—[Field(id)]→ (✓)
+    (0) —(identifier)—[CaptureNode]→ (✓)
     ");
 }
 
 #[test]
 fn optimized_sequence() {
     insta::assert_snapshot!(snapshot_optimized("Q = { (a) @x (b) @y }"), @r"
-    Q = (1)
+    Q = (0)
 
+    (0) —𝜀—[StartObject]→ (1)
     (1) —{→}—(a)—[CaptureNode]→ (2)
     (2) —𝜀—[Field(x)]→ (3)
-    (3) —{→}—(b)—[CaptureNode]→ (4)
-    (4) —𝜀—[Field(y)]→ (✓)
+    (3) —{→}—(b)—[CaptureNode]→ (6)
+    (6) —𝜀—[Field(y), EndObject]→ (✓)
     ");
 }
 
@@ -263,5 +265,85 @@ fn symbol_table_reuse() {
     (2) —𝜀—<Foo>→ (✓)
     (3) —<Bar>—𝜀→ (1), (4)
     (4) —𝜀—<Bar>→ (✓)
+    ");
+}
+
+// ============================================================================
+// wrap_definitions_with_root
+// ============================================================================
+
+#[test]
+fn wrap_with_root_simple() {
+    let query = Query::try_from("Q = (identifier)")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (1)
+
+    (0) —{↘}—(identifier)→ (✓)
+    (1) —(program)→ (0)
+    (2) —{↘}—𝜀→ (0)
+    ");
+}
+
+#[test]
+fn wrap_with_root_already_matches() {
+    // Definition already starts with root - no wrapping needed
+    let query = Query::try_from("Q = (program (identifier))")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (0)
+
+    (0) —(program)→ (1)
+    (1) —{↘}—(identifier)→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
+    ");
+}
+
+#[test]
+fn wrap_with_root_multiple_definitions() {
+    let input = indoc! {r#"
+        Foo = (identifier)
+        Bar = (program (string))
+    "#};
+    let query = Query::try_from(input)
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    // Foo gets wrapped, Bar already matches root
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Foo = (4)
+    Bar = (1)
+
+    (0) —{↘}—(identifier)→ (✓)
+    (1) —(program)→ (2)
+    (2) —{↘}—(string)→ (3)
+    (3) —{↗¹}—𝜀→ (✓)
+    (4) —(program)→ (0)
+    (5) —{↘}—𝜀→ (0)
+    ");
+}
+
+#[test]
+fn wrap_with_root_with_captures() {
+    let query = Query::try_from("Q = (function_declaration name: (identifier) @name)")
+        .unwrap()
+        .build_graph()
+        .wrap_with_root("program");
+
+    insta::assert_snapshot!(query.graph().dump(), @r"
+    Q = (3)
+
+    (0) —{↘}—(function_declaration)→ (1)
+    (1) —{↘}—(identifier)@name—[CaptureNode]→ (2)
+    (2) —{↗¹}—𝜀→ (✓)
+    (3) —(program)→ (0)
+    (4) —{↘}—𝜀→ (0)
     ");
 }

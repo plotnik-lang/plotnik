@@ -12,7 +12,7 @@ use crate::parser::{
 };
 
 use super::Query;
-use super::graph::{BuildEffect, BuildMatcher, Fragment, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 
 /// Context for navigation determination.
 /// When `anchored` is true, `prev_anonymous` indicates whether the preceding
@@ -97,8 +97,31 @@ impl<'a> Query<'a> {
             .map(|(name, body)| (*name, body.clone()))
             .collect();
         for (name, body) in entries {
+            self.current_def_name = name;
             let fragment = self.construct_expr(&body, NavContext::Root);
-            self.graph.add_definition(name, fragment.entry);
+
+            // Multi-capture definitions need struct wrapping at root
+            let entry = if self.multi_capture_defs.contains(name) {
+                let start_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(start_id)
+                    .add_effect(BuildEffect::StartObject {
+                        for_alternation: false,
+                    });
+                self.graph.connect(start_id, fragment.entry);
+
+                let end_id = self.graph.add_epsilon();
+                self.graph
+                    .node_mut(end_id)
+                    .add_effect(BuildEffect::EndObject);
+                self.graph.connect(fragment.exit, end_id);
+
+                start_id
+            } else {
+                fragment.entry
+            };
+
+            self.graph.add_definition(name, entry);
         }
 
         self.link_references();
@@ -178,6 +201,31 @@ impl<'a> Query<'a> {
 
         let exit_id = self.graph.add_epsilon();
         self.graph.node_mut(exit_id).set_nav(exit_ctx.to_up_nav(1));
+
+        // Trailing anchor retry loop: when UpSkipTrivia fails, try next sibling
+        if exit_ctx.has_trailing_anchor && !child_fragments.is_empty() {
+            let last_frag = child_fragments.last().unwrap();
+            let last_entry = self.graph.node(last_frag.entry);
+            let last_matcher = last_entry.matcher.clone();
+            let last_effects = last_entry.effects.clone();
+
+            // Choice point: epsilon with 2 successors (won't be eliminated)
+            let choice_id = self.graph.add_epsilon();
+            self.graph.connect(inner.exit, choice_id);
+            self.graph.connect(choice_id, exit_id); // First: try UpSkipTrivia
+
+            // Retry node: Nav::next() + same matcher + same effects
+            let retry_id = self.graph.add_node(BuildNode::with_matcher(last_matcher));
+            self.graph.node_mut(retry_id).set_nav(Nav::next());
+            for effect in last_effects {
+                self.graph.node_mut(retry_id).add_effect(effect);
+            }
+            self.graph.connect(choice_id, retry_id); // Second: try next sibling
+            self.graph.connect(retry_id, choice_id); // Loop back to choice
+
+            return Fragment::new(node_id, exit_id);
+        }
+
         self.graph.connect(inner.exit, exit_id);
 
         Fragment::new(node_id, exit_id)
@@ -444,65 +492,105 @@ impl<'a> Query<'a> {
 
         // Captured sequence/alternation creates object scope for nested fields.
         // Tagged alternations use variants instead (handled in construct_tagged_alt).
-        // Quantifiers only need wrapper if QIS (2+ captures) - otherwise the array is the direct value.
+        // Quantifiers never need outer wrapper - QIS handles per-element wrapping inside the array.
         let needs_object_wrapper = match &inner_expr {
             Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
-            Expr::QuantifiedExpr(q) => self.qis_triggers.contains_key(q),
+            Expr::QuantifiedExpr(_) => false,
             _ => false,
         };
 
-        let matchers = self.find_all_matchers(inner_frag.entry);
-        for matcher_id in matchers {
-            self.graph
-                .node_mut(matcher_id)
-                .add_effect(BuildEffect::CaptureNode);
-
-            if has_to_string {
+        // Only add CaptureNode to inner matchers when capturing a node directly.
+        // Captured containers (seq/alt) capture structure, not individual nodes.
+        if !needs_object_wrapper {
+            let matchers = self.find_all_matchers(inner_frag.entry);
+            for matcher_id in matchers {
                 self.graph
                     .node_mut(matcher_id)
-                    .add_effect(BuildEffect::ToString);
+                    .add_effect(BuildEffect::CaptureNode);
+
+                if has_to_string {
+                    self.graph
+                        .node_mut(matcher_id)
+                        .add_effect(BuildEffect::ToString);
+                }
             }
         }
 
-        if let Some(name) = capture_name {
-            let span = capture_token
-                .as_ref()
-                .map(|t| t.text_range())
-                .unwrap_or_default();
+        let Some(name) = capture_name else {
+            return inner_frag;
+        };
 
-            // Check if we're capturing an alternation (for enum vs struct distinction)
+        // Single-capture definitions unwrap: no Field effect, type is capture's type directly.
+        // Only the specific propagating capture should unwrap, not nested captures.
+        let is_single_capture = self.is_single_capture(self.current_def_name, name);
+
+        if is_single_capture && needs_object_wrapper {
+            // Captured container at single-capture definition root
+            let inner_captures = self.collect_propagating_captures(&inner_expr);
+            if inner_captures.is_empty() {
+                // No inner captures → Void (per ADR-0009 Payload Rule).
+                // Return epsilon for matching only, discard inner effects.
+                return self.graph.epsilon_fragment();
+            }
+            // Has inner captures → wrap with StartObject/EndObject but skip outer Field
             let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
-
-            let (entry, exit) = if needs_object_wrapper {
-                // Wrap with StartObject/EndObject for composite captures
-                let start_id = self.graph.add_epsilon();
-                self.graph
-                    .node_mut(start_id)
-                    .add_effect(BuildEffect::StartObject {
-                        for_alternation: is_alternation_capture,
-                    });
-                self.graph.connect(start_id, inner_frag.entry);
-
-                let end_id = self.graph.add_epsilon();
-                self.graph
-                    .node_mut(end_id)
-                    .add_effect(BuildEffect::EndObject);
-                self.graph.connect(inner_frag.exit, end_id);
-
-                (start_id, end_id)
-            } else {
-                (inner_frag.entry, inner_frag.exit)
-            };
-
-            let field_id = self.graph.add_epsilon();
+            let start_id = self.graph.add_epsilon();
             self.graph
-                .node_mut(field_id)
-                .add_effect(BuildEffect::Field { name, span });
-            self.graph.connect(exit, field_id);
-            Fragment::new(entry, field_id)
-        } else {
-            inner_frag
+                .node_mut(start_id)
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: is_alternation_capture,
+                });
+            self.graph.connect(start_id, inner_frag.entry);
+
+            let end_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(end_id)
+                .add_effect(BuildEffect::EndObject);
+            self.graph.connect(inner_frag.exit, end_id);
+
+            return Fragment::new(start_id, end_id);
         }
+
+        if is_single_capture {
+            // Non-container single capture: unwrap directly
+            return inner_frag;
+        }
+
+        let span = capture_token
+            .as_ref()
+            .map(|t| t.text_range())
+            .unwrap_or_default();
+
+        // Check if we're capturing an alternation (for enum vs struct distinction)
+        let is_alternation_capture = matches!(&inner_expr, Expr::AltExpr(_));
+
+        let (entry, exit) = if needs_object_wrapper {
+            // Wrap with StartObject/EndObject for composite captures
+            let start_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(start_id)
+                .add_effect(BuildEffect::StartObject {
+                    for_alternation: is_alternation_capture,
+                });
+            self.graph.connect(start_id, inner_frag.entry);
+
+            let end_id = self.graph.add_epsilon();
+            self.graph
+                .node_mut(end_id)
+                .add_effect(BuildEffect::EndObject);
+            self.graph.connect(inner_frag.exit, end_id);
+
+            (start_id, end_id)
+        } else {
+            (inner_frag.entry, inner_frag.exit)
+        };
+
+        let field_id = self.graph.add_epsilon();
+        self.graph
+            .node_mut(field_id)
+            .add_effect(BuildEffect::Field { name, span });
+        self.graph.connect(exit, field_id);
+        Fragment::new(entry, field_id)
     }
 
     fn construct_quantifier(&mut self, quant: &QuantifiedExpr, ctx: NavContext) -> Fragment {
@@ -513,18 +601,20 @@ impl<'a> Query<'a> {
             return self.construct_expr(&inner_expr, ctx);
         };
 
-        let f = self.construct_expr(&inner_expr, ctx);
+        // Build inner with Stay nav; the repetition combinator handles initial/re-entry nav
+        let f = self.construct_expr(&inner_expr, NavContext::Root);
+        let nav = ctx.to_nav();
         let qis = self.qis_triggers.contains_key(quant);
 
         match (op.kind(), qis) {
-            (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f),
-            (SyntaxKind::Star, true) => self.graph.zero_or_more_array_qis(f),
-            (SyntaxKind::StarQuestion, false) => self.graph.zero_or_more_array_lazy(f),
-            (SyntaxKind::StarQuestion, true) => self.graph.zero_or_more_array_qis_lazy(f),
-            (SyntaxKind::Plus, false) => self.graph.one_or_more_array(f),
-            (SyntaxKind::Plus, true) => self.graph.one_or_more_array_qis(f),
-            (SyntaxKind::PlusQuestion, false) => self.graph.one_or_more_array_lazy(f),
-            (SyntaxKind::PlusQuestion, true) => self.graph.one_or_more_array_qis_lazy(f),
+            (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f, nav),
+            (SyntaxKind::Star, true) => self.graph.zero_or_more_array_qis(f, nav),
+            (SyntaxKind::StarQuestion, false) => self.graph.zero_or_more_array_lazy(f, nav),
+            (SyntaxKind::StarQuestion, true) => self.graph.zero_or_more_array_qis_lazy(f, nav),
+            (SyntaxKind::Plus, false) => self.graph.one_or_more_array(f, nav),
+            (SyntaxKind::Plus, true) => self.graph.one_or_more_array_qis(f, nav),
+            (SyntaxKind::PlusQuestion, false) => self.graph.one_or_more_array_lazy(f, nav),
+            (SyntaxKind::PlusQuestion, true) => self.graph.one_or_more_array_qis_lazy(f, nav),
             (SyntaxKind::Question, false) => self.graph.optional(f),
             (SyntaxKind::Question, true) => self.graph.optional_qis(f),
             (SyntaxKind::QuestionQuestion, false) => self.graph.optional_lazy(f),
@@ -582,7 +672,7 @@ impl<'a> Query<'a> {
 
         if !node.is_epsilon() {
             result.push(node_id);
-            return;
+            // Continue through to find all matchers in loops (e.g., try_next in quantifiers)
         }
 
         for &succ in &node.successors {
