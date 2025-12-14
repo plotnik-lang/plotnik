@@ -189,18 +189,19 @@ fn qis_graph_has_object_effects() {
         .build_graph_with_pre_opt_dump();
 
     // QIS adds StartObj/EndObj around each iteration to keep captures coupled.
-    // Sequences themselves don't add object scope (captures propagate to parent).
+    // Multi-capture definitions also get wrapped in StartObj/EndObj at root.
     let start_count = pre_opt.matches("StartObj").count();
     let end_count = pre_opt.matches("EndObj").count();
 
+    // 1 from multi-capture def wrapper + 1 from QIS loop = 2
     assert_eq!(
-        start_count, 1,
-        "QIS graph should have 1 StartObj (from QIS loop):\n{}",
+        start_count, 2,
+        "QIS graph should have 2 StartObj (multi-capture def + QIS loop):\n{}",
         pre_opt
     );
     assert_eq!(
-        end_count, 1,
-        "QIS graph should have 1 EndObj (from QIS loop):\n{}",
+        end_count, 2,
+        "QIS graph should have 2 EndObj (multi-capture def + QIS loop):\n{}",
         pre_opt
     );
 }

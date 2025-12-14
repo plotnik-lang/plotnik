@@ -169,6 +169,7 @@ impl<'src> BuildGraph<'src> {
         at_least_one: bool,
         greedy: bool,
         mode: ArrayMode,
+        initial_nav: Nav,
     ) -> Fragment {
         let has_array = mode != ArrayMode::None;
         let has_qis = mode == ArrayMode::Qis;
@@ -233,56 +234,86 @@ impl<'src> BuildGraph<'src> {
             (inner.entry, inner.exit)
         };
 
+        // Create first-entry node with initial navigation (e.g., Down for first child)
+        let first_entry = self.add_epsilon();
+        self.node_mut(first_entry).set_nav(initial_nav);
+        self.connect(first_entry, loop_body_entry);
+
+        // Create try_next node with Next navigation for subsequent iterations
+        // This is separate from re_entry so that Next failure triggers backtracking
+        // to re_entry's branch point, not to before the loop started
+        let try_next = self.add_epsilon();
+        self.node_mut(try_next).set_nav(Nav::next());
+        self.connect(try_next, loop_body_entry);
+
         // Wire up the graph based on at_least_one and greedy
         if at_least_one {
             // + pattern: must match at least once
-            // Entry → body → push/branch → (loop back or exit)
-            let entry_point = start.unwrap_or(loop_body_entry);
+            // Entry → first_entry → body → push → re_entry → (try_next → body or exit)
+            let entry_point = start.unwrap_or(first_entry);
             let exit_point = end.or(exit).unwrap();
 
+            // re_entry is a branch point (no nav) that chooses: try more or exit
+            let re_entry = self.add_epsilon();
+
             if let Some(s) = start {
-                self.connect(s, loop_body_entry);
+                self.connect(s, first_entry);
             }
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
-                self.connect(p, branch);
+                self.connect(p, re_entry);
             } else {
-                self.connect(loop_body_exit, branch);
+                self.connect(loop_body_exit, re_entry);
             }
 
+            // re_entry branches: try_next (Next nav) or exit
+            // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
             if greedy {
-                self.connect(branch, loop_body_entry);
-                self.connect(branch, exit_point);
+                self.connect(re_entry, try_next);
+                self.connect(re_entry, exit_point);
             } else {
-                self.connect(branch, exit_point);
-                self.connect(branch, loop_body_entry);
+                self.connect(re_entry, exit_point);
+                self.connect(re_entry, try_next);
             }
 
             Fragment::new(entry_point, exit_point)
         } else {
             // * pattern: zero or more
-            // Entry → branch → (body → push → branch) or exit
+            // Entry → branch → (first_entry → body → push → re_entry → try_next → body) or exit
             let entry_point = start.unwrap_or(branch);
             let exit_point = end.or(exit).unwrap();
+
+            // re_entry is a branch point (no nav) that chooses: try more or exit
+            let re_entry = self.add_epsilon();
 
             if let Some(s) = start {
                 self.connect(s, branch);
             }
 
             if greedy {
-                self.connect(branch, loop_body_entry);
+                self.connect(branch, first_entry);
                 self.connect(branch, exit_point);
             } else {
                 self.connect(branch, exit_point);
-                self.connect(branch, loop_body_entry);
+                self.connect(branch, first_entry);
             }
 
             if let Some(p) = push {
                 self.connect(loop_body_exit, p);
-                self.connect(p, branch);
+                self.connect(p, re_entry);
             } else {
-                self.connect(loop_body_exit, branch);
+                self.connect(loop_body_exit, re_entry);
+            }
+
+            // re_entry branches: try_next (Next nav) or exit
+            // If try_next's Next fails, backtrack finds re_entry checkpoint and tries exit
+            if greedy {
+                self.connect(re_entry, try_next);
+                self.connect(re_entry, exit_point);
+            } else {
+                self.connect(re_entry, exit_point);
+                self.connect(re_entry, try_next);
             }
 
             Fragment::new(entry_point, exit_point)
@@ -343,23 +374,23 @@ impl<'src> BuildGraph<'src> {
     }
 
     /// Zero or more (greedy): inner*
-    pub fn zero_or_more(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::None)
+    pub fn zero_or_more(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::None, nav)
     }
 
     /// Zero or more (non-greedy): inner*?
-    pub fn zero_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::None)
+    pub fn zero_or_more_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::None, nav)
     }
 
     /// One or more (greedy): inner+
-    pub fn one_or_more(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::None)
+    pub fn one_or_more(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::None, nav)
     }
 
     /// One or more (non-greedy): inner+?
-    pub fn one_or_more_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::None)
+    pub fn one_or_more_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::None, nav)
     }
 
     /// Optional (greedy): inner?
@@ -373,46 +404,46 @@ impl<'src> BuildGraph<'src> {
     }
 
     /// Zero or more with array collection (greedy): inner*
-    pub fn zero_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::Simple)
+    pub fn zero_or_more_array(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::Simple, nav)
     }
 
     /// Zero or more with array collection (non-greedy): inner*?
-    pub fn zero_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::Simple)
+    pub fn zero_or_more_array_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::Simple, nav)
     }
 
     /// One or more with array collection (greedy): inner+
-    pub fn one_or_more_array(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::Simple)
+    pub fn one_or_more_array(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::Simple, nav)
     }
 
     /// One or more with array collection (non-greedy): inner+?
-    pub fn one_or_more_array_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::Simple)
+    pub fn one_or_more_array_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::Simple, nav)
     }
 
     /// Zero or more with QIS object wrapping (greedy): inner*
     ///
     /// Each iteration is wrapped in StartObject/EndObject to keep
     /// multiple captures coupled per-iteration.
-    pub fn zero_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, true, ArrayMode::Qis)
+    pub fn zero_or_more_array_qis(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, true, ArrayMode::Qis, nav)
     }
 
     /// Zero or more with QIS object wrapping (non-greedy): inner*?
-    pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, false, false, ArrayMode::Qis)
+    pub fn zero_or_more_array_qis_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, false, false, ArrayMode::Qis, nav)
     }
 
     /// One or more with QIS object wrapping (greedy): inner+
-    pub fn one_or_more_array_qis(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, true, ArrayMode::Qis)
+    pub fn one_or_more_array_qis(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, true, ArrayMode::Qis, nav)
     }
 
     /// One or more with QIS object wrapping (non-greedy): inner+?
-    pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment) -> Fragment {
-        self.build_repetition(inner, true, false, ArrayMode::Qis)
+    pub fn one_or_more_array_qis_lazy(&mut self, inner: Fragment, nav: Nav) -> Fragment {
+        self.build_repetition(inner, true, false, ArrayMode::Qis, nav)
     }
 
     /// Optional with QIS object wrapping: inner?

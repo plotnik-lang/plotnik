@@ -134,6 +134,15 @@ fn is_eliminable_epsilon(
         return false;
     }
 
+    // Don't eliminate if node has nav and successor is a join point.
+    // Different paths may need different navigation (e.g., first iteration vs loop re-entry).
+    if !node.nav.is_stay() {
+        let succ_pred_count = predecessors.get(&successor_id).map_or(0, |p| p.len());
+        if succ_pred_count > 1 {
+            return false;
+        }
+    }
+
     if !node.effects.is_empty() && successor.ref_marker.is_some() {
         return false;
     }

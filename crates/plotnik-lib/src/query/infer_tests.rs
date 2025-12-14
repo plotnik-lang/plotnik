@@ -44,18 +44,21 @@ fn debug_star_quantifier_graph() {
     (2) —{↗¹}—𝜀→ (5)
     (3) —𝜀—[StartArray]→ (6)
     (4) —𝜀—[EndArray]→ (✓)
-    (5) —𝜀—[PushElement]→ (6)
-    (6) —𝜀→ (0), (4)
+    (5) —𝜀—[PushElement]→ (9)
+    (6) —𝜀→ (7), (4)
+    (7) —𝜀→ (0)
+    (8) —{→}—𝜀→ (0)
+    (9) —𝜀→ (8), (4)
 
     (post-optimization)
-    Foo = (3)
+    Foo = (6)
 
     (0) —(_)→ (1)
-    (1) —{↘}—(item)—[CaptureNode]→ (5)
-    (3) —𝜀—[StartArray]→ (6)
+    (1) —{↘}—(item)—[CaptureNode]→ (9)
     (4) —𝜀—[EndArray]→ (✓)
-    (5) —{↗¹}—𝜀—[PushElement]→ (6)
-    (6) —𝜀→ (0), (4)
+    (6) —𝜀—[StartArray]→ (0), (4)
+    (8) —{→}—𝜀→ (0)
+    (9) —{↗¹}—𝜀—[PushElement]→ (8), (4)
 
     Foo = [Node]
     ");
@@ -342,18 +345,18 @@ fn quantified_seq_with_inline_tagged_alt() {
 
     let result = infer_with_graph(input);
     insta::assert_snapshot!(result, @r"
-    Test = (09)
+    Test = (14)
 
     (00) —𝜀—[StartObject]→ (01)
     (01) —{→}—𝜀→ (04), (07)
     (04) —(a)—[StartVariant(A), CaptureNode, CaptureNode]→ (05)
-    (05) —𝜀—[EndVariant]→ (13)
+    (05) —𝜀—[EndVariant]→ (17)
     (07) —(b)—[StartVariant(B), CaptureNode, CaptureNode]→ (08)
-    (08) —𝜀—[EndVariant]→ (13)
-    (09) —𝜀—[StartArray]→ (14)
+    (08) —𝜀—[EndVariant]→ (17)
     (10) —𝜀—[EndArray]→ (✓)
-    (13) —𝜀—[EndObject, PushElement]→ (14)
-    (14) —𝜀→ (00), (10)
+    (14) —𝜀—[StartArray]→ (00), (10)
+    (16) —{→}—𝜀→ (00)
+    (17) —𝜀—[EndObject, PushElement]→ (16), (10)
 
     Test = T6
 

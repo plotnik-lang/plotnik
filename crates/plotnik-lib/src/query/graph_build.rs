@@ -541,18 +541,20 @@ impl<'a> Query<'a> {
             return self.construct_expr(&inner_expr, ctx);
         };
 
-        let f = self.construct_expr(&inner_expr, ctx);
+        // Build inner with Stay nav; the repetition combinator handles initial/re-entry nav
+        let f = self.construct_expr(&inner_expr, NavContext::Root);
+        let nav = ctx.to_nav();
         let qis = self.qis_triggers.contains_key(quant);
 
         match (op.kind(), qis) {
-            (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f),
-            (SyntaxKind::Star, true) => self.graph.zero_or_more_array_qis(f),
-            (SyntaxKind::StarQuestion, false) => self.graph.zero_or_more_array_lazy(f),
-            (SyntaxKind::StarQuestion, true) => self.graph.zero_or_more_array_qis_lazy(f),
-            (SyntaxKind::Plus, false) => self.graph.one_or_more_array(f),
-            (SyntaxKind::Plus, true) => self.graph.one_or_more_array_qis(f),
-            (SyntaxKind::PlusQuestion, false) => self.graph.one_or_more_array_lazy(f),
-            (SyntaxKind::PlusQuestion, true) => self.graph.one_or_more_array_qis_lazy(f),
+            (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f, nav),
+            (SyntaxKind::Star, true) => self.graph.zero_or_more_array_qis(f, nav),
+            (SyntaxKind::StarQuestion, false) => self.graph.zero_or_more_array_lazy(f, nav),
+            (SyntaxKind::StarQuestion, true) => self.graph.zero_or_more_array_qis_lazy(f, nav),
+            (SyntaxKind::Plus, false) => self.graph.one_or_more_array(f, nav),
+            (SyntaxKind::Plus, true) => self.graph.one_or_more_array_qis(f, nav),
+            (SyntaxKind::PlusQuestion, false) => self.graph.one_or_more_array_lazy(f, nav),
+            (SyntaxKind::PlusQuestion, true) => self.graph.one_or_more_array_qis_lazy(f, nav),
             (SyntaxKind::Question, false) => self.graph.optional(f),
             (SyntaxKind::Question, true) => self.graph.optional_qis(f),
             (SyntaxKind::QuestionQuestion, false) => self.graph.optional_lazy(f),

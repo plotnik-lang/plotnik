@@ -104,13 +104,16 @@ fn alternation_tagged() {
 #[test]
 fn quantifier_star() {
     insta::assert_snapshot!(snapshot("Q = (identifier)*"), @r"
-    Q = (1)
+    Q = (4)
 
-    (0) —(identifier)→ (3)
+    (0) —(identifier)→ (7)
     (1) —𝜀—[StartArray]→ (4)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (4)
-    (4) —𝜀→ (0), (2)
+    (3) —𝜀—[PushElement]→ (7)
+    (4) —𝜀—[StartArray]→ (0), (2)
+    (5) —𝜀→ (0)
+    (6) —{→}—𝜀→ (0)
+    (7) —𝜀—[PushElement]→ (6), (2)
     ");
 }
 
@@ -119,11 +122,14 @@ fn quantifier_plus() {
     insta::assert_snapshot!(snapshot("Q = (identifier)+"), @r"
     Q = (1)
 
-    (0) —(identifier)→ (4)
+    (0) —(identifier)→ (7)
     (1) —𝜀—[StartArray]→ (0)
     (2) —𝜀—[EndArray]→ (✓)
-    (3) —𝜀—[PushElement]→ (4)
-    (4) —𝜀—[PushElement]→ (0), (2)
+    (3) —𝜀—[PushElement]→ (7)
+    (4) —𝜀→ (✓)
+    (5) —𝜀→ (0)
+    (6) —{→}—𝜀→ (0)
+    (7) —𝜀—[PushElement]→ (6), (2)
     ");
 }
 
