@@ -170,7 +170,8 @@ enum EffectOp {
     EndArray,
     StartObject,
     EndObject,
-    Field(DataFieldId),
+    SetField(DataFieldId),
+    PushField(DataFieldId),
     StartVariant(VariantTagId),
     EndVariant,
     ToString,
@@ -259,11 +260,11 @@ Query: `{ (identifier) @name (number) @value } @pair`
 ```
 T0: ε + StartObject       → [T1]
 T1: Match(identifier)     → [T2]
-T2: ε + Field("name")     → [T3]
+T2: ε + SetField("name")  → [T3]
 T3: Match(number)         → [T4]
-T4: ε + Field("value")    → [T5]
+T4: ε + SetField("value") → [T5]
 T5: ε + EndObject         → [T6]
-T6: ε + Field("pair")     → [...]
+T6: ε + SetField("pair")  → [...]
 ```
 
 ### Example: Tagged Alternation
@@ -274,10 +275,10 @@ Query: `[ A: (true) @val  B: (false) @val ]`
 T0: ε (branch)                        → [T1, T4]
 T1: ε + StartVariant("A")             → [T2]
 T2: Match(true)                       → [T3]
-T3: ε + Field("val") + EndVariant     → [T7]
+T3: ε + SetField("val") + EndVariant  → [T7]
 T4: ε + StartVariant("B")             → [T5]
 T5: Match(false)                      → [T6]
-T6: ε + Field("val") + EndVariant     → [T7]
+T6: ε + SetField("val") + EndVariant  → [T7]
 ```
 
 ### Epsilon Elimination
@@ -303,10 +304,10 @@ Example of safe elimination:
 Before:
 T1: Match(A) [CaptureNode]                 → [T2]
 T2: ε [PushElement]                        → [T3]
-T3: Match(B) [CaptureNode, Field("b")]     → [...]
+T3: Match(B) [CaptureNode, SetField("b")]     → [...]
 
 After:
-T3': Match(B) [PushElement, CaptureNode, Field("b")]  → [...]
+T3': Match(B) [PushElement, CaptureNode, SetField("b")]  → [...]
 ```
 
 `PushElement` consumes T1's captured value before T3 overwrites `current`.

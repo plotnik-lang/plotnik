@@ -23,6 +23,7 @@
   - [ADR-0007: Type Metadata Format](docs/adr/ADR-0007-type-metadata-format.md)
   - [ADR-0008: Tree Navigation](docs/adr/ADR-0008-tree-navigation.md)
   - [ADR-0009: Type System](docs/adr/ADR-0009-type-system.md)
+  - [ADR-0010: Type System v2](docs/adr/ADR-0010-type-system-v2.md)
 - **Template**:
 
   ```markdown
