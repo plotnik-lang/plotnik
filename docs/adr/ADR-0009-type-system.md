@@ -1,6 +1,6 @@
 # ADR-0009: Type System
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0010](ADR-0010-type-system-v2.md)
 - **Date**: 2025-01-14
 
 ## Context

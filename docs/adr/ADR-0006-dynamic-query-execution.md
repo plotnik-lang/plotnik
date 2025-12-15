@@ -80,13 +80,14 @@ enum Container<'a> {
 | `PushElement`       | move `current` into top array             |
 | `EndArray`          | pop array into `current`                  |
 | `StartObject`       | push `Object({})` onto stack              |
-| `Field(id)`         | move `current` into top object field      |
+| `SetField(id)`      | set field `id` to `current`               |
+| `PushField(id)`     | append `current` to array at field `id`   |
 | `EndObject`         | pop object into `current`                 |
 | `StartVariant(tag)` | push `Variant(tag)` onto stack            |
 | `EndVariant`        | pop, wrap `current`, set as current       |
 | `ToString`          | replace `current` Node with text          |
 
-`ClearCurrent` is emitted on skip paths for optional captures (`expr? @name`). When the optional is skipped, `ClearCurrent` ensures `current = None` before `Field(id)` executes, producing the correct `None` value for the optional field.
+`ClearCurrent` is emitted on skip paths for optional captures (`expr? @name`). When the optional is skipped, `ClearCurrent` ensures `current = None` before `SetField(id)` executes, producing the correct `None` value for the optional field.
 
 Invalid state = IR bug → panic.
 
