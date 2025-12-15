@@ -84,10 +84,10 @@ pub enum SyntaxKind {
     #[token("|")]
     Pipe,
 
-    /// String literal (split by lexer into quote + content + quote)
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     #[regex(r"'(?:[^'\\]|\\.)*'")]
-    StringLiteral,
+    #[doc(hidden)]
+    StringLiteral, // Lexer-internal only
 
     DoubleQuote,
     SingleQuote,

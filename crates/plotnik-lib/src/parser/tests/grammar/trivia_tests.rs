@@ -127,8 +127,8 @@ fn trivia_between_alternation_items() {
               ParenOpen "("
               Id "b"
               ParenClose ")"
+          Newline "\n"
           BracketClose "]"
-      Newline "\n"
       Newline "\n"
     "#);
 }

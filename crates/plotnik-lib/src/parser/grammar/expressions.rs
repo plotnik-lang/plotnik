@@ -1,126 +1,48 @@
-//! Grammar productions for the query language.
-//!
-//! This module implements all `parse_*` methods as an extension of `Parser`.
-//! The grammar follows tree-sitter query syntax with extensions for named subqueries.
-
 use rowan::{Checkpoint, TextRange};
 
-use super::core::Parser;
-
-use super::cst::token_sets::{
+use super::utils::capitalize_first;
+use crate::diagnostics::DiagnosticKind;
+use crate::parser::Parser;
+use crate::parser::cst::token_sets::{
     ALT_RECOVERY, EXPR_FIRST, QUANTIFIERS, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
 };
-use super::cst::{SyntaxKind, TokenSet};
-use super::lexer::token_text;
-use crate::diagnostics::DiagnosticKind;
+use crate::parser::cst::{SyntaxKind, TokenSet};
+use crate::parser::lexer::token_text;
 
 impl Parser<'_> {
-    pub fn parse_root(&mut self) {
-        self.start_node(SyntaxKind::Root);
-
-        let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
-
-        while !self.has_fatal_error() && (self.peek() != SyntaxKind::Error || !self.eof()) {
-            if self.peek() == SyntaxKind::Pub {
-                self.parse_def();
-                continue;
-            }
-
-            // LL(2): Id followed by Equals → named definition (if PascalCase)
-            if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
-                self.parse_def();
-                continue;
-            }
-
-            let start = self.current_span().start();
-            self.start_node(SyntaxKind::Def);
-            let success = self.parse_expr_or_error();
-            if !success {
-                self.synchronize_to_def_start();
-            }
-            self.finish_node();
-            if success {
-                let end = self.last_non_trivia_end().unwrap_or(start);
-                unnamed_def_spans.push(TextRange::new(start, end));
-            }
-        }
-
-        if unnamed_def_spans.len() > 1 {
-            for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
-                let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
-                self.diagnostics
-                    .report(DiagnosticKind::UnnamedDefNotLast, *span)
-                    .message(format!("give it a name like `Name = {}`", def_text.trim()))
-                    .emit();
-            }
-        }
-
-        self.eat_trivia();
-        self.finish_node();
-    }
-
-    /// Named expression definition: `Name = expr`
-    fn parse_def(&mut self) {
-        self.start_node(SyntaxKind::Def);
-
-        self.eat(SyntaxKind::Pub);
-        self.peek();
-
-        let span = self.current_span();
-        let name = token_text(self.source, &self.tokens[self.pos]);
-        self.bump();
-        self.validate_def_name(name, span);
-
-        self.peek();
-        let ate_equals = self.eat(SyntaxKind::Equals);
-        assert!(
-            ate_equals,
-            "parse_def: expected '=' but found {:?} (caller should verify Equals is present)",
-            self.current()
-        );
-
-        if EXPR_FIRST.contains(self.peek()) {
-            self.parse_expr();
-        } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "after `=` in definition",
-            );
-        }
-
-        self.finish_node();
-    }
-
     /// Parse an expression, or emit an error if current token can't start one.
     /// Returns `true` if a valid expression was parsed, `false` on error.
-    fn parse_expr_or_error(&mut self) -> bool {
-        let kind = self.peek();
-        if EXPR_FIRST.contains(kind) {
+    pub(crate) fn parse_expr_or_error(&mut self) -> bool {
+        if self.currently_at_set(EXPR_FIRST) {
             self.parse_expr();
-            true
-        } else if kind == SyntaxKind::At {
-            self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
-            false
-        } else if kind == SyntaxKind::Predicate {
-            self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
-            false
-        } else {
-            self.error_and_bump_msg(
-                DiagnosticKind::UnexpectedToken,
-                "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
-            );
-            false
+            return true;
         }
+
+        if self.currently_at(SyntaxKind::At) {
+            self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
+            return false;
+        }
+
+        if self.currently_at(SyntaxKind::Predicate) {
+            self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
+            return false;
+        }
+
+        self.error_and_bump_msg(
+            DiagnosticKind::UnexpectedToken,
+            "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
+        );
+        false
     }
 
     /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier/capture suffix.
-    fn parse_expr(&mut self) {
+    pub(crate) fn parse_expr(&mut self) {
         self.parse_expr_inner(true)
     }
 
     /// Parse expression without applying quantifier/capture suffix.
     /// Used for field values so that `field: (x)*` parses as `(field: (x))*`.
-    fn parse_expr_no_suffix(&mut self) {
+    pub(crate) fn parse_expr_no_suffix(&mut self) {
         self.parse_expr_inner(false)
     }
 
@@ -136,7 +58,7 @@ impl Parser<'_> {
 
         let checkpoint = self.checkpoint();
 
-        match self.peek() {
+        match self.current() {
             SyntaxKind::ParenOpen => self.parse_tree(),
             SyntaxKind::BracketOpen => self.parse_alt(),
             SyntaxKind::BraceOpen => self.parse_seq(),
@@ -171,7 +93,7 @@ impl Parser<'_> {
         let mut is_ref = false;
         let mut ref_name: Option<String> = None;
 
-        match self.peek() {
+        match self.current() {
             SyntaxKind::ParenClose => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.error(DiagnosticKind::EmptyTree);
@@ -196,14 +118,14 @@ impl Parser<'_> {
                     self.start_node_at(checkpoint, SyntaxKind::Tree);
                 }
 
-                if self.peek() == SyntaxKind::Slash {
+                if self.current() == SyntaxKind::Slash {
                     if is_ref {
                         self.start_node_at(checkpoint, SyntaxKind::Tree);
                         self.error(DiagnosticKind::InvalidSupertypeSyntax);
                         is_ref = false;
                     }
                     self.bump();
-                    match self.peek() {
+                    match self.current() {
                         SyntaxKind::Id => {
                             self.bump();
                         }
@@ -222,7 +144,7 @@ impl Parser<'_> {
             SyntaxKind::KwError => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
-                if self.peek() != SyntaxKind::ParenClose {
+                if self.current() != SyntaxKind::ParenClose {
                     self.error(DiagnosticKind::ErrorTakesNoArguments);
                     self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
                 }
@@ -234,7 +156,7 @@ impl Parser<'_> {
             SyntaxKind::KwMissing => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
-                match self.peek() {
+                match self.current() {
                     SyntaxKind::Id => {
                         self.bump();
                     }
@@ -256,7 +178,7 @@ impl Parser<'_> {
             }
         }
 
-        let has_children = self.peek() != SyntaxKind::ParenClose;
+        let has_children = self.current() != SyntaxKind::ParenClose;
 
         if is_ref && has_children {
             self.start_node_at(checkpoint, SyntaxKind::Tree);
@@ -289,7 +211,6 @@ impl Parser<'_> {
         self.finish_node();
     }
 
-    /// Parse children until `until` token or recovery set hit.
     fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
             if self.eof() {
@@ -319,7 +240,7 @@ impl Parser<'_> {
             if self.has_fatal_error() {
                 break;
             }
-            let kind = self.peek();
+            let kind = self.current();
             if kind == until {
                 break;
             }
@@ -380,17 +301,16 @@ impl Parser<'_> {
             if self.has_fatal_error() {
                 break;
             }
-            let kind = self.peek();
-            if kind == SyntaxKind::BracketClose {
+            if self.currently_at(SyntaxKind::BracketClose) {
                 break;
             }
-            if SEPARATORS.contains(kind) {
+            if self.currently_at_set(SEPARATORS) {
                 self.error_skip_separator();
                 continue;
             }
 
             // LL(2): Id followed by Colon → branch label or field (check casing)
-            if kind == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Colon {
+            if self.currently_at(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
                 let text = token_text(self.source, &self.tokens[self.pos]);
                 let first_char = text.chars().next().unwrap_or('a');
                 if first_char.is_ascii_uppercase() {
@@ -400,13 +320,13 @@ impl Parser<'_> {
                 }
                 continue;
             }
-            if EXPR_FIRST.contains(kind) {
+            if self.currently_at_set(EXPR_FIRST) {
                 self.start_node(SyntaxKind::Branch);
                 self.parse_expr();
                 self.finish_node();
                 continue;
             }
-            if ALT_RECOVERY.contains(kind) {
+            if self.currently_at_set(ALT_RECOVERY) {
                 break;
             }
             self.error_and_bump_msg(
@@ -425,10 +345,9 @@ impl Parser<'_> {
         self.bump();
         self.validate_branch_label(text, span);
 
-        self.peek();
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        if EXPR_FIRST.contains(self.peek()) {
+        if EXPR_FIRST.contains(self.current()) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `Label:`");
@@ -454,10 +373,9 @@ impl Parser<'_> {
         );
 
         self.bump();
-        self.peek();
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        if EXPR_FIRST.contains(self.peek()) {
+        if EXPR_FIRST.contains(self.current()) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `label:`");
@@ -494,15 +412,15 @@ impl Parser<'_> {
 
     /// Consume string tokens (quote + optional content + quote) without creating a node.
     /// Used for contexts where string appears as a raw value (supertype, MISSING arg).
-    fn bump_string_tokens(&mut self) {
-        let open_quote = self.peek();
+    pub(crate) fn bump_string_tokens(&mut self) {
+        let open_quote = self.current();
         self.bump(); // opening quote
 
-        if self.peek() == SyntaxKind::StrVal {
+        if self.current() == SyntaxKind::StrVal {
             self.bump(); // content
         }
 
-        let closing = self.peek();
+        let closing = self.current();
         assert_eq!(
             closing, open_quote,
             "bump_string_tokens: expected closing {:?} but found {:?} \
@@ -516,7 +434,7 @@ impl Parser<'_> {
     fn parse_capture_suffix(&mut self) {
         self.bump(); // consume At
 
-        if self.peek() != SyntaxKind::Id {
+        if self.current() != SyntaxKind::Id {
             self.error(DiagnosticKind::ExpectedCaptureName);
             return;
         }
@@ -527,11 +445,11 @@ impl Parser<'_> {
 
         self.validate_capture_name(name, span);
 
-        if self.peek() == SyntaxKind::Colon {
+        if self.current() == SyntaxKind::Colon {
             self.parse_type_annotation_single_colon();
             return;
         }
-        if self.peek() == SyntaxKind::DoubleColon {
+        if self.current() == SyntaxKind::DoubleColon {
             self.parse_type_annotation();
         }
     }
@@ -541,7 +459,7 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
-        if self.peek() == SyntaxKind::Id {
+        if self.current() == SyntaxKind::Id {
             let span = self.current_span();
             let text = token_text(self.source, &self.tokens[self.pos]);
             self.bump();
@@ -558,7 +476,7 @@ impl Parser<'_> {
 
     /// Handle single colon type annotation (common mistake: `@x : Type` instead of `@x :: Type`)
     fn parse_type_annotation_single_colon(&mut self) {
-        if self.peek_nth(1) != SyntaxKind::Id {
+        if !self.next_is(SyntaxKind::Id) {
             return;
         }
 
@@ -576,7 +494,7 @@ impl Parser<'_> {
         self.bump(); // colon
 
         // peek() skips whitespace, so this handles `@x : Type` with space
-        if self.peek() == SyntaxKind::Id {
+        if self.current() == SyntaxKind::Id {
             self.bump();
         }
 
@@ -595,7 +513,7 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::NegatedField);
         self.expect(SyntaxKind::Negation, "'!' for negated field");
 
-        if self.peek() != SyntaxKind::Id {
+        if self.current() != SyntaxKind::Id {
             self.error_msg(DiagnosticKind::ExpectedFieldName, "e.g., `!value`");
             self.finish_node();
             return;
@@ -611,30 +529,28 @@ impl Parser<'_> {
     /// Disambiguate `field: expr` from bare identifier via LL(2) lookahead.
     /// Also handles `field = expr` typo (should be `field: expr`).
     fn parse_tree_or_field(&mut self) {
-        if self.peek_nth(1) == SyntaxKind::Colon {
+        if self.next_is(SyntaxKind::Colon) {
             self.parse_field();
-        } else if self.peek_nth(1) == SyntaxKind::Equals {
-            self.parse_field_equals_typo();
-        } else {
-            // Bare identifiers are not valid expressions; trees require parentheses
-            self.error_and_bump_msg(
-                DiagnosticKind::BareIdentifier,
-                "wrap in parentheses: `(identifier)`",
-            );
+            return;
         }
+
+        if self.next_is(SyntaxKind::Equals) {
+            self.parse_field_equals_typo();
+            return;
+        }
+
+        // Bare identifiers are not valid expressions; trees require parentheses
+        self.error_and_bump_msg(
+            DiagnosticKind::BareIdentifier,
+            "wrap in parentheses: `(identifier)`",
+        );
     }
 
     /// Field constraint: `field_name: expr`
     fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
-        let kind = self.peek();
-        assert_eq!(
-            kind,
-            SyntaxKind::Id,
-            "parse_field: expected Id but found {:?} (caller should verify Id is present)",
-            kind
-        );
+        self.assert_current(SyntaxKind::Id);
         let span = self.current_span();
         let text = token_text(self.source, &self.tokens[self.pos]);
         self.bump();
@@ -645,7 +561,7 @@ impl Parser<'_> {
             "':' to separate field name from its value",
         );
 
-        if EXPR_FIRST.contains(self.peek()) {
+        if self.currently_at_set(EXPR_FIRST) {
             self.parse_expr_no_suffix();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `field:`");
@@ -659,7 +575,6 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Field);
 
         self.bump();
-        self.peek();
         let span = self.current_span();
         self.error_with_fix(
             DiagnosticKind::InvalidFieldEquals,
@@ -670,7 +585,7 @@ impl Parser<'_> {
         );
         self.bump();
 
-        if EXPR_FIRST.contains(self.peek()) {
+        if EXPR_FIRST.contains(self.current()) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `field =`");
@@ -704,7 +619,7 @@ impl Parser<'_> {
 
     /// If current token is quantifier, wrap preceding expression using checkpoint.
     fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
-        if self.at_set(QUANTIFIERS) {
+        if self.currently_at_set(QUANTIFIERS) {
             self.start_node_at(checkpoint, SyntaxKind::Quantifier);
             self.bump();
             self.finish_node();
@@ -713,183 +628,11 @@ impl Parser<'_> {
 
     /// If current token is a capture (`@name`), wrap preceding expression with Capture using checkpoint.
     fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        if self.peek() == SyntaxKind::At {
+        if self.current() == SyntaxKind::At {
             self.start_node_at(checkpoint, SyntaxKind::Capture);
             self.drain_trivia();
             self.parse_capture_suffix();
             self.finish_node();
         }
     }
-
-    /// Validate capture name follows plotnik convention (snake_case).
-    fn validate_capture_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') {
-            let suggested = name.replace(['.', '-'], "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameHasDots,
-                span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.contains('-') {
-            let suggested = name.replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameHasHyphens,
-                span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-            let suggested = to_snake_case(name);
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameUppercase,
-                span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
-            );
-        }
-    }
-
-    /// Validate definition name follows PascalCase convention.
-    fn validate_def_name(&mut self, name: &str, span: TextRange) {
-        if !name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-            let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::DefNameLowercase,
-                span,
-                "definitions map to types",
-                format!("use `{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.contains('_') || name.contains('-') || name.contains('.') {
-            let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::DefNameHasSeparators,
-                span,
-                "definitions map to types",
-                format!("use `{}`", suggested),
-                suggested,
-            );
-        }
-    }
-
-    /// Validate branch label follows PascalCase convention.
-    fn validate_branch_label(&mut self, name: &str, span: TextRange) {
-        if name.contains('_') || name.contains('-') || name.contains('.') {
-            let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::BranchLabelHasSeparators,
-                span,
-                "branch labels map to enum variants",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-        }
-    }
-
-    /// Validate field name follows snake_case convention.
-    fn validate_field_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') {
-            let suggested = name.replace(['.', '-'], "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::FieldNameHasDots,
-                span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-            return;
-        }
-
-        if name.contains('-') {
-            let suggested = name.replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::FieldNameHasHyphens,
-                span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-            return;
-        }
-
-        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-            let suggested = to_snake_case(name);
-            self.error_with_fix(
-                DiagnosticKind::FieldNameUppercase,
-                span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-        }
-    }
-
-    /// Validate type annotation name (PascalCase for user types, snake_case for primitives allowed).
-    fn validate_type_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') || name.contains('-') {
-            let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::TypeNameInvalidChars,
-                span,
-                "type annotations map to types",
-                format!("use `::{}`", suggested),
-                format!("::{}", suggested),
-            );
-        }
-    }
-}
-
-fn to_snake_case(s: &str) -> String {
-    let mut result = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if c.is_ascii_uppercase() {
-            if i > 0 && !result.ends_with('_') {
-                result.push('_');
-            }
-            result.push(c.to_ascii_lowercase());
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
-
-fn to_pascal_case(s: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = true;
-    for c in s.chars() {
-        if c == '_' || c == '-' || c == '.' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(c.to_ascii_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(c.to_ascii_lowercase());
-        }
-    }
-    result
-}
-
-fn capitalize_first(s: &str) -> String {
-    assert!(!s.is_empty(), "capitalize_first: called with empty string");
-    let mut chars = s.chars();
-    let c = chars.next().unwrap();
-    c.to_uppercase().chain(chars).collect()
 }

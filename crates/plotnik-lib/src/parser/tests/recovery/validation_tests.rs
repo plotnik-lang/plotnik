@@ -1288,11 +1288,6 @@ fn single_colon_primitive_type() {
     1 | @val : string
       | ^
 
-    error: unexpected token; expected ':' to separate field name from its value
-      |
-    1 | @val : string
-      |     ^
-
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | @val : string
