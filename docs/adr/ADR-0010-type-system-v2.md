@@ -89,12 +89,12 @@ To prevent **Data Desynchronization** (where `a[i]` no longer corresponds to `b[
 
 ### Recursive Definitions
 
-Since private definitions inline their contents, infinite recursion is structurally impossible for inlining.
+Private definitions can be recursive. The compiler detects cycles and generates function calls (Enter/Exit transitions) instead of inlining (see ADR-0011).
 
-**Solution**:
+**Trade-off**:
 
-- Recursive definitions must be `pub` (creating a stable API boundary) OR wrapped in a capture at the call site `(Recurse) @next`.
-- _Note: This is a natural constraint. Recursion implies a tree structure, so the output type must naturally reflect that tree structure._
+- **Transparent Recursion**: Captures bubble up through the recursion, producing flat arrays ("buckets") of nodes. This enables "Deep Search" patterns but loses association between multiple captured fields (Structure of Arrays).
+- **Captured Recursion**: Wrapping the recursive call `(Recurse) @tree` forces a scope boundary, preserving the nested tree structure in the output type.
 
 ### Collision Handling
 

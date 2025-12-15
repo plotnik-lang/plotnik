@@ -179,7 +179,7 @@ Buffer layout:
 
 ## Consequences
 
-**Positive**: Cache-efficient, O(1) string lookup, zero-copy access, simple validation. Self-contained binaries enable query caching by input hash.
+**Positive**: Cache-efficient, O(1) string access, zero-copy access, simple validation. Self-contained binaries enable query caching by input hash.
 
 **Negative**: Format changes require rebuild. No version migration.
 
