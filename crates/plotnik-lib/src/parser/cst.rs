@@ -100,6 +100,9 @@ pub enum SyntaxKind {
     #[token("MISSING")]
     KwMissing,
 
+    #[token("pub")]
+    Pub,
+
     /// Identifier. Accepts dots/hyphens for tree-sitter compat; parser validates per context.
     /// Defined after keywords so they take precedence.
     #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]

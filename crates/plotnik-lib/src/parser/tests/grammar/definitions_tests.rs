@@ -252,7 +252,7 @@ fn named_def_referencing_another() {
 #[test]
 fn named_def_with_quantifier() {
     let input = indoc! {r#"
-    Statements = (statement)+
+    pub Statements = (statement)+
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -260,6 +260,7 @@ fn named_def_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Pub "pub"
         Id "Statements"
         Equals "="
         Quantifier

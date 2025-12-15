@@ -21,21 +21,27 @@ impl Parser<'_> {
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
         while !self.has_fatal_error() && (self.peek() != SyntaxKind::Error || !self.eof()) {
+            if self.peek() == SyntaxKind::Pub {
+                self.parse_def();
+                continue;
+            }
+
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.peek() == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
                 self.parse_def();
-            } else {
-                let start = self.current_span().start();
-                self.start_node(SyntaxKind::Def);
-                let success = self.parse_expr_or_error();
-                if !success {
-                    self.synchronize_to_def_start();
-                }
-                self.finish_node();
-                if success {
-                    let end = self.last_non_trivia_end().unwrap_or(start);
-                    unnamed_def_spans.push(TextRange::new(start, end));
-                }
+                continue;
+            }
+
+            let start = self.current_span().start();
+            self.start_node(SyntaxKind::Def);
+            let success = self.parse_expr_or_error();
+            if !success {
+                self.synchronize_to_def_start();
+            }
+            self.finish_node();
+            if success {
+                let end = self.last_non_trivia_end().unwrap_or(start);
+                unnamed_def_spans.push(TextRange::new(start, end));
             }
         }
 
@@ -56,6 +62,9 @@ impl Parser<'_> {
     /// Named expression definition: `Name = expr`
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
+
+        self.eat(SyntaxKind::Pub);
+        self.peek();
 
         let span = self.current_span();
         let name = token_text(self.source, &self.tokens[self.pos]);
