@@ -1,23 +1,23 @@
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::EXPR_FIRST;
+use crate::parser::cst::token_sets::EXPR_FIRST_TOKENS;
 
 impl Parser<'_> {
     /// Parse an expression, or emit an error if current token can't start one.
     /// Returns `true` if a valid expression was parsed, `false` on error.
     pub(crate) fn parse_expr_or_error(&mut self) -> bool {
-        if self.currently_at_set(EXPR_FIRST) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
             return true;
         }
 
-        if self.currently_at(SyntaxKind::At) {
+        if self.currently_is(SyntaxKind::At) {
             self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
             return false;
         }
 
-        if self.currently_at(SyntaxKind::Predicate) {
+        if self.currently_is(SyntaxKind::Predicate) {
             self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
             return false;
         }

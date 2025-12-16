@@ -4,7 +4,7 @@ use super::utils::capitalize_first;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::token_sets::{
-    ALT_RECOVERY, EXPR_FIRST, SEPARATORS, SEQ_RECOVERY, TREE_RECOVERY,
+    ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, SEPARATORS, SEQ_RECOVERY_TOKENS, TREE_RECOVERY_TOKENS,
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
 use crate::parser::lexer::token_text;
@@ -66,7 +66,7 @@ impl Parser<'_> {
             self.start_node_at(checkpoint, SyntaxKind::Tree);
         }
 
-        if self.current() == SyntaxKind::Slash {
+        if self.currently_is(SyntaxKind::Slash) {
             if is_ref {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.error(DiagnosticKind::InvalidSupertypeSyntax);
@@ -94,9 +94,9 @@ impl Parser<'_> {
     fn parse_tree_error(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Tree);
         self.bump(); // KwError
-        if self.current() != SyntaxKind::ParenClose {
+        if !self.currently_is(SyntaxKind::ParenClose) {
             self.error(DiagnosticKind::ErrorTakesNoArguments);
-            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
         }
         self.pop_delimiter();
         self.expect(SyntaxKind::ParenClose, "closing ')' for (ERROR)");
@@ -115,7 +115,7 @@ impl Parser<'_> {
             }
             SyntaxKind::ParenClose => {}
             _ => {
-                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
             }
         }
         self.pop_delimiter();
@@ -129,12 +129,12 @@ impl Parser<'_> {
         is_ref: bool,
         ref_name: Option<String>,
     ) {
-        let has_children = self.current() != SyntaxKind::ParenClose;
+        let has_children = !self.currently_is(SyntaxKind::ParenClose);
 
         if is_ref && has_children {
             self.start_node_at(checkpoint, SyntaxKind::Tree);
             let children_start = self.current_span().start();
-            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
             let children_end = self.last_non_trivia_end().unwrap_or(children_start);
             let children_span = TextRange::new(children_start, children_end);
 
@@ -147,7 +147,7 @@ impl Parser<'_> {
         } else if is_ref {
             self.start_node_at(checkpoint, SyntaxKind::Ref);
         } else {
-            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY);
+            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
         }
 
         self.pop_delimiter();
@@ -191,23 +191,22 @@ impl Parser<'_> {
             if self.has_fatal_error() {
                 break;
             }
-            let kind = self.current();
-            if kind == until {
+            if self.currently_is(until) {
                 break;
             }
-            if SEPARATORS.contains(kind) {
+            if self.currently_is_one_of(SEPARATORS) {
                 self.error_skip_separator();
                 continue;
             }
-            if EXPR_FIRST.contains(kind) {
+            if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
                 self.parse_expr();
                 continue;
             }
-            if kind == SyntaxKind::Predicate {
+            if self.currently_is(SyntaxKind::Predicate) {
                 self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
                 continue;
             }
-            if recovery.contains(kind) {
+            if self.currently_is_one_of(recovery) {
                 break;
             }
             self.error_and_bump_msg(
@@ -252,16 +251,16 @@ impl Parser<'_> {
             if self.has_fatal_error() {
                 break;
             }
-            if self.currently_at(SyntaxKind::BracketClose) {
+            if self.currently_is(SyntaxKind::BracketClose) {
                 break;
             }
-            if self.currently_at_set(SEPARATORS) {
+            if self.currently_is_one_of(SEPARATORS) {
                 self.error_skip_separator();
                 continue;
             }
 
             // LL(2): Id followed by Colon → branch label or field (check casing)
-            if self.currently_at(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
+            if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
                 let text = token_text(self.source, &self.tokens[self.pos]);
                 let first_char = text.chars().next().unwrap_or('a');
                 if first_char.is_ascii_uppercase() {
@@ -271,13 +270,13 @@ impl Parser<'_> {
                 }
                 continue;
             }
-            if self.currently_at_set(EXPR_FIRST) {
+            if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
                 self.start_node(SyntaxKind::Branch);
                 self.parse_expr();
                 self.finish_node();
                 continue;
             }
-            if self.currently_at_set(ALT_RECOVERY) {
+            if self.currently_is_one_of(ALT_RECOVERY_TOKENS) {
                 break;
             }
             self.error_and_bump_msg(
@@ -298,7 +297,7 @@ impl Parser<'_> {
 
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        if EXPR_FIRST.contains(self.current()) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `Label:`");
@@ -326,7 +325,7 @@ impl Parser<'_> {
         self.bump();
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        if EXPR_FIRST.contains(self.current()) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `label:`");
@@ -341,7 +340,7 @@ impl Parser<'_> {
         self.push_delimiter(SyntaxKind::BraceOpen);
         self.expect(SyntaxKind::BraceOpen, "opening '{' for sequence");
 
-        self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY);
+        self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY_TOKENS);
 
         self.pop_delimiter();
         self.expect(SyntaxKind::BraceClose, "closing '}' for sequence");

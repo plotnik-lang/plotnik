@@ -21,7 +21,7 @@ impl Parser<'_> {
         let open_quote = self.current();
         self.bump(); // opening quote
 
-        if self.current() == SyntaxKind::StrVal {
+        if self.currently_is(SyntaxKind::StrVal) {
             self.bump(); // content
         }
 

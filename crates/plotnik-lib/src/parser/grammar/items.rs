@@ -3,7 +3,7 @@ use rowan::TextRange;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::{EXPR_FIRST, ROOT_EXPR_FIRST};
+use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, ROOT_EXPR_FIRST_TOKENS};
 use crate::parser::lexer::token_text;
 
 impl Parser<'_> {
@@ -12,14 +12,14 @@ impl Parser<'_> {
 
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
-        while !self.should_stop() && !self.currently_at(SyntaxKind::Error) {
-            if self.currently_at(SyntaxKind::Pub) {
+        while !self.should_stop() && !self.currently_is(SyntaxKind::Error) {
+            if self.currently_is(SyntaxKind::Pub) {
                 self.parse_def();
                 continue;
             }
 
             // LL(2): Id followed by Equals → named definition (if PascalCase)
-            if self.currently_at(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
+            if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
                 self.parse_def();
                 continue;
             }
@@ -70,10 +70,10 @@ impl Parser<'_> {
     }
 
     pub(crate) fn currently_at_def_start(&mut self) -> bool {
-        if self.currently_at(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
+        if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
             return true;
         }
-        self.currently_at_set(ROOT_EXPR_FIRST)
+        self.currently_is_one_of(ROOT_EXPR_FIRST_TOKENS)
     }
 
     /// Named expression definition: `Name = expr`
@@ -94,7 +94,7 @@ impl Parser<'_> {
             self.current()
         );
 
-        if EXPR_FIRST.contains(self.current()) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
             self.error_msg(

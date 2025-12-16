@@ -3,7 +3,7 @@ use rowan::Checkpoint;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::{EXPR_FIRST, QUANTIFIERS};
+use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
 use crate::parser::lexer::token_text;
 
 impl Parser<'_> {
@@ -11,7 +11,7 @@ impl Parser<'_> {
     pub(crate) fn parse_capture_suffix(&mut self) {
         self.bump(); // consume At
 
-        if self.current() != SyntaxKind::Id {
+        if !self.currently_is(SyntaxKind::Id) {
             self.error(DiagnosticKind::ExpectedCaptureName);
             return;
         }
@@ -22,11 +22,11 @@ impl Parser<'_> {
 
         self.validate_capture_name(name, span);
 
-        if self.current() == SyntaxKind::Colon {
+        if self.currently_is(SyntaxKind::Colon) {
             self.parse_type_annotation_single_colon();
             return;
         }
-        if self.current() == SyntaxKind::DoubleColon {
+        if self.currently_is(SyntaxKind::DoubleColon) {
             self.parse_type_annotation();
         }
     }
@@ -36,7 +36,7 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
-        if self.current() == SyntaxKind::Id {
+        if self.currently_is(SyntaxKind::Id) {
             let span = self.current_span();
             let text = token_text(self.source, &self.tokens[self.pos]);
             self.bump();
@@ -71,7 +71,7 @@ impl Parser<'_> {
         self.bump(); // colon
 
         // peek() skips whitespace, so this handles `@x : Type` with space
-        if self.current() == SyntaxKind::Id {
+        if self.currently_is(SyntaxKind::Id) {
             self.bump();
         }
 
@@ -83,7 +83,7 @@ impl Parser<'_> {
         self.start_node(SyntaxKind::NegatedField);
         self.expect(SyntaxKind::Negation, "'!' for negated field");
 
-        if self.current() != SyntaxKind::Id {
+        if !self.currently_is(SyntaxKind::Id) {
             self.error_msg(DiagnosticKind::ExpectedFieldName, "e.g., `!value`");
             self.finish_node();
             return;
@@ -131,7 +131,7 @@ impl Parser<'_> {
             "':' to separate field name from its value",
         );
 
-        if self.currently_at_set(EXPR_FIRST) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr_no_suffix();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `field:`");
@@ -155,7 +155,7 @@ impl Parser<'_> {
         );
         self.bump();
 
-        if EXPR_FIRST.contains(self.current()) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
             self.error_msg(DiagnosticKind::ExpectedExpression, "after `field =`");
@@ -166,7 +166,7 @@ impl Parser<'_> {
 
     /// If current token is quantifier, wrap preceding expression using checkpoint.
     pub(crate) fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
-        if self.currently_at_set(QUANTIFIERS) {
+        if self.currently_is_one_of(QUANTIFIERS) {
             self.start_node_at(checkpoint, SyntaxKind::Quantifier);
             self.bump();
             self.finish_node();
@@ -175,7 +175,7 @@ impl Parser<'_> {
 
     /// If current token is a capture (`@name`), wrap preceding expression with Capture using checkpoint.
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        if self.current() == SyntaxKind::At {
+        if self.currently_is(SyntaxKind::At) {
             self.start_node_at(checkpoint, SyntaxKind::Capture);
             self.drain_trivia();
             self.parse_capture_suffix();

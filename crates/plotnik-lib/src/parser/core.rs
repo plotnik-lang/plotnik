@@ -145,11 +145,11 @@ impl<'src> Parser<'src> {
         self.eof() || self.has_fatal_error()
     }
 
-    pub(super) fn currently_at(&mut self, kind: SyntaxKind) -> bool {
+    pub(super) fn currently_is(&mut self, kind: SyntaxKind) -> bool {
         self.current() == kind
     }
 
-    pub(super) fn currently_at_set(&mut self, set: TokenSet) -> bool {
+    pub(super) fn currently_is_one_of(&mut self, set: TokenSet) -> bool {
         set.contains(self.current())
     }
 
@@ -233,7 +233,7 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn eat_token(&mut self, kind: SyntaxKind) -> bool {
-        if self.currently_at(kind) {
+        if self.currently_is(kind) {
             self.bump();
             true
         } else {
@@ -323,14 +323,14 @@ impl<'src> Parser<'src> {
         message: &str,
         recovery: TokenSet,
     ) {
-        if self.currently_at_set(recovery) || self.should_stop() {
+        if self.currently_is_one_of(recovery) || self.should_stop() {
             self.error_msg(kind, message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
         self.error_msg(kind, message);
-        while !self.currently_at_set(recovery) && !self.should_stop() {
+        while !self.currently_is_one_of(recovery) && !self.should_stop() {
             self.bump();
         }
         self.finish_node();
