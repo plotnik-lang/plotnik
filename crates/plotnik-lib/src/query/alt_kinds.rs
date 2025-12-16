@@ -7,37 +7,43 @@ use rowan::TextRange;
 
 use super::Query;
 use super::invariants::ensure_both_branch_kinds;
-use crate::diagnostics::DiagnosticKind;
-use crate::parser::{AltExpr, AltKind, Branch, Expr};
+use super::visitor::{Visitor, walk_alt_expr, walk_root};
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::parser::{AltExpr, AltKind, Branch, Root};
 
 impl Query<'_> {
     pub(super) fn validate_alt_kinds(&mut self) {
-        let defs: Vec<_> = self.ast.defs().collect();
-        for def in defs {
-            let Some(body) = def.body() else { continue };
-            self.validate_alt_expr(&body);
-        }
+        let mut visitor = AltKindsValidator {
+            diagnostics: &mut self.alt_kind_diagnostics,
+        };
+        visitor.visit_root(&self.ast);
+    }
+}
 
+struct AltKindsValidator<'a> {
+    diagnostics: &'a mut Diagnostics,
+}
+
+impl Visitor for AltKindsValidator<'_> {
+    fn visit_root(&mut self, root: &Root) {
         assert!(
-            self.ast.exprs().next().is_none(),
+            root.exprs().next().is_none(),
             "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
         );
+        walk_root(self, root);
     }
 
-    fn validate_alt_expr(&mut self, expr: &Expr) {
-        if let Expr::AltExpr(alt) = expr {
-            self.check_mixed_alternation(alt);
-            assert!(
-                alt.exprs().next().is_none(),
-                "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
-            );
-        }
-
-        for child in expr.children() {
-            self.validate_alt_expr(&child);
-        }
+    fn visit_alt_expr(&mut self, alt: &AltExpr) {
+        self.check_mixed_alternation(alt);
+        assert!(
+            alt.exprs().next().is_none(),
+            "alt_kind: unexpected bare Expr in Alt (parser should wrap in Branch)"
+        );
+        walk_alt_expr(self, alt);
     }
+}
 
+impl AltKindsValidator<'_> {
     fn check_mixed_alternation(&mut self, alt: &AltExpr) {
         if alt.kind() != AltKind::Mixed {
             return;
@@ -57,7 +63,7 @@ impl Query<'_> {
 
         let untagged_range = branch_range(untagged_branch);
 
-        self.alt_kind_diagnostics
+        self.diagnostics
             .report(DiagnosticKind::MixedAltBranches, untagged_range)
             .related_to("tagged branch here", tagged_range)
             .emit();

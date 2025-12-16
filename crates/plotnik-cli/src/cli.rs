@@ -197,9 +197,9 @@ pub struct OutputArgs {
     #[arg(long)]
     pub spans: bool,
 
-    /// Show inferred cardinalities
+    /// Show inferred arities
     #[arg(long)]
-    pub cardinalities: bool,
+    pub arities: bool,
 
     /// Show compiled graph
     #[arg(long)]

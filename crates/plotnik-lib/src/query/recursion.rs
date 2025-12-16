@@ -8,8 +8,9 @@ use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
 use super::Query;
+use super::visitor::{Visitor, walk_expr};
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Def, Expr};
+use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, SeqExpr};
 
 impl Query<'_> {
     pub(super) fn validate_recursion(&mut self) {
@@ -36,8 +37,8 @@ impl Query<'_> {
         if !has_escape {
             // Find a cycle to report. Any cycle within the SCC is an infinite recursion loop
             // because there are no escape paths.
-            if let Some(raw_chain) = self.find_cycle(&scc, &scc_set, |q, expr, target| {
-                q.find_ref_range(expr, target)
+            if let Some(raw_chain) = self.find_cycle(&scc, &scc_set, |_, expr, target| {
+                find_ref_range(expr, target)
             }) {
                 let chain = self.format_chain(raw_chain, false);
                 self.report_cycle(DiagnosticKind::RecursionNoEscape, &scc, chain);
@@ -48,8 +49,8 @@ impl Query<'_> {
         // 2. Check for infinite loops (Guarded Recursion Analysis)
         // Even if there is an escape, every recursive cycle must consume input (be guarded).
         // We look for a cycle composed entirely of unguarded references.
-        if let Some(raw_chain) = self.find_cycle(&scc, &scc_set, |q, expr, target| {
-            q.find_unguarded_ref_range(expr, target)
+        if let Some(raw_chain) = self.find_cycle(&scc, &scc_set, |_, expr, target| {
+            find_unguarded_ref_range(expr, target)
         }) {
             let chain = self.format_chain(raw_chain, true);
             self.report_cycle(DiagnosticKind::DirectRecursion, &scc, chain);
@@ -166,14 +167,6 @@ impl Query<'_> {
             .defs()
             .find(|d| d.name().map(|n| n.text() == name).unwrap_or(false))
     }
-
-    fn find_ref_range(&self, expr: &Expr, target: &str) -> Option<TextRange> {
-        find_ref_in_expr(expr, target)
-    }
-
-    fn find_unguarded_ref_range(&self, expr: &Expr, target: &str) -> Option<TextRange> {
-        find_unguarded_ref_in_expr(expr, target)
-    }
 }
 
 struct CycleFinder<'a> {
@@ -222,9 +215,6 @@ impl<'a> CycleFinder<'a> {
             for (target, range) in neighbors {
                 if let Some(&start_index) = self.on_path.get(target) {
                     // Cycle detected!
-                    // Path: path[start_index] ... path[last] (current)
-                    // Edges: edges[start_index] ... edges[last-1]
-                    // Closing edge: range
                     let mut chain = Vec::new();
                     for i in start_index..self.path.len() - 1 {
                         chain.push((self.edges[i], self.path[i + 1].clone()));
@@ -378,65 +368,106 @@ fn expr_guarantees_consumption(expr: &Expr) -> bool {
     }
 }
 
+struct RefCollector<'a> {
+    refs: &'a mut IndexSet<String>,
+}
+
+impl Visitor for RefCollector<'_> {
+    fn visit_ref(&mut self, r: &Ref) {
+        if let Some(name) = r.name() {
+            self.refs.insert(name.text().to_string());
+        }
+    }
+}
+
 fn collect_refs(expr: &Expr) -> IndexSet<String> {
     let mut refs = IndexSet::new();
-    collect_refs_into(expr, &mut refs);
+    let mut visitor = RefCollector { refs: &mut refs };
+    visitor.visit_expr(expr);
     refs
 }
 
-fn collect_refs_into(expr: &Expr, refs: &mut IndexSet<String>) {
-    if let Expr::Ref(r) = expr
-        && let Some(name_token) = r.name()
-    {
-        refs.insert(name_token.text().to_string());
+struct RefFinder<'a> {
+    target: &'a str,
+    found: Option<TextRange>,
+}
+
+impl Visitor for RefFinder<'_> {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if self.found.is_some() {
+            return;
+        }
+        walk_expr(self, expr);
     }
 
-    for child in expr.children() {
-        collect_refs_into(&child, refs);
+    fn visit_ref(&mut self, r: &Ref) {
+        if self.found.is_some() {
+            return;
+        }
+        if let Some(name) = r.name()
+            && name.text() == self.target
+        {
+            self.found = Some(name.text_range());
+        }
     }
 }
 
-fn find_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
-    if let Expr::Ref(r) = expr {
-        let name_token = r.name()?;
-        if name_token.text() == target {
-            return Some(name_token.text_range());
+fn find_ref_range(expr: &Expr, target: &str) -> Option<TextRange> {
+    let mut visitor = RefFinder {
+        target,
+        found: None,
+    };
+    visitor.visit_expr(expr);
+    visitor.found
+}
+
+struct UnguardedRefFinder<'a> {
+    target: &'a str,
+    found: Option<TextRange>,
+}
+
+impl Visitor for UnguardedRefFinder<'_> {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if self.found.is_some() {
+            return;
+        }
+        walk_expr(self, expr);
+    }
+
+    fn visit_named_node(&mut self, _node: &NamedNode) {
+        // Guarded: stop recursion
+    }
+
+    fn visit_anonymous_node(&mut self, _node: &AnonymousNode) {
+        // Guarded: stop recursion
+    }
+
+    fn visit_ref(&mut self, r: &Ref) {
+        if let Some(name) = r.name()
+            && name.text() == self.target
+        {
+            self.found = Some(name.text_range());
         }
     }
 
-    expr.children()
-        .iter()
-        .find_map(|child| find_ref_in_expr(child, target))
-}
-
-fn find_unguarded_ref_in_expr(expr: &Expr, target: &str) -> Option<TextRange> {
-    match expr {
-        Expr::Ref(r) => r
-            .name()
-            .filter(|n| n.text() == target)
-            .map(|n| n.text_range()),
-        Expr::NamedNode(_) | Expr::AnonymousNode(_) => None,
-        Expr::AltExpr(_) => expr
-            .children()
-            .iter()
-            .find_map(|c| find_unguarded_ref_in_expr(c, target)),
-        Expr::SeqExpr(_) => {
-            for c in expr.children() {
-                if let Some(range) = find_unguarded_ref_in_expr(&c, target) {
-                    return Some(range);
-                }
-                if expr_guarantees_consumption(&c) {
-                    return None;
-                }
+    fn visit_seq_expr(&mut self, seq: &SeqExpr) {
+        for child in seq.children() {
+            self.visit_expr(&child);
+            if self.found.is_some() {
+                return;
             }
-            None
+            if expr_guarantees_consumption(&child) {
+                return;
+            }
         }
-        Expr::QuantifiedExpr(q) => q
-            .inner()
-            .and_then(|i| find_unguarded_ref_in_expr(&i, target)),
-        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => expr
-            .children()
-            .iter()
-            .find_map(|c| find_unguarded_ref_in_expr(c, target)),
     }
+}
+
+fn find_unguarded_ref_range(expr: &Expr, target: &str) -> Option<TextRange> {
+    let mut visitor = UnguardedRefFinder {
+        target,
+        found: None,
+    };
+    visitor.visit_expr(expr);
+    visitor.found
 }

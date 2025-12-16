@@ -11,9 +11,11 @@ mod dump;
 mod graph_qis;
 mod invariants;
 mod printer;
+mod utils;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
+pub mod expr_arity;
 pub mod graph;
 mod graph_build;
 mod graph_dump;
@@ -23,8 +25,8 @@ mod infer_dump;
 #[cfg(feature = "plotnik-langs")]
 pub mod link;
 pub mod recursion;
-pub mod shapes;
 pub mod symbol_table;
+pub mod visitor;
 
 pub use graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
 pub use graph_optimize::OptimizeStats;
@@ -35,6 +37,8 @@ pub use symbol_table::UNNAMED_DEF;
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(test)]
+mod expr_arity_tests;
 #[cfg(test)]
 mod graph_build_tests;
 #[cfg(test)]
@@ -51,8 +55,6 @@ mod mod_tests;
 mod printer_tests;
 #[cfg(test)]
 mod recursion_tests;
-#[cfg(test)]
-mod shapes_tests;
 #[cfg(test)]
 mod symbol_table_tests;
 
@@ -72,7 +74,7 @@ use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;
 
-use shapes::ShapeCardinality;
+use expr_arity::ExprArity;
 use symbol_table::SymbolTable;
 
 /// A parsed and analyzed query.
@@ -95,15 +97,15 @@ pub struct QisTrigger<'a> {
 }
 
 #[derive(Debug)]
-pub struct Query<'a> {
-    source: &'a str,
+pub struct Query<'q> {
+    source: &'q str,
     ast: Root,
-    symbol_table: SymbolTable<'a>,
-    shape_cardinality_table: HashMap<ast::Expr, ShapeCardinality>,
+    symbol_table: SymbolTable<'q>,
+    expr_arity_table: HashMap<ast::Expr, ExprArity>,
     #[cfg(feature = "plotnik-langs")]
-    node_type_ids: HashMap<&'a str, Option<NodeTypeId>>,
+    node_type_ids: HashMap<&'q str, Option<NodeTypeId>>,
     #[cfg(feature = "plotnik-langs")]
-    node_field_ids: HashMap<&'a str, Option<NodeFieldId>>,
+    node_field_ids: HashMap<&'q str, Option<NodeFieldId>>,
     exec_fuel: Option<u32>,
     recursion_fuel: Option<u32>,
     exec_fuel_consumed: u32,
@@ -111,21 +113,21 @@ pub struct Query<'a> {
     alt_kind_diagnostics: Diagnostics,
     resolve_diagnostics: Diagnostics,
     recursion_diagnostics: Diagnostics,
-    shapes_diagnostics: Diagnostics,
+    expr_arity_diagnostics: Diagnostics,
     #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
     // Graph compilation fields
-    graph: BuildGraph<'a>,
+    graph: BuildGraph<'q>,
     dead_nodes: HashSet<NodeId>,
-    type_info: TypeInferenceResult<'a>,
+    type_info: TypeInferenceResult<'q>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
-    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'q>>,
     /// Definitions with exactly 1 propagating capture: def name → capture name.
-    single_capture_defs: HashMap<&'a str, &'a str>,
+    single_capture_defs: HashMap<&'q str, &'q str>,
     /// Definitions with 2+ propagating captures (need struct wrapping at root).
-    multi_capture_defs: HashSet<&'a str>,
+    multi_capture_defs: HashSet<&'q str>,
     /// Current definition name during graph construction.
-    current_def_name: &'a str,
+    current_def_name: &'q str,
     /// Counter for generating unique ref IDs during graph construction.
     next_ref_id: u32,
 }
@@ -147,7 +149,7 @@ impl<'a> Query<'a> {
             source,
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
-            shape_cardinality_table: HashMap::new(),
+            expr_arity_table: HashMap::new(),
             #[cfg(feature = "plotnik-langs")]
             node_type_ids: HashMap::new(),
             #[cfg(feature = "plotnik-langs")]
@@ -159,7 +161,7 @@ impl<'a> Query<'a> {
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
             recursion_diagnostics: Diagnostics::new(),
-            shapes_diagnostics: Diagnostics::new(),
+            expr_arity_diagnostics: Diagnostics::new(),
             #[cfg(feature = "plotnik-langs")]
             link_diagnostics: Diagnostics::new(),
             graph: BuildGraph::default(),
@@ -200,7 +202,7 @@ impl<'a> Query<'a> {
         self.validate_alt_kinds();
         self.resolve_names();
         self.validate_recursion();
-        self.infer_shapes();
+        self.infer_arities();
         Ok(self)
     }
 
@@ -293,43 +295,6 @@ impl<'a> Query<'a> {
         &self.type_info
     }
 
-    pub(crate) fn shape_cardinality(&self, node: &SyntaxNode) -> ShapeCardinality {
-        // Error nodes are invalid
-        if node.kind() == SyntaxKind::Error {
-            return ShapeCardinality::Invalid;
-        }
-
-        // Root: cardinality based on definition count
-        if let Some(root) = Root::cast(node.clone()) {
-            return if root.defs().count() > 1 {
-                ShapeCardinality::Many
-            } else {
-                ShapeCardinality::One
-            };
-        }
-
-        // Def: delegate to body's cardinality
-        if let Some(def) = ast::Def::cast(node.clone()) {
-            return def
-                .body()
-                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
-                .unwrap_or(ShapeCardinality::Invalid);
-        }
-
-        // Branch: delegate to body's cardinality
-        if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch
-                .body()
-                .and_then(|b| self.shape_cardinality_table.get(&b).copied())
-                .unwrap_or(ShapeCardinality::Invalid);
-        }
-
-        // Expr: direct lookup
-        ast::Expr::cast(node.clone())
-            .and_then(|e| self.shape_cardinality_table.get(&e).copied())
-            .unwrap_or(ShapeCardinality::One)
-    }
-
     /// All diagnostics combined from all passes (unfiltered).
     ///
     /// Use this for debugging or when you need to see all diagnostics
@@ -340,7 +305,7 @@ impl<'a> Query<'a> {
         all.extend(self.alt_kind_diagnostics.clone());
         all.extend(self.resolve_diagnostics.clone());
         all.extend(self.recursion_diagnostics.clone());
-        all.extend(self.shapes_diagnostics.clone());
+        all.extend(self.expr_arity_diagnostics.clone());
         #[cfg(feature = "plotnik-langs")]
         all.extend(self.link_diagnostics.clone());
         all.extend(self.type_info.diagnostics.clone());
@@ -362,7 +327,7 @@ impl<'a> Query<'a> {
             && !self.alt_kind_diagnostics.has_errors()
             && !self.resolve_diagnostics.has_errors()
             && !self.recursion_diagnostics.has_errors()
-            && !self.shapes_diagnostics.has_errors()
+            && !self.expr_arity_diagnostics.has_errors()
             && !self.link_diagnostics.has_errors()
     }
 

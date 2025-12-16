@@ -17,12 +17,12 @@ mod test_helpers {
             self.printer().dump()
         }
 
-        pub fn dump_with_cardinalities(&self) -> String {
-            self.printer().with_cardinalities(true).dump()
+        pub fn dump_with_arities(&self) -> String {
+            self.printer().with_arities(true).dump()
         }
 
-        pub fn dump_cst_with_cardinalities(&self) -> String {
-            self.printer().raw(true).with_cardinalities(true).dump()
+        pub fn dump_cst_with_arities(&self) -> String {
+            self.printer().raw(true).with_arities(true).dump()
         }
 
         pub fn dump_symbols(&self) -> String {

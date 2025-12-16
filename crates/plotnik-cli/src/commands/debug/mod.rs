@@ -17,7 +17,7 @@ pub struct DebugArgs {
     pub raw: bool,
     pub cst: bool,
     pub spans: bool,
-    pub cardinalities: bool,
+    pub arities: bool,
     pub graph: bool,
     pub graph_raw: bool,
     pub types: bool,
@@ -65,7 +65,7 @@ pub fn run(args: DebugArgs) {
                 .raw(args.cst || args.raw)
                 .with_trivia(args.raw)
                 .with_spans(args.spans)
-                .with_cardinalities(args.cardinalities)
+                .with_arities(args.arities)
                 .dump()
         );
     }
@@ -77,7 +77,7 @@ pub fn run(args: DebugArgs) {
             "{}",
             q.printer()
                 .only_symbols(true)
-                .with_cardinalities(args.cardinalities)
+                .with_arities(args.arities)
                 .dump()
         );
     }
