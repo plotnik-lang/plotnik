@@ -12,45 +12,11 @@ use rowan::TextRange;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::cst::{SyntaxKind, SyntaxToken};
+use crate::parser::token_src;
 
 use super::Query;
-
-/// Simple edit distance for fuzzy matching (Levenshtein).
-fn edit_distance(a: &str, b: &str) -> usize {
-    let a_len = a.chars().count();
-    let b_len = b.chars().count();
-
-    if a_len == 0 {
-        return b_len;
-    }
-    if b_len == 0 {
-        return a_len;
-    }
-
-    let mut prev: Vec<usize> = (0..=b_len).collect();
-    let mut curr = vec![0; b_len + 1];
-
-    for (i, ca) in a.chars().enumerate() {
-        curr[0] = i + 1;
-        for (j, cb) in b.chars().enumerate() {
-            let cost = if ca == cb { 0 } else { 1 };
-            curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-
-    prev[b_len]
-}
-
-/// Find the best match from candidates within a reasonable edit distance.
-fn find_similar<'a>(name: &str, candidates: &[&'a str], max_distance: usize) -> Option<&'a str> {
-    candidates
-        .iter()
-        .map(|&c| (c, edit_distance(name, c)))
-        .filter(|(_, d)| *d <= max_distance)
-        .min_by_key(|(_, d)| *d)
-        .map(|(c, _)| c)
-}
+use super::utils::find_similar;
+use super::visitor::{Visitor, walk_root};
 
 /// Check if `child` is a subtype of `supertype`, recursively handling nested supertypes.
 #[allow(dead_code)]
@@ -160,69 +126,9 @@ impl<'a> Query<'a> {
     }
 
     fn resolve_node_types(&mut self, lang: &Lang) {
-        let defs: Vec<_> = self.ast.defs().collect();
-        for def in defs {
-            let Some(body) = def.body() else { continue };
-            self.collect_node_types(&body, lang);
-        }
-    }
-
-    fn collect_node_types(&mut self, expr: &Expr, lang: &Lang) {
-        match expr {
-            Expr::NamedNode(node) => {
-                self.resolve_named_node(node, lang);
-                for child in node.children() {
-                    self.collect_node_types(&child, lang);
-                }
-            }
-            Expr::AnonymousNode(anon) => {
-                if anon.is_any() {
-                    return;
-                }
-                let Some(value_token) = anon.value() else {
-                    return;
-                };
-                let value = value_token.text();
-                if self.node_type_ids.contains_key(value) {
-                    return;
-                }
-                let resolved = lang.resolve_anonymous_node(value);
-                self.node_type_ids.insert(
-                    &self.source[text_range_to_usize(value_token.text_range())],
-                    resolved,
-                );
-                if resolved.is_none() {
-                    self.link_diagnostics
-                        .report(DiagnosticKind::UnknownNodeType, value_token.text_range())
-                        .message(value)
-                        .emit();
-                }
-            }
-            Expr::AltExpr(alt) => {
-                for branch in alt.branches() {
-                    let Some(body) = branch.body() else { continue };
-                    self.collect_node_types(&body, lang);
-                }
-            }
-            Expr::SeqExpr(seq) => {
-                for child in seq.children() {
-                    self.collect_node_types(&child, lang);
-                }
-            }
-            Expr::CapturedExpr(cap) => {
-                let Some(inner) = cap.inner() else { return };
-                self.collect_node_types(&inner, lang);
-            }
-            Expr::QuantifiedExpr(q) => {
-                let Some(inner) = q.inner() else { return };
-                self.collect_node_types(&inner, lang);
-            }
-            Expr::FieldExpr(f) => {
-                let Some(value) = f.value() else { return };
-                self.collect_node_types(&value, lang);
-            }
-            Expr::Ref(_) => {}
-        }
+        let root = self.ast.clone();
+        let mut collector = NodeTypeCollector { query: self, lang };
+        collector.visit_root(&root);
     }
 
     fn resolve_named_node(&mut self, node: &NamedNode, lang: &Lang) {
@@ -243,10 +149,8 @@ impl<'a> Query<'a> {
             return;
         }
         let resolved = lang.resolve_named_node(type_name);
-        self.node_type_ids.insert(
-            &self.source[text_range_to_usize(type_token.text_range())],
-            resolved,
-        );
+        self.node_type_ids
+            .insert(token_src(&type_token, self.source), resolved);
         if resolved.is_none() {
             let all_types = lang.all_named_node_kinds();
             let max_dist = (type_name.len() / 3).clamp(2, 4);
@@ -265,51 +169,9 @@ impl<'a> Query<'a> {
     }
 
     fn resolve_fields(&mut self, lang: &Lang) {
-        let defs: Vec<_> = self.ast.defs().collect();
-        for def in defs {
-            let Some(body) = def.body() else { continue };
-            self.collect_fields(&body, lang);
-        }
-    }
-
-    fn collect_fields(&mut self, expr: &Expr, lang: &Lang) {
-        match expr {
-            Expr::NamedNode(node) => {
-                for child in node.children() {
-                    self.collect_fields(&child, lang);
-                }
-                for child in node.as_cst().children() {
-                    if let Some(neg) = ast::NegatedField::cast(child) {
-                        self.resolve_field_by_token(neg.name(), lang);
-                    }
-                }
-            }
-            Expr::AltExpr(alt) => {
-                for branch in alt.branches() {
-                    let Some(body) = branch.body() else { continue };
-                    self.collect_fields(&body, lang);
-                }
-            }
-            Expr::SeqExpr(seq) => {
-                for child in seq.children() {
-                    self.collect_fields(&child, lang);
-                }
-            }
-            Expr::CapturedExpr(cap) => {
-                let Some(inner) = cap.inner() else { return };
-                self.collect_fields(&inner, lang);
-            }
-            Expr::QuantifiedExpr(q) => {
-                let Some(inner) = q.inner() else { return };
-                self.collect_fields(&inner, lang);
-            }
-            Expr::FieldExpr(f) => {
-                self.resolve_field_by_token(f.name(), lang);
-                let Some(value) = f.value() else { return };
-                self.collect_fields(&value, lang);
-            }
-            Expr::AnonymousNode(_) | Expr::Ref(_) => {}
-        }
+        let root = self.ast.clone();
+        let mut collector = FieldCollector { query: self, lang };
+        collector.visit_root(&root);
     }
 
     fn resolve_field_by_token(&mut self, name_token: Option<SyntaxToken>, lang: &Lang) {
@@ -321,10 +183,8 @@ impl<'a> Query<'a> {
             return;
         }
         let resolved = lang.resolve_field(field_name);
-        self.node_field_ids.insert(
-            &self.source[text_range_to_usize(name_token.text_range())],
-            resolved,
-        );
+        self.node_field_ids
+            .insert(token_src(&name_token, self.source), resolved);
         if resolved.is_some() {
             return;
         }
@@ -505,7 +365,7 @@ impl<'a> Query<'a> {
             parent_name: ctx.parent_name,
             parent_range: ctx.parent_range,
             field: Some(FieldContext {
-                name: &self.source[text_range_to_usize(name_token.text_range())],
+                name: token_src(&name_token, self.source),
                 id: field_id,
                 range: name_token.text_range(),
             }),
@@ -736,7 +596,7 @@ impl<'a> Query<'a> {
                 }
                 let type_name = type_token.text();
                 let type_id = self.node_type_ids.get(type_name).copied().flatten()?;
-                let name = &self.source[text_range_to_usize(type_token.text_range())];
+                let name = token_src(&type_token, self.source);
                 Some((type_id, name, type_token.text_range()))
             }
             Expr::AnonymousNode(anon) => {
@@ -744,7 +604,7 @@ impl<'a> Query<'a> {
                     return None;
                 }
                 let value_token = anon.value()?;
-                let value = &self.source[text_range_to_usize(value_token.text_range())];
+                let value = token_src(&value_token, self.source);
                 let type_id = self.node_type_ids.get(value).copied().flatten()?;
                 Some((type_id, value, value_token.text_range()))
             }
@@ -813,8 +673,71 @@ impl<'a> Query<'a> {
     }
 }
 
-fn text_range_to_usize(range: TextRange) -> std::ops::Range<usize> {
-    let start: usize = range.start().into();
-    let end: usize = range.end().into();
-    start..end
+struct NodeTypeCollector<'a, 'q> {
+    query: &'a mut Query<'q>,
+    lang: &'a Lang,
+}
+
+impl Visitor for NodeTypeCollector<'_, '_> {
+    fn visit_root(&mut self, root: &ast::Root) {
+        walk_root(self, root);
+    }
+
+    fn visit_named_node(&mut self, node: &ast::NamedNode) {
+        self.query.resolve_named_node(node, self.lang);
+        super::visitor::walk_named_node(self, node);
+    }
+
+    fn visit_anonymous_node(&mut self, node: &ast::AnonymousNode) {
+        if node.is_any() {
+            return;
+        }
+        let Some(value_token) = node.value() else {
+            return;
+        };
+        let value = value_token.text();
+        if self.query.node_type_ids.contains_key(value) {
+            return;
+        }
+
+        let resolved = self.lang.resolve_anonymous_node(value);
+        self.query
+            .node_type_ids
+            .insert(token_src(&value_token, self.query.source), resolved);
+
+        if resolved.is_none() {
+            self.query
+                .link_diagnostics
+                .report(DiagnosticKind::UnknownNodeType, value_token.text_range())
+                .message(value)
+                .emit();
+        }
+    }
+}
+
+struct FieldCollector<'a, 'q> {
+    query: &'a mut Query<'q>,
+    lang: &'a Lang,
+}
+
+impl Visitor for FieldCollector<'_, '_> {
+    fn visit_root(&mut self, root: &ast::Root) {
+        walk_root(self, root);
+    }
+
+    fn visit_named_node(&mut self, node: &ast::NamedNode) {
+        for child in node.as_cst().children() {
+            if let Some(neg) = ast::NegatedField::cast(child) {
+                self.query.resolve_field_by_token(neg.name(), self.lang);
+            }
+        }
+
+        super::visitor::walk_named_node(self, node);
+    }
+
+    fn visit_field_expr(&mut self, field: &ast::FieldExpr) {
+        self.query.resolve_field_by_token(field.name(), self.lang);
+
+        super::visitor::walk_field_expr(self, field);
+    }
 }

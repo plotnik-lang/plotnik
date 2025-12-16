@@ -11,6 +11,7 @@ mod dump;
 mod graph_qis;
 mod invariants;
 mod printer;
+mod utils;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
