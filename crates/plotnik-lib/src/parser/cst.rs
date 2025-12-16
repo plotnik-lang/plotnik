@@ -84,10 +84,10 @@ pub enum SyntaxKind {
     #[token("|")]
     Pipe,
 
-    /// String literal (split by lexer into quote + content + quote)
     #[regex(r#""(?:[^"\\]|\\.)*""#)]
     #[regex(r"'(?:[^'\\]|\\.)*'")]
-    StringLiteral,
+    #[doc(hidden)]
+    StringLiteral, // Lexer-internal only
 
     DoubleQuote,
     SingleQuote,
@@ -267,7 +267,7 @@ pub mod token_sets {
     use super::*;
 
     /// FIRST set of expr. `At` excluded (captures wrap, not start).
-    pub const EXPR_FIRST: TokenSet = TokenSet::new(&[
+    pub const EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
         BraceOpen,
@@ -282,7 +282,7 @@ pub mod token_sets {
     ]);
 
     /// FIRST set for root-level expressions. Excludes `Dot`/`Negation` (tree-internal).
-    pub const ROOT_EXPR_FIRST: TokenSet = TokenSet::new(&[
+    pub const ROOT_EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
         BraceOpen,
@@ -306,17 +306,19 @@ pub mod token_sets {
     pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
-    pub const TREE_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
+    pub const TREE_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
 
-    pub const ALT_RECOVERY: TokenSet = TokenSet::new(&[ParenClose]);
+    pub const ALT_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenClose]);
 
-    pub const FIELD_RECOVERY: TokenSet =
+    pub const FIELD_RECOVERY_TOKENS: TokenSet =
         TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
 
-    pub const ROOT_RECOVERY: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);
+    pub const ROOT_RECOVERY_TOKENS: TokenSet =
+        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);
 
-    pub const DEF_RECOVERY: TokenSet =
+    pub const DEF_RECOVERY_TOKENS: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id, Equals]);
 
-    pub const SEQ_RECOVERY: TokenSet = TokenSet::new(&[BraceClose, ParenClose, BracketClose]);
+    pub const SEQ_RECOVERY_TOKENS: TokenSet =
+        TokenSet::new(&[BraceClose, ParenClose, BracketClose]);
 }

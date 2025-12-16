@@ -9,7 +9,7 @@ clippy:
 test:
 	@cargo nextest run --no-fail-fast --hide-progress-bar --status-level none --failure-output final
 
-snapshots:
+shot:
 	@cargo insta accept
 
 coverage-lines:

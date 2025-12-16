@@ -257,7 +257,7 @@ cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript -o types.d
 - IMPORTANT: the `debug` is your first tool you should use to test your changes
 - Run tests: `make test`
 - We use snapshot testing (`insta`) heavily
-  - Accept snapshots: `make snapshots`
+  - Accept snapshots: `make shot`
 
 ## Test structure
 

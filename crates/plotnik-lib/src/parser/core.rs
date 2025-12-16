@@ -3,7 +3,6 @@
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::ast::Root;
-use super::cst::token_sets::ROOT_EXPR_FIRST;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
 use crate::Error;
@@ -99,15 +98,16 @@ impl<'src> Parser<'src> {
         self.fatal_error.is_some()
     }
 
-    pub(super) fn current(&self) -> SyntaxKind {
-        self.nth(0)
+    pub(super) fn current(&mut self) -> SyntaxKind {
+        self.skip_trivia_to_buffer();
+        self.nth_raw(0)
     }
 
     fn reset_debug_fuel(&self) {
         self.debug_fuel.set(256);
     }
 
-    pub(super) fn nth(&self, lookahead: usize) -> SyntaxKind {
+    pub(super) fn nth_raw(&self, lookahead: usize) -> SyntaxKind {
         self.ensure_progress();
         self.tokens
             .get(self.pos + lookahead)
@@ -126,7 +126,8 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(super) fn current_span(&self) -> TextRange {
+    pub(super) fn current_span(&mut self) -> TextRange {
+        self.skip_trivia_to_buffer();
         self.tokens
             .get(self.pos)
             .map_or_else(|| TextRange::empty(self.eof_offset()), |t| t.span)
@@ -144,21 +145,16 @@ impl<'src> Parser<'src> {
         self.eof() || self.has_fatal_error()
     }
 
-    pub(super) fn at(&self, kind: SyntaxKind) -> bool {
+    pub(super) fn currently_is(&mut self, kind: SyntaxKind) -> bool {
         self.current() == kind
     }
 
-    pub(super) fn at_set(&self, set: TokenSet) -> bool {
+    pub(super) fn currently_is_one_of(&mut self, set: TokenSet) -> bool {
         set.contains(self.current())
     }
 
-    pub(super) fn peek(&mut self) -> SyntaxKind {
-        self.skip_trivia_to_buffer();
-        self.current()
-    }
-
     /// LL(k) lookahead past trivia.
-    pub(super) fn peek_nth(&mut self, n: usize) -> SyntaxKind {
+    fn peek_nth(&mut self, n: usize) -> SyntaxKind {
         self.skip_trivia_to_buffer();
         let mut count = 0;
         let mut pos = self.pos;
@@ -173,6 +169,10 @@ impl<'src> Parser<'src> {
             pos += 1;
         }
         SyntaxKind::Error
+    }
+
+    pub(super) fn next_is(&mut self, kind: SyntaxKind) -> bool {
+        self.peek_nth(1) == kind
     }
 
     pub(super) fn skip_trivia_to_buffer(&mut self) {
@@ -217,6 +217,8 @@ impl<'src> Parser<'src> {
         self.reset_debug_fuel();
         self.consume_exec_fuel();
 
+        self.drain_trivia();
+
         let token = self.tokens[self.pos];
         let text = token_text(self.source, &token);
         self.builder.token(token.kind.into(), text);
@@ -230,8 +232,8 @@ impl<'src> Parser<'src> {
         self.pos += 1;
     }
 
-    pub(super) fn eat(&mut self, kind: SyntaxKind) -> bool {
-        if self.at(kind) {
+    pub(super) fn eat_token(&mut self, kind: SyntaxKind) -> bool {
+        if self.currently_is(kind) {
             self.bump();
             true
         } else {
@@ -241,7 +243,7 @@ impl<'src> Parser<'src> {
 
     /// On mismatch: emit diagnostic but don't consume.
     pub(super) fn expect(&mut self, kind: SyntaxKind, what: &str) -> bool {
-        if self.eat(kind) {
+        if self.eat_token(kind) {
             return true;
         }
         self.error_msg(
@@ -251,7 +253,7 @@ impl<'src> Parser<'src> {
         false
     }
 
-    pub(super) fn current_suppression_span(&self) -> TextRange {
+    pub(super) fn current_suppression_span(&mut self) -> TextRange {
         self.delimiter_stack
             .last()
             .map(|d| TextRange::new(d.span.start(), TextSize::from(self.source.len() as u32)))
@@ -321,44 +323,17 @@ impl<'src> Parser<'src> {
         message: &str,
         recovery: TokenSet,
     ) {
-        if self.at_set(recovery) || self.should_stop() {
+        if self.currently_is_one_of(recovery) || self.should_stop() {
             self.error_msg(kind, message);
             return;
         }
 
         self.start_node(SyntaxKind::Error);
         self.error_msg(kind, message);
-        while !self.at_set(recovery) && !self.should_stop() {
+        while !self.currently_is_one_of(recovery) && !self.should_stop() {
             self.bump();
         }
         self.finish_node();
-    }
-
-    pub(super) fn synchronize_to_def_start(&mut self) -> bool {
-        if self.should_stop() {
-            return false;
-        }
-
-        // Check if already at a sync point
-        if self.at_def_start() {
-            return false;
-        }
-
-        self.start_node(SyntaxKind::Error);
-        while !self.should_stop() && !self.at_def_start() {
-            self.bump();
-            self.skip_trivia_to_buffer();
-        }
-        self.finish_node();
-        true
-    }
-
-    pub(super) fn at_def_start(&mut self) -> bool {
-        let kind = self.peek();
-        if kind == SyntaxKind::Id && self.peek_nth(1) == SyntaxKind::Equals {
-            return true;
-        }
-        ROOT_EXPR_FIRST.contains(kind)
     }
 
     pub(super) fn enter_recursion(&mut self) -> bool {
@@ -381,10 +356,8 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn push_delimiter(&mut self, kind: SyntaxKind) {
-        self.delimiter_stack.push(OpenDelimiter {
-            kind,
-            span: self.current_span(),
-        });
+        let span = self.current_span();
+        self.delimiter_stack.push(OpenDelimiter { kind, span });
     }
 
     pub(super) fn pop_delimiter(&mut self) -> Option<OpenDelimiter> {
