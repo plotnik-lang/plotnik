@@ -8,7 +8,7 @@ use rowan::NodeOrToken;
 use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
-use super::shapes::ShapeCardinality;
+use super::expr_arity::ExprArity;
 
 pub struct QueryPrinter<'q, 'src> {
     query: &'q Query<'src>,
@@ -348,10 +348,10 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         if !self.cardinalities {
             return "";
         }
-        match self.query.shape_cardinality(node) {
-            ShapeCardinality::One => "¹",
-            ShapeCardinality::Many => "⁺",
-            ShapeCardinality::Invalid => "⁻",
+        match self.query.shape_arity(node) {
+            ExprArity::One => "¹",
+            ExprArity::Many => "⁺",
+            ExprArity::Invalid => "⁻",
         }
     }
 

@@ -203,7 +203,7 @@ fn field_with_ref_to_seq_error() {
 }
 
 #[test]
-fn quantifier_preserves_inner_shape() {
+fn quantifier_preserves_inner_arity() {
     let query = Query::try_from("(identifier)*").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
@@ -215,7 +215,7 @@ fn quantifier_preserves_inner_shape() {
 }
 
 #[test]
-fn capture_preserves_inner_shape() {
+fn capture_preserves_inner_arity() {
     let query = Query::try_from("(identifier) @name").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
@@ -241,7 +241,7 @@ fn capture_on_seq() {
 }
 
 #[test]
-fn complex_nested_shapes() {
+fn complex_nested_arities() {
     let input = indoc! {r#"
     Stmt = [(expr_stmt) (return_stmt)]
     (function_definition
@@ -272,7 +272,7 @@ fn complex_nested_shapes() {
 }
 
 #[test]
-fn tagged_alt_shapes() {
+fn tagged_alt_arities() {
     let input = indoc! {r#"
     [Ident: (identifier) Num: (number)]
     "#};
