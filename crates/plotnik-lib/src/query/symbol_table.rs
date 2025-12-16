@@ -11,9 +11,10 @@ use indexmap::IndexMap;
 pub const UNNAMED_DEF: &str = "_";
 
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Expr, Ref, ast, token_src};
+use crate::parser::{ast, token_src};
 
 use super::Query;
+use super::visitor::{Visitor, walk_root};
 
 pub type SymbolTable<'src> = IndexMap<&'src str, ast::Expr>;
 
@@ -21,65 +22,60 @@ impl<'a> Query<'a> {
     pub(super) fn resolve_names(&mut self) {
         // Pass 1: collect definitions
         for def in self.ast.defs() {
-            let (name, is_named) = match def.name() {
-                Some(token) => (token_src(&token, self.source), true),
-                None => (UNNAMED_DEF, false),
-            };
+            let Some(body) = def.body() else { continue };
 
-            // Skip duplicate check for unnamed definitions (already diagnosed by parser)
-            if is_named && self.symbol_table.contains_key(name) {
-                let name_token = def.name().unwrap();
-                self.resolve_diagnostics
-                    .report(DiagnosticKind::DuplicateDefinition, name_token.text_range())
-                    .message(name)
-                    .emit();
-                continue;
+            if let Some(token) = def.name() {
+                // Named definition: `Name = ...`
+                let name = token_src(&token, self.source);
+                if self.symbol_table.contains_key(name) {
+                    self.resolve_diagnostics
+                        .report(DiagnosticKind::DuplicateDefinition, token.text_range())
+                        .message(name)
+                        .emit();
+                } else {
+                    self.symbol_table.insert(name, body);
+                }
+            } else {
+                // Unnamed definition: `...` (root expression)
+                // Parser already validates multiple unnamed defs; we keep the last one.
+                if self.symbol_table.contains_key(UNNAMED_DEF) {
+                    self.symbol_table.shift_remove(UNNAMED_DEF);
+                }
+                self.symbol_table.insert(UNNAMED_DEF, body);
             }
-
-            // For unnamed defs, only keep the last one (parser already warned about others)
-            if !is_named && self.symbol_table.contains_key(name) {
-                self.symbol_table.shift_remove(name);
-            }
-
-            let Some(body) = def.body() else {
-                continue;
-            };
-            self.symbol_table.insert(name, body);
         }
 
         // Pass 2: check references
-        let defs: Vec<_> = self.ast.defs().collect();
-        for def in defs {
-            let Some(body) = def.body() else { continue };
-            self.collect_reference_diagnostics(&body);
-        }
+        let root = self.ast.clone();
+        let mut validator = ReferenceValidator { query: self };
+        validator.visit_root(&root);
+    }
+}
 
+struct ReferenceValidator<'a, 'q> {
+    query: &'a mut Query<'q>,
+}
+
+impl Visitor for ReferenceValidator<'_, '_> {
+    fn visit_root(&mut self, root: &ast::Root) {
         // Parser wraps all top-level exprs in Def nodes, so this should be empty
         assert!(
-            self.ast.exprs().next().is_none(),
+            root.exprs().next().is_none(),
             "symbol_table: unexpected bare Expr in Root (parser should wrap in Def)"
         );
+        walk_root(self, root);
     }
 
-    fn collect_reference_diagnostics(&mut self, expr: &Expr) {
-        if let Expr::Ref(r) = expr {
-            self.check_ref_diagnostic(r);
-        }
-
-        for child in expr.children() {
-            self.collect_reference_diagnostics(&child);
-        }
-    }
-
-    fn check_ref_diagnostic(&mut self, r: &Ref) {
+    fn visit_ref(&mut self, r: &ast::Ref) {
         let Some(name_token) = r.name() else { return };
         let name = name_token.text();
 
-        if self.symbol_table.contains_key(name) {
+        if self.query.symbol_table.contains_key(name) {
             return;
         }
 
-        self.resolve_diagnostics
+        self.query
+            .resolve_diagnostics
             .report(DiagnosticKind::UndefinedReference, name_token.text_range())
             .message(name)
             .emit();
