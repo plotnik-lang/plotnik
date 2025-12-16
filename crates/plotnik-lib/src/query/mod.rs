@@ -96,15 +96,15 @@ pub struct QisTrigger<'a> {
 }
 
 #[derive(Debug)]
-pub struct Query<'a> {
-    source: &'a str,
+pub struct Query<'q> {
+    source: &'q str,
     ast: Root,
-    symbol_table: SymbolTable<'a>,
+    symbol_table: SymbolTable<'q>,
     expr_arity_table: HashMap<ast::Expr, ExprArity>,
     #[cfg(feature = "plotnik-langs")]
-    node_type_ids: HashMap<&'a str, Option<NodeTypeId>>,
+    node_type_ids: HashMap<&'q str, Option<NodeTypeId>>,
     #[cfg(feature = "plotnik-langs")]
-    node_field_ids: HashMap<&'a str, Option<NodeFieldId>>,
+    node_field_ids: HashMap<&'q str, Option<NodeFieldId>>,
     exec_fuel: Option<u32>,
     recursion_fuel: Option<u32>,
     exec_fuel_consumed: u32,
@@ -116,17 +116,17 @@ pub struct Query<'a> {
     #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
     // Graph compilation fields
-    graph: BuildGraph<'a>,
+    graph: BuildGraph<'q>,
     dead_nodes: HashSet<NodeId>,
-    type_info: TypeInferenceResult<'a>,
+    type_info: TypeInferenceResult<'q>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
-    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'q>>,
     /// Definitions with exactly 1 propagating capture: def name → capture name.
-    single_capture_defs: HashMap<&'a str, &'a str>,
+    single_capture_defs: HashMap<&'q str, &'q str>,
     /// Definitions with 2+ propagating captures (need struct wrapping at root).
-    multi_capture_defs: HashSet<&'a str>,
+    multi_capture_defs: HashSet<&'q str>,
     /// Current definition name during graph construction.
-    current_def_name: &'a str,
+    current_def_name: &'q str,
     /// Counter for generating unique ref IDs during graph construction.
     next_ref_id: u32,
 }

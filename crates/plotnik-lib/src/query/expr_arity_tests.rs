@@ -5,7 +5,7 @@ use indoc::indoc;
 fn tree_is_one() {
     let query = Query::try_from("(identifier)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ identifier
@@ -16,7 +16,7 @@ fn tree_is_one() {
 fn singleton_seq_is_one() {
     let query = Query::try_from("{(identifier)}").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -28,7 +28,7 @@ fn singleton_seq_is_one() {
 fn nested_singleton_seq_is_one() {
     let query = Query::try_from("{{{(identifier)}}}").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -42,7 +42,7 @@ fn nested_singleton_seq_is_one() {
 fn multi_seq_is_many() {
     let query = Query::try_from("{(a) (b)}").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def⁺
         Seq⁺
@@ -55,7 +55,7 @@ fn multi_seq_is_many() {
 fn alt_is_one() {
     let query = Query::try_from("[(a) (b)]").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -73,7 +73,7 @@ fn alt_with_seq_branches() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -94,7 +94,7 @@ fn ref_to_tree_is_one() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root⁺
       Def¹ X
         NamedNode¹ identifier
@@ -112,7 +112,7 @@ fn ref_to_seq_is_many() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
@@ -128,7 +128,7 @@ fn ref_to_seq_is_many() {
 fn field_with_tree() {
     let query = Query::try_from("(call name: (identifier))").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -141,7 +141,7 @@ fn field_with_tree() {
 fn field_with_alt() {
     let query = Query::try_from("(call name: [(identifier) (string)])").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -158,7 +158,7 @@ fn field_with_alt() {
 fn field_with_seq_error() {
     let query = Query::try_from("(call name: {(a) (b)})").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -183,7 +183,7 @@ fn field_with_ref_to_seq_error() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root⁺
       Def⁺ X
         Seq⁺
@@ -206,7 +206,7 @@ fn field_with_ref_to_seq_error() {
 fn quantifier_preserves_inner_arity() {
     let query = Query::try_from("(identifier)*").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         QuantifiedExpr¹ *
@@ -218,7 +218,7 @@ fn quantifier_preserves_inner_arity() {
 fn capture_preserves_inner_arity() {
     let query = Query::try_from("(identifier) @name").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         CapturedExpr¹ @name
@@ -230,7 +230,7 @@ fn capture_preserves_inner_arity() {
 fn capture_on_seq() {
     let query = Query::try_from("{(a) (b)} @items").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def⁺
         CapturedExpr⁺ @items
@@ -250,7 +250,7 @@ fn complex_nested_arities() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root⁺
       Def¹ Stmt
         Alt¹
@@ -278,7 +278,7 @@ fn tagged_alt_arities() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Alt¹
@@ -290,10 +290,10 @@ fn tagged_alt_arities() {
 }
 
 #[test]
-fn anchor_has_no_cardinality() {
+fn anchor_has_no_arity() {
     let query = Query::try_from("(block . (statement))").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ block
@@ -303,10 +303,10 @@ fn anchor_has_no_cardinality() {
 }
 
 #[test]
-fn negated_field_has_no_cardinality() {
+fn negated_field_has_no_arity() {
     let query = Query::try_from("(function !async)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ function
@@ -318,7 +318,7 @@ fn negated_field_has_no_cardinality() {
 fn tree_with_wildcard_type() {
     let query = Query::try_from("(_)").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ (any)
@@ -329,7 +329,7 @@ fn tree_with_wildcard_type() {
 fn bare_wildcard_is_one() {
     let query = Query::try_from("_").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         AnonymousNode¹ (any)
@@ -340,7 +340,7 @@ fn bare_wildcard_is_one() {
 fn empty_seq_is_one() {
     let query = Query::try_from("{}").unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Seq¹
@@ -351,7 +351,7 @@ fn empty_seq_is_one() {
 fn literal_is_one() {
     let query = Query::try_from(r#""if""#).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r#"
+    insta::assert_snapshot!(query.dump_with_arities(), @r#"
     Root¹
       Def¹
         AnonymousNode¹ "if"
@@ -362,7 +362,7 @@ fn literal_is_one() {
 fn invalid_error_node() {
     let query = Query::try_from("(foo %)").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_with_cardinalities(), @r#"
+    insta::assert_snapshot!(query.dump_cst_with_arities(), @r#"
     Root¹
       Def¹
         Tree¹
@@ -378,7 +378,7 @@ fn invalid_error_node() {
 fn invalid_undefined_ref() {
     let query = Query::try_from("(Undefined)").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def⁻
         Ref⁻ Undefined
@@ -389,11 +389,11 @@ fn invalid_undefined_ref() {
 fn invalid_branch_without_body() {
     let query = Query::try_from("[A:]").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         Alt¹
-          Branch⁻ A:
+          Branchˣ A:
     ");
 }
 
@@ -405,10 +405,10 @@ fn invalid_ref_to_bodyless_def() {
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root⁺
-      Def⁻ X
-      Def⁻
+      Defˣ X
+      Defˣ
       Def⁻
         Ref⁻ X
     ");
@@ -419,7 +419,7 @@ fn invalid_capture_without_inner() {
     // Error recovery: `extra` is invalid, but `@y` still creates a Capture node
     let query = Query::try_from("(call extra @y)").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -450,7 +450,7 @@ fn invalid_capture_without_inner_standalone() {
 fn invalid_multiple_captures_with_error() {
     let query = Query::try_from("(call (Undefined) @x extra @y)").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -465,7 +465,7 @@ fn invalid_quantifier_without_inner() {
     // Error recovery: `extra` is invalid, but `*` still creates a Quantifier node
     let query = Query::try_from("(foo extra*)").unwrap();
     assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_with_cardinalities(), @r"
+    insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
       Def¹
         NamedNode¹ foo

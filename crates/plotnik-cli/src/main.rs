@@ -26,7 +26,7 @@ fn main() {
                 raw: output.raw,
                 cst: output.cst,
                 spans: output.spans,
-                cardinalities: output.cardinalities,
+                arities: output.arities,
                 graph: output.graph,
                 graph_raw: output.graph_raw,
                 types: output.types,

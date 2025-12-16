@@ -234,7 +234,7 @@ The schema infrastructure is built. Type inference is next.
 The CLI foundation exists. The full developer experience is ahead.
 
 - [x] CLI framework with `debug`, `docs`, `langs`, `exec`, `types` commands
-- [x] Query inspection: AST dump, symbol table, cardinalities, spans, transition graph, inferred types
+- [x] Query inspection: AST dump, symbol table, node arities, spans, transition graph, inferred types
 - [x] Source inspection: Tree-sitter parse tree visualization
 - [x] Execute queries against source code and output JSON (`exec`)
 - [x] Generate TypeScript types from queries (`types`)

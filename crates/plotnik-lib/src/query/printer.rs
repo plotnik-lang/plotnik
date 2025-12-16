@@ -14,7 +14,7 @@ pub struct QueryPrinter<'q, 'src> {
     query: &'q Query<'src>,
     raw: bool,
     trivia: bool,
-    cardinalities: bool,
+    arities: bool,
     spans: bool,
     symbols: bool,
 }
@@ -25,7 +25,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             query,
             raw: false,
             trivia: false,
-            cardinalities: false,
+            arities: false,
             spans: false,
             symbols: false,
         }
@@ -41,8 +41,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         self
     }
 
-    pub fn with_cardinalities(mut self, value: bool) -> Self {
-        self.cardinalities = value;
+    pub fn with_arities(mut self, value: bool) -> Self {
+        self.arities = value;
         self
     }
 
@@ -120,7 +120,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
         let card = body_nodes
             .get(name)
-            .map(|n| self.cardinality_mark(n))
+            .map(|n| self.arity_mark(n))
             .unwrap_or("");
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
@@ -140,7 +140,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_cst(&self, node: &SyntaxNode, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(node);
+        let card = self.arity_mark(node);
         let span = self.span_str(node.text_range());
 
         writeln!(w, "{}{:?}{}{}", prefix, node.kind(), card, span)?;
@@ -169,7 +169,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     }
 
     fn format_root(&self, root: &ast::Root, w: &mut impl Write) -> std::fmt::Result {
-        let card = self.cardinality_mark(root.as_cst());
+        let card = self.arity_mark(root.as_cst());
         let span = self.span_str(root.text_range());
         writeln!(w, "Root{}{}", card, span)?;
 
@@ -186,7 +186,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_def(&self, def: &ast::Def, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(def.as_cst());
+        let card = self.arity_mark(def.as_cst());
         let span = self.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
 
@@ -203,7 +203,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
 
     fn format_expr(&self, expr: &ast::Expr, indent: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(expr.as_cst());
+        let card = self.arity_mark(expr.as_cst());
         let span = self.span_str(expr.text_range());
 
         match expr {
@@ -329,7 +329,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         w: &mut impl Write,
     ) -> std::fmt::Result {
         let prefix = "  ".repeat(indent);
-        let card = self.cardinality_mark(branch.as_cst());
+        let card = self.arity_mark(branch.as_cst());
         let span = self.span_str(branch.text_range());
         let label = branch.label().map(|t| t.text().to_string());
 
@@ -344,14 +344,15 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         self.format_expr(&body, indent + 1, w)
     }
 
-    fn cardinality_mark(&self, node: &SyntaxNode) -> &'static str {
-        if !self.cardinalities {
+    fn arity_mark(&self, node: &SyntaxNode) -> &'static str {
+        if !self.arities {
             return "";
         }
-        match self.query.shape_arity(node) {
-            ExprArity::One => "¹",
-            ExprArity::Many => "⁺",
-            ExprArity::Invalid => "⁻",
+        match self.query.get_arity(node) {
+            Some(ExprArity::One) => "¹",
+            Some(ExprArity::Many) => "⁺",
+            Some(ExprArity::Invalid) => "⁻",
+            None => "ˣ",
         }
     }
 

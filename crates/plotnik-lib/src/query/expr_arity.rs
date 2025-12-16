@@ -4,7 +4,7 @@
 //! or multiple sequential positions (`Many`). Used to validate field constraints:
 //! `field: expr` requires `expr` to have `ExprArity::One`.
 //!
-//! `Invalid` marks nodes where cardinality cannot be determined (error nodes,
+//! `Invalid` marks nodes where arity cannot be determined (error nodes,
 //! undefined refs, etc.).
 
 use super::Query;
@@ -30,41 +30,40 @@ impl Query<'_> {
         validator.visit_root(&root);
     }
 
-    pub(super) fn shape_arity(&self, node: &SyntaxNode) -> ExprArity {
-        // Error nodes are invalid
+    pub(super) fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
         if node.kind() == SyntaxKind::Error {
-            return ExprArity::Invalid;
+            return Some(ExprArity::Invalid);
         }
 
-        // Root: cardinality based on definition count
+        // Try casting to Expr first as it's the most common query
+        if let Some(expr) = ast::Expr::cast(node.clone()) {
+            return self.expr_arity_table.get(&expr).copied();
+        }
+
+        // Root: arity based on definition count
         if let Some(root) = ast::Root::cast(node.clone()) {
-            return if root.defs().count() > 1 {
+            return Some(if root.defs().nth(1).is_some() {
                 ExprArity::Many
             } else {
                 ExprArity::One
-            };
+            });
         }
 
-        // Def: delegate to body's cardinality
+        // Def: delegate to body's arity
         if let Some(def) = ast::Def::cast(node.clone()) {
             return def
                 .body()
-                .and_then(|b| self.expr_arity_table.get(&b).copied())
-                .unwrap_or(ExprArity::Invalid);
+                .and_then(|b| self.expr_arity_table.get(&b).copied());
         }
 
-        // Branch: delegate to body's cardinality
+        // Branch: delegate to body's arity
         if let Some(branch) = ast::Branch::cast(node.clone()) {
             return branch
                 .body()
-                .and_then(|b| self.expr_arity_table.get(&b).copied())
-                .unwrap_or(ExprArity::Invalid);
+                .and_then(|b| self.expr_arity_table.get(&b).copied());
         }
 
-        // Expr: direct lookup
-        ast::Expr::cast(node.clone())
-            .and_then(|e| self.expr_arity_table.get(&e).copied())
-            .unwrap_or(ExprArity::One)
+        None
     }
 }
 
@@ -74,7 +73,7 @@ struct ArityComputer<'a, 'q> {
 
 impl Visitor for ArityComputer<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
-        self.query.compute_cardinality(expr);
+        self.query.compute_arity(expr);
         walk_expr(self, expr);
     }
 }
@@ -91,66 +90,69 @@ impl Visitor for ArityValidator<'_, '_> {
 }
 
 impl Query<'_> {
-    fn compute_cardinality(&mut self, expr: &Expr) -> ExprArity {
+    fn compute_arity(&mut self, expr: &Expr) -> ExprArity {
         if let Some(&c) = self.expr_arity_table.get(expr) {
             return c;
         }
         // Insert sentinel to break cycles (e.g., `Foo = (Foo)`)
         self.expr_arity_table
             .insert(expr.clone(), ExprArity::Invalid);
-        let c = self.compute_single_cardinality(expr);
+
+        let c = self.compute_single_arity(expr);
         self.expr_arity_table.insert(expr.clone(), c);
         c
     }
 
-    fn compute_single_cardinality(&mut self, expr: &Expr) -> ExprArity {
+    fn compute_single_arity(&mut self, expr: &Expr) -> ExprArity {
         match expr {
             Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::FieldExpr(_) | Expr::AltExpr(_) => {
                 ExprArity::One
             }
 
-            Expr::SeqExpr(seq) => self.seq_cardinality(seq),
+            Expr::SeqExpr(seq) => self.seq_arity(seq),
 
-            Expr::CapturedExpr(cap) => {
-                let Some(inner) = cap.inner() else {
-                    return ExprArity::Invalid;
-                };
-                self.compute_cardinality(&inner)
-            }
+            Expr::CapturedExpr(cap) => cap
+                .inner()
+                .map(|inner| self.compute_arity(&inner))
+                .unwrap_or(ExprArity::Invalid),
 
-            Expr::QuantifiedExpr(q) => {
-                let Some(inner) = q.inner() else {
-                    return ExprArity::Invalid;
-                };
-                self.compute_cardinality(&inner)
-            }
+            Expr::QuantifiedExpr(q) => q
+                .inner()
+                .map(|inner| self.compute_arity(&inner))
+                .unwrap_or(ExprArity::Invalid),
 
-            Expr::Ref(r) => self.ref_cardinality(r),
+            Expr::Ref(r) => self.ref_arity(r),
         }
     }
 
-    fn seq_cardinality(&mut self, seq: &SeqExpr) -> ExprArity {
-        let children: Vec<_> = seq.children().collect();
+    fn seq_arity(&mut self, seq: &SeqExpr) -> ExprArity {
+        // Avoid collecting into Vec; check if we have 0, 1, or >1 children.
+        let mut children = seq.children();
 
-        match children.len() {
-            0 => ExprArity::One,
-            1 => self.compute_cardinality(&children[0]),
-            _ => ExprArity::Many,
+        match children.next() {
+            None => ExprArity::One,
+            Some(first) => {
+                if children.next().is_some() {
+                    ExprArity::Many
+                } else {
+                    self.compute_arity(&first)
+                }
+            }
         }
     }
 
-    fn ref_cardinality(&mut self, r: &Ref) -> ExprArity {
+    fn ref_arity(&mut self, r: &Ref) -> ExprArity {
         let name_tok = r.name().expect(
             "expr_arities: Ref without name token \
              (parser only creates Ref for PascalCase Id)",
         );
         let name = name_tok.text();
 
-        let Some(body) = self.symbol_table.get(name).cloned() else {
-            return ExprArity::Invalid;
-        };
-
-        self.compute_cardinality(&body)
+        self.symbol_table
+            .get(name)
+            .cloned()
+            .map(|body| self.compute_arity(&body))
+            .unwrap_or(ExprArity::Invalid)
     }
 
     fn validate_field(&mut self, field: &FieldExpr) {

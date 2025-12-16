@@ -192,7 +192,7 @@ Inputs: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file 
 - `--cst` — Show query CST instead of AST
 - `--raw` — Include trivia tokens (whitespace, comments)
 - `--spans` — Show source spans
-- `--cardinalities` — Show inferred cardinalities
+- `--arities` — Show node arities
 - `--graph` — Show compiled transition graph
 - `--graph-raw` — Show unoptimized graph (before epsilon elimination)
 - `--types` — Show inferred types

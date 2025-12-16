@@ -12,9 +12,9 @@ fn printer_with_spans() {
 }
 
 #[test]
-fn printer_with_cardinalities() {
+fn printer_with_arities() {
     let q = Query::try_from("(call)").unwrap();
-    insta::assert_snapshot!(q.printer().with_cardinalities(true).dump(), @r"
+    insta::assert_snapshot!(q.printer().with_arities(true).dump(), @r"
     Root¹
       Def¹
         NamedNode¹ call
@@ -150,14 +150,14 @@ fn printer_ref() {
 }
 
 #[test]
-fn printer_symbols_with_cardinalities() {
+fn printer_symbols_with_arities() {
     let input = indoc! {r#"
         A = (a)
         B = {(b) (c)}
         (entry (A) (B))
     "#};
     let q = Query::try_from(input).unwrap();
-    insta::assert_snapshot!(q.printer().only_symbols(true).with_cardinalities(true).dump(), @r"
+    insta::assert_snapshot!(q.printer().only_symbols(true).with_arities(true).dump(), @r"
     A¹
     B⁺
     _
