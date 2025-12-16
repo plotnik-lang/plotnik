@@ -30,7 +30,11 @@ macro_rules! ast_node {
 
         impl $name {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
-                (node.kind() == SyntaxKind::$kind).then(|| Self(node))
+                Self::can_cast(node.kind()).then(|| Self(node))
+            }
+
+            pub fn can_cast(kind: SyntaxKind) -> bool {
+                kind == SyntaxKind::$kind
             }
 
             pub fn as_cst(&self) -> &SyntaxNode {
@@ -54,7 +58,8 @@ macro_rules! define_expr {
 
         impl Expr {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
-                $(if let Some(n) = $variant::cast(node.clone()) { return Some(Expr::$variant(n)); })+
+                let kind = node.kind();
+                $(if $variant::can_cast(kind) { return Some(Expr::$variant($variant(node))); })+
                 None
             }
 
@@ -138,7 +143,11 @@ pub struct AnonymousNode(SyntaxNode);
 
 impl AnonymousNode {
     pub fn cast(node: SyntaxNode) -> Option<Self> {
-        matches!(node.kind(), SyntaxKind::Str | SyntaxKind::Wildcard).then(|| Self(node))
+        Self::can_cast(node.kind()).then(|| Self(node))
+    }
+
+    pub fn can_cast(kind: SyntaxKind) -> bool {
+        matches!(kind, SyntaxKind::Str | SyntaxKind::Wildcard)
     }
 
     pub fn as_cst(&self) -> &SyntaxNode {
