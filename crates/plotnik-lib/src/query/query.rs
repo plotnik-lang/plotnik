@@ -119,18 +119,25 @@ pub struct QueryAnalyzed<'q> {
 }
 
 impl<'q> QueryAnalyzed<'q> {
-    pub fn link(mut self, lang: &Lang) {
-        let mut node_type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
-        let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+    pub fn link(mut self, lang: &Lang) -> LinkedQuery<'q> {
+        let mut type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
+        let mut field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+
         link::link(
             &self.query_parsed.ast,
             self.query_parsed.src,
             lang,
             &self.symbol_table,
-            &mut node_type_ids,
-            &mut node_field_ids,
+            &mut type_ids,
+            &mut field_ids,
             &mut self.query_parsed.diag,
         );
+
+        LinkedQuery {
+            inner: self,
+            type_ids,
+            field_ids,
+        }
     }
 }
 
@@ -146,4 +153,13 @@ impl<'q> DerefMut for QueryAnalyzed<'q> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.query_parsed
     }
+}
+
+type NodeTypeIdTable<'q> = HashMap<&'q str, Option<NodeTypeId>>;
+type NodeFieldIdTable<'q> = HashMap<&'q str, Option<NodeFieldId>>;
+
+pub struct LinkedQuery<'q> {
+    inner: QueryAnalyzed<'q>,
+    type_ids: NodeTypeIdTable<'q>,
+    field_ids: NodeFieldIdTable<'q>,
 }
