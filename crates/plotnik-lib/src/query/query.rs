@@ -57,6 +57,10 @@ impl<'q> QueryBuilder<'q> {
 
         validate_alt_kinds(&ast, &mut diag);
 
+        if diag.has_errors() {
+            return Err(crate::Error::QueryParseError(diag));
+        }
+
         Ok(QueryParsed {
             src,
             diag,
@@ -74,7 +78,7 @@ pub struct QueryParsed<'q> {
 }
 
 impl<'q> QueryParsed<'q> {
-    pub fn analyze(mut self) -> QueryAnalyzed<'q> {
+    pub fn analyze(mut self) -> crate::Result<QueryAnalyzed<'q>> {
         let symbol_table = resolve_names(&self.ast, self.src, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
@@ -87,12 +91,16 @@ impl<'q> QueryParsed<'q> {
 
         let arity_table = infer_arities(&self.ast, &symbol_table, &mut self.diag);
 
-        QueryAnalyzed {
+        if self.diag.has_errors() {
+            return Err(crate::Error::QueryAnalyzeError(self.diag));
+        }
+
+        Ok(QueryAnalyzed {
             query_parsed: self,
             symbol_table,
             dependency_analysis,
             arity_table,
-        }
+        })
     }
 }
 

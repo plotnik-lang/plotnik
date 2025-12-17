@@ -41,6 +41,12 @@ pub enum Error {
     /// Recursion fuel exhausted (input nested too deeply).
     #[error("recursion limit exceeded")]
     RecursionLimitExceeded,
+
+    #[error("query parsing failed with {} errors", .0.error_count())]
+    QueryParseError(Diagnostics),
+
+    #[error("query analysis failed with {} errors", .0.error_count())]
+    QueryAnalyzeError(Diagnostics),
 }
 
 /// Result type for query operations.
