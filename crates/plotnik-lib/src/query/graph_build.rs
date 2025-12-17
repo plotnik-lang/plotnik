@@ -10,10 +10,10 @@ use crate::parser::{
     AltExpr, AltKind, AnonymousNode, Branch, CapturedExpr, Expr, FieldExpr, NamedNode,
     NegatedField, QuantifiedExpr, Ref, SeqExpr, SeqItem, SyntaxKind, token_src,
 };
-use crate::query::graph_qis::collect_propagating_captures;
+use crate::query::graph_qis::{QisContext, collect_propagating_captures};
 
-use super::Query;
-use super::graph::{BuildEffect, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
+use super::graph::{BuildEffect, BuildGraph, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
+use super::{Query, SymbolTable};
 
 /// Context for navigation determination.
 /// When `anchored` is true, `prev_anonymous` indicates whether the preceding
@@ -90,8 +90,43 @@ impl<'a> Query<'a> {
     /// This method reuses the symbol_table from name resolution and
     /// qis_triggers from QIS detection.
     pub(super) fn construct_graph(&mut self) {
-        self.next_ref_id = 0;
+        let mut builder = GraphBuilder::new(
+            self.source,
+            &mut self.graph,
+            &self.symbol_table,
+            &self.qis_ctx,
+        );
+        builder.construct();
+    }
+}
 
+struct GraphBuilder<'a, 'q> {
+    source: &'q str,
+    graph: &'a mut BuildGraph<'q>,
+    symbol_table: &'a SymbolTable<'q>,
+    qis_ctx: &'a QisContext<'q>,
+    current_def_name: &'q str,
+    next_ref_id: u32,
+}
+
+impl<'a, 'q> GraphBuilder<'a, 'q> {
+    fn new(
+        source: &'q str,
+        graph: &'a mut BuildGraph<'q>,
+        symbol_table: &'a SymbolTable<'q>,
+        qis_ctx: &'a QisContext<'q>,
+    ) -> Self {
+        Self {
+            source,
+            graph,
+            symbol_table,
+            qis_ctx,
+            current_def_name: "",
+            next_ref_id: 0,
+        }
+    }
+
+    fn construct(&mut self) {
         let entries: Vec<_> = self
             .symbol_table
             .iter()
@@ -130,7 +165,7 @@ impl<'a> Query<'a> {
 
     /// Link Enter nodes to their definition entry points.
     fn link_references(&mut self) {
-        let mut links: Vec<(NodeId, &'a str, Option<NodeId>)> = Vec::new();
+        let mut links: Vec<(NodeId, &'q str, Option<NodeId>)> = Vec::new();
 
         for (id, node) in self.graph.iter() {
             if let RefMarker::Enter { .. } = &node.ref_marker
@@ -284,13 +319,13 @@ impl<'a> Query<'a> {
         (fragments, exit_ctx)
     }
 
-    fn build_named_matcher(&self, node: &NamedNode) -> BuildMatcher<'a> {
+    fn build_named_matcher(&self, node: &NamedNode) -> BuildMatcher<'q> {
         let kind = node
             .node_type()
             .map(|t| token_src(&t, self.source))
             .unwrap_or("_");
 
-        let negated_fields: Vec<&'a str> = node
+        let negated_fields: Vec<&'q str> = node
             .as_cst()
             .children()
             .filter_map(NegatedField::cast)
@@ -637,7 +672,7 @@ impl<'a> Query<'a> {
         self.construct_expr(&value_expr, ctx)
     }
 
-    fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'a str> {
+    fn find_field_constraint(&self, node: &crate::parser::SyntaxNode) -> Option<&'q str> {
         let parent = node.parent()?;
         let field_expr = FieldExpr::cast(parent)?;
         let name_token = field_expr.name()?;
@@ -686,6 +721,7 @@ impl<'a> Query<'a> {
             self.collect_matchers(succ, result, visited);
         }
     }
+
     /// Count Field effects reachable from a node (for variant flattening).
     fn count_field_effects(&self, start: NodeId) -> usize {
         self.nodes_with_field_effects(start)

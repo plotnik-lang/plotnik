@@ -117,10 +117,6 @@ pub struct Query<'q> {
     type_info: TypeInferenceResult<'q>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
     qis_ctx: QisContext<'q>,
-    /// Current definition name during graph construction.
-    current_def_name: &'q str,
-    /// Counter for generating unique ref IDs during graph construction.
-    next_ref_id: u32,
 }
 
 fn empty_root() -> Root {
@@ -157,8 +153,6 @@ impl<'a> Query<'a> {
             dead_nodes: HashSet::new(),
             type_info: TypeInferenceResult::default(),
             qis_ctx: QisContext::default(),
-            current_def_name: "",
-            next_ref_id: 0,
         }
     }
 
