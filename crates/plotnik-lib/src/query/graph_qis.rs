@@ -5,153 +5,159 @@
 //!
 //! See ADR-0009 for full specification.
 
+use std::collections::{HashMap, HashSet};
+
 use crate::parser::{ast, token_src};
+use crate::query::symbol_table::SymbolTable;
+use crate::query::visitor::Visitor;
 
-use super::{QisTrigger, Query};
+#[derive(Debug, Clone)]
+pub struct QisTrigger<'a> {
+    #[allow(unused)]
+    pub captures: Vec<&'a str>,
+}
 
-impl<'a> Query<'a> {
-    /// Detect capture scopes: QIS triggers and single-capture definitions.
-    ///
-    /// - QIS triggers when quantified expression has ≥2 propagating captures
-    /// - Single-capture definitions unwrap (no Field effect, type is capture's type)
-    pub(super) fn detect_capture_scopes(&mut self) {
-        let entries: Vec<_> = self
-            .symbol_table
-            .iter()
-            .map(|(n, b)| (*n, b.clone()))
-            .collect();
-        for (name, body) in &entries {
-            // Detect single-capture and multi-capture definitions
-            let captures = self.collect_propagating_captures(body);
-            if captures.len() == 1 {
-                self.single_capture_defs.insert(*name, captures[0]);
-            } else if captures.len() >= 2 {
-                self.multi_capture_defs.insert(*name);
+pub type QisTriggerTable<'q> = HashMap<ast::QuantifiedExpr, QisTrigger<'q>>;
+
+#[derive(Debug, Default)]
+pub struct QisContext<'q> {
+    pub qis_triggers: QisTriggerTable<'q>,
+    /// Definitions with exactly 1 propagating capture: def name → capture name.
+    pub single_capture_defs: HashMap<&'q str, &'q str>,
+    /// Definitions with 2+ propagating captures (need struct wrapping at root).
+    pub multi_capture_defs: HashSet<&'q str>,
+}
+
+/// Detect capture scopes: QIS triggers and single-capture definitions.
+///
+/// - QIS triggers when quantified expression has ≥2 propagating captures
+/// - Single-capture definitions unwrap (no Field effect, type is capture's type)
+pub fn detect_capture_scopes<'q>(
+    source: &'q str,
+    symbol_table: &SymbolTable<'q>,
+) -> QisContext<'q> {
+    let mut ctx: QisContext<'q> = QisContext::default();
+
+    let mut visitor = QisVisitor {
+        source,
+        qis_triggers: &mut ctx.qis_triggers,
+    };
+
+    // Collect entries to decouple from self for the iteration
+    let entries: Vec<_> = symbol_table.iter().map(|(n, b)| (*n, b.clone())).collect();
+
+    for (name, body) in entries {
+        // 1. Detect single/multi capture definitions
+        let captures = collect_propagating_captures(&body, source);
+
+        if captures.len() == 1 {
+            ctx.single_capture_defs.insert(name, captures[0]);
+        } else if captures.len() >= 2 {
+            ctx.multi_capture_defs.insert(name);
+        }
+
+        // 2. Detect QIS within this definition
+        visitor.visit_expr(&body);
+    }
+
+    ctx
+}
+
+struct QisVisitor<'a, 'map> {
+    source: &'a str,
+    qis_triggers: &'map mut HashMap<ast::QuantifiedExpr, QisTrigger<'a>>,
+}
+
+impl<'a, 'map> Visitor for QisVisitor<'a, 'map> {
+    fn visit_quantified_expr(&mut self, q: &ast::QuantifiedExpr) {
+        if let Some(inner) = q.inner() {
+            let captures = collect_propagating_captures(&inner, self.source);
+            if captures.len() >= 2 {
+                self.qis_triggers.insert(q.clone(), QisTrigger { captures });
             }
-            // Detect QIS within this definition
-            self.detect_qis_in_expr(body);
+            // Recurse
+            self.visit_expr(&inner);
         }
     }
 
-    fn detect_qis_in_expr(&mut self, expr: &ast::Expr) {
-        match expr {
-            ast::Expr::QuantifiedExpr(q) => {
-                if let Some(inner) = q.inner() {
-                    let captures = self.collect_propagating_captures(&inner);
-                    if captures.len() >= 2 {
-                        self.qis_triggers.insert(q.clone(), QisTrigger { captures });
-                    }
-                    self.detect_qis_in_expr(&inner);
+    fn visit_captured_expr(&mut self, c: &ast::CapturedExpr) {
+        // Captures on sequences/alternations absorb inner captures,
+        // but we still recurse to find nested quantifiers.
+        if let Some(inner) = c.inner() {
+            // Special case: captured quantifier with ≥1 nested capture needs QIS
+            // to wrap each iteration with StartObject/EndObject for proper field scoping.
+            if let ast::Expr::QuantifiedExpr(q) = &inner
+                && let Some(quant_inner) = q.inner()
+            {
+                let captures = collect_propagating_captures(&quant_inner, self.source);
+                // Trigger QIS if there's at least 1 capture (not already covered by ≥2 rule)
+                if !captures.is_empty() && !self.qis_triggers.contains_key(q) {
+                    self.qis_triggers.insert(q.clone(), QisTrigger { captures });
                 }
             }
-            ast::Expr::CapturedExpr(c) => {
-                // Captures on sequences/alternations absorb inner captures,
-                // but we still recurse to find nested quantifiers.
-                // Special case: captured quantifier with ≥1 nested capture needs QIS
-                // to wrap each iteration with StartObject/EndObject for proper field scoping.
-                if let Some(inner) = c.inner() {
-                    // Check if this capture wraps a quantifier with nested captures
-                    if let ast::Expr::QuantifiedExpr(q) = &inner
-                        && let Some(quant_inner) = q.inner()
-                    {
-                        let captures = self.collect_propagating_captures(&quant_inner);
-                        // Trigger QIS if there's at least 1 capture (not already covered by ≥2 rule)
-                        if !captures.is_empty() && !self.qis_triggers.contains_key(q) {
-                            self.qis_triggers.insert(q.clone(), QisTrigger { captures });
-                        }
-                    }
-                    self.detect_qis_in_expr(&inner);
-                }
-            }
-            _ => {
-                for child in expr.children() {
-                    self.detect_qis_in_expr(&child);
-                }
-            }
+            self.visit_expr(&inner);
+        }
+    }
+}
+
+pub fn collect_propagating_captures<'a>(expr: &ast::Expr, source: &'a str) -> Vec<&'a str> {
+    let mut collector = CaptureCollector {
+        source,
+        captures: Vec::new(),
+    };
+    collector.visit_expr(expr);
+    collector.captures
+}
+
+struct CaptureCollector<'a> {
+    source: &'a str,
+    captures: Vec<&'a str>,
+}
+
+impl<'a> Visitor for CaptureCollector<'a> {
+    fn visit_captured_expr(&mut self, c: &ast::CapturedExpr) {
+        if let Some(name_token) = c.name() {
+            let name = token_src(&name_token, self.source);
+            self.captures.push(name);
+        }
+
+        // Captured sequence/alternation absorbs inner captures.
+        // Captured quantifiers with nested captures also absorb (they become QIS).
+        if let Some(inner) = c.inner()
+            && !is_scope_container(&inner, self.source)
+        {
+            self.visit_expr(&inner);
         }
     }
 
-    /// Collect captures that propagate out of an expression (not absorbed by inner scopes).
-    pub(super) fn collect_propagating_captures(&self, expr: &ast::Expr) -> Vec<&'a str> {
-        let mut captures = Vec::new();
-        self.collect_propagating_captures_impl(expr, &mut captures);
-        captures
-    }
-
-    fn collect_propagating_captures_impl(&self, expr: &ast::Expr, out: &mut Vec<&'a str>) {
-        match expr {
-            ast::Expr::CapturedExpr(c) => {
-                if let Some(name_token) = c.name() {
-                    let name = token_src(&name_token, self.source);
-                    out.push(name);
-                }
-                // Captured sequence/alternation absorbs inner captures.
-                // Captured quantifiers with nested captures also absorb (they become QIS).
-                if let Some(inner) = c.inner()
-                    && !self.is_scope_container(&inner)
-                {
-                    self.collect_propagating_captures_impl(&inner, out);
-                }
-            }
-            ast::Expr::QuantifiedExpr(q) => {
-                // Nested quantifier: its captures propagate (with modified cardinality)
-                if let Some(inner) = q.inner() {
-                    self.collect_propagating_captures_impl(&inner, out);
-                }
-            }
-            _ => {
-                for child in expr.children() {
-                    self.collect_propagating_captures_impl(&child, out);
-                }
-            }
+    fn visit_quantified_expr(&mut self, q: &ast::QuantifiedExpr) {
+        // Nested quantifier: its captures propagate (with modified cardinality)
+        if let Some(inner) = q.inner() {
+            self.visit_expr(&inner);
         }
     }
+}
 
-    /// Check if an expression is a scope container that absorbs inner captures.
-    /// - Sequences and alternations always absorb
-    /// - Quantifiers absorb if they have nested captures (will become QIS)
-    fn is_scope_container(&self, expr: &ast::Expr) -> bool {
-        match expr {
-            ast::Expr::SeqExpr(_) | ast::Expr::AltExpr(_) => true,
-            ast::Expr::QuantifiedExpr(q) => {
-                if let Some(inner) = q.inner() {
-                    // Quantifier with nested captures acts as scope container
-                    // (will be treated as QIS, wrapping each element in an object)
-                    let nested_captures = self.collect_propagating_captures(&inner);
-                    if !nested_captures.is_empty() {
-                        return true;
-                    }
-                    // Otherwise check if inner is a scope container
-                    self.is_scope_container(&inner)
-                } else {
-                    false
+/// Check if an expression is a scope container that absorbs inner captures.
+/// - Sequences and alternations always absorb
+/// - Quantifiers absorb if they have nested captures (will become QIS)
+fn is_scope_container(expr: &ast::Expr, source: &str) -> bool {
+    match expr {
+        ast::Expr::SeqExpr(_) | ast::Expr::AltExpr(_) => true,
+        ast::Expr::QuantifiedExpr(q) => {
+            if let Some(inner) = q.inner() {
+                // Quantifier with nested captures acts as scope container
+                // (will be treated as QIS, wrapping each element in an object)
+                let nested_captures = collect_propagating_captures(&inner, source);
+                if !nested_captures.is_empty() {
+                    return true;
                 }
+                // Otherwise check if inner is a scope container
+                is_scope_container(&inner, source)
+            } else {
+                false
             }
-            _ => false,
         }
-    }
-
-    /// Check if a quantified expression triggers QIS.
-    pub fn is_qis_trigger(&self, q: &ast::QuantifiedExpr) -> bool {
-        self.qis_triggers.contains_key(q)
-    }
-
-    /// Get QIS trigger info for a quantified expression.
-    pub fn qis_trigger(&self, q: &ast::QuantifiedExpr) -> Option<&QisTrigger<'a>> {
-        self.qis_triggers.get(q)
-    }
-
-    /// Check if this capture is the single propagating capture for its definition.
-    /// Only that specific capture should unwrap (skip Field effect).
-    pub fn is_single_capture(&self, def_name: &str, capture_name: &str) -> bool {
-        self.single_capture_defs
-            .get(def_name)
-            .map(|c| *c == capture_name)
-            .unwrap_or(false)
-    }
-
-    /// Check if definition has 2+ propagating captures (needs struct wrapping).
-    pub fn is_multi_capture_def(&self, name: &str) -> bool {
-        self.multi_capture_defs.contains(name)
+        _ => false,
     }
 }

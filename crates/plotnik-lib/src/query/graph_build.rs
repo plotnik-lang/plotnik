@@ -10,6 +10,7 @@ use crate::parser::{
     AltExpr, AltKind, AnonymousNode, Branch, CapturedExpr, Expr, FieldExpr, NamedNode,
     NegatedField, QuantifiedExpr, Ref, SeqExpr, SeqItem, SyntaxKind, token_src,
 };
+use crate::query::graph_qis::collect_propagating_captures;
 
 use super::Query;
 use super::graph::{BuildEffect, BuildMatcher, BuildNode, Fragment, NodeId, RefMarker};
@@ -101,7 +102,7 @@ impl<'a> Query<'a> {
             let fragment = self.construct_expr(&body, NavContext::Root);
 
             // Multi-capture definitions need struct wrapping at root
-            let entry = if self.multi_capture_defs.contains(name) {
+            let entry = if self.qis_ctx.multi_capture_defs.contains(name) {
                 let start_id = self.graph.add_epsilon();
                 self.graph
                     .node_mut(start_id)
@@ -522,11 +523,17 @@ impl<'a> Query<'a> {
 
         // Single-capture definitions unwrap: no Field effect, type is capture's type directly.
         // Only the specific propagating capture should unwrap, not nested captures.
-        let is_single_capture = self.is_single_capture(self.current_def_name, name);
+        let is_single_capture = self
+            .qis_ctx
+            .single_capture_defs
+            .get(self.current_def_name)
+            .map(|c| *c == name)
+            .unwrap_or(false);
 
         if is_single_capture && needs_object_wrapper {
             // Captured container at single-capture definition root
-            let inner_captures = self.collect_propagating_captures(&inner_expr);
+            // let inner_captures = self.collect_propagating_captures(&inner_expr);
+            let inner_captures = collect_propagating_captures(&inner_expr, self.source);
             if inner_captures.is_empty() {
                 // No inner captures → Void (per ADR-0009 Payload Rule).
                 // Return epsilon for matching only, discard inner effects.
@@ -604,7 +611,7 @@ impl<'a> Query<'a> {
         // Build inner with Stay nav; the repetition combinator handles initial/re-entry nav
         let f = self.construct_expr(&inner_expr, NavContext::Root);
         let nav = ctx.to_nav();
-        let qis = self.qis_triggers.contains_key(quant);
+        let qis = self.qis_ctx.qis_triggers.contains_key(quant);
 
         match (op.kind(), qis) {
             (SyntaxKind::Star, false) => self.graph.zero_or_more_array(f, nav),

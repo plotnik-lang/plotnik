@@ -9,6 +9,7 @@ use crate::parser::{ParseResult, Parser, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
 use crate::query::dependencies::{self, DependencyAnalysis};
 use crate::query::expr_arity::{ExprArityTable, infer_arities};
+use crate::query::graph_qis::{QisContext, detect_capture_scopes};
 use crate::query::link;
 use crate::query::symbol_table::{SymbolTable, resolve_names};
 use crate::{Diagnostics, parser::Root};
@@ -102,11 +103,14 @@ impl<'q> QueryParsed<'q> {
             return Err(crate::Error::QueryAnalyzeError(self.diag));
         }
 
+        let qis_ctx = detect_capture_scopes(self.src, &symbol_table);
+
         Ok(QueryAnalyzed {
             query_parsed: self,
             symbol_table,
             dependency_analysis,
             arity_table,
+            qis_ctx,
         })
     }
 }
@@ -116,6 +120,7 @@ pub struct QueryAnalyzed<'q> {
     symbol_table: SymbolTable<'q>,
     dependency_analysis: DependencyAnalysis<'q>,
     arity_table: ExprArityTable,
+    qis_ctx: QisContext<'q>,
 }
 
 impl<'q> QueryAnalyzed<'q> {

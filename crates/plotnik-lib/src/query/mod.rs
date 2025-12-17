@@ -71,6 +71,8 @@ use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
 use crate::query::dependencies::DependencyAnalysis;
+use crate::query::graph_qis::QisContext;
+use crate::query::graph_qis::detect_capture_scopes;
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;
@@ -91,12 +93,6 @@ use symbol_table::SymbolTable;
 ///
 /// When a quantified expression has ≥2 propagating captures, QIS creates
 /// an implicit object scope so captures stay coupled per-iteration.
-#[derive(Debug, Clone)]
-pub struct QisTrigger<'a> {
-    /// Capture names that propagate from this quantified expression.
-    pub captures: Vec<&'a str>,
-}
-
 #[derive(Debug)]
 pub struct Query<'q> {
     source: &'q str,
@@ -120,11 +116,7 @@ pub struct Query<'q> {
     dead_nodes: HashSet<NodeId>,
     type_info: TypeInferenceResult<'q>,
     /// QIS triggers: quantified expressions with ≥2 propagating captures.
-    qis_triggers: HashMap<ast::QuantifiedExpr, QisTrigger<'q>>,
-    /// Definitions with exactly 1 propagating capture: def name → capture name.
-    single_capture_defs: HashMap<&'q str, &'q str>,
-    /// Definitions with 2+ propagating captures (need struct wrapping at root).
-    multi_capture_defs: HashSet<&'q str>,
+    qis_ctx: QisContext<'q>,
     /// Current definition name during graph construction.
     current_def_name: &'q str,
     /// Counter for generating unique ref IDs during graph construction.
@@ -164,9 +156,7 @@ impl<'a> Query<'a> {
             graph: BuildGraph::default(),
             dead_nodes: HashSet::new(),
             type_info: TypeInferenceResult::default(),
-            qis_triggers: HashMap::new(),
-            single_capture_defs: HashMap::new(),
-            multi_capture_defs: HashSet::new(),
+            qis_ctx: QisContext::default(),
             current_def_name: "",
             next_ref_id: 0,
         }
@@ -198,7 +188,6 @@ impl<'a> Query<'a> {
         self.try_parse()?;
         self.validate_alt_kinds();
         self.resolve_names();
-        // self.validate_recursion();
 
         self.dependency_analysis = dependencies::analyze_dependencies(&self.symbol_table);
         dependencies::validate_recursion(
@@ -209,6 +198,11 @@ impl<'a> Query<'a> {
         );
 
         self.infer_arities();
+
+        self.qis_ctx = detect_capture_scopes(self.source, &self.symbol_table);
+
+        self.infer_types();
+
         Ok(self)
     }
 
@@ -222,9 +216,7 @@ impl<'a> Query<'a> {
         if !self.is_valid() {
             return self;
         }
-        self.detect_capture_scopes();
         self.construct_graph();
-        self.infer_types(); // Run before optimization to avoid merged effects
         self.optimize_graph();
         self
     }
@@ -236,7 +228,9 @@ impl<'a> Query<'a> {
         if !self.is_valid() {
             return (self, String::new());
         }
-        self.detect_capture_scopes();
+
+        self.qis_ctx = detect_capture_scopes(self.source, &self.symbol_table);
+
         self.construct_graph();
         if let Some(root) = root_kind {
             self.graph.wrap_definitions_with_root(root);

@@ -9,6 +9,7 @@ fn check_qis(source: &str) -> String {
     for def in query.root().defs() {
         let def_name = def.name().map(|t| t.text().to_string()).unwrap_or_default();
         let mut triggers: Vec<_> = query
+            .qis_ctx
             .qis_triggers
             .iter()
             .filter_map(|(q, trigger)| {

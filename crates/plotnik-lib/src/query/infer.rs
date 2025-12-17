@@ -784,7 +784,7 @@ impl<'a> Query<'a> {
     /// Run type inference on the query AST.
     pub(super) fn infer_types(&mut self) {
         // Collect QIS triggers upfront to avoid borrowing issues
-        let qis_triggers: HashSet<_> = self.qis_triggers.keys().cloned().collect();
+        let qis_triggers: HashSet<_> = self.qis_ctx.qis_triggers.keys().cloned().collect();
 
         let mut ctx = InferenceContext::new(self.source, qis_triggers);
 
