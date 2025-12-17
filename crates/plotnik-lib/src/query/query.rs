@@ -1,7 +1,8 @@
 #![allow(unused)]
 use crate::parser::{ParseResult, Parser, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
-use crate::query::dependencies;
+use crate::query::dependencies::{self, DependencyAnalysis};
+use crate::query::expr_arity::{ExprArityTable, infer_arities};
 use crate::query::symbol_table::{SymbolTable, resolve_names};
 use crate::{Diagnostics, parser::Root};
 
@@ -84,9 +85,13 @@ impl<'q> QueryParsed<'q> {
             &mut self.diag,
         );
 
+        let arity_table = infer_arities(&self.ast, &symbol_table, &mut self.diag);
+
         QueryAnalyzed {
             query_parsed: self,
             symbol_table,
+            dependency_analysis,
+            arity_table,
         }
     }
 }
@@ -94,4 +99,6 @@ impl<'q> QueryParsed<'q> {
 pub struct QueryAnalyzed<'q> {
     query_parsed: QueryParsed<'q>,
     symbol_table: SymbolTable<'q>,
+    dependency_analysis: DependencyAnalysis<'q>,
+    arity_table: ExprArityTable,
 }
