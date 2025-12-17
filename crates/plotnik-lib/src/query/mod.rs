@@ -12,7 +12,6 @@ mod graph_qis;
 mod invariants;
 mod printer;
 mod utils;
-#[cfg(feature = "plotnik-langs")]
 use plotnik_core::NodeFieldId;
 use plotnik_core::NodeTypeId;
 pub use printer::QueryPrinter;
@@ -26,7 +25,6 @@ mod graph_dump;
 mod graph_optimize;
 pub mod infer;
 mod infer_dump;
-#[cfg(feature = "plotnik-langs")]
 pub mod link;
 #[allow(clippy::module_inception)]
 pub mod query;
@@ -105,9 +103,7 @@ pub struct Query<'q> {
     ast: Root,
     symbol_table: SymbolTable<'q>,
     expr_arity_table: HashMap<ast::Expr, ExprArity>,
-    #[cfg(feature = "plotnik-langs")]
     node_type_ids: HashMap<&'q str, Option<NodeTypeId>>,
-    #[cfg(feature = "plotnik-langs")]
     node_field_ids: HashMap<&'q str, Option<NodeFieldId>>,
     exec_fuel: u32,
     recursion_fuel: u32,
@@ -117,7 +113,6 @@ pub struct Query<'q> {
     resolve_diagnostics: Diagnostics,
     recursion_diagnostics: Diagnostics,
     expr_arity_diagnostics: Diagnostics,
-    #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
     dependency_analysis: DependencyAnalysis<'q>,
     // Graph compilation fields
@@ -154,9 +149,7 @@ impl<'a> Query<'a> {
             ast: empty_root(),
             symbol_table: SymbolTable::default(),
             expr_arity_table: HashMap::new(),
-            #[cfg(feature = "plotnik-langs")]
             node_type_ids: HashMap::new(),
-            #[cfg(feature = "plotnik-langs")]
             node_field_ids: HashMap::new(),
             exec_fuel: DEFAULT_EXEC_FUEL,
             recursion_fuel: DEFAULT_RECURSION_FUEL,
@@ -167,7 +160,6 @@ impl<'a> Query<'a> {
             recursion_diagnostics: Diagnostics::new(),
             expr_arity_diagnostics: Diagnostics::new(),
             dependency_analysis: DependencyAnalysis::default(),
-            #[cfg(feature = "plotnik-langs")]
             link_diagnostics: Diagnostics::new(),
             graph: BuildGraph::default(),
             dead_nodes: HashSet::new(),
@@ -318,7 +310,6 @@ impl<'a> Query<'a> {
         all.extend(self.resolve_diagnostics.clone());
         all.extend(self.recursion_diagnostics.clone());
         all.extend(self.expr_arity_diagnostics.clone());
-        #[cfg(feature = "plotnik-langs")]
         all.extend(self.link_diagnostics.clone());
         all.extend(self.type_info.diagnostics.clone());
         all
@@ -333,7 +324,6 @@ impl<'a> Query<'a> {
     }
 
     /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
-    #[cfg(feature = "plotnik-langs")]
     pub fn is_valid(&self) -> bool {
         !self.parse_diagnostics.has_errors()
             && !self.alt_kind_diagnostics.has_errors()
@@ -341,16 +331,6 @@ impl<'a> Query<'a> {
             && !self.recursion_diagnostics.has_errors()
             && !self.expr_arity_diagnostics.has_errors()
             && !self.link_diagnostics.has_errors()
-    }
-
-    /// Query is valid if there are no error-severity diagnostics (warnings are allowed).
-    #[cfg(not(feature = "plotnik-langs"))]
-    pub fn is_valid(&self) -> bool {
-        !self.parse_diagnostics.has_errors()
-            && !self.alt_kind_diagnostics.has_errors()
-            && !self.resolve_diagnostics.has_errors()
-            && !self.recursion_diagnostics.has_errors()
-            && !self.shapes_diagnostics.has_errors()
     }
 
     /// Check if graph compilation produced type errors.
