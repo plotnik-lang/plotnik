@@ -24,10 +24,10 @@ impl Query<'_> {
         let root = self.ast.clone();
 
         let mut computer = ArityComputer { query: self };
-        computer.visit_root(&root);
+        computer.visit(&root);
 
         let mut validator = ArityValidator { query: self };
-        validator.visit_root(&root);
+        validator.visit(&root);
     }
 
     pub(super) fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {

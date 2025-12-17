@@ -21,8 +21,8 @@ use crate::parser::ast::{
 };
 
 pub trait Visitor: Sized {
-    fn visit_root(&mut self, root: &Root) {
-        walk_root(self, root);
+    fn visit(&mut self, ast: &Root) {
+        walk(self, ast);
     }
 
     fn visit_def(&mut self, def: &Def) {
@@ -37,13 +37,9 @@ pub trait Visitor: Sized {
         walk_named_node(self, node);
     }
 
-    fn visit_anonymous_node(&mut self, _node: &AnonymousNode) {
-        // Leaf node
-    }
+    fn visit_anonymous_node(&mut self, _node: &AnonymousNode) {}
 
-    fn visit_ref(&mut self, _ref: &Ref) {
-        // Leaf node in AST structure (semantic traversal happens via SymbolTable lookup)
-    }
+    fn visit_ref(&mut self, _ref: &Ref) {}
 
     fn visit_alt_expr(&mut self, alt: &AltExpr) {
         walk_alt_expr(self, alt);
@@ -66,8 +62,8 @@ pub trait Visitor: Sized {
     }
 }
 
-pub fn walk_root<V: Visitor>(visitor: &mut V, root: &Root) {
-    for def in root.defs() {
+pub fn walk<V: Visitor>(visitor: &mut V, ast: &Root) {
+    for def in ast.defs() {
         visitor.visit_def(&def);
     }
 }
@@ -92,7 +88,6 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
 }
 
 pub fn walk_named_node<V: Visitor>(visitor: &mut V, node: &NamedNode) {
-    // We iterate specific children to avoid Expr::children() Vec allocation
     for child in node.children() {
         visitor.visit_expr(&child);
     }
@@ -104,7 +99,7 @@ pub fn walk_alt_expr<V: Visitor>(visitor: &mut V, alt: &AltExpr) {
             visitor.visit_expr(&body);
         }
     }
-    // Also visit bare exprs in untagged/mixed alts if any exist unwrapped
+
     for expr in alt.exprs() {
         visitor.visit_expr(&expr);
     }

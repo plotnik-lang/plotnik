@@ -785,18 +785,21 @@ impl<'a> Query<'a> {
     pub(super) fn infer_types(&mut self) {
         // Collect QIS triggers upfront to avoid borrowing issues
         let qis_triggers: HashSet<_> = self.qis_triggers.keys().cloned().collect();
-        let sorted = self.topological_sort_definitions_ast();
 
         let mut ctx = InferenceContext::new(self.source, qis_triggers);
 
         // Process definitions in dependency order
-        for (name, body) in &sorted {
-            let type_id = ctx.infer_definition(name, body);
-            ctx.definition_types.insert(name, type_id);
+        for scc in &self.dependency_analysis.sccs {
+            for name in scc {
+                if let Some(body) = self.symbol_table.get(name) {
+                    let type_id = ctx.infer_definition(name, body);
+                    ctx.definition_types.insert(name, type_id);
+                }
+            }
         }
 
         // Preserve symbol table order for entrypoints
-        for (name, _) in &sorted {
+        for (name, _) in self.symbol_table.iter() {
             if let Some(&type_id) = ctx.definition_types.get(name) {
                 self.type_info.entrypoint_types.insert(*name, type_id);
             }
@@ -804,106 +807,5 @@ impl<'a> Query<'a> {
         self.type_info.type_defs = ctx.type_defs;
         self.type_info.diagnostics = ctx.diagnostics;
         self.type_info.errors = ctx.errors;
-    }
-
-    /// Topologically sort definitions for processing order.
-    fn topological_sort_definitions_ast(&self) -> Vec<(&'a str, ast::Expr)> {
-        use std::collections::{HashSet, VecDeque};
-
-        let definitions: Vec<_> = self
-            .symbol_table
-            .iter()
-            .map(|(&name, body)| (name, body.clone()))
-            .collect();
-        let def_names: HashSet<&str> = definitions.iter().map(|(name, _)| *name).collect();
-
-        // Build dependency graph from AST references
-        let mut deps: HashMap<&str, Vec<&str>> = HashMap::new();
-        for (name, body) in &definitions {
-            let refs = Self::collect_ast_references(body, &def_names);
-            deps.insert(name, refs);
-        }
-
-        // Kahn's algorithm
-        let mut in_degree: HashMap<&str, usize> = HashMap::new();
-        for (name, _) in &definitions {
-            in_degree.insert(name, 0);
-        }
-        for refs in deps.values() {
-            for &dep in refs {
-                *in_degree.entry(dep).or_insert(0) += 1;
-            }
-        }
-
-        let mut zero_degree: Vec<&str> = in_degree
-            .iter()
-            .filter(|(_, deg)| **deg == 0)
-            .map(|(&name, _)| name)
-            .collect();
-        zero_degree.sort();
-        let mut queue: VecDeque<&str> = zero_degree.into_iter().collect();
-
-        let mut sorted_names = Vec::new();
-        while let Some(name) = queue.pop_front() {
-            sorted_names.push(name);
-            if let Some(refs) = deps.get(name) {
-                for &dep in refs {
-                    if let Some(deg) = in_degree.get_mut(dep) {
-                        *deg = deg.saturating_sub(1);
-                        if *deg == 0 {
-                            queue.push_back(dep);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Reverse so dependencies come first
-        sorted_names.reverse();
-
-        // Add any remaining (cyclic) definitions
-        for (name, _) in &definitions {
-            if !sorted_names.contains(name) {
-                sorted_names.push(name);
-            }
-        }
-
-        // Build result with bodies
-        sorted_names
-            .into_iter()
-            .filter_map(|name| self.symbol_table.get(name).map(|body| (name, body.clone())))
-            .collect()
-    }
-
-    /// Collect references from an AST expression.
-    fn collect_ast_references<'b>(expr: &Expr, def_names: &HashSet<&'b str>) -> Vec<&'b str> {
-        let mut refs = Vec::new();
-        Self::collect_ast_references_impl(expr, def_names, &mut refs);
-        refs
-    }
-
-    fn collect_ast_references_impl<'b>(
-        expr: &Expr,
-        def_names: &HashSet<&'b str>,
-        refs: &mut Vec<&'b str>,
-    ) {
-        match expr {
-            Expr::Ref(r) => {
-                if let Some(name_token) = r.name() {
-                    let name = name_token.text();
-                    if def_names.contains(name) && !refs.contains(&name) {
-                        // Find the actual &'b str from the set
-                        if let Some(&found) = def_names.iter().find(|&&n| n == name) {
-                            refs.push(found);
-                        }
-                    }
-                }
-            }
-            _ => {
-                for child in expr.children() {
-                    Self::collect_ast_references_impl(&child, def_names, refs);
-                }
-            }
-        }
     }
 }

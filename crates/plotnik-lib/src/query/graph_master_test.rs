@@ -511,109 +511,109 @@ fn golden_master_comprehensive() {
                                   TYPE INFERENCE
     ═══════════════════════════════════════════════════════════════════════════════
 
-    Identifier = Node
-    RefSimple = ()
-    WildcardCapture = Node
-    UntaggedSymmetric = Node
-    UntaggedCaptured = UntaggedCapturedScope3
-    TaggedCaptured = TaggedCapturedScope13
-    StringLiteral = Node
-    StringCapture = str
-    StarQuant = [Node]
     SimpleCapture = Node
-    RefChain = ()
-    RefCaptured = Node
-    QisSequence = T16
-    QisNode = T18
+    StringCapture = str
+    AnchorFirst = Node
+    AnchorLast = Node
+    DeepNest = Node
+    StarQuant = [Node]
     PlusQuant = [Node]⁺
     OptQuant = Node?
+    QisNode = T09
+    QisSequence = T11
     NoQis = [Node]
-    NoCaptures = ()
-    NestedScopes = NestedScopesScope24
-    NestedQuant = T27
-    DeepNest = Node
+    TaggedCaptured = TaggedCapturedScope14
+    UntaggedSymmetric = Node
+    UntaggedCaptured = UntaggedCapturedScope20
+    CapturedSeq = CapturedSeqScope23
+    NestedScopes = NestedScopesScope27
+    Identifier = Node
+    RefSimple = ()
+    RefCaptured = Node
+    RefChain = ()
     CardinalityJoin = [Node]⁺
-    CapturedSeq = CapturedSeqScope42
-    AnchorLast = Node
-    AnchorFirst = Node
+    NestedQuant = T31
+    WildcardCapture = Node
+    StringLiteral = Node
+    NoCaptures = ()
 
-    UntaggedCapturedScope3 = {
-      x: Node?
-      y: Node?
+    MultiCapture = {
+      fn_name: str
+      fn_body: Node
     }
-    UntaggedAsymmetric = {
-      x: Node?
-      y: Node?
+    AnchorSibling = {
+      left: Node
+      right: Node
     }
-    UncapturedSeq = {
-      x: Node
-      y: Node
+    QisNodeScope8 = {
+      name: Node
+      body: Node
     }
+    T09 = [QisNodeScope8]
+    QisSequenceScope10 = {
+      key: Node
+      value: Node
+    }
+    T11 = [QisSequenceScope10]
     TaggedRoot = {
       Ok => Node
       Err => str
     }
-    TaggedMultiScope11 = {
+    TaggedCapturedScope14 = {
+      Left => Node
+      Right => Node
+    }
+    TaggedMultiScope15 = {
       k: Node
       v: Node
     }
     TaggedMulti = {
       Simple => Node
-      Complex => TaggedMultiScope11
+      Complex => TaggedMultiScope15
     }
-    TaggedCapturedScope13 = {
-      Left => Node
-      Right => Node
+    UntaggedAsymmetric = {
+      x: Node?
+      y: Node?
     }
-    QisSequenceScope15 = {
-      key: Node
-      value: Node
+    UntaggedCapturedScope20 = {
+      x: Node?
+      y: Node?
     }
-    T16 = [QisSequenceScope15]
-    QisNodeScope17 = {
-      name: Node
-      body: Node
+    CapturedSeqScope23 = {
+      x: Node
+      y: Node
     }
-    T18 = [QisNodeScope17]
-    NestedScopesScope22 = { a: Node }
-    NestedScopesScope23 = { b: Node }
-    NestedScopesScope24 = {
-      inner1: NestedScopesScope22
-      inner2: NestedScopesScope23
+    UncapturedSeq = {
+      x: Node
+      y: Node
     }
-    NestedQuantScope25 = { inner: [Node] }
-    T27 = [NestedQuantScope25]⁺
-    MultiCapture = {
-      fn_name: str
-      fn_body: Node
+    NestedScopesScope25 = { a: Node }
+    NestedScopesScope26 = { b: Node }
+    NestedScopesScope27 = {
+      inner1: NestedScopesScope25
+      inner2: NestedScopesScope26
     }
-    EmptyBranch = {
-      Some => Node
-      None => ()
-    }
-    ComplexScope30 = { p: Node }
-    T31 = [ComplexScope30]
-    T33 = T31?
-    ComplexScope32 = {
+    NestedQuantScope29 = { inner: [Node] }
+    T31 = [NestedQuantScope29]⁺
+    ComplexScope32 = { p: Node }
+    T33 = [ComplexScope32]
+    T35 = T33?
+    ComplexScope34 = {
       fn_name: str?
-      params: T33
+      params: T35
       fn_body: Node?
       cls_name: str?
       cls_body: Node?
     }
-    T38 = [ComplexScope32]
+    T40 = [ComplexScope34]
     Complex = {
       mod_name: str
       imports: [Node]
-      items: T38
+      items: T40
     }
-    CapturedSeqScope42 = {
-      x: Node
-      y: Node
-    }
-    AnchorSibling = {
-      left: Node
-      right: Node
+    EmptyBranch = {
+      Some => Node
+      None => ()
     }
     "#);
 }
@@ -714,18 +714,18 @@ fn golden_navigation_patterns() {
                                   TYPE INFERENCE
     ═══════════════════════════════════════════════════════════════════════════════
 
-    NavUpMulti = Node
-    NavUpAnchor = Node
-    NavUp = Node
     NavStay = Node
-    NavDownAnchor = Node
     NavDown = Node
+    NavDownAnchor = Node
+    NavUp = Node
+    NavUpAnchor = Node
+    NavUpMulti = Node
 
-    NavNextAnchor = {
+    NavNext = {
       a: Node
       b: Node
     }
-    NavNext = {
+    NavNextAnchor = {
       a: Node
       b: Node
     }
@@ -864,24 +864,23 @@ fn golden_type_inference() {
                                   TYPE INFERENCE
     ═══════════════════════════════════════════════════════════════════════════════
 
+    FlatScope = Node
     BaseWithCapture = Node
-    SyntheticNames = SyntheticNamesScope7
     RefOpaque = ()
     RefCaptured = Node
+    CardMult = [Node]
     QisTwo = T09
     NoQisOne = [Node]
-    FlatScope = Node
-    CardMult = [Node]
+    SyntheticNames = SyntheticNamesScope13
 
-    TaggedInline = {
-      x: Node?
-      y: Node?
-    }
     TaggedAtRoot = {
       A => Node
       B => Node
     }
-    SyntheticNamesScope7 = { bar: Node }
+    TaggedInline = {
+      x: Node?
+      y: Node?
+    }
     QisTwoScope8 = {
       x: Node
       y: Node
@@ -896,6 +895,7 @@ fn golden_type_inference() {
       Full => MissingFieldScope11
       Partial => Node
     }
+    SyntheticNamesScope13 = { bar: Node }
     ");
 }
 
@@ -964,20 +964,20 @@ fn golden_effect_patterns() {
                                   TYPE INFERENCE
     ═══════════════════════════════════════════════════════════════════════════════
 
-    EffVariant = EffVariantScope3
-    EffToString = str
-    EffObject = EffObjectScope4
-    EffClear = Node?
     EffCapture = Node
+    EffToString = str
     EffArray = [Node]
+    EffObject = EffObjectScope4
+    EffVariant = EffVariantScope5
+    EffClear = Node?
 
-    EffVariantScope3 = {
-      A => Node
-      B => Node
-    }
     EffObjectScope4 = {
       x: Node
       y: Node
+    }
+    EffVariantScope5 = {
+      A => Node
+      B => Node
     }
     ");
 }
@@ -1074,20 +1074,20 @@ fn golden_quantifier_graphs() {
                                   TYPE INFERENCE
     ═══════════════════════════════════════════════════════════════════════════════
 
-    QuantSeq = T04
-    Optional = Node?
-    NestedQuant = T08
-    LazyStar = [Node]
-    LazyPlus = [Node]⁺
     GreedyStar = [Node]
     GreedyPlus = [Node]⁺
+    Optional = Node?
+    LazyStar = [Node]
+    LazyPlus = [Node]⁺
+    QuantSeq = T09
+    NestedQuant = T12
 
-    QuantSeqScope3 = {
+    QuantSeqScope8 = {
       x: Node
       y: Node
     }
-    T04 = [QuantSeqScope3]
-    NestedQuantScope6 = { inners: [Node] }
-    T08 = [NestedQuantScope6]⁺
+    T09 = [QuantSeqScope8]
+    NestedQuantScope10 = { inners: [Node] }
+    T12 = [NestedQuantScope10]⁺
     ");
 }

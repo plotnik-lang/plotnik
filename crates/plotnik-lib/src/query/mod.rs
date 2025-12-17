@@ -15,6 +15,7 @@ mod utils;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
+mod dependencies;
 pub mod expr_arity;
 pub mod graph;
 mod graph_build;
@@ -24,7 +25,8 @@ pub mod infer;
 mod infer_dump;
 #[cfg(feature = "plotnik-langs")]
 pub mod link;
-pub mod recursion;
+#[allow(clippy::module_inception)]
+pub mod query;
 pub mod symbol_table;
 pub mod visitor;
 
@@ -37,6 +39,8 @@ pub use symbol_table::UNNAMED_DEF;
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(test)]
+mod dependencies_tests;
 #[cfg(test)]
 mod expr_arity_tests;
 #[cfg(test)]
@@ -54,8 +58,6 @@ mod mod_tests;
 #[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
-mod recursion_tests;
-#[cfg(test)]
 mod symbol_table_tests;
 
 use std::collections::{HashMap, HashSet};
@@ -70,6 +72,7 @@ use crate::diagnostics::Diagnostics;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::lex;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, ast};
+use crate::query::dependencies::DependencyAnalysis;
 
 const DEFAULT_EXEC_FUEL: u32 = 1_000_000;
 const DEFAULT_RECURSION_FUEL: u32 = 4096;
@@ -106,8 +109,8 @@ pub struct Query<'q> {
     node_type_ids: HashMap<&'q str, Option<NodeTypeId>>,
     #[cfg(feature = "plotnik-langs")]
     node_field_ids: HashMap<&'q str, Option<NodeFieldId>>,
-    exec_fuel: Option<u32>,
-    recursion_fuel: Option<u32>,
+    exec_fuel: u32,
+    recursion_fuel: u32,
     exec_fuel_consumed: u32,
     parse_diagnostics: Diagnostics,
     alt_kind_diagnostics: Diagnostics,
@@ -116,6 +119,7 @@ pub struct Query<'q> {
     expr_arity_diagnostics: Diagnostics,
     #[cfg(feature = "plotnik-langs")]
     link_diagnostics: Diagnostics,
+    dependency_analysis: DependencyAnalysis<'q>,
     // Graph compilation fields
     graph: BuildGraph<'q>,
     dead_nodes: HashSet<NodeId>,
@@ -154,14 +158,15 @@ impl<'a> Query<'a> {
             node_type_ids: HashMap::new(),
             #[cfg(feature = "plotnik-langs")]
             node_field_ids: HashMap::new(),
-            exec_fuel: Some(DEFAULT_EXEC_FUEL),
-            recursion_fuel: Some(DEFAULT_RECURSION_FUEL),
+            exec_fuel: DEFAULT_EXEC_FUEL,
+            recursion_fuel: DEFAULT_RECURSION_FUEL,
             exec_fuel_consumed: 0,
             parse_diagnostics: Diagnostics::new(),
             alt_kind_diagnostics: Diagnostics::new(),
             resolve_diagnostics: Diagnostics::new(),
             recursion_diagnostics: Diagnostics::new(),
             expr_arity_diagnostics: Diagnostics::new(),
+            dependency_analysis: DependencyAnalysis::default(),
             #[cfg(feature = "plotnik-langs")]
             link_diagnostics: Diagnostics::new(),
             graph: BuildGraph::default(),
@@ -179,7 +184,7 @@ impl<'a> Query<'a> {
     ///
     /// Execution fuel never replenishes. It protects against large inputs.
     /// Returns error from [`exec`](Self::exec) when exhausted.
-    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
+    pub fn with_exec_fuel(mut self, limit: u32) -> Self {
         self.exec_fuel = limit;
         self
     }
@@ -188,7 +193,7 @@ impl<'a> Query<'a> {
     ///
     /// Recursion fuel restores when exiting recursion. It protects against
     /// deeply nested input. Returns error from [`exec`](Self::exec) when exhausted.
-    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
+    pub fn with_recursion_fuel(mut self, limit: u32) -> Self {
         self.recursion_fuel = limit;
         self
     }
@@ -201,7 +206,16 @@ impl<'a> Query<'a> {
         self.try_parse()?;
         self.validate_alt_kinds();
         self.resolve_names();
-        self.validate_recursion();
+        // self.validate_recursion();
+
+        self.dependency_analysis = dependencies::analyze_dependencies(&self.symbol_table);
+        dependencies::validate_recursion(
+            &self.dependency_analysis,
+            &self.ast,
+            &self.symbol_table,
+            &mut self.recursion_diagnostics,
+        );
+
         self.infer_arities();
         Ok(self)
     }
@@ -243,17 +257,15 @@ impl<'a> Query<'a> {
 
     fn try_parse(&mut self) -> Result<()> {
         let tokens = lex(self.source);
-        let parser = Parser::new(self.source, tokens)
-            .with_exec_fuel(self.exec_fuel)
-            .with_recursion_fuel(self.recursion_fuel);
+        let parser = Parser::new(self.source, tokens, self.exec_fuel, self.recursion_fuel);
 
         let ParseResult {
-            root,
-            diagnostics,
-            exec_fuel_consumed,
+            ast,
+            diag,
+            fuel_consumed: exec_fuel_consumed,
         } = parser.parse()?;
-        self.ast = root;
-        self.parse_diagnostics = diagnostics;
+        self.ast = ast;
+        self.parse_diagnostics = diag;
         self.exec_fuel_consumed = exec_fuel_consumed;
         Ok(())
     }

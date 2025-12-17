@@ -7,30 +7,35 @@ use rowan::TextRange;
 
 use super::Query;
 use super::invariants::ensure_both_branch_kinds;
-use super::visitor::{Visitor, walk_alt_expr, walk_root};
+use super::visitor::{Visitor, walk, walk_alt_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{AltExpr, AltKind, Branch, Root};
 
 impl Query<'_> {
     pub(super) fn validate_alt_kinds(&mut self) {
         let mut visitor = AltKindsValidator {
-            diagnostics: &mut self.alt_kind_diagnostics,
+            diag: &mut self.alt_kind_diagnostics,
         };
-        visitor.visit_root(&self.ast);
+        visitor.visit(&self.ast);
     }
 }
 
+pub fn validate_alt_kinds(ast: &Root, diag: &mut Diagnostics) {
+    let mut visitor = AltKindsValidator { diag };
+    visitor.visit(ast);
+}
+
 struct AltKindsValidator<'a> {
-    diagnostics: &'a mut Diagnostics,
+    diag: &'a mut Diagnostics,
 }
 
 impl Visitor for AltKindsValidator<'_> {
-    fn visit_root(&mut self, root: &Root) {
+    fn visit(&mut self, root: &Root) {
         assert!(
             root.exprs().next().is_none(),
             "alt_kind: unexpected bare Expr in Root (parser should wrap in Def)"
         );
-        walk_root(self, root);
+        walk(self, root);
     }
 
     fn visit_alt_expr(&mut self, alt: &AltExpr) {
@@ -63,7 +68,7 @@ impl AltKindsValidator<'_> {
 
         let untagged_range = branch_range(untagged_branch);
 
-        self.diagnostics
+        self.diag
             .report(DiagnosticKind::MixedAltBranches, untagged_range)
             .related_to("tagged branch here", tagged_range)
             .emit();

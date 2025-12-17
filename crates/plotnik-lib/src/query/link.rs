@@ -16,7 +16,7 @@ use crate::parser::token_src;
 
 use super::Query;
 use super::utils::find_similar;
-use super::visitor::{Visitor, walk_root};
+use super::visitor::{Visitor, walk};
 
 /// Check if `child` is a subtype of `supertype`, recursively handling nested supertypes.
 #[allow(dead_code)]
@@ -128,7 +128,7 @@ impl<'a> Query<'a> {
     fn resolve_node_types(&mut self, lang: &Lang) {
         let root = self.ast.clone();
         let mut collector = NodeTypeCollector { query: self, lang };
-        collector.visit_root(&root);
+        collector.visit(&root);
     }
 
     fn resolve_named_node(&mut self, node: &NamedNode, lang: &Lang) {
@@ -171,7 +171,7 @@ impl<'a> Query<'a> {
     fn resolve_fields(&mut self, lang: &Lang) {
         let root = self.ast.clone();
         let mut collector = FieldCollector { query: self, lang };
-        collector.visit_root(&root);
+        collector.visit(&root);
     }
 
     fn resolve_field_by_token(&mut self, name_token: Option<SyntaxToken>, lang: &Lang) {
@@ -679,8 +679,8 @@ struct NodeTypeCollector<'a, 'q> {
 }
 
 impl Visitor for NodeTypeCollector<'_, '_> {
-    fn visit_root(&mut self, root: &ast::Root) {
-        walk_root(self, root);
+    fn visit(&mut self, root: &ast::Root) {
+        walk(self, root);
     }
 
     fn visit_named_node(&mut self, node: &ast::NamedNode) {
@@ -721,8 +721,8 @@ struct FieldCollector<'a, 'q> {
 }
 
 impl Visitor for FieldCollector<'_, '_> {
-    fn visit_root(&mut self, root: &ast::Root) {
-        walk_root(self, root);
+    fn visit(&mut self, root: &ast::Root) {
+        walk(self, root);
     }
 
     fn visit_named_node(&mut self, node: &ast::NamedNode) {

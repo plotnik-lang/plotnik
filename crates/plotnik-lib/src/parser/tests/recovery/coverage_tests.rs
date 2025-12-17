@@ -12,7 +12,7 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
+    let result = Query::new(&input).with_recursion_fuel(depth).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -32,7 +32,7 @@ fn deeply_nested_sequences_hit_recursion_limit() {
         input.push('}');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
+    let result = Query::new(&input).with_recursion_fuel(depth).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -52,7 +52,7 @@ fn deeply_nested_alternations_hit_recursion_limit() {
         input.push(']');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(Some(depth)).exec();
+    let result = Query::new(&input).with_recursion_fuel(depth).exec();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -69,7 +69,7 @@ fn many_trees_exhaust_exec_fuel() {
         input.push_str("(a) ");
     }
 
-    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
+    let result = Query::new(&input).with_exec_fuel(100).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -91,7 +91,7 @@ fn many_branches_exhaust_exec_fuel() {
     }
     input.push(']');
 
-    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
+    let result = Query::new(&input).with_exec_fuel(100).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -113,7 +113,7 @@ fn many_fields_exhaust_exec_fuel() {
     }
     input.push(')');
 
-    let result = Query::new(&input).with_exec_fuel(Some(100)).exec();
+    let result = Query::new(&input).with_exec_fuel(100).exec();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
