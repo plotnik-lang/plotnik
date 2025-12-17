@@ -9,10 +9,8 @@ use std::collections::HashSet;
 
 use tree_sitter::{Node, TreeCursor};
 
-use crate::ir::{
-    CompiledQuery, EffectOp, Matcher, Nav, NavKind, NodeFieldId, NodeTypeId, RefTransition,
-    TransitionId,
-};
+use crate::ir::{CompiledQuery, EffectOp, Matcher, Nav, NavKind, RefTransition, TransitionId};
+use plotnik_core::{NodeFieldId, NodeTypeId};
 
 use super::effect_stream::EffectStream;
 use super::error::RuntimeError;

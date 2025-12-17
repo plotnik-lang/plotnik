@@ -36,10 +36,7 @@ mod slice_tests;
 mod string_ref_tests;
 
 // Re-export ID types
-pub use ids::{
-    DataFieldId, NodeFieldId, NodeTypeId, RefId, STRING_NONE, StringId, TransitionId, TypeId,
-    VariantTagId,
-};
+pub use ids::{DataFieldId, RefId, STRING_NONE, StringId, TransitionId, TypeId, VariantTagId};
 
 // Re-export TypeId constants
 pub use ids::{TYPE_INVALID, TYPE_NODE, TYPE_STR, TYPE_VOID};

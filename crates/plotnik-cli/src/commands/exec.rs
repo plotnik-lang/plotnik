@@ -2,7 +2,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
+use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_langs::Lang;
 use plotnik_lib::Query;
 use plotnik_lib::engine::interpreter::QueryInterpreter;
 use plotnik_lib::engine::validate::validate as validate_result;

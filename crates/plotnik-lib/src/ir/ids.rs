@@ -3,17 +3,8 @@
 //! These are lightweight wrappers/aliases for indices and identifiers
 //! used throughout the IR. They provide type safety without runtime cost.
 
-use std::num::NonZeroU16;
-
 /// Index into the transitions segment.
 pub type TransitionId = u32;
-
-/// Node type ID from tree-sitter. Do not change the underlying type.
-pub type NodeTypeId = u16;
-
-/// Node field ID from tree-sitter. Uses `NonZeroU16` so `Option<NodeFieldId>`
-/// is the same size as `NodeFieldId` (niche optimization with 0 = None).
-pub type NodeFieldId = NonZeroU16;
 
 /// Index into the string_refs segment.
 pub type StringId = u16;

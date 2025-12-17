@@ -12,6 +12,9 @@ mod graph_qis;
 mod invariants;
 mod printer;
 mod utils;
+#[cfg(feature = "plotnik-langs")]
+use plotnik_core::NodeFieldId;
+use plotnik_core::NodeTypeId;
 pub use printer::QueryPrinter;
 
 pub mod alt_kinds;
@@ -61,9 +64,6 @@ mod printer_tests;
 mod symbol_table_tests;
 
 use std::collections::{HashMap, HashSet};
-
-#[cfg(feature = "plotnik-langs")]
-use plotnik_langs::{NodeFieldId, NodeTypeId};
 
 use rowan::GreenNodeBuilder;
 

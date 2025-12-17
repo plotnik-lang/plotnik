@@ -3,7 +3,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
+use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_langs::Lang;
 use plotnik_lib::Query;
 use plotnik_lib::ir::{
     CompiledQuery, NodeKindResolver, QueryEmitter, STRING_NONE, TYPE_NODE, TYPE_STR, TYPE_VOID,

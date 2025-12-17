@@ -7,9 +7,10 @@ use std::alloc::{Layout, alloc, dealloc};
 use std::fmt::Write;
 use std::ptr;
 
+use plotnik_core::{NodeFieldId, NodeTypeId};
+
 use super::{
-    EffectOp, Entrypoint, NodeFieldId, NodeTypeId, Slice, StringId, StringRef, Transition,
-    TransitionId, TypeDef, TypeMember,
+    EffectOp, Entrypoint, Slice, StringId, StringRef, Transition, TransitionId, TypeDef, TypeMember,
 };
 
 /// Buffer alignment for cache-line efficiency.

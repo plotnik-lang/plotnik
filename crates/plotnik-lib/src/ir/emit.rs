@@ -8,8 +8,10 @@
 use std::collections::HashMap;
 use std::ptr;
 
+use plotnik_core::{NodeFieldId, NodeTypeId};
+
 use super::compiled::{CompiledQuery, CompiledQueryBuffer, align_up};
-use super::ids::{NodeFieldId, NodeTypeId, RefId, StringId, TYPE_NODE, TransitionId};
+use super::ids::{RefId, StringId, TYPE_NODE, TransitionId};
 use super::strings::StringInterner;
 use super::{
     EffectOp, Entrypoint, MAX_INLINE_SUCCESSORS, Matcher, RefTransition, Slice, StringRef,

@@ -1,8 +1,15 @@
 #![allow(unused)]
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+
+use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_langs::Lang;
+
 use crate::parser::{ParseResult, Parser, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
 use crate::query::dependencies::{self, DependencyAnalysis};
 use crate::query::expr_arity::{ExprArityTable, infer_arities};
+use crate::query::link;
 use crate::query::symbol_table::{SymbolTable, resolve_names};
 use crate::{Diagnostics, parser::Root};
 
@@ -109,4 +116,34 @@ pub struct QueryAnalyzed<'q> {
     symbol_table: SymbolTable<'q>,
     dependency_analysis: DependencyAnalysis<'q>,
     arity_table: ExprArityTable,
+}
+
+impl<'q> QueryAnalyzed<'q> {
+    pub fn link(mut self, lang: &Lang) {
+        let mut node_type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
+        let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+        link::link(
+            &self.query_parsed.ast,
+            self.query_parsed.src,
+            lang,
+            &self.symbol_table,
+            &mut node_type_ids,
+            &mut node_field_ids,
+            &mut self.query_parsed.diag,
+        );
+    }
+}
+
+impl<'q> Deref for QueryAnalyzed<'q> {
+    type Target = QueryParsed<'q>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.query_parsed
+    }
+}
+
+impl<'q> DerefMut for QueryAnalyzed<'q> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.query_parsed
+    }
 }

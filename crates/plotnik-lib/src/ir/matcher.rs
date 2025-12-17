@@ -2,7 +2,9 @@
 //!
 //! Matchers are purely for node matching - navigation is handled by `Nav`.
 
-use super::{NodeFieldId, NodeTypeId, Slice};
+use plotnik_core::{NodeFieldId, NodeTypeId};
+
+use super::Slice;
 
 /// Discriminant for matcher variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

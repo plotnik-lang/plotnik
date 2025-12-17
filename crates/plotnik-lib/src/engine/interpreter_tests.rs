@@ -1,4 +1,5 @@
-use plotnik_langs::{Lang, NodeFieldId, NodeTypeId, javascript};
+use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_langs::{Lang, javascript};
 
 use crate::engine::interpreter::QueryInterpreter;
 use crate::engine::value::Value;
