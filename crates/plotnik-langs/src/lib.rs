@@ -282,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO: wait for arborium to use ABI v15
     #[cfg(feature = "lang-javascript")]
     fn supertype_via_lang_trait() {
         let lang = javascript();
@@ -289,8 +290,8 @@ mod tests {
         let expr_id = lang.resolve_named_node("expression").unwrap();
         assert!(lang.is_supertype(expr_id));
 
-        // subtypes() may be empty in newer grammars, just verify it's callable
-        let _ = lang.subtypes(expr_id);
+        let subtypes = lang.subtypes(expr_id);
+        assert!(!subtypes.is_empty());
 
         let func_id = lang.resolve_named_node("function_declaration").unwrap();
         assert!(!lang.is_supertype(func_id));
