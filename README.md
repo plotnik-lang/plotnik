@@ -194,7 +194,7 @@ For the detailed specification, see the [Language Reference](docs/lang-reference
 
 ## Supported Languages
 
-Plotnik uses [arborium](https://github.com/bearcove/arborium), a batteries-included tree-sitter grammar collection with 67 permissively-licensed languages out of the box.
+Plotnik uses [arborium](https://github.com/bearcove/arborium), a batteries-included tree-sitter grammar collection with 60+ permissively-licensed languages out of the box.
 
 ## Roadmap
 
