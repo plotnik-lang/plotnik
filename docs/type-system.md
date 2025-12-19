@@ -2,6 +2,63 @@
 
 Plotnik infers static types from query structure. This governs how captures materialize into output (JSON, structs, etc.).
 
+## Design Philosophy
+
+Plotnik prioritizes **schema evolution** and **refactoring safety** over local intuition.
+
+Two principles guide the type system:
+
+1. **Additive captures are non-breaking**: Adding a new `@capture` to an existing query should not invalidate downstream code that uses other captures.
+
+2. **Extract-refactor equivalence**: Moving a pattern fragment into a named definition should not change the output shape.
+
+These constraints produce designs that may initially surprise users (parallel arrays instead of row objects, transparent scoping instead of nesting), but enable queries to evolve without breaking consumers.
+
+### Why Parallel Arrays
+
+Traditional row-oriented output breaks when queries evolve:
+
+```
+// v1: Extract names
+(identifier)* @names
+→ { names: Node[] }
+
+// v2: Also extract types (row-oriented would require restructuring)
+{ (identifier) @name (type) @type }* @items
+→ { items: [{ name, type }, ...] }   // BREAKING: names[] is gone
+```
+
+Plotnik's columnar approach:
+
+```
+// v1
+(identifier)* @names
+→ { names: Node[] }
+
+// v2: Add types alongside
+{ (identifier) @names (type) @types }*
+→ { names: Node[], types: Node[] }   // NON-BREAKING: names[] unchanged
+```
+
+Existing code using `result.names[i]` continues to work.
+
+### Why Transparent Scoping
+
+Extracting a pattern into a definition shouldn't change output:
+
+```
+// Inline
+(function name: (identifier) @name)
+→ { name: Node }
+
+// Extracted
+Func = (function name: (identifier) @name)
+(Func)
+→ { name: Node }   // Same shape—@name bubbles through
+```
+
+If definitions created implicit boundaries, extraction would wrap output in a new struct, breaking downstream types.
+
 ## Mental Model
 
 | Operation          | Nested (tree-sitter) | Transparent (Plotnik) |
@@ -78,7 +135,7 @@ Quantifiers (`*`, `+`) produce arrays per-field, not lists of objects:
 
 Output: `{ "k": ["key1", "key2"], "v": ["val1", "val2"] }`
 
-This Struct-of-Arrays layout is efficient for analysis and avoids implicit row creation.
+This Struct-of-Arrays layout enables non-breaking schema evolution: adding `@newfield` to an existing loop doesn't restructure existing fields. It also avoids implicit row creation and is efficient for columnar analysis.
 
 For List-of-Objects, wrap explicitly:
 
@@ -127,6 +184,22 @@ Fixes:
 { { (A)* @a  (B) @b } @row }*   // Wrap for rows
 ```
 
+### Multiple Desynchronized Fields
+
+When multiple `*`/`+` fields coexist, each produces an independent array with no alignment guarantee:
+
+```
+{ (A)* @a  (B)* @b }*
+```
+
+If iteration 1 yields `a: [1,2,3], b: [x]` and iteration 2 yields `a: [4], b: [y,z]`, the result is:
+
+```
+{ a: [1,2,3,4], b: [x,y,z] }   // lengths differ, no row correspondence
+```
+
+This is valid columnar concatenation—arrays are independent streams. If you need per-iteration grouping, wrap with `{...} @row`.
+
 ## 5. Type Unification in Alternations
 
 Shallow unification across untagged branches:
@@ -166,6 +239,21 @@ When a quantified capture appears in some branches but not others, the result is
 ```
 
 The missing branch emits `PushNull`, not an empty array. This distinction matters for columnar output—`null` indicates "branch didn't match" vs `[]` meaning "matched zero times."
+
+Note the `*` vs `+` difference:
+
+```
+[ (A)+ @x  (B) ]  // x: Node[] | null  — null means B branch
+[ (A)* @x  (B) ]  // x: Node[] | null  — null means B branch, [] means A matched zero times
+```
+
+In the `*` case, `null` and `[]` are semantically distinct. Check explicitly:
+
+```typescript
+if (result.x !== null) {
+  // A branch matched (possibly zero times if x.length === 0)
+}
+```
 
 For type conflicts, use tagged alternations:
 

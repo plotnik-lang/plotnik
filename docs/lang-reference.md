@@ -162,11 +162,13 @@ Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because c
 
 ## Data Model
 
-Plotnik infers output types from your query. The key rule may surprise you:
+Plotnik infers output types from your query. The key rule may surprise you—but it's intentional for schema stability.
 
 ### Flat by Default
 
 Query nesting does NOT create output nesting. All captures become fields in a single flat record.
+
+**Why?** Adding a new `@capture` to an existing query shouldn't break downstream code using other captures. Flat output makes capture additions non-breaking. See [Type System](type-system.md#design-philosophy) for the full rationale.
 
 ```
 (function_declaration

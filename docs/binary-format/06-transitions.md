@@ -92,7 +92,7 @@ Member/variant indices are resolved via `type_members[struct_or_enum.members.sta
 
 All instructions are exactly 8 bytes.
 
-**Note**: In tree-sitter, `0` is never a valid `NodeTypeId` or `NodeFieldId`. We use `Option<NonZeroU16>` to represent these values, where `None` (stored as `0`) indicates no check (wildcard).
+**Note**: In tree-sitter, `NodeTypeId` 0 is reserved for an internal "end" sentinel and is never exposed via the Cursor API. Languages with an actual `end` keyword (Ruby, Lua, etc.) assign it a different non-zero ID. Similarly, `NodeFieldId` 0 is never valid. We use `Option<NonZeroU16>` to represent these values, where `None` (stored as `0`) indicates no check (wildcard).
 
 **Epsilon Transitions**: A `MatchExt` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This is critical for:
 

@@ -9,7 +9,7 @@ documentation = "https://docs.rs/plotnik-cli"
 keywords = ["tree-sitter", "query", "ast", "parser", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../../README.md"
-include = ["src/**/*", "Cargo.toml", "docs/REFERENCE.md"]
+include = ["src/**/*", "Cargo.toml", "docs/lang-reference.md"]
 
 [[bin]]
 name = "plotnik"

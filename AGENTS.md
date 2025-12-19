@@ -14,16 +14,7 @@
 - **Location**: `docs/adr/`
 - **Naming**: `ADR-XXXX-short-title-in-kebab-case.md` (`XXXX` is a sequential number).
 - **Index**:
-  - [ADR-0001: Query Parser](docs/adr/ADR-0001-query-parser.md)
-  - [ADR-0002: Diagnostics System](docs/adr/ADR-0002-diagnostics-system.md)
-  - ADR-0003: Query Intermediate Representation (superseded by ADR-0004, ADR-0005, ADR-0006, available via git history)
-  - [ADR-0004: Query IR Binary Format](docs/adr/ADR-0004-query-ir-binary-format.md)
-  - [ADR-0005: Transition Graph Format](docs/adr/ADR-0005-transition-graph-format.md)
-  - [ADR-0006: Dynamic Query Execution](docs/adr/ADR-0006-dynamic-query-execution.md)
-  - [ADR-0007: Type Metadata Format](docs/adr/ADR-0007-type-metadata-format.md)
-  - [ADR-0008: Tree Navigation](docs/adr/ADR-0008-tree-navigation.md)
-  - [ADR-0009: Type System](docs/adr/ADR-0009-type-system.md)
-  - [ADR-0010: Type System v2](docs/adr/ADR-0010-type-system-v2.md)
+  - _(no ADRs yet)_
 - **Template**:
 
   ```markdown
@@ -169,7 +160,7 @@ crates/
   plotnik-macros/      # Proc macros of the project
 docs/
   adr/                 # Architecture Decision Records (ADRs)
-  REFERENCE.md         # Language specification
+  lang-reference.md    # Language specification
 ```
 
 # CLI
