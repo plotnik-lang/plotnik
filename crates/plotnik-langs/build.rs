@@ -83,7 +83,6 @@ fn arborium_package_to_feature(package_name: &str) -> Option<String> {
         "arborium-host",
         "arborium-mdbook",
         "arborium-plugin-runtime",
-        "arborium-query",
         "arborium-rustdoc",
         "arborium-sysroot",
         "arborium-test-harness",
