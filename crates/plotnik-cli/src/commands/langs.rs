@@ -18,13 +18,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "bash")]
+    #[cfg(feature = "lang-bash")]
     fn smoke_parse_bash() {
         smoke_test(plotnik_langs::bash(), "echo hello", "program");
     }
 
     #[test]
-    #[cfg(feature = "c")]
+    #[cfg(feature = "lang-c")]
     fn smoke_parse_c() {
         smoke_test(
             plotnik_langs::c(),
@@ -34,7 +34,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "cpp")]
+    #[cfg(feature = "lang-cpp")]
     fn smoke_parse_cpp() {
         smoke_test(
             plotnik_langs::cpp(),
@@ -44,31 +44,31 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "csharp")]
+    #[cfg(feature = "lang-c-sharp")]
     fn smoke_parse_csharp() {
         smoke_test(plotnik_langs::csharp(), "class Foo { }", "compilation_unit");
     }
 
     #[test]
-    #[cfg(feature = "css")]
+    #[cfg(feature = "lang-css")]
     fn smoke_parse_css() {
         smoke_test(plotnik_langs::css(), "body { color: red; }", "stylesheet");
     }
 
     #[test]
-    #[cfg(feature = "elixir")]
+    #[cfg(feature = "lang-elixir")]
     fn smoke_parse_elixir() {
         smoke_test(plotnik_langs::elixir(), "defmodule Foo do end", "source");
     }
 
     #[test]
-    #[cfg(feature = "go")]
+    #[cfg(feature = "lang-go")]
     fn smoke_parse_go() {
         smoke_test(plotnik_langs::go(), "package main", "source_file");
     }
 
     #[test]
-    #[cfg(feature = "haskell")]
+    #[cfg(feature = "lang-haskell")]
     fn smoke_parse_haskell() {
         smoke_test(
             plotnik_langs::haskell(),
@@ -78,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "hcl")]
+    #[cfg(feature = "lang-hcl")]
     fn smoke_parse_hcl() {
         smoke_test(
             plotnik_langs::hcl(),
@@ -88,19 +88,19 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "html")]
+    #[cfg(feature = "lang-html")]
     fn smoke_parse_html() {
         smoke_test(plotnik_langs::html(), "<html></html>", "document");
     }
 
     #[test]
-    #[cfg(feature = "java")]
+    #[cfg(feature = "lang-java")]
     fn smoke_parse_java() {
         smoke_test(plotnik_langs::java(), "class Foo {}", "program");
     }
 
     #[test]
-    #[cfg(feature = "javascript")]
+    #[cfg(feature = "lang-javascript")]
     fn smoke_parse_javascript() {
         smoke_test(
             plotnik_langs::javascript(),
@@ -110,37 +110,37 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "json")]
+    #[cfg(feature = "lang-json")]
     fn smoke_parse_json() {
         smoke_test(plotnik_langs::json(), r#"{"key": "value"}"#, "document");
     }
 
     #[test]
-    #[cfg(feature = "kotlin")]
+    #[cfg(feature = "lang-kotlin")]
     fn smoke_parse_kotlin() {
         smoke_test(plotnik_langs::kotlin(), "fun main() {}", "source_file");
     }
 
     #[test]
-    #[cfg(feature = "lua")]
+    #[cfg(feature = "lang-lua")]
     fn smoke_parse_lua() {
         smoke_test(plotnik_langs::lua(), "print('hello')", "chunk");
     }
 
     #[test]
-    #[cfg(feature = "nix")]
+    #[cfg(feature = "lang-nix")]
     fn smoke_parse_nix() {
         smoke_test(plotnik_langs::nix(), "{ x = 1; }", "source_code");
     }
 
     #[test]
-    #[cfg(feature = "php")]
+    #[cfg(feature = "lang-php")]
     fn smoke_parse_php() {
         smoke_test(plotnik_langs::php(), "<?php echo 1;", "program");
     }
 
     #[test]
-    #[cfg(feature = "python")]
+    #[cfg(feature = "lang-python")]
     fn smoke_parse_python() {
         smoke_test(
             plotnik_langs::python(),
@@ -150,37 +150,31 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ruby")]
+    #[cfg(feature = "lang-ruby")]
     fn smoke_parse_ruby() {
         smoke_test(plotnik_langs::ruby(), "def hello; end", "program");
     }
 
     #[test]
-    #[cfg(feature = "rust")]
+    #[cfg(feature = "lang-rust")]
     fn smoke_parse_rust() {
         smoke_test(plotnik_langs::rust(), "fn main() {}", "source_file");
     }
 
     #[test]
-    #[cfg(feature = "scala")]
+    #[cfg(feature = "lang-scala")]
     fn smoke_parse_scala() {
         smoke_test(plotnik_langs::scala(), "object Main {}", "compilation_unit");
     }
 
     #[test]
-    #[cfg(feature = "solidity")]
-    fn smoke_parse_solidity() {
-        smoke_test(plotnik_langs::solidity(), "contract Foo {}", "source_file");
-    }
-
-    #[test]
-    #[cfg(feature = "swift")]
+    #[cfg(feature = "lang-swift")]
     fn smoke_parse_swift() {
         smoke_test(plotnik_langs::swift(), "func main() {}", "source_file");
     }
 
     #[test]
-    #[cfg(feature = "typescript")]
+    #[cfg(feature = "lang-typescript")]
     fn smoke_parse_typescript() {
         smoke_test(
             plotnik_langs::typescript(),
@@ -190,19 +184,19 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "typescript")]
+    #[cfg(feature = "lang-tsx")]
     fn smoke_parse_tsx() {
         smoke_test(plotnik_langs::tsx(), "const x = <div />;", "program");
     }
 
     #[test]
-    #[cfg(feature = "yaml")]
+    #[cfg(feature = "lang-yaml")]
     fn smoke_parse_yaml() {
         smoke_test(plotnik_langs::yaml(), "key: value", "stream");
     }
 
     #[test]
-    #[cfg(feature = "javascript")]
+    #[cfg(feature = "lang-javascript")]
     fn lang_from_name() {
         assert_eq!(plotnik_langs::from_name("js").unwrap().name(), "javascript");
         assert_eq!(
@@ -213,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "javascript")]
+    #[cfg(feature = "lang-javascript")]
     fn lang_from_extension() {
         assert_eq!(plotnik_langs::from_ext("js").unwrap().name(), "javascript");
         assert_eq!(plotnik_langs::from_ext("mjs").unwrap().name(), "javascript");

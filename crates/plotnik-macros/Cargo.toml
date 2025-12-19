@@ -11,31 +11,31 @@ proc-macro = true
 
 [features]
 default = []
-bash = ["dep:tree-sitter-bash"]
-c = ["dep:tree-sitter-c"]
-cpp = ["dep:tree-sitter-cpp"]
-csharp = ["dep:tree-sitter-c-sharp"]
-css = ["dep:tree-sitter-css"]
-elixir = ["dep:tree-sitter-elixir"]
-go = ["dep:tree-sitter-go"]
-haskell = ["dep:tree-sitter-haskell"]
-hcl = ["dep:tree-sitter-hcl"]
-html = ["dep:tree-sitter-html"]
-java = ["dep:tree-sitter-java"]
-javascript = ["dep:tree-sitter-javascript"]
-json = ["dep:tree-sitter-json"]
-kotlin = ["dep:tree-sitter-kotlin"]
-lua = ["dep:tree-sitter-lua"]
-nix = ["dep:tree-sitter-nix"]
-php = ["dep:tree-sitter-php"]
-python = ["dep:tree-sitter-python"]
-ruby = ["dep:tree-sitter-ruby"]
-rust = ["dep:tree-sitter-rust"]
-scala = ["dep:tree-sitter-scala"]
-solidity = ["dep:tree-sitter-solidity"]
-swift = ["dep:tree-sitter-swift"]
-typescript = ["dep:tree-sitter-typescript"]
-yaml = ["dep:tree-sitter-yaml"]
+lang-bash = ["dep:arborium-bash"]
+lang-c = ["dep:arborium-c"]
+lang-cpp = ["dep:arborium-cpp"]
+lang-c-sharp = ["dep:arborium-c-sharp"]
+lang-css = ["dep:arborium-css"]
+lang-elixir = ["dep:arborium-elixir"]
+lang-go = ["dep:arborium-go"]
+lang-haskell = ["dep:arborium-haskell"]
+lang-hcl = ["dep:arborium-hcl"]
+lang-html = ["dep:arborium-html"]
+lang-java = ["dep:arborium-java"]
+lang-javascript = ["dep:arborium-javascript"]
+lang-json = ["dep:arborium-json"]
+lang-kotlin = ["dep:arborium-kotlin"]
+lang-lua = ["dep:arborium-lua"]
+lang-nix = ["dep:arborium-nix"]
+lang-php = ["dep:arborium-php"]
+lang-python = ["dep:arborium-python"]
+lang-ruby = ["dep:arborium-ruby"]
+lang-rust = ["dep:arborium-rust"]
+lang-scala = ["dep:arborium-scala"]
+lang-swift = ["dep:arborium-swift"]
+lang-typescript = ["dep:arborium-typescript"]
+lang-tsx = ["dep:arborium-tsx"]
+lang-yaml = ["dep:arborium-yaml"]
 
 [dependencies]
 proc-macro2 = "1"
@@ -43,29 +43,29 @@ quote = "1"
 syn = "2"
 plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
 serde_json = "1"
-tree-sitter = "0.26"
-tree-sitter-bash = { version = "0.25.0", optional = true }
-tree-sitter-c = { version = "0.24.0", optional = true }
-tree-sitter-cpp = { version = "0.23.0", optional = true }
-tree-sitter-c-sharp = { version = "0.23.0", optional = true }
-tree-sitter-css = { version = "0.25.0", optional = true }
-tree-sitter-elixir = { version = "0.3.0", optional = true }
-tree-sitter-go = { version = "0.25.0", optional = true }
-tree-sitter-haskell = { version = "0.23.0", optional = true }
-tree-sitter-hcl = { version = "1.1.0", optional = true }
-tree-sitter-html = { version = "0.23.0", optional = true }
-tree-sitter-java = { version = "0.23.0", optional = true }
-tree-sitter-javascript = { version = "0.25.0", optional = true }
-tree-sitter-json = { version = "0.24.0", optional = true }
-tree-sitter-kotlin = { version = "0.4.0", optional = true, package = "tree-sitter-kotlin-sg" }
-tree-sitter-lua = { version = "0.2.0", optional = true }
-tree-sitter-nix = { version = "0.3.0", optional = true }
-tree-sitter-php = { version = "0.24.0", optional = true }
-tree-sitter-python = { version = "0.25.0", optional = true }
-tree-sitter-ruby = { version = "0.23.0", optional = true }
-tree-sitter-rust = { version = "0.24.0", optional = true }
-tree-sitter-scala = { version = "0.24.0", optional = true }
-tree-sitter-solidity = { version = "1.2.11", optional = true }
-tree-sitter-swift = { version = "0.7.0", optional = true }
-tree-sitter-typescript = { version = "0.23.2", optional = true }
-tree-sitter-yaml = { version = "0.7.0", optional = true }
+arborium-tree-sitter = "2.3.2"
+arborium-bash = { version = "2.3.2", optional = true }
+arborium-c = { version = "2.3.2", optional = true }
+arborium-cpp = { version = "2.3.2", optional = true }
+arborium-c-sharp = { version = "2.3.2", optional = true }
+arborium-css = { version = "2.3.2", optional = true }
+arborium-elixir = { version = "2.3.2", optional = true }
+arborium-go = { version = "2.3.2", optional = true }
+arborium-haskell = { version = "2.3.2", optional = true }
+arborium-hcl = { version = "2.3.2", optional = true }
+arborium-html = { version = "2.3.2", optional = true }
+arborium-java = { version = "2.3.2", optional = true }
+arborium-javascript = { version = "2.3.2", optional = true }
+arborium-json = { version = "2.3.2", optional = true }
+arborium-kotlin = { version = "2.3.2", optional = true }
+arborium-lua = { version = "2.3.2", optional = true }
+arborium-nix = { version = "2.3.2", optional = true }
+arborium-php = { version = "2.3.2", optional = true }
+arborium-python = { version = "2.3.2", optional = true }
+arborium-ruby = { version = "2.3.2", optional = true }
+arborium-rust = { version = "2.3.2", optional = true }
+arborium-scala = { version = "2.3.2", optional = true }
+arborium-swift = { version = "2.3.2", optional = true }
+arborium-typescript = { version = "2.3.2", optional = true }
+arborium-tsx = { version = "2.3.2", optional = true }
+arborium-yaml = { version = "2.3.2", optional = true }

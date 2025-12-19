@@ -17,57 +17,57 @@ path = "src/main.rs"
 
 [features]
 default = [
-    "bash",
-    "c",
-    "cpp",
-    "csharp",
-    "css",
-    "elixir",
-    "go",
-    "haskell",
-    "hcl",
-    "html",
-    "java",
-    "javascript",
-    "json",
-    "kotlin",
-    "lua",
-    "nix",
-    "php",
-    "python",
-    "ruby",
-    "rust",
-    "scala",
-    "solidity",
-    "swift",
-    "typescript",
-    "yaml",
+    "lang-bash",
+    "lang-c",
+    "lang-cpp",
+    "lang-c-sharp",
+    "lang-css",
+    "lang-elixir",
+    "lang-go",
+    "lang-haskell",
+    "lang-hcl",
+    "lang-html",
+    "lang-java",
+    "lang-javascript",
+    "lang-json",
+    "lang-kotlin",
+    "lang-lua",
+    "lang-nix",
+    "lang-php",
+    "lang-python",
+    "lang-ruby",
+    "lang-rust",
+    "lang-scala",
+    "lang-swift",
+    "lang-typescript",
+    "lang-tsx",
+    "lang-yaml",
 ]
-bash = ["plotnik-langs/bash"]
-c = ["plotnik-langs/c"]
-cpp = ["plotnik-langs/cpp"]
-csharp = ["plotnik-langs/csharp"]
-css = ["plotnik-langs/css"]
-elixir = ["plotnik-langs/elixir"]
-go = ["plotnik-langs/go"]
-haskell = ["plotnik-langs/haskell"]
-hcl = ["plotnik-langs/hcl"]
-html = ["plotnik-langs/html"]
-java = ["plotnik-langs/java"]
-javascript = ["plotnik-langs/javascript"]
-json = ["plotnik-langs/json"]
-kotlin = ["plotnik-langs/kotlin"]
-lua = ["plotnik-langs/lua"]
-nix = ["plotnik-langs/nix"]
-php = ["plotnik-langs/php"]
-python = ["plotnik-langs/python"]
-ruby = ["plotnik-langs/ruby"]
-rust = ["plotnik-langs/rust"]
-scala = ["plotnik-langs/scala"]
-solidity = ["plotnik-langs/solidity"]
-swift = ["plotnik-langs/swift"]
-typescript = ["plotnik-langs/typescript"]
-yaml = ["plotnik-langs/yaml"]
+lang-bash = ["plotnik-langs/lang-bash"]
+lang-c = ["plotnik-langs/lang-c"]
+lang-cpp = ["plotnik-langs/lang-cpp"]
+lang-c-sharp = ["plotnik-langs/lang-c-sharp"]
+lang-css = ["plotnik-langs/lang-css"]
+lang-elixir = ["plotnik-langs/lang-elixir"]
+lang-go = ["plotnik-langs/lang-go"]
+lang-haskell = ["plotnik-langs/lang-haskell"]
+lang-hcl = ["plotnik-langs/lang-hcl"]
+lang-html = ["plotnik-langs/lang-html"]
+lang-java = ["plotnik-langs/lang-java"]
+lang-javascript = ["plotnik-langs/lang-javascript"]
+lang-json = ["plotnik-langs/lang-json"]
+lang-kotlin = ["plotnik-langs/lang-kotlin"]
+lang-lua = ["plotnik-langs/lang-lua"]
+lang-nix = ["plotnik-langs/lang-nix"]
+lang-php = ["plotnik-langs/lang-php"]
+lang-python = ["plotnik-langs/lang-python"]
+lang-ruby = ["plotnik-langs/lang-ruby"]
+lang-rust = ["plotnik-langs/lang-rust"]
+lang-scala = ["plotnik-langs/lang-scala"]
+lang-swift = ["plotnik-langs/lang-swift"]
+lang-typescript = ["plotnik-langs/lang-typescript"]
+lang-tsx = ["plotnik-langs/lang-tsx"]
+lang-yaml = ["plotnik-langs/lang-yaml"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -75,4 +75,4 @@ plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
 plotnik-langs = { version = "0.1.0", path = "../plotnik-langs", default-features = false }
 plotnik-lib = { version = "0.1.0", path = "../plotnik-lib" }
 serde_json = "1.0"
-tree-sitter = "0.26"
+arborium-tree-sitter = "2.3.2"

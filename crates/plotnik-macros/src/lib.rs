@@ -1,8 +1,8 @@
+use arborium_tree_sitter::Language;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{LitStr, parse_macro_input};
-use tree_sitter::Language;
 
 use plotnik_core::NodeTypes;
 
@@ -46,58 +46,56 @@ pub fn generate_node_types(input: TokenStream) -> TokenStream {
 
 fn get_language_for_key(key: &str) -> Language {
     match key.to_lowercase().as_str() {
-        #[cfg(feature = "bash")]
-        "bash" => tree_sitter_bash::LANGUAGE.into(),
-        #[cfg(feature = "c")]
-        "c" => tree_sitter_c::LANGUAGE.into(),
-        #[cfg(feature = "cpp")]
-        "cpp" => tree_sitter_cpp::LANGUAGE.into(),
-        #[cfg(feature = "csharp")]
-        "csharp" => tree_sitter_c_sharp::LANGUAGE.into(),
-        #[cfg(feature = "css")]
-        "css" => tree_sitter_css::LANGUAGE.into(),
-        #[cfg(feature = "elixir")]
-        "elixir" => tree_sitter_elixir::LANGUAGE.into(),
-        #[cfg(feature = "go")]
-        "go" => tree_sitter_go::LANGUAGE.into(),
-        #[cfg(feature = "haskell")]
-        "haskell" => tree_sitter_haskell::LANGUAGE.into(),
-        #[cfg(feature = "hcl")]
-        "hcl" => tree_sitter_hcl::LANGUAGE.into(),
-        #[cfg(feature = "html")]
-        "html" => tree_sitter_html::LANGUAGE.into(),
-        #[cfg(feature = "java")]
-        "java" => tree_sitter_java::LANGUAGE.into(),
-        #[cfg(feature = "javascript")]
-        "javascript" => tree_sitter_javascript::LANGUAGE.into(),
-        #[cfg(feature = "json")]
-        "json" => tree_sitter_json::LANGUAGE.into(),
-        #[cfg(feature = "kotlin")]
-        "kotlin" => tree_sitter_kotlin::LANGUAGE.into(),
-        #[cfg(feature = "lua")]
-        "lua" => tree_sitter_lua::LANGUAGE.into(),
-        #[cfg(feature = "nix")]
-        "nix" => tree_sitter_nix::LANGUAGE.into(),
-        #[cfg(feature = "php")]
-        "php" => tree_sitter_php::LANGUAGE_PHP.into(),
-        #[cfg(feature = "python")]
-        "python" => tree_sitter_python::LANGUAGE.into(),
-        #[cfg(feature = "ruby")]
-        "ruby" => tree_sitter_ruby::LANGUAGE.into(),
-        #[cfg(feature = "rust")]
-        "rust" => tree_sitter_rust::LANGUAGE.into(),
-        #[cfg(feature = "scala")]
-        "scala" => tree_sitter_scala::LANGUAGE.into(),
-        #[cfg(feature = "solidity")]
-        "solidity" => tree_sitter_solidity::LANGUAGE.into(),
-        #[cfg(feature = "swift")]
-        "swift" => tree_sitter_swift::LANGUAGE.into(),
-        #[cfg(feature = "typescript")]
-        "typescript" => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-        #[cfg(feature = "typescript")]
-        "typescript_tsx" => tree_sitter_typescript::LANGUAGE_TSX.into(),
-        #[cfg(feature = "yaml")]
-        "yaml" => tree_sitter_yaml::LANGUAGE.into(),
+        #[cfg(feature = "lang-bash")]
+        "bash" => arborium_bash::language().into(),
+        #[cfg(feature = "lang-c")]
+        "c" => arborium_c::language().into(),
+        #[cfg(feature = "lang-cpp")]
+        "cpp" => arborium_cpp::language().into(),
+        #[cfg(feature = "lang-c-sharp")]
+        "c_sharp" => arborium_c_sharp::language().into(),
+        #[cfg(feature = "lang-css")]
+        "css" => arborium_css::language().into(),
+        #[cfg(feature = "lang-elixir")]
+        "elixir" => arborium_elixir::language().into(),
+        #[cfg(feature = "lang-go")]
+        "go" => arborium_go::language().into(),
+        #[cfg(feature = "lang-haskell")]
+        "haskell" => arborium_haskell::language().into(),
+        #[cfg(feature = "lang-hcl")]
+        "hcl" => arborium_hcl::language().into(),
+        #[cfg(feature = "lang-html")]
+        "html" => arborium_html::language().into(),
+        #[cfg(feature = "lang-java")]
+        "java" => arborium_java::language().into(),
+        #[cfg(feature = "lang-javascript")]
+        "javascript" => arborium_javascript::language().into(),
+        #[cfg(feature = "lang-json")]
+        "json" => arborium_json::language().into(),
+        #[cfg(feature = "lang-kotlin")]
+        "kotlin" => arborium_kotlin::language().into(),
+        #[cfg(feature = "lang-lua")]
+        "lua" => arborium_lua::language().into(),
+        #[cfg(feature = "lang-nix")]
+        "nix" => arborium_nix::language().into(),
+        #[cfg(feature = "lang-php")]
+        "php" => arborium_php::language().into(),
+        #[cfg(feature = "lang-python")]
+        "python" => arborium_python::language().into(),
+        #[cfg(feature = "lang-ruby")]
+        "ruby" => arborium_ruby::language().into(),
+        #[cfg(feature = "lang-rust")]
+        "rust" => arborium_rust::language().into(),
+        #[cfg(feature = "lang-scala")]
+        "scala" => arborium_scala::language().into(),
+        #[cfg(feature = "lang-swift")]
+        "swift" => arborium_swift::language().into(),
+        #[cfg(feature = "lang-typescript")]
+        "typescript" => arborium_typescript::language().into(),
+        #[cfg(feature = "lang-tsx")]
+        "tsx" => arborium_tsx::language().into(),
+        #[cfg(feature = "lang-yaml")]
+        "yaml" => arborium_yaml::language().into(),
         _ => panic!("Unknown or disabled language key: {}", key),
     }
 }

@@ -12,88 +12,88 @@ readme = "../../README.md"
 
 [features]
 default = [
-    "bash",
-    "c",
-    "cpp",
-    "csharp",
-    "css",
-    "elixir",
-    "go",
-    "haskell",
-    "hcl",
-    "html",
-    "java",
-    "javascript",
-    "json",
-    "kotlin",
-    "lua",
-    "nix",
-    "php",
-    "python",
-    "ruby",
-    "rust",
-    "scala",
-    "solidity",
-    "swift",
-    "typescript",
-    "yaml",
+    "lang-bash",
+    "lang-c",
+    "lang-cpp",
+    "lang-c-sharp",
+    "lang-css",
+    "lang-elixir",
+    "lang-go",
+    "lang-haskell",
+    "lang-hcl",
+    "lang-html",
+    "lang-java",
+    "lang-javascript",
+    "lang-json",
+    "lang-kotlin",
+    "lang-lua",
+    "lang-nix",
+    "lang-php",
+    "lang-python",
+    "lang-ruby",
+    "lang-rust",
+    "lang-scala",
+    "lang-swift",
+    "lang-typescript",
+    "lang-tsx",
+    "lang-yaml",
 ]
-bash = ["dep:tree-sitter-bash", "plotnik-macros/bash"]
-c = ["dep:tree-sitter-c", "plotnik-macros/c"]
-cpp = ["dep:tree-sitter-cpp", "plotnik-macros/cpp"]
-csharp = ["dep:tree-sitter-c-sharp", "plotnik-macros/csharp"]
-css = ["dep:tree-sitter-css", "plotnik-macros/css"]
-elixir = ["dep:tree-sitter-elixir", "plotnik-macros/elixir"]
-go = ["dep:tree-sitter-go", "plotnik-macros/go"]
-haskell = ["dep:tree-sitter-haskell", "plotnik-macros/haskell"]
-hcl = ["dep:tree-sitter-hcl", "plotnik-macros/hcl"]
-html = ["dep:tree-sitter-html", "plotnik-macros/html"]
-java = ["dep:tree-sitter-java", "plotnik-macros/java"]
-javascript = ["dep:tree-sitter-javascript", "plotnik-macros/javascript"]
-json = ["dep:tree-sitter-json", "plotnik-macros/json"]
-kotlin = ["dep:tree-sitter-kotlin", "plotnik-macros/kotlin"]
-lua = ["dep:tree-sitter-lua", "plotnik-macros/lua"]
-nix = ["dep:tree-sitter-nix", "plotnik-macros/nix"]
-php = ["dep:tree-sitter-php", "plotnik-macros/php"]
-python = ["dep:tree-sitter-python", "plotnik-macros/python"]
-ruby = ["dep:tree-sitter-ruby", "plotnik-macros/ruby"]
-rust = ["dep:tree-sitter-rust", "plotnik-macros/rust"]
-scala = ["dep:tree-sitter-scala", "plotnik-macros/scala"]
-solidity = ["dep:tree-sitter-solidity", "plotnik-macros/solidity"]
-swift = ["dep:tree-sitter-swift", "plotnik-macros/swift"]
-typescript = ["dep:tree-sitter-typescript", "plotnik-macros/typescript"]
-yaml = ["dep:tree-sitter-yaml", "plotnik-macros/yaml"]
+lang-bash = ["dep:arborium-bash", "plotnik-macros/lang-bash"]
+lang-c = ["dep:arborium-c", "plotnik-macros/lang-c"]
+lang-cpp = ["dep:arborium-cpp", "plotnik-macros/lang-cpp"]
+lang-c-sharp = ["dep:arborium-c-sharp", "plotnik-macros/lang-c-sharp"]
+lang-css = ["dep:arborium-css", "plotnik-macros/lang-css"]
+lang-elixir = ["dep:arborium-elixir", "plotnik-macros/lang-elixir"]
+lang-go = ["dep:arborium-go", "plotnik-macros/lang-go"]
+lang-haskell = ["dep:arborium-haskell", "plotnik-macros/lang-haskell"]
+lang-hcl = ["dep:arborium-hcl", "plotnik-macros/lang-hcl"]
+lang-html = ["dep:arborium-html", "plotnik-macros/lang-html"]
+lang-java = ["dep:arborium-java", "plotnik-macros/lang-java"]
+lang-javascript = ["dep:arborium-javascript", "plotnik-macros/lang-javascript"]
+lang-json = ["dep:arborium-json", "plotnik-macros/lang-json"]
+lang-kotlin = ["dep:arborium-kotlin", "plotnik-macros/lang-kotlin"]
+lang-lua = ["dep:arborium-lua", "plotnik-macros/lang-lua"]
+lang-nix = ["dep:arborium-nix", "plotnik-macros/lang-nix"]
+lang-php = ["dep:arborium-php", "plotnik-macros/lang-php"]
+lang-python = ["dep:arborium-python", "plotnik-macros/lang-python"]
+lang-ruby = ["dep:arborium-ruby", "plotnik-macros/lang-ruby"]
+lang-rust = ["dep:arborium-rust", "plotnik-macros/lang-rust"]
+lang-scala = ["dep:arborium-scala", "plotnik-macros/lang-scala"]
+lang-swift = ["dep:arborium-swift", "plotnik-macros/lang-swift"]
+lang-typescript = ["dep:arborium-typescript", "plotnik-macros/lang-typescript"]
+lang-tsx = ["dep:arborium-tsx", "plotnik-macros/lang-tsx"]
+lang-yaml = ["dep:arborium-yaml", "plotnik-macros/lang-yaml"]
 
 [dependencies]
 paste = "1.0"
 plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
 plotnik-macros = { version = "0.1.0", path = "../plotnik-macros" }
-tree-sitter = "0.26"
-tree-sitter-bash = { version = "0.25.0", optional = true }
-tree-sitter-c = { version = "0.24.0", optional = true }
-tree-sitter-cpp = { version = "0.23.0", optional = true }
-tree-sitter-c-sharp = { version = "0.23.0", optional = true }
-tree-sitter-css = { version = "0.25.0", optional = true }
-tree-sitter-elixir = { version = "0.3.0", optional = true }
-tree-sitter-go = { version = "0.25.0", optional = true }
-tree-sitter-haskell = { version = "0.23.0", optional = true }
-tree-sitter-hcl = { version = "1.1.0", optional = true }
-tree-sitter-html = { version = "0.23.0", optional = true }
-tree-sitter-java = { version = "0.23.0", optional = true }
-tree-sitter-javascript = { version = "0.25.0", optional = true }
-tree-sitter-json = { version = "0.24.0", optional = true }
-tree-sitter-kotlin = { version = "0.4.0", optional = true, package = "tree-sitter-kotlin-sg" }
-tree-sitter-lua = { version = "0.2.0", optional = true }
-tree-sitter-nix = { version = "0.3.0", optional = true }
-tree-sitter-php = { version = "0.24.0", optional = true }
-tree-sitter-python = { version = "0.25.0", optional = true }
-tree-sitter-ruby = { version = "0.23.0", optional = true }
-tree-sitter-rust = { version = "0.24.0", optional = true }
-tree-sitter-scala = { version = "0.24.0", optional = true }
-tree-sitter-solidity = { version = "1.2.11", optional = true }
-tree-sitter-swift = { version = "0.7.0", optional = true }
-tree-sitter-typescript = { version = "0.23.2", optional = true }
-tree-sitter-yaml = { version = "0.7.0", optional = true }
+arborium-tree-sitter = "2.3.2"
+arborium-bash = { version = "2.3.2", optional = true }
+arborium-c = { version = "2.3.2", optional = true }
+arborium-cpp = { version = "2.3.2", optional = true }
+arborium-c-sharp = { version = "2.3.2", optional = true }
+arborium-css = { version = "2.3.2", optional = true }
+arborium-elixir = { version = "2.3.2", optional = true }
+arborium-go = { version = "2.3.2", optional = true }
+arborium-haskell = { version = "2.3.2", optional = true }
+arborium-hcl = { version = "2.3.2", optional = true }
+arborium-html = { version = "2.3.2", optional = true }
+arborium-java = { version = "2.3.2", optional = true }
+arborium-javascript = { version = "2.3.2", optional = true }
+arborium-json = { version = "2.3.2", optional = true }
+arborium-kotlin = { version = "2.3.2", optional = true }
+arborium-lua = { version = "2.3.2", optional = true }
+arborium-nix = { version = "2.3.2", optional = true }
+arborium-php = { version = "2.3.2", optional = true }
+arborium-python = { version = "2.3.2", optional = true }
+arborium-ruby = { version = "2.3.2", optional = true }
+arborium-rust = { version = "2.3.2", optional = true }
+arborium-scala = { version = "2.3.2", optional = true }
+arborium-swift = { version = "2.3.2", optional = true }
+arborium-typescript = { version = "2.3.2", optional = true }
+arborium-tsx = { version = "2.3.2", optional = true }
+arborium-yaml = { version = "2.3.2", optional = true }
 
 [build-dependencies]
 cargo_metadata = "0.23"

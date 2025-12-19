@@ -10,15 +10,16 @@ fn main() {
         .expect("failed to run cargo metadata");
 
     for package in &metadata.packages {
-        if !package.name.starts_with("tree-sitter-") {
+        if !package.name.starts_with("arborium-") {
             continue;
         }
 
-        let Some(feature_name) = tree_sitter_package_to_feature(&package.name) else {
+        let Some(feature_name) = arborium_package_to_feature(&package.name) else {
             continue;
         };
 
-        if std::env::var(format!("CARGO_FEATURE_{}", feature_name.to_uppercase())).is_err() {
+        let env_feature = feature_name.to_uppercase().replace('-', "_");
+        if std::env::var(format!("CARGO_FEATURE_{}", env_feature)).is_err() {
             continue;
         }
 
@@ -40,7 +41,7 @@ fn main() {
 
             let env_var_name = format!(
                 "PLOTNIK_NODE_TYPES_{}{}",
-                feature_name.to_uppercase(),
+                feature_to_node_types_key(feature_name),
                 suffix
             );
             println!("cargo::rustc-env={}={}", env_var_name, node_types_path);
@@ -54,42 +55,49 @@ fn main() {
 
 fn get_node_types_paths(package_name: &str) -> Vec<(&'static str, &'static str)> {
     match package_name {
-        "tree-sitter-php" => vec![("", "php/src/node-types.json")],
-        "tree-sitter-typescript" => vec![
-            ("", "typescript/src/node-types.json"),
-            ("_TSX", "tsx/src/node-types.json"),
-        ],
-        _ => vec![("", "src/node-types.json")],
+        // All arborium crates use consistent path
+        _ => vec![("", "grammar/src/node-types.json")],
     }
 }
 
-fn tree_sitter_package_to_feature(package_name: &str) -> Option<&str> {
+fn feature_to_node_types_key(feature: &str) -> String {
+    match feature {
+        "lang-c-sharp" => "C_SHARP".to_string(),
+        _ => feature
+            .strip_prefix("lang-")
+            .unwrap_or(feature)
+            .to_uppercase()
+            .replace('-', "_"),
+    }
+}
+
+fn arborium_package_to_feature(package_name: &str) -> Option<&str> {
     match package_name {
-        "tree-sitter-bash" => Some("bash"),
-        "tree-sitter-c" => Some("c"),
-        "tree-sitter-cpp" => Some("cpp"),
-        "tree-sitter-c-sharp" => Some("csharp"),
-        "tree-sitter-css" => Some("css"),
-        "tree-sitter-elixir" => Some("elixir"),
-        "tree-sitter-go" => Some("go"),
-        "tree-sitter-haskell" => Some("haskell"),
-        "tree-sitter-hcl" => Some("hcl"),
-        "tree-sitter-html" => Some("html"),
-        "tree-sitter-java" => Some("java"),
-        "tree-sitter-javascript" => Some("javascript"),
-        "tree-sitter-json" => Some("json"),
-        "tree-sitter-kotlin-sg" => Some("kotlin"),
-        "tree-sitter-lua" => Some("lua"),
-        "tree-sitter-nix" => Some("nix"),
-        "tree-sitter-php" => Some("php"),
-        "tree-sitter-python" => Some("python"),
-        "tree-sitter-ruby" => Some("ruby"),
-        "tree-sitter-rust" => Some("rust"),
-        "tree-sitter-scala" => Some("scala"),
-        "tree-sitter-solidity" => Some("solidity"),
-        "tree-sitter-swift" => Some("swift"),
-        "tree-sitter-typescript" => Some("typescript"),
-        "tree-sitter-yaml" => Some("yaml"),
+        "arborium-bash" => Some("lang-bash"),
+        "arborium-c" => Some("lang-c"),
+        "arborium-cpp" => Some("lang-cpp"),
+        "arborium-c-sharp" => Some("lang-c-sharp"),
+        "arborium-css" => Some("lang-css"),
+        "arborium-elixir" => Some("lang-elixir"),
+        "arborium-go" => Some("lang-go"),
+        "arborium-haskell" => Some("lang-haskell"),
+        "arborium-hcl" => Some("lang-hcl"),
+        "arborium-html" => Some("lang-html"),
+        "arborium-java" => Some("lang-java"),
+        "arborium-javascript" => Some("lang-javascript"),
+        "arborium-json" => Some("lang-json"),
+        "arborium-kotlin" => Some("lang-kotlin"),
+        "arborium-lua" => Some("lang-lua"),
+        "arborium-nix" => Some("lang-nix"),
+        "arborium-php" => Some("lang-php"),
+        "arborium-python" => Some("lang-python"),
+        "arborium-ruby" => Some("lang-ruby"),
+        "arborium-rust" => Some("lang-rust"),
+        "arborium-scala" => Some("lang-scala"),
+        "arborium-swift" => Some("lang-swift"),
+        "arborium-typescript" => Some("lang-typescript"),
+        "arborium-tsx" => Some("lang-tsx"),
+        "arborium-yaml" => Some("lang-yaml"),
         _ => None,
     }
 }
