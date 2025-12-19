@@ -362,4 +362,27 @@ mod tests {
         assert!(lang.resolve_field("name").is_some());
         assert!(lang.resolve_field("fake_field").is_none());
     }
+
+    /// Verifies that languages with "end" keyword assign it a non-zero ID.
+    /// This proves that ID 0 ("end" sentinel) is internal to tree-sitter
+    /// and never exposed via the Cursor API for actual syntax nodes.
+    #[test]
+    #[cfg(all(feature = "ruby", feature = "lua"))]
+    fn end_keyword_has_nonzero_id() {
+        // Ruby has "end" keyword for blocks, methods, classes, etc.
+        let ruby = ruby();
+        let ruby_end = ruby.resolve_anonymous_node("end");
+        assert!(ruby_end.is_some(), "Ruby should have 'end' keyword");
+        assert_ne!(ruby_end, Some(0), "Ruby 'end' keyword must not be ID 0");
+
+        // Lua has "end" keyword for blocks, functions, etc.
+        let lua = lua();
+        let lua_end = lua.resolve_anonymous_node("end");
+        assert!(lua_end.is_some(), "Lua should have 'end' keyword");
+        assert_ne!(lua_end, Some(0), "Lua 'end' keyword must not be ID 0");
+
+        // Both languages still have internal "end" sentinel at ID 0
+        assert_eq!(ruby.node_type_name(0), Some("end"));
+        assert_eq!(lua.node_type_name(0), Some("end"));
+    }
 }

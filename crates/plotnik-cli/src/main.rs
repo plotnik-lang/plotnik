@@ -33,9 +33,6 @@ fn main() {
                 color: output.color.should_colorize(),
             });
         }
-        Command::Docs { topic } => {
-            commands::docs::run(topic.as_deref());
-        }
         Command::Langs => {
             commands::langs::run();
         }

@@ -1,0 +1,79 @@
+# Binary Format: Overview
+
+64-byte Header + 8 aligned Sections.
+
+## Architecture
+
+- **Alignment**: Sections start on 64-byte boundaries; internal structures align to natural size (2/4/8 bytes)
+- **Sequential**: Fixed order for single-pass writing
+- **Endianness**: Little Endian
+- **Limits**: All indices u16 (max 65,535). Transitions: 512 KB max. Use `Call` to share patterns.
+
+### Addressing
+
+| Type                | Description                       |
+| ------------------- | --------------------------------- |
+| `StepId` (u16)      | 8-byte block index in Transitions |
+| `StringId` (u16)    | String Table index                |
+| `TypeId` (u16)      | Type Definition index             |
+| `NodeTypeId` (u16)  | Tree-sitter node type ID          |
+| `NodeFieldId` (u16) | Tree-sitter field ID              |
+
+## Memory Layout
+
+Section offsets defined in Header for robust parsing.
+
+| Section       | Content                  | Record Size |
+| ------------- | ------------------------ | ----------- |
+| Header        | Meta                     | 64          |
+| [StringBlob]  | UTF-8                    | 1           |
+| [StringTable] | StringId → Offset+Length | 4           |
+| [NodeTypes]   | NodeTypeId → StringId    | 4           |
+| [NodeFields]  | NodeFieldId → StringId   | 4           |
+| [Trivia]      | List of NodeTypeId       | 2           |
+| [TypeMeta]    | Types                    | Var         |
+| [Entrypoints] | `pub` definitions        | 8           |
+| [Transitions] | Tree walking graph       | 8           |
+
+[StringBlob]: 02-strings.md
+[StringTable]: 02-strings.md
+[NodeTypes]: 03-symbols.md
+[NodeFields]: 03-symbols.md
+[Trivia]: 03-symbols.md
+[TypeMeta]: 04-types.md
+[Entrypoints]: 05-entrypoints.md
+[Transitions]: 06-transitions.md
+
+## Header
+
+First 64 bytes: magic (`PTKQ`), version (1), CRC32 checksum, section offsets.
+
+```rust
+#[repr(C, align(64))]
+struct Header {
+    magic: [u8; 4],          // b"PTKQ"
+    version: u32,            // 1
+    checksum: u32,           // CRC32
+    total_size: u32,         // Total file size in bytes
+
+    // Section Offsets (Absolute byte offsets)
+    str_blob_offset: u32,
+    str_table_offset: u32,
+    node_types_offset: u32,
+    node_fields_offset: u32,
+    trivia_offset: u32,
+    type_meta_offset: u32,
+    entrypoints_offset: u32,
+    transitions_offset: u32,
+
+    // Element Counts
+    str_table_count: u16,
+    node_types_count: u16,
+    node_fields_count: u16,
+    trivia_count: u16,
+    type_defs_count: u16,
+    type_members_count: u16, // Number of TypeMember blocks
+    entrypoints_count: u16,
+    transitions_count: u16,
+}
+```
