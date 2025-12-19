@@ -3,7 +3,7 @@
 //! Binary format (see ADR-0004):
 //! ```text
 //! Header (64 bytes):
-//!   magic: [u8; 4]           b"PLNK"
+//!   magic: [u8; 4]           b"PTKQ"
 //!   version: u32             format version
 //!   checksum: u32            CRC32(header[12..64] || buffer_data)
 //!   buffer_len: u32

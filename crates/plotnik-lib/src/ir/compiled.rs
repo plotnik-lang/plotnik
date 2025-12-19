@@ -17,7 +17,7 @@ use super::{
 pub const BUFFER_ALIGN: usize = 64;
 
 /// Magic bytes identifying a compiled query file.
-pub const MAGIC: [u8; 4] = *b"PLNK";
+pub const MAGIC: [u8; 4] = *b"PTKQ";
 
 /// Current format version.
 pub const FORMAT_VERSION: u32 = 1;
