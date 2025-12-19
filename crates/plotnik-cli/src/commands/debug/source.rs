@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
+use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 
 pub fn load_source(text: &Option<String>, file: &Option<PathBuf>) -> String {
@@ -53,20 +54,16 @@ pub fn resolve_lang(
     std::process::exit(1);
 }
 
-pub fn parse_tree(source: &str, lang: Lang) -> plotnik_langs::arborium_tree_sitter::Tree {
+pub fn parse_tree(source: &str, lang: Lang) -> tree_sitter::Tree {
     lang.parse(source)
 }
 
-pub fn dump_source(
-    tree: &plotnik_langs::arborium_tree_sitter::Tree,
-    source: &str,
-    include_anonymous: bool,
-) -> String {
+pub fn dump_source(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {
     format_node(tree.root_node(), source, 0, include_anonymous) + "\n"
 }
 
 fn format_node(
-    node: plotnik_langs::arborium_tree_sitter::Node,
+    node: tree_sitter::Node,
     source: &str,
     depth: usize,
     include_anonymous: bool,
@@ -75,7 +72,7 @@ fn format_node(
 }
 
 fn format_node_with_field(
-    node: plotnik_langs::arborium_tree_sitter::Node,
+    node: tree_sitter::Node,
     field_name: Option<&str>,
     source: &str,
     depth: usize,

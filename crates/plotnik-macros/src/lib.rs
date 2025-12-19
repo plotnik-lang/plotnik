@@ -1,8 +1,9 @@
-use arborium_tree_sitter::Language;
+use arborium_tree_sitter as tree_sitter;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{LitStr, parse_macro_input};
+use tree_sitter::Language;
 
 use plotnik_core::NodeTypes;
 

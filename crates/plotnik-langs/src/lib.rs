@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use arborium_tree_sitter::Language;
 
-pub use arborium_tree_sitter;
-
 use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
 
 pub mod builtin;
