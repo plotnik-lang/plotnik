@@ -13,11 +13,6 @@ impl Parser<'_> {
         let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
 
         while !self.should_stop() && !self.currently_is(SyntaxKind::Error) {
-            if self.currently_is(SyntaxKind::Pub) {
-                self.parse_def();
-                continue;
-            }
-
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
                 self.parse_def();
@@ -79,8 +74,6 @@ impl Parser<'_> {
     /// Named expression definition: `Name = expr`
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
-
-        self.eat_token(SyntaxKind::Pub);
 
         let span = self.current_span();
         let name = token_text(self.source, &self.tokens[self.pos]);

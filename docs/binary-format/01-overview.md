@@ -32,7 +32,7 @@ Section offsets defined in Header for robust parsing.
 | [NodeFields]  | NodeFieldId → StringId   | 4           |
 | [Trivia]      | List of NodeTypeId       | 2           |
 | [TypeMeta]    | Types                    | Var         |
-| [Entrypoints] | `pub` definitions        | 8           |
+| [Entrypoints] | Definitions              | 8           |
 | [Transitions] | Tree walking graph       | 8           |
 
 [StringBlob]: 02-strings.md
