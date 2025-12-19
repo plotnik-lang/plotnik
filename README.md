@@ -194,11 +194,7 @@ For the detailed specification, see the [Language Reference](docs/lang-reference
 
 ## Supported Languages
 
-Plotnik is bundled with 26 languages:
-
-> Bash, C, C++, C#, CSS, Elixir, Go, Haskell, HCL, HTML, Java, JavaScript, JSON, Kotlin, Lua, Nix, PHP, Python, Ruby, Rust, Scala, Solidity, Swift, TypeScript, TSX, YAML
-
-Additional languages and dynamic loading are planned.
+Plotnik uses [arborium](https://github.com/bearcove/arborium), a batteries-included tree-sitter grammar collection with 60+ permissively-licensed languages out of the box.
 
 ## Roadmap
 
