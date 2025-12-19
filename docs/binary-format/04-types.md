@@ -105,7 +105,7 @@ Recursive types reference themselves via TypeId. Since types are addressed by in
 Example query:
 
 ```plotnik
-pub List = [
+List = [
     Nil: (nil)
     Cons: (cons (T) @head (List) @tail)
 ]

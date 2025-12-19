@@ -69,22 +69,16 @@ Fields participate in sequential matching—they're not independent lookups.
 
 A `.ptk` file contains definitions:
 
-```plotnik/docs/lang-reference.md#L78-82
-; Internal (mixin/fragment)
+````plotnik/docs/lang-reference.md#L78-82
+```plotnik
+; Helper (can also be used as entrypoint)
 Expr = [(identifier) (number) (string)]
 
-; Public entrypoint
-pub Stmt = (statement) @stmt
-```
+; Another definition
+Stmt = (statement) @stmt
+````
 
-### Visibility
-
-| Syntax          | Role              | In Binary |
-| --------------- | ----------------- | --------- |
-| `Def = ...`     | Internal mixin    | No        |
-| `pub Def = ...` | Public entrypoint | Yes       |
-
-Internal definitions exist only to support `pub` definitions.
+All definitions are entrypoints and included in the binary. Use `--entry <Name>` to select which one to execute.
 
 ### Script vs Module Mode
 
@@ -96,12 +90,12 @@ plotnik exec -q '(identifier) @id' -s app.js
 
 **Module** (`.ptk` files): Only named definitions allowed.
 
-```plotnik/docs/lang-reference.md#L106-110
+```plotnik
 ; ERROR in .ptk file
 (identifier) @id
 
 ; OK
-pub Query = (identifier) @id
+Query = (identifier) @id
 ```
 
 ---
@@ -123,9 +117,8 @@ Inferred from directory name (`queries.ts/` → TypeScript, `java-checks/` → J
 
 ### Execution
 
-- Single `pub`: Default entrypoint
-- Multiple `pub`: Use `--entry <Name>`
-- No `pub`: Compilation error
+- Single definition: Default entrypoint
+- Multiple definitions: Use `--entry <Name>`
 
 ### Example
 
@@ -142,8 +135,8 @@ DeepSearch = [
 
 `main.ptk`:
 
-```plotnik/docs/lang-reference.md#L157-158
-pub AllIdentifiers = (program (DeepSearch)*)
+```plotnik
+AllIdentifiers = (program (DeepSearch)*)
 ```
 
 ---
@@ -825,7 +818,6 @@ type Root = {
 | Tagged alternation   |                  | `[A: (a) B: (b)]`         |
 | Anchor               | `.`              | `.`                       |
 | Named expression     |                  | `Name = pattern`          |
-| Public entrypoint    |                  | `pub Name = pattern`      |
 | Use named expression |                  | `(Name)`                  |
 
 ---

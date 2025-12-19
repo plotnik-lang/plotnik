@@ -29,8 +29,7 @@
 | `.`                 | Anchor (adjacency)             |
 | `{...}`             | Sequence (siblings in order)   |
 | `[...]`             | Alternation (first match wins) |
-| `Name = ...`        | Named expression (internal)    |
-| `pub Name = ...`    | Public entrypoint              |
+| `Name = ...`        | Named definition (entrypoint)  |
 | `(Name)`            | Use named expression           |
 
 ## Data Model Rules
