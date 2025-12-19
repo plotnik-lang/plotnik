@@ -190,7 +190,7 @@ for (const stmt of result.statements) {
 }
 ```
 
-For the detailed specification, see the [Language Reference](docs/REFERENCE.md).
+For the detailed specification, see the [Language Reference](docs/lang-reference.md).
 
 ## Supported Languages
 

@@ -1,111 +1,174 @@
 # Plotnik Query Language Reference
 
-Plotnik QL is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query language](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and type inference.
+Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
-> Predicates (`#eq?`, `#match?`, etc.) and directives (`#set!`, etc.) from tree-sitter QL are intentionally not supported. Plotnik focuses on structural pattern matching; filtering logic belongs in the host language.
+Predicates (`#eq?`, `#match?`) and directives (`#set!`) are intentionally unsupported—filtering logic belongs in your host language.
 
 ---
 
 ## Execution Model
 
-Plotnik uses an NFA-based recursive cursor walk with backtracking. Understanding this model helps predict matching behavior.
+NFA-based cursor walk with backtracking.
 
 ### Key Properties
 
-- **Root-anchored:** Matching starts at the root of the target tree and must match the entire structure (like `^...$` in regex, not a substring search)
-- **Backtracking:** When a branch fails, the engine backtracks and tries alternatives
-- **Ordered choice:** In alternations `[A B C]`, branches are tried in order; first match wins
+- **Root-anchored**: Matches the entire tree structure (like `^...$` in regex)
+- **Backtracking**: Failed branches restore state and try alternatives
+- **Ordered choice**: `[A B C]` tries branches left-to-right; first match wins
 
 ### Trivia Handling
 
-Comments and other "extra" nodes (as defined by the tree-sitter grammar) are automatically skipped when walking siblings, unless explicitly matched in the pattern.
+Comments and "extra" nodes (per tree-sitter grammar) are automatically skipped unless explicitly matched.
 
-```
+```plotnik/docs/lang-reference.md#L24-24
 (function_declaration (identifier) @name (block) @body)
 ```
 
-This matches even if comments appear between children:
+Matches even with comments between children:
 
-```javascript
+```plotnik/docs/lang-reference.md#L28-31
 function foo /* comment */() {
   /* body */
 }
 ```
 
-The `.` anchor enforces strict adjacency (no trivia between):
+The `.` anchor enforces strict adjacency:
 
+```plotnik/docs/lang-reference.md#L35-35
+(array . (identifier) @first)  ; must be immediately after bracket
 ```
-(array . (identifier) @first)  ; first must be immediately after opening bracket
-```
 
-### Partial Matching (Open World)
+### Partial Matching
 
-Node patterns `(type ...)` are partial—unmentioned children are ignored:
+Node patterns are open—unmentioned children are ignored:
 
-```
+```plotnik/docs/lang-reference.md#L46-46
 (binary_expression left: (identifier) @left)
 ```
 
-Matches any `binary_expression` with an `identifier` in its `left` field, regardless of other children (`operator`, `right`, etc.).
+Matches any `binary_expression` with an `identifier` in `left`, regardless of `operator`, `right`, etc.
 
-Sequences `{...}` advance the cursor through siblings in order, skipping non-matching nodes between elements.
+Sequences `{...}` advance through siblings in order, skipping non-matching nodes.
 
 ### Field Constraints
 
-Field constraints (`field: pattern`) add a field requirement to positional matching. The child must match both the pattern AND have the specified field:
+`field: pattern` requires the child to have that field AND match the pattern:
 
-```
+```plotnik/docs/lang-reference.md#L58-61
 (binary_expression
   left: (identifier) @x
   right: (number) @y
 )
 ```
 
-This matches a `binary_expression` where:
-
-- The first matched child has field `left` and is an `identifier`
-- The second matched child has field `right` and is a `number`
-
-Field constraints participate in sequential matching just like regular children—they are not independent lookups.
+Fields participate in sequential matching—they're not independent lookups.
 
 ---
 
 ## File Structure
 
-A Plotnik file contains one or more definitions. All definitions must be named (`Name = expr`) except optionally the last one, which becomes the entry point:
+A `.ptk` file contains definitions:
 
-```
-; named definitions (required for all but last)
+```plotnik/docs/lang-reference.md#L78-82
+; Internal (mixin/fragment)
 Expr = [(identifier) (number) (string)]
-Stmt = (statement)
 
-; unnamed entry point (only allowed as last definition)
-(assignment_expression right: (Expr) @value)
+; Public entrypoint
+pub Stmt = (statement) @stmt
 ```
 
-An unnamed definition that is not the last in the file produces an error. The error message includes the entire unnamed definition to help identify and fix it.
+### Visibility
+
+| Syntax          | Role              | In Binary |
+| --------------- | ----------------- | --------- |
+| `Def = ...`     | Internal mixin    | No        |
+| `pub Def = ...` | Public entrypoint | Yes       |
+
+Internal definitions exist only to support `pub` definitions.
+
+### Script vs Module Mode
+
+**Script** (`-q` flag): Anonymous expressions allowed, auto-wrapped in language root.
+
+```sh
+plotnik exec -q '(identifier) @id' -s app.js
+```
+
+**Module** (`.ptk` files): Only named definitions allowed.
+
+```plotnik/docs/lang-reference.md#L106-110
+; ERROR in .ptk file
+(identifier) @id
+
+; OK
+pub Query = (identifier) @id
+```
+
+---
+
+## Workspace
+
+A directory of `.ptk` files loaded as a single compilation unit.
+
+### Properties
+
+- **Flat namespace**: `Foo` in `a.ptk` visible in `b.ptk` without imports
+- **Global uniqueness**: Duplicate names are errors
+- **Non-recursive**: Subdirectories are separate workspaces
+- **Dead code elimination**: Unreachable internals stripped
+
+### Language Inference
+
+Inferred from directory name (`queries.ts/` → TypeScript, `java-checks/` → Java). Override with `-l/--lang`.
+
+### Execution
+
+- Single `pub`: Default entrypoint
+- Multiple `pub`: Use `--entry <Name>`
+- No `pub`: Compilation error
+
+### Example
+
+`helpers.ptk`:
+
+```plotnik/docs/lang-reference.md#L147-153
+Ident = (identifier)
+
+DeepSearch = [
+    (Ident) @target
+    (_ (DeepSearch)*)
+]
+```
+
+`main.ptk`:
+
+```plotnik/docs/lang-reference.md#L157-158
+pub AllIdentifiers = (program (DeepSearch)*)
+```
 
 ---
 
 ## Naming Conventions
 
-- Capitalized names (`Expr`, `Statement`, `BinaryOp`) are user-defined: named expressions, alternation labels, type annotations
-- Lowercase names (`function_declaration`, `identifier`, `binary_expression`) are language-defined: node types from tree-sitter grammars
-- Capture names must be snake_case (e.g., `@name`, `@func_body`)
+| Kind                       | Case         | Examples                             |
+| -------------------------- | ------------ | ------------------------------------ |
+| Definitions, labels, types | `PascalCase` | `Expr`, `Statement`, `BinaryOp`      |
+| Node kinds                 | `snake_case` | `function_declaration`, `identifier` |
+| Captures, fields           | `snake_case` | `@name`, `@func_body`                |
 
-This distinction is enforced by the parser.
-
-> **Difference from tree-sitter:** Tree-sitter allows arbitrary capture names including dots (e.g., `@function.name`). Plotnik restricts captures to snake*case identifiers (`[a-z]a-z0-9*]\*`) because they map directly to struct fields in generated code (Rust, TypeScript, Python). Use underscores instead: `@function_name`.
+Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because captures map to struct fields.
 
 ---
 
 ## Data Model
 
-Plotnik infers structured output types from your query. Understanding this section is essential—the rules are simple but may surprise users expecting nested output to mirror nested patterns.
+Plotnik infers output types from your query. The key rule may surprise you—but it's intentional for schema stability.
 
-### Core Concept: Flat by Default
+### Flat by Default
 
-Query nesting does NOT create output nesting. All captures within a query become fields in a single flat record, regardless of how deeply nested the pattern is.
+Query nesting does NOT create output nesting. All captures become fields in a single flat record.
+
+**Why?** Adding a new `@capture` to an existing query shouldn't break downstream code using other captures. Flat output makes capture additions non-breaking. See [Type System](type-system.md#design-philosophy) for the full rationale.
 
 ```
 (function_declaration
@@ -124,12 +187,12 @@ The pattern is 4 levels deep, but the output is flat. This is intentional: you'r
 
 ### The Node Type
 
-Every capture produces a `Node` by default—a reference to a tree-sitter node:
+Default capture type—a reference to a tree-sitter node:
 
-```typescript
+```plotnik/docs/lang-reference.md#L205-210
 interface Node {
-  kind: string; // node type, e.g. "identifier"
-  text: string; // source text
+  kind: string;    // e.g. "identifier"
+  text: string;    // source text
   start: Position; // { row, column }
   end: Position;
 }
@@ -148,7 +211,7 @@ Quantifiers on the captured pattern determine whether a field is singular, optio
 
 ### Creating Nested Structure
 
-To create nested structure, place a capture on a sequence `{...}` or alternation `[...]`. It's the capture on the grouping construct that creates a new scope—the braces alone don't introduce nesting:
+Capture a sequence `{...}` or alternation `[...]` to create a new scope. Braces alone don't introduce nesting:
 
 ```
 {
@@ -169,22 +232,17 @@ The `@func` capture on the group creates a nested scope. All captures inside (`@
 
 ### Type Annotations
 
-The `::` syntax after a capture names the output type for codegen:
+`::` after a capture controls the output type:
 
-```
-@x :: MyType    // name this capture's type "MyType"
-@x :: string    // special: extract node.text as a string
-```
+| Annotation     | Effect                        |
+| -------------- | ----------------------------- |
+| `@x`           | Inferred (usually `Node`)     |
+| `@x :: string` | Extract `node.text` as string |
+| `@x :: T`      | Name the type `T` in codegen  |
 
-| Annotation     | Effect                                      |
-| -------------- | ------------------------------------------- |
-| `@x`           | inferred type (usually `Node`)              |
-| `@x :: string` | converts to `string` (extracts `node.text`) |
-| `@x :: T`      | names the type `T` in generated code        |
+Only `:: string` changes data; other `:: T` affect only generated type names.
 
-Only `:: string` changes the actual data. Other `:: T` annotations only affect generated type/interface names.
-
-Example with type annotation on a group:
+Example:
 
 ```
 {
@@ -211,14 +269,14 @@ interface FunctionDeclaration {
 
 ### Summary
 
-| What you write            | What you get                           |
-| ------------------------- | -------------------------------------- |
-| `@name` anywhere in query | field `name` in current scope          |
-| `(pattern)? @x`           | optional field                         |
-| `(pattern)* @x`           | array field                            |
-| `{...} @x` or `[...] @x`  | nested object (new scope for captures) |
-| `@x :: string`            | string value instead of Node           |
-| `@x :: TypeName`          | custom type name in codegen            |
+| Pattern                 | Output                    |
+| ----------------------- | ------------------------- |
+| `@name`                 | Field in current scope    |
+| `(x)? @a`               | Optional field            |
+| `(x)* @a`               | Array field               |
+| `{...} @x` / `[...] @x` | Nested object (new scope) |
+| `@x :: string`          | String value              |
+| `@x :: T`               | Custom type name          |
 
 ---
 
@@ -288,19 +346,14 @@ Output type:
 
 ### Wildcards
 
-- `(_)` — matches any named node
-- `_` — matches any node (named or anonymous)
+| Syntax | Matches                       |
+| ------ | ----------------------------- |
+| `(_)`  | Any named node                |
+| `_`    | Any node (named or anonymous) |
 
-```
+```plotnik/docs/lang-reference.md#L370-371
 (call_expression function: (_) @fn)
 (pair key: _ @key value: _ @value)
-```
-
-Output type:
-
-```typescript
-{ fn: Node }
-{ key: Node, value: Node }
 ```
 
 ### Special Nodes
@@ -328,28 +381,12 @@ Output type:
 
 ### Supertypes
 
-Some grammars define supertypes (abstract node types). Query them directly:
+Query abstract node types directly, or narrow with `/`:
 
-```
+```plotnik/docs/lang-reference.md#L406-409
 (expression) @expr
-```
-
-Query a specific subtype within a supertype context:
-
-```
 (expression/binary_expression) @binary
 (expression/"()") @empty_parens
-```
-
-Output type:
-
-```typescript
-{
-  binary: Node;
-}
-{
-  empty_parens: Node;
-}
 ```
 
 ---
@@ -432,7 +469,17 @@ Plotnik also supports non-greedy variants: `*?`, `+?`, `??`
 
 ## Sequences
 
-Match sibling patterns in order with braces. Tree-sitter uses `((a) (b))` for the same purpose. Plotnik uses `{...}` to visually distinguish grouping from node patterns, and adds scope creation when captured (`{...} @name`).
+Match sibling patterns in order with braces.
+
+> **⚠️ Syntax Difference from Tree-sitter**
+>
+> Tree-sitter: `((a) (b))` — parentheses for sequences
+> Plotnik: `{(a) (b)}` — braces for sequences
+>
+> This avoids ambiguity: `(foo)` is always a node, `{...}` is always a sequence.
+> Using tree-sitter's `((a) (b))` syntax in Plotnik is a parse error.
+
+Plotnik uses `{...}` to visually distinguish grouping from node patterns, and adds scope creation when captured (`{...} @name`).
 
 ```
 {
@@ -490,12 +537,12 @@ interface Section {
 
 ## Alternations
 
-Match one of several alternatives with `[...]`:
+Match alternatives with `[...]`:
 
-- **Untagged** (no labels): Simpler output, fields merge. Use when you only need the captured data.
-- **Tagged** (with labels): Precise discriminated union. Use when you need to know which branch matched.
+- **Untagged**: Fields merge across branches
+- **Tagged** (with labels): Discriminated union
 
-```
+```plotnik/docs/lang-reference.md#L570-573
 [
   (identifier)
   (string_literal)
@@ -504,9 +551,9 @@ Match one of several alternatives with `[...]`:
 
 ### Merge Style (Unlabeled)
 
-Without labels, captures from all branches merge. If a capture appears in all branches, it's required; otherwise optional. Captures with the same name must have the same type across all branches where they appear.
+Captures merge: present in all branches → required; some branches → optional. Same-name captures must have compatible types.
 
-All branches must be type-compatible: either all branches produce bare nodes (no internal captures), or all branches produce structures (have internal captures). When branches mix nodes and structures, bare node captures are auto-promoted to single-field structures. When merging structures, the captured alternation requires an explicit type annotation (`@x :: TypeName`) for codegen.
+Branches must be type-compatible. Bare nodes are auto-promoted to single-field structs when mixed with structured branches.
 
 ```
 (statement
@@ -583,30 +630,19 @@ Output type:
 
 ### Tagged Style (Labeled)
 
-Labels create a discriminated union:
+Labels create a discriminated union (`$tag` + `$data`):
 
-```
+```plotnik/docs/lang-reference.md#L657-660
 [
   Assign: (assignment_expression left: (identifier) @left)
   Call: (call_expression function: (identifier) @func)
 ] @stmt :: Stmt
 ```
 
-Output type (discriminant is always `$tag`, payload in `$data`):
-
-```typescript
+```plotnik/docs/lang-reference.md#L664-667
 type Stmt =
   | { $tag: "Assign"; $data: { left: Node } }
   | { $tag: "Call"; $data: { func: Node } };
-```
-
-In Rust, tagged alternations become enums:
-
-```rust
-enum Stmt {
-    Assign { left: Node },
-    Call { func: Node },
-}
 ```
 
 ### Alternations with Type Annotations
@@ -674,9 +710,9 @@ Anchors ignore anonymous nodes.
 
 ## Named Expressions
 
-Define reusable patterns with `Name = pattern`:
+Define reusable patterns:
 
-```
+```plotnik/docs/lang-reference.md#L744-748
 BinaryOp =
   (binary_expression
     left: (_) @left
@@ -684,83 +720,44 @@ BinaryOp =
     right: (_) @right)
 ```
 
-Use named expressions as node types:
+Use as node types:
 
-```
+```plotnik/docs/lang-reference.md#L752-752
 (return_statement (BinaryOp) @expr)
 ```
 
-Output type:
+**Encapsulation**: `(Name)` matches but extracts nothing. You must capture (`(Name) @x`) to access fields. This separates structural reuse from data extraction.
 
-```typescript
-{
-  expr: BinaryOp;
-} // BinaryOp = { left: Node, op: Node, right: Node }
-```
+Named expressions define both pattern and type:
 
-> **Important: Encapsulation.** Named expressions encapsulate their captures. Using `(Name)` without a capture matches the pattern but extracts no data. You must capture the reference (`(Name) @x`) to access the named expression's fields via `x`. This is intentional—named expressions provide structural reuse (pattern abstraction), while captures provide data extraction (explicit addressing).
-
-Named expressions define both a pattern and a type. The type is inferred from captures within:
-
-```
+```plotnik/docs/lang-reference.md#L764-764
 Expr = [(BinaryOp) (UnaryOp) (identifier) (number)]
-```
-
-When used:
-
-```
-(assignment_expression right: (Expr) @value)
-```
-
-Output type:
-
-```typescript
-{
-  value: Expr;
-} // union of BinaryOp, UnaryOp, or Node
 ```
 
 ---
 
 ## Recursion
 
-Named expressions can reference themselves:
+Named expressions can self-reference:
 
-```
+```plotnik/docs/lang-reference.md#L794-798
 NestedCall =
   (call_expression
     function: [(identifier) @name (NestedCall) @inner]
     arguments: (arguments))
 ```
 
-This matches `a()`, `a()()`, `a()()()`, etc.
+Matches `a()`, `a()()`, `a()()()`, etc. → `{ name?: Node, inner?: NestedCall }`
 
-Output type:
+Tagged recursive example:
 
-```typescript
-type NestedCall = {
-  name?: Node;
-  inner?: NestedCall;
-};
-```
-
-Another example—matching arbitrarily nested member chains:
-
-```
+```plotnik/docs/lang-reference.md#L810-815
 MemberChain = [
   Base: (identifier) @name
   Access: (member_expression
     object: (MemberChain) @object
     property: (property_identifier) @property)
 ]
-```
-
-Output type:
-
-```typescript
-type MemberChain =
-  | { $tag: "Base"; $data: { name: Node } }
-  | { $tag: "Access"; $data: { object: MemberChain; property: Node } };
 ```
 
 ---
@@ -828,4 +825,11 @@ type Root = {
 | Tagged alternation   |                  | `[A: (a) B: (b)]`         |
 | Anchor               | `.`              | `.`                       |
 | Named expression     |                  | `Name = pattern`          |
+| Public entrypoint    |                  | `pub Name = pattern`      |
 | Use named expression |                  | `(Name)`                  |
+
+---
+
+## Diagnostics
+
+Priority-based suppression: when diagnostics overlap, lower-priority ones are hidden. You see the root cause, not cascading symptoms.
