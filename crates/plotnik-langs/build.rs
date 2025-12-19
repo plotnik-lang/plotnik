@@ -4,8 +4,23 @@ fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let manifest_path = PathBuf::from(&manifest_dir).join("Cargo.toml");
 
+    // Collect enabled lang-* features from environment
+    let enabled_features: Vec<String> = std::env::vars()
+        .filter_map(|(key, _)| {
+            key.strip_prefix("CARGO_FEATURE_LANG_")
+                .map(|suffix| format!("lang-{}", suffix.to_lowercase().replace('_', "-")))
+        })
+        .collect();
+
+    if enabled_features.is_empty() {
+        println!("cargo::rerun-if-changed=build.rs");
+        println!("cargo::rerun-if-changed=Cargo.toml");
+        return;
+    }
+
     let metadata = cargo_metadata::MetadataCommand::new()
         .manifest_path(&manifest_path)
+        .features(cargo_metadata::CargoOpt::SomeFeatures(enabled_features))
         .exec()
         .expect("failed to run cargo metadata");
 
@@ -17,11 +32,6 @@ fn main() {
         let Some(feature_name) = arborium_package_to_feature(&package.name) else {
             continue;
         };
-
-        let env_feature = feature_name.to_uppercase().replace('-', "_");
-        if std::env::var(format!("CARGO_FEATURE_{}", env_feature)).is_err() {
-            continue;
-        }
 
         let package_root = package
             .manifest_path
@@ -46,6 +56,12 @@ fn main() {
             );
             println!("cargo::rustc-env={}={}", env_var_name, node_types_path);
             println!("cargo::rerun-if-changed={}", node_types_path);
+        }
+    }
+
+    for (key, _) in std::env::vars() {
+        if key.starts_with("CARGO_FEATURE_LANG_") {
+            println!("cargo::rerun-if-env-changed={}", key);
         }
     }
 

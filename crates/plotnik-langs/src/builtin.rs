@@ -48,6 +48,7 @@ macro_rules! define_langs {
             }
         }
 
+        #[allow(unreachable_patterns)]
         pub fn from_ext(ext: &str) -> Option<Lang> {
             match ext.to_ascii_lowercase().as_str() {
                 $(
