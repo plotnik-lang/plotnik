@@ -384,6 +384,7 @@ name = "plotnik-cli"
 version = "0.1.1"
 dependencies = [
  "clap",
+ "plotnik-core",
  "plotnik-langs",
  "plotnik-lib",
  "serde_json",
@@ -443,6 +444,7 @@ dependencies = [
  "indoc",
  "insta",
  "logos",
+ "plotnik-core",
  "plotnik-langs",
  "rowan",
  "serde",

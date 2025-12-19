@@ -10,9 +10,9 @@ use crate::diagnostics::{DiagnosticKind, Diagnostics};
 
 #[derive(Debug)]
 pub struct ParseResult {
-    pub root: Root,
-    pub diagnostics: Diagnostics,
-    pub exec_fuel_consumed: u32,
+    pub ast: Root,
+    pub diag: Diagnostics,
+    pub fuel_consumed: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,14 +34,14 @@ pub struct Parser<'src> {
     pub(super) last_diagnostic_pos: Option<TextSize>,
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
     pub(super) debug_fuel: std::cell::Cell<u32>,
-    exec_fuel_initial: Option<u32>,
-    exec_fuel_remaining: Option<u32>,
-    recursion_fuel_limit: Option<u32>,
+    fuel_initial: u32,
+    fuel_remaining: u32,
+    max_depth: u32,
     fatal_error: Option<Error>,
 }
 
 impl<'src> Parser<'src> {
-    pub fn new(source: &'src str, tokens: Vec<Token>) -> Self {
+    pub fn new(source: &'src str, tokens: Vec<Token>, fuel: u32, max_depth: u32) -> Self {
         Self {
             source,
             tokens,
@@ -53,22 +53,11 @@ impl<'src> Parser<'src> {
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             debug_fuel: std::cell::Cell::new(256),
-            exec_fuel_initial: None,
-            exec_fuel_remaining: None,
-            recursion_fuel_limit: None,
+            fuel_initial: fuel,
+            fuel_remaining: fuel,
+            max_depth,
             fatal_error: None,
         }
-    }
-
-    pub fn with_exec_fuel(mut self, limit: Option<u32>) -> Self {
-        self.exec_fuel_initial = limit;
-        self.exec_fuel_remaining = limit;
-        self
-    }
-
-    pub fn with_recursion_fuel(mut self, limit: Option<u32>) -> Self {
-        self.recursion_fuel_limit = limit;
-        self
     }
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
@@ -76,9 +65,9 @@ impl<'src> Parser<'src> {
         let (cst, diagnostics, exec_fuel_consumed) = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
         Ok(ParseResult {
-            root,
-            diagnostics,
-            exec_fuel_consumed,
+            ast: root,
+            diag: diagnostics,
+            fuel_consumed: exec_fuel_consumed,
         })
     }
 
@@ -87,11 +76,8 @@ impl<'src> Parser<'src> {
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
-        let exec_fuel_consumed = match (self.exec_fuel_initial, self.exec_fuel_remaining) {
-            (Some(initial), Some(remaining)) => initial.saturating_sub(remaining),
-            _ => 0,
-        };
-        Ok((self.builder.finish(), self.diagnostics, exec_fuel_consumed))
+        let fuel_consumed = self.fuel_initial.saturating_sub(self.fuel_remaining);
+        Ok((self.builder.finish(), self.diagnostics, fuel_consumed))
     }
 
     pub(super) fn has_fatal_error(&self) -> bool {
@@ -115,14 +101,13 @@ impl<'src> Parser<'src> {
     }
 
     fn consume_exec_fuel(&mut self) {
-        if let Some(ref mut remaining) = self.exec_fuel_remaining {
-            if *remaining == 0 {
-                if self.fatal_error.is_none() {
-                    self.fatal_error = Some(Error::ExecFuelExhausted);
-                }
-                return;
-            }
-            *remaining -= 1;
+        if self.fuel_remaining > 0 {
+            self.fuel_remaining -= 1;
+            return;
+        }
+
+        if self.fatal_error.is_none() {
+            self.fatal_error = Some(Error::ExecFuelExhausted);
         }
     }
 
@@ -337,17 +322,17 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn enter_recursion(&mut self) -> bool {
-        if let Some(limit) = self.recursion_fuel_limit
-            && self.depth >= limit
-        {
-            if self.fatal_error.is_none() {
-                self.fatal_error = Some(Error::RecursionLimitExceeded);
-            }
-            return false;
+        if self.depth < self.max_depth {
+            self.depth += 1;
+            self.reset_debug_fuel();
+            return true;
         }
-        self.depth += 1;
-        self.reset_debug_fuel();
-        true
+
+        if self.fatal_error.is_none() {
+            self.fatal_error = Some(Error::RecursionLimitExceeded);
+        }
+
+        false
     }
 
     pub(super) fn exit_recursion(&mut self) {

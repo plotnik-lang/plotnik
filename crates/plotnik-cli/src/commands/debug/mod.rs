@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub mod source;
 
 use std::fs;
@@ -40,7 +41,7 @@ pub fn run(args: DebugArgs) {
     };
 
     let mut query = query_source.as_ref().map(|src| {
-        Query::try_from(src).unwrap_or_else(|e| {
+        Query::try_from(src.as_str()).unwrap_or_else(|e| {
             eprintln!("error: {}", e);
             std::process::exit(1);
         })
@@ -48,15 +49,13 @@ pub fn run(args: DebugArgs) {
 
     // Auto-link when --lang is provided with a query
     if args.lang.is_some()
-        && let Some(ref mut q) = query
+        && let Some(ref mut _q) = query
     {
-        let lang = resolve_lang_for_link(&args.lang);
-        q.link(&lang);
+        unimplemented!();
     }
 
     let show_query = has_query_input && !args.symbols && !args.graph && !args.types;
     let show_source = has_source_input;
-    let show_both_graphs = args.graph_raw && args.graph;
 
     if show_query && let Some(ref q) = query {
         print!(
@@ -84,40 +83,9 @@ pub fn run(args: DebugArgs) {
 
     // Build graph if needed for --graph, --graph-raw, or --types
     if (args.graph || args.graph_raw || args.types)
-        && let Some(q) = query.take()
+        && let Some(_) = query.take()
     {
-        // Determine root kind for auto-wrapping
-        let root_kind = args.lang.as_ref().and_then(|lang_name| {
-            let lang = resolve_lang_for_link(&Some(lang_name.clone()));
-            lang.root().and_then(|root_id| lang.node_type_name(root_id))
-        });
-
-        let (q, pre_opt_dump) = q.build_graph_with_pre_opt_dump(root_kind);
-        let mut needs_separator = false;
-        if args.graph_raw {
-            if show_both_graphs {
-                println!("(pre-optimization)");
-            }
-            print!("{}", pre_opt_dump);
-            needs_separator = true;
-        }
-        if args.graph {
-            if needs_separator {
-                println!();
-            }
-            if show_both_graphs {
-                println!("(post-optimization)");
-            }
-            print!("{}", q.graph().dump_live(q.dead_nodes()));
-            needs_separator = true;
-        }
-        if args.types {
-            if needs_separator {
-                println!();
-            }
-            print!("{}", q.type_info().dump());
-        }
-        return;
+        unimplemented!();
     }
 
     if show_source {

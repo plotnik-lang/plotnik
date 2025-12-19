@@ -2,12 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use plotnik_langs::{Lang, NodeFieldId, NodeTypeId};
-use plotnik_lib::Query;
-use plotnik_lib::engine::interpreter::QueryInterpreter;
-use plotnik_lib::engine::validate::validate as validate_result;
-use plotnik_lib::engine::value::{ResolvedValue, VerboseResolvedValue};
-use plotnik_lib::ir::{NodeKindResolver, QueryEmitter};
+use plotnik_lib::QueryBuilder;
 
 use super::debug::source::resolve_lang;
 
@@ -23,18 +18,6 @@ pub struct ExecArgs {
     pub entry: Option<String>,
 }
 
-struct LangResolver(Lang);
-
-impl NodeKindResolver for LangResolver {
-    fn resolve_kind(&self, name: &str) -> Option<NodeTypeId> {
-        self.0.resolve_named_node(name)
-    }
-
-    fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {
-        self.0.resolve_field(name)
-    }
-}
-
 pub fn run(args: ExecArgs) {
     if let Err(msg) = validate(&args) {
         eprintln!("error: {}", msg);
@@ -46,113 +29,33 @@ pub fn run(args: ExecArgs) {
         eprintln!("error: query cannot be empty");
         std::process::exit(1);
     }
-    let source_code = load_source(&args);
+    let _source_code = load_source(&args);
     let lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
 
-    // Parse and validate query
-    let mut query = Query::new(&query_source).exec().unwrap_or_else(|e| {
-        eprintln!("error: {}", e);
-        std::process::exit(1);
-    });
-
-    if !query.is_valid() {
-        eprint!("{}", query.diagnostics().render(&query_source));
-        std::process::exit(1);
-    }
-
-    // Link query against language
-    query.link(&lang);
-    if !query.is_valid() {
-        eprint!("{}", query.diagnostics().render(&query_source));
-        std::process::exit(1);
-    }
-
-    // Build transition graph and type info
-    let mut query = query.build_graph();
-    if query.has_type_errors() {
-        eprint!("{}", query.diagnostics().render(&query_source));
-        std::process::exit(1);
-    }
-
-    // Auto-wrap definitions with root node if available
-    if let Some(root_id) = lang.root()
-        && let Some(root_kind) = lang.node_type_name(root_id)
-    {
-        query = query.wrap_with_root(root_kind);
-    }
-
-    // Emit compiled query
-    let resolver = LangResolver(lang.clone());
-    let emitter = QueryEmitter::new(query.graph(), query.type_info(), resolver);
-    let compiled = emitter.emit().unwrap_or_else(|e| {
-        eprintln!("error: emit failed: {:?}", e);
-        std::process::exit(1);
-    });
-
-    // Parse source
-    let tree = lang.parse(&source_code);
-    let cursor = tree.walk();
-
-    // Find entry point
-    let entrypoint = match &args.entry {
-        Some(name) => compiled
-            .entrypoints()
-            .iter()
-            .find(|ep| compiled.string(ep.name_id()) == name)
-            .unwrap_or_else(|| {
-                let available: Vec<_> = compiled
-                    .entrypoints()
-                    .iter()
-                    .map(|ep| compiled.string(ep.name_id()))
-                    .collect();
-                eprintln!(
-                    "error: entry point '{}' not found. Available: {}",
-                    name,
-                    available.join(", ")
-                );
-                std::process::exit(1);
-            }),
-        None => compiled.entrypoints().last().unwrap_or_else(|| {
-            eprintln!("error: no entry points in query");
-            std::process::exit(1);
-        }),
-    };
-
-    // Run interpreter
-    let interpreter = QueryInterpreter::new(&compiled, cursor, &source_code);
-    let result = interpreter
-        .run_from(entrypoint.target())
+    // Parse query
+    let query_parsed = QueryBuilder::new(&query_source)
+        .parse()
         .unwrap_or_else(|e| {
             eprintln!("error: {}", e);
             std::process::exit(1);
         });
 
-    // Type checking against inferred types
-    if args.check {
-        let expected_type = Some(entrypoint.result_type());
-        if let Some(type_id) = expected_type
-            && let Err(e) = validate_result(&result, type_id, &compiled)
-        {
-            eprintln!("type error: {}", e);
-            std::process::exit(1);
-        }
+    // Analyze query
+    let query_analyzed = query_parsed.analyze().unwrap_or_else(|e| {
+        eprintln!("error: {}", e);
+        std::process::exit(1);
+    });
+
+    // Link query against language
+    let linked = query_analyzed.link(&lang);
+    if !linked.is_valid() {
+        eprint!("{}", linked.diagnostics().render(&query_source));
+        std::process::exit(1);
     }
 
-    // Output JSON
-    let output = match (args.verbose_nodes, args.pretty) {
-        (true, true) => serde_json::to_string_pretty(&VerboseResolvedValue(&result, &compiled)),
-        (true, false) => serde_json::to_string(&VerboseResolvedValue(&result, &compiled)),
-        (false, true) => serde_json::to_string_pretty(&ResolvedValue(&result, &compiled)),
-        (false, false) => serde_json::to_string(&ResolvedValue(&result, &compiled)),
-    };
+    let _ = (args.pretty, args.verbose_nodes, args.check, args.entry);
 
-    match output {
-        Ok(json) => println!("{}", json),
-        Err(e) => {
-            eprintln!("error: JSON serialization failed: {}", e);
-            std::process::exit(1);
-        }
-    }
+    todo!("IR emission and query execution not yet implemented")
 }
 
 fn load_query(args: &ExecArgs) -> String {

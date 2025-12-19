@@ -7,10 +7,12 @@
 //! `Invalid` marks nodes where arity cannot be determined (error nodes,
 //! undefined refs, etc.).
 
-use super::Query;
+use std::collections::HashMap;
+
+use super::symbol_table::SymbolTable;
 use super::visitor::{Visitor, walk_expr, walk_field_expr};
-use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxKind, SyntaxNode, ast};
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::parser::{Expr, FieldExpr, Ref, Root, SeqExpr, SyntaxKind, SyntaxNode, ast};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExprArity {
@@ -19,87 +21,78 @@ pub enum ExprArity {
     Invalid,
 }
 
-impl Query<'_> {
-    pub(super) fn infer_arities(&mut self) {
-        let root = self.ast.clone();
+pub type ExprArityTable = HashMap<Expr, ExprArity>;
 
-        let mut computer = ArityComputer { query: self };
-        computer.visit_root(&root);
+pub fn infer_arities(
+    root: &Root,
+    symbol_table: &SymbolTable,
+    diag: &mut Diagnostics,
+) -> ExprArityTable {
+    let ctx = ArityContext {
+        symbol_table,
+        arity_table: HashMap::new(),
+        diag,
+    };
 
-        let mut validator = ArityValidator { query: self };
-        validator.visit_root(&root);
+    let mut computer = ArityComputer { ctx };
+    computer.visit(root);
+    let ctx = computer.ctx;
+
+    let mut validator = ArityValidator { ctx };
+    validator.visit(root);
+    let ctx = validator.ctx;
+
+    ctx.arity_table
+}
+
+pub fn resolve_arity(node: &SyntaxNode, table: &ExprArityTable) -> Option<ExprArity> {
+    if node.kind() == SyntaxKind::Error {
+        return Some(ExprArity::Invalid);
     }
 
-    pub(super) fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
-        if node.kind() == SyntaxKind::Error {
-            return Some(ExprArity::Invalid);
-        }
-
-        // Try casting to Expr first as it's the most common query
-        if let Some(expr) = ast::Expr::cast(node.clone()) {
-            return self.expr_arity_table.get(&expr).copied();
-        }
-
-        // Root: arity based on definition count
-        if let Some(root) = ast::Root::cast(node.clone()) {
-            return Some(if root.defs().nth(1).is_some() {
-                ExprArity::Many
-            } else {
-                ExprArity::One
-            });
-        }
-
-        // Def: delegate to body's arity
-        if let Some(def) = ast::Def::cast(node.clone()) {
-            return def
-                .body()
-                .and_then(|b| self.expr_arity_table.get(&b).copied());
-        }
-
-        // Branch: delegate to body's arity
-        if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch
-                .body()
-                .and_then(|b| self.expr_arity_table.get(&b).copied());
-        }
-
-        None
+    // Try casting to Expr first as it's the most common query
+    if let Some(expr) = ast::Expr::cast(node.clone()) {
+        return table.get(&expr).copied();
     }
-}
 
-struct ArityComputer<'a, 'q> {
-    query: &'a mut Query<'q>,
-}
-
-impl Visitor for ArityComputer<'_, '_> {
-    fn visit_expr(&mut self, expr: &Expr) {
-        self.query.compute_arity(expr);
-        walk_expr(self, expr);
+    // Root: arity based on definition count
+    if let Some(root) = ast::Root::cast(node.clone()) {
+        return Some(if root.defs().nth(1).is_some() {
+            ExprArity::Many
+        } else {
+            ExprArity::One
+        });
     }
-}
 
-struct ArityValidator<'a, 'q> {
-    query: &'a mut Query<'q>,
-}
-
-impl Visitor for ArityValidator<'_, '_> {
-    fn visit_field_expr(&mut self, field: &FieldExpr) {
-        self.query.validate_field(field);
-        walk_field_expr(self, field);
+    // Def: delegate to body's arity
+    if let Some(def) = ast::Def::cast(node.clone()) {
+        return def.body().and_then(|b| table.get(&b).copied());
     }
+
+    // Branch: delegate to body's arity
+    if let Some(branch) = ast::Branch::cast(node.clone()) {
+        return branch.body().and_then(|b| table.get(&b).copied());
+    }
+
+    None
 }
 
-impl Query<'_> {
+struct ArityContext<'a, 'd> {
+    symbol_table: &'a SymbolTable<'a>,
+    arity_table: ExprArityTable,
+    diag: &'d mut Diagnostics,
+}
+
+impl ArityContext<'_, '_> {
     fn compute_arity(&mut self, expr: &Expr) -> ExprArity {
-        if let Some(&c) = self.expr_arity_table.get(expr) {
+        if let Some(&c) = self.arity_table.get(expr) {
             return c;
         }
         // Insert sentinel to break cycles (e.g., `Foo = (Foo)`)
-        self.expr_arity_table
-            .insert(expr.clone(), ExprArity::Invalid);
+        self.arity_table.insert(expr.clone(), ExprArity::Invalid);
 
         let c = self.compute_single_arity(expr);
-        self.expr_arity_table.insert(expr.clone(), c);
+        self.arity_table.insert(expr.clone(), c);
         c
     }
 
@@ -161,7 +154,7 @@ impl Query<'_> {
         };
 
         let card = self
-            .expr_arity_table
+            .arity_table
             .get(&value)
             .copied()
             .unwrap_or(ExprArity::One);
@@ -172,10 +165,32 @@ impl Query<'_> {
                 .map(|t| t.text().to_string())
                 .unwrap_or_else(|| "field".to_string());
 
-            self.expr_arity_diagnostics
+            self.diag
                 .report(DiagnosticKind::FieldSequenceValue, value.text_range())
                 .message(field_name)
                 .emit();
         }
+    }
+}
+
+struct ArityComputer<'a, 'd> {
+    ctx: ArityContext<'a, 'd>,
+}
+
+impl Visitor for ArityComputer<'_, '_> {
+    fn visit_expr(&mut self, expr: &Expr) {
+        self.ctx.compute_arity(expr);
+        walk_expr(self, expr);
+    }
+}
+
+struct ArityValidator<'a, 'd> {
+    ctx: ArityContext<'a, 'd>,
+}
+
+impl Visitor for ArityValidator<'_, '_> {
+    fn visit_field_expr(&mut self, field: &FieldExpr) {
+        self.ctx.validate_field(field);
+        walk_field_expr(self, field);
     }
 }

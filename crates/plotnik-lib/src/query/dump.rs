@@ -30,11 +30,11 @@ mod test_helpers {
         }
 
         pub fn dump_diagnostics(&self) -> String {
-            self.diagnostics().render_filtered(self.source)
+            self.diagnostics().render_filtered(self.source())
         }
 
         pub fn dump_diagnostics_raw(&self) -> String {
-            self.diagnostics_raw().render(self.source)
+            self.diagnostics().render(self.source())
         }
     }
 }

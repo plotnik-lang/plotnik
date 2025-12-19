@@ -61,7 +61,7 @@ pub enum Command {
   plotnik exec -q '(identifier) @id' -s app.js --pretty
   plotnik exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
   plotnik exec -q '(identifier) @id' -s app.js --check
-  plotnik exec --query-file query.plnk -s app.js --entry FunctionDef"#)]
+  plotnik exec --query-file query.ptk -s app.js --entry FunctionDef"#)]
     Exec {
         #[command(flatten)]
         query: QueryArgs,
@@ -80,7 +80,7 @@ pub enum Command {
     /// Generate type definitions from a query
     #[command(after_help = r#"EXAMPLES:
   plotnik types -q '(identifier) @id' -l javascript
-  plotnik types --query-file query.plnk -l typescript
+  plotnik types --query-file query.ptk -l typescript
   plotnik types -q '(function_declaration) @fn' -l js --format ts
   plotnik types -q '(identifier) @id' -l js --verbose-nodes
   plotnik types -q '(identifier) @id' -l js -o types.d.ts

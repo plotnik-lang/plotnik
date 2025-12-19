@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tree_sitter::Language;
 
-pub use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
+use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
 
 pub mod builtin;
 pub mod dynamic;

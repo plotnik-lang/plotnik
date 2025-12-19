@@ -8,8 +8,9 @@ fn valid_query_with_field() {
             name: (identifier) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
@@ -29,8 +30,9 @@ fn unknown_node_type_with_suggestion() {
         (function_declaraton) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -49,8 +51,9 @@ fn unknown_node_type_no_suggestion() {
         (xyzzy_foobar_baz) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -68,8 +71,9 @@ fn unknown_field_with_suggestion() {
             nme: (identifier) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -89,8 +93,9 @@ fn unknown_field_no_suggestion() {
             xyzzy: (identifier) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -108,8 +113,9 @@ fn field_not_on_node_type() {
             condition: (identifier) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -131,8 +137,9 @@ fn field_not_on_node_type_with_suggestion() {
             parameter: (formal_parameters) @params) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::typescript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::typescript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -154,8 +161,9 @@ fn negated_field_unknown() {
         (function_declaration !nme) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -174,8 +182,9 @@ fn negated_field_not_on_node_type() {
         (function_declaration !condition) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -196,8 +205,9 @@ fn negated_field_not_on_node_type_with_suggestion() {
         (function_declaration !parameter) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::typescript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::typescript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -219,8 +229,9 @@ fn negated_field_valid() {
         (function_declaration !name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
@@ -238,8 +249,9 @@ fn anonymous_node_unknown() {
         (function_declaration "xyzzy_fake_token") @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
@@ -256,8 +268,9 @@ fn error_and_missing_nodes_skip_validation() {
         (ERROR) @err
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 
@@ -265,8 +278,9 @@ fn error_and_missing_nodes_skip_validation() {
         (MISSING) @miss
     "#};
 
-    let mut query2 = Query::try_from(input2).unwrap();
-    query2.link(&plotnik_langs::javascript());
+    let query2 = Query::try_from(input2)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query2.is_valid());
 }
@@ -278,8 +292,9 @@ fn multiple_errors_in_query() {
             nme: (identifer) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -314,8 +329,9 @@ fn nested_field_validation() {
                 (return_statement) @ret) @body) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
@@ -339,8 +355,9 @@ fn invalid_child_type_for_field() {
             name: (statement_block) @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -362,8 +379,9 @@ fn alternation_with_link_errors() {
          (class_declaraton)] @decl
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -392,8 +410,9 @@ fn sequence_with_link_errors() {
              (statement_block)} @body) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -421,8 +440,9 @@ fn quantified_expr_validation() {
             (function_declaration)+ @fns) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
@@ -442,8 +462,9 @@ fn wildcard_node_skips_validation() {
         (_) @any
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -456,8 +477,9 @@ fn def_reference_with_link() {
         (program (Func)+)
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
@@ -482,8 +504,9 @@ fn field_on_node_without_fields() {
             name: (identifier) @inner) @id
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -506,8 +529,9 @@ fn invalid_child_type_no_children_allowed() {
             (class_declaration)) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -528,8 +552,9 @@ fn invalid_child_type_wrong_type() {
             (identifier)) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -551,8 +576,9 @@ fn valid_child_via_supertype() {
             (function_declaration)) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -564,8 +590,9 @@ fn valid_child_via_nested_supertype() {
             (function_declaration)) @prog
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -578,8 +605,9 @@ fn invalid_anonymous_child() {
             "function") @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
@@ -602,8 +630,9 @@ fn invalid_child_in_alternation() {
             [(function_declaration) (identifier)]) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -626,8 +655,9 @@ fn invalid_child_in_sequence() {
             {(function_declaration) (identifier)}) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -648,8 +678,9 @@ fn deeply_nested_sequences_valid() {
         (statement_block {{{(function_declaration)}}}) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -661,8 +692,9 @@ fn deeply_nested_sequences_invalid() {
         (statement_block {{{(identifier)}}}) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -683,8 +715,9 @@ fn deeply_nested_alternations_in_field_valid() {
         (function_declaration name: [[[(identifier)]]]) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -696,8 +729,9 @@ fn deeply_nested_alternations_in_field_invalid() {
         (function_declaration name: [[[(statement_block)]]]) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -719,8 +753,9 @@ fn deeply_nested_no_fields_allowed() {
         (function_declaration {{{(class_declaration)}}}) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -742,8 +777,9 @@ fn mixed_nested_with_capture_and_quantifier() {
               (identifier) @id]*}) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -767,8 +803,9 @@ fn field_with_captured_and_quantified_invalid_type() {
             name: (statement_block)? @name) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -791,8 +828,9 @@ fn multiple_invalid_types_in_alternation_field() {
             name: [(statement_block) (class_declaration)]) @fn
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -824,8 +862,9 @@ fn multiple_invalid_types_in_sequence_child() {
             {(identifier) (number)}) @block
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -857,8 +896,9 @@ fn ref_followed_for_child_validation() {
         (function_declaration (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -886,8 +926,9 @@ fn ref_followed_for_field_validation() {
         (function_declaration name: (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -918,8 +959,9 @@ fn ref_followed_valid_case() {
         (function_declaration name: (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(query.is_valid());
 }
@@ -932,8 +974,9 @@ fn ref_followed_recursive_with_invalid_type() {
         (function_declaration name: (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -962,8 +1005,9 @@ fn ref_followed_recursive_valid() {
         (function_declaration name: (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -985,8 +1029,9 @@ fn ref_followed_mutual_recursion() {
         (function_declaration name: (Foo))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -1029,8 +1074,9 @@ fn ref_followed_in_sequence() {
         (statement_block {(Foo) (string)})
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
@@ -1064,8 +1110,9 @@ fn ref_validated_in_multiple_contexts() {
             body: (statement_block (Foo)))
     "#};
 
-    let mut query = Query::try_from(input).unwrap();
-    query.link(&plotnik_langs::javascript());
+    let query = Query::try_from(input)
+        .unwrap()
+        .link(&plotnik_langs::javascript());
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics_raw(), @r"
