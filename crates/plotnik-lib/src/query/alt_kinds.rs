@@ -5,20 +5,10 @@
 
 use rowan::TextRange;
 
-use super::Query;
 use super::invariants::ensure_both_branch_kinds;
 use super::visitor::{Visitor, walk, walk_alt_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{AltExpr, AltKind, Branch, Root};
-
-impl Query<'_> {
-    pub(super) fn validate_alt_kinds(&mut self) {
-        let mut visitor = AltKindsValidator {
-            diag: &mut self.alt_kind_diagnostics,
-        };
-        visitor.visit(&self.ast);
-    }
-}
 
 pub fn validate_alt_kinds(ast: &Root, diag: &mut Diagnostics) {
     let mut visitor = AltKindsValidator { diag };

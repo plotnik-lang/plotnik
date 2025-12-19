@@ -1,4 +1,5 @@
 use crate::Query;
+use crate::query::query::QueryBuilder;
 use indoc::indoc;
 
 #[test]
@@ -12,7 +13,9 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(depth).exec();
+    let result = QueryBuilder::new(&input)
+        .with_query_parse_recursion_limit(depth)
+        .parse();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -32,7 +35,9 @@ fn deeply_nested_sequences_hit_recursion_limit() {
         input.push('}');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(depth).exec();
+    let result = QueryBuilder::new(&input)
+        .with_query_parse_recursion_limit(depth)
+        .parse();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -52,7 +57,9 @@ fn deeply_nested_alternations_hit_recursion_limit() {
         input.push(']');
     }
 
-    let result = Query::new(&input).with_recursion_fuel(depth).exec();
+    let result = QueryBuilder::new(&input)
+        .with_query_parse_recursion_limit(depth)
+        .parse();
 
     assert!(
         matches!(result, Err(crate::Error::RecursionLimitExceeded)),
@@ -69,7 +76,7 @@ fn many_trees_exhaust_exec_fuel() {
         input.push_str("(a) ");
     }
 
-    let result = Query::new(&input).with_exec_fuel(100).exec();
+    let result = QueryBuilder::new(&input).with_query_parse_fuel(100).parse();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -91,7 +98,7 @@ fn many_branches_exhaust_exec_fuel() {
     }
     input.push(']');
 
-    let result = Query::new(&input).with_exec_fuel(100).exec();
+    let result = QueryBuilder::new(&input).with_query_parse_fuel(100).parse();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),
@@ -113,7 +120,7 @@ fn many_fields_exhaust_exec_fuel() {
     }
     input.push(')');
 
-    let result = Query::new(&input).with_exec_fuel(100).exec();
+    let result = QueryBuilder::new(&input).with_query_parse_fuel(100).parse();
 
     assert!(
         matches!(result, Err(crate::Error::ExecFuelExhausted)),

@@ -18,27 +18,9 @@ use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::cst::{SyntaxKind, SyntaxToken};
 use crate::parser::token_src;
 
-use super::Query;
 use super::symbol_table::SymbolTable;
 use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
-
-impl<'a> Query<'a> {
-    /// Link query against a language grammar.
-    ///
-    /// Resolves node types and fields, validates structural constraints.
-    pub fn link(&mut self, lang: &Lang) {
-        link(
-            &self.ast,
-            self.source,
-            lang,
-            &self.symbol_table,
-            &mut self.node_type_ids,
-            &mut self.node_field_ids,
-            &mut self.link_diagnostics,
-        );
-    }
-}
 
 /// Link query against a language grammar.
 ///

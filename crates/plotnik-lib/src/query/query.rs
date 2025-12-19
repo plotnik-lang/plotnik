@@ -5,14 +5,13 @@ use std::ops::{Deref, DerefMut};
 use plotnik_core::{NodeFieldId, NodeTypeId};
 use plotnik_langs::Lang;
 
-use crate::parser::{ParseResult, Parser, lexer::lex};
+use crate::Diagnostics;
+use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
 use crate::query::dependencies::{self, DependencyAnalysis};
-use crate::query::expr_arity::{ExprArityTable, infer_arities};
-use crate::query::graph_qis::{QisContext, detect_capture_scopes};
+use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
 use crate::query::symbol_table::{SymbolTable, resolve_names};
-use crate::{Diagnostics, parser::Root};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -65,10 +64,6 @@ impl<'q> QueryBuilder<'q> {
 
         validate_alt_kinds(&ast, &mut diag);
 
-        if diag.has_errors() {
-            return Err(crate::Error::QueryParseError(diag));
-        }
-
         Ok(QueryParsed {
             src,
             diag,
@@ -78,11 +73,18 @@ impl<'q> QueryBuilder<'q> {
     }
 }
 
+#[derive(Debug)]
 pub struct QueryParsed<'q> {
     src: &'q str,
     diag: Diagnostics,
     ast: Root,
-    pub fuel_consumed: u32,
+    fuel_consumed: u32,
+}
+
+impl<'q> QueryParsed<'q> {
+    pub fn query_parser_fuel_consumed(&self) -> u32 {
+        self.fuel_consumed
+    }
 }
 
 impl<'q> QueryParsed<'q> {
@@ -99,31 +101,49 @@ impl<'q> QueryParsed<'q> {
 
         let arity_table = infer_arities(&self.ast, &symbol_table, &mut self.diag);
 
-        if self.diag.has_errors() {
-            return Err(crate::Error::QueryAnalyzeError(self.diag));
-        }
-
-        let qis_ctx = detect_capture_scopes(self.src, &symbol_table);
-
         Ok(QueryAnalyzed {
             query_parsed: self,
             symbol_table,
             dependency_analysis,
             arity_table,
-            qis_ctx,
         })
+    }
+
+    pub fn source(&self) -> &'q str {
+        self.src
+    }
+
+    pub fn diagnostics(&self) -> Diagnostics {
+        self.diag.clone()
+    }
+
+    pub fn root(&self) -> &Root {
+        &self.ast
+    }
+
+    pub fn as_cst(&self) -> &SyntaxNode {
+        self.ast.as_cst()
     }
 }
 
+pub type Query<'q> = QueryAnalyzed<'q>;
+
 pub struct QueryAnalyzed<'q> {
     query_parsed: QueryParsed<'q>,
-    symbol_table: SymbolTable<'q>,
+    pub symbol_table: SymbolTable<'q>,
     dependency_analysis: DependencyAnalysis<'q>,
     arity_table: ExprArityTable,
-    qis_ctx: QisContext<'q>,
 }
 
 impl<'q> QueryAnalyzed<'q> {
+    pub fn is_valid(&self) -> bool {
+        !self.diag.has_errors()
+    }
+
+    pub fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
+        resolve_arity(node, &self.arity_table)
+    }
+
     pub fn link(mut self, lang: &Lang) -> LinkedQuery<'q> {
         let mut type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
         let mut field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
@@ -160,6 +180,14 @@ impl<'q> DerefMut for QueryAnalyzed<'q> {
     }
 }
 
+impl<'q> TryFrom<&'q str> for QueryAnalyzed<'q> {
+    type Error = crate::Error;
+
+    fn try_from(src: &'q str) -> crate::Result<Self> {
+        QueryBuilder::new(src).parse()?.analyze()
+    }
+}
+
 type NodeTypeIdTable<'q> = HashMap<&'q str, Option<NodeTypeId>>;
 type NodeFieldIdTable<'q> = HashMap<&'q str, Option<NodeFieldId>>;
 
@@ -167,4 +195,18 @@ pub struct LinkedQuery<'q> {
     inner: QueryAnalyzed<'q>,
     type_ids: NodeTypeIdTable<'q>,
     field_ids: NodeFieldIdTable<'q>,
+}
+
+impl<'q> Deref for LinkedQuery<'q> {
+    type Target = QueryAnalyzed<'q>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'q> DerefMut for LinkedQuery<'q> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }

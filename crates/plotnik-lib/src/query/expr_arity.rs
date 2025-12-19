@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 
-use super::Query;
 use super::symbol_table::SymbolTable;
 use super::visitor::{Visitor, walk_expr, walk_field_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
@@ -23,20 +22,6 @@ pub enum ExprArity {
 }
 
 pub type ExprArityTable = HashMap<Expr, ExprArity>;
-
-impl Query<'_> {
-    pub(super) fn infer_arities(&mut self) {
-        self.expr_arity_table = infer_arities(
-            &self.ast,
-            &self.symbol_table,
-            &mut self.expr_arity_diagnostics,
-        );
-    }
-
-    pub(super) fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
-        resolve_arity(node, &self.expr_arity_table)
-    }
-}
 
 pub fn infer_arities(
     root: &Root,

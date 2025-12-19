@@ -17,8 +17,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod diagnostics;
-pub mod engine;
-pub mod ir;
 pub mod parser;
 pub mod query;
 
@@ -29,7 +27,7 @@ pub mod query;
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
 
 pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity};
-pub use query::{Query, UNNAMED_DEF};
+pub use query::{Query, QueryBuilder};
 
 /// Errors that can occur during query parsing.
 #[derive(Debug, Clone, thiserror::Error)]

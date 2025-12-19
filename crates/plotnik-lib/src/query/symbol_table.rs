@@ -14,16 +14,9 @@ use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Root, ast, token_src};
 
-use super::Query;
 use super::visitor::Visitor;
 
 pub type SymbolTable<'src> = IndexMap<&'src str, ast::Expr>;
-
-impl<'a> Query<'a> {
-    pub(super) fn resolve_names(&mut self) {
-        self.symbol_table = resolve_names(&self.ast, self.source, &mut self.resolve_diagnostics);
-    }
-}
 
 pub fn resolve_names<'q>(ast: &Root, src: &'q str, diag: &mut Diagnostics) -> SymbolTable<'q> {
     let symbol_table = SymbolTable::default();
