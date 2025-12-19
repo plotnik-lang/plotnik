@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
+use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 
 pub fn load_source(text: &Option<String>, file: &Option<PathBuf>) -> String {
