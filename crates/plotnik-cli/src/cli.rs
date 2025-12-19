@@ -52,12 +52,6 @@ pub enum Command {
         output: OutputArgs,
     },
 
-    /// Print documentation
-    Docs {
-        /// Topic to display (e.g., "reference", "examples")
-        topic: Option<String>,
-    },
-
     /// List supported languages
     Langs,
 
