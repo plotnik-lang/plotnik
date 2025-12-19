@@ -38,25 +38,20 @@ fn main() {
             .parent()
             .expect("package has no parent dir");
 
-        let node_types_paths = get_node_types_paths(&package.name);
-        for (suffix, rel_path) in node_types_paths {
-            let node_types_path = package_root.join(rel_path);
-
-            if !node_types_path.exists() {
-                panic!(
-                    "node-types.json not found for {}: {}",
-                    package.name, node_types_path
-                );
-            }
-
-            let env_var_name = format!(
-                "PLOTNIK_NODE_TYPES_{}{}",
-                feature_to_node_types_key(feature_name),
-                suffix
+        let node_types_path = package_root.join("grammar/src/node-types.json");
+        if !node_types_path.exists() {
+            panic!(
+                "node-types.json not found for {}: {}",
+                package.name, node_types_path
             );
-            println!("cargo::rustc-env={}={}", env_var_name, node_types_path);
-            println!("cargo::rerun-if-changed={}", node_types_path);
         }
+
+        let env_var_name = format!(
+            "PLOTNIK_NODE_TYPES_{}",
+            feature_to_node_types_key(feature_name),
+        );
+        println!("cargo::rustc-env={}={}", env_var_name, node_types_path);
+        println!("cargo::rerun-if-changed={}", node_types_path);
     }
 
     for (key, _) in std::env::vars() {
@@ -67,13 +62,6 @@ fn main() {
 
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=Cargo.toml");
-}
-
-fn get_node_types_paths(package_name: &str) -> Vec<(&'static str, &'static str)> {
-    match package_name {
-        // All arborium crates use consistent path
-        _ => vec![("", "grammar/src/node-types.json")],
-    }
 }
 
 fn feature_to_node_types_key(feature: &str) -> String {
