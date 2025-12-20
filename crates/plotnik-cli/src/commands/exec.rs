@@ -41,10 +41,7 @@ pub fn run(args: ExecArgs) {
         });
 
     // Analyze query
-    let query_analyzed = query_parsed.analyze().unwrap_or_else(|e| {
-        eprintln!("error: {}", e);
-        std::process::exit(1);
-    });
+    let query_analyzed = query_parsed.analyze();
 
     // Link query against language
     let linked = query_analyzed.link(&lang);

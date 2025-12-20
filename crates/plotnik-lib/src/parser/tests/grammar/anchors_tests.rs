@@ -7,9 +7,9 @@ fn anchor_first_child() {
     Q = (block . (first_statement))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -33,9 +33,9 @@ fn anchor_last_child() {
     Q = (block (last_statement) .)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -59,9 +59,9 @@ fn anchor_adjacency() {
     Q = (dotted_name (identifier) @a . (identifier) @b)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -95,9 +95,9 @@ fn anchor_both_ends() {
     Q = (array . (element) .)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -123,9 +123,9 @@ fn anchor_multiple_adjacent() {
     Q = (tuple . (a) . (b) . (c) .)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -163,9 +163,9 @@ fn anchor_in_sequence() {
     Q = {. (first) (second) .}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"

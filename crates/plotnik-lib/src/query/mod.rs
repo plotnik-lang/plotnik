@@ -23,8 +23,8 @@ mod expr_arity_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
-mod mod_tests;
-#[cfg(test)]
 mod printer_tests;
+#[cfg(test)]
+mod query_tests;
 #[cfg(test)]
 mod symbol_table_tests;

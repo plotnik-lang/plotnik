@@ -3,9 +3,7 @@ use indoc::indoc;
 
 #[test]
 fn empty_input() {
-    let query = Query::try_from("").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @"Root");
+    insta::assert_snapshot!(Query::expect_valid_cst(""), @"Root");
 }
 
 #[test]
@@ -14,9 +12,9 @@ fn simple_named_node() {
     Q = (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -34,9 +32,9 @@ fn nested_node() {
     Q = (function_definition name: (identifier))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -64,9 +62,9 @@ fn deeply_nested() {
             (d))))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -99,9 +97,9 @@ fn sibling_children() {
         (statement))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -131,9 +129,9 @@ fn wildcard() {
     Q = (_)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -151,9 +149,9 @@ fn anonymous_node() {
     Q = "if"
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -171,9 +169,9 @@ fn anonymous_node_operator() {
     Q = "+="
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -191,9 +189,9 @@ fn supertype_basic() {
     Q = (expression/binary_expression)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -213,9 +211,9 @@ fn supertype_with_string_subtype() {
     Q = (expression/"()")
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -237,9 +235,9 @@ fn supertype_with_capture() {
     Q = (expression/binary_expression) @expr
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -264,9 +262,9 @@ fn supertype_with_children() {
         right: (_) @right)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -307,9 +305,9 @@ fn supertype_nested() {
         (expression/call_expression))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -335,9 +333,9 @@ fn supertype_in_alternation() {
     Q = [(expression/identifier) (expression/number)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -368,9 +366,9 @@ fn no_supertype_plain_node() {
     Q = (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"

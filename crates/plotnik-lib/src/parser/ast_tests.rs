@@ -3,9 +3,8 @@ use indoc::indoc;
 
 #[test]
 fn simple_tree() {
-    let query = Query::try_from("Q = (identifier)").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (identifier)");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode identifier
@@ -18,9 +17,9 @@ fn nested_tree() {
     Q = (function_definition name: (identifier))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode function_definition
@@ -31,9 +30,8 @@ fn nested_tree() {
 
 #[test]
 fn wildcard() {
-    let query = Query::try_from("Q = (_)").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (_)");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode (any)
@@ -42,9 +40,8 @@ fn wildcard() {
 
 #[test]
 fn literal() {
-    let query = Query::try_from(r#"Q = "if""#).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r#"
+    let res = Query::expect_valid_ast(r#"Q = "if""#);
+    insta::assert_snapshot!(res, @r#"
     Root
       Def Q
         AnonymousNode "if"
@@ -53,9 +50,8 @@ fn literal() {
 
 #[test]
 fn capture() {
-    let query = Query::try_from("Q = (identifier) @name").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (identifier) @name");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         CapturedExpr @name
@@ -65,9 +61,8 @@ fn capture() {
 
 #[test]
 fn capture_with_type() {
-    let query = Query::try_from("Q = (identifier) @name :: string").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (identifier) @name :: string");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         CapturedExpr @name :: string
@@ -77,9 +72,8 @@ fn capture_with_type() {
 
 #[test]
 fn named_definition() {
-    let query = Query::try_from("Expr = (expression)").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Expr = (expression)");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Expr
         NamedNode expression
@@ -93,9 +87,9 @@ fn reference() {
     Q = (call (Expr))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Expr
         NamedNode identifier
@@ -107,9 +101,8 @@ fn reference() {
 
 #[test]
 fn alternation_unlabeled() {
-    let query = Query::try_from("Q = [(identifier) (number)]").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = [(identifier) (number)]");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Alt
@@ -126,9 +119,9 @@ fn alternation_tagged() {
     Q = [Ident: (identifier) Num: (number)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Alt
@@ -141,9 +134,8 @@ fn alternation_tagged() {
 
 #[test]
 fn sequence() {
-    let query = Query::try_from("Q = {(a) (b) (c)}").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = {(a) (b) (c)}");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Seq
@@ -155,9 +147,8 @@ fn sequence() {
 
 #[test]
 fn quantifier_star() {
-    let query = Query::try_from("Q = (statement)*").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (statement)*");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         QuantifiedExpr *
@@ -167,9 +158,8 @@ fn quantifier_star() {
 
 #[test]
 fn quantifier_plus() {
-    let query = Query::try_from("Q = (statement)+").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (statement)+");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         QuantifiedExpr +
@@ -179,9 +169,8 @@ fn quantifier_plus() {
 
 #[test]
 fn quantifier_optional() {
-    let query = Query::try_from("Q = (statement)?").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (statement)?");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         QuantifiedExpr ?
@@ -191,9 +180,8 @@ fn quantifier_optional() {
 
 #[test]
 fn quantifier_non_greedy() {
-    let query = Query::try_from("Q = (statement)*?").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (statement)*?");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         QuantifiedExpr *?
@@ -203,9 +191,8 @@ fn quantifier_non_greedy() {
 
 #[test]
 fn anchor() {
-    let query = Query::try_from("Q = (block . (statement))").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (block . (statement))");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode block
@@ -216,9 +203,8 @@ fn anchor() {
 
 #[test]
 fn negated_field() {
-    let query = Query::try_from("Q = (function !async)").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (function !async)");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode function
@@ -237,9 +223,9 @@ fn complex_example() {
     ]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Expression
         Alt
@@ -259,9 +245,8 @@ fn complex_example() {
 
 #[test]
 fn ast_with_errors() {
-    let query = Query::try_from("Q = (call (Undefined))").unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid("Q = (call (Undefined))");
+    insta::assert_snapshot!(res, @r"
     error: `Undefined` is not defined
       |
     1 | Q = (call (Undefined))
@@ -271,9 +256,8 @@ fn ast_with_errors() {
 
 #[test]
 fn supertype() {
-    let query = Query::try_from("Q = (expression/binary_expression)").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast("Q = (expression/binary_expression)");
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode expression
@@ -289,9 +273,9 @@ fn multiple_fields() {
         right: (_) @right) @expr
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         CapturedExpr @expr

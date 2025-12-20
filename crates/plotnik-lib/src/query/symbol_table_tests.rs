@@ -4,9 +4,9 @@ use indoc::indoc;
 #[test]
 fn single_definition() {
     let input = "Expr = (expression)";
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @"Expr");
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @"Expr");
 }
 
 #[test]
@@ -17,9 +17,9 @@ fn multiple_definitions() {
     Decl = (declaration)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Stmt
     Decl
@@ -33,9 +33,9 @@ fn valid_reference() {
     Call = (call_expression function: (Expr))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Call
       Expr
@@ -46,9 +46,9 @@ fn valid_reference() {
 fn undefined_reference() {
     let input = "Call = (call_expression function: (Undefined))";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: `Undefined` is not defined
       |
     1 | Call = (call_expression function: (Undefined))
@@ -60,9 +60,9 @@ fn undefined_reference() {
 fn self_reference() {
     let input = "Expr = [(identifier) (call (Expr))]";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
       Expr (cycle)
     ");
@@ -75,9 +75,9 @@ fn mutual_recursion() {
     B = (bar (A))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (foo (B))
@@ -97,9 +97,9 @@ fn duplicate_definition() {
     Expr = (other)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: `Expr` is already defined
       |
     2 | Expr = (other)
@@ -114,9 +114,9 @@ fn reference_in_alternation() {
     Value = [(Expr) (literal)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Value
       Expr
@@ -130,9 +130,9 @@ fn reference_in_sequence() {
     Pair = {(Expr) (Expr)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Pair
       Expr
@@ -146,9 +146,9 @@ fn reference_in_quantifier() {
     List = (Expr)*
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     List
       Expr
@@ -162,9 +162,9 @@ fn reference_in_capture() {
     Named = (Expr) @e
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Named
       Expr
@@ -178,9 +178,9 @@ fn entry_point_reference() {
     Q = (call function: (Expr))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     Expr
     Q
       Expr
@@ -191,9 +191,9 @@ fn entry_point_reference() {
 fn entry_point_undefined_reference() {
     let input = "Q = (call function: (Unknown))";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: `Unknown` is not defined
       |
     1 | Q = (call function: (Unknown))
@@ -204,9 +204,9 @@ fn entry_point_undefined_reference() {
 #[test]
 fn no_definitions() {
     let input = "Q = (identifier)";
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @"Q");
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @"Q");
 }
 
 #[test]
@@ -218,9 +218,9 @@ fn nested_references() {
     D = (d (C) (A))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     A
     B
       A
@@ -239,9 +239,9 @@ fn nested_references() {
 fn multiple_undefined() {
     let input = "Q = (foo (X) (Y) (Z))";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: `X` is not defined
       |
     1 | Q = (foo (X) (Y) (Z))
@@ -266,9 +266,9 @@ fn reference_inside_tree_child() {
         B = (b (A))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     A
     B
       A
@@ -282,9 +282,9 @@ fn reference_inside_capture() {
         B = (A)@x
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @r"
+    let res = Query::expect_valid_symbols(input);
+
+    insta::assert_snapshot!(res, @r"
     A
     B
       A

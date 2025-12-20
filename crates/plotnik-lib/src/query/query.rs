@@ -88,7 +88,7 @@ impl<'q> QueryParsed<'q> {
 }
 
 impl<'q> QueryParsed<'q> {
-    pub fn analyze(mut self) -> crate::Result<QueryAnalyzed<'q>> {
+    pub fn analyze(mut self) -> QueryAnalyzed<'q> {
         let symbol_table = resolve_names(&self.ast, self.src, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
@@ -101,12 +101,12 @@ impl<'q> QueryParsed<'q> {
 
         let arity_table = infer_arities(&self.ast, &symbol_table, &mut self.diag);
 
-        Ok(QueryAnalyzed {
+        QueryAnalyzed {
             query_parsed: self,
             symbol_table,
             dependency_analysis,
             arity_table,
-        })
+        }
     }
 
     pub fn source(&self) -> &'q str {
@@ -184,7 +184,7 @@ impl<'q> TryFrom<&'q str> for QueryAnalyzed<'q> {
     type Error = crate::Error;
 
     fn try_from(src: &'q str) -> crate::Result<Self> {
-        QueryBuilder::new(src).parse()?.analyze()
+        Ok(QueryBuilder::new(src).parse()?.analyze())
     }
 }
 

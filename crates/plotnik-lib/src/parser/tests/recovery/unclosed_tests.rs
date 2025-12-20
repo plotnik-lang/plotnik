@@ -7,9 +7,9 @@ fn missing_paren() {
     (identifier
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 | (identifier
@@ -25,9 +25,9 @@ fn missing_bracket() {
     [(identifier) (string)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `]`; expected `]`
       |
     1 | [(identifier) (string)
@@ -43,9 +43,9 @@ fn missing_brace() {
     {(a) (b)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `}`; expected `}`
       |
     1 | {(a) (b)
@@ -61,9 +61,9 @@ fn nested_unclosed() {
     (a (b (c)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 | (a (b (c)
@@ -79,9 +79,9 @@ fn deeply_nested_unclosed() {
     (a (b (c (d
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 | (a (b (c (d
@@ -97,9 +97,9 @@ fn unclosed_alternation_nested() {
     [(a) (b
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 | [(a) (b
@@ -115,9 +115,9 @@ fn empty_parens() {
     ()
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: empty parentheses are not allowed
       |
     1 | ()
@@ -132,9 +132,9 @@ fn unclosed_tree_shows_open_location() {
         (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 |   (call
@@ -154,9 +154,9 @@ fn unclosed_alternation_shows_open_location() {
         (b)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `]`; expected `]`
       |
     1 |   [
@@ -177,9 +177,9 @@ fn unclosed_sequence_shows_open_location() {
         (b)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `}`; expected `}`
       |
     1 |   {
@@ -196,9 +196,9 @@ fn unclosed_sequence_shows_open_location() {
 fn unclosed_double_quote_string() {
     let input = r#"(call "foo)"#;
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
     error: missing closing `)`; expected `)`
       |
     1 | (call "foo)
@@ -212,9 +212,9 @@ fn unclosed_double_quote_string() {
 fn unclosed_single_quote_string() {
     let input = "(call 'foo)";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: missing closing `)`; expected `)`
       |
     1 | (call 'foo)

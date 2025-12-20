@@ -7,9 +7,9 @@ fn error_node() {
     Q = (ERROR)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -27,9 +27,9 @@ fn error_node_with_capture() {
     Q = (ERROR) @err
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -50,9 +50,9 @@ fn missing_node_bare() {
     Q = (MISSING)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -70,9 +70,9 @@ fn missing_node_with_type() {
     Q = (MISSING identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -91,9 +91,9 @@ fn missing_node_with_string() {
     Q = (MISSING ";")
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -114,9 +114,9 @@ fn missing_node_with_capture() {
     Q = (MISSING ";") @missing_semi
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -140,9 +140,9 @@ fn error_in_alternation() {
     Q = [(ERROR) (identifier)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -169,9 +169,9 @@ fn missing_in_sequence() {
     Q = {(MISSING ";") (identifier)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -200,9 +200,9 @@ fn special_node_nested() {
         body: (block (ERROR)))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -231,9 +231,9 @@ fn error_with_quantifier() {
     Q = (ERROR)*
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -253,9 +253,9 @@ fn missing_with_quantifier() {
     Q = (MISSING identifier)?
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"

@@ -7,9 +7,9 @@ fn quantifier_star() {
     Q = (statement)*
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -29,9 +29,9 @@ fn quantifier_plus() {
     Q = (statement)+
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -51,9 +51,9 @@ fn quantifier_optional() {
     Q = (statement)?
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -73,9 +73,9 @@ fn quantifier_with_capture() {
     Q = (statement)* @statements
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -99,9 +99,9 @@ fn quantifier_inside_node() {
         (statement)*)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
