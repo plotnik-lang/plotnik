@@ -6,7 +6,7 @@ use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
 use crate::parser::lexer::token_text;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// `@name` | `@name :: Type`
     pub(crate) fn parse_capture_suffix(&mut self) {
         self.bump(); // consume At

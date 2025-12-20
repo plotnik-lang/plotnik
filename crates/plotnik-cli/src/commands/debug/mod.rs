@@ -101,8 +101,10 @@ pub fn run(args: DebugArgs) {
     if let Some(ref q) = query
         && !q.is_valid()
     {
-        let src = query_source.as_ref().unwrap();
-        eprint!("{}", q.diagnostics().render_colored(src, args.color));
+        eprint!(
+            "{}",
+            q.diagnostics().render_colored(q.source_map(), args.color)
+        );
         std::process::exit(1);
     }
 }

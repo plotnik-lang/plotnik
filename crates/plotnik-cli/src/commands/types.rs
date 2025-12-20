@@ -41,13 +41,13 @@ pub fn run(args: TypesArgs) {
         .link(&lang);
 
     if !query.is_valid() {
-        eprint!("{}", query.diagnostics().render(&query_source));
+        eprint!("{}", query.diagnostics().render(query.source_map()));
         std::process::exit(1);
     }
 
     // Link query against language
     if !query.is_valid() {
-        eprint!("{}", query.diagnostics().render(&query_source));
+        eprint!("{}", query.diagnostics().render(query.source_map()));
         std::process::exit(1);
     }
 

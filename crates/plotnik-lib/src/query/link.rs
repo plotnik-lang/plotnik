@@ -19,7 +19,7 @@ use crate::parser::token_src;
 
 use super::query::AstMap;
 use super::source_map::{SourceId, SourceMap};
-use super::symbol_table::SymbolTable;
+use super::symbol_table::SymbolTableOwned;
 use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
 
@@ -31,7 +31,7 @@ pub fn link<'q>(
     ast_map: &AstMap,
     source_map: &'q SourceMap,
     lang: &Lang,
-    symbol_table: &SymbolTable<'q>,
+    symbol_table: &SymbolTableOwned,
     node_type_ids: &mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &mut Diagnostics,
@@ -54,7 +54,7 @@ struct Linker<'a, 'q> {
     source_map: &'q SourceMap,
     source_id: SourceId,
     lang: &'a Lang,
-    symbol_table: &'a SymbolTable<'q>,
+    symbol_table: &'a SymbolTableOwned,
     node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &'a mut Diagnostics,
@@ -370,7 +370,11 @@ impl<'a, 'q> Linker<'a, 'q> {
             .diagnostics
             .report(self.source_id, DiagnosticKind::FieldNotOnNodeType, range)
             .message(field_name)
-            .related_to(format!("on `{}`", parent_name), parent_range);
+            .related_to(
+                self.source_id,
+                parent_range,
+                format!("on `{}`", parent_name),
+            );
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));

@@ -134,6 +134,15 @@ impl SourceMap {
             .expect("invalid SourceId")
     }
 
+    /// Get the file path if this source is a file, None otherwise.
+    pub fn path(&self, id: SourceId) -> Option<&str> {
+        let entry = self.entries.get(id.0 as usize).expect("invalid SourceId");
+        match &entry.kind {
+            SourceKindEntry::File { name_range } => Some(self.slice(name_range)),
+            _ => None,
+        }
+    }
+
     /// Number of sources in the map.
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -204,7 +213,8 @@ mod tests {
 
     #[test]
     fn single_one_liner() {
-        let (map, id) = SourceMap::one_liner("hello world");
+        let map = SourceMap::one_liner("hello world");
+        let id = SourceId(0);
 
         assert_eq!(map.content(id), "hello world");
         assert_eq!(map.kind(id), SourceKind::OneLiner);
@@ -282,6 +292,13 @@ mod tests {
         assert_eq!(SourceKind::OneLiner.display_name(), "<query>");
         assert_eq!(SourceKind::Stdin.display_name(), "<stdin>");
         assert_eq!(SourceKind::File("foo.ptk").display_name(), "foo.ptk");
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SourceId")]
+    fn invalid_id_panics() {
+        let map = SourceMap::new();
+        let _ = map.content(SourceId(999));
     }
 
     #[test]

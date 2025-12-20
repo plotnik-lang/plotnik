@@ -372,7 +372,7 @@ impl<'src, 'diag> Parser<'src, 'diag> {
         self.diagnostics
             .report(self.source_id, kind, full_range)
             .message(message)
-            .related_to(related_msg, open_range)
+            .related_to(self.source_id, open_range, related_msg)
             .emit();
     }
 

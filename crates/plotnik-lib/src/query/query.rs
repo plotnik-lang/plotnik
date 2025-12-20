@@ -10,11 +10,11 @@ use plotnik_langs::Lang;
 use crate::Diagnostics;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
-use crate::query::dependencies::{self, DependencyAnalysis};
+use crate::query::dependencies::{self, DependencyAnalysisOwned};
 use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
-use crate::query::symbol_table::{SymbolTable, resolve_names};
+use crate::query::symbol_table::{SymbolTableOwned, resolve_names};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -39,6 +39,11 @@ impl QueryBuilder {
         };
 
         Self { source_map, config }
+    }
+
+    pub fn from_str(src: &str) -> Self {
+        let source_map = SourceMap::one_liner(src);
+        Self::new(source_map)
     }
 
     pub fn with_query_parse_fuel(mut self, fuel: u32) -> Self {
@@ -99,6 +104,7 @@ impl QueryParsed {
 
 impl QueryParsed {
     pub fn analyze(mut self) -> QueryAnalyzed {
+        // Use reference-based structures for processing
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
@@ -111,10 +117,14 @@ impl QueryParsed {
 
         let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
 
+        // Convert to owned for storage
+        let symbol_table_owned = crate::query::symbol_table::to_owned(symbol_table);
+        let dependency_analysis_owned = dependency_analysis.to_owned();
+
         QueryAnalyzed {
             query_parsed: self,
-            symbol_table,
-            dependency_analysis,
+            symbol_table: symbol_table_owned,
+            dependency_analysis: dependency_analysis_owned,
             arity_table,
         }
     }
@@ -136,8 +146,8 @@ pub type Query = QueryAnalyzed;
 
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
-    pub symbol_table: SymbolTable,
-    dependency_analysis: DependencyAnalysis,
+    pub symbol_table: SymbolTableOwned,
+    dependency_analysis: DependencyAnalysisOwned,
     arity_table: ExprArityTable,
 }
 
@@ -151,8 +161,9 @@ impl QueryAnalyzed {
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
-        let mut type_ids: NodeTypeIdTable = HashMap::new();
-        let mut field_ids: NodeFieldIdTable = HashMap::new();
+        // Use reference-based hash maps during processing
+        let mut type_ids: HashMap<&str, Option<NodeTypeId>> = HashMap::new();
+        let mut field_ids: HashMap<&str, Option<NodeFieldId>> = HashMap::new();
 
         link::link(
             &self.query_parsed.ast_map,
@@ -164,10 +175,20 @@ impl QueryAnalyzed {
             &mut self.query_parsed.diag,
         );
 
+        // Convert to owned for storage
+        let type_ids_owned = type_ids
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect();
+        let field_ids_owned = field_ids
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect();
+
         LinkedQuery {
             inner: self,
-            type_ids,
-            field_ids,
+            type_ids: type_ids_owned,
+            field_ids: field_ids_owned,
         }
     }
 }
@@ -196,16 +217,16 @@ impl TryFrom<&str> for QueryAnalyzed {
     }
 }
 
-type NodeTypeIdTable<'a> = HashMap<&'a str, Option<NodeTypeId>>;
-type NodeFieldIdTable<'a> = HashMap<&'a str, Option<NodeFieldId>>;
+type NodeTypeIdTableOwned = HashMap<String, Option<NodeTypeId>>;
+type NodeFieldIdTableOwned = HashMap<String, Option<NodeFieldId>>;
 
-pub struct LinkedQuery<'a> {
+pub struct LinkedQuery {
     inner: QueryAnalyzed,
-    type_ids: NodeTypeIdTable<'a>,
-    field_ids: NodeFieldIdTable<'a>,
+    type_ids: NodeTypeIdTableOwned,
+    field_ids: NodeFieldIdTableOwned,
 }
 
-impl Deref for LinkedQuery<'_> {
+impl Deref for LinkedQuery {
     type Target = QueryAnalyzed;
 
     fn deref(&self) -> &Self::Target {
@@ -213,7 +234,7 @@ impl Deref for LinkedQuery<'_> {
     }
 }
 
-impl DerefMut for LinkedQuery<'_> {
+impl DerefMut for LinkedQuery {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

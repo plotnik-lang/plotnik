@@ -21,6 +21,12 @@ pub struct Span {
     pub range: TextRange,
 }
 
+impl Span {
+    pub fn new(source: SourceId, range: TextRange) -> Self {
+        Self { source, range }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
     messages: Vec<DiagnosticMessage>,
@@ -48,11 +54,9 @@ impl Diagnostics {
         kind: DiagnosticKind,
         range: TextRange,
     ) -> DiagnosticBuilder<'_> {
-        let mut msg = DiagnosticMessage::with_default_message(kind, range);
-        msg.source = source;
         DiagnosticBuilder {
             diagnostics: self,
-            message: msg,
+            message: DiagnosticMessage::with_default_message(source, kind, range),
         }
     }
 
@@ -207,14 +211,7 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
-    /// Related info in same file (backward compat).
-    pub fn related_to(mut self, msg: impl Into<String>, range: TextRange) -> Self {
-        self.message.related.push(RelatedInfo::new(range, msg));
-        self
-    }
-
-    /// Related info in different file.
-    pub fn related_in(
+    pub fn related_to(
         mut self,
         source: SourceId,
         range: TextRange,
@@ -222,7 +219,7 @@ impl<'a> DiagnosticBuilder<'a> {
     ) -> Self {
         self.message
             .related
-            .push(RelatedInfo::in_source(source, range, msg));
+            .push(RelatedInfo::new(source, range, msg));
         self
     }
 

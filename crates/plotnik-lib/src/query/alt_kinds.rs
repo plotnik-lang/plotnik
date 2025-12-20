@@ -66,7 +66,7 @@ impl AltKindsValidator<'_> {
                 DiagnosticKind::MixedAltBranches,
                 untagged_range,
             )
-            .related_to("tagged branch here", tagged_range)
+            .related_to(self.source_id, tagged_range, "tagged branch here")
             .emit();
     }
 }

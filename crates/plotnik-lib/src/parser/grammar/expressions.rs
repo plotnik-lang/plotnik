@@ -3,7 +3,7 @@ use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::EXPR_FIRST_TOKENS;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parse an expression, or emit an error if current token can't start one.
     /// Returns `true` if a valid expression was parsed, `false` on error.
     pub(crate) fn parse_expr_or_error(&mut self) -> bool {

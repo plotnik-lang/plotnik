@@ -18,6 +18,11 @@ use super::visitor::Visitor;
 pub const UNNAMED_DEF: &str = "_";
 
 pub type SymbolTable<'src> = IndexMap<&'src str, (SourceId, ast::Expr)>;
+pub type SymbolTableOwned = IndexMap<String, (SourceId, ast::Expr)>;
+
+pub fn to_owned(table: SymbolTable<'_>) -> SymbolTableOwned {
+    table.into_iter().map(|(k, v)| (k.to_owned(), v)).collect()
+}
 
 pub fn resolve_names<'q>(
     source_map: &'q SourceMap,
@@ -43,6 +48,7 @@ pub fn resolve_names<'q>(
         let src = source_map.content(source_id);
         let mut validator = ReferenceValidator {
             src,
+            source_id,
             diag,
             symbol_table: &symbol_table,
         };
@@ -68,7 +74,11 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
             let name = token_src(&token, self.src);
             if self.symbol_table.contains_key(name) {
                 self.diag
-                    .report(DiagnosticKind::DuplicateDefinition, token.text_range())
+                    .report(
+                        self.source_id,
+                        DiagnosticKind::DuplicateDefinition,
+                        token.text_range(),
+                    )
                     .message(name)
                     .emit();
             } else {
@@ -89,6 +99,7 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
 struct ReferenceValidator<'q, 'd, 't> {
     #[allow(dead_code)]
     src: &'q str,
+    source_id: SourceId,
     diag: &'d mut Diagnostics,
     symbol_table: &'t SymbolTable<'q>,
 }
@@ -103,7 +114,11 @@ impl Visitor for ReferenceValidator<'_, '_, '_> {
         }
 
         self.diag
-            .report(DiagnosticKind::UndefinedReference, name_token.text_range())
+            .report(
+                self.source_id,
+                DiagnosticKind::UndefinedReference,
+                name_token.text_range(),
+            )
             .message(name)
             .emit();
     }

@@ -9,7 +9,7 @@ use crate::parser::cst::token_sets::{
 use crate::parser::cst::{SyntaxKind, TokenSet};
 use crate::parser::lexer::token_text;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)` | `(expr/subtype)`
     /// PascalCase without children → Ref; with children → error but parses as Tree.
     pub(crate) fn parse_tree(&mut self) {
@@ -140,7 +140,11 @@ impl Parser<'_> {
 
             if let Some(name) = &ref_name {
                 self.diagnostics
-                    .report(DiagnosticKind::RefCannotHaveChildren, children_span)
+                    .report(
+                        self.source_id,
+                        DiagnosticKind::RefCannotHaveChildren,
+                        children_span,
+                    )
                     .message(name)
                     .emit();
             }

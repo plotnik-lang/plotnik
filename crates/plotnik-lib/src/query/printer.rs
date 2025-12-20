@@ -9,9 +9,10 @@ use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
 use super::expr_arity::ExprArity;
+use super::source_map::SourceKind;
 
-pub struct QueryPrinter<'q, 'src> {
-    query: &'q Query<'src>,
+pub struct QueryPrinter<'q> {
+    query: &'q Query,
     raw: bool,
     trivia: bool,
     arities: bool,
@@ -19,8 +20,8 @@ pub struct QueryPrinter<'q, 'src> {
     symbols: bool,
 }
 
-impl<'q, 'src> QueryPrinter<'q, 'src> {
-    pub fn new(query: &'q Query<'src>) -> Self {
+impl<'q> QueryPrinter<'q> {
+    pub fn new(query: &'q Query) -> Self {
         Self {
             query,
             raw: false,
@@ -66,10 +67,42 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         if self.symbols {
             return self.format_symbols(w);
         }
-        if self.raw {
-            return self.format_cst(self.query.as_cst(), 0, w);
+
+        let source_map = self.query.source_map();
+        let ast_map = self.query.asts();
+        let show_headers = self.should_show_headers(source_map);
+        let mut first = true;
+
+        for source in source_map.iter() {
+            let Some(root) = ast_map.get(&source.id) else {
+                continue;
+            };
+
+            if show_headers {
+                if !first {
+                    writeln!(w)?;
+                }
+                writeln!(w, "# {}", source.kind.display_name())?;
+            }
+
+            if self.raw {
+                self.format_cst(root.as_cst(), 0, w)?;
+            } else {
+                self.format_root(root, w)?;
+            }
+
+            first = false;
         }
-        self.format_root(self.query.root(), w)
+
+        Ok(())
+    }
+
+    fn should_show_headers(&self, source_map: &super::source_map::SourceMap) -> bool {
+        source_map.len() > 1
+            || source_map
+                .iter()
+                .next()
+                .is_some_and(|s| !matches!(s.kind, SourceKind::OneLiner))
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
@@ -80,12 +113,15 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.keys().copied().collect();
+        let defined: IndexSet<&str> = symbols.keys().map(String::as_str).collect();
 
+        // Collect body nodes from all files
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
-        for def in self.query.root().defs() {
-            if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
-                body_nodes.insert(name_tok.text().to_string(), body.as_cst().clone());
+        for root in self.query.asts().values() {
+            for def in root.defs() {
+                if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
+                    body_nodes.insert(name_tok.text().to_string(), body.as_cst().clone());
+                }
             }
         }
 
@@ -125,7 +161,7 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some(body) = self.query.symbol_table.get(name) {
+        if let Some((_, body)) = self.query.symbol_table.get(name) {
             let refs_set = collect_refs(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
@@ -368,8 +404,8 @@ impl<'q, 'src> QueryPrinter<'q, 'src> {
     }
 }
 
-impl Query<'_> {
-    pub fn printer(&self) -> QueryPrinter<'_, '_> {
+impl Query {
+    pub fn printer(&self) -> QueryPrinter<'_> {
         QueryPrinter::new(self)
     }
 }

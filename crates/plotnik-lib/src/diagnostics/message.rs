@@ -289,16 +289,7 @@ pub struct RelatedInfo {
 }
 
 impl RelatedInfo {
-    /// Same-file related info (backward compat).
-    pub fn new(range: TextRange, message: impl Into<String>) -> Self {
-        Self {
-            span: Span::anonymous(range),
-            message: message.into(),
-        }
-    }
-
-    /// Cross-file related info.
-    pub fn in_source(source: SourceId, range: TextRange, message: impl Into<String>) -> Self {
+    pub fn new(source: SourceId, range: TextRange, message: impl Into<String>) -> Self {
         Self {
             span: Span::new(source, range),
             message: message.into(),
@@ -325,10 +316,15 @@ pub(crate) struct DiagnosticMessage {
 }
 
 impl DiagnosticMessage {
-    pub(crate) fn new(kind: DiagnosticKind, range: TextRange, message: impl Into<String>) -> Self {
+    pub(crate) fn new(
+        source: SourceId,
+        kind: DiagnosticKind,
+        range: TextRange,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             kind,
-            source: SourceId::DEFAULT,
+            source,
             range,
             suppression_range: range,
             message: message.into(),
@@ -338,8 +334,12 @@ impl DiagnosticMessage {
         }
     }
 
-    pub(crate) fn with_default_message(kind: DiagnosticKind, range: TextRange) -> Self {
-        Self::new(kind, range, kind.fallback_message())
+    pub(crate) fn with_default_message(
+        source: SourceId,
+        kind: DiagnosticKind,
+        range: TextRange,
+    ) -> Self {
+        Self::new(source, kind, range, kind.fallback_message())
     }
 
     pub(crate) fn severity(&self) -> Severity {

@@ -6,7 +6,7 @@ use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, ROOT_EXPR_FIRST_TOKENS};
 use crate::parser::lexer::token_text;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {
         self.start_node(SyntaxKind::Root);
 
@@ -29,7 +29,7 @@ impl Parser<'_> {
                 let span = TextRange::new(start, end);
                 let def_text = &self.source[usize::from(start)..usize::from(end)];
                 self.diagnostics
-                    .report(DiagnosticKind::UnnamedDef, span)
+                    .report(self.source_id, DiagnosticKind::UnnamedDef, span)
                     .message(format!("give it a name like `Name = {}`", def_text.trim()))
                     .emit();
             }

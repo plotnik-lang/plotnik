@@ -1,7 +1,7 @@
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     pub(crate) fn parse_wildcard(&mut self) {
         self.start_node(SyntaxKind::Wildcard);
         self.expect(SyntaxKind::Underscore, "'_' wildcard");

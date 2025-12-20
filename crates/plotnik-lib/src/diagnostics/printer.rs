@@ -42,14 +42,11 @@ impl<'a> DiagnosticsPrinter<'a> {
         };
 
         for (i, diag) in self.diagnostics.iter().enumerate() {
-            let Some(primary_content) = self.sources.content(diag.source) else {
-                continue;
-            };
-
+            let primary_content = self.sources.content(diag.source);
             let range = adjust_range(diag.range, primary_content.len());
 
             let mut primary_snippet = Snippet::source(primary_content).line_start(1);
-            if let Some(name) = self.sources.name(diag.source) {
+            if let Some(name) = self.source_path(diag.source) {
                 primary_snippet = primary_snippet.path(name);
             }
             primary_snippet =
@@ -66,10 +63,11 @@ impl<'a> DiagnosticsPrinter<'a> {
                             .span(adjust_range(related.span.range, primary_content.len()))
                             .label(&related.message),
                     );
-                } else if let Some(related_content) = self.sources.content(related.span.source) {
+                } else {
                     // Different file: create separate snippet
+                    let related_content = self.sources.content(related.span.source);
                     let mut snippet = Snippet::source(related_content).line_start(1);
-                    if let Some(name) = self.sources.name(related.span.source) {
+                    if let Some(name) = self.source_path(related.span.source) {
                         snippet = snippet.path(name);
                     }
                     snippet = snippet.annotation(
@@ -111,6 +109,10 @@ impl<'a> DiagnosticsPrinter<'a> {
         }
 
         Ok(())
+    }
+
+    fn source_path(&self, source: crate::query::SourceId) -> Option<&'a str> {
+        self.sources.path(source)
     }
 }
 

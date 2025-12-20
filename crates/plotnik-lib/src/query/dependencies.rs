@@ -31,6 +31,25 @@ pub struct DependencyAnalysis<'q> {
     pub sccs: Vec<Vec<&'q str>>,
 }
 
+/// Owned variant of `DependencyAnalysis` for storage in pipeline structs.
+#[derive(Debug, Clone, Default)]
+pub struct DependencyAnalysisOwned {
+    #[allow(dead_code)]
+    pub sccs: Vec<Vec<String>>,
+}
+
+impl DependencyAnalysis<'_> {
+    pub fn to_owned(&self) -> DependencyAnalysisOwned {
+        DependencyAnalysisOwned {
+            sccs: self
+                .sccs
+                .iter()
+                .map(|scc| scc.iter().map(|s| (*s).to_owned()).collect())
+                .collect(),
+        }
+    }
+}
+
 /// Analyze dependencies between definitions.
 ///
 /// Returns the SCCs in reverse topological order.
@@ -196,12 +215,12 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
 
         let mut builder = self.diag.report(primary_source, kind, primary_loc);
 
-        for (_, range, msg) in chain {
-            builder = builder.related_to(msg, range);
+        for (source_id, range, msg) in chain {
+            builder = builder.related_to(source_id, range, msg);
         }
 
-        if let Some((msg, range)) = related_def {
-            builder = builder.related_to(msg, range);
+        if let Some((source_id, msg, range)) = related_def {
+            builder = builder.related_to(source_id, range, msg);
         }
 
         builder.emit();
@@ -211,7 +230,7 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
         &self,
         scc: &[&'q str],
         range: TextRange,
-    ) -> Option<(String, TextRange)> {
+    ) -> Option<(SourceId, String, TextRange)> {
         scc.iter()
             .find(|name| {
                 self.symbol_table
@@ -220,17 +239,23 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
                     .unwrap_or(false)
             })
             .and_then(|name| {
-                self.find_def_by_name(name).and_then(|def| {
-                    def.name()
-                        .map(|n| (format!("{} is defined here", name), n.text_range()))
+                self.find_def_by_name(name).and_then(|(source_id, def)| {
+                    def.name().map(|n| {
+                        (
+                            source_id,
+                            format!("{} is defined here", name),
+                            n.text_range(),
+                        )
+                    })
                 })
             })
     }
 
-    fn find_def_by_name(&self, name: &str) -> Option<Def> {
-        self.ast_map.values().find_map(|ast| {
+    fn find_def_by_name(&self, name: &str) -> Option<(SourceId, Def)> {
+        self.ast_map.iter().find_map(|(source_id, ast)| {
             ast.defs()
                 .find(|d| d.name().map(|n| n.text() == name).unwrap_or(false))
+                .map(|def| (*source_id, def))
         })
     }
 }
