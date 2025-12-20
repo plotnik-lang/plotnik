@@ -775,7 +775,7 @@ Expression = [
   Str: (string) @value :: string
 ]
 
-(program (Statement)+ @statements)
+Root = (program (Statement)+ @statements)
 ```
 
 Output types:

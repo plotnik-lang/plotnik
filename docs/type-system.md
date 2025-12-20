@@ -76,7 +76,7 @@ Scopes are transparent by default. Captures bubble up through definitions and co
 
 This enables reusable fragments ("mixins") that contribute fields to parent output without creating nesting.
 
-- **Private Definitions (`Def = ...`)**: Transparent (macro-like)
+- **Definitions (`Def = ...`)**: Transparent (macro-like)
 - **Uncaptured Containers (`{...}`, `[...]`)**: Transparent
 - **References (`(Def)`)**: Transparent
 
@@ -84,10 +84,9 @@ This enables reusable fragments ("mixins") that contribute fields to parent outp
 
 New data structures are created only when explicitly requested:
 
-1. **Public Roots**: `pub Def = ...`
-2. **Captured Groups**: `{...} @name` → Struct
-3. **Captured Alternations**: `[...] @name` → Union
-4. **Tagged Alternations**: `[ L: ... ] @name` → Tagged Union
+1. **Captured Groups**: `{...} @name` → Struct
+2. **Captured Alternations**: `[...] @name` → Union
+3. **Tagged Alternations**: `[ L: ... ] @name` → Tagged Union
 
 ## 2. Data Shapes
 
@@ -300,7 +299,7 @@ Self-referential types via:
 ### Example
 
 ```plotnik/docs/type-system.md#L213-219
-pub Expr = [
+Expr = [
     Lit: (number) @value ::string
     Binary: (binary_expression
         left: (Expr) @left
@@ -324,7 +323,7 @@ B = (bar (A))                    // OK: descends each step
 
 ### Scope Boundaries
 
-Recursive private definitions get automatic type boundaries (behave like `pub` for typing):
+Recursive definitions get automatic type boundaries:
 
 ```plotnik/docs/type-system.md#L240-241
 NestedCall = (call_expression
@@ -340,21 +339,12 @@ DeepSearch = [
     (identifier) @target
     (_ (DeepSearch)*)
 ]
-pub AllIdentifiers = (program (DeepSearch)*)
+AllIdentifiers = (program (DeepSearch)*)
 ```
 
 Output: `{ target: Node[] }` — flat array regardless of tree depth.
 
-## 7. Definition Roles
-
-| Feature  | `Def` (Private)    | `pub Def` (Public) |
-| -------- | ------------------ | ------------------ |
-| Concept  | Fragment/Mixin     | API Contract       |
-| Behavior | Inlined            | Entrypoint         |
-| Scoping  | Transparent        | Boundary           |
-| Output   | Merges into parent | Named Interface    |
-
-## 8. Type Metadata
+## 7. Type Metadata
 
 For codegen, types are named:
 
