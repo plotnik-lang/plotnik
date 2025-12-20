@@ -1,5 +1,7 @@
 use rowan::TextRange;
 
+use super::{SourceId, Span};
+
 /// Diagnostic kinds ordered by priority (highest priority first).
 ///
 /// When two diagnostics have overlapping spans, the higher-priority one
@@ -282,14 +284,23 @@ impl Fix {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelatedInfo {
-    pub(crate) range: TextRange,
+    pub(crate) span: Span,
     pub(crate) message: String,
 }
 
 impl RelatedInfo {
+    /// Same-file related info (backward compat).
     pub fn new(range: TextRange, message: impl Into<String>) -> Self {
         Self {
-            range,
+            span: Span::anonymous(range),
+            message: message.into(),
+        }
+    }
+
+    /// Cross-file related info.
+    pub fn in_source(source: SourceId, range: TextRange, message: impl Into<String>) -> Self {
+        Self {
+            span: Span::new(source, range),
             message: message.into(),
         }
     }
@@ -298,6 +309,8 @@ impl RelatedInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DiagnosticMessage {
     pub(crate) kind: DiagnosticKind,
+    /// Which source file this diagnostic belongs to.
+    pub(crate) source: SourceId,
     /// The range shown to the user (underlined in output).
     pub(crate) range: TextRange,
     /// The range used for suppression logic. Errors within another error's
@@ -315,6 +328,7 @@ impl DiagnosticMessage {
     pub(crate) fn new(kind: DiagnosticKind, range: TextRange, message: impl Into<String>) -> Self {
         Self {
             kind,
+            source: SourceId::DEFAULT,
             range,
             suppression_range: range,
             message: message.into(),
@@ -359,8 +373,8 @@ impl std::fmt::Display for DiagnosticMessage {
                 f,
                 " (related: {} at {}..{})",
                 related.message,
-                u32::from(related.range.start()),
-                u32::from(related.range.end())
+                u32::from(related.span.range.start()),
+                u32::from(related.span.range.end())
             )?;
         }
         for hint in &self.hints {

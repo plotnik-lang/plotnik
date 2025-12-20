@@ -7,16 +7,18 @@ use rowan::TextRange;
 
 use super::invariants::ensure_both_branch_kinds;
 use super::visitor::{Visitor, walk, walk_alt_expr};
+use crate::SourceId;
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{AltExpr, AltKind, Branch, Root};
 
-pub fn validate_alt_kinds(ast: &Root, diag: &mut Diagnostics) {
-    let mut visitor = AltKindsValidator { diag };
+pub fn validate_alt_kinds(source_id: SourceId, ast: &Root, diag: &mut Diagnostics) {
+    let mut visitor = AltKindsValidator { diag, source_id };
     visitor.visit(ast);
 }
 
 struct AltKindsValidator<'a> {
     diag: &'a mut Diagnostics,
+    source_id: SourceId,
 }
 
 impl Visitor for AltKindsValidator<'_> {
@@ -59,7 +61,11 @@ impl AltKindsValidator<'_> {
         let untagged_range = branch_range(untagged_branch);
 
         self.diag
-            .report(DiagnosticKind::MixedAltBranches, untagged_range)
+            .report(
+                self.source_id,
+                DiagnosticKind::MixedAltBranches,
+                untagged_range,
+            )
             .related_to("tagged branch here", tagged_range)
             .emit();
     }

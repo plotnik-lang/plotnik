@@ -9,10 +9,12 @@
 
 use std::collections::HashMap;
 
+use super::query::AstMap;
+use super::source_map::SourceId;
 use super::symbol_table::SymbolTable;
 use super::visitor::{Visitor, walk_expr, walk_field_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{Expr, FieldExpr, Ref, Root, SeqExpr, SyntaxKind, SyntaxNode, ast};
+use crate::parser::{Expr, FieldExpr, Ref, SeqExpr, SyntaxKind, SyntaxNode, ast};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExprArity {
@@ -24,25 +26,37 @@ pub enum ExprArity {
 pub type ExprArityTable = HashMap<Expr, ExprArity>;
 
 pub fn infer_arities(
-    root: &Root,
+    ast_map: &AstMap,
     symbol_table: &SymbolTable,
     diag: &mut Diagnostics,
 ) -> ExprArityTable {
-    let ctx = ArityContext {
-        symbol_table,
-        arity_table: HashMap::new(),
-        diag,
-    };
+    let mut arity_table = ExprArityTable::default();
 
-    let mut computer = ArityComputer { ctx };
-    computer.visit(root);
-    let ctx = computer.ctx;
+    for (&source_id, root) in ast_map {
+        let ctx = ArityContext {
+            symbol_table,
+            arity_table,
+            diag,
+            source_id,
+        };
+        let mut computer = ArityComputer { ctx };
+        computer.visit(root);
+        arity_table = computer.ctx.arity_table;
+    }
 
-    let mut validator = ArityValidator { ctx };
-    validator.visit(root);
-    let ctx = validator.ctx;
+    for (&source_id, root) in ast_map {
+        let ctx = ArityContext {
+            symbol_table,
+            arity_table,
+            diag,
+            source_id,
+        };
+        let mut validator = ArityValidator { ctx };
+        validator.visit(root);
+        arity_table = validator.ctx.arity_table;
+    }
 
-    ctx.arity_table
+    arity_table
 }
 
 pub fn resolve_arity(node: &SyntaxNode, table: &ExprArityTable) -> Option<ExprArity> {
@@ -81,6 +95,7 @@ struct ArityContext<'a, 'd> {
     symbol_table: &'a SymbolTable<'a>,
     arity_table: ExprArityTable,
     diag: &'d mut Diagnostics,
+    source_id: SourceId,
 }
 
 impl ArityContext<'_, '_> {
@@ -143,8 +158,7 @@ impl ArityContext<'_, '_> {
 
         self.symbol_table
             .get(name)
-            .cloned()
-            .map(|body| self.compute_arity(&body))
+            .map(|(_, body)| self.compute_arity(body))
             .unwrap_or(ExprArity::Invalid)
     }
 
@@ -166,7 +180,11 @@ impl ArityContext<'_, '_> {
                 .unwrap_or_else(|| "field".to_string());
 
             self.diag
-                .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+                .report(
+                    self.source_id,
+                    DiagnosticKind::FieldSequenceValue,
+                    value.text_range(),
+                )
                 .message(field_name)
                 .emit();
         }

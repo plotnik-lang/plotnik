@@ -11,6 +11,16 @@ pub use printer::DiagnosticsPrinter;
 
 use message::{DiagnosticMessage, Fix, RelatedInfo};
 
+// Re-export from query module
+pub use crate::query::{SourceId, SourceMap};
+
+/// A location that knows which source it belongs to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Span {
+    pub source: SourceId,
+    pub range: TextRange,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
     messages: Vec<DiagnosticMessage>,
@@ -32,26 +42,17 @@ impl Diagnostics {
     /// Create a diagnostic with the given kind and span.
     ///
     /// Uses the kind's default message. Call `.message()` on the builder to override.
-    pub fn report(&mut self, kind: DiagnosticKind, range: TextRange) -> DiagnosticBuilder<'_> {
+    pub fn report(
+        &mut self,
+        source: SourceId,
+        kind: DiagnosticKind,
+        range: TextRange,
+    ) -> DiagnosticBuilder<'_> {
+        let mut msg = DiagnosticMessage::with_default_message(kind, range);
+        msg.source = source;
         DiagnosticBuilder {
             diagnostics: self,
-            message: DiagnosticMessage::with_default_message(kind, range),
-        }
-    }
-
-    /// Create an error diagnostic (legacy API, prefer `report()`).
-    pub fn error(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
-        DiagnosticBuilder {
-            diagnostics: self,
-            message: DiagnosticMessage::new(DiagnosticKind::UnexpectedToken, range, msg),
-        }
-    }
-
-    /// Create a warning diagnostic (legacy API, prefer `report()`).
-    pub fn warning(&mut self, msg: impl Into<String>, range: TextRange) -> DiagnosticBuilder<'_> {
-        DiagnosticBuilder {
-            diagnostics: self,
-            message: DiagnosticMessage::new(DiagnosticKind::UnexpectedToken, range, msg),
+            message: msg,
         }
     }
 
@@ -163,29 +164,34 @@ impl Diagnostics {
         &self.messages
     }
 
-    pub fn printer<'a>(&self, source: &'a str) -> DiagnosticsPrinter<'a> {
-        DiagnosticsPrinter::new(self.messages.clone(), source)
+    /// Create a printer with a source map (multi-file support).
+    pub fn printer<'a>(&self, sources: &'a SourceMap) -> DiagnosticsPrinter<'a> {
+        DiagnosticsPrinter::new(self.messages.clone(), sources)
     }
 
-    /// Printer that uses filtered diagnostics (cascading errors suppressed).
-    pub fn filtered_printer<'a>(&self, source: &'a str) -> DiagnosticsPrinter<'a> {
-        DiagnosticsPrinter::new(self.filtered(), source)
+    /// Filtered printer with source map (cascading errors suppressed).
+    pub fn filtered_printer<'a>(&self, sources: &'a SourceMap) -> DiagnosticsPrinter<'a> {
+        DiagnosticsPrinter::new(self.filtered(), sources)
     }
 
-    pub fn render(&self, source: &str) -> String {
-        self.printer(source).render()
+    /// Render with source map.
+    pub fn render(&self, sources: &SourceMap) -> String {
+        self.printer(sources).render()
     }
 
-    pub fn render_colored(&self, source: &str, colored: bool) -> String {
-        self.printer(source).colored(colored).render()
+    /// Render with source map, colored output.
+    pub fn render_colored(&self, sources: &SourceMap, colored: bool) -> String {
+        self.printer(sources).colored(colored).render()
     }
 
-    pub fn render_filtered(&self, source: &str) -> String {
-        self.filtered_printer(source).render()
+    /// Render filtered with source map.
+    pub fn render_filtered(&self, sources: &SourceMap) -> String {
+        self.filtered_printer(sources).render()
     }
 
-    pub fn render_filtered_colored(&self, source: &str, colored: bool) -> String {
-        self.filtered_printer(source).colored(colored).render()
+    /// Render filtered with source map, colored output.
+    pub fn render_filtered_colored(&self, sources: &SourceMap, colored: bool) -> String {
+        self.filtered_printer(sources).colored(colored).render()
     }
 
     pub fn extend(&mut self, other: Diagnostics) {
@@ -201,8 +207,22 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
+    /// Related info in same file (backward compat).
     pub fn related_to(mut self, msg: impl Into<String>, range: TextRange) -> Self {
         self.message.related.push(RelatedInfo::new(range, msg));
+        self
+    }
+
+    /// Related info in different file.
+    pub fn related_in(
+        mut self,
+        source: SourceId,
+        range: TextRange,
+        msg: impl Into<String>,
+    ) -> Self {
+        self.message
+            .related
+            .push(RelatedInfo::in_source(source, range, msg));
         self
     }
 

@@ -9,6 +9,8 @@
 //! dependents (like type inference).
 
 use indexmap::{IndexMap, IndexSet};
+
+use super::source_map::SourceId;
 use rowan::TextRange;
 
 use crate::Diagnostics;
@@ -40,12 +42,12 @@ pub fn analyze_dependencies<'q>(symbol_table: &SymbolTable<'q>) -> DependencyAna
 /// Validate recursion using the pre-computed dependency analysis.
 pub fn validate_recursion<'q>(
     analysis: &DependencyAnalysis<'q>,
-    ast: &Root,
+    ast_map: &IndexMap<SourceId, Root>,
     symbol_table: &SymbolTable<'q>,
     diag: &mut Diagnostics,
 ) {
     let mut validator = RecursionValidator {
-        ast,
+        ast_map,
         symbol_table,
         diag,
     };
@@ -57,7 +59,7 @@ pub fn validate_recursion<'q>(
 // -----------------------------------------------------------------------------
 
 struct RecursionValidator<'a, 'q, 'd> {
-    ast: &'a Root,
+    ast_map: &'a IndexMap<SourceId, Root>,
     symbol_table: &'a SymbolTable<'q>,
     diag: &'d mut Diagnostics,
 }
@@ -77,7 +79,7 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
             let is_self_recursive = self
                 .symbol_table
                 .get(name)
-                .map(|body| collect_refs(body, self.symbol_table).contains(name))
+                .map(|(_, body)| collect_refs(body, self.symbol_table).contains(name))
                 .unwrap_or(false);
 
             if !is_self_recursive {
@@ -93,14 +95,14 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
         let has_escape = scc.iter().any(|name| {
             self.symbol_table
                 .get(*name)
-                .map(|body| expr_has_escape(body, &scc_set))
+                .map(|(_, body)| expr_has_escape(body, &scc_set))
                 .unwrap_or(true)
         });
 
         if !has_escape {
             // Find a cycle to report. Any cycle within the SCC is an infinite recursion loop
             // because there are no escape paths.
-            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, expr, target| {
+            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
                 find_ref_range(expr, target)
             }) {
                 let chain = self.format_chain(raw_chain, false);
@@ -112,7 +114,7 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
         // 2. Check for infinite loops (Guarded Recursion Analysis)
         // Even if there is an escape, every recursive cycle must consume input (be guarded).
         // We look for a cycle composed entirely of unguarded references.
-        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, expr, target| {
+        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
             find_unguarded_ref_range(expr, target)
         }) {
             let chain = self.format_chain(raw_chain, true);
@@ -126,15 +128,16 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
         &self,
         nodes: &[&'q str],
         domain: &IndexSet<&'q str>,
-        get_edge_location: impl Fn(&Self, &Expr, &str) -> Option<TextRange>,
-    ) -> Option<Vec<(TextRange, &'q str)>> {
+        get_edge_location: impl Fn(&Self, SourceId, &Expr, &str) -> Option<TextRange>,
+    ) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
-            if let Some(body) = self.symbol_table.get(*name) {
+            if let Some(&(source_id, ref body)) = self.symbol_table.get(*name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
-                        get_edge_location(self, body, target).map(|range| (*target, range))
+                        get_edge_location(self, source_id, body, target)
+                            .map(|range| (*target, source_id, range))
                     })
                     .collect::<Vec<_>>();
                 adj.insert(*name, neighbors);
@@ -146,30 +149,30 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
 
     fn format_chain(
         &self,
-        chain: Vec<(TextRange, &'q str)>,
+        chain: Vec<(SourceId, TextRange, &'q str)>,
         is_unguarded: bool,
-    ) -> Vec<(TextRange, String)> {
+    ) -> Vec<(SourceId, TextRange, String)> {
         if chain.len() == 1 {
-            let (range, target) = &chain[0];
+            let (source_id, range, target) = &chain[0];
             let msg = if is_unguarded {
                 "references itself".to_string()
             } else {
                 format!("{} references itself", target)
             };
-            return vec![(*range, msg)];
+            return vec![(*source_id, *range, msg)];
         }
 
         let len = chain.len();
         chain
             .into_iter()
             .enumerate()
-            .map(|(i, (range, target))| {
+            .map(|(i, (source_id, range, target))| {
                 let msg = if i == len - 1 {
                     format!("references {} (completing cycle)", target)
                 } else {
                     format!("references {}", target)
                 };
-                (range, msg)
+                (source_id, range, msg)
             })
             .collect()
     }
@@ -178,12 +181,12 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
         &mut self,
         kind: DiagnosticKind,
         scc: &[&'q str],
-        chain: Vec<(TextRange, String)>,
+        chain: Vec<(SourceId, TextRange, String)>,
     ) {
-        let primary_loc = chain
+        let (primary_source, primary_loc) = chain
             .first()
-            .map(|(r, _)| *r)
-            .unwrap_or_else(|| TextRange::empty(0.into()));
+            .map(|(s, r, _)| (*s, *r))
+            .unwrap_or_else(|| (SourceId::default(), TextRange::empty(0.into())));
 
         let related_def = if scc.len() > 1 {
             self.find_def_info_containing(scc, primary_loc)
@@ -191,9 +194,9 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
             None
         };
 
-        let mut builder = self.diag.report(kind, primary_loc);
+        let mut builder = self.diag.report(primary_source, kind, primary_loc);
 
-        for (range, msg) in chain {
+        for (_, range, msg) in chain {
             builder = builder.related_to(msg, range);
         }
 
@@ -213,7 +216,7 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
             .find(|name| {
                 self.symbol_table
                     .get(*name)
-                    .map(|body| body.text_range().contains_range(range))
+                    .map(|(_, body)| body.text_range().contains_range(range))
                     .unwrap_or(false)
             })
             .and_then(|name| {
@@ -225,9 +228,10 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
     }
 
     fn find_def_by_name(&self, name: &str) -> Option<Def> {
-        self.ast
-            .defs()
-            .find(|d| d.name().map(|n| n.text() == name).unwrap_or(false))
+        self.ast_map.values().find_map(|ast| {
+            ast.defs()
+                .find(|d| d.name().map(|n| n.text() == name).unwrap_or(false))
+        })
     }
 }
 
@@ -273,7 +277,7 @@ impl<'a, 'q> SccFinder<'a, 'q> {
         self.stack.push(name);
         self.on_stack.insert(name);
 
-        if let Some(body) = self.symbol_table.get(name) {
+        if let Some((_, body)) = self.symbol_table.get(name) {
             let refs = collect_refs(body, self.symbol_table);
             for ref_name in refs {
                 // We've already resolved to canonical &'q str in collect_refs
@@ -311,18 +315,18 @@ impl<'a, 'q> SccFinder<'a, 'q> {
 // -----------------------------------------------------------------------------
 
 struct CycleFinder<'a, 'q> {
-    adj: &'a IndexMap<&'q str, Vec<(&'q str, TextRange)>>,
+    adj: &'a IndexMap<&'q str, Vec<(&'q str, SourceId, TextRange)>>,
     visited: IndexSet<&'q str>,
     on_path: IndexMap<&'q str, usize>,
     path: Vec<&'q str>,
-    edges: Vec<TextRange>,
+    edges: Vec<(SourceId, TextRange)>,
 }
 
 impl<'a, 'q> CycleFinder<'a, 'q> {
     fn find(
         nodes: &[&'q str],
-        adj: &'a IndexMap<&'q str, Vec<(&'q str, TextRange)>>,
-    ) -> Option<Vec<(TextRange, &'q str)>> {
+        adj: &'a IndexMap<&'q str, Vec<(&'q str, SourceId, TextRange)>>,
+    ) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
         let mut finder = Self {
             adj,
             visited: IndexSet::new(),
@@ -339,7 +343,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         None
     }
 
-    fn dfs(&mut self, current: &'q str) -> Option<Vec<(TextRange, &'q str)>> {
+    fn dfs(&mut self, current: &'q str) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
         if self.on_path.contains_key(current) {
             return None;
         }
@@ -353,18 +357,19 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         self.path.push(current);
 
         if let Some(neighbors) = self.adj.get(current) {
-            for (target, range) in neighbors {
+            for (target, source_id, range) in neighbors {
                 if let Some(&start_index) = self.on_path.get(target) {
                     // Cycle detected!
                     let mut chain = Vec::new();
                     for i in start_index..self.path.len() - 1 {
-                        chain.push((self.edges[i], self.path[i + 1]));
+                        let (src, rng) = self.edges[i];
+                        chain.push((src, rng, self.path[i + 1]));
                     }
-                    chain.push((*range, *target));
+                    chain.push((*source_id, *range, *target));
                     return Some(chain);
                 }
 
-                self.edges.push(*range);
+                self.edges.push((*source_id, *range));
                 if let Some(chain) = self.dfs(target) {
                     return Some(chain);
                 }

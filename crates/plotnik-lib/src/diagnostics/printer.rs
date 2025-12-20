@@ -5,28 +5,22 @@ use std::fmt::Write;
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 use rowan::TextRange;
 
+use super::SourceMap;
 use super::message::{DiagnosticMessage, Severity};
 
 pub struct DiagnosticsPrinter<'a> {
     diagnostics: Vec<DiagnosticMessage>,
-    source: &'a str,
-    path: Option<&'a str>,
+    sources: &'a SourceMap,
     colored: bool,
 }
 
 impl<'a> DiagnosticsPrinter<'a> {
-    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, source: &'a str) -> Self {
+    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, sources: &'a SourceMap) -> Self {
         Self {
             diagnostics,
-            source,
-            path: None,
+            sources,
             colored: false,
         }
-    }
-
-    pub fn path(mut self, path: &'a str) -> Self {
-        self.path = Some(path);
-        self
     }
 
     pub fn colored(mut self, value: bool) -> Self {
@@ -48,33 +42,58 @@ impl<'a> DiagnosticsPrinter<'a> {
         };
 
         for (i, diag) in self.diagnostics.iter().enumerate() {
-            let range = adjust_range(diag.range, self.source.len());
+            let Some(primary_content) = self.sources.content(diag.source) else {
+                continue;
+            };
 
-            let mut snippet = Snippet::source(self.source)
-                .line_start(1)
-                .annotation(AnnotationKind::Primary.span(range.clone()));
+            let range = adjust_range(diag.range, primary_content.len());
 
-            if let Some(p) = self.path {
-                snippet = snippet.path(p);
+            let mut primary_snippet = Snippet::source(primary_content).line_start(1);
+            if let Some(name) = self.sources.name(diag.source) {
+                primary_snippet = primary_snippet.path(name);
             }
+            primary_snippet =
+                primary_snippet.annotation(AnnotationKind::Primary.span(range.clone()));
+
+            // Collect same-file and cross-file related info separately
+            let mut cross_file_snippets = Vec::new();
 
             for related in &diag.related {
-                snippet = snippet.annotation(
-                    AnnotationKind::Context
-                        .span(adjust_range(related.range, self.source.len()))
-                        .label(&related.message),
-                );
+                if related.span.source == diag.source {
+                    // Same file: add annotation to primary snippet
+                    primary_snippet = primary_snippet.annotation(
+                        AnnotationKind::Context
+                            .span(adjust_range(related.span.range, primary_content.len()))
+                            .label(&related.message),
+                    );
+                } else if let Some(related_content) = self.sources.content(related.span.source) {
+                    // Different file: create separate snippet
+                    let mut snippet = Snippet::source(related_content).line_start(1);
+                    if let Some(name) = self.sources.name(related.span.source) {
+                        snippet = snippet.path(name);
+                    }
+                    snippet = snippet.annotation(
+                        AnnotationKind::Context
+                            .span(adjust_range(related.span.range, related_content.len()))
+                            .label(&related.message),
+                    );
+                    cross_file_snippets.push(snippet);
+                }
             }
 
             let level = severity_to_level(diag.severity());
-            let title_group = level.primary_title(&diag.message).element(snippet);
+            let mut title_group = level.primary_title(&diag.message).element(primary_snippet);
+
+            for snippet in cross_file_snippets {
+                title_group = title_group.element(snippet);
+            }
 
             let mut report: Vec<Group> = vec![title_group];
 
             if let Some(fix) = &diag.fix {
                 report.push(
                     Level::HELP.secondary_title(&fix.description).element(
-                        Snippet::source(self.source)
+                        Snippet::source(primary_content)
                             .line_start(1)
                             .patch(Patch::new(range, &fix.replacement)),
                     ),

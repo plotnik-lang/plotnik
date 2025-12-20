@@ -61,7 +61,8 @@ fn builder_with_related() {
         .emit();
 
     assert_eq!(diagnostics.len(), 1);
-    let result = diagnostics.printer("hello world!").render();
+    let map = SourceMap::one_liner("hello world!");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: missing closing `)`; primary
       |
@@ -82,7 +83,8 @@ fn builder_with_fix() {
         .fix("apply this fix", "fixed")
         .emit();
 
-    let result = diagnostics.printer("hello world").render();
+    let (map, _) = SourceMap::anonymous("hello world");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: use `:` for field constraints, not `=`; fixable
       |
@@ -111,7 +113,8 @@ fn builder_with_all_options() {
         .fix("try this", "HELLO")
         .emit();
 
-    let result = diagnostics.printer("hello world stuff!").render();
+    let (map, _) = SourceMap::anonymous("hello world stuff!");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: missing closing `)`; main error
       |
@@ -139,7 +142,8 @@ fn printer_colored() {
         .message("test")
         .emit();
 
-    let result = diagnostics.printer("hello").colored(true).render();
+    let (map, _) = SourceMap::anonymous("hello");
+    let result = diagnostics.printer_with(&map).colored(true).render();
     assert!(result.contains("test"));
     assert!(result.contains('\x1b'));
 }
@@ -147,12 +151,13 @@ fn printer_colored() {
 #[test]
 fn printer_empty_diagnostics() {
     let diagnostics = Diagnostics::new();
-    let result = diagnostics.printer("source").render();
+    let (map, _) = SourceMap::anonymous("source");
+    let result = diagnostics.printer_with(&map).render();
     assert!(result.is_empty());
 }
 
 #[test]
-fn printer_with_path() {
+fn printer_with_custom_path() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
@@ -162,7 +167,9 @@ fn printer_with_path() {
         .message("test error")
         .emit();
 
-    let result = diagnostics.printer("hello world").path("test.pql").render();
+    let mut map = SourceMap::new();
+    map.add("test.pql", "hello world");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: `test error` is not defined
      --> test.pql:1:1
@@ -183,7 +190,8 @@ fn printer_zero_width_span() {
         .message("zero width error")
         .emit();
 
-    let result = diagnostics.printer("hello").render();
+    let (map, _) = SourceMap::anonymous("hello");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: expected an expression; zero width error
       |
@@ -204,7 +212,8 @@ fn printer_related_zero_width() {
         .related_to("zero width related", TextRange::empty(6.into()))
         .emit();
 
-    let result = diagnostics.printer("hello world!").render();
+    let (map, _) = SourceMap::anonymous("hello world!");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: missing closing `)`; primary
       |
@@ -231,7 +240,8 @@ fn printer_multiple_diagnostics() {
         .message("second error")
         .emit();
 
-    let result = diagnostics.printer("hello world!").render();
+    let (map, _) = SourceMap::anonymous("hello world!");
+    let result = diagnostics.printer_with(&map).render();
     insta::assert_snapshot!(result, @r"
     error: missing closing `)`; first error
       |
@@ -454,8 +464,101 @@ fn render_filtered() {
         .message("unnamed def")
         .emit();
 
-    let result = diagnostics.render_filtered("(function_declaration");
+    let (map, _) = SourceMap::anonymous("(function_declaration");
+    let result = diagnostics.render_filtered_with(&map);
     // Should only show the unclosed tree error
     assert!(result.contains("unclosed tree"));
     assert!(!result.contains("unnamed def"));
+}
+
+// Multi-file diagnostics tests
+
+#[test]
+fn multi_file_cross_file_related() {
+    let mut map = SourceMap::new();
+    let file_a = map.add("a.ptk", "Foo = (bar)");
+    let file_b = map.add("b.ptk", "(Foo) @x");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report_in(
+            file_b,
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(1.into(), 4.into()),
+        )
+        .message("Foo")
+        .related_in(file_a, TextRange::new(0.into(), 3.into()), "defined here")
+        .emit();
+
+    let result = diagnostics.printer_with(&map).render();
+    insta::assert_snapshot!(result, @r"
+    error: `Foo` is not defined
+     --> b.ptk:1:2
+      |
+    1 | (Foo) @x
+      |  ^^^
+      |
+     ::: a.ptk:1:1
+      |
+    1 | Foo = (bar)
+      | --- defined here
+    ");
+}
+
+#[test]
+fn multi_file_same_file_related() {
+    let mut map = SourceMap::new();
+    let file_a = map.add("main.ptk", "Foo = (bar) Foo = (baz)");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report_in(
+            file_a,
+            DiagnosticKind::DuplicateDefinition,
+            TextRange::new(12.into(), 15.into()),
+        )
+        .message("Foo")
+        .related_in(
+            file_a,
+            TextRange::new(0.into(), 3.into()),
+            "first defined here",
+        )
+        .emit();
+
+    let result = diagnostics.printer_with(&map).render();
+    insta::assert_snapshot!(result, @r"
+    error: `Foo` is already defined
+     --> main.ptk:1:13
+      |
+    1 | Foo = (bar) Foo = (baz)
+      | ---         ^^^
+      | |
+      | first defined here
+    ");
+}
+
+#[test]
+fn source_map_iteration() {
+    let mut map = SourceMap::new();
+    map.add("a.ptk", "content a");
+    map.add("b.ptk", "content b");
+
+    assert_eq!(map.len(), 2);
+    assert!(!map.is_empty());
+
+    let names: Vec<_> = map.iter().map(|(_, name, _)| name).collect();
+    assert_eq!(names, vec![Some("a.ptk"), Some("b.ptk")]);
+}
+
+#[test]
+fn source_id_default() {
+    assert_eq!(SourceId::DEFAULT, SourceId::default());
+}
+
+#[test]
+fn span_anonymous() {
+    let range = TextRange::new(5.into(), 10.into());
+    let span = Span::anonymous(range);
+    assert_eq!(span.source, SourceId::DEFAULT);
+    assert_eq!(span.range, range);
 }
