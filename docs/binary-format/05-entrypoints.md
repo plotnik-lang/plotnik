@@ -1,6 +1,6 @@
 # Binary Format: Entrypoints
 
-This section defines the named entry points for the query. Each definition can be executed against a syntax tree.
+This section defines the named entry points for the query. Every named definition in the workspace is an entrypoint and can be executed against a syntax tree.
 
 ## Layout
 
