@@ -175,38 +175,38 @@ fn reference_in_capture() {
 fn entry_point_reference() {
     let input = indoc! {r#"
     Expr = (expression)
-    (call function: (Expr))
+    Q = (call function: (Expr))
     "#};
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_symbols(), @r"
     Expr
-    _
+    Q
       Expr
     ");
 }
 
 #[test]
 fn entry_point_undefined_reference() {
-    let input = "(call function: (Unknown))";
+    let input = "Q = (call function: (Unknown))";
 
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `Unknown` is not defined
       |
-    1 | (call function: (Unknown))
-      |                  ^^^^^^^
+    1 | Q = (call function: (Unknown))
+      |                      ^^^^^^^
     ");
 }
 
 #[test]
 fn no_definitions() {
-    let input = "(identifier)";
+    let input = "Q = (identifier)";
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_symbols(), @"_");
+    insta::assert_snapshot!(query.dump_symbols(), @"Q");
 }
 
 #[test]
@@ -237,25 +237,25 @@ fn nested_references() {
 
 #[test]
 fn multiple_undefined() {
-    let input = "(foo (X) (Y) (Z))";
+    let input = "Q = (foo (X) (Y) (Z))";
 
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `X` is not defined
       |
-    1 | (foo (X) (Y) (Z))
-      |       ^
+    1 | Q = (foo (X) (Y) (Z))
+      |           ^
 
     error: `Y` is not defined
       |
-    1 | (foo (X) (Y) (Z))
-      |           ^
+    1 | Q = (foo (X) (Y) (Z))
+      |               ^
 
     error: `Z` is not defined
       |
-    1 | (foo (X) (Y) (Z))
-      |               ^
+    1 | Q = (foo (X) (Y) (Z))
+      |                   ^
     ");
 }
 

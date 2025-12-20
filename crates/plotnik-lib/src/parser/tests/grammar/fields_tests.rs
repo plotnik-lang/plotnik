@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn field_expression() {
     let input = indoc! {r#"
-    (call function: (identifier))
+    Q = (call function: (identifier))
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn field_expression() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "call"
@@ -29,7 +31,7 @@ fn field_expression() {
 #[test]
 fn multiple_fields() {
     let input = indoc! {r#"
-    (assignment
+    Q = (assignment
         left: (identifier)
         right: (expression))
     "#};
@@ -39,6 +41,8 @@ fn multiple_fields() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "assignment"
@@ -63,7 +67,7 @@ fn multiple_fields() {
 #[test]
 fn negated_field() {
     let input = indoc! {r#"
-    (function !async)
+    Q = (function !async)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -71,6 +75,8 @@ fn negated_field() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "function"
@@ -84,7 +90,7 @@ fn negated_field() {
 #[test]
 fn negated_and_regular_fields() {
     let input = indoc! {r#"
-    (function
+    Q = (function
         !async
         name: (identifier))
     "#};
@@ -94,6 +100,8 @@ fn negated_and_regular_fields() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "function"
@@ -114,7 +122,7 @@ fn negated_and_regular_fields() {
 #[test]
 fn mixed_children_and_fields() {
     let input = indoc! {r#"
-    (if
+    Q = (if
         condition: (expr)
         (then_block)
         else: (else_block))
@@ -125,6 +133,8 @@ fn mixed_children_and_fields() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "if"
@@ -153,7 +163,7 @@ fn mixed_children_and_fields() {
 #[test]
 fn fields_and_quantifiers() {
     let input = indoc! {r#"
-    (node
+    Q = (node
         foo: (foo)?
         foo: (foo)??
         bar: (bar)*
@@ -167,6 +177,8 @@ fn fields_and_quantifiers() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "node"
@@ -231,7 +243,7 @@ fn fields_and_quantifiers() {
 #[test]
 fn fields_with_quantifiers_and_captures() {
     let input = indoc! {r#"
-    (node foo: (bar)* @baz)
+    Q = (node foo: (bar)* @baz)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -239,6 +251,8 @@ fn fields_with_quantifiers_and_captures() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "node"

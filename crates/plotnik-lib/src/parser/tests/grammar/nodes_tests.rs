@@ -11,7 +11,7 @@ fn empty_input() {
 #[test]
 fn simple_named_node() {
     let input = indoc! {r#"
-    (identifier)
+    Q = (identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -19,6 +19,8 @@ fn simple_named_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "identifier"
@@ -29,7 +31,7 @@ fn simple_named_node() {
 #[test]
 fn nested_node() {
     let input = indoc! {r#"
-    (function_definition name: (identifier))
+    Q = (function_definition name: (identifier))
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -37,6 +39,8 @@ fn nested_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "function_definition"
@@ -54,7 +58,7 @@ fn nested_node() {
 #[test]
 fn deeply_nested() {
     let input = indoc! {r#"
-    (a
+    Q = (a
         (b
         (c
             (d))))
@@ -65,6 +69,8 @@ fn deeply_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "a"
@@ -87,7 +93,7 @@ fn deeply_nested() {
 #[test]
 fn sibling_children() {
     let input = indoc! {r#"
-    (block
+    Q = (block
         (statement)
         (statement)
         (statement))
@@ -98,6 +104,8 @@ fn sibling_children() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "block"
@@ -120,7 +128,7 @@ fn sibling_children() {
 #[test]
 fn wildcard() {
     let input = indoc! {r#"
-    (_)
+    Q = (_)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -128,6 +136,8 @@ fn wildcard() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Underscore "_"
@@ -138,7 +148,7 @@ fn wildcard() {
 #[test]
 fn anonymous_node() {
     let input = indoc! {r#"
-    "if"
+    Q = "if"
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -146,6 +156,8 @@ fn anonymous_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Str
           DoubleQuote "\""
           StrVal "if"
@@ -156,7 +168,7 @@ fn anonymous_node() {
 #[test]
 fn anonymous_node_operator() {
     let input = indoc! {r#"
-    "+="
+    Q = "+="
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -164,6 +176,8 @@ fn anonymous_node_operator() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Str
           DoubleQuote "\""
           StrVal "+="
@@ -174,7 +188,7 @@ fn anonymous_node_operator() {
 #[test]
 fn supertype_basic() {
     let input = indoc! {r#"
-    (expression/binary_expression)
+    Q = (expression/binary_expression)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -182,6 +196,8 @@ fn supertype_basic() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "expression"
@@ -194,7 +210,7 @@ fn supertype_basic() {
 #[test]
 fn supertype_with_string_subtype() {
     let input = indoc! {r#"
-    (expression/"()")
+    Q = (expression/"()")
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -202,6 +218,8 @@ fn supertype_with_string_subtype() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "expression"
@@ -216,7 +234,7 @@ fn supertype_with_string_subtype() {
 #[test]
 fn supertype_with_capture() {
     let input = indoc! {r#"
-    (expression/binary_expression) @expr
+    Q = (expression/binary_expression) @expr
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -224,6 +242,8 @@ fn supertype_with_capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -239,7 +259,7 @@ fn supertype_with_capture() {
 #[test]
 fn supertype_with_children() {
     let input = indoc! {r#"
-    (expression/binary_expression
+    Q = (expression/binary_expression
         left: (_) @left
         right: (_) @right)
     "#};
@@ -249,6 +269,8 @@ fn supertype_with_children() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "expression"
@@ -281,7 +303,7 @@ fn supertype_with_children() {
 #[test]
 fn supertype_nested() {
     let input = indoc! {r#"
-    (statement/expression_statement
+    Q = (statement/expression_statement
         (expression/call_expression))
     "#};
 
@@ -290,6 +312,8 @@ fn supertype_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "statement"
@@ -308,7 +332,7 @@ fn supertype_nested() {
 #[test]
 fn supertype_in_alternation() {
     let input = indoc! {r#"
-    [(expression/identifier) (expression/number)]
+    Q = [(expression/identifier) (expression/number)]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -316,6 +340,8 @@ fn supertype_in_alternation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -339,7 +365,7 @@ fn supertype_in_alternation() {
 #[test]
 fn no_supertype_plain_node() {
     let input = indoc! {r#"
-    (identifier)
+    Q = (identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -347,6 +373,8 @@ fn no_supertype_plain_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "identifier"

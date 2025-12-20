@@ -350,7 +350,7 @@ fn valid_non_recursive_reference() {
 fn valid_entry_point_using_recursive_def() {
     let input = indoc! {r#"
         E = [(x) (call (E))]
-        (program (E))
+        Q = (program (E))
     "#};
     let query = Query::try_from(input).unwrap();
 

@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn valid_query_with_field() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             name: (identifier) @name) @fn
     "#};
 
@@ -15,7 +15,7 @@ fn valid_query_with_field() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
-      Def
+      Def Q
         CapturedExpr @fn
           NamedNode function_declaration
             CapturedExpr @name
@@ -27,7 +27,7 @@ fn valid_query_with_field() {
 #[test]
 fn unknown_node_type_with_suggestion() {
     let input = indoc! {r#"
-        (function_declaraton) @fn
+        Q = (function_declaraton) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -38,8 +38,8 @@ fn unknown_node_type_with_suggestion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
       |
-    1 | (function_declaraton) @fn
-      |  ^^^^^^^^^^^^^^^^^^^
+    1 | Q = (function_declaraton) @fn
+      |      ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
     ");
@@ -48,7 +48,7 @@ fn unknown_node_type_with_suggestion() {
 #[test]
 fn unknown_node_type_no_suggestion() {
     let input = indoc! {r#"
-        (xyzzy_foobar_baz) @fn
+        Q = (xyzzy_foobar_baz) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -59,15 +59,15 @@ fn unknown_node_type_no_suggestion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `xyzzy_foobar_baz` is not a valid node type
       |
-    1 | (xyzzy_foobar_baz) @fn
-      |  ^^^^^^^^^^^^^^^^
+    1 | Q = (xyzzy_foobar_baz) @fn
+      |      ^^^^^^^^^^^^^^^^
     ");
 }
 
 #[test]
 fn unknown_field_with_suggestion() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             nme: (identifier) @name) @fn
     "#};
 
@@ -89,7 +89,7 @@ fn unknown_field_with_suggestion() {
 #[test]
 fn unknown_field_no_suggestion() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             xyzzy: (identifier) @name) @fn
     "#};
 
@@ -109,7 +109,7 @@ fn unknown_field_no_suggestion() {
 #[test]
 fn field_not_on_node_type() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             condition: (identifier) @name) @fn
     "#};
 
@@ -121,8 +121,8 @@ fn field_not_on_node_type() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `condition` is not valid on this node type
       |
-    1 | (function_declaration
-      |  -------------------- on `function_declaration`
+    1 | Q = (function_declaration
+      |      -------------------- on `function_declaration`
     2 |     condition: (identifier) @name) @fn
       |     ^^^^^^^^^
       |
@@ -133,7 +133,7 @@ fn field_not_on_node_type() {
 #[test]
 fn field_not_on_node_type_with_suggestion() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             parameter: (formal_parameters) @params) @fn
     "#};
 
@@ -145,8 +145,8 @@ fn field_not_on_node_type_with_suggestion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `parameter` is not valid on this node type
       |
-    1 | (function_declaration
-      |  -------------------- on `function_declaration`
+    1 | Q = (function_declaration
+      |      -------------------- on `function_declaration`
     2 |     parameter: (formal_parameters) @params) @fn
       |     ^^^^^^^^^
       |
@@ -158,7 +158,7 @@ fn field_not_on_node_type_with_suggestion() {
 #[test]
 fn negated_field_unknown() {
     let input = indoc! {r#"
-        (function_declaration !nme) @fn
+        Q = (function_declaration !nme) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -169,8 +169,8 @@ fn negated_field_unknown() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `nme` is not a valid field
       |
-    1 | (function_declaration !nme) @fn
-      |                        ^^^
+    1 | Q = (function_declaration !nme) @fn
+      |                            ^^^
       |
     help: did you mean `name`?
     ");
@@ -179,7 +179,7 @@ fn negated_field_unknown() {
 #[test]
 fn negated_field_not_on_node_type() {
     let input = indoc! {r#"
-        (function_declaration !condition) @fn
+        Q = (function_declaration !condition) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -190,10 +190,10 @@ fn negated_field_not_on_node_type() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `condition` is not valid on this node type
       |
-    1 | (function_declaration !condition) @fn
-      |  --------------------  ^^^^^^^^^
-      |  |
-      |  on `function_declaration`
+    1 | Q = (function_declaration !condition) @fn
+      |      --------------------  ^^^^^^^^^
+      |      |
+      |      on `function_declaration`
       |
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
@@ -202,7 +202,7 @@ fn negated_field_not_on_node_type() {
 #[test]
 fn negated_field_not_on_node_type_with_suggestion() {
     let input = indoc! {r#"
-        (function_declaration !parameter) @fn
+        Q = (function_declaration !parameter) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -213,10 +213,10 @@ fn negated_field_not_on_node_type_with_suggestion() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `parameter` is not valid on this node type
       |
-    1 | (function_declaration !parameter) @fn
-      |  --------------------  ^^^^^^^^^
-      |  |
-      |  on `function_declaration`
+    1 | Q = (function_declaration !parameter) @fn
+      |      --------------------  ^^^^^^^^^
+      |      |
+      |      on `function_declaration`
       |
     help: did you mean `parameters`?
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
@@ -226,7 +226,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
 #[test]
 fn negated_field_valid() {
     let input = indoc! {r#"
-        (function_declaration !name) @fn
+        Q = (function_declaration !name) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -236,7 +236,7 @@ fn negated_field_valid() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
-      Def
+      Def Q
         CapturedExpr @fn
           NamedNode function_declaration
             NegatedField !name
@@ -246,7 +246,7 @@ fn negated_field_valid() {
 #[test]
 fn anonymous_node_unknown() {
     let input = indoc! {r#"
-        (function_declaration "xyzzy_fake_token") @fn
+        Q = (function_declaration "xyzzy_fake_token") @fn
     "#};
 
     let query = Query::try_from(input)
@@ -257,15 +257,15 @@ fn anonymous_node_unknown() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: `xyzzy_fake_token` is not a valid node type
       |
-    1 | (function_declaration "xyzzy_fake_token") @fn
-      |                        ^^^^^^^^^^^^^^^^
+    1 | Q = (function_declaration "xyzzy_fake_token") @fn
+      |                            ^^^^^^^^^^^^^^^^
     "#);
 }
 
 #[test]
 fn error_and_missing_nodes_skip_validation() {
     let input = indoc! {r#"
-        (ERROR) @err
+        Q = (ERROR) @err
     "#};
 
     let query = Query::try_from(input)
@@ -275,7 +275,7 @@ fn error_and_missing_nodes_skip_validation() {
     assert!(query.is_valid());
 
     let input2 = indoc! {r#"
-        (MISSING) @miss
+        Q = (MISSING) @miss
     "#};
 
     let query2 = Query::try_from(input2)
@@ -288,7 +288,7 @@ fn error_and_missing_nodes_skip_validation() {
 #[test]
 fn multiple_errors_in_query() {
     let input = indoc! {r#"
-        (function_declaraton
+        Q = (function_declaraton
             nme: (identifer) @name) @fn
     "#};
 
@@ -300,8 +300,8 @@ fn multiple_errors_in_query() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
       |
-    1 | (function_declaraton
-      |  ^^^^^^^^^^^^^^^^^^^
+    1 | Q = (function_declaraton
+      |      ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
 
@@ -324,7 +324,7 @@ fn multiple_errors_in_query() {
 #[test]
 fn nested_field_validation() {
     let input = indoc! {r#"
-        (function_declaration
+        Q = (function_declaration
             body: (statement_block
                 (return_statement) @ret) @body) @fn
     "#};
@@ -336,7 +336,7 @@ fn nested_field_validation() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
-      Def
+      Def Q
         CapturedExpr @fn
           NamedNode function_declaration
             CapturedExpr @body
@@ -350,7 +350,7 @@ fn nested_field_validation() {
 #[test]
 fn alternation_with_link_errors() {
     let input = indoc! {r#"
-        [(function_declaraton)
+        Q = [(function_declaraton)
          (class_declaraton)] @decl
     "#};
 
@@ -362,8 +362,8 @@ fn alternation_with_link_errors() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: `function_declaraton` is not a valid node type
       |
-    1 | [(function_declaraton)
-      |   ^^^^^^^^^^^^^^^^^^^
+    1 | Q = [(function_declaraton)
+      |       ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
 
@@ -379,7 +379,7 @@ fn alternation_with_link_errors() {
 #[test]
 fn quantified_expr_validation() {
     let input = indoc! {r#"
-        (statement_block
+        Q = (statement_block
             (function_declaration)+ @fns) @block
     "#};
 
@@ -390,7 +390,7 @@ fn quantified_expr_validation() {
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_ast(), @r"
     Root
-      Def
+      Def Q
         CapturedExpr @block
           NamedNode statement_block
             CapturedExpr @fns
@@ -402,7 +402,7 @@ fn quantified_expr_validation() {
 #[test]
 fn wildcard_node_skips_validation() {
     let input = indoc! {r#"
-        (_) @any
+        Q = (_) @any
     "#};
 
     let query = Query::try_from(input)
@@ -417,7 +417,7 @@ fn def_reference_with_link() {
     let input = indoc! {r#"
         Func = (function_declaration
             name: (identifier) @name) @fn
-        (program (Func)+)
+        Q = (program (Func)+)
     "#};
 
     let query = Query::try_from(input)
@@ -433,7 +433,7 @@ fn def_reference_with_link() {
             CapturedExpr @name
               FieldExpr name:
                 NamedNode identifier
-      Def
+      Def Q
         NamedNode program
           QuantifiedExpr +
             Ref Func
@@ -443,7 +443,7 @@ fn def_reference_with_link() {
 #[test]
 fn field_on_node_without_fields() {
     let input = indoc! {r#"
-        (identifier
+        Q = (identifier
             name: (identifier) @inner) @id
     "#};
 
@@ -455,8 +455,8 @@ fn field_on_node_without_fields() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` is not valid on this node type
       |
-    1 | (identifier
-      |  ---------- on `identifier`
+    1 | Q = (identifier
+      |      ---------- on `identifier`
     2 |     name: (identifier) @inner) @id
       |     ^^^^
       |
@@ -467,7 +467,7 @@ fn field_on_node_without_fields() {
 #[test]
 fn valid_child_via_supertype() {
     let input = indoc! {r#"
-        (statement_block
+        Q = (statement_block
             (function_declaration)) @block
     "#};
 
@@ -481,7 +481,7 @@ fn valid_child_via_supertype() {
 #[test]
 fn valid_child_via_nested_supertype() {
     let input = indoc! {r#"
-        (program
+        Q = (program
             (function_declaration)) @prog
     "#};
 
@@ -495,7 +495,7 @@ fn valid_child_via_nested_supertype() {
 #[test]
 fn deeply_nested_sequences_valid() {
     let input = indoc! {r#"
-        (statement_block {{{(function_declaration)}}}) @block
+        Q = (statement_block {{{(function_declaration)}}}) @block
     "#};
 
     let query = Query::try_from(input)
@@ -508,7 +508,7 @@ fn deeply_nested_sequences_valid() {
 #[test]
 fn deeply_nested_alternations_in_field_valid() {
     let input = indoc! {r#"
-        (function_declaration name: [[[(identifier)]]]) @fn
+        Q = (function_declaration name: [[[(identifier)]]]) @fn
     "#};
 
     let query = Query::try_from(input)
@@ -522,7 +522,7 @@ fn deeply_nested_alternations_in_field_valid() {
 fn ref_followed_valid_case() {
     let input = indoc! {r#"
         Foo = (identifier)
-        (function_declaration name: (Foo))
+        Q = (function_declaration name: (Foo))
     "#};
 
     let query = Query::try_from(input)
@@ -536,7 +536,7 @@ fn ref_followed_valid_case() {
 fn ref_followed_recursive_valid() {
     let input = indoc! {r#"
         Foo = [(identifier) (Foo)]
-        (function_declaration name: (Foo))
+        Q = (function_declaration name: (Foo))
     "#};
 
     let query = Query::try_from(input)

@@ -132,7 +132,7 @@ fn many_fields_exhaust_exec_fuel() {
 #[test]
 fn named_def_missing_equals_with_garbage() {
     let input = indoc! {r#"
-    Expr ^^^ (identifier)
+    Q = Expr ^^^ (identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -140,13 +140,13 @@ fn named_def_missing_equals_with_garbage() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r#"
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
-    1 | Expr ^^^ (identifier)
-      | ^^^^
+    1 | Q = Expr ^^^ (identifier)
+      |     ^^^^
 
     error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
       |
-    1 | Expr ^^^ (identifier)
-      |      ^^^
+    1 | Q = Expr ^^^ (identifier)
+      |          ^^^
     "#);
 }
 
@@ -175,7 +175,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
 #[test]
 fn empty_double_quote_string() {
     let input = indoc! {r#"
-    (a "")
+    Q = (a "")
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -183,6 +183,8 @@ fn empty_double_quote_string() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "a"
@@ -196,7 +198,7 @@ fn empty_double_quote_string() {
 #[test]
 fn empty_single_quote_string() {
     let input = indoc! {r#"
-    (a '')
+    Q = (a '')
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -204,6 +206,8 @@ fn empty_single_quote_string() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "a"
@@ -216,13 +220,15 @@ fn empty_single_quote_string() {
 
 #[test]
 fn single_quote_string_is_valid() {
-    let input = "(node 'if')";
+    let input = "Q = (node 'if')";
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "node"
@@ -236,13 +242,15 @@ fn single_quote_string_is_valid() {
 
 #[test]
 fn single_quote_in_alternation() {
-    let input = "['public' 'private']";
+    let input = "Q = ['public' 'private']";
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -261,13 +269,15 @@ fn single_quote_in_alternation() {
 
 #[test]
 fn single_quote_with_escape() {
-    let input = r"(node 'it\'s')";
+    let input = r"Q = (node 'it\'s')";
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "node"
@@ -281,13 +291,15 @@ fn single_quote_with_escape() {
 
 #[test]
 fn missing_with_nested_tree_parses() {
-    let input = "(MISSING (something))";
+    let input = "Q = (MISSING (something))";
 
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           KwMissing "MISSING"

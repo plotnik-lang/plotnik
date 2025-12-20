@@ -212,10 +212,15 @@ fn unnamed_def_not_allowed_in_middle() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: only the last definition can be unnamed — give it a name like `Name = (first)`
+    error: definitions must be named — give it a name like `Name = (first)`
       |
     1 | (first)
       | ^^^^^^^
+
+    error: definitions must be named — give it a name like `Name = (last)`
+      |
+    3 | (last)
+      | ^^^^^^
     ");
 }
 
@@ -230,15 +235,20 @@ fn multiple_unnamed_defs_errors_for_all_but_last() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: only the last definition can be unnamed — give it a name like `Name = (first)`
+    error: definitions must be named — give it a name like `Name = (first)`
       |
     1 | (first)
       | ^^^^^^^
 
-    error: only the last definition can be unnamed — give it a name like `Name = (second)`
+    error: definitions must be named — give it a name like `Name = (second)`
       |
     2 | (second)
       | ^^^^^^^^
+
+    error: definitions must be named — give it a name like `Name = (third)`
+      |
+    3 | (third)
+      | ^^^^^^^
     ");
 }
 
@@ -251,15 +261,20 @@ fn capture_space_after_dot_is_anchor() {
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: only the last definition can be unnamed — give it a name like `Name = (identifier) @foo`
+    error: definitions must be named — give it a name like `Name = (identifier) @foo`
       |
     1 | (identifier) @foo . (other)
       | ^^^^^^^^^^^^^^^^^
 
-    error: only the last definition can be unnamed — give it a name like `Name = .`
+    error: definitions must be named — give it a name like `Name = .`
       |
     1 | (identifier) @foo . (other)
       |                   ^
+
+    error: definitions must be named — give it a name like `Name = (other)`
+      |
+    1 | (identifier) @foo . (other)
+      |                     ^^^^^^^
     ");
 }
 

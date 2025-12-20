@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn alternation() {
     let input = indoc! {r#"
-    [(identifier) (string)]
+    Q = [(identifier) (string)]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn alternation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -31,7 +33,7 @@ fn alternation() {
 #[test]
 fn alternation_with_anonymous() {
     let input = indoc! {r#"
-    ["true" "false"]
+    Q = ["true" "false"]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -39,6 +41,8 @@ fn alternation_with_anonymous() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -58,7 +62,7 @@ fn alternation_with_anonymous() {
 #[test]
 fn alternation_with_capture() {
     let input = indoc! {r#"
-    [(identifier) (string)] @value
+    Q = [(identifier) (string)] @value
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -66,6 +70,8 @@ fn alternation_with_capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Alt
             BracketOpen "["
@@ -88,7 +94,7 @@ fn alternation_with_capture() {
 #[test]
 fn alternation_with_quantifier() {
     let input = indoc! {r#"
-    [
+    Q = [
       (identifier)
       (string)* @strings
     ]
@@ -99,6 +105,8 @@ fn alternation_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -123,8 +131,9 @@ fn alternation_with_quantifier() {
 #[test]
 fn alternation_nested() {
     let input = indoc! {r#"
-    (expr
-        [(binary) (unary)])
+    Q = (expr
+        [(binary) (unary)]
+    )
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -132,6 +141,8 @@ fn alternation_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "expr"
@@ -155,8 +166,9 @@ fn alternation_nested() {
 #[test]
 fn alternation_in_field() {
     let input = indoc! {r#"
-    (call
-        arguments: [(string) (number)])
+    Q = (call
+        arguments: [(string) (number)]
+    )
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -164,6 +176,8 @@ fn alternation_in_field() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "call"
@@ -190,7 +204,7 @@ fn alternation_in_field() {
 #[test]
 fn unlabeled_alternation_three_items() {
     let input = indoc! {r#"
-    [(identifier) (number) (string)]
+    Q = [(identifier) (number) (string)]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -198,6 +212,8 @@ fn unlabeled_alternation_three_items() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -222,7 +238,7 @@ fn unlabeled_alternation_three_items() {
 #[test]
 fn tagged_alternation_simple() {
     let input = indoc! {r#"
-    [
+    Q = [
         Ident: (identifier)
         Num: (number)
     ]
@@ -233,6 +249,8 @@ fn tagged_alternation_simple() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -256,7 +274,7 @@ fn tagged_alternation_simple() {
 #[test]
 fn tagged_alternation_single_line() {
     let input = indoc! {r#"
-    [A: (a) B: (b) C: (c)]
+    Q = [A: (a) B: (b) C: (c)]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -264,6 +282,8 @@ fn tagged_alternation_single_line() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -294,7 +314,7 @@ fn tagged_alternation_single_line() {
 #[test]
 fn tagged_alternation_with_captures() {
     let input = indoc! {r#"
-    [
+    Q = [
         Assign: (assignment_expression left: (identifier) @left)
         Call: (call_expression function: (identifier) @func)
     ] @stmt
@@ -305,6 +325,8 @@ fn tagged_alternation_with_captures() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Alt
             BracketOpen "["
@@ -351,7 +373,7 @@ fn tagged_alternation_with_captures() {
 #[test]
 fn tagged_alternation_with_type_annotation() {
     let input = indoc! {r#"
-    [
+    Q = [
         Base: (identifier) @name
         Access: (member_expression object: (_) @obj)
     ] @chain :: MemberChain
@@ -362,6 +384,8 @@ fn tagged_alternation_with_type_annotation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Alt
             BracketOpen "["
@@ -404,7 +428,7 @@ fn tagged_alternation_with_type_annotation() {
 #[test]
 fn tagged_alternation_nested() {
     let input = indoc! {r#"
-    (expr
+    Q = (expr
         [
             Binary: (binary_expression)
             Unary: (unary_expression)
@@ -416,6 +440,8 @@ fn tagged_alternation_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "expr"
@@ -487,7 +513,7 @@ fn tagged_alternation_in_named_def() {
 #[test]
 fn tagged_alternation_with_quantifier() {
     let input = indoc! {r#"
-    [
+    Q = [
         Single: (statement)
         Multiple: (statement)+
     ]
@@ -498,6 +524,8 @@ fn tagged_alternation_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -523,7 +551,7 @@ fn tagged_alternation_with_quantifier() {
 #[test]
 fn tagged_alternation_with_sequence() {
     let input = indoc! {r#"
-    [
+    Q = [
         Pair: {(key) (value)}
         Single: (value)
     ]
@@ -534,6 +562,8 @@ fn tagged_alternation_with_sequence() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -564,7 +594,7 @@ fn tagged_alternation_with_sequence() {
 #[test]
 fn tagged_alternation_with_nested_alternation() {
     let input = indoc! {r#"
-    [
+    Q = [
         Literal: [(number) (string)]
         Ident: (identifier)
     ]
@@ -575,6 +605,8 @@ fn tagged_alternation_with_nested_alternation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
