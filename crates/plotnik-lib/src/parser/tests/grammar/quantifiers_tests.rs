@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn quantifier_star() {
     let input = indoc! {r#"
-    (statement)*
+    Q = (statement)*
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn quantifier_star() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Tree
             ParenOpen "("
@@ -24,7 +26,7 @@ fn quantifier_star() {
 #[test]
 fn quantifier_plus() {
     let input = indoc! {r#"
-    (statement)+
+    Q = (statement)+
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -32,6 +34,8 @@ fn quantifier_plus() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Tree
             ParenOpen "("
@@ -44,7 +48,7 @@ fn quantifier_plus() {
 #[test]
 fn quantifier_optional() {
     let input = indoc! {r#"
-    (statement)?
+    Q = (statement)?
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -52,6 +56,8 @@ fn quantifier_optional() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Tree
             ParenOpen "("
@@ -64,7 +70,7 @@ fn quantifier_optional() {
 #[test]
 fn quantifier_with_capture() {
     let input = indoc! {r#"
-    (statement)* @statements
+    Q = (statement)* @statements
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -72,6 +78,8 @@ fn quantifier_with_capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Quantifier
             Tree
@@ -87,7 +95,7 @@ fn quantifier_with_capture() {
 #[test]
 fn quantifier_inside_node() {
     let input = indoc! {r#"
-    (block
+    Q = (block
         (statement)*)
     "#};
 
@@ -96,6 +104,8 @@ fn quantifier_inside_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "block"

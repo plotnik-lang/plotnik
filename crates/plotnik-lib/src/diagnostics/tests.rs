@@ -271,7 +271,7 @@ fn diagnostic_kind_default_severity() {
         Severity::Error
     );
     assert_eq!(
-        DiagnosticKind::UnnamedDefNotLast.default_severity(),
+        DiagnosticKind::UnnamedDef.default_severity(),
         Severity::Error
     );
 }
@@ -279,15 +279,15 @@ fn diagnostic_kind_default_severity() {
 #[test]
 fn diagnostic_kind_suppression_order() {
     // Higher priority (earlier in enum) suppresses lower priority (later in enum)
-    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnnamedDefNotLast));
+    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnnamedDef));
     assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UndefinedReference));
-    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::UnnamedDefNotLast));
+    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::UnnamedDef));
 
     // Same kind doesn't suppress itself
     assert!(!DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnclosedTree));
 
     // Lower priority doesn't suppress higher priority
-    assert!(!DiagnosticKind::UnnamedDefNotLast.suppresses(&DiagnosticKind::UnclosedTree));
+    assert!(!DiagnosticKind::UnnamedDef.suppresses(&DiagnosticKind::UnclosedTree));
 }
 
 #[test]
@@ -364,7 +364,7 @@ fn filtered_no_suppression_disjoint_spans() {
 #[test]
 fn filtered_suppresses_lower_priority_contained() {
     let mut diagnostics = Diagnostics::new();
-    // Higher priority error (UnclosedTree) contains lower priority (UnnamedDefNotLast)
+    // Higher priority error (UnclosedTree) contains lower priority (UnnamedDef)
     diagnostics
         .report(
             DiagnosticKind::UnclosedTree,
@@ -373,7 +373,7 @@ fn filtered_suppresses_lower_priority_contained() {
         .emit();
     diagnostics
         .report(
-            DiagnosticKind::UnnamedDefNotLast,
+            DiagnosticKind::UnnamedDef,
             TextRange::new(5.into(), 15.into()),
         )
         .emit();
@@ -386,10 +386,10 @@ fn filtered_suppresses_lower_priority_contained() {
 #[test]
 fn filtered_consequence_suppressed_by_structural() {
     let mut diagnostics = Diagnostics::new();
-    // Consequence error (UnnamedDefNotLast) suppressed when structural error (UnclosedTree) exists
+    // Consequence error (UnnamedDef) suppressed when structural error (UnclosedTree) exists
     diagnostics
         .report(
-            DiagnosticKind::UnnamedDefNotLast,
+            DiagnosticKind::UnnamedDef,
             TextRange::new(0.into(), 20.into()),
         )
         .emit();
@@ -418,7 +418,7 @@ fn filtered_same_span_higher_priority_wins() {
         .emit();
     diagnostics
         .report(
-            DiagnosticKind::UnnamedDefNotLast,
+            DiagnosticKind::UnnamedDef,
             TextRange::new(0.into(), 10.into()),
         )
         .emit();
@@ -448,7 +448,7 @@ fn render_filtered() {
         .emit();
     diagnostics
         .report(
-            DiagnosticKind::UnnamedDefNotLast,
+            DiagnosticKind::UnnamedDef,
             TextRange::new(5.into(), 15.into()),
         )
         .message("unnamed def")

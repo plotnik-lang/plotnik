@@ -85,7 +85,7 @@ impl Diagnostics {
     /// 1. Containment: when error A's suppression_range contains error B's display range,
     ///    and A has higher priority, suppress B (only for structural errors)
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
-    /// 3. Consequence errors (UnnamedDefNotLast) suppressed when any other error exists
+    /// 3. Consequence errors (UnnamedDef) suppressed when any other error exists
     /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
     pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
         if self.messages.is_empty() {

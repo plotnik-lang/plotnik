@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn whitespace_preserved() {
     let input = indoc! {r#"
-    (identifier)  @name
+    Q = (identifier)  @name
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,10 @@ fn whitespace_preserved() {
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
       Def
+        Id "Q"
+        Whitespace " "
+        Equals "="
+        Whitespace " "
         Capture
           Tree
             ParenOpen "("
@@ -28,7 +32,7 @@ fn whitespace_preserved() {
 fn comment_preserved() {
     let input = indoc! {r#"
     // comment
-    (identifier)
+    Q = (identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -38,6 +42,10 @@ fn comment_preserved() {
       LineComment "// comment"
       Newline "\n"
       Def
+        Id "Q"
+        Whitespace " "
+        Equals "="
+        Whitespace " "
         Tree
           ParenOpen "("
           Id "identifier"
@@ -49,7 +57,7 @@ fn comment_preserved() {
 #[test]
 fn comment_inside_expression() {
     let input = indoc! {r#"
-    (call // inline
+    Q = (call // inline
         name: (identifier))
     "#};
 
@@ -58,6 +66,10 @@ fn comment_inside_expression() {
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
       Def
+        Id "Q"
+        Whitespace " "
+        Equals "="
+        Whitespace " "
         Tree
           ParenOpen "("
           Id "call"
@@ -82,7 +94,7 @@ fn comment_inside_expression() {
 fn trivia_filtered_by_default() {
     let input = indoc! {r#"
     // comment
-    (identifier)
+    Q = (identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -90,6 +102,8 @@ fn trivia_filtered_by_default() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "identifier"
@@ -100,7 +114,7 @@ fn trivia_filtered_by_default() {
 #[test]
 fn trivia_between_alternation_items() {
     let input = indoc! {r#"
-    [
+    Q = [
         (a)
         (b)
     ]
@@ -111,6 +125,10 @@ fn trivia_between_alternation_items() {
     insta::assert_snapshot!(query.dump_cst_full(), @r#"
     Root
       Def
+        Id "Q"
+        Whitespace " "
+        Equals "="
+        Whitespace " "
         Alt
           BracketOpen "["
           Newline "\n"

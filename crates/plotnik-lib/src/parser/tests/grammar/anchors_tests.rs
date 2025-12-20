@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn anchor_first_child() {
     let input = indoc! {r#"
-    (block . (first_statement))
+    Q = (block . (first_statement))
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn anchor_first_child() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "block"
@@ -28,7 +30,7 @@ fn anchor_first_child() {
 #[test]
 fn anchor_last_child() {
     let input = indoc! {r#"
-    (block (last_statement) .)
+    Q = (block (last_statement) .)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -36,6 +38,8 @@ fn anchor_last_child() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "block"
@@ -52,7 +56,7 @@ fn anchor_last_child() {
 #[test]
 fn anchor_adjacency() {
     let input = indoc! {r#"
-    (dotted_name (identifier) @a . (identifier) @b)
+    Q = (dotted_name (identifier) @a . (identifier) @b)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -60,6 +64,8 @@ fn anchor_adjacency() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "dotted_name"
@@ -86,7 +92,7 @@ fn anchor_adjacency() {
 #[test]
 fn anchor_both_ends() {
     let input = indoc! {r#"
-    (array . (element) .)
+    Q = (array . (element) .)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -94,6 +100,8 @@ fn anchor_both_ends() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "array"
@@ -112,7 +120,7 @@ fn anchor_both_ends() {
 #[test]
 fn anchor_multiple_adjacent() {
     let input = indoc! {r#"
-    (tuple . (a) . (b) . (c) .)
+    Q = (tuple . (a) . (b) . (c) .)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -120,6 +128,8 @@ fn anchor_multiple_adjacent() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "tuple"
@@ -150,7 +160,7 @@ fn anchor_multiple_adjacent() {
 #[test]
 fn anchor_in_sequence() {
     let input = indoc! {r#"
-    {. (first) (second) .}
+    Q = {. (first) (second) .}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -158,6 +168,8 @@ fn anchor_in_sequence() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Anchor

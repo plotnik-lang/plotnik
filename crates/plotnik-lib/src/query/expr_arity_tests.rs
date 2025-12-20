@@ -3,22 +3,22 @@ use indoc::indoc;
 
 #[test]
 fn tree_is_one() {
-    let query = Query::try_from("(identifier)").unwrap();
+    let query = Query::try_from("Q = (identifier)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ identifier
     ");
 }
 
 #[test]
 fn singleton_seq_is_one() {
-    let query = Query::try_from("{(identifier)}").unwrap();
+    let query = Query::try_from("Q = {(identifier)}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Seq¹
           NamedNode¹ identifier
     ");
@@ -26,11 +26,11 @@ fn singleton_seq_is_one() {
 
 #[test]
 fn nested_singleton_seq_is_one() {
-    let query = Query::try_from("{{{(identifier)}}}").unwrap();
+    let query = Query::try_from("Q = {{{(identifier)}}}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Seq¹
           Seq¹
             Seq¹
@@ -40,11 +40,11 @@ fn nested_singleton_seq_is_one() {
 
 #[test]
 fn multi_seq_is_many() {
-    let query = Query::try_from("{(a) (b)}").unwrap();
+    let query = Query::try_from("Q = {(a) (b)}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def⁺
+      Def⁺ Q
         Seq⁺
           NamedNode¹ a
           NamedNode¹ b
@@ -53,11 +53,11 @@ fn multi_seq_is_many() {
 
 #[test]
 fn alt_is_one() {
-    let query = Query::try_from("[(a) (b)]").unwrap();
+    let query = Query::try_from("Q = [(a) (b)]").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Alt¹
           Branch¹
             NamedNode¹ a
@@ -69,13 +69,13 @@ fn alt_is_one() {
 #[test]
 fn alt_with_seq_branches() {
     let input = indoc! {r#"
-    [{(a) (b)} (c)]
+    Q = [{(a) (b)} (c)]
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Alt¹
           Branch⁺
             Seq⁺
@@ -90,7 +90,7 @@ fn alt_with_seq_branches() {
 fn ref_to_tree_is_one() {
     let input = indoc! {r#"
     X = (identifier)
-    (call (X))
+    Q = (call (X))
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
@@ -98,7 +98,7 @@ fn ref_to_tree_is_one() {
     Root⁺
       Def¹ X
         NamedNode¹ identifier
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           Ref¹ X
     ");
@@ -108,7 +108,7 @@ fn ref_to_tree_is_one() {
 fn ref_to_seq_is_many() {
     let input = indoc! {r#"
     X = {(a) (b)}
-    (call (X))
+    Q = (call (X))
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
@@ -118,7 +118,7 @@ fn ref_to_seq_is_many() {
         Seq⁺
           NamedNode¹ a
           NamedNode¹ b
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           Ref⁺ X
     ");
@@ -126,11 +126,11 @@ fn ref_to_seq_is_many() {
 
 #[test]
 fn field_with_tree() {
-    let query = Query::try_from("(call name: (identifier))").unwrap();
+    let query = Query::try_from("Q = (call name: (identifier))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           FieldExpr¹ name:
             NamedNode¹ identifier
@@ -139,11 +139,11 @@ fn field_with_tree() {
 
 #[test]
 fn field_with_alt() {
-    let query = Query::try_from("(call name: [(identifier) (string)])").unwrap();
+    let query = Query::try_from("Q = (call name: [(identifier) (string)])").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           FieldExpr¹ name:
             Alt¹
@@ -156,11 +156,11 @@ fn field_with_alt() {
 
 #[test]
 fn field_with_seq_error() {
-    let query = Query::try_from("(call name: {(a) (b)})").unwrap();
+    let query = Query::try_from("Q = (call name: {(a) (b)})").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           FieldExpr¹ name:
             Seq⁺
@@ -170,8 +170,8 @@ fn field_with_seq_error() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` must match exactly one node, not a sequence
       |
-    1 | (call name: {(a) (b)})
-      |             ^^^^^^^^^
+    1 | Q = (call name: {(a) (b)})
+      |                 ^^^^^^^^^
     ");
 }
 
@@ -179,7 +179,7 @@ fn field_with_seq_error() {
 fn field_with_ref_to_seq_error() {
     let input = indoc! {r#"
     X = {(a) (b)}
-    (call name: (X))
+    Q = (call name: (X))
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
@@ -189,7 +189,7 @@ fn field_with_ref_to_seq_error() {
         Seq⁺
           NamedNode¹ a
           NamedNode¹ b
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           FieldExpr¹ name:
             Ref⁺ X
@@ -197,18 +197,18 @@ fn field_with_ref_to_seq_error() {
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: field `name` must match exactly one node, not a sequence
       |
-    2 | (call name: (X))
-      |             ^^^
+    2 | Q = (call name: (X))
+      |                 ^^^
     ");
 }
 
 #[test]
 fn quantifier_preserves_inner_arity() {
-    let query = Query::try_from("(identifier)*").unwrap();
+    let query = Query::try_from("Q = (identifier)*").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         QuantifiedExpr¹ *
           NamedNode¹ identifier
     ");
@@ -216,11 +216,11 @@ fn quantifier_preserves_inner_arity() {
 
 #[test]
 fn capture_preserves_inner_arity() {
-    let query = Query::try_from("(identifier) @name").unwrap();
+    let query = Query::try_from("Q = (identifier) @name").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         CapturedExpr¹ @name
           NamedNode¹ identifier
     ");
@@ -228,11 +228,11 @@ fn capture_preserves_inner_arity() {
 
 #[test]
 fn capture_on_seq() {
-    let query = Query::try_from("{(a) (b)} @items").unwrap();
+    let query = Query::try_from("Q = {(a) (b)} @items").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def⁺
+      Def⁺ Q
         CapturedExpr⁺ @items
           Seq⁺
             NamedNode¹ a
@@ -244,9 +244,9 @@ fn capture_on_seq() {
 fn complex_nested_arities() {
     let input = indoc! {r#"
     Stmt = [(expr_stmt) (return_stmt)]
-    (function_definition
+    Q = (function_definition
         name: (identifier) @name
-        body: (block (Stmt)* @stmts))
+         body: (block (Stmt)* @stmts))
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
@@ -258,7 +258,7 @@ fn complex_nested_arities() {
             NamedNode¹ expr_stmt
           Branch¹
             NamedNode¹ return_stmt
-      Def¹
+      Def¹ Q
         NamedNode¹ function_definition
           CapturedExpr¹ @name
             FieldExpr¹ name:
@@ -274,13 +274,13 @@ fn complex_nested_arities() {
 #[test]
 fn tagged_alt_arities() {
     let input = indoc! {r#"
-    [Ident: (identifier) Num: (number)]
+    Q = [Ident: (identifier) Num: (number)]
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Alt¹
           Branch¹ Ident:
             NamedNode¹ identifier
@@ -291,11 +291,11 @@ fn tagged_alt_arities() {
 
 #[test]
 fn anchor_has_no_arity() {
-    let query = Query::try_from("(block . (statement))").unwrap();
+    let query = Query::try_from("Q = (block . (statement))").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ block
           .
           NamedNode¹ statement
@@ -304,11 +304,11 @@ fn anchor_has_no_arity() {
 
 #[test]
 fn negated_field_has_no_arity() {
-    let query = Query::try_from("(function !async)").unwrap();
+    let query = Query::try_from("Q = (function !async)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ function
           NegatedField !async
     ");
@@ -316,55 +316,57 @@ fn negated_field_has_no_arity() {
 
 #[test]
 fn tree_with_wildcard_type() {
-    let query = Query::try_from("(_)").unwrap();
+    let query = Query::try_from("Q = (_)").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ (any)
     ");
 }
 
 #[test]
 fn bare_wildcard_is_one() {
-    let query = Query::try_from("_").unwrap();
+    let query = Query::try_from("Q = _").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         AnonymousNode¹ (any)
     ");
 }
 
 #[test]
 fn empty_seq_is_one() {
-    let query = Query::try_from("{}").unwrap();
+    let query = Query::try_from("Q = {}").unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Seq¹
     ");
 }
 
 #[test]
 fn literal_is_one() {
-    let query = Query::try_from(r#""if""#).unwrap();
+    let query = Query::try_from(r#"Q = "if""#).unwrap();
     assert!(query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r#"
     Root¹
-      Def¹
+      Def¹ Q
         AnonymousNode¹ "if"
     "#);
 }
 
 #[test]
 fn invalid_error_node() {
-    let query = Query::try_from("(foo %)").unwrap();
+    let query = Query::try_from("Q = (foo %)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_cst_with_arities(), @r#"
     Root¹
       Def¹
+        Id "Q"
+        Equals "="
         Tree¹
           ParenOpen "("
           Id "foo"
@@ -376,22 +378,22 @@ fn invalid_error_node() {
 
 #[test]
 fn invalid_undefined_ref() {
-    let query = Query::try_from("(Undefined)").unwrap();
+    let query = Query::try_from("Q = (Undefined)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def⁻
+      Def⁻ Q
         Ref⁻ Undefined
     ");
 }
 
 #[test]
 fn invalid_branch_without_body() {
-    let query = Query::try_from("[A:]").unwrap();
+    let query = Query::try_from("Q = [A:]").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         Alt¹
           Branchˣ A:
     ");
@@ -401,7 +403,7 @@ fn invalid_branch_without_body() {
 fn invalid_ref_to_bodyless_def() {
     let input = indoc! {r#"
     X = %
-    (X)
+    Q = (X)
     "#};
     let query = Query::try_from(input).unwrap();
     assert!(!query.is_valid());
@@ -409,7 +411,7 @@ fn invalid_ref_to_bodyless_def() {
     Root⁺
       Defˣ X
       Defˣ
-      Def⁻
+      Def⁻ Q
         Ref⁻ X
     ");
 }
@@ -417,42 +419,42 @@ fn invalid_ref_to_bodyless_def() {
 #[test]
 fn invalid_capture_without_inner() {
     // Error recovery: `extra` is invalid, but `@y` still creates a Capture node
-    let query = Query::try_from("(call extra @y)").unwrap();
+    let query = Query::try_from("Q = (call extra @y)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           CapturedExpr⁻ @y
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
-    1 | (call extra @y)
-      |       ^^^^^
+    1 | Q = (call extra @y)
+      |           ^^^^^
     ");
 }
 
 #[test]
 fn invalid_capture_without_inner_standalone() {
     // Standalone capture without preceding expression
-    let query = Query::try_from("@x").unwrap();
+    let query = Query::try_from("Q = @x").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: `@` must follow an expression to capture
+    error: expected an expression; after `=` in definition
       |
-    1 | @x
-      | ^
+    1 | Q = @x
+      |     ^
     ");
 }
 
 #[test]
 fn invalid_multiple_captures_with_error() {
-    let query = Query::try_from("(call (Undefined) @x extra @y)").unwrap();
+    let query = Query::try_from("Q = (call (Undefined) @x extra @y)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ call
           CapturedExpr⁻ @x
             Ref⁻ Undefined
@@ -463,18 +465,18 @@ fn invalid_multiple_captures_with_error() {
 #[test]
 fn invalid_quantifier_without_inner() {
     // Error recovery: `extra` is invalid, but `*` still creates a Quantifier node
-    let query = Query::try_from("(foo extra*)").unwrap();
+    let query = Query::try_from("Q = (foo extra*)").unwrap();
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_with_arities(), @r"
     Root¹
-      Def¹
+      Def¹ Q
         NamedNode¹ foo
           QuantifiedExpr⁻ *
     ");
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
-    1 | (foo extra*)
-      |      ^^^^^
+    1 | Q = (foo extra*)
+      |          ^^^^^
     ");
 }

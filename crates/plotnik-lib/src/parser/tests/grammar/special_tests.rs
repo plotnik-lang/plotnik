@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn error_node() {
     let input = indoc! {r#"
-    (ERROR)
+    Q = (ERROR)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn error_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           KwError "ERROR"
@@ -22,7 +24,7 @@ fn error_node() {
 #[test]
 fn error_node_with_capture() {
     let input = indoc! {r#"
-    (ERROR) @err
+    Q = (ERROR) @err
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -30,6 +32,8 @@ fn error_node_with_capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -43,7 +47,7 @@ fn error_node_with_capture() {
 #[test]
 fn missing_node_bare() {
     let input = indoc! {r#"
-    (MISSING)
+    Q = (MISSING)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -51,6 +55,8 @@ fn missing_node_bare() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           KwMissing "MISSING"
@@ -61,7 +67,7 @@ fn missing_node_bare() {
 #[test]
 fn missing_node_with_type() {
     let input = indoc! {r#"
-    (MISSING identifier)
+    Q = (MISSING identifier)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -69,6 +75,8 @@ fn missing_node_with_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           KwMissing "MISSING"
@@ -80,7 +88,7 @@ fn missing_node_with_type() {
 #[test]
 fn missing_node_with_string() {
     let input = indoc! {r#"
-    (MISSING ";")
+    Q = (MISSING ";")
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -88,6 +96,8 @@ fn missing_node_with_string() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           KwMissing "MISSING"
@@ -101,7 +111,7 @@ fn missing_node_with_string() {
 #[test]
 fn missing_node_with_capture() {
     let input = indoc! {r#"
-    (MISSING ";") @missing_semi
+    Q = (MISSING ";") @missing_semi
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -109,6 +119,8 @@ fn missing_node_with_capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -125,7 +137,7 @@ fn missing_node_with_capture() {
 #[test]
 fn error_in_alternation() {
     let input = indoc! {r#"
-    [(ERROR) (identifier)]
+    Q = [(ERROR) (identifier)]
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -133,6 +145,8 @@ fn error_in_alternation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Alt
           BracketOpen "["
           Branch
@@ -152,7 +166,7 @@ fn error_in_alternation() {
 #[test]
 fn missing_in_sequence() {
     let input = indoc! {r#"
-    {(MISSING ";") (identifier)}
+    Q = {(MISSING ";") (identifier)}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -160,6 +174,8 @@ fn missing_in_sequence() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Tree
@@ -180,7 +196,7 @@ fn missing_in_sequence() {
 #[test]
 fn special_node_nested() {
     let input = indoc! {r#"
-    (function_definition
+    Q = (function_definition
         body: (block (ERROR)))
     "#};
 
@@ -189,6 +205,8 @@ fn special_node_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "function_definition"
@@ -210,7 +228,7 @@ fn special_node_nested() {
 #[test]
 fn error_with_quantifier() {
     let input = indoc! {r#"
-    (ERROR)*
+    Q = (ERROR)*
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -218,6 +236,8 @@ fn error_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Tree
             ParenOpen "("
@@ -230,7 +250,7 @@ fn error_with_quantifier() {
 #[test]
 fn missing_with_quantifier() {
     let input = indoc! {r#"
-    (MISSING identifier)?
+    Q = (MISSING identifier)?
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -238,6 +258,8 @@ fn missing_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Tree
             ParenOpen "("

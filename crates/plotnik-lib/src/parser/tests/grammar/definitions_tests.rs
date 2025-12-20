@@ -169,7 +169,7 @@ fn named_def_then_expression() {
     "#};
 
     let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
+    assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
@@ -371,7 +371,7 @@ fn named_def_with_type_annotation() {
 fn unnamed_def_allowed_as_last() {
     let input = indoc! {r#"
     Expr = (identifier)
-    (program (Expr) @value)
+    Q = (program (Expr) @value)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -386,6 +386,8 @@ fn unnamed_def_allowed_as_last() {
           Id "identifier"
           ParenClose ")"
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "program"

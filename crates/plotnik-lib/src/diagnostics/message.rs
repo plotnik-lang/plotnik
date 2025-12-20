@@ -74,7 +74,7 @@ pub enum DiagnosticKind {
     InvalidChildType,
 
     // Often consequences of earlier errors
-    UnnamedDefNotLast,
+    UnnamedDef,
 }
 
 impl DiagnosticKind {
@@ -119,7 +119,7 @@ impl DiagnosticKind {
     /// Consequence errors - often caused by earlier parse errors.
     /// These get suppressed when any root-cause or structural error exists.
     pub fn is_consequence_error(&self) -> bool {
-        matches!(self, Self::UnnamedDefNotLast)
+        matches!(self, Self::UnnamedDef)
     }
 
     /// Base message for this diagnostic kind, used when no custom message is provided.
@@ -189,7 +189,7 @@ impl DiagnosticKind {
             Self::InvalidChildType => "node type not valid as child",
 
             // Structural
-            Self::UnnamedDefNotLast => "only the last definition can be unnamed",
+            Self::UnnamedDef => "definitions must be named",
         }
     }
 
@@ -229,8 +229,8 @@ impl DiagnosticKind {
                 "type annotations use `::`, not `:` — {}".to_string()
             }
 
-            // Named def ordering
-            Self::UnnamedDefNotLast => "only the last definition can be unnamed — {}".to_string(),
+            // Named def
+            Self::UnnamedDef => "definitions must be named — {}".to_string(),
 
             // Standard pattern: fallback + context
             _ => format!("{}; {{}}", self.fallback_message()),

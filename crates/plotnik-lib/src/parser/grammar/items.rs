@@ -10,8 +10,6 @@ impl Parser<'_> {
     pub fn parse_root(&mut self) {
         self.start_node(SyntaxKind::Root);
 
-        let mut unnamed_def_spans: Vec<TextRange> = Vec::new();
-
         while !self.should_stop() && !self.currently_is(SyntaxKind::Error) {
             // LL(2): Id followed by Equals → named definition (if PascalCase)
             if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
@@ -28,15 +26,10 @@ impl Parser<'_> {
             self.finish_node();
             if success {
                 let end = self.last_non_trivia_end().unwrap_or(start);
-                unnamed_def_spans.push(TextRange::new(start, end));
-            }
-        }
-
-        if unnamed_def_spans.len() > 1 {
-            for span in &unnamed_def_spans[..unnamed_def_spans.len() - 1] {
-                let def_text = &self.source[usize::from(span.start())..usize::from(span.end())];
+                let span = TextRange::new(start, end);
+                let def_text = &self.source[usize::from(start)..usize::from(end)];
                 self.diagnostics
-                    .report(DiagnosticKind::UnnamedDefNotLast, *span)
+                    .report(DiagnosticKind::UnnamedDef, span)
                     .message(format!("give it a name like `Name = {}`", def_text.trim()))
                     .emit();
             }

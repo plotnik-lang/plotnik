@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn simple_sequence() {
     let input = indoc! {r#"
-    {(a) (b)}
+    Q = {(a) (b)}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn simple_sequence() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Tree
@@ -29,7 +31,7 @@ fn simple_sequence() {
 #[test]
 fn empty_sequence() {
     let input = indoc! {r#"
-    {}
+    Q = {}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -37,6 +39,8 @@ fn empty_sequence() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           BraceClose "}"
@@ -46,7 +50,7 @@ fn empty_sequence() {
 #[test]
 fn sequence_single_element() {
     let input = indoc! {r#"
-    {(identifier)}
+    Q = {(identifier)}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -54,6 +58,8 @@ fn sequence_single_element() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Tree
@@ -67,7 +73,7 @@ fn sequence_single_element() {
 #[test]
 fn sequence_with_captures() {
     let input = indoc! {r#"
-    {(comment)* @comments (function) @fn}
+    Q = {(comment)* @comments (function) @fn}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -75,6 +81,8 @@ fn sequence_with_captures() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Capture
@@ -100,7 +108,7 @@ fn sequence_with_captures() {
 #[test]
 fn sequence_with_quantifier() {
     let input = indoc! {r#"
-    {(a) (b)}+
+    Q = {(a) (b)}+
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -108,6 +116,8 @@ fn sequence_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Quantifier
           Seq
             BraceOpen "{"
@@ -127,7 +137,7 @@ fn sequence_with_quantifier() {
 #[test]
 fn nested_sequences() {
     let input = indoc! {r#"
-    {{(a)} {(b)}}
+    Q = {{(a)} {(b)}}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -135,6 +145,8 @@ fn nested_sequences() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Seq
@@ -158,7 +170,7 @@ fn nested_sequences() {
 #[test]
 fn sequence_in_named_node() {
     let input = indoc! {r#"
-    (block {(statement) (statement)})
+    Q = (block {(statement) (statement)})
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -166,6 +178,8 @@ fn sequence_in_named_node() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "block"
@@ -187,7 +201,7 @@ fn sequence_in_named_node() {
 #[test]
 fn sequence_with_alternation() {
     let input = indoc! {r#"
-    {[(a) (b)] (c)}
+    Q = {[(a) (b)] (c)}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -195,6 +209,8 @@ fn sequence_with_alternation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Alt
@@ -221,7 +237,7 @@ fn sequence_with_alternation() {
 #[test]
 fn sequence_comma_separated_expression() {
     let input = indoc! {r#"
-    {(number) {"," (number)}*}
+    Q = {(number) {"," (number)}*}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -229,6 +245,8 @@ fn sequence_comma_separated_expression() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Tree
@@ -255,7 +273,7 @@ fn sequence_comma_separated_expression() {
 #[test]
 fn sequence_with_anchor() {
     let input = indoc! {r#"
-    {. (first) (second) .}
+    Q = {. (first) (second) .}
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -263,6 +281,8 @@ fn sequence_with_anchor() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Seq
           BraceOpen "{"
           Anchor

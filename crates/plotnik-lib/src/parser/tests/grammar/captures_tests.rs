@@ -4,7 +4,7 @@ use indoc::indoc;
 #[test]
 fn capture() {
     let input = indoc! {r#"
-    (identifier) @name
+    Q = (identifier) @name
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -12,6 +12,8 @@ fn capture() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -25,7 +27,7 @@ fn capture() {
 #[test]
 fn capture_nested() {
     let input = indoc! {r#"
-    (call function: (identifier) @func)
+    Q = (call function: (identifier) @func)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -33,6 +35,8 @@ fn capture_nested() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "call"
@@ -53,7 +57,7 @@ fn capture_nested() {
 #[test]
 fn multiple_captures() {
     let input = indoc! {r#"
-    (binary
+    Q = (binary
         left: (_) @left
         right: (_) @right) @expr
     "#};
@@ -63,6 +67,8 @@ fn multiple_captures() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -96,7 +102,7 @@ fn multiple_captures() {
 #[test]
 fn capture_with_type_annotation() {
     let input = indoc! {r#"
-    (identifier) @name :: string
+    Q = (identifier) @name :: string
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -104,6 +110,8 @@ fn capture_with_type_annotation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -120,7 +128,7 @@ fn capture_with_type_annotation() {
 #[test]
 fn capture_with_custom_type() {
     let input = indoc! {r#"
-    (function_declaration) @fn :: FunctionDecl
+    Q = (function_declaration) @fn :: FunctionDecl
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -128,6 +136,8 @@ fn capture_with_custom_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -144,7 +154,7 @@ fn capture_with_custom_type() {
 #[test]
 fn capture_without_type_annotation() {
     let input = indoc! {r#"
-    (identifier) @name
+    Q = (identifier) @name
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -152,6 +162,8 @@ fn capture_without_type_annotation() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -165,7 +177,7 @@ fn capture_without_type_annotation() {
 #[test]
 fn multiple_captures_with_types() {
     let input = indoc! {r#"
-    (binary
+    Q = (binary
         left: (_) @left :: Node
         right: (_) @right :: string) @expr :: BinaryExpr
     "#};
@@ -175,6 +187,8 @@ fn multiple_captures_with_types() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -217,7 +231,7 @@ fn multiple_captures_with_types() {
 #[test]
 fn sequence_capture_with_type() {
     let input = indoc! {r#"
-    {(a) (b)} @seq :: MySequence
+    Q = {(a) (b)} @seq :: MySequence
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -225,6 +239,8 @@ fn sequence_capture_with_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Seq
             BraceOpen "{"
@@ -248,7 +264,7 @@ fn sequence_capture_with_type() {
 #[test]
 fn alternation_capture_with_type() {
     let input = indoc! {r#"
-    [(identifier) (number)] @value :: Value
+    Q = [(identifier) (number)] @value :: Value
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -256,6 +272,8 @@ fn alternation_capture_with_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Alt
             BracketOpen "["
@@ -281,7 +299,7 @@ fn alternation_capture_with_type() {
 #[test]
 fn quantified_capture_with_type() {
     let input = indoc! {r#"
-    (statement)+ @stmts :: Statement
+    Q = (statement)+ @stmts :: Statement
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -289,6 +307,8 @@ fn quantified_capture_with_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Quantifier
             Tree
@@ -307,7 +327,7 @@ fn quantified_capture_with_type() {
 #[test]
 fn nested_captures_with_types() {
     let input = indoc! {r#"
-    (function
+    Q = (function
         name: (identifier) @name :: string
         body: (block
             (statement)* @body_stmts :: Statement)) @func :: Function
@@ -318,6 +338,8 @@ fn nested_captures_with_types() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -366,7 +388,7 @@ fn nested_captures_with_types() {
 #[test]
 fn capture_with_type_no_spaces() {
     let input = indoc! {r#"
-    (identifier) @name::string
+    Q = (identifier) @name::string
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -374,6 +396,8 @@ fn capture_with_type_no_spaces() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Tree
             ParenOpen "("
@@ -390,7 +414,7 @@ fn capture_with_type_no_spaces() {
 #[test]
 fn capture_literal() {
     let input = indoc! {r#"
-    "foo" @keyword
+    Q = "foo" @keyword
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -398,6 +422,8 @@ fn capture_literal() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Str
             DoubleQuote "\""
@@ -411,7 +437,7 @@ fn capture_literal() {
 #[test]
 fn capture_literal_with_type() {
     let input = indoc! {r#"
-    "return" @kw :: string
+    Q = "return" @kw :: string
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -419,6 +445,8 @@ fn capture_literal_with_type() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Str
             DoubleQuote "\""
@@ -435,7 +463,7 @@ fn capture_literal_with_type() {
 #[test]
 fn capture_literal_in_tree() {
     let input = indoc! {r#"
-    (binary_expression "+" @op)
+    Q = (binary_expression "+" @op)
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -443,6 +471,8 @@ fn capture_literal_in_tree() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Tree
           ParenOpen "("
           Id "binary_expression"
@@ -460,7 +490,7 @@ fn capture_literal_in_tree() {
 #[test]
 fn capture_literal_with_quantifier() {
     let input = indoc! {r#"
-    ","* @commas
+    Q = ","* @commas
     "#};
 
     let query = Query::try_from(input).unwrap();
@@ -468,6 +498,8 @@ fn capture_literal_with_quantifier() {
     insta::assert_snapshot!(query.dump_cst(), @r#"
     Root
       Def
+        Id "Q"
+        Equals "="
         Capture
           Quantifier
             Str
