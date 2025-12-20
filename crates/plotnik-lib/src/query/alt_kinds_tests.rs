@@ -2,9 +2,11 @@ use crate::Query;
 
 #[test]
 fn tagged_alternation_valid() {
-    let query = Query::try_from("Q = [A: (a) B: (b)]").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let input = "Q = [A: (a) B: (b)]";
+
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Alt
@@ -17,9 +19,11 @@ fn tagged_alternation_valid() {
 
 #[test]
 fn untagged_alternation_valid() {
-    let query = Query::try_from("Q = [(a) (b)]").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let input = "Q = [(a) (b)]";
+
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Alt
@@ -32,9 +36,11 @@ fn untagged_alternation_valid() {
 
 #[test]
 fn mixed_alternation_tagged_first() {
-    let query = Query::try_from("Q = [A: (a) (b)]").unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let input = "Q = [A: (a) (b)]";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: cannot mix labeled and unlabeled branches
       |
     1 | Q = [A: (a) (b)]
@@ -46,17 +52,16 @@ fn mixed_alternation_tagged_first() {
 
 #[test]
 fn mixed_alternation_untagged_first() {
-    let query = Query::try_from(
-        r#"
+    let input = r#"
     Q = [
       (a)
       B: (b)
     ]
-    "#,
-    )
-    .unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    "#;
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: cannot mix labeled and unlabeled branches
       |
     3 |       (a)
@@ -68,9 +73,11 @@ fn mixed_alternation_untagged_first() {
 
 #[test]
 fn nested_mixed_alternation() {
-    let query = Query::try_from("Q = (call [A: (a) (b)])").unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let input = "Q = (call [A: (a) (b)])";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: cannot mix labeled and unlabeled branches
       |
     1 | Q = (call [A: (a) (b)])
@@ -82,9 +89,11 @@ fn nested_mixed_alternation() {
 
 #[test]
 fn multiple_mixed_alternations() {
-    let query = Query::try_from("Q = (foo [A: (a) (b)] [C: (c) (d)])").unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    let input = "Q = (foo [A: (a) (b)] [C: (c) (d)])";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
     error: cannot mix labeled and unlabeled branches
       |
     1 | Q = (foo [A: (a) (b)] [C: (c) (d)])
@@ -103,9 +112,11 @@ fn multiple_mixed_alternations() {
 
 #[test]
 fn single_branch_no_error() {
-    let query = Query::try_from("Q = [A: (a)]").unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
+    let input = "Q = [A: (a)]";
+
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
     Root
       Def Q
         Alt

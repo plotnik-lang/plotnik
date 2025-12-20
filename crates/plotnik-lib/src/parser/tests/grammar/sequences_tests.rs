@@ -7,9 +7,9 @@ fn simple_sequence() {
     Q = {(a) (b)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -34,9 +34,9 @@ fn empty_sequence() {
     Q = {}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -53,9 +53,9 @@ fn sequence_single_element() {
     Q = {(identifier)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -76,9 +76,9 @@ fn sequence_with_captures() {
     Q = {(comment)* @comments (function) @fn}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -111,9 +111,9 @@ fn sequence_with_quantifier() {
     Q = {(a) (b)}+
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -140,9 +140,9 @@ fn nested_sequences() {
     Q = {{(a)} {(b)}}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -173,9 +173,9 @@ fn sequence_in_named_node() {
     Q = (block {(statement) (statement)})
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -204,9 +204,9 @@ fn sequence_with_alternation() {
     Q = {[(a) (b)] (c)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -240,9 +240,9 @@ fn sequence_comma_separated_expression() {
     Q = {(number) {"," (number)}*}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -276,9 +276,9 @@ fn sequence_with_anchor() {
     Q = {. (first) (second) .}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"

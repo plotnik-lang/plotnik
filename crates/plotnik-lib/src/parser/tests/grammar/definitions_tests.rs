@@ -7,9 +7,9 @@ fn simple_named_def() {
     Expr = (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Expr"
@@ -27,9 +27,9 @@ fn named_def_with_alternation() {
     Value = [(identifier) (number) (string)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Value"
@@ -61,9 +61,9 @@ fn named_def_with_sequence() {
     Pair = {(identifier) (expression)}
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Pair"
@@ -91,9 +91,9 @@ fn named_def_with_captures() {
         right: (_) @right)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "BinaryOp"
@@ -140,9 +140,9 @@ fn multiple_named_defs() {
     Stmt = (statement)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Expr"
@@ -168,39 +168,14 @@ fn named_def_then_expression() {
     (program (Expr) @value)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
-    Root
-      Def
-        Id "Expr"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "number"
-              ParenClose ")"
-          BracketClose "]"
-      Def
-        Tree
-          ParenOpen "("
-          Id "program"
-          Capture
-            Ref
-              ParenOpen "("
-              Id "Expr"
-              ParenClose ")"
-            At "@"
-            Id "value"
-          ParenClose ")"
-    "#);
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: definitions must be named — give it a name like `Name = (program (Expr) @value)`
+      |
+    2 | (program (Expr) @value)
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    ");
 }
 
 #[test]
@@ -210,9 +185,9 @@ fn named_def_referencing_another() {
     Expr = [(identifier) (Literal)]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Literal"
@@ -255,9 +230,9 @@ fn named_def_with_quantifier() {
     Statements = (statement)+
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Statements"
@@ -279,9 +254,9 @@ fn named_def_complex_recursive() {
         arguments: (arguments))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "NestedCall"
@@ -330,9 +305,9 @@ fn named_def_with_type_annotation() {
         body: (_) @body)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Func"
@@ -374,9 +349,9 @@ fn unnamed_def_allowed_as_last() {
     Q = (program (Expr) @value)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Expr"

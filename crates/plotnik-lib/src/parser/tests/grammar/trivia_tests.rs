@@ -7,9 +7,9 @@ fn whitespace_preserved() {
     Q = (identifier)  @name
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -35,9 +35,9 @@ fn comment_preserved() {
     Q = (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       LineComment "// comment"
       Newline "\n"
@@ -61,9 +61,9 @@ fn comment_inside_expression() {
         name: (identifier))
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -97,17 +97,22 @@ fn trivia_filtered_by_default() {
     Q = (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
+      LineComment "// comment"
+      Newline "\n"
       Def
         Id "Q"
+        Whitespace " "
         Equals "="
+        Whitespace " "
         Tree
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
+      Newline "\n"
     "#);
 }
 
@@ -120,9 +125,9 @@ fn trivia_between_alternation_items() {
     ]
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -155,9 +160,9 @@ fn trivia_between_alternation_items() {
 fn whitespace_only() {
     let input = "    ";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Whitespace "    "
     "#);
@@ -169,9 +174,9 @@ fn comment_only_raw() {
     // just a comment
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst_full(), @r#"
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       LineComment "// just a comment"
       Newline "\n"

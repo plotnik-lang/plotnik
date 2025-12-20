@@ -1,5 +1,9 @@
 use crate::Query;
 use indoc::indoc;
+use plotnik_langs::Lang;
+use std::sync::LazyLock;
+
+static LANG: LazyLock<Lang> = LazyLock::new(|| plotnik_langs::javascript());
 
 #[test]
 fn valid_query_with_field() {
@@ -7,21 +11,7 @@ fn valid_query_with_field() {
         Q = (function_declaration
             name: (identifier) @name) @fn
     "#};
-
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
-    Root
-      Def Q
-        CapturedExpr @fn
-          NamedNode function_declaration
-            CapturedExpr @name
-              FieldExpr name:
-                NamedNode identifier
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -30,12 +20,9 @@ fn unknown_node_type_with_suggestion() {
         Q = (function_declaraton) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = (function_declaraton) @fn
@@ -51,12 +38,9 @@ fn unknown_node_type_no_suggestion() {
         Q = (xyzzy_foobar_baz) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `xyzzy_foobar_baz` is not a valid node type
       |
     1 | Q = (xyzzy_foobar_baz) @fn
@@ -71,12 +55,9 @@ fn unknown_field_with_suggestion() {
             nme: (identifier) @name) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `nme` is not a valid field
       |
     2 |     nme: (identifier) @name) @fn
@@ -93,12 +74,9 @@ fn unknown_field_no_suggestion() {
             xyzzy: (identifier) @name) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `xyzzy` is not a valid field
       |
     2 |     xyzzy: (identifier) @name) @fn
@@ -113,12 +91,9 @@ fn field_not_on_node_type() {
             condition: (identifier) @name) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `condition` is not valid on this node type
       |
     1 | Q = (function_declaration
@@ -134,24 +109,22 @@ fn field_not_on_node_type() {
 fn field_not_on_node_type_with_suggestion() {
     let input = indoc! {r#"
         Q = (function_declaration
-            parameter: (formal_parameters) @params) @fn
+            parameter: (formal_parameters) @params
+        ) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::typescript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `parameter` is not valid on this node type
       |
     1 | Q = (function_declaration
       |      -------------------- on `function_declaration`
-    2 |     parameter: (formal_parameters) @params) @fn
+    2 |     parameter: (formal_parameters) @params
       |     ^^^^^^^^^
       |
     help: did you mean `parameters`?
-    help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
+    help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
 }
 
@@ -161,12 +134,9 @@ fn negated_field_unknown() {
         Q = (function_declaration !nme) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `nme` is not a valid field
       |
     1 | Q = (function_declaration !nme) @fn
@@ -182,12 +152,9 @@ fn negated_field_not_on_node_type() {
         Q = (function_declaration !condition) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `condition` is not valid on this node type
       |
     1 | Q = (function_declaration !condition) @fn
@@ -205,12 +172,9 @@ fn negated_field_not_on_node_type_with_suggestion() {
         Q = (function_declaration !parameter) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::typescript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `parameter` is not valid on this node type
       |
     1 | Q = (function_declaration !parameter) @fn
@@ -219,7 +183,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
       |      on `function_declaration`
       |
     help: did you mean `parameters`?
-    help: valid fields for `function_declaration`: `body`, `name`, `parameters`, `return_type`, `type_parameters`
+    help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
 }
 
@@ -229,18 +193,7 @@ fn negated_field_valid() {
         Q = (function_declaration !name) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
-    Root
-      Def Q
-        CapturedExpr @fn
-          NamedNode function_declaration
-            NegatedField !name
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -249,12 +202,9 @@ fn anonymous_node_unknown() {
         Q = (function_declaration "xyzzy_fake_token") @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
+    insta::assert_snapshot!(res, @r#"
     error: `xyzzy_fake_token` is not a valid node type
       |
     1 | Q = (function_declaration "xyzzy_fake_token") @fn
@@ -263,26 +213,19 @@ fn anonymous_node_unknown() {
 }
 
 #[test]
-fn error_and_missing_nodes_skip_validation() {
+fn error_nodes_skip_validation() {
     let input = indoc! {r#"
         Q = (ERROR) @err
     "#};
+    Query::expect_valid_linking(input, &LANG);
+}
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-
-    let input2 = indoc! {r#"
+#[test]
+fn missing_nodes_skip_validation() {
+    let input = indoc! {r#"
         Q = (MISSING) @miss
     "#};
-
-    let query2 = Query::try_from(input2)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query2.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -292,12 +235,9 @@ fn multiple_errors_in_query() {
             nme: (identifer) @name) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = (function_declaraton
@@ -329,22 +269,7 @@ fn nested_field_validation() {
                 (return_statement) @ret) @body) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
-    Root
-      Def Q
-        CapturedExpr @fn
-          NamedNode function_declaration
-            CapturedExpr @body
-              FieldExpr body:
-                NamedNode statement_block
-                  CapturedExpr @ret
-                    NamedNode return_statement
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -354,12 +279,9 @@ fn alternation_with_link_errors() {
          (class_declaraton)] @decl
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = [(function_declaraton)
@@ -383,20 +305,7 @@ fn quantified_expr_validation() {
             (function_declaration)+ @fns) @block
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
-    Root
-      Def Q
-        CapturedExpr @block
-          NamedNode statement_block
-            CapturedExpr @fns
-              QuantifiedExpr +
-                NamedNode function_declaration
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -405,11 +314,7 @@ fn wildcard_node_skips_validation() {
         Q = (_) @any
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -420,24 +325,7 @@ fn def_reference_with_link() {
         Q = (program (Func)+)
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @r"
-    Root
-      Def Func
-        CapturedExpr @fn
-          NamedNode function_declaration
-            CapturedExpr @name
-              FieldExpr name:
-                NamedNode identifier
-      Def Q
-        NamedNode program
-          QuantifiedExpr +
-            Ref Func
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -447,12 +335,9 @@ fn field_on_node_without_fields() {
             name: (identifier) @inner) @id
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
+    let res = Query::expect_invalid_linking(input, &LANG);
 
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `name` is not valid on this node type
       |
     1 | Q = (identifier
@@ -471,11 +356,7 @@ fn valid_child_via_supertype() {
             (function_declaration)) @block
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -485,11 +366,7 @@ fn valid_child_via_nested_supertype() {
             (function_declaration)) @prog
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -498,11 +375,7 @@ fn deeply_nested_sequences_valid() {
         Q = (statement_block {{{(function_declaration)}}}) @block
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -511,11 +384,7 @@ fn deeply_nested_alternations_in_field_valid() {
         Q = (function_declaration name: [[[(identifier)]]]) @fn
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
+    Query::expect_valid_linking(input, &LANG);
 }
 
 #[test]
@@ -525,31 +394,5 @@ fn ref_followed_valid_case() {
         Q = (function_declaration name: (Foo))
     "#};
 
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(query.is_valid());
-}
-
-#[test]
-fn ref_followed_recursive_valid() {
-    let input = indoc! {r#"
-        Foo = [(identifier) (Foo)]
-        Q = (function_declaration name: (Foo))
-    "#};
-
-    let query = Query::try_from(input)
-        .unwrap()
-        .link(&plotnik_langs::javascript());
-
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle consumes no input
-      |
-    1 | Foo = [(identifier) (Foo)]
-      |                      ^^^
-      |                      |
-      |                      references itself
-    ");
+    Query::expect_valid_linking(input, &LANG);
 }

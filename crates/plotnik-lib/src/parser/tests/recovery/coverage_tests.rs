@@ -135,9 +135,9 @@ fn named_def_missing_equals_with_garbage() {
     Q = Expr ^^^ (identifier)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | Q = Expr ^^^ (identifier)
@@ -157,9 +157,9 @@ fn named_def_missing_equals_recovers_to_next_def() {
     Valid = (ok)
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r#"
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
     error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
       |
     1 | Broken ^^^
@@ -178,9 +178,9 @@ fn empty_double_quote_string() {
     Q = (a "")
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -201,9 +201,9 @@ fn empty_single_quote_string() {
     Q = (a '')
     "#};
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -222,9 +222,9 @@ fn empty_single_quote_string() {
 fn single_quote_string_is_valid() {
     let input = "Q = (node 'if')";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -244,9 +244,9 @@ fn single_quote_string_is_valid() {
 fn single_quote_in_alternation() {
     let input = "Q = ['public' 'private']";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -271,9 +271,9 @@ fn single_quote_in_alternation() {
 fn single_quote_with_escape() {
     let input = r"Q = (node 'it\'s')";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
@@ -293,9 +293,9 @@ fn single_quote_with_escape() {
 fn missing_with_nested_tree_parses() {
     let input = "Q = (MISSING (something))";
 
-    let query = Query::try_from(input).unwrap();
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_cst(), @r#"
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
     Root
       Def
         Id "Q"
