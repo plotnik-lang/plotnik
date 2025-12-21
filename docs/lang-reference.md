@@ -20,29 +20,46 @@ NFA-based cursor walk with backtracking.
 
 Comments and "extra" nodes (per tree-sitter grammar) are automatically skipped unless explicitly matched.
 
-```plotnik/docs/lang-reference.md#L24-24
+```
 (function_declaration (identifier) @name (block) @body)
 ```
 
 Matches even with comments between children:
 
-```plotnik/docs/lang-reference.md#L28-31
+```javascript
 function foo /* comment */() {
   /* body */
 }
 ```
 
-The `.` anchor enforces strict adjacency:
+### Anchor Behavior
 
-```plotnik/docs/lang-reference.md#L35-35
-(array . (identifier) @first)  ; must be immediately after bracket
+The `.` anchor enforces adjacency, but its strictness depends on what's being anchored:
+
+**Between named nodes** — skips trivia, disallows other named nodes:
+
 ```
+(dotted_name (identifier) @a . (identifier) @b)
+```
+
+Matches `a.b` even if there's a comment like `a /* x */ .b` (trivia skipped), but won't match if another named node appears between them.
+
+**With anonymous nodes** — strict, nothing skipped:
+
+```
+(array "[" . (identifier) @first)   ; must be immediately after bracket
+(call_expression (identifier) @fn . "(")  ; no trivia between name and paren
+```
+
+When any side of the anchor is an anonymous node (literal token), the match is exact—no trivia allowed.
+
+**Rule**: The anchor is as strict as its strictest operand. Anonymous nodes demand precision; named nodes tolerate trivia.
 
 ### Partial Matching
 
 Node patterns are open—unmentioned children are ignored:
 
-```plotnik/docs/lang-reference.md#L46-46
+```
 (binary_expression left: (identifier) @left)
 ```
 
@@ -54,7 +71,7 @@ Sequences `{...}` advance through siblings in order, skipping non-matching nodes
 
 `field: pattern` requires the child to have that field AND match the pattern:
 
-```plotnik/docs/lang-reference.md#L58-61
+```
 (binary_expression
   left: (identifier) @x
   right: (number) @y
@@ -69,8 +86,8 @@ Fields participate in sequential matching—they're not independent lookups.
 
 A `.ptk` file contains definitions:
 
-````plotnik/docs/lang-reference.md#L78-82
-```plotnik
+````
+```
 ; Helper (can also be used as entrypoint)
 Expr = [(identifier) (number) (string)]
 
@@ -90,7 +107,7 @@ plotnik exec -q '(identifier) @id' -s app.js
 
 **Module** (`.ptk` files): Only named definitions allowed.
 
-```plotnik
+```
 ; ERROR in .ptk file
 (identifier) @id
 
@@ -124,7 +141,7 @@ Inferred from directory name (`queries.ts/` → TypeScript, `java-checks/` → J
 
 `helpers.ptk`:
 
-```plotnik/docs/lang-reference.md#L147-153
+```
 Ident = (identifier)
 
 DeepSearch = [
@@ -135,7 +152,7 @@ DeepSearch = [
 
 `main.ptk`:
 
-```plotnik
+```
 AllIdentifiers = (program (DeepSearch)*)
 ```
 
@@ -155,13 +172,11 @@ Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because c
 
 ## Data Model
 
-Plotnik infers output types from your query. The key rule may surprise you—but it's intentional for schema stability.
+Plotnik infers output types from your query. See [Type System](type-system.md) for full details.
 
 ### Flat by Default
 
-Query nesting does NOT create output nesting. All captures become fields in a single flat record.
-
-**Why?** Adding a new `@capture` to an existing query shouldn't break downstream code using other captures. Flat output makes capture additions non-breaking. See [Type System](type-system.md#design-philosophy) for the full rationale.
+Query nesting does NOT create output nesting. All captures bubble up to the nearest scope boundary:
 
 ```
 (function_declaration
@@ -176,13 +191,28 @@ Output type:
 { name: Node, retval: Node }  // flat, not nested
 ```
 
-The pattern is 4 levels deep, but the output is flat. This is intentional: you're usually extracting specific pieces from an AST, not reconstructing its shape.
+The pattern is 4 levels deep, but the output is flat. You're extracting specific pieces from an AST, not reconstructing its shape.
+
+### Strict Dimensionality
+
+**Quantifiers (`*`, `+`) containing internal captures require an explicit row capture.**
+
+```
+// ERROR: internal capture without row structure
+(method_definition name: (identifier) @name)*
+
+// OK: explicit row capture
+{ (method_definition name: (identifier) @name) @method }* @methods
+→ { methods: { method: Node, name: Node }[] }
+```
+
+This prevents association loss—each row is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
 
 ### The Node Type
 
 Default capture type—a reference to a tree-sitter node:
 
-```plotnik/docs/lang-reference.md#L205-210
+```
 interface Node {
   kind: string;    // e.g. "identifier"
   text: string;    // source text
@@ -193,14 +223,22 @@ interface Node {
 
 ### Cardinality: Quantifiers → Arrays
 
-Quantifiers on the captured pattern determine whether a field is singular, optional, or an array:
+Quantifiers determine whether a field is singular, optional, or an array:
 
-| Pattern   | Output Type      | Meaning      |
-| --------- | ---------------- | ------------ |
-| `(x) @a`  | `a: T`           | exactly one  |
-| `(x)? @a` | `a?: T`          | zero or one  |
-| `(x)* @a` | `a: T[]`         | zero or more |
-| `(x)+ @a` | `a: [T, ...T[]]` | one or more  |
+| Pattern   | Output Type      | Meaning                    |
+| --------- | ---------------- | -------------------------- |
+| `(x) @a`  | `a: T`           | exactly one                |
+| `(x)? @a` | `a?: T`          | zero or one                |
+| `(x)* @a` | `a: T[]`         | zero or more (scalar list) |
+| `(x)+ @a` | `a: [T, ...T[]]` | one or more (scalar list)  |
+
+Scalar lists work when the quantified pattern has **no internal captures**. For patterns with internal captures, use row lists:
+
+| Pattern        | Output Type      | Meaning                              |
+| -------------- | ---------------- | ------------------------------------ |
+| `{...}* @rows` | `rows: T[]`      | zero or more rows                    |
+| `{...}+ @rows` | `rows: [T, ...]` | one or more rows                     |
+| `{...}? @row`  | `row?: T`        | optional row (bubbles if uncaptured) |
 
 ### Creating Nested Structure
 
@@ -262,14 +300,15 @@ interface FunctionDeclaration {
 
 ### Summary
 
-| Pattern                 | Output                    |
-| ----------------------- | ------------------------- |
-| `@name`                 | Field in current scope    |
-| `(x)? @a`               | Optional field            |
-| `(x)* @a`               | Array field               |
-| `{...} @x` / `[...] @x` | Nested object (new scope) |
-| `@x :: string`          | String value              |
-| `@x :: T`               | Custom type name          |
+| Pattern                 | Output                              |
+| ----------------------- | ----------------------------------- |
+| `@name`                 | Field in current scope              |
+| `(x)? @a`               | Optional field                      |
+| `(x)* @a`               | Scalar array (no internal captures) |
+| `{...}* @rows`          | Row array (with internal captures)  |
+| `{...} @x` / `[...] @x` | Nested object (new scope)           |
+| `@x :: string`          | String value                        |
+| `@x :: T`               | Custom type name                    |
 
 ---
 
@@ -344,7 +383,7 @@ Output type:
 | `(_)`  | Any named node                |
 | `_`    | Any node (named or anonymous) |
 
-```plotnik/docs/lang-reference.md#L370-371
+```
 (call_expression function: (_) @fn)
 (pair key: _ @key value: _ @value)
 ```
@@ -376,7 +415,7 @@ Output type:
 
 Query abstract node types directly, or narrow with `/`:
 
-```plotnik/docs/lang-reference.md#L406-409
+```
 (expression) @expr
 (expression/binary_expression) @binary
 (expression/"()") @empty_parens
@@ -535,7 +574,7 @@ Match alternatives with `[...]`:
 - **Untagged**: Fields merge across branches
 - **Tagged** (with labels): Discriminated union
 
-```plotnik/docs/lang-reference.md#L570-573
+```
 [
   (identifier)
   (string_literal)
@@ -625,14 +664,14 @@ Output type:
 
 Labels create a discriminated union (`$tag` + `$data`):
 
-```plotnik/docs/lang-reference.md#L657-660
+```
 [
   Assign: (assignment_expression left: (identifier) @left)
   Call: (call_expression function: (identifier) @func)
 ] @stmt :: Stmt
 ```
 
-```plotnik/docs/lang-reference.md#L664-667
+```
 type Stmt =
   | { $tag: "Assign"; $data: { left: Node } }
   | { $tag: "Call"; $data: { func: Node } };
@@ -669,6 +708,21 @@ interface Target {
 
 The anchor `.` constrains sibling positions. Anchors don't affect types—they're structural constraints.
 
+### Anchor Strictness
+
+Anchor behavior depends on the node types being anchored:
+
+| Pattern     | Trivia Between | Named Nodes Between |
+| ----------- | -------------- | ------------------- |
+| `(a) . (b)` | Allowed        | Disallowed          |
+| `"x" . (b)` | Disallowed     | Disallowed          |
+| `(a) . "x"` | Disallowed     | Disallowed          |
+| `"x" . "y"` | Disallowed     | Disallowed          |
+
+When anchoring named nodes, trivia (comments, whitespace) is skipped but no other named nodes may appear between. When any operand is an anonymous node (literal token), the anchor enforces exact adjacency—nothing in between.
+
+### Position Anchors
+
 First child:
 
 ```
@@ -681,15 +735,25 @@ Last child:
 (block (_) @last .)
 ```
 
-Immediate adjacency:
+### Adjacency Anchors
 
 ```
 (dotted_name (identifier) @a . (identifier) @b)
 ```
 
-Without the anchor, `@a` and `@b` would match non-adjacent pairs too.
+Without the anchor, `@a` and `@b` would match non-adjacent pairs too. With the anchor, only consecutive identifiers match (trivia like comments between them is tolerated).
 
-Output type for all examples:
+For strict token-level adjacency:
+
+```
+(call_expression (identifier) @fn . "(")
+```
+
+Here, no trivia is allowed between the function name and the opening parenthesis because `"("` is an anonymous node.
+
+### Output Types
+
+Anchors are structural constraints only—they don't affect output types:
 
 ```typescript
 { first: Node }
@@ -705,7 +769,7 @@ Anchors ignore anonymous nodes.
 
 Define reusable patterns:
 
-```plotnik/docs/lang-reference.md#L744-748
+```
 BinaryOp =
   (binary_expression
     left: (_) @left
@@ -715,7 +779,7 @@ BinaryOp =
 
 Use as node types:
 
-```plotnik/docs/lang-reference.md#L752-752
+```
 (return_statement (BinaryOp) @expr)
 ```
 
@@ -723,7 +787,7 @@ Use as node types:
 
 Named expressions define both pattern and type:
 
-```plotnik/docs/lang-reference.md#L764-764
+```
 Expr = [(BinaryOp) (UnaryOp) (identifier) (number)]
 ```
 
@@ -733,7 +797,7 @@ Expr = [(BinaryOp) (UnaryOp) (identifier) (number)]
 
 Named expressions can self-reference:
 
-```plotnik/docs/lang-reference.md#L794-798
+```
 NestedCall =
   (call_expression
     function: [(identifier) @name (NestedCall) @inner]
@@ -744,7 +808,7 @@ Matches `a()`, `a()()`, `a()()()`, etc. → `{ name?: Node, inner?: NestedCall }
 
 Tagged recursive example:
 
-```plotnik/docs/lang-reference.md#L810-815
+```
 MemberChain = [
   Base: (identifier) @name
   Access: (member_expression
