@@ -10,7 +10,7 @@ use plotnik_langs::Lang;
 use crate::Diagnostics;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
-use crate::query::dependencies::{self, DependencyAnalysisOwned};
+use crate::query::dependencies;
 use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
@@ -116,15 +116,11 @@ impl QueryParsed {
         );
 
         let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
-
-        // Convert to owned for storage
         let symbol_table_owned = crate::query::symbol_table::to_owned(symbol_table);
-        let dependency_analysis_owned = dependency_analysis.to_owned();
 
         QueryAnalyzed {
             query_parsed: self,
             symbol_table: symbol_table_owned,
-            dependency_analysis: dependency_analysis_owned,
             arity_table,
         }
     }
@@ -147,7 +143,6 @@ pub type Query = QueryAnalyzed;
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     pub symbol_table: SymbolTableOwned,
-    dependency_analysis: DependencyAnalysisOwned,
     arity_table: ExprArityTable,
 }
 
