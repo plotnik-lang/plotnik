@@ -197,6 +197,8 @@ fn field_with_ref_to_seq_error() {
     insta::assert_snapshot!(res, @r"
     error: field `name` must match exactly one node, not a sequence
       |
+    1 | X = {(a) (b)}
+      |     --------- defined here
     2 | Q = (call name: (X))
       |                 ^^^
     ");

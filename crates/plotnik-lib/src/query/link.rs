@@ -13,12 +13,13 @@ use plotnik_langs::Lang;
 use rowan::TextRange;
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::Root;
 use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::cst::{SyntaxKind, SyntaxToken};
 use crate::parser::token_src;
 
-use super::symbol_table::SymbolTable;
+use super::query::AstMap;
+use super::source_map::{SourceId, SourceMap};
+use super::symbol_table::SymbolTableOwned;
 use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
 
@@ -27,42 +28,50 @@ use super::visitor::{Visitor, walk};
 /// This function is decoupled from `Query` to allow easier testing and
 /// modularity. It orchestrates the resolution and validation phases.
 pub fn link<'q>(
-    root: &Root,
-    source: &'q str,
+    ast_map: &AstMap,
+    source_map: &'q SourceMap,
     lang: &Lang,
-    symbol_table: &SymbolTable<'q>,
+    symbol_table: &SymbolTableOwned,
     node_type_ids: &mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &mut Diagnostics,
 ) {
-    let mut linker = Linker {
-        source,
-        lang,
-        symbol_table,
-        node_type_ids,
-        node_field_ids,
-        diagnostics,
-    };
-    linker.link(root);
+    for (&source_id, root) in ast_map {
+        let mut linker = Linker {
+            source_map,
+            source_id,
+            lang,
+            symbol_table,
+            node_type_ids,
+            node_field_ids,
+            diagnostics,
+        };
+        linker.link(root);
+    }
 }
 
 struct Linker<'a, 'q> {
-    source: &'q str,
+    source_map: &'q SourceMap,
+    source_id: SourceId,
     lang: &'a Lang,
-    symbol_table: &'a SymbolTable<'q>,
+    symbol_table: &'a SymbolTableOwned,
     node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &'a mut Diagnostics,
 }
 
 impl<'a, 'q> Linker<'a, 'q> {
-    fn link(&mut self, root: &Root) {
+    fn source(&self) -> &'q str {
+        self.source_map.content(self.source_id)
+    }
+
+    fn link(&mut self, root: &ast::Root) {
         self.resolve_node_types(root);
         self.resolve_fields(root);
         self.validate_structure(root);
     }
 
-    fn resolve_node_types(&mut self, root: &Root) {
+    fn resolve_node_types(&mut self, root: &ast::Root) {
         let mut collector = NodeTypeCollector { linker: self };
         collector.visit(root);
     }
@@ -86,7 +95,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
         let resolved = self.lang.resolve_named_node(type_name);
         self.node_type_ids
-            .insert(token_src(&type_token, self.source), resolved);
+            .insert(token_src(&type_token, self.source()), resolved);
         if resolved.is_none() {
             let all_types = self.lang.all_named_node_kinds();
             let max_dist = (type_name.len() / 3).clamp(2, 4);
@@ -94,7 +103,11 @@ impl<'a, 'q> Linker<'a, 'q> {
 
             let mut builder = self
                 .diagnostics
-                .report(DiagnosticKind::UnknownNodeType, type_token.text_range())
+                .report(
+                    self.source_id,
+                    DiagnosticKind::UnknownNodeType,
+                    type_token.text_range(),
+                )
                 .message(type_name);
 
             if let Some(similar) = suggestion {
@@ -104,7 +117,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
     }
 
-    fn resolve_fields(&mut self, root: &Root) {
+    fn resolve_fields(&mut self, root: &ast::Root) {
         let mut collector = FieldCollector { linker: self };
         collector.visit(root);
     }
@@ -119,7 +132,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
         let resolved = self.lang.resolve_field(field_name);
         self.node_field_ids
-            .insert(token_src(&name_token, self.source), resolved);
+            .insert(token_src(&name_token, self.source()), resolved);
         if resolved.is_some() {
             return;
         }
@@ -129,7 +142,11 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         let mut builder = self
             .diagnostics
-            .report(DiagnosticKind::UnknownField, name_token.text_range())
+            .report(
+                self.source_id,
+                DiagnosticKind::UnknownField,
+                name_token.text_range(),
+            )
             .message(field_name);
 
         if let Some(similar) = suggestion {
@@ -138,7 +155,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         builder.emit();
     }
 
-    fn validate_structure(&mut self, root: &Root) {
+    fn validate_structure(&mut self, root: &ast::Root) {
         let defs: Vec<_> = root.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
@@ -223,7 +240,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 if !visited.insert(name.to_string()) {
                     return;
                 }
-                let Some(body) = self.symbol_table.get(name).cloned() else {
+                let Some((_, body)) = self.symbol_table.get(name).cloned() else {
                     visited.swap_remove(name);
                     return;
                 };
@@ -351,9 +368,13 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         let mut builder = self
             .diagnostics
-            .report(DiagnosticKind::FieldNotOnNodeType, range)
+            .report(self.source_id, DiagnosticKind::FieldNotOnNodeType, range)
             .message(field_name)
-            .related_to(format!("on `{}`", parent_name), parent_range);
+            .related_to(
+                self.source_id,
+                parent_range,
+                format!("on `{}`", parent_name),
+            );
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
@@ -436,12 +457,16 @@ impl Visitor for NodeTypeCollector<'_, '_, '_> {
         let resolved = self.linker.lang.resolve_anonymous_node(value);
         self.linker
             .node_type_ids
-            .insert(token_src(&value_token, self.linker.source), resolved);
+            .insert(token_src(&value_token, self.linker.source()), resolved);
 
         if resolved.is_none() {
             self.linker
                 .diagnostics
-                .report(DiagnosticKind::UnknownNodeType, value_token.text_range())
+                .report(
+                    self.linker.source_id,
+                    DiagnosticKind::UnknownNodeType,
+                    value_token.text_range(),
+                )
                 .message(value)
                 .emit();
         }

@@ -6,12 +6,11 @@ use super::ast::Root;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
 use crate::Error;
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::diagnostics::{DiagnosticKind, Diagnostics, SourceId};
 
 #[derive(Debug)]
 pub struct ParseResult {
     pub ast: Root,
-    pub diag: Diagnostics,
     pub fuel_consumed: u32,
 }
 
@@ -23,13 +22,14 @@ pub(super) struct OpenDelimiter {
 }
 
 /// Trivia tokens are buffered and flushed when starting a new node.
-pub struct Parser<'src> {
+pub struct Parser<'src, 'diag> {
     pub(super) source: &'src str,
+    pub(super) source_id: SourceId,
     pub(super) tokens: Vec<Token>,
     pub(super) pos: usize,
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
-    pub(super) diagnostics: Diagnostics,
+    pub(super) diagnostics: &'diag mut Diagnostics,
     pub(super) depth: u32,
     pub(super) last_diagnostic_pos: Option<TextSize>,
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
@@ -40,15 +40,23 @@ pub struct Parser<'src> {
     fatal_error: Option<Error>,
 }
 
-impl<'src> Parser<'src> {
-    pub fn new(source: &'src str, tokens: Vec<Token>, fuel: u32, max_depth: u32) -> Self {
+impl<'src, 'diag> Parser<'src, 'diag> {
+    pub fn new(
+        source: &'src str,
+        source_id: SourceId,
+        tokens: Vec<Token>,
+        diagnostics: &'diag mut Diagnostics,
+        fuel: u32,
+        max_depth: u32,
+    ) -> Self {
         Self {
             source,
+            source_id,
             tokens,
             pos: 0,
             trivia_buffer: Vec::with_capacity(4),
             builder: GreenNodeBuilder::new(),
-            diagnostics: Diagnostics::new(),
+            diagnostics,
             depth: 0,
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
@@ -62,22 +70,21 @@ impl<'src> Parser<'src> {
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
         self.parse_root();
-        let (cst, diagnostics, exec_fuel_consumed) = self.finish()?;
+        let (cst, exec_fuel_consumed) = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
         Ok(ParseResult {
             ast: root,
-            diag: diagnostics,
             fuel_consumed: exec_fuel_consumed,
         })
     }
 
-    fn finish(mut self) -> Result<(GreenNode, Diagnostics, u32), Error> {
+    fn finish(mut self) -> Result<(GreenNode, u32), Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
         let fuel_consumed = self.fuel_initial.saturating_sub(self.fuel_remaining);
-        Ok((self.builder.finish(), self.diagnostics, fuel_consumed))
+        Ok((self.builder.finish(), fuel_consumed))
     }
 
     pub(super) fn has_fatal_error(&self) -> bool {
@@ -275,7 +282,7 @@ impl<'src> Parser<'src> {
             return;
         };
         self.diagnostics
-            .report(kind, range)
+            .report(self.source_id, kind, range)
             .suppression_range(suppression)
             .emit();
     }
@@ -285,7 +292,7 @@ impl<'src> Parser<'src> {
             return;
         };
         self.diagnostics
-            .report(kind, range)
+            .report(self.source_id, kind, range)
             .message(message)
             .suppression_range(suppression)
             .emit();
@@ -363,9 +370,9 @@ impl<'src> Parser<'src> {
         // Use full range for easier downstream error suppression
         let full_range = TextRange::new(open_range.start(), current.end());
         self.diagnostics
-            .report(kind, full_range)
+            .report(self.source_id, kind, full_range)
             .message(message)
-            .related_to(related_msg, open_range)
+            .related_to(self.source_id, open_range, related_msg)
             .emit();
     }
 
@@ -389,7 +396,7 @@ impl<'src> Parser<'src> {
             return;
         }
         self.diagnostics
-            .report(kind, range)
+            .report(self.source_id, kind, range)
             .message(message)
             .fix(fix_description, fix_replacement)
             .emit();

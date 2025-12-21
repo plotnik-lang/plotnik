@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use plotnik_lib::QueryBuilder;
+use plotnik_lib::{QueryBuilder, SourceMap};
 
 use super::debug::source::resolve_lang;
 
@@ -33,7 +33,7 @@ pub fn run(args: ExecArgs) {
     let lang = resolve_lang(&args.lang, &args.source_text, &args.source_file);
 
     // Parse query
-    let query_parsed = QueryBuilder::new(&query_source)
+    let query_parsed = QueryBuilder::new(SourceMap::one_liner(&query_source))
         .parse()
         .unwrap_or_else(|e| {
             eprintln!("error: {}", e);
@@ -46,7 +46,7 @@ pub fn run(args: ExecArgs) {
     // Link query against language
     let linked = query_analyzed.link(&lang);
     if !linked.is_valid() {
-        eprint!("{}", linked.diagnostics().render(&query_source));
+        eprint!("{}", linked.diagnostics().render(linked.source_map()));
         std::process::exit(1);
     }
 

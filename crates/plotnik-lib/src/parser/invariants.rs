@@ -6,7 +6,7 @@ use crate::parser::SyntaxKind;
 
 use super::core::Parser;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     #[inline]
     pub(super) fn ensure_progress(&self) {
         assert!(

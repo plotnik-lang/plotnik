@@ -4,7 +4,7 @@ use super::utils::{to_pascal_case, to_snake_case};
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Validate capture name follows plotnik convention (snake_case).
     pub(crate) fn validate_capture_name(&mut self, name: &str, span: TextRange) {
         if name.contains('.') {

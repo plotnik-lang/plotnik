@@ -2,38 +2,48 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
+use indexmap::IndexMap;
+
 use plotnik_core::{NodeFieldId, NodeTypeId};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
-use crate::query::dependencies::{self, DependencyAnalysis};
+use crate::query::dependencies::{self, DependencyAnalysisOwned};
 use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
-use crate::query::symbol_table::{SymbolTable, resolve_names};
+use crate::query::source_map::{SourceId, SourceMap};
+use crate::query::symbol_table::{SymbolTableOwned, resolve_names};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
+
+pub type AstMap = IndexMap<SourceId, Root>;
 
 pub struct QueryConfig {
     pub query_parse_fuel: u32,
     pub query_parse_max_depth: u32,
 }
 
-pub struct QueryBuilder<'q> {
-    pub src: &'q str,
+pub struct QueryBuilder {
+    source_map: SourceMap,
     config: QueryConfig,
 }
 
-impl<'q> QueryBuilder<'q> {
-    pub fn new(src: &'q str) -> Self {
+impl QueryBuilder {
+    pub fn new(source_map: SourceMap) -> Self {
         let config = QueryConfig {
             query_parse_fuel: DEFAULT_QUERY_PARSE_FUEL,
             query_parse_max_depth: DEFAULT_QUERY_PARSE_MAX_DEPTH,
         };
 
-        Self { src, config }
+        Self { source_map, config }
+    }
+
+    pub fn one_liner(src: &str) -> Self {
+        let source_map = SourceMap::one_liner(src);
+        Self::new(source_map)
     }
 
     pub fn with_query_parse_fuel(mut self, fuel: u32) -> Self {
@@ -46,96 +56,102 @@ impl<'q> QueryBuilder<'q> {
         self
     }
 
-    pub fn parse(self) -> crate::Result<QueryParsed<'q>> {
-        let src = self.src;
-        let tokens = lex(src);
-        let parser = Parser::new(
-            self.src,
-            tokens,
-            self.config.query_parse_fuel,
-            self.config.query_parse_max_depth,
-        );
+    pub fn parse(self) -> crate::Result<QueryParsed> {
+        let mut ast = IndexMap::new();
+        let mut diag = Diagnostics::new();
+        let mut total_fuel_consumed = 0u32;
 
-        let ParseResult {
-            ast,
-            mut diag,
-            fuel_consumed,
-        } = parser.parse()?;
+        for source in self.source_map.iter() {
+            let tokens = lex(source.content);
+            let parser = Parser::new(
+                source.content,
+                source.id,
+                tokens,
+                &mut diag,
+                self.config.query_parse_fuel,
+                self.config.query_parse_max_depth,
+            );
 
-        validate_alt_kinds(&ast, &mut diag);
+            let res = parser.parse()?;
+
+            validate_alt_kinds(source.id, &res.ast, &mut diag);
+            total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed);
+            ast.insert(source.id, res.ast);
+        }
 
         Ok(QueryParsed {
-            src,
+            source_map: self.source_map,
             diag,
-            ast,
-            fuel_consumed,
+            ast_map: ast,
+            fuel_consumed: total_fuel_consumed,
         })
     }
 }
 
 #[derive(Debug)]
-pub struct QueryParsed<'q> {
-    src: &'q str,
+pub struct QueryParsed {
+    source_map: SourceMap,
+    ast_map: AstMap,
     diag: Diagnostics,
-    ast: Root,
     fuel_consumed: u32,
 }
 
-impl<'q> QueryParsed<'q> {
+impl QueryParsed {
     pub fn query_parser_fuel_consumed(&self) -> u32 {
         self.fuel_consumed
     }
 }
 
-impl<'q> QueryParsed<'q> {
-    pub fn analyze(mut self) -> QueryAnalyzed<'q> {
-        let symbol_table = resolve_names(&self.ast, self.src, &mut self.diag);
+impl QueryParsed {
+    pub fn analyze(mut self) -> QueryAnalyzed {
+        // Use reference-based structures for processing
+        let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
         dependencies::validate_recursion(
             &dependency_analysis,
-            &self.ast,
+            &self.ast_map,
             &symbol_table,
             &mut self.diag,
         );
 
-        let arity_table = infer_arities(&self.ast, &symbol_table, &mut self.diag);
+        let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
+
+        // Convert to owned for storage
+        let symbol_table_owned = crate::query::symbol_table::to_owned(symbol_table);
+        let dependency_analysis_owned = dependency_analysis.to_owned();
 
         QueryAnalyzed {
             query_parsed: self,
-            symbol_table,
-            dependency_analysis,
+            symbol_table: symbol_table_owned,
+            dependency_analysis: dependency_analysis_owned,
             arity_table,
         }
     }
 
-    pub fn source(&self) -> &'q str {
-        self.src
+    pub fn source_map(&self) -> &SourceMap {
+        &self.source_map
     }
 
     pub fn diagnostics(&self) -> Diagnostics {
         self.diag.clone()
     }
 
-    pub fn root(&self) -> &Root {
-        &self.ast
-    }
-
-    pub fn as_cst(&self) -> &SyntaxNode {
-        self.ast.as_cst()
+    pub fn asts(&self) -> &AstMap {
+        &self.ast_map
     }
 }
 
-pub type Query<'q> = QueryAnalyzed<'q>;
+pub type Query = QueryAnalyzed;
 
-pub struct QueryAnalyzed<'q> {
-    query_parsed: QueryParsed<'q>,
-    pub symbol_table: SymbolTable<'q>,
-    dependency_analysis: DependencyAnalysis<'q>,
+pub struct QueryAnalyzed {
+    query_parsed: QueryParsed,
+    pub symbol_table: SymbolTableOwned,
+    dependency_analysis: DependencyAnalysisOwned,
     arity_table: ExprArityTable,
 }
 
-impl<'q> QueryAnalyzed<'q> {
+impl QueryAnalyzed {
     pub fn is_valid(&self) -> bool {
         !self.diag.has_errors()
     }
@@ -144,13 +160,14 @@ impl<'q> QueryAnalyzed<'q> {
         resolve_arity(node, &self.arity_table)
     }
 
-    pub fn link(mut self, lang: &Lang) -> LinkedQuery<'q> {
-        let mut type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
-        let mut field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+    pub fn link(mut self, lang: &Lang) -> LinkedQuery {
+        // Use reference-based hash maps during processing
+        let mut type_ids: HashMap<&str, Option<NodeTypeId>> = HashMap::new();
+        let mut field_ids: HashMap<&str, Option<NodeFieldId>> = HashMap::new();
 
         link::link(
-            &self.query_parsed.ast,
-            self.query_parsed.src,
+            &self.query_parsed.ast_map,
+            &self.query_parsed.source_map,
             lang,
             &self.symbol_table,
             &mut type_ids,
@@ -158,54 +175,66 @@ impl<'q> QueryAnalyzed<'q> {
             &mut self.query_parsed.diag,
         );
 
+        // Convert to owned for storage
+        let type_ids_owned = type_ids
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect();
+        let field_ids_owned = field_ids
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect();
+
         LinkedQuery {
             inner: self,
-            type_ids,
-            field_ids,
+            type_ids: type_ids_owned,
+            field_ids: field_ids_owned,
         }
     }
 }
 
-impl<'q> Deref for QueryAnalyzed<'q> {
-    type Target = QueryParsed<'q>;
+impl Deref for QueryAnalyzed {
+    type Target = QueryParsed;
 
     fn deref(&self) -> &Self::Target {
         &self.query_parsed
     }
 }
 
-impl<'q> DerefMut for QueryAnalyzed<'q> {
+impl DerefMut for QueryAnalyzed {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.query_parsed
     }
 }
 
-impl<'q> TryFrom<&'q str> for QueryAnalyzed<'q> {
+impl TryFrom<&str> for QueryAnalyzed {
     type Error = crate::Error;
 
-    fn try_from(src: &'q str) -> crate::Result<Self> {
-        Ok(QueryBuilder::new(src).parse()?.analyze())
+    fn try_from(src: &str) -> crate::Result<Self> {
+        Ok(QueryBuilder::new(SourceMap::one_liner(src))
+            .parse()?
+            .analyze())
     }
 }
 
-type NodeTypeIdTable<'q> = HashMap<&'q str, Option<NodeTypeId>>;
-type NodeFieldIdTable<'q> = HashMap<&'q str, Option<NodeFieldId>>;
+type NodeTypeIdTableOwned = HashMap<String, Option<NodeTypeId>>;
+type NodeFieldIdTableOwned = HashMap<String, Option<NodeFieldId>>;
 
-pub struct LinkedQuery<'q> {
-    inner: QueryAnalyzed<'q>,
-    type_ids: NodeTypeIdTable<'q>,
-    field_ids: NodeFieldIdTable<'q>,
+pub struct LinkedQuery {
+    inner: QueryAnalyzed,
+    type_ids: NodeTypeIdTableOwned,
+    field_ids: NodeFieldIdTableOwned,
 }
 
-impl<'q> Deref for LinkedQuery<'q> {
-    type Target = QueryAnalyzed<'q>;
+impl Deref for LinkedQuery {
+    type Target = QueryAnalyzed;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<'q> DerefMut for LinkedQuery<'q> {
+impl DerefMut for LinkedQuery {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

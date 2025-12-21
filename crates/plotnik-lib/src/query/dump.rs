@@ -4,7 +4,7 @@
 mod test_helpers {
     use crate::Query;
 
-    impl Query<'_> {
+    impl Query {
         pub fn dump_cst(&self) -> String {
             self.printer().raw(true).dump()
         }
@@ -30,11 +30,11 @@ mod test_helpers {
         }
 
         pub fn dump_diagnostics(&self) -> String {
-            self.diagnostics().render_filtered(self.source())
+            self.diagnostics().render_filtered(self.source_map())
         }
 
         pub fn dump_diagnostics_raw(&self) -> String {
-            self.diagnostics().render(self.source())
+            self.diagnostics().render(self.source_map())
         }
     }
 }
