@@ -209,10 +209,9 @@ fn valid_query() {
       (function_declaration name: (identifier) @name)
     "#};
 
-    let query = Query::try_from(input).unwrap();
+    let res = Query::expect_valid_ast(input).unwrap();
 
-    assert!(query.is_valid());
-    insta::assert_snapshot!(query.dump_ast(), @"");
+    insta::assert_snapshot!(res, @"");
 }
 ```
 

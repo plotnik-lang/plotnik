@@ -118,3 +118,26 @@ fn invalid_three_way_mutual_recursion_across_files() {
       |         - references C (completing cycle)
     ");
 }
+
+#[test]
+fn multifile_field_with_ref_to_seq_error() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file("defs.ptk", "X = {(a) (b)}");
+    source_map.add_file("main.ptk", "Q = (call name: (X))");
+
+    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: field `name` must match exactly one node, not a sequence
+     --> main.ptk:1:17
+      |
+    1 | Q = (call name: (X))
+      |                 ^^^
+      |
+     ::: defs.ptk:1:5
+      |
+    1 | X = {(a) (b)}
+      |     --------- defined here
+    ");
+}

@@ -179,14 +179,24 @@ impl ArityContext<'_, '_> {
                 .map(|t| t.text().to_string())
                 .unwrap_or_else(|| "field".to_string());
 
-            self.diag
+            let mut builder = self
+                .diag
                 .report(
                     self.source_id,
                     DiagnosticKind::FieldSequenceValue,
                     value.text_range(),
                 )
-                .message(field_name)
-                .emit();
+                .message(field_name);
+
+            // If value is a reference, add related info pointing to definition
+            if let Expr::Ref(r) = &value
+                && let Some(name_tok) = r.name()
+                && let Some((def_source, def_body)) = self.symbol_table.get(name_tok.text())
+            {
+                builder = builder.related_to(*def_source, def_body.text_range(), "defined here");
+            }
+
+            builder.emit();
         }
     }
 }
