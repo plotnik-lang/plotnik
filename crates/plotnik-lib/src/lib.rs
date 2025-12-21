@@ -11,7 +11,7 @@
 //! "#;
 //!
 //! let query = Query::try_from(source).expect("out of fuel");
-//! eprintln!("{}", query.diagnostics().render(source));
+//! eprintln!("{}", query.diagnostics().render(query.source_map()));
 //! ```
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]

@@ -31,25 +31,6 @@ pub struct DependencyAnalysis<'q> {
     pub sccs: Vec<Vec<&'q str>>,
 }
 
-/// Owned variant of `DependencyAnalysis` for storage in pipeline structs.
-#[derive(Debug, Clone, Default)]
-pub struct DependencyAnalysisOwned {
-    #[allow(dead_code)]
-    pub sccs: Vec<Vec<String>>,
-}
-
-impl DependencyAnalysis<'_> {
-    pub fn to_owned(&self) -> DependencyAnalysisOwned {
-        DependencyAnalysisOwned {
-            sccs: self
-                .sccs
-                .iter()
-                .map(|scc| scc.iter().map(|s| (*s).to_owned()).collect())
-                .collect(),
-        }
-    }
-}
-
 /// Analyze dependencies between definitions.
 ///
 /// Returns the SCCs in reverse topological order.
