@@ -26,7 +26,7 @@
 | `!field`            | Negated field (assert absent)  |
 | `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)      |
 | `??` `*?` `+?`      | Non-greedy variants            |
-| `.`                 | Anchor (adjacency)             |
+| `.`                 | Anchor (adjacency, see below)  |
 | `{...}`             | Sequence (siblings in order)   |
 | `[...]`             | Alternation (first match wins) |
 | `Name = ...`        | Named definition (entrypoint)  |
@@ -36,7 +36,9 @@
 
 - Captures are flat by default: nesting in pattern ≠ nesting in output
 - `{...} @x` or `[...] @x` creates a nested scope
-- Quantifier on captured pattern → array: `(x)* @a` → `a: T[]`
+- Scalar list (no internal captures): `(x)* @a` → `a: T[]`
+- Row list (with internal captures): `{(x) @x}* @rows` → `rows: { x: T }[]`
+- **Strict dimensionality**: `*`/`+` with internal captures requires row capture
 
 ## Alternations
 
@@ -68,6 +70,18 @@ Labeled (tagged union):
 Nested = (call function: [(id) @name (Nested) @inner])
 ```
 
+## Anchor Strictness
+
+The `.` anchor adapts to what it's anchoring:
+
+| Pattern     | Behavior                                    |
+| ----------- | ------------------------------------------- |
+| `(a) . (b)` | Skip trivia, no named nodes between         |
+| `"x" . (b)` | Strict—nothing between (anonymous involved) |
+| `(a) . "x"` | Strict—nothing between (anonymous involved) |
+
+Rule: anchor is as strict as its strictest operand.
+
 ## Anti-patterns
 
 ```
@@ -81,21 +95,21 @@ Nested = (call function: [(id) @name (Nested) @inner])
 (id) @x (#eq? @x "foo")
 ```
 
-## Type System Gotchas
+## Type System Rules
 
-**Columnar output**: Quantifiers produce parallel arrays, not list of objects:
-
-```
-{(A) @a (B) @b}*  → { a: Node[], b: Node[] }  // NOT [{a,b}, {a,b}]
-```
-
-For list of objects, wrap in sequence: `({(A) @a (B) @b} @row)*`
-
-**Row integrity**: Can't mix `*`/`+` with `1`/`?` in same quantified scope:
+**Strict dimensionality**: Quantifiers with internal captures require explicit row capture:
 
 ```
-{(A)* @a (B) @b}*   ; ERROR: @a desync, @b sync
-{(A)? @a (B) @b}*   ; OK: both synchronized (? emits null)
+{(a) @a (b) @b}*          ; ERROR: internal captures, no row capture
+{(a) @a (b) @b}* @rows    ; OK: rows: { a: Node, b: Node }[]
+(func (id) @name)*        ; ERROR: internal capture without row
+{(func (id) @name) @f}* @funcs  ; OK: funcs: { f: Node, name: Node }[]
+```
+
+**Optional bubbling**: `?` does NOT require row capture (no dimensionality added):
+
+```
+{(a) @a (b) @b}?    ; OK: a?: Node, b?: Node (bubbles to parent)
 ```
 
 **Recursion rules**:
@@ -110,9 +124,7 @@ A = (foo (B))  B = (bar (A))      ; OK: descends each step
 
 ## ⚠️ Sequence Syntax (Tree-sitter vs Plotnik)
 
-Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax mistake.
-
-`((a) (b))` in Plotnik means "node `(a)` with child `(b)`", NOT a sequence.
+Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 
 # Architecture Decision Records (ADRs)
 
@@ -121,10 +133,6 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax mistake.
 - **Index**:
   - _(no ADRs yet)_
 - **Template**:
-
-[ADR-0001](docs/adr/ADR-0001-query-parser.md) | [ADR-0002](docs/adr/ADR-0002-diagnostics-system.md) | [ADR-0004](docs/adr/ADR-0004-query-ir-binary-format.md) | [ADR-0005](docs/adr/ADR-0005-transition-graph-format.md) | [ADR-0006](docs/adr/ADR-0006-dynamic-query-execution.md) | [ADR-0007](docs/adr/ADR-0007-type-metadata-format.md) | [ADR-0008](docs/adr/ADR-0008-tree-navigation.md) | [ADR-0009](docs/adr/ADR-0009-type-system.md) | [ADR-0010](docs/adr/ADR-0010-type-system-v2.md) | [ADR-0012](docs/adr/ADR-0012-variable-length-ir.md)
-
-## Template
 
 ```markdown
 # ADR-XXXX: Title

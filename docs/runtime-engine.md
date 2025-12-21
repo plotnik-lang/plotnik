@@ -42,11 +42,11 @@ Fetch block at `ip` → dispatch by `type_id` → execute → update `ip`.
 
 ### Epsilon Transitions
 
-A `MatchExt` with `node_type: None` and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
+A `MatchExt` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
 
 Common patterns:
 
-- **Quantifier branches**: `(A)?` uses epsilon to decide match-or-skip
+- **Quantifier branches**: `(a)?` uses epsilon to decide match-or-skip
 - **Trailing cleanup**: Many queries end with epsilon + `Up(n)` to restore cursor position after matching, regardless of tree depth
 
 ### Call (0x02)
@@ -101,14 +101,23 @@ struct Frame {
 
 ### Pruning
 
-Problem: `(A)+` accumulates frames forever. Solution: high-water mark pruning after `Return`:
+Problem: `(a)+` accumulates frames forever. Solution: high-water mark pruning after `Return`:
 
 ```
-high_water = max(current_frame_idx, max_checkpoint_watermark)
+high_water = max(current_frame_idx, checkpoint_stack.max_frame_ref)
 arena.truncate(high_water + 1)
 ```
 
 Bounds arena to O(max_checkpoint_depth + current_call_depth).
+
+**O(1) Invariant**: The checkpoint stack maintains `max_frame_ref`—the highest `frame_index` referenced by any active checkpoint.
+
+| Operation | Invariant Update                                     | Complexity     |
+| --------- | ---------------------------------------------------- | -------------- |
+| Push      | `max_frame_ref = max(max_frame_ref, cp.frame_index)` | O(1)           |
+| Pop       | Recompute only if popping the max holder             | O(1) amortized |
+
+Amortized analysis: each checkpoint contributes to at most one recomputation over its lifetime.
 
 ### Call/Return
 
@@ -146,18 +155,17 @@ struct EffectStream<'a> {
 }
 ```
 
-| Effect              | Action                             |
-| ------------------- | ---------------------------------- |
-| CaptureNode         | Push `matched_node`                |
-| Start/EndObject     | Object boundaries                  |
-| SetField(id)        | Assign to field                    |
-| PushField(id)       | Append to array field (columnar)   |
-| Start/EndArray      | Array boundaries                   |
-| PushElement         | Append to array                    |
-| Start/EndVariant(t) | Tagged union boundaries            |
-| ToString            | Node → source text                 |
-| ClearCurrent        | Reset current value                |
-| PushNull            | Null placeholder (`?` in columnar) |
+| Effect              | Action                                  |
+| ------------------- | --------------------------------------- |
+| CaptureNode         | Push `matched_node`                     |
+| Start/EndObject     | Object boundaries                       |
+| SetField(id)        | Assign to field                         |
+| Start/EndArray      | Array boundaries                        |
+| PushElement         | Append to array                         |
+| Start/EndVariant(t) | Tagged union boundaries                 |
+| ToString            | Node → source text                      |
+| ClearCurrent        | Reset current value                     |
+| PushNull            | Null placeholder (optional/alternation) |
 
 ### Materialization
 

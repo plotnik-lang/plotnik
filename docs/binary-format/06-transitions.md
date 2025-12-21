@@ -67,8 +67,8 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-- **Opcode**: 6 bits (0-63), currently 13 defined
-- **Payload**: 10 bits (0-1023), member/variant index
+- **Opcode**: 6 bits (0-63), currently 12 defined
+- **Payload**: 10 bits (0-1023), member/variant index. Limits struct/enum members to 1024.
 
 | Opcode | Name           | Payload (10b)          |
 | :----- | :------------- | :--------------------- |
@@ -79,14 +79,49 @@ EffectOp (u16)
 | 4      | `StartObject`  | -                      |
 | 5      | `EndObject`    | -                      |
 | 6      | `SetField`     | Member index (0-1023)  |
-| 7      | `PushField`    | Member index (0-1023)  |
-| 8      | `StartVariant` | Variant index (0-1023) |
-| 9      | `EndVariant`   | -                      |
-| 10     | `ToString`     | -                      |
-| 11     | `ClearCurrent` | -                      |
-| 12     | `PushNull`     | -                      |
+| 7      | `StartVariant` | Variant index (0-1023) |
+| 8      | `EndVariant`   | -                      |
+| 9      | `ToString`     | -                      |
+| 10     | `ClearCurrent` | -                      |
+| 11     | `PushNull`     | -                      |
+
+**Object vs Scalar List Context**:
+
+The VM builds **Array of Structs** (AoS), not Structure of Arrays (SoA). This affects opcode usage:
+
+- **Scalar lists** (`(x)* @items`): `StartArray` → loop(`CaptureNode`, `PushElement`) → `EndArray`, `SetField`
+- **Row lists** (`{ (x) @x }* @rows`): `StartArray` → loop(`StartObject`, `CaptureNode`, `SetField`, `EndObject`, `PushElement`) → `EndArray`, `SetField`
+
+Arrays are built on a value stack and assigned to fields via `SetField`.
+
+`PushNull` emits explicit null values for:
+
+- Optional fields when the optional branch is skipped
+- Alternation branches missing a capture present in other branches
 
 Member/variant indices are resolved via `type_members[struct_or_enum.members.start + index]`.
+
+### Opcode Ranges (Future Extensibility)
+
+Opcodes are partitioned by argument size:
+
+| Range | Format      | Payload                        |
+| :---- | :---------- | :----------------------------- |
+| 0-31  | Single word | 10-bit payload in same word    |
+| 32-63 | Extended    | Next u16 word is full argument |
+
+Current opcodes (0-11) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format:
+
+```
+// Single word (current)
+SetField:     [opcode=6 | member_idx]
+
+// Extended (future)
+AssertEqText: [opcode=32 | reserved], [StringId]
+AssertMatch:  [opcode=33 | flags],    [RegexId]
+```
+
+This maintains backwards compatibility—existing binaries use only opcodes < 32.
 
 ## 4. Instructions
 
@@ -96,7 +131,7 @@ All instructions are exactly 8 bytes.
 
 **Epsilon Transitions**: A `MatchExt` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This is critical for:
 
-- **Branching at EOF**: `(A)?` must succeed when no node exists to match
+- **Branching at EOF**: `(a)?` must succeed when no node exists to match
 - **Trailing navigation**: Many queries end with epsilon + `Up(n)` to restore cursor position after matching descendants
 
 Epsilon transitions bypass the normal "check node exists → check type → check field" logic entirely. They execute effects and select successors without touching the cursor.
@@ -195,12 +230,17 @@ struct MatchPayloadHeader {
 }
 ```
 
-**Body Layout** (contiguous, u16 aligned):
+**Body Layout** (contiguous, u16 aligned, matches header order):
 
 1. `pre_effects`: `[EffectOp; pre_count]`
-2. `post_effects`: `[EffectOp; post_count]`
-3. `negated_fields`: `[u16; neg_count]`
+2. `negated_fields`: `[u16; neg_count]`
+3. `post_effects`: `[EffectOp; post_count]`
 4. `successors`: `[u16; succ_count]` (StepIds)
+
+**Pre vs Post Effects**:
+
+- `pre_effects`: Execute before match attempt. Used for scope openers (`StartObject`, `StartArray`, `StartVariant`) that must run regardless of which branch succeeds.
+- `post_effects`: Execute after successful match. Used for capture/assignment ops (`CaptureNode`, `SetField`, `EndObject`, etc.) that depend on `matched_node`.
 
 **Continuation Logic**:
 
@@ -268,29 +308,26 @@ Entry ─ε→ Branch ─ε→ Match ─ε→ Exit
 Branch.successors = [match, skip]  // try match first
 ```
 
-The `PushNull` effect on the skip path is required for **Row Integrity** (see [type-system.md](../type-system.md#4-row-integrity)). When `?` captures a synchronized field, the skip branch must emit a null placeholder to keep parallel arrays aligned.
+The `PushNull` effect on the skip path emits an explicit null value when the optional pattern doesn't match. This distinguishes "not present" (`null`) from "not attempted." In alternations and optional captures, downstream consumers can differentiate between a missing match and a match that produced no value.
 
 ## 7. Alternation Compilation
 
-Untagged alternations `[ A  B ]` compile to branching with **symmetric effect injection** for row integrity.
+Untagged alternations `[ A  B ]` compile to branching with **symmetric null injection** for type consistency.
 
-### Row Integrity in Alternations
+### Null Injection in Alternations
 
-When a capture appears in some branches but not others, the compiler injects `PushNull` into branches missing that capture:
+When a capture appears in some branches but not others, the type system produces an optional field (`x?: T`). The compiler injects `PushNull` into branches missing that capture:
 
 ```
-Query: [ (A) @x  (B) ]
+Query: [ (a) @x  (b) ]
+Type:  { x?: Node }
 
-Branch 1 (A): [CaptureNode, PushField(x)] → Exit
-Branch 2 (B): [PushNull, PushField(x)]   → Exit
+Branch 1 (a): [CaptureNode, SetField(x)] → Exit
+Branch 2 (b): [PushNull, SetField(x)]    → Exit
                  ↑ injected
 ```
 
-In columnar context `([ (A) @x  (B) ])*`:
-
-- Iteration 1 matches A: `x` array gets the node
-- Iteration 2 matches B: `x` array gets null placeholder
-- Result: `x` array length equals iteration count
+The output object always has the `x` field set—either to a node or to null. This matches the type system's merged struct model.
 
 ### Multiple Captures
 
@@ -298,17 +335,18 @@ Each missing capture gets its own `PushNull`:
 
 ```
 Query: [
-  { (A) @x (B) @y }
-  { (C) @x }
-  (D)
+  { (a) @x (b) @y }
+  { (c) @x }
+  (d)
 ]
+Type: { x?: Node, y?: Node }
 
-Branch 1: [CaptureNode, PushField(x), CaptureNode, PushField(y)]
-Branch 2: [CaptureNode, PushField(x), PushNull, PushField(y)]
-Branch 3: [PushNull, PushField(x), PushNull, PushField(y)]
+Branch 1: [CaptureNode, SetField(x), CaptureNode, SetField(y)]
+Branch 2: [CaptureNode, SetField(x), PushNull, SetField(y)]
+Branch 3: [PushNull, SetField(x), PushNull, SetField(y)]
 ```
 
-This ensures all synchronized fields maintain identical array lengths across iterations.
+This ensures the output object has all fields defined, with nulls for unmatched captures.
 
 ### Non-Greedy `??`
 

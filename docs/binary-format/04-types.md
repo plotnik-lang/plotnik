@@ -39,7 +39,7 @@ The **TypeMeta** section contains two contiguous arrays:
 1. **Definitions**: `[TypeDef; header.type_defs_count]`
 2. **Members**: `[TypeMember; header.type_members_count]`
 
-Both `header.type_members_count` and `Slice.ptr` are `u16`, so the addressable range (0..65535) is identical—no capacity mismatch is possible by construction.
+**Validation**: For `Struct`/`Enum` kinds, loaders must verify: `(ptr as u32) + (len as u32) ≤ type_members_count`. This prevents out-of-bounds reads from malformed binaries (e.g., `ptr=65000, len=1000` overflows u16 arithmetic).
 
 ### 2.1. TypeDef (8 bytes)
 
@@ -104,10 +104,10 @@ Recursive types reference themselves via TypeId. Since types are addressed by in
 
 Example query:
 
-```plotnik
+```
 List = [
     Nil: (nil)
-    Cons: (cons (T) @head (List) @tail)
+    Cons: (cons (a) @head (List) @tail)
 ]
 ```
 
