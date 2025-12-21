@@ -41,7 +41,7 @@ impl QueryBuilder {
         Self { source_map, config }
     }
 
-    pub fn from_str(src: &str) -> Self {
+    pub fn one_liner(src: &str) -> Self {
         let source_map = SourceMap::one_liner(src);
         Self::new(source_map)
     }
