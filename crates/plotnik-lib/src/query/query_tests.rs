@@ -86,3 +86,35 @@ impl QueryAnalyzed {
         query.dump_diagnostics()
     }
 }
+
+#[test]
+fn invalid_three_way_mutual_recursion_across_files() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file("a.ptk", "A = (a (B))");
+    source_map.add_file("b.ptk", "B = (b (C))");
+    source_map.add_file("c.ptk", "C = (c (A))");
+
+    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+
+    assert!(!query.is_valid());
+    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    error: infinite recursion: cycle has no escape path
+     --> c.ptk:1:9
+      |
+    1 | C = (c (A))
+      | -       ^
+      | |       |
+      | |       references A
+      | C is defined here
+      |
+     ::: a.ptk:1:9
+      |
+    1 | A = (a (B))
+      |         - references B
+      |
+     ::: b.ptk:1:9
+      |
+    1 | B = (b (C))
+      |         - references C (completing cycle)
+    ");
+}
