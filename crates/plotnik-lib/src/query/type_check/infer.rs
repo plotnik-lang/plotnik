@@ -5,6 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use super::symbol::Symbol;
+
 use rowan::TextRange;
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
@@ -76,7 +78,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Named node: matches one position, bubbles up child captures
     fn infer_named_node(&mut self, node: &NamedNode) -> TermInfo {
-        let mut merged_fields: BTreeMap<String, FieldInfo> = BTreeMap::new();
+        let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
 
         for child in node.children() {
             let child_info = self.infer_expr(&child);
@@ -135,7 +137,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         };
 
         // Merge fields from all children
-        let mut merged_fields: BTreeMap<String, FieldInfo> = BTreeMap::new();
+        let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
 
         for child in &children {
             let child_info = self.infer_expr(child);
@@ -150,7 +152,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                                 DiagnosticKind::DuplicateCaptureInScope,
                                 child.text_range(),
                             )
-                            .message(&name)
+                            .message(self.ctx.resolve(name))
                             .emit();
                     } else {
                         merged_fields.insert(name, info);
@@ -181,19 +183,19 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     fn infer_tagged_alt(&mut self, alt: &AltExpr) -> TermInfo {
-        let mut variants: BTreeMap<String, TypeId> = BTreeMap::new();
+        let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
         for branch in alt.branches() {
             let Some(label) = branch.label() else {
                 continue;
             };
-            let label_text = label.text().to_string();
+            let label_sym = self.ctx.intern(label.text());
 
             let Some(body) = branch.body() else {
                 // Empty variant gets void/empty struct type
                 variants.insert(
-                    label_text,
+                    label_sym,
                     self.ctx.intern_type(TypeKind::Struct(BTreeMap::new())),
                 );
                 continue;
@@ -204,7 +206,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             // Convert flow to a type for this variant
             let variant_type = self.flow_to_type(&body_info.flow);
-            variants.insert(label_text, variant_type);
+            variants.insert(label_sym, variant_type);
         }
 
         // Tagged alternation produces an Enum type
@@ -252,7 +254,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 .map(|inner| self.infer_expr(&inner))
                 .unwrap_or_else(TermInfo::void);
         };
-        let capture_name = name_tok.text().to_string();
+        let capture_name = self.ctx.intern(name_tok.text());
 
         // Check for type annotation
         let annotation_type = cap.type_annotation().and_then(|t| {
@@ -261,8 +263,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 if type_name == "string" {
                     TYPE_STRING
                 } else {
-                    self.ctx
-                        .intern_type(TypeKind::Custom(type_name.to_string()))
+                    let type_sym = self.ctx.intern(type_name);
+                    self.ctx.intern_type(TypeKind::Custom(type_sym))
                 }
             })
         });
@@ -453,7 +455,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 .map(|t| t.text().to_string())
                 .unwrap_or_else(|| "*".to_string());
 
-            let capture_names: Vec<_> = fields.keys().map(|s| format!("`@{}`", s)).collect();
+            let capture_names: Vec<_> = fields
+                .keys()
+                .map(|s| format!("`@{}`", self.ctx.resolve(*s)))
+                .collect();
             let captures_str = capture_names.join(", ");
 
             self.diag
@@ -499,15 +504,18 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 DiagnosticKind::IncompatibleTypes,
                 "scalar type in untagged alternation; use tagged alternation instead".to_string(),
             ),
-            UnifyError::IncompatibleTypes { field } => {
-                (DiagnosticKind::IncompatibleCaptureTypes, field.clone())
-            }
-            UnifyError::IncompatibleStructs { field } => {
-                (DiagnosticKind::IncompatibleStructShapes, field.clone())
-            }
-            UnifyError::IncompatibleArrayElements { field } => {
-                (DiagnosticKind::IncompatibleCaptureTypes, field.clone())
-            }
+            UnifyError::IncompatibleTypes { field } => (
+                DiagnosticKind::IncompatibleCaptureTypes,
+                self.ctx.resolve(*field).to_string(),
+            ),
+            UnifyError::IncompatibleStructs { field } => (
+                DiagnosticKind::IncompatibleStructShapes,
+                self.ctx.resolve(*field).to_string(),
+            ),
+            UnifyError::IncompatibleArrayElements { field } => (
+                DiagnosticKind::IncompatibleCaptureTypes,
+                self.ctx.resolve(*field).to_string(),
+            ),
         };
 
         self.diag

@@ -5,6 +5,7 @@
 
 use std::collections::BTreeMap;
 
+use super::symbol::Symbol;
 use super::types::{FieldInfo, TYPE_NODE, TypeFlow, TypeId};
 
 /// Error during type unification.
@@ -13,20 +14,20 @@ pub enum UnifyError {
     /// Scalar type appeared in untagged alternation (needs tagging)
     ScalarInUntagged,
     /// Capture has incompatible types across branches
-    IncompatibleTypes { field: String },
+    IncompatibleTypes { field: Symbol },
     /// Capture has incompatible struct shapes across branches
-    IncompatibleStructs { field: String },
+    IncompatibleStructs { field: Symbol },
     /// Array element types don't match
-    IncompatibleArrayElements { field: String },
+    IncompatibleArrayElements { field: Symbol },
 }
 
 impl UnifyError {
-    pub fn field_name(&self) -> Option<&str> {
+    pub fn field_symbol(&self) -> Option<Symbol> {
         match self {
             UnifyError::ScalarInUntagged => None,
             UnifyError::IncompatibleTypes { field }
             | UnifyError::IncompatibleStructs { field }
-            | UnifyError::IncompatibleArrayElements { field } => Some(field),
+            | UnifyError::IncompatibleArrayElements { field } => Some(*field),
         }
     }
 }
@@ -64,7 +65,7 @@ pub fn unify_flows(flows: impl IntoIterator<Item = TypeFlow>) -> Result<TypeFlow
 }
 
 /// Make all fields in a map optional.
-fn make_all_optional(fields: BTreeMap<String, FieldInfo>) -> BTreeMap<String, FieldInfo> {
+fn make_all_optional(fields: BTreeMap<Symbol, FieldInfo>) -> BTreeMap<Symbol, FieldInfo> {
     fields
         .into_iter()
         .map(|(k, v)| (k, v.make_optional()))
@@ -77,19 +78,19 @@ fn make_all_optional(fields: BTreeMap<String, FieldInfo>) -> BTreeMap<String, Fi
 /// - Keys in both: types must be compatible, field is required iff required in both
 /// - Keys in only one: field becomes optional
 fn merge_fields(
-    a: BTreeMap<String, FieldInfo>,
-    b: BTreeMap<String, FieldInfo>,
-) -> Result<BTreeMap<String, FieldInfo>, UnifyError> {
+    a: BTreeMap<Symbol, FieldInfo>,
+    b: BTreeMap<Symbol, FieldInfo>,
+) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
     let mut result = BTreeMap::new();
 
     // Process all keys from a
     for (key, a_info) in &a {
         if let Some(b_info) = b.get(key) {
             // Key exists in both: unify types
-            let unified_type = unify_type_ids(a_info.type_id, b_info.type_id, key)?;
+            let unified_type = unify_type_ids(a_info.type_id, b_info.type_id, *key)?;
             let optional = a_info.optional || b_info.optional;
             result.insert(
-                key.clone(),
+                *key,
                 FieldInfo {
                     type_id: unified_type,
                     optional,
@@ -97,7 +98,7 @@ fn merge_fields(
             );
         } else {
             // Key only in a: make optional
-            result.insert(key.clone(), a_info.clone().make_optional());
+            result.insert(*key, a_info.make_optional());
         }
     }
 
@@ -115,7 +116,7 @@ fn merge_fields(
 ///
 /// For now, types must match exactly (except Node is compatible with Node).
 /// Future: could allow structural subtyping for structs.
-fn unify_type_ids(a: TypeId, b: TypeId, field: &str) -> Result<TypeId, UnifyError> {
+fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyError> {
     if a == b {
         return Ok(a);
     }
@@ -126,14 +127,18 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: &str) -> Result<TypeId, UnifyErro
     }
 
     // Type mismatch
-    Err(UnifyError::IncompatibleTypes {
-        field: field.to_string(),
-    })
+    Err(UnifyError::IncompatibleTypes { field })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_symbol(n: u32) -> Symbol {
+        // For tests, create symbols directly. In real code, use Interner.
+        // This is safe because tests don't need actual string resolution.
+        unsafe { std::mem::transmute(n) }
+    }
 
     #[test]
     fn unify_void_void() {
@@ -143,14 +148,15 @@ mod tests {
 
     #[test]
     fn unify_void_fields() {
+        let x = make_symbol(0);
         let mut fields = BTreeMap::new();
-        fields.insert("x".to_string(), FieldInfo::required(TYPE_NODE));
+        fields.insert(x, FieldInfo::required(TYPE_NODE));
 
         let result = unify_flow(TypeFlow::Void, TypeFlow::Fields(fields)).unwrap();
 
         match result {
             TypeFlow::Fields(f) => {
-                assert!(f.get("x").unwrap().optional);
+                assert!(f.get(&x).unwrap().optional);
             }
             _ => panic!("expected Fields"),
         }
@@ -158,21 +164,24 @@ mod tests {
 
     #[test]
     fn unify_fields_merge() {
+        let x = make_symbol(0);
+        let y = make_symbol(1);
+
         let mut a = BTreeMap::new();
-        a.insert("x".to_string(), FieldInfo::required(TYPE_NODE));
+        a.insert(x, FieldInfo::required(TYPE_NODE));
 
         let mut b = BTreeMap::new();
-        b.insert("x".to_string(), FieldInfo::required(TYPE_NODE));
-        b.insert("y".to_string(), FieldInfo::required(TYPE_NODE));
+        b.insert(x, FieldInfo::required(TYPE_NODE));
+        b.insert(y, FieldInfo::required(TYPE_NODE));
 
         let result = unify_flow(TypeFlow::Fields(a), TypeFlow::Fields(b)).unwrap();
 
         match result {
             TypeFlow::Fields(f) => {
                 // x is in both, so required
-                assert!(!f.get("x").unwrap().optional);
+                assert!(!f.get(&x).unwrap().optional);
                 // y only in b, so optional
-                assert!(f.get("y").unwrap().optional);
+                assert!(f.get(&y).unwrap().optional);
             }
             _ => panic!("expected Fields"),
         }

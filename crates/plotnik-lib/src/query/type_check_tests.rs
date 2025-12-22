@@ -38,11 +38,11 @@ fn capture_with_custom_type() {
       text: string;
     }
 
+    export type Identifier = Node;
+
     export interface Q {
       name: Identifier;
     }
-
-    export type Identifier = Node;
     ");
 }
 
@@ -142,13 +142,13 @@ fn row_list_basic() {
       text: string;
     }
 
-    export interface Q {
-      rows: QRows[];
-    }
-
     export interface QRows {
       k: Node;
       v: Node;
+    }
+
+    export interface Q {
+      rows: QRows[];
     }
     ");
 }
@@ -165,13 +165,13 @@ fn row_list_non_empty() {
       text: string;
     }
 
-    export interface Q {
-      rows: [QRows, ...QRows[]];
-    }
-
     export interface QRows {
       k: Node;
       v: Node;
+    }
+
+    export interface Q {
+      rows: [QRows, ...QRows[]];
     }
     ");
 }
@@ -242,13 +242,13 @@ fn captured_sequence_creates_struct() {
       text: string;
     }
 
-    export interface Q {
-      row: QRow;
-    }
-
     export interface QRow {
       a: Node;
       b: Node;
+    }
+
+    export interface Q {
+      row: QRow;
     }
     ");
 }
@@ -375,10 +375,6 @@ fn tagged_alt_captured() {
       text: string;
     }
 
-    export interface Q {
-      result: QResult;
-    }
-
     export interface QResultNum {
       $tag: "Num";
       $data: { n: Node };
@@ -390,6 +386,10 @@ fn tagged_alt_captured() {
     }
 
     export type QResult = QResultNum | QResultStr;
+
+    export interface Q {
+      result: QResult;
+    }
     "#);
 }
 
@@ -408,14 +408,14 @@ fn nested_captured_group() {
       text: string;
     }
 
-    export interface Q {
-      name: Node;
-      pair: QPair;
-    }
-
     export interface QPair {
       k: Node;
       v: Node;
+    }
+
+    export interface Q {
+      name: Node;
+      pair: QPair;
     }
     ");
 }

@@ -6,6 +6,8 @@
 
 use std::collections::BTreeMap;
 
+use super::symbol::Symbol;
+
 /// Interned type identifier. Types are stored in TypeContext and referenced by ID.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TypeId(pub u32);
@@ -33,17 +35,17 @@ pub enum TypeKind {
     /// Extracted text from a node
     String,
     /// User-specified type via `@x :: TypeName`
-    Custom(String),
-    /// Object with named fields
-    Struct(BTreeMap<String, FieldInfo>),
-    /// Tagged union from labeled alternations
-    Enum(BTreeMap<String, TypeId>),
+    Custom(Symbol),
+    /// Object with named fields (keys are interned Symbols)
+    Struct(BTreeMap<Symbol, FieldInfo>),
+    /// Tagged union from labeled alternations (keys are interned Symbols)
+    Enum(BTreeMap<Symbol, TypeId>),
     /// Array type with element type
     Array { element: TypeId, non_empty: bool },
     /// Optional wrapper
     Optional(TypeId),
-    /// Forward reference to a recursive type
-    Ref(String),
+    /// Forward reference to a recursive type (name as Symbol)
+    Ref(Symbol),
 }
 
 impl TypeKind {
@@ -67,7 +69,7 @@ impl TypeKind {
 }
 
 /// Field information within a struct type.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FieldInfo {
     pub type_id: TypeId,
     pub optional: bool,
@@ -129,7 +131,7 @@ impl TermInfo {
         }
     }
 
-    pub fn fields(arity: Arity, fields: BTreeMap<String, FieldInfo>) -> Self {
+    pub fn fields(arity: Arity, fields: BTreeMap<Symbol, FieldInfo>) -> Self {
         Self {
             arity,
             flow: TypeFlow::Fields(fields),
@@ -170,8 +172,8 @@ pub enum TypeFlow {
     Void,
     /// Opaque single value that doesn't bubble
     Scalar(TypeId),
-    /// Transparent fields that bubble to parent scope
-    Fields(BTreeMap<String, FieldInfo>),
+    /// Transparent fields that bubble to parent scope (keys are interned Symbols)
+    Fields(BTreeMap<Symbol, FieldInfo>),
 }
 
 impl TypeFlow {
@@ -195,16 +197,16 @@ impl TypeFlow {
         }
     }
 
-    /// Get field names if this is a Fields flow
-    pub fn field_names(&self) -> Option<Vec<&str>> {
+    /// Get field symbols if this is a Fields flow
+    pub fn field_symbols(&self) -> Option<Vec<Symbol>> {
         match self {
-            TypeFlow::Fields(f) => Some(f.keys().map(|s| s.as_str()).collect()),
+            TypeFlow::Fields(f) => Some(f.keys().copied().collect()),
             _ => None,
         }
     }
 
     /// Create a single-field flow
-    pub fn single_field(name: String, info: FieldInfo) -> Self {
+    pub fn single_field(name: Symbol, info: FieldInfo) -> Self {
         let mut fields = BTreeMap::new();
         fields.insert(name, info);
         TypeFlow::Fields(fields)

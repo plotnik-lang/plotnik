@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::context::TypeContext;
+use super::symbol::Symbol;
 use super::types::{FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeId, TypeKind};
 
 /// Naming context for synthetic type names: (DefName, FieldName)
@@ -47,10 +48,11 @@ pub struct TsEmitter<'a> {
     used_names: BTreeSet<String>,
     /// TypeId -> generated name mapping
     type_names: HashMap<TypeId, String>,
-    /// Custom type names that need `type X = Node` aliases
-    custom_types: BTreeSet<String>,
+
     /// Track which builtin types are referenced
     referenced_builtins: HashSet<TypeId>,
+    /// Track which types have been emitted
+    emitted: HashSet<TypeId>,
     /// Output buffer
     output: String,
 }
@@ -62,8 +64,8 @@ impl<'a> TsEmitter<'a> {
             config,
             used_names: BTreeSet::new(),
             type_names: HashMap::new(),
-            custom_types: BTreeSet::new(),
             referenced_builtins: HashSet::new(),
+            emitted: HashSet::new(),
             output: String::new(),
         }
     }
@@ -81,13 +83,26 @@ impl<'a> TsEmitter<'a> {
             self.emit_node_type();
         }
 
-        // Emit each definition type
-        for (name, type_id) in self.ctx.iter_def_types() {
-            self.emit_definition(name, type_id);
-        }
+        // Collect definition names for lookup
+        let def_names: HashMap<TypeId, String> = self
+            .ctx
+            .iter_def_types()
+            .map(|(sym, id)| (id, self.ctx.resolve(sym).to_string()))
+            .collect();
 
-        // Emit custom type aliases
-        self.emit_custom_type_aliases();
+        // Compute topological order (leaves first)
+        let sorted = self.topological_sort();
+
+        // Emit types in topological order
+        for type_id in sorted {
+            if let Some(def_name) = def_names.get(&type_id) {
+                self.emit_definition(def_name, type_id);
+            } else if let Some(name) = self.type_names.get(&type_id).cloned() {
+                self.emit_nested_type(type_id, &name);
+            } else if let Some(TypeKind::Custom(sym)) = self.ctx.get_type(type_id) {
+                self.emit_custom_type_alias(self.ctx.resolve(*sym));
+            }
+        }
 
         self.output
     }
@@ -101,14 +116,169 @@ impl<'a> TsEmitter<'a> {
             self.emit_node_type();
         }
 
+        // Compute topological order for types reachable from this definition
+        let sorted = self.topological_sort_from(type_id);
+
+        // Emit nested types first (in dependency order)
+        for nested_id in &sorted {
+            if *nested_id != type_id {
+                if let Some(nested_name) = self.type_names.get(nested_id).cloned() {
+                    self.emit_nested_type(*nested_id, &nested_name);
+                } else if let Some(TypeKind::Custom(sym)) = self.ctx.get_type(*nested_id) {
+                    self.emit_custom_type_alias(self.ctx.resolve(*sym));
+                }
+            }
+        }
+
+        // Emit the main definition last
         self.emit_definition(name, type_id);
-        self.emit_custom_type_aliases();
         self.output
+    }
+
+    /// Compute topological sort of all types (leaves first).
+    fn topological_sort(&self) -> Vec<TypeId> {
+        // Collect all types that need emission
+        let mut to_emit: HashSet<TypeId> = HashSet::new();
+        for (_, type_id) in self.ctx.iter_def_types() {
+            self.collect_emittable_types(type_id, &mut to_emit);
+        }
+
+        self.topo_sort_set(&to_emit)
+    }
+
+    /// Compute topological sort starting from a single type.
+    fn topological_sort_from(&self, root: TypeId) -> Vec<TypeId> {
+        let mut to_emit: HashSet<TypeId> = HashSet::new();
+        self.collect_emittable_types(root, &mut to_emit);
+        self.topo_sort_set(&to_emit)
+    }
+
+    /// Collect all types reachable from `type_id` that need emission.
+    fn collect_emittable_types(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
+        if type_id.is_builtin() || out.contains(&type_id) {
+            return;
+        }
+
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return;
+        };
+
+        match kind {
+            TypeKind::Struct(fields) => {
+                out.insert(type_id);
+                for info in fields.values() {
+                    self.collect_emittable_types(info.type_id, out);
+                }
+            }
+            TypeKind::Enum(_) => {
+                // Variant payload structs are inlined in $data by emit_tagged_union,
+                // so don't collect them for separate emission
+                out.insert(type_id);
+            }
+            TypeKind::Array { element, .. } => {
+                self.collect_emittable_types(*element, out);
+            }
+            TypeKind::Optional(inner) => {
+                self.collect_emittable_types(*inner, out);
+            }
+            TypeKind::Custom(_) => {
+                out.insert(type_id);
+            }
+            _ => {}
+        }
+    }
+
+    /// Topologically sort a set of types (leaves first via Kahn's algorithm).
+    fn topo_sort_set(&self, types: &HashSet<TypeId>) -> Vec<TypeId> {
+        // Build adjacency: type -> types it depends on (within the set)
+        let mut deps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
+        let mut rdeps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
+
+        for &tid in types {
+            deps.entry(tid).or_default();
+            rdeps.entry(tid).or_default();
+        }
+
+        for &tid in types {
+            for dep in self.direct_deps(tid) {
+                if types.contains(&dep) && dep != tid {
+                    deps.entry(tid).or_default().insert(dep);
+                    rdeps.entry(dep).or_default().insert(tid);
+                }
+            }
+        }
+
+        // Kahn's algorithm: start with nodes that have no dependencies
+        let mut result = Vec::with_capacity(types.len());
+        let mut queue: Vec<TypeId> = deps
+            .iter()
+            .filter(|(_, d)| d.is_empty())
+            .map(|(&tid, _)| tid)
+            .collect();
+
+        // Sort for deterministic output
+        queue.sort_by_key(|tid| tid.0);
+
+        while let Some(tid) = queue.pop() {
+            result.push(tid);
+            if let Some(dependents) = rdeps.get(&tid) {
+                for &dependent in dependents {
+                    if let Some(dep_set) = deps.get_mut(&dependent) {
+                        dep_set.remove(&tid);
+                        if dep_set.is_empty() {
+                            queue.push(dependent);
+                            queue.sort_by_key(|t| t.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Get direct type dependencies of a type (non-recursive).
+    /// Unwraps Array/Optional to find actual emittable dependencies.
+    fn direct_deps(&self, type_id: TypeId) -> Vec<TypeId> {
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return vec![];
+        };
+
+        match kind {
+            TypeKind::Struct(fields) => fields
+                .values()
+                .flat_map(|info| self.unwrap_to_emittable(info.type_id))
+                .collect(),
+            TypeKind::Enum(variants) => variants
+                .values()
+                .flat_map(|&tid| self.unwrap_to_emittable(tid))
+                .collect(),
+            TypeKind::Array { element, .. } => self.unwrap_to_emittable(*element),
+            TypeKind::Optional(inner) => self.unwrap_to_emittable(*inner),
+            _ => vec![],
+        }
+    }
+
+    /// Unwrap Array/Optional wrappers to find the underlying emittable type.
+    fn unwrap_to_emittable(&self, type_id: TypeId) -> Vec<TypeId> {
+        if type_id.is_builtin() {
+            return vec![];
+        }
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return vec![];
+        };
+        match kind {
+            TypeKind::Array { element, .. } => self.unwrap_to_emittable(*element),
+            TypeKind::Optional(inner) => self.unwrap_to_emittable(*inner),
+            TypeKind::Struct(_) | TypeKind::Enum(_) | TypeKind::Custom(_) => vec![type_id],
+            _ => vec![],
+        }
     }
 
     fn collect_type_names_with_context(&mut self) {
         // Reserve definition names first
-        for (name, _) in self.ctx.iter_def_types() {
+        for (sym, _) in self.ctx.iter_def_types() {
+            let name = self.ctx.resolve(sym);
             let pascal_name = to_pascal_case(name);
             self.used_names.insert(pascal_name);
         }
@@ -116,7 +286,8 @@ impl<'a> TsEmitter<'a> {
         // Collect naming contexts by traversing definition types
         let mut type_contexts: HashMap<TypeId, NamingContext> = HashMap::new();
 
-        for (def_name, type_id) in self.ctx.iter_def_types() {
+        for (sym, type_id) in self.ctx.iter_def_types() {
+            let def_name = self.ctx.resolve(sym);
             self.collect_contexts_for_type(
                 type_id,
                 &NamingContext {
@@ -161,10 +332,11 @@ impl<'a> TsEmitter<'a> {
                     contexts.insert(type_id, ctx.clone());
                 }
                 // Recurse into fields
-                for (field_name, info) in fields {
+                for (&field_sym, info) in fields {
+                    let field_name = self.ctx.resolve(field_sym);
                     let field_ctx = NamingContext {
                         def_name: ctx.def_name.clone(),
-                        field_name: Some(field_name.clone()),
+                        field_name: Some(field_name.to_string()),
                     };
                     self.collect_contexts_for_type(info.type_id, &field_ctx, contexts);
                 }
@@ -226,19 +398,18 @@ impl<'a> TsEmitter<'a> {
             TypeKind::String => {
                 self.referenced_builtins.insert(TYPE_STRING);
             }
-            TypeKind::Custom(name) => {
-                self.custom_types.insert(name.clone());
+            TypeKind::Custom(_) => {
                 // Custom types alias to Node
                 self.referenced_builtins.insert(TYPE_NODE);
             }
             TypeKind::Struct(fields) => {
-                for (_, info) in fields {
+                for info in fields.values() {
                     self.collect_refs_in_type(info.type_id);
                 }
             }
             TypeKind::Enum(variants) => {
-                for (_, vtype) in variants {
-                    self.collect_refs_in_type(*vtype);
+                for &vtype in variants.values() {
+                    self.collect_refs_in_type(vtype);
                 }
             }
             TypeKind::Array { element, .. } => {
@@ -323,19 +494,22 @@ impl<'a> TsEmitter<'a> {
         }
     }
 
-    fn emit_custom_type_aliases(&mut self) {
+    fn emit_custom_type_alias(&mut self, name: &str) {
         let export = if self.config.export { "export " } else { "" };
-        for name in &self.custom_types.clone() {
-            self.output
-                .push_str(&format!("{}type {} = Node;\n\n", export, name));
-        }
+        self.output
+            .push_str(&format!("{}type {} = Node;\n\n", export, name));
     }
 
-    fn emit_interface(&mut self, name: &str, fields: &BTreeMap<String, FieldInfo>, export: &str) {
+    fn emit_interface(&mut self, name: &str, fields: &BTreeMap<Symbol, FieldInfo>, export: &str) {
         self.output
             .push_str(&format!("{}interface {} {{\n", export, name));
 
-        for (field_name, info) in fields {
+        // Sort fields by resolved name for deterministic output
+        let mut sorted_fields: Vec<_> = fields.iter().collect();
+        sorted_fields.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+
+        for (&field_sym, info) in sorted_fields {
+            let field_name = self.ctx.resolve(field_sym);
             let ts_type = self.type_to_ts(info.type_id);
             let optional = if info.optional { "?" } else { "" };
             self.output
@@ -343,29 +517,27 @@ impl<'a> TsEmitter<'a> {
         }
 
         self.output.push_str("}\n\n");
-
-        // Emit nested types
-        for (_, info) in fields {
-            self.maybe_emit_nested_type(info.type_id);
-        }
     }
 
-    fn emit_tagged_union(&mut self, name: &str, variants: &BTreeMap<String, TypeId>, export: &str) {
-        // Emit variant types first
+    fn emit_tagged_union(&mut self, name: &str, variants: &BTreeMap<Symbol, TypeId>, export: &str) {
         let mut variant_types = Vec::new();
-        for (variant_name, type_id) in variants {
+
+        // Sort variants by resolved name for deterministic output
+        let mut sorted_variants: Vec<_> = variants.iter().collect();
+        sorted_variants.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+
+        for (&variant_sym, &type_id) in sorted_variants {
+            let variant_name = self.ctx.resolve(variant_sym);
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());
 
-            // Inline $data as struct literal instead of separate type
-            let data_str = self.inline_data_type(*type_id);
+            let data_str = self.inline_data_type(type_id);
             self.output.push_str(&format!(
                 "{}interface {} {{\n  $tag: \"{}\";\n  $data: {};\n}}\n\n",
                 export, variant_type_name, variant_name, data_str
             ));
         }
 
-        // Emit union type
         let union = variant_types.join(" | ");
         self.output
             .push_str(&format!("{}type {} = {};\n\n", export, name, union));
@@ -384,36 +556,25 @@ impl<'a> TsEmitter<'a> {
         }
     }
 
-    fn maybe_emit_nested_type(&mut self, type_id: TypeId) {
+    /// Emit a nested type by its generated name.
+    fn emit_nested_type(&mut self, type_id: TypeId, name: &str) {
+        if self.emitted.contains(&type_id) || type_id.is_builtin() {
+            return;
+        }
+        self.emitted.insert(type_id);
+
         let Some(kind) = self.ctx.get_type(type_id) else {
             return;
         };
 
-        // Skip if already emitted or is a primitive
-        if type_id.is_builtin() {
-            return;
-        }
+        let export = if self.config.export { "export " } else { "" };
 
         match kind {
             TypeKind::Struct(fields) => {
-                if let Some(name) = self.type_names.get(&type_id) {
-                    let name = name.clone();
-                    let export = if self.config.export { "export " } else { "" };
-                    self.emit_interface(&name, fields, export);
-                }
+                self.emit_interface(name, fields, export);
             }
             TypeKind::Enum(variants) => {
-                if let Some(name) = self.type_names.get(&type_id) {
-                    let name = name.clone();
-                    let export = if self.config.export { "export " } else { "" };
-                    self.emit_tagged_union(&name, variants, export);
-                }
-            }
-            TypeKind::Array { element, .. } => {
-                self.maybe_emit_nested_type(*element);
-            }
-            TypeKind::Optional(inner) => {
-                self.maybe_emit_nested_type(*inner);
+                self.emit_tagged_union(name, variants, export);
             }
             _ => {}
         }
@@ -438,8 +599,8 @@ impl<'a> TsEmitter<'a> {
             TypeKind::Void => "void".to_string(),
             TypeKind::Node => "Node".to_string(),
             TypeKind::String => "string".to_string(),
-            TypeKind::Custom(name) => name.clone(),
-            TypeKind::Ref(name) => to_pascal_case(name),
+            TypeKind::Custom(sym) => self.ctx.resolve(*sym).to_string(),
+            TypeKind::Ref(sym) => to_pascal_case(self.ctx.resolve(*sym)),
 
             TypeKind::Struct(fields) => {
                 if let Some(name) = self.type_names.get(&type_id) {
@@ -473,14 +634,19 @@ impl<'a> TsEmitter<'a> {
         }
     }
 
-    fn inline_struct(&self, fields: &BTreeMap<String, FieldInfo>) -> String {
+    fn inline_struct(&self, fields: &BTreeMap<Symbol, FieldInfo>) -> String {
         if fields.is_empty() {
             return "{}".to_string();
         }
 
-        let field_strs: Vec<_> = fields
+        // Sort fields by resolved name for deterministic output
+        let mut sorted_fields: Vec<_> = fields.iter().collect();
+        sorted_fields.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+
+        let field_strs: Vec<_> = sorted_fields
             .iter()
-            .map(|(name, info)| {
+            .map(|&(&sym, ref info)| {
+                let name = self.ctx.resolve(sym);
                 let ts_type = self.type_to_ts(info.type_id);
                 let optional = if info.optional { "?" } else { "" };
                 format!("{}{}: {}", name, optional, ts_type)
@@ -490,11 +656,16 @@ impl<'a> TsEmitter<'a> {
         format!("{{ {} }}", field_strs.join("; "))
     }
 
-    fn inline_enum(&self, variants: &BTreeMap<String, TypeId>) -> String {
-        let variant_strs: Vec<_> = variants
+    fn inline_enum(&self, variants: &BTreeMap<Symbol, TypeId>) -> String {
+        // Sort variants by resolved name for deterministic output
+        let mut sorted_variants: Vec<_> = variants.iter().collect();
+        sorted_variants.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+
+        let variant_strs: Vec<_> = sorted_variants
             .iter()
-            .map(|(name, type_id)| {
-                let data_type = self.type_to_ts(*type_id);
+            .map(|&(&sym, &type_id)| {
+                let name = self.ctx.resolve(sym);
+                let data_type = self.type_to_ts(type_id);
                 format!("{{ $tag: \"{}\"; $data: {} }}", name, data_type)
             })
             .collect();
@@ -554,10 +725,11 @@ mod tests {
 
         // Context with a definition using Node - should emit Node
         let mut ctx = TypeContext::new();
+        let x_sym = ctx.intern("x");
         let mut fields = BTreeMap::new();
-        fields.insert("x".to_string(), FieldInfo::required(TYPE_NODE));
+        fields.insert(x_sym, FieldInfo::required(TYPE_NODE));
         let struct_id = ctx.intern_type(TypeKind::Struct(fields));
-        ctx.set_def_type("Q".to_string(), struct_id);
+        ctx.set_def_type_by_name("Q", struct_id);
 
         let output = TsEmitter::new(&ctx, EmitConfig::default()).emit();
         assert!(output.contains("interface Node"));

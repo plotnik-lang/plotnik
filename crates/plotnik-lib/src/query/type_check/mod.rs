@@ -8,16 +8,20 @@
 mod context;
 mod emit_ts;
 mod infer;
+mod symbol;
 mod types;
 mod unify;
 
 pub use context::TypeContext;
 pub use emit_ts::{EmitConfig, TsEmitter, emit_typescript, emit_typescript_with_config};
+pub use symbol::{Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,
     TypeId, TypeKind,
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
+
+use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
 
@@ -60,7 +64,7 @@ pub fn infer_types(
             if let Some(body) = symbol_table.get(def_name) {
                 if let Some(info) = ctx.get_term_info(body).cloned() {
                     let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                    ctx.set_def_type(def_name.to_string(), type_id);
+                    ctx.set_def_type_by_name(def_name, type_id);
                 }
             }
         }
@@ -68,7 +72,7 @@ pub fn infer_types(
 
     // Handle any definitions not in an SCC (shouldn't happen, but be safe)
     for (name, source_id, _body) in symbol_table.iter_full() {
-        if ctx.get_def_type(name).is_some() {
+        if ctx.get_def_type_by_name(name).is_some() {
             continue;
         }
 
@@ -81,7 +85,7 @@ pub fn infer_types(
         if let Some(body) = symbol_table.get(name) {
             if let Some(info) = ctx.get_term_info(body).cloned() {
                 let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                ctx.set_def_type(name.to_string(), type_id);
+                ctx.set_def_type_by_name(name, type_id);
             }
         }
     }
@@ -92,7 +96,7 @@ pub fn infer_types(
 /// Convert a TypeFlow to a TypeId for storage.
 fn flow_to_type_id(ctx: &mut TypeContext, flow: &TypeFlow) -> TypeId {
     match flow {
-        TypeFlow::Void => ctx.intern_type(TypeKind::Struct(std::collections::BTreeMap::new())),
+        TypeFlow::Void => ctx.intern_type(TypeKind::Struct(BTreeMap::new())),
         TypeFlow::Scalar(type_id) => *type_id,
         TypeFlow::Fields(fields) => ctx.intern_type(TypeKind::Struct(fields.clone())),
     }
