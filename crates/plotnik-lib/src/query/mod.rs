@@ -15,6 +15,7 @@ pub mod link;
 #[allow(clippy::module_inception)]
 pub mod query;
 pub mod symbol_table;
+pub mod type_check;
 pub mod visitor;
 
 #[cfg(test)]
@@ -31,3 +32,5 @@ mod printer_tests;
 mod query_tests;
 #[cfg(test)]
 mod symbol_table_tests;
+#[cfg(test)]
+mod type_check_tests;

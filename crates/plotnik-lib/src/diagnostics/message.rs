@@ -67,6 +67,10 @@ pub enum DiagnosticKind {
     IncompatibleTypes,
     MultiCaptureQuantifierNoName,
     UnusedBranchLabels,
+    StrictDimensionalityViolation,
+    DuplicateCaptureInScope,
+    IncompatibleCaptureTypes,
+    IncompatibleStructShapes,
 
     // Link pass - grammar validation
     UnknownNodeType,
@@ -182,6 +186,10 @@ impl DiagnosticKind {
                 "quantified expression with multiple captures requires `@name`"
             }
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
+            Self::StrictDimensionalityViolation => "quantifier requires row capture",
+            Self::DuplicateCaptureInScope => "duplicate capture in scope",
+            Self::IncompatibleCaptureTypes => "incompatible capture types",
+            Self::IncompatibleStructShapes => "incompatible struct shapes",
 
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",
@@ -210,6 +218,18 @@ impl DiagnosticKind {
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
             Self::IncompatibleTypes => "incompatible types: {}".to_string(),
+
+            // Type inference errors with context
+            Self::StrictDimensionalityViolation => "{}".to_string(),
+            Self::DuplicateCaptureInScope => {
+                "capture `@{}` already defined in this scope".to_string()
+            }
+            Self::IncompatibleCaptureTypes => {
+                "capture `@{}` has incompatible types across branches".to_string()
+            }
+            Self::IncompatibleStructShapes => {
+                "capture `@{}` has incompatible struct fields across branches".to_string()
+            }
 
             // Link pass errors with context
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),

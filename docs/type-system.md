@@ -8,35 +8,9 @@ Plotnik prioritizes **predictability** and **structural clarity** over terseness
 
 Two principles guide the type system:
 
-1. **Explicit structure**: Captures bubble up to the nearest scope boundary. To create nested output, you must explicitly capture a group (`{...} @name`).
+1. **Flat structure**: Captures bubble up to the nearest scope boundary.
 
-2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require an explicit row capture. This prevents parallel arrays where `a[i]` and `b[i]` lose their per-iteration association.
-
-### Why Strictness
-
-Permissive systems create surprises:
-
-```
-// Permissive: implicit parallel arrays
-{ (key) @k (value) @v }*
-→ { k: Node[], v: Node[] }   // Are k[0] and v[0] related? Maybe...
-
-// Iteration 1: k="a", v="1"
-// Iteration 2: k="b", v="2"
-// Output: { k: ["a","b"], v: ["1","2"] }  // Association lost in flat arrays
-```
-
-Plotnik's strict approach:
-
-```
-// Strict: explicit row structure
-{ (key) @k (value) @v }* @pairs
-→ { pairs: { k: Node, v: Node }[] }   // Each pair is a distinct object
-
-// Output: { pairs: [{ k: "a", v: "1" }, { k: "b", v: "2" }] }
-```
-
-The explicit `@pairs` capture tells both the compiler and reader: "this is a list of structured rows."
+2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require an explicit row capture. The alternative could be creating parallel arrays, but it's hard to maintain the per-iteration association for `a[i]` and `b[i]`.
 
 ### Why Transparent Scoping
 
@@ -77,7 +51,7 @@ This is the core rule that prevents association loss.
 Strict dimensionality applies **transitively through definitions**. Since definitions are transparent (captures bubble up), quantifying a definition that contains captures is equivalent to quantifying those captures directly:
 
 ```
-// Definition with capture
+// Definition with captures
 Item = (pair (key) @k (value) @v)
 
 // These are equivalent after expansion:
@@ -127,6 +101,8 @@ For node patterns with internal captures, wrap explicitly:
 → { params: { param: Node, name: string }[] }
 ```
 
+The strict rule forces you to think about structure upfront.
+
 ### Optional Bubbling
 
 The `?` quantifier does **not** add dimensionality—it produces at most one value, not a list. Therefore, optional groups without captures are allowed:
@@ -140,32 +116,6 @@ The `?` quantifier does **not** add dimensionality—it produces at most one val
 ```
 
 This lets optional fragments contribute fields directly to the parent struct without forcing an extra wrapper object.
-
-### Why This Matters
-
-Consider extracting methods from classes:
-
-```
-// What we want: list of method objects
-(class_declaration
-  body: (class_body
-    { (method_definition
-        name: (property_identifier) @name
-        parameters: (formal_parameters) @params
-      ) @method
-    }* @methods))
-→ { methods: { method: Node, name: Node, params: Node }[] }
-
-// Without strict dimensionality, you might write:
-(class_declaration
-  body: (class_body
-    (method_definition
-      name: (property_identifier) @name
-      parameters: (formal_parameters) @params)*))
-→ { name: Node[], params: Node[] }  // Parallel arrays—which name goes with which params?
-```
-
-The strict rule forces you to think about structure upfront.
 
 ## 2. Scope Model
 
@@ -187,6 +137,8 @@ New data structures are created only when explicitly requested:
 2. **Captured Alternations**: `[...] @name` → Union
 3. **Tagged Alternations**: `[ L: ... ] @name` → Tagged Union
 
+In case of using quantifiers with captures, compiler forces you to create scope boundaries.
+
 ## 3. Data Shapes
 
 ### Structs
@@ -207,7 +159,7 @@ Created by `{ ... } @name`:
 Created by `[ ... ]`:
 
 - **Tagged**: `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
-- **Untagged**: `[ (a) @a  (b) @b ]` → `{ a?: Node, b?: Node }` (merged)
+- **Untagged**: `[ (a) @a  (b) @b ]` → `{ a?: Node, b?: Node }` (merged 1-level deep)
 
 ### Enum Variants
 
@@ -231,10 +183,10 @@ Quantifiers determine whether a field is singular, optional, or an array:
 
 | Pattern   | Output Type      | Meaning      |
 | --------- | ---------------- | ------------ |
-| `(x) @a`  | `a: T`           | exactly one  |
-| `(x)? @a` | `a?: T`          | zero or one  |
-| `(x)* @a` | `a: T[]`         | zero or more |
-| `(x)+ @a` | `a: [T, ...T[]]` | one or more  |
+| `(A) @a`  | `a: T`           | exactly one  |
+| `(A)? @a` | `a?: T`          | zero or one  |
+| `(A)* @a` | `a: T[]`         | zero or more |
+| `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
 
 ### Row Cardinality
 
@@ -287,20 +239,22 @@ Shallow unification across untagged branches:
 ]  // ERROR: String vs Node
 ```
 
+The choice of shallow unification is intentional. For more precision, users should use tagged unions.
+
 ### Array Captures in Alternations
 
-When a quantified capture appears in some branches but not others, the result is `Array | null`:
+When a quantified capture appears in some branches but not others, the missing branch emits an empty array:
 
 ```
 [
   (a)+ @x
   (b)
-]  // x: Node[] | null
+]  // x: Node[]
 ```
 
-The missing branch emits `null`, not an empty array. This distinction matters: `null` means "branch didn't match" vs `[]` meaning "matched zero times."
+Untagged alternations are "I don't care which branch matched"—so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
 
-For type conflicts, use tagged alternations:
+When types start to conflict, use tagged alternations:
 
 ```
 [
@@ -321,8 +275,11 @@ For type conflicts, use tagged alternations:
 Top-level fields merge with optionality; nested mismatches are errors:
 
 ```
-// OK: top-level merge
+// OK: top-level merge (scalars become optional)
 { x: Node, y: Node } ∪ { x: Node, z: String } → { x: Node, y?: Node, z?: String }
+
+// OK: arrays emit [] when missing (not null)
+{ items: Node[], x: Node } ∪ { x: Node } → { items: Node[], x: Node }
 
 // OK: identical nested
 { data: { a: Node } } ∪ { data: { a: Node }, extra: Node } → { data: { a: Node }, extra?: Node }

@@ -15,6 +15,7 @@ use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
 use crate::query::symbol_table::{SymbolTable, resolve_names};
+use crate::query::type_check::{self, Arity, TypeContext};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -115,12 +116,22 @@ impl QueryParsed {
             &mut self.diag,
         );
 
+        // Legacy arity table (to be removed once type_check is fully integrated)
         let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
+
+        // New unified type checking pass
+        let type_context = type_check::infer_types(
+            &self.ast_map,
+            &symbol_table,
+            &dependency_analysis,
+            &mut self.diag,
+        );
 
         QueryAnalyzed {
             query_parsed: self,
             symbol_table,
             arity_table,
+            type_context,
         }
     }
 
@@ -143,6 +154,7 @@ pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     pub symbol_table: SymbolTable,
     arity_table: ExprArityTable,
+    type_context: TypeContext,
 }
 
 impl QueryAnalyzed {
@@ -152,6 +164,10 @@ impl QueryAnalyzed {
 
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
         resolve_arity(node, &self.arity_table)
+    }
+
+    pub fn type_context(&self) -> &TypeContext {
+        &self.type_context
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
