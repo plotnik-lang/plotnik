@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use super::types::{FieldInfo, TYPE_NODE, TypeFlow, TypeId, TypeKind};
+use super::types::{FieldInfo, TYPE_NODE, TypeFlow, TypeId};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]

@@ -3,10 +3,17 @@
 //! Converts inferred types to TypeScript declarations.
 //! Used as a test oracle to verify type inference correctness.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::context::TypeContext;
 use super::types::{FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeId, TypeKind};
+
+/// Naming context for synthetic type names: (DefName, FieldName)
+#[derive(Clone, Debug)]
+struct NamingContext {
+    def_name: String,
+    field_name: Option<String>,
+}
 
 /// Configuration for TypeScript emission.
 #[derive(Clone, Debug)]
@@ -40,6 +47,10 @@ pub struct TsEmitter<'a> {
     used_names: BTreeSet<String>,
     /// TypeId -> generated name mapping
     type_names: HashMap<TypeId, String>,
+    /// Custom type names that need `type X = Node` aliases
+    custom_types: BTreeSet<String>,
+    /// Track which builtin types are referenced
+    referenced_builtins: HashSet<TypeId>,
     /// Output buffer
     output: String,
 }
@@ -51,17 +62,22 @@ impl<'a> TsEmitter<'a> {
             config,
             used_names: BTreeSet::new(),
             type_names: HashMap::new(),
+            custom_types: BTreeSet::new(),
+            referenced_builtins: HashSet::new(),
             output: String::new(),
         }
     }
 
     /// Emit TypeScript for all definition types.
     pub fn emit(mut self) -> String {
-        // First pass: collect all types that need names
-        self.collect_type_names();
+        // First pass: collect all types that need names with context
+        self.collect_type_names_with_context();
 
-        // Emit Node type if configured
-        if self.config.emit_node_type {
+        // Second pass: collect referenced builtins and custom types
+        self.collect_references();
+
+        // Emit Node type if configured and actually used
+        if self.config.emit_node_type && self.referenced_builtins.contains(&TYPE_NODE) {
             self.emit_node_type();
         }
 
@@ -70,34 +86,168 @@ impl<'a> TsEmitter<'a> {
             self.emit_definition(name, type_id);
         }
 
+        // Emit custom type aliases
+        self.emit_custom_type_aliases();
+
         self.output
     }
 
     /// Emit TypeScript for a single definition.
     pub fn emit_single(mut self, name: &str, type_id: TypeId) -> String {
-        self.collect_type_names();
+        self.collect_type_names_with_context();
+        self.collect_references();
 
-        if self.config.emit_node_type {
+        if self.config.emit_node_type && self.referenced_builtins.contains(&TYPE_NODE) {
             self.emit_node_type();
         }
 
         self.emit_definition(name, type_id);
+        self.emit_custom_type_aliases();
         self.output
     }
 
-    fn collect_type_names(&mut self) {
+    fn collect_type_names_with_context(&mut self) {
         // Reserve definition names first
         for (name, _) in self.ctx.iter_def_types() {
             let pascal_name = to_pascal_case(name);
             self.used_names.insert(pascal_name);
         }
 
-        // Then assign names to anonymous types
+        // Collect naming contexts by traversing definition types
+        let mut type_contexts: HashMap<TypeId, NamingContext> = HashMap::new();
+
+        for (def_name, type_id) in self.ctx.iter_def_types() {
+            self.collect_contexts_for_type(
+                type_id,
+                &NamingContext {
+                    def_name: def_name.to_string(),
+                    field_name: None,
+                },
+                &mut type_contexts,
+            );
+        }
+
+        // Assign names using contexts
         for (id, kind) in self.ctx.iter_types() {
             if self.needs_named_type(kind) && !self.type_names.contains_key(&id) {
-                let name = self.generate_type_name(kind);
+                let name = if let Some(ctx) = type_contexts.get(&id) {
+                    self.generate_contextual_name(ctx)
+                } else {
+                    self.generate_type_name(kind)
+                };
                 self.type_names.insert(id, name);
             }
+        }
+    }
+
+    fn collect_contexts_for_type(
+        &self,
+        type_id: TypeId,
+        ctx: &NamingContext,
+        contexts: &mut HashMap<TypeId, NamingContext>,
+    ) {
+        if type_id.is_builtin() || contexts.contains_key(&type_id) {
+            return;
+        }
+
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return;
+        };
+
+        match kind {
+            TypeKind::Struct(fields) => {
+                // Only set context if this type needs a name
+                if !contexts.contains_key(&type_id) {
+                    contexts.insert(type_id, ctx.clone());
+                }
+                // Recurse into fields
+                for (field_name, info) in fields {
+                    let field_ctx = NamingContext {
+                        def_name: ctx.def_name.clone(),
+                        field_name: Some(field_name.clone()),
+                    };
+                    self.collect_contexts_for_type(info.type_id, &field_ctx, contexts);
+                }
+            }
+            TypeKind::Enum(variants) => {
+                if !contexts.contains_key(&type_id) {
+                    contexts.insert(type_id, ctx.clone());
+                }
+                // Don't recurse into variant types - they're inlined as $data
+                let _ = variants;
+            }
+            TypeKind::Array { element, .. } => {
+                self.collect_contexts_for_type(*element, ctx, contexts);
+            }
+            TypeKind::Optional(inner) => {
+                self.collect_contexts_for_type(*inner, ctx, contexts);
+            }
+            _ => {}
+        }
+    }
+
+    fn generate_contextual_name(&mut self, ctx: &NamingContext) -> String {
+        let base = if let Some(field) = &ctx.field_name {
+            format!("{}{}", to_pascal_case(&ctx.def_name), to_pascal_case(field))
+        } else {
+            to_pascal_case(&ctx.def_name)
+        };
+
+        self.unique_name(&base)
+    }
+
+    fn collect_references(&mut self) {
+        for (_, type_id) in self.ctx.iter_def_types() {
+            self.collect_refs_in_type(type_id);
+        }
+    }
+
+    fn collect_refs_in_type(&mut self, type_id: TypeId) {
+        if type_id == TYPE_NODE {
+            self.referenced_builtins.insert(TYPE_NODE);
+            return;
+        }
+        if type_id == TYPE_STRING {
+            self.referenced_builtins.insert(TYPE_STRING);
+            return;
+        }
+        if type_id == TYPE_VOID {
+            return;
+        }
+
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return;
+        };
+
+        match kind {
+            TypeKind::Node => {
+                self.referenced_builtins.insert(TYPE_NODE);
+            }
+            TypeKind::String => {
+                self.referenced_builtins.insert(TYPE_STRING);
+            }
+            TypeKind::Custom(name) => {
+                self.custom_types.insert(name.clone());
+                // Custom types alias to Node
+                self.referenced_builtins.insert(TYPE_NODE);
+            }
+            TypeKind::Struct(fields) => {
+                for (_, info) in fields {
+                    self.collect_refs_in_type(info.type_id);
+                }
+            }
+            TypeKind::Enum(variants) => {
+                for (_, vtype) in variants {
+                    self.collect_refs_in_type(*vtype);
+                }
+            }
+            TypeKind::Array { element, .. } => {
+                self.collect_refs_in_type(*element);
+            }
+            TypeKind::Optional(inner) => {
+                self.collect_refs_in_type(*inner);
+            }
+            _ => {}
         }
     }
 
@@ -173,6 +323,14 @@ impl<'a> TsEmitter<'a> {
         }
     }
 
+    fn emit_custom_type_aliases(&mut self) {
+        let export = if self.config.export { "export " } else { "" };
+        for name in &self.custom_types.clone() {
+            self.output
+                .push_str(&format!("{}type {} = Node;\n\n", export, name));
+        }
+    }
+
     fn emit_interface(&mut self, name: &str, fields: &BTreeMap<String, FieldInfo>, export: &str) {
         self.output
             .push_str(&format!("{}interface {} {{\n", export, name));
@@ -199,19 +357,31 @@ impl<'a> TsEmitter<'a> {
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());
 
-            let data_type = self.type_to_ts(*type_id);
+            // Inline $data as struct literal instead of separate type
+            let data_str = self.inline_data_type(*type_id);
             self.output.push_str(&format!(
                 "{}interface {} {{\n  $tag: \"{}\";\n  $data: {};\n}}\n\n",
-                export, variant_type_name, variant_name, data_type
+                export, variant_type_name, variant_name, data_str
             ));
-
-            self.maybe_emit_nested_type(*type_id);
         }
 
         // Emit union type
         let union = variant_types.join(" | ");
         self.output
             .push_str(&format!("{}type {} = {};\n\n", export, name, union));
+    }
+
+    /// Inline a type as $data value (struct fields inlined, others as-is)
+    fn inline_data_type(&self, type_id: TypeId) -> String {
+        let Some(kind) = self.ctx.get_type(type_id) else {
+            return "unknown".to_string();
+        };
+
+        match kind {
+            TypeKind::Struct(fields) => self.inline_struct(fields),
+            TypeKind::Void => "{}".to_string(),
+            _ => self.type_to_ts(type_id),
+        }
     }
 
     fn maybe_emit_nested_type(&mut self, type_id: TypeId) {
@@ -230,6 +400,13 @@ impl<'a> TsEmitter<'a> {
                     let name = name.clone();
                     let export = if self.config.export { "export " } else { "" };
                     self.emit_interface(&name, fields, export);
+                }
+            }
+            TypeKind::Enum(variants) => {
+                if let Some(name) = self.type_names.get(&type_id) {
+                    let name = name.clone();
+                    let export = if self.config.export { "export " } else { "" };
+                    self.emit_tagged_union(&name, variants, export);
                 }
             }
             TypeKind::Array { element, .. } => {
@@ -369,10 +546,20 @@ mod tests {
     }
 
     #[test]
-    fn emit_node_type() {
+    fn emit_node_type_only_when_referenced() {
+        // Empty context - Node should not be emitted
         let ctx = TypeContext::new();
         let output = TsEmitter::new(&ctx, EmitConfig::default()).emit();
+        assert!(!output.contains("interface Node"));
 
+        // Context with a definition using Node - should emit Node
+        let mut ctx = TypeContext::new();
+        let mut fields = BTreeMap::new();
+        fields.insert("x".to_string(), FieldInfo::required(TYPE_NODE));
+        let struct_id = ctx.intern_type(TypeKind::Struct(fields));
+        ctx.set_def_type("Q".to_string(), struct_id);
+
+        let output = TsEmitter::new(&ctx, EmitConfig::default()).emit();
         assert!(output.contains("interface Node"));
         assert!(output.contains("kind: string"));
     }

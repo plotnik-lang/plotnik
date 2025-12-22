@@ -276,20 +276,19 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             );
         };
 
-        // Special handling: if inner is a * or + quantifier, this capture serves as
-        // the row capture, so we skip strict dimensionality check
-        let inner_info = if let Expr::QuantifiedExpr(q) = &inner {
+        // Special handling for quantifiers:
+        // - * or +: this capture serves as row capture, skip strict dimensionality
+        // - ?: capture produces an optional field
+        let (inner_info, is_optional_capture) = if let Expr::QuantifiedExpr(q) = &inner {
             let quantifier = self.parse_quantifier(q);
-            if matches!(
-                quantifier,
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
-            ) {
-                self.infer_quantified_expr_as_row(q)
-            } else {
-                self.infer_expr(&inner)
+            match quantifier {
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                    (self.infer_quantified_expr_as_row(q), false)
+                }
+                QuantifierKind::Optional => (self.infer_expr(&inner), true),
             }
         } else {
-            self.infer_expr(&inner)
+            (self.infer_expr(&inner), false)
         };
 
         // Transform based on inner's flow
@@ -312,9 +311,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             }
         };
 
+        let field_info = if is_optional_capture {
+            FieldInfo::optional(captured_type)
+        } else {
+            FieldInfo::required(captured_type)
+        };
+
         TermInfo::new(
             inner_info.arity,
-            TypeFlow::single_field(capture_name, FieldInfo::required(captured_type)),
+            TypeFlow::single_field(capture_name, field_info),
         )
     }
 

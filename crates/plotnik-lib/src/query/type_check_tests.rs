@@ -1,10 +1,6 @@
 use crate::Query;
 use indoc::indoc;
 
-// =============================================================================
-// BASIC CAPTURES
-// =============================================================================
-
 #[test]
 fn capture_single_node() {
     let input = "Q = (identifier) @name";
@@ -26,11 +22,6 @@ fn capture_with_string_annotation() {
     let input = "Q = (identifier) @name :: string";
     let res = Query::expect_valid_types(input);
     insta::assert_snapshot!(res, @r"
-    export interface Node {
-      kind: string;
-      text: string;
-    }
-
     export interface Q {
       name: string;
     }
@@ -50,12 +41,10 @@ fn capture_with_custom_type() {
     export interface Q {
       name: Identifier;
     }
+
+    export type Identifier = Node;
     ");
 }
-
-// =============================================================================
-// NAMED NODE FLOW PROPAGATION (Bug #2)
-// =============================================================================
 
 #[test]
 fn named_node_with_field_capture() {
@@ -107,10 +96,6 @@ fn nested_named_node_captures() {
     ");
 }
 
-// =============================================================================
-// SCALAR LISTS (Bug #1)
-// =============================================================================
-
 #[test]
 fn scalar_list_zero_or_more() {
     // No internal captures → scalar list: Node[]
@@ -145,10 +130,6 @@ fn scalar_list_one_or_more() {
     ");
 }
 
-// =============================================================================
-// ROW LISTS
-// =============================================================================
-
 #[test]
 fn row_list_basic() {
     let input = indoc! {r#"
@@ -162,10 +143,10 @@ fn row_list_basic() {
     }
 
     export interface Q {
-      rows: Struct[];
+      rows: QRows[];
     }
 
-    export interface Struct {
+    export interface QRows {
       k: Node;
       v: Node;
     }
@@ -185,19 +166,15 @@ fn row_list_non_empty() {
     }
 
     export interface Q {
-      rows: [Struct, ...Struct[]];
+      rows: [QRows, ...QRows[]];
     }
 
-    export interface Struct {
+    export interface QRows {
       k: Node;
       v: Node;
     }
     ");
 }
-
-// =============================================================================
-// OPTIONAL PATTERNS
-// =============================================================================
 
 #[test]
 fn optional_single_capture() {
@@ -210,14 +187,13 @@ fn optional_single_capture() {
     }
 
     export interface Q {
-      dec: Node;
+      dec?: Node;
     }
     ");
 }
 
 #[test]
 fn optional_group_bubbles_fields() {
-    // ? does NOT require row capture; fields bubble as optional
     let input = indoc! {r#"
         Q = {(modifier) @mod (decorator) @dec}?
     "#};
@@ -234,10 +210,6 @@ fn optional_group_bubbles_fields() {
     }
     ");
 }
-
-// =============================================================================
-// SEQUENCES
-// =============================================================================
 
 #[test]
 fn sequence_merges_fields() {
@@ -271,19 +243,15 @@ fn captured_sequence_creates_struct() {
     }
 
     export interface Q {
-      row: Struct;
+      row: QRow;
     }
 
-    export interface Struct {
+    export interface QRow {
       a: Node;
       b: Node;
     }
     ");
 }
-
-// =============================================================================
-// UNTAGGED ALTERNATIONS (merge style)
-// =============================================================================
 
 #[test]
 fn untagged_alt_same_capture_all_branches() {
@@ -322,7 +290,6 @@ fn untagged_alt_different_captures() {
 
 #[test]
 fn untagged_alt_partial_overlap() {
-    // Partial overlap → common required, others optional
     let input = indoc! {r#"
         Q = [
             {(a) @x (b) @y}
@@ -343,10 +310,6 @@ fn untagged_alt_partial_overlap() {
     ");
 }
 
-// =============================================================================
-// TAGGED ALTERNATIONS (Bug #3)
-// =============================================================================
-
 #[test]
 fn tagged_alt_basic() {
     let input = indoc! {r#"
@@ -361,20 +324,12 @@ fn tagged_alt_basic() {
 
     export interface QNum {
       $tag: "Num";
-      $data: Struct2;
-    }
-
-    export interface Struct2 {
-      n: Node;
+      $data: { n: Node };
     }
 
     export interface QStr {
       $tag: "Str";
-      $data: Struct;
-    }
-
-    export interface Struct {
-      s: Node;
+      $data: { s: Node };
     }
 
     export type Q = QNum | QStr;
@@ -395,20 +350,12 @@ fn tagged_alt_with_type_annotation() {
 
     export interface QNum {
       $tag: "Num";
-      $data: Struct2;
-    }
-
-    export interface Struct2 {
-      n: Node;
+      $data: { n: Node };
     }
 
     export interface QStr {
       $tag: "Str";
-      $data: Struct;
-    }
-
-    export interface Struct {
-      s: string;
+      $data: { s: string };
     }
 
     export type Q = QNum | QStr;
@@ -422,21 +369,29 @@ fn tagged_alt_captured() {
         Q = [Str: (string) @s  Num: (number) @n] @result
     "#};
     let res = Query::expect_valid_types(input);
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     export interface Node {
       kind: string;
       text: string;
     }
 
     export interface Q {
-      result: Enum;
+      result: QResult;
     }
-    ");
-}
 
-// =============================================================================
-// NESTED STRUCTURES
-// =============================================================================
+    export interface QResultNum {
+      $tag: "Num";
+      $data: { n: Node };
+    }
+
+    export interface QResultStr {
+      $tag: "Str";
+      $data: { s: Node };
+    }
+
+    export type QResult = QResultNum | QResultStr;
+    "#);
+}
 
 #[test]
 fn nested_captured_group() {
@@ -455,19 +410,15 @@ fn nested_captured_group() {
 
     export interface Q {
       name: Node;
-      pair: Struct;
+      pair: QPair;
     }
 
-    export interface Struct {
+    export interface QPair {
       k: Node;
       v: Node;
     }
     ");
 }
-
-// =============================================================================
-// STRICT DIMENSIONALITY VIOLATIONS (errors)
-// =============================================================================
 
 #[test]
 fn error_star_with_internal_captures_no_row() {
