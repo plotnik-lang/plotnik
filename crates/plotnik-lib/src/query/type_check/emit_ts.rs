@@ -432,7 +432,7 @@ impl<'a> TsEmitter<'a> {
     fn emit_tagged_union(&mut self, name: &str, variants: &BTreeMap<Symbol, TypeId>, export: &str) {
         let mut variant_types = Vec::new();
 
-        for (&sym, &type_id) in self.sort_map_by_name(variants) {
+        for (&sym, &type_id) in variants {
             let variant_name = self.interner.resolve(sym);
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());

@@ -364,17 +364,17 @@ fn tagged_alt_basic() {
       text: string;
     }
 
-    export interface QNum {
-      $tag: "Num";
-      $data: { n: Node };
-    }
-
     export interface QStr {
       $tag: "Str";
       $data: { s: Node };
     }
 
-    export type Q = QNum | QStr;
+    export interface QNum {
+      $tag: "Num";
+      $data: { n: Node };
+    }
+
+    export type Q = QStr | QNum;
     "#);
 }
 
@@ -395,17 +395,17 @@ fn tagged_alt_with_type_annotation() {
       text: string;
     }
 
-    export interface QNum {
-      $tag: "Num";
-      $data: { n: Node };
-    }
-
     export interface QStr {
       $tag: "Str";
       $data: { s: string };
     }
 
-    export type Q = QNum | QStr;
+    export interface QNum {
+      $tag: "Num";
+      $data: { n: Node };
+    }
+
+    export type Q = QStr | QNum;
     "#);
 }
 
@@ -426,17 +426,17 @@ fn tagged_alt_captured() {
       text: string;
     }
 
-    export interface QResultNum {
-      $tag: "Num";
-      $data: { n: Node };
-    }
-
     export interface QResultStr {
       $tag: "Str";
       $data: { s: Node };
     }
 
-    export type QResult = QResultNum | QResultStr;
+    export interface QResultNum {
+      $tag: "Num";
+      $data: { n: Node };
+    }
+
+    export type QResult = QResultStr | QResultNum;
 
     export interface Q {
       result: QResult;
@@ -541,17 +541,17 @@ fn recursive_type_with_alternation() {
     let res = Query::expect_valid_types(input);
 
     insta::assert_snapshot!(res, @r#"
-    export interface ExprBinary {
-      $tag: "Binary";
-      $data: { left: Expr; right: Expr };
-    }
-
     export interface ExprLit {
       $tag: "Lit";
       $data: { value: string };
     }
 
-    export type Expr = ExprBinary | ExprLit;
+    export interface ExprBinary {
+      $tag: "Binary";
+      $data: { left: Expr; right: Expr };
+    }
+
+    export type Expr = ExprLit | ExprBinary;
     "#);
 }
 
