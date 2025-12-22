@@ -5,6 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use plotnik_core::Interner;
+
 use super::symbol::Symbol;
 
 use rowan::TextRange;
@@ -28,6 +30,7 @@ use super::unify::{UnifyError, unify_flows};
 /// Inference context for a single pass over the AST.
 pub struct InferenceVisitor<'a, 'd> {
     pub ctx: &'a mut TypeContext,
+    pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub diag: &'d mut Diagnostics,
     pub source_id: SourceId,
@@ -36,12 +39,14 @@ pub struct InferenceVisitor<'a, 'd> {
 impl<'a, 'd> InferenceVisitor<'a, 'd> {
     pub fn new(
         ctx: &'a mut TypeContext,
+        interner: &'a mut Interner,
         symbol_table: &'a SymbolTable,
         diag: &'d mut Diagnostics,
         source_id: SourceId,
     ) -> Self {
         Self {
             ctx,
+            interner,
             symbol_table,
             diag,
             source_id,
@@ -159,7 +164,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                                     DiagnosticKind::DuplicateCaptureInScope,
                                     child.text_range(),
                                 )
-                                .message(self.ctx.resolve(name))
+                                .message(self.interner.resolve(name))
                                 .emit();
                         }
                     }
@@ -196,7 +201,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let Some(label) = branch.label() else {
                 continue;
             };
-            let label_sym = self.ctx.intern(label.text());
+            let label_sym = self.interner.intern(label.text());
 
             let Some(body) = branch.body() else {
                 // Empty variant gets void/empty struct type
@@ -260,7 +265,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 .map(|inner| self.infer_expr(&inner))
                 .unwrap_or_else(TermInfo::void);
         };
-        let capture_name = self.ctx.intern(name_tok.text());
+        let capture_name = self.interner.intern(name_tok.text());
 
         // Check for type annotation
         let annotation_type = cap.type_annotation().and_then(|t| {
@@ -269,7 +274,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 if type_name == "string" {
                     TYPE_STRING
                 } else {
-                    let type_sym = self.ctx.intern(type_name);
+                    let type_sym = self.interner.intern(type_name);
                     self.ctx.intern_type(TypeKind::Custom(type_sym))
                 }
             })
@@ -467,7 +472,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             let capture_names: Vec<_> = fields
                 .keys()
-                .map(|s| format!("`@{}`", self.ctx.resolve(*s)))
+                .map(|s| format!("`@{}`", self.interner.resolve(*s)))
                 .collect();
             let captures_str = capture_names.join(", ");
 
@@ -515,15 +520,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             ),
             UnifyError::IncompatibleTypes { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
-                self.ctx.resolve(*field).to_string(),
+                self.interner.resolve(*field).to_string(),
             ),
             UnifyError::IncompatibleStructs { field } => (
                 DiagnosticKind::IncompatibleStructShapes,
-                self.ctx.resolve(*field).to_string(),
+                self.interner.resolve(*field).to_string(),
             ),
             UnifyError::IncompatibleArrayElements { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
-                self.ctx.resolve(*field).to_string(),
+                self.interner.resolve(*field).to_string(),
             ),
         };
 
@@ -560,11 +565,12 @@ impl Visitor for InferenceVisitor<'_, '_> {
 /// Run inference on all definitions in a root.
 pub fn infer_root(
     ctx: &mut TypeContext,
+    interner: &mut Interner,
     symbol_table: &SymbolTable,
     diag: &mut Diagnostics,
     source_id: SourceId,
     root: &Root,
 ) {
-    let mut visitor = InferenceVisitor::new(ctx, symbol_table, diag, source_id);
+    let mut visitor = InferenceVisitor::new(ctx, interner, symbol_table, diag, source_id);
     visitor.visit(root);
 }

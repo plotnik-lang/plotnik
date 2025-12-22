@@ -152,6 +152,7 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use plotnik_core::Interner;
 
     #[test]
     fn unify_void_void() {
@@ -163,7 +164,8 @@ mod tests {
     #[test]
     fn unify_void_bubble() {
         let mut ctx = TypeContext::new();
-        let x = ctx.intern("x");
+        let mut interner = Interner::new();
+        let x = interner.intern("x");
         let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 
         let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Bubble(struct_id)).unwrap();
@@ -180,8 +182,9 @@ mod tests {
     #[test]
     fn unify_bubble_merge() {
         let mut ctx = TypeContext::new();
-        let x = ctx.intern("x");
-        let y = ctx.intern("y");
+        let mut interner = Interner::new();
+        let x = interner.intern("x");
+        let y = interner.intern("y");
 
         let a_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 

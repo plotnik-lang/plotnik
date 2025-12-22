@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
 
-use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_core::{Interner, NodeFieldId, NodeTypeId};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
@@ -105,10 +105,13 @@ impl QueryParsed {
 
 impl QueryParsed {
     pub fn analyze(mut self) -> QueryAnalyzed {
+        // Create shared interner for all phases
+        let mut interner = Interner::new();
+
         // Use reference-based structures for processing
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
-        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
+        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
         dependencies::validate_recursion(
             &dependency_analysis,
             &self.ast_map,
@@ -119,16 +122,18 @@ impl QueryParsed {
         // Legacy arity table (to be removed once type_check is fully integrated)
         let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
 
-        // New unified type checking pass
+        // New unified type checking pass - receives mutable interner reference
         let type_context = type_check::infer_types(
             &self.ast_map,
             &symbol_table,
             &dependency_analysis,
             &mut self.diag,
+            &mut interner,
         );
 
         QueryAnalyzed {
             query_parsed: self,
+            interner,
             symbol_table,
             arity_table,
             type_context,
@@ -152,6 +157,7 @@ pub type Query = QueryAnalyzed;
 
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
+    interner: Interner,
     pub symbol_table: SymbolTable,
     arity_table: ExprArityTable,
     type_context: TypeContext,
@@ -168,6 +174,10 @@ impl QueryAnalyzed {
 
     pub fn type_context(&self) -> &TypeContext {
         &self.type_context
+    }
+
+    pub fn interner(&self) -> &Interner {
+        &self.interner
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
@@ -234,6 +244,12 @@ pub struct LinkedQuery {
     inner: QueryAnalyzed,
     type_ids: NodeTypeIdTableOwned,
     field_ids: NodeFieldIdTableOwned,
+}
+
+impl LinkedQuery {
+    pub fn interner(&self) -> &Interner {
+        &self.inner.interner
+    }
 }
 
 impl Deref for LinkedQuery {

@@ -13,7 +13,10 @@
 use std::collections::HashMap;
 use std::num::NonZeroU16;
 
+mod interner;
 mod invariants;
+
+pub use interner::{Interner, Symbol};
 
 /// Raw node definition from `node-types.json`.
 #[derive(Debug, Clone, serde::Deserialize)]

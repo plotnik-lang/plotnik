@@ -1,12 +1,14 @@
 //! TypeContext: manages interned types, symbols, and term info cache.
 //!
 //! Types are interned to enable cheap equality checks and cycle handling.
-//! Symbols are interned to enable cheap string comparison.
+//! Symbols are stored but resolved via external Interner reference.
 //! TermInfo is cached per-expression to avoid recomputation.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::parser::ast::Expr;
+
+use std::collections::HashMap;
 
 use super::symbol::{DefId, Interner, Symbol};
 use super::types::{
@@ -16,8 +18,6 @@ use super::types::{
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Debug, Clone)]
 pub struct TypeContext {
-    /// String interner for field/type names
-    interner: Interner,
     /// Interned types by ID
     types: Vec<TypeKind>,
     /// Deduplication map for type interning
@@ -41,7 +41,6 @@ impl Default for TypeContext {
 impl TypeContext {
     pub fn new() -> Self {
         let mut ctx = Self {
-            interner: Interner::new(),
             types: Vec::new(),
             type_map: HashMap::new(),
             term_info: HashMap::new(),
@@ -63,30 +62,11 @@ impl TypeContext {
         ctx
     }
 
-    // ========== Symbol interning ==========
-
-    /// Intern a string, returning its Symbol.
-    #[inline]
-    pub fn intern(&mut self, s: &str) -> Symbol {
-        self.interner.intern(s)
-    }
-
-    /// Intern an owned string.
-    #[inline]
-    pub fn intern_owned(&mut self, s: String) -> Symbol {
-        self.interner.intern_owned(s)
-    }
-
-    /// Resolve a Symbol back to its string.
-    #[inline]
-    pub fn resolve(&self, sym: Symbol) -> &str {
-        self.interner.resolve(sym)
-    }
-
-    /// Get a reference to the interner (for emission, etc.).
-    #[inline]
-    pub fn interner(&self) -> &Interner {
-        &self.interner
+    /// Seed definition mappings from DependencyAnalysis.
+    /// This avoids re-registering definitions that were already assigned DefIds.
+    pub fn seed_defs(&mut self, def_names: &[Symbol], name_to_def: &HashMap<Symbol, DefId>) {
+        self.def_names = def_names.to_vec();
+        self.def_ids = name_to_def.clone();
     }
 
     // ========== Type interning ==========
@@ -150,8 +130,8 @@ impl TypeContext {
 
     /// Register a definition by name, returning its DefId.
     /// If already registered, returns existing DefId.
-    pub fn register_def(&mut self, name: &str) -> DefId {
-        let sym = self.interner.intern(name);
+    pub fn register_def(&mut self, interner: &mut Interner, name: &str) -> DefId {
+        let sym = interner.intern(name);
         if let Some(&def_id) = self.def_ids.get(&sym) {
             return def_id;
         }
@@ -161,11 +141,27 @@ impl TypeContext {
         def_id
     }
 
-    /// Get DefId for a definition name.
-    pub fn get_def_id(&self, name: &str) -> Option<DefId> {
-        // Need to check if interned, avoid creating new symbol
+    /// Register a definition by pre-interned Symbol, returning its DefId.
+    pub fn register_def_sym(&mut self, sym: Symbol) -> DefId {
+        if let Some(&def_id) = self.def_ids.get(&sym) {
+            return def_id;
+        }
+        let def_id = DefId::from_raw(self.def_names.len() as u32);
+        self.def_names.push(sym);
+        self.def_ids.insert(sym, def_id);
+        def_id
+    }
+
+    /// Get DefId for a definition by Symbol.
+    pub fn get_def_id_sym(&self, sym: Symbol) -> Option<DefId> {
+        self.def_ids.get(&sym).copied()
+    }
+
+    /// Get DefId for a definition name (requires interner for lookup).
+    pub fn get_def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
+        // Linear scan - only used during analysis, not hot path
         for (&sym, &def_id) in &self.def_ids {
-            if self.interner.resolve(sym) == name {
+            if interner.resolve(sym) == name {
                 return Some(def_id);
             }
         }
@@ -178,8 +174,8 @@ impl TypeContext {
     }
 
     /// Get the name string for a DefId.
-    pub fn def_name(&self, def_id: DefId) -> &str {
-        self.resolve(self.def_names[def_id.index()])
+    pub fn def_name<'a>(&self, interner: &'a Interner, def_id: DefId) -> &'a str {
+        interner.resolve(self.def_names[def_id.index()])
     }
 
     // ========== Definition types ==========
@@ -191,8 +187,8 @@ impl TypeContext {
 
     /// Register the output type for a definition by string name.
     /// Registers the def if not already known.
-    pub fn set_def_type_by_name(&mut self, name: &str, type_id: TypeId) {
-        let def_id = self.register_def(name);
+    pub fn set_def_type_by_name(&mut self, interner: &mut Interner, name: &str, type_id: TypeId) {
+        let def_id = self.register_def(interner, name);
         self.def_types.insert(def_id, type_id);
     }
 
@@ -202,8 +198,8 @@ impl TypeContext {
     }
 
     /// Get the output type for a definition by string name.
-    pub fn get_def_type_by_name(&self, name: &str) -> Option<TypeId> {
-        self.get_def_id(name)
+    pub fn get_def_type_by_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {
+        self.get_def_id(interner, name)
             .and_then(|id| self.def_types.get(&id).copied())
     }
 
@@ -270,8 +266,9 @@ mod tests {
     #[test]
     fn struct_types_intern_correctly() {
         let mut ctx = TypeContext::new();
+        let mut interner = Interner::new();
 
-        let x_sym = ctx.intern("x");
+        let x_sym = interner.intern("x");
         let mut fields = BTreeMap::new();
         fields.insert(x_sym, FieldInfo::required(TYPE_NODE));
 
@@ -283,47 +280,53 @@ mod tests {
 
     #[test]
     fn symbol_interning_works() {
-        let mut ctx = TypeContext::new();
+        let mut interner = Interner::new();
 
-        let a = ctx.intern("foo");
-        let b = ctx.intern("foo");
-        let c = ctx.intern("bar");
+        let a = interner.intern("foo");
+        let b = interner.intern("foo");
+        let c = interner.intern("bar");
 
         assert_eq!(a, b);
         assert_ne!(a, c);
-        assert_eq!(ctx.resolve(a), "foo");
-        assert_eq!(ctx.resolve(c), "bar");
+        assert_eq!(interner.resolve(a), "foo");
+        assert_eq!(interner.resolve(c), "bar");
     }
 
     #[test]
     fn def_type_by_name() {
         let mut ctx = TypeContext::new();
+        let mut interner = Interner::new();
 
-        ctx.set_def_type_by_name("Query", TYPE_NODE);
-        assert_eq!(ctx.get_def_type_by_name("Query"), Some(TYPE_NODE));
-        assert_eq!(ctx.get_def_type_by_name("Missing"), None);
+        ctx.set_def_type_by_name(&mut interner, "Query", TYPE_NODE);
+        assert_eq!(
+            ctx.get_def_type_by_name(&interner, "Query"),
+            Some(TYPE_NODE)
+        );
+        assert_eq!(ctx.get_def_type_by_name(&interner, "Missing"), None);
     }
 
     #[test]
     fn register_def_returns_stable_id() {
         let mut ctx = TypeContext::new();
+        let mut interner = Interner::new();
 
-        let id1 = ctx.register_def("Foo");
-        let id2 = ctx.register_def("Bar");
-        let id3 = ctx.register_def("Foo"); // duplicate
+        let id1 = ctx.register_def(&mut interner, "Foo");
+        let id2 = ctx.register_def(&mut interner, "Bar");
+        let id3 = ctx.register_def(&mut interner, "Foo"); // duplicate
 
         assert_eq!(id1, id3);
         assert_ne!(id1, id2);
-        assert_eq!(ctx.def_name(id1), "Foo");
-        assert_eq!(ctx.def_name(id2), "Bar");
+        assert_eq!(ctx.def_name(&interner, id1), "Foo");
+        assert_eq!(ctx.def_name(&interner, id2), "Bar");
     }
 
     #[test]
     fn def_id_lookup() {
         let mut ctx = TypeContext::new();
+        let mut interner = Interner::new();
 
-        ctx.register_def("Query");
-        assert!(ctx.get_def_id("Query").is_some());
-        assert!(ctx.get_def_id("Missing").is_none());
+        ctx.register_def(&mut interner, "Query");
+        assert!(ctx.get_def_id(&interner, "Query").is_some());
+        assert!(ctx.get_def_id(&interner, "Missing").is_none());
     }
 }

@@ -5,6 +5,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+use plotnik_core::Interner;
+
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeId, TypeKind};
@@ -43,6 +45,7 @@ impl Default for EmitConfig {
 /// TypeScript emitter.
 pub struct TsEmitter<'a> {
     ctx: &'a TypeContext,
+    interner: &'a Interner,
     config: EmitConfig,
     /// Generated type names, to avoid collisions
     used_names: BTreeSet<String>,
@@ -58,9 +61,10 @@ pub struct TsEmitter<'a> {
 }
 
 impl<'a> TsEmitter<'a> {
-    pub fn new(ctx: &'a TypeContext, config: EmitConfig) -> Self {
+    pub fn new(ctx: &'a TypeContext, interner: &'a Interner, config: EmitConfig) -> Self {
         Self {
             ctx,
+            interner,
             config,
             used_names: BTreeSet::new(),
             type_names: HashMap::new(),
@@ -87,7 +91,12 @@ impl<'a> TsEmitter<'a> {
         let def_names: HashMap<TypeId, String> = self
             .ctx
             .iter_def_types()
-            .map(|(def_id, type_id)| (type_id, self.ctx.def_name(def_id).to_string()))
+            .map(|(def_id, type_id)| {
+                (
+                    type_id,
+                    self.ctx.def_name(self.interner, def_id).to_string(),
+                )
+            })
             .collect();
 
         // Compute topological order (leaves first)
@@ -100,7 +109,7 @@ impl<'a> TsEmitter<'a> {
             } else if let Some(name) = self.type_names.get(&type_id).cloned() {
                 self.emit_nested_type(type_id, &name);
             } else if let Some(TypeKind::Custom(sym)) = self.ctx.get_type(type_id) {
-                self.emit_custom_type_alias(self.ctx.resolve(*sym));
+                self.emit_custom_type_alias(self.interner.resolve(*sym));
             }
         }
 
@@ -125,7 +134,7 @@ impl<'a> TsEmitter<'a> {
                 if let Some(nested_name) = self.type_names.get(nested_id).cloned() {
                     self.emit_nested_type(*nested_id, &nested_name);
                 } else if let Some(TypeKind::Custom(sym)) = self.ctx.get_type(*nested_id) {
-                    self.emit_custom_type_alias(self.ctx.resolve(*sym));
+                    self.emit_custom_type_alias(self.interner.resolve(*sym));
                 }
             }
         }
@@ -278,7 +287,7 @@ impl<'a> TsEmitter<'a> {
     fn collect_type_names_with_context(&mut self) {
         // Reserve definition names first
         for (def_id, _) in self.ctx.iter_def_types() {
-            let name = self.ctx.def_name(def_id);
+            let name = self.ctx.def_name(self.interner, def_id);
             let pascal_name = to_pascal_case(name);
             self.used_names.insert(pascal_name);
         }
@@ -287,7 +296,7 @@ impl<'a> TsEmitter<'a> {
         let mut type_contexts: HashMap<TypeId, NamingContext> = HashMap::new();
 
         for (def_id, type_id) in self.ctx.iter_def_types() {
-            let def_name = self.ctx.def_name(def_id);
+            let def_name = self.ctx.def_name(self.interner, def_id);
             self.collect_contexts_for_type(
                 type_id,
                 &NamingContext {
@@ -331,7 +340,7 @@ impl<'a> TsEmitter<'a> {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 // Recurse into fields
                 for (&field_sym, info) in fields {
-                    let field_name = self.ctx.resolve(field_sym);
+                    let field_name = self.interner.resolve(field_sym);
                     let field_ctx = NamingContext {
                         def_name: ctx.def_name.clone(),
                         field_name: Some(field_name.to_string()),
@@ -502,10 +511,10 @@ impl<'a> TsEmitter<'a> {
 
         // Sort fields by resolved name for deterministic output
         let mut sorted_fields: Vec<_> = fields.iter().collect();
-        sorted_fields.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+        sorted_fields.sort_by_key(|&(&sym, _)| self.interner.resolve(sym));
 
         for (&field_sym, info) in sorted_fields {
-            let field_name = self.ctx.resolve(field_sym);
+            let field_name = self.interner.resolve(field_sym);
             let ts_type = self.type_to_ts(info.type_id);
             let optional = if info.optional { "?" } else { "" };
             self.output
@@ -520,10 +529,10 @@ impl<'a> TsEmitter<'a> {
 
         // Sort variants by resolved name for deterministic output
         let mut sorted_variants: Vec<_> = variants.iter().collect();
-        sorted_variants.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+        sorted_variants.sort_by_key(|&(&sym, _)| self.interner.resolve(sym));
 
         for (&variant_sym, &type_id) in sorted_variants {
-            let variant_name = self.ctx.resolve(variant_sym);
+            let variant_name = self.interner.resolve(variant_sym);
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());
 
@@ -595,8 +604,8 @@ impl<'a> TsEmitter<'a> {
             TypeKind::Void => "void".to_string(),
             TypeKind::Node => "Node".to_string(),
             TypeKind::String => "string".to_string(),
-            TypeKind::Custom(sym) => self.ctx.resolve(*sym).to_string(),
-            TypeKind::Ref(def_id) => to_pascal_case(self.ctx.def_name(*def_id)),
+            TypeKind::Custom(sym) => self.interner.resolve(*sym).to_string(),
+            TypeKind::Ref(def_id) => to_pascal_case(self.ctx.def_name(self.interner, *def_id)),
 
             TypeKind::Struct(fields) => {
                 if let Some(name) = self.type_names.get(&type_id) {
@@ -637,12 +646,12 @@ impl<'a> TsEmitter<'a> {
 
         // Sort fields by resolved name for deterministic output
         let mut sorted_fields: Vec<_> = fields.iter().collect();
-        sorted_fields.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+        sorted_fields.sort_by_key(|&(&sym, _)| self.interner.resolve(sym));
 
         let field_strs: Vec<_> = sorted_fields
             .iter()
             .map(|&(&sym, info)| {
-                let name = self.ctx.resolve(sym);
+                let name = self.interner.resolve(sym);
                 let ts_type = self.type_to_ts(info.type_id);
                 let optional = if info.optional { "?" } else { "" };
                 format!("{}{}: {}", name, optional, ts_type)
@@ -655,12 +664,12 @@ impl<'a> TsEmitter<'a> {
     fn inline_enum(&self, variants: &BTreeMap<Symbol, TypeId>) -> String {
         // Sort variants by resolved name for deterministic output
         let mut sorted_variants: Vec<_> = variants.iter().collect();
-        sorted_variants.sort_by_key(|&(&sym, _)| self.ctx.resolve(sym));
+        sorted_variants.sort_by_key(|&(&sym, _)| self.interner.resolve(sym));
 
         let variant_strs: Vec<_> = sorted_variants
             .iter()
             .map(|&(&sym, &type_id)| {
-                let name = self.ctx.resolve(sym);
+                let name = self.interner.resolve(sym);
                 let data_type = self.type_to_ts(type_id);
                 format!("{{ $tag: \"{}\"; $data: {} }}", name, data_type)
             })
@@ -690,13 +699,17 @@ fn to_pascal_case(s: &str) -> String {
 }
 
 /// Convenience function to emit TypeScript from a TypeContext.
-pub fn emit_typescript(ctx: &TypeContext) -> String {
-    TsEmitter::new(ctx, EmitConfig::default()).emit()
+pub fn emit_typescript(ctx: &TypeContext, interner: &Interner) -> String {
+    TsEmitter::new(ctx, interner, EmitConfig::default()).emit()
 }
 
 /// Emit TypeScript with custom configuration.
-pub fn emit_typescript_with_config(ctx: &TypeContext, config: EmitConfig) -> String {
-    TsEmitter::new(ctx, config).emit()
+pub fn emit_typescript_with_config(
+    ctx: &TypeContext,
+    interner: &Interner,
+    config: EmitConfig,
+) -> String {
+    TsEmitter::new(ctx, interner, config).emit()
 }
 
 #[cfg(test)]
@@ -716,18 +729,20 @@ mod tests {
     fn emit_node_type_only_when_referenced() {
         // Empty context - Node should not be emitted
         let ctx = TypeContext::new();
-        let output = TsEmitter::new(&ctx, EmitConfig::default()).emit();
+        let interner = Interner::new();
+        let output = TsEmitter::new(&ctx, &interner, EmitConfig::default()).emit();
         assert!(!output.contains("interface Node"));
 
         // Context with a definition using Node - should emit Node
         let mut ctx = TypeContext::new();
-        let x_sym = ctx.intern("x");
+        let mut interner = Interner::new();
+        let x_sym = interner.intern("x");
         let mut fields = BTreeMap::new();
         fields.insert(x_sym, FieldInfo::required(TYPE_NODE));
         let struct_id = ctx.intern_type(TypeKind::Struct(fields));
-        ctx.set_def_type_by_name("Q", struct_id);
+        ctx.set_def_type_by_name(&mut interner, "Q", struct_id);
 
-        let output = TsEmitter::new(&ctx, EmitConfig::default()).emit();
+        let output = TsEmitter::new(&ctx, &interner, EmitConfig::default()).emit();
         assert!(output.contains("interface Node"));
         assert!(output.contains("kind: string"));
     }

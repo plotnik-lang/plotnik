@@ -42,8 +42,15 @@ pub fn infer_types(
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
+    interner: &mut Interner,
 ) -> TypeContext {
     let mut ctx = TypeContext::new();
+
+    // Seed def mappings from DependencyAnalysis (avoids re-registration)
+    ctx.seed_defs(
+        dependency_analysis.def_names(),
+        dependency_analysis.name_to_def(),
+    );
 
     // Process definitions in SCC order (leaves first)
     for scc in &dependency_analysis.sccs {
@@ -58,21 +65,21 @@ pub fn infer_types(
             };
 
             // Run inference on this root
-            infer_root(&mut ctx, symbol_table, diag, source_id, root);
+            infer_root(&mut ctx, interner, symbol_table, diag, source_id, root);
 
             // Register the definition's output type
             if let Some(body) = symbol_table.get(def_name)
                 && let Some(info) = ctx.get_term_info(body).cloned()
             {
                 let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                ctx.set_def_type_by_name(def_name, type_id);
+                ctx.set_def_type_by_name(interner, def_name, type_id);
             }
         }
     }
 
     // Handle any definitions not in an SCC (shouldn't happen, but be safe)
     for (name, source_id, _body) in symbol_table.iter_full() {
-        if ctx.get_def_type_by_name(name).is_some() {
+        if ctx.get_def_type_by_name(interner, name).is_some() {
             continue;
         }
 
@@ -80,13 +87,13 @@ pub fn infer_types(
             continue;
         };
 
-        infer_root(&mut ctx, symbol_table, diag, source_id, root);
+        infer_root(&mut ctx, interner, symbol_table, diag, source_id, root);
 
         if let Some(body) = symbol_table.get(name)
             && let Some(info) = ctx.get_term_info(body).cloned()
         {
             let type_id = flow_to_type_id(&mut ctx, &info.flow);
-            ctx.set_def_type_by_name(name, type_id);
+            ctx.set_def_type_by_name(interner, name, type_id);
         }
     }
 
