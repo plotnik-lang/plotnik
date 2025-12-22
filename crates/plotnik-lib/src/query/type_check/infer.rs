@@ -111,12 +111,41 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(Arity::One, TypeFlow::Void)
     }
 
-    /// Reference: transparent - propagate body's flow and arity
+    /// If expr is (or contains at its core) a recursive Ref, return its Ref type.
+    fn get_recursive_ref_type(&mut self, expr: &Expr) -> Option<TypeId> {
+        match expr {
+            Expr::Ref(r) => {
+                let name_tok = r.name()?;
+                let name_sym = self.interner.intern(name_tok.text());
+                let def_id = self.ctx.get_def_id_sym(name_sym)?;
+                if self.ctx.is_recursive(def_id) {
+                    Some(self.ctx.intern_type(TypeKind::Ref(def_id)))
+                } else {
+                    None
+                }
+            }
+            Expr::QuantifiedExpr(q) => q.inner().and_then(|i| self.get_recursive_ref_type(&i)),
+            Expr::CapturedExpr(c) => c.inner().and_then(|i| self.get_recursive_ref_type(&i)),
+            Expr::FieldExpr(f) => f.value().and_then(|v| self.get_recursive_ref_type(&v)),
+            _ => None,
+        }
+    }
+
+    /// Reference: transparent for non-recursive defs, opaque boundary for recursive ones.
     fn infer_ref(&mut self, r: &Ref) -> TermInfo {
         let Some(name_tok) = r.name() else {
             return TermInfo::void();
         };
         let name = name_tok.text();
+        let name_sym = self.interner.intern(name);
+
+        // Recursive refs are opaque boundaries - they match but don't bubble captures.
+        // The Ref type is created when a recursive ref is captured (in infer_captured_expr).
+        if let Some(def_id) = self.ctx.get_def_id_sym(name_sym)
+            && self.ctx.is_recursive(def_id)
+        {
+            return TermInfo::new(Arity::One, TypeFlow::Void);
+        }
 
         // Get the body expression for this definition
         let Some(body) = self.symbol_table.get(name) else {
@@ -124,7 +153,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return TermInfo::void();
         };
 
-        // Refs are transparent - propagate body's flow and arity
+        // Non-recursive refs are transparent - propagate body's flow and arity
         self.infer_expr(body)
     }
 
@@ -310,8 +339,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // Transform based on inner's flow
         let captured_type = match &inner_info.flow {
             TypeFlow::Void => {
-                // @name on Void → capture produces Node (or annotated type)
-                annotation_type.unwrap_or(TYPE_NODE)
+                // Check if inner is a recursive ref - if so, capture produces Ref type
+                if let Some(ref_type) = self.get_recursive_ref_type(&inner) {
+                    annotation_type.unwrap_or(ref_type)
+                } else {
+                    // @name on Void → capture produces Node (or annotated type)
+                    annotation_type.unwrap_or(TYPE_NODE)
+                }
             }
             TypeFlow::Scalar(type_id) => {
                 // @name on Scalar → capture that scalar type
@@ -390,9 +424,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
                 let flow = match inner_info.flow {
                     TypeFlow::Void => {
-                        // Scalar list: void inner becomes array of Node
+                        // Scalar list: void inner becomes array of Node (or Ref for recursive)
+                        let element = self.get_recursive_ref_type(&inner).unwrap_or(TYPE_NODE);
                         let array_type = self.ctx.intern_type(TypeKind::Array {
-                            element: TYPE_NODE,
+                            element,
                             non_empty: quantifier.is_non_empty(),
                         });
                         TypeFlow::Scalar(array_type)

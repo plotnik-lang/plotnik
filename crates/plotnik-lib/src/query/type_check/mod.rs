@@ -52,6 +52,29 @@ pub fn infer_types(
         dependency_analysis.name_to_def(),
     );
 
+    // Mark recursive definitions before inference.
+    // A def is recursive if it's in an SCC with >1 member, or it references itself.
+    for scc in &dependency_analysis.sccs {
+        let is_recursive_scc = if scc.len() > 1 {
+            true
+        } else if let Some(name) = scc.first()
+            && let Some(body) = symbol_table.get(name)
+        {
+            body_references_self(body, name)
+        } else {
+            false
+        };
+
+        if is_recursive_scc {
+            for def_name in scc {
+                let sym = interner.intern(def_name);
+                if let Some(def_id) = ctx.get_def_id_sym(sym) {
+                    ctx.mark_recursive(def_id);
+                }
+            }
+        }
+    }
+
     // Process definitions in SCC order (leaves first)
     for scc in &dependency_analysis.sccs {
         for def_name in scc {
@@ -98,6 +121,20 @@ pub fn infer_types(
     }
 
     ctx
+}
+
+/// Check if an expression body contains a reference to the given name.
+fn body_references_self(body: &crate::parser::ast::Expr, name: &str) -> bool {
+    use crate::parser::ast::Ref;
+    for descendant in body.as_cst().descendants() {
+        if let Some(r) = Ref::cast(descendant)
+            && let Some(name_tok) = r.name()
+            && name_tok.text() == name
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// Convert a TypeFlow to a TypeId for storage.

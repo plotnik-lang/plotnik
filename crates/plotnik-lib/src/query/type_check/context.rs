@@ -4,11 +4,9 @@
 //! Symbols are stored but resolved via external Interner reference.
 //! TermInfo is cached per-expression to avoid recomputation.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::parser::ast::Expr;
-
-use std::collections::HashMap;
 
 use super::symbol::{DefId, Interner, Symbol};
 use super::types::{
@@ -30,6 +28,8 @@ pub struct TypeContext {
     def_names: Vec<Symbol>,
     /// Symbol → DefId reverse lookup
     def_ids: HashMap<Symbol, DefId>,
+    /// Definitions that are part of a recursive SCC
+    recursive_defs: HashSet<DefId>,
 }
 
 impl Default for TypeContext {
@@ -47,6 +47,7 @@ impl TypeContext {
             def_types: HashMap::new(),
             def_names: Vec::new(),
             def_ids: HashMap::new(),
+            recursive_defs: HashSet::new(),
         };
 
         // Pre-register builtin types at their expected IDs
@@ -68,8 +69,6 @@ impl TypeContext {
         self.def_names = def_names.to_vec();
         self.def_ids = name_to_def.clone();
     }
-
-    // ========== Type interning ==========
 
     /// Intern a type, returning its ID. Deduplicates identical types.
     pub fn intern_type(&mut self, kind: TypeKind) -> TypeId {
@@ -114,8 +113,6 @@ impl TypeContext {
         }
     }
 
-    // ========== Term info cache ==========
-
     /// Cache term info for an expression.
     pub fn set_term_info(&mut self, expr: Expr, info: TermInfo) {
         self.term_info.insert(expr, info);
@@ -125,8 +122,6 @@ impl TypeContext {
     pub fn get_term_info(&self, expr: &Expr) -> Option<&TermInfo> {
         self.term_info.get(expr)
     }
-
-    // ========== Definition registry ==========
 
     /// Register a definition by name, returning its DefId.
     /// If already registered, returns existing DefId.
@@ -178,7 +173,15 @@ impl TypeContext {
         interner.resolve(self.def_names[def_id.index()])
     }
 
-    // ========== Definition types ==========
+    /// Mark a definition as recursive.
+    pub fn mark_recursive(&mut self, def_id: DefId) {
+        self.recursive_defs.insert(def_id);
+    }
+
+    /// Check if a definition is recursive.
+    pub fn is_recursive(&self, def_id: DefId) -> bool {
+        self.recursive_defs.contains(&def_id)
+    }
 
     /// Register the output type for a definition by DefId.
     pub fn set_def_type(&mut self, def_id: DefId, type_id: TypeId) {
@@ -207,8 +210,6 @@ impl TypeContext {
     pub fn get_arity(&self, expr: &Expr) -> Option<Arity> {
         self.term_info.get(expr).map(|info| info.arity)
     }
-
-    // ========== Iteration ==========
 
     /// Iterate over all interned types.
     pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeKind)> {
