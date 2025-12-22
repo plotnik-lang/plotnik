@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use super::context::TypeContext;
 use super::symbol::Symbol;
-use super::types::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeFlow, TypeId};
+use super::types::{FieldInfo, TYPE_VOID, TypeFlow, TypeId};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
@@ -33,35 +33,6 @@ impl UnifyError {
     }
 }
 
-/// Unify two TypeFlows from alternation branches.
-///
-/// Rules:
-/// - Void ∪ Void → Void
-/// - Void ∪ Bubble(s) → Bubble(make_all_optional(s))
-/// - Bubble(a) ∪ Bubble(b) → Bubble(merge_fields(a, b))
-/// - Scalar in untagged → Error (use tagged alternation instead)
-pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
-    match (a, b) {
-        (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
-
-        (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
-            let fields = ctx.get_struct_fields(id).cloned().unwrap_or_default();
-            let optional_fields = make_all_optional(fields);
-            Ok(TypeFlow::Bubble(ctx.intern_struct(optional_fields)))
-        }
-
-        (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
-            let a_fields = ctx.get_struct_fields(a_id).cloned().unwrap_or_default();
-            let b_fields = ctx.get_struct_fields(b_id).cloned().unwrap_or_default();
-            let merged = merge_fields(a_fields, b_fields)?;
-            Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
-        }
-
-        // Scalars can't appear in untagged alternations
-        (TypeFlow::Scalar(_), _) | (_, TypeFlow::Scalar(_)) => Err(UnifyError::ScalarInUntagged),
-    }
-}
-
 /// Unify multiple flows from alternation branches.
 pub fn unify_flows(
     ctx: &mut TypeContext,
@@ -75,6 +46,42 @@ pub fn unify_flows(
     iter.try_fold(first, |acc, flow| unify_flow(ctx, acc, flow))
 }
 
+/// Unify two TypeFlows from alternation branches.
+///
+/// Rules:
+/// - Void ∪ Void → Void
+/// - Void ∪ Bubble(s) → Bubble(make_all_optional(s))
+/// - Bubble(a) ∪ Bubble(b) → Bubble(merge_fields(a, b))
+/// - Scalar in untagged → Error
+pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
+    // Untagged alternations cannot contain scalars.
+    if matches!(a, TypeFlow::Scalar(_)) || matches!(b, TypeFlow::Scalar(_)) {
+        return Err(UnifyError::ScalarInUntagged);
+    }
+
+    match (a, b) {
+        (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
+
+        // Void ∪ Bubble -> Bubble (all fields become optional)
+        (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
+            let fields = ctx.get_struct_fields(id).cloned().unwrap_or_default();
+            let optional_fields = make_all_optional(fields);
+            Ok(TypeFlow::Bubble(ctx.intern_struct(optional_fields)))
+        }
+
+        (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
+            let a_fields = ctx.get_struct_fields(a_id).cloned().unwrap_or_default();
+            let b_fields = ctx.get_struct_fields(b_id).cloned().unwrap_or_default();
+
+            let merged = merge_fields(a_fields, b_fields)?;
+            Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
+        }
+
+        // Should be unreachable due to initial scalar check, but technically possible if new variants are added
+        _ => Err(UnifyError::ScalarInUntagged),
+    }
+}
+
 /// Make all fields in a map optional.
 fn make_all_optional(fields: BTreeMap<Symbol, FieldInfo>) -> BTreeMap<Symbol, FieldInfo> {
     fields
@@ -86,39 +93,29 @@ fn make_all_optional(fields: BTreeMap<Symbol, FieldInfo>) -> BTreeMap<Symbol, Fi
 /// Merge two field maps.
 ///
 /// Rules:
-/// - Keys in both: types must be compatible, field is required iff required in both
-/// - Keys in only one: field becomes optional
+/// - Keys in both: types must be compatible, field is required iff required in both.
+/// - Keys in only one: field becomes optional.
 fn merge_fields(
     a: BTreeMap<Symbol, FieldInfo>,
-    b: BTreeMap<Symbol, FieldInfo>,
+    mut b: BTreeMap<Symbol, FieldInfo>,
 ) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
     let mut result = BTreeMap::new();
 
-    // Process all keys from a
-    for (key, a_info) in &a {
-        if let Some(b_info) = b.get(key) {
+    // Process all keys from 'a'. Check intersection with 'b'.
+    for (key, a_info) in a {
+        if let Some(b_info) = b.remove(&key) {
             // Key exists in both: unify types
-            let unified_type = unify_type_ids(a_info.type_id, b_info.type_id, *key)?;
+            let type_id = unify_type_ids(a_info.type_id, b_info.type_id, key)?;
             let optional = a_info.optional || b_info.optional;
-            result.insert(
-                *key,
-                FieldInfo {
-                    type_id: unified_type,
-                    optional,
-                },
-            );
+            result.insert(key, FieldInfo { type_id, optional });
         } else {
-            // Key only in a: make optional
-            result.insert(*key, a_info.make_optional());
+            // Key only in 'a': make optional
+            result.insert(key, a_info.make_optional());
         }
     }
 
-    // Process keys only in b
-    for (key, b_info) in b {
-        if !a.contains_key(&key) {
-            result.insert(key, b_info.make_optional());
-        }
-    }
+    // Remaining keys in 'b' were not in 'a': make optional
+    result.extend(make_all_optional(b));
 
     Ok(result)
 }
@@ -126,15 +123,9 @@ fn merge_fields(
 /// Unify two type IDs.
 ///
 /// For now, types must match exactly (except Node is compatible with Node).
-/// Future: could allow structural subtyping for structs.
 fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyError> {
     if a == b {
         return Ok(a);
-    }
-
-    // Both are Node type - compatible
-    if a == TYPE_NODE && b == TYPE_NODE {
-        return Ok(TYPE_NODE);
     }
 
     // Void is compatible with anything (treat as identity)
@@ -152,6 +143,7 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::query::type_check::TYPE_NODE;
     use plotnik_core::Interner;
 
     #[test]

@@ -1,31 +1,22 @@
-//! Symbol interning and definition identifiers.
-//!
-//! `Symbol` and `Interner` are re-exported from `plotnik_core`.
-//! `DefId` identifies named definitions (like `Foo = ...`) by stable index.
-
 pub use plotnik_core::{Interner, Symbol};
 
 /// A lightweight handle to a named definition.
 ///
-/// Assigned during dependency analysis. Enables O(1) lookup of definition
-/// properties without string comparison.
+/// Assigned during dependency analysis.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct DefId(u32);
 
 impl DefId {
-    /// Create a DefId from a raw index. Use only for deserialization.
     #[inline]
     pub fn from_raw(index: u32) -> Self {
         Self(index)
     }
 
-    /// Raw index for serialization/debugging.
     #[inline]
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
-    /// Index for array access.
     #[inline]
     pub fn index(self) -> usize {
         self.0 as usize

@@ -1,70 +1,57 @@
 //! Core type definitions for the type checking pass.
 //!
 //! The type system tracks two orthogonal properties:
-//! - Arity: Whether an expression matches one or many node positions (for field validation)
-//! - TypeFlow: What data flows through an expression (for TypeScript emission)
+//! - Arity: Whether an expression matches one or many node positions.
+//! - TypeFlow: What data flows through an expression.
 
 use std::collections::BTreeMap;
 
 use super::symbol::{DefId, Symbol};
 
-/// Interned type identifier. Types are stored in TypeContext and referenced by ID.
+/// Interned type identifier.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TypeId(pub u32);
 
-/// Void type - produces nothing, transparent
 pub const TYPE_VOID: TypeId = TypeId(0);
-/// Node type - a tree-sitter node
 pub const TYPE_NODE: TypeId = TypeId(1);
-/// String type - extracted text from a node via `:: string`
 pub const TYPE_STRING: TypeId = TypeId(2);
 
 impl TypeId {
     pub fn is_builtin(self) -> bool {
-        self.0 <= 2
+        self.0 <= TYPE_STRING.0
     }
 }
 
 /// The kind of a type, determining its structure.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeKind {
-    /// Produces nothing, transparent to parent scope
+    /// Produces nothing, transparent to parent scope.
     Void,
-    /// A tree-sitter node
+    /// A tree-sitter node.
     Node,
-    /// Extracted text from a node
+    /// Extracted text from a node.
     String,
-    /// User-specified type via `@x :: TypeName`
+    /// User-specified type via `@x :: TypeName`.
     Custom(Symbol),
-    /// Object with named fields (keys are interned Symbols)
+    /// Object with named fields.
     Struct(BTreeMap<Symbol, FieldInfo>),
-    /// Tagged union from labeled alternations (keys are interned Symbols)
+    /// Tagged union from labeled alternations.
     Enum(BTreeMap<Symbol, TypeId>),
-    /// Array type with element type
+    /// Array type with element type.
     Array { element: TypeId, non_empty: bool },
-    /// Optional wrapper
+    /// Optional wrapper.
     Optional(TypeId),
-    /// Forward reference to a recursive type (resolved DefId)
+    /// Forward reference to a recursive type.
     Ref(DefId),
 }
 
 impl TypeKind {
     pub fn is_void(&self) -> bool {
-        matches!(self, TypeKind::Void)
+        matches!(self, Self::Void)
     }
 
     pub fn is_scalar(&self) -> bool {
-        matches!(
-            self,
-            TypeKind::Node
-                | TypeKind::String
-                | TypeKind::Custom(_)
-                | TypeKind::Struct(_)
-                | TypeKind::Enum(_)
-                | TypeKind::Array { .. }
-                | TypeKind::Optional(_)
-                | TypeKind::Ref(_)
-        )
+        !self.is_void()
     }
 }
 
@@ -94,6 +81,57 @@ impl FieldInfo {
         Self {
             optional: true,
             ..self
+        }
+    }
+}
+
+/// Structural arity - whether an expression matches one or many positions.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Arity {
+    /// Exactly one node position.
+    One,
+    /// Multiple sequential positions.
+    Many,
+}
+
+impl Arity {
+    /// Combine arities: Many wins.
+    pub fn combine(self, other: Self) -> Self {
+        if self == Self::One && other == Self::One {
+            return Self::One;
+        }
+        Self::Many
+    }
+}
+
+/// Data flow through an expression.
+#[derive(Clone, Debug)]
+pub enum TypeFlow {
+    /// Transparent, produces nothing.
+    Void,
+    /// Opaque single value that doesn't bubble (scope boundary).
+    Scalar(TypeId),
+    /// Struct type whose fields bubble to parent scope.
+    Bubble(TypeId),
+}
+
+impl TypeFlow {
+    pub fn is_void(&self) -> bool {
+        matches!(self, Self::Void)
+    }
+
+    pub fn is_scalar(&self) -> bool {
+        matches!(self, Self::Scalar(_))
+    }
+
+    pub fn is_bubble(&self) -> bool {
+        matches!(self, Self::Bubble(_))
+    }
+
+    pub fn type_id(&self) -> Option<TypeId> {
+        match self {
+            Self::Void => None,
+            Self::Scalar(id) | Self::Bubble(id) => Some(*id),
         }
     }
 }
@@ -139,85 +177,24 @@ impl TermInfo {
     }
 }
 
-/// Structural arity - whether an expression matches one or many positions.
-///
-/// Used for field validation: `field: expr` requires `expr` to have `Arity::One`.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Arity {
-    /// Exactly one node position
-    One,
-    /// Multiple sequential positions
-    Many,
-}
-
-impl Arity {
-    /// Combine arities: Many wins
-    pub fn combine(self, other: Arity) -> Arity {
-        match (self, other) {
-            (Arity::One, Arity::One) => Arity::One,
-            _ => Arity::Many,
-        }
-    }
-}
-
-/// Data flow through an expression.
-///
-/// Determines what data an expression contributes to output:
-/// - Void: Transparent, produces nothing (used for structural matching)
-/// - Scalar: Opaque single value that doesn't bubble (scope boundary)
-/// - Bubble: Struct type whose fields bubble to parent scope
-#[derive(Clone, Debug)]
-pub enum TypeFlow {
-    /// Transparent, produces nothing
-    Void,
-    /// Opaque single value that doesn't bubble
-    Scalar(TypeId),
-    /// Struct type with fields that bubble to parent scope.
-    /// The TypeId must point to a TypeKind::Struct.
-    Bubble(TypeId),
-}
-
-impl TypeFlow {
-    pub fn is_void(&self) -> bool {
-        matches!(self, TypeFlow::Void)
-    }
-
-    pub fn is_scalar(&self) -> bool {
-        matches!(self, TypeFlow::Scalar(_))
-    }
-
-    pub fn is_bubble(&self) -> bool {
-        matches!(self, TypeFlow::Bubble(_))
-    }
-
-    /// Get the TypeId if this is Scalar or Bubble
-    pub fn type_id(&self) -> Option<TypeId> {
-        match self {
-            TypeFlow::Void => None,
-            TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => Some(*id),
-        }
-    }
-}
-
-/// Quantifier kind for type inference
+/// Quantifier kind for type inference.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum QuantifierKind {
-    /// `?` or `??` - zero or one, no dimensionality added
+    /// `?` or `??` - zero or one.
     Optional,
-    /// `*` or `*?` - zero or more, adds dimensionality
+    /// `*` or `*?` - zero or more.
     ZeroOrMore,
-    /// `+` or `+?` - one or more, adds dimensionality
+    /// `+` or `+?` - one or more.
     OneOrMore,
 }
 
 impl QuantifierKind {
-    /// Whether this quantifier requires strict dimensionality (row capture for internal captures)
+    /// Whether this quantifier requires strict dimensionality (row capture).
     pub fn requires_row_capture(self) -> bool {
-        matches!(self, QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
+        matches!(self, Self::ZeroOrMore | Self::OneOrMore)
     }
 
-    /// Whether the resulting array is non-empty
     pub fn is_non_empty(self) -> bool {
-        matches!(self, QuantifierKind::OneOrMore)
+        matches!(self, Self::OneOrMore)
     }
 }

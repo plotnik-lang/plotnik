@@ -2,8 +2,6 @@
 //!
 //! Computes both structural arity (for field validation) and data flow types
 //! (for TypeScript emission) in a single traversal.
-//!
-//! Provides arity validation and type inference for TypeScript emission.
 
 mod context;
 mod emit_ts;
@@ -26,7 +24,7 @@ use std::collections::BTreeMap;
 use indexmap::IndexMap;
 
 use crate::diagnostics::Diagnostics;
-use crate::parser::ast::Root;
+use crate::parser::ast::{self, Root};
 use crate::query::dependencies::DependencyAnalysis;
 use crate::query::source_map::SourceId;
 use crate::query::symbol_table::{SymbolTable, UNNAMED_DEF};
@@ -44,105 +42,140 @@ pub fn infer_types(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeContext {
-    let mut ctx = TypeContext::new();
+    let ctx = TypeContext::new();
+    InferencePass {
+        ctx,
+        interner,
+        ast_map,
+        symbol_table,
+        dependency_analysis,
+        diag,
+    }
+    .run()
+}
 
-    // Seed def mappings from DependencyAnalysis (avoids re-registration)
-    ctx.seed_defs(
-        dependency_analysis.def_names(),
-        dependency_analysis.name_to_def(),
-    );
+struct InferencePass<'a> {
+    ctx: TypeContext,
+    interner: &'a mut Interner,
+    ast_map: &'a IndexMap<SourceId, Root>,
+    symbol_table: &'a SymbolTable,
+    dependency_analysis: &'a DependencyAnalysis,
+    diag: &'a mut Diagnostics,
+}
 
-    // Mark recursive definitions before inference.
-    // A def is recursive if it's in an SCC with >1 member, or it references itself.
-    for scc in &dependency_analysis.sccs {
-        let is_recursive_scc = if scc.len() > 1 {
-            true
-        } else if let Some(name) = scc.first()
-            && let Some(body) = symbol_table.get(name)
-        {
-            body_references_self(body, name)
-        } else {
-            false
-        };
+impl<'a> InferencePass<'a> {
+    fn run(mut self) -> TypeContext {
+        // Avoid re-registration of definitions
+        self.ctx.seed_defs(
+            self.dependency_analysis.def_names(),
+            self.dependency_analysis.name_to_def(),
+        );
 
-        if is_recursive_scc {
-            for def_name in scc {
-                let sym = interner.intern(def_name);
-                if let Some(def_id) = ctx.get_def_id_sym(sym) {
-                    ctx.mark_recursive(def_id);
+        self.mark_recursion();
+        self.process_sccs();
+        self.process_orphans();
+
+        self.ctx
+    }
+
+    /// Identify and mark recursive definitions.
+    /// A def is recursive if it's in an SCC with >1 member, or it references itself directly.
+    fn mark_recursion(&mut self) {
+        for scc in &self.dependency_analysis.sccs {
+            if self.is_scc_recursive(scc) {
+                for def_name in scc {
+                    let sym = self.interner.intern(def_name);
+                    if let Some(def_id) = self.ctx.get_def_id_sym(sym) {
+                        self.ctx.mark_recursive(def_id);
+                    }
                 }
             }
         }
     }
 
-    // Process definitions in SCC order (leaves first)
-    for scc in &dependency_analysis.sccs {
-        for def_name in scc {
-            // Get the source ID for this definition
-            let Some(source_id) = symbol_table.source_id(def_name) else {
-                continue;
-            };
-
-            let Some(root) = ast_map.get(&source_id) else {
-                continue;
-            };
-
-            // Run inference on this root
-            infer_root(&mut ctx, interner, symbol_table, source_id, root, diag);
-
-            // Register the definition's output type
-            if let Some(body) = symbol_table.get(def_name)
-                && let Some(info) = ctx.get_term_info(body).cloned()
-            {
-                let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                ctx.set_def_type_by_name(interner, def_name, type_id);
+    /// Process definitions in SCC order (leaves first).
+    fn process_sccs(&mut self) {
+        for scc in &self.dependency_analysis.sccs {
+            for def_name in scc {
+                if let Some(source_id) = self.symbol_table.source_id(def_name) {
+                    self.infer_and_register(def_name, source_id);
+                }
             }
         }
     }
 
-    // Handle any definitions not in an SCC (shouldn't happen, but be safe)
-    for (name, source_id, _body) in symbol_table.iter_full() {
-        if ctx.get_def_type_by_name(interner, name).is_some() {
-            continue;
-        }
-
-        let Some(root) = ast_map.get(&source_id) else {
-            continue;
-        };
-
-        infer_root(&mut ctx, interner, symbol_table, source_id, root, diag);
-
-        if let Some(body) = symbol_table.get(name)
-            && let Some(info) = ctx.get_term_info(body).cloned()
-        {
-            let type_id = flow_to_type_id(&mut ctx, &info.flow);
-            ctx.set_def_type_by_name(interner, name, type_id);
+    /// Handle any definitions not in an SCC (safety net).
+    fn process_orphans(&mut self) {
+        for (name, source_id, _body) in self.symbol_table.iter_full() {
+            // Skip if already processed
+            if self.ctx.get_def_type_by_name(self.interner, name).is_some() {
+                continue;
+            }
+            self.infer_and_register(name, source_id);
         }
     }
 
-    ctx
+    fn infer_and_register(&mut self, def_name: &str, source_id: SourceId) {
+        let Some(root) = self.ast_map.get(&source_id) else {
+            return;
+        };
+
+        infer_root(
+            &mut self.ctx,
+            self.interner,
+            self.symbol_table,
+            source_id,
+            root,
+            self.diag,
+        );
+
+        // Register the definition's output type based on the inferred body flow
+        if let Some(body) = self.symbol_table.get(def_name)
+            && let Some(info) = self.ctx.get_term_info(body).cloned()
+        {
+            let type_id = self.flow_to_type_id(&info.flow);
+            self.ctx
+                .set_def_type_by_name(self.interner, def_name, type_id);
+        }
+    }
+
+    fn is_scc_recursive(&self, scc: &[String]) -> bool {
+        if scc.len() > 1 {
+            return true;
+        }
+
+        let Some(name) = scc.first() else {
+            return false;
+        };
+
+        let Some(body) = self.symbol_table.get(name) else {
+            return false;
+        };
+
+        body_references_self(body, name)
+    }
+
+    fn flow_to_type_id(&mut self, flow: &TypeFlow) -> TypeId {
+        match flow {
+            TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
+            TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => *id,
+        }
+    }
 }
 
 /// Check if an expression body contains a reference to the given name.
-fn body_references_self(body: &crate::parser::ast::Expr, name: &str) -> bool {
-    use crate::parser::ast::Ref;
-    for descendant in body.as_cst().descendants() {
-        if let Some(r) = Ref::cast(descendant)
-            && let Some(name_tok) = r.name()
-            && name_tok.text() == name
-        {
-            return true;
-        }
-    }
-    false
-}
+fn body_references_self(body: &ast::Expr, name: &str) -> bool {
+    body.as_cst().descendants().any(|descendant| {
+        let Some(r) = ast::Ref::cast(descendant) else {
+            return false;
+        };
 
-/// Convert a TypeFlow to a TypeId for storage.
-fn flow_to_type_id(ctx: &mut TypeContext, flow: &TypeFlow) -> TypeId {
-    match flow {
-        TypeFlow::Void => ctx.intern_struct(BTreeMap::new()),
-        TypeFlow::Scalar(type_id) | TypeFlow::Bubble(type_id) => *type_id,
-    }
+        let Some(name_tok) = r.name() else {
+            return false;
+        };
+
+        name_tok.text() == name
+    })
 }
 
 /// Get the primary definition name (first non-underscore, or underscore if none).
@@ -152,5 +185,6 @@ pub fn primary_def_name(symbol_table: &SymbolTable) -> &str {
             return name;
         }
     }
+
     UNNAMED_DEF
 }
