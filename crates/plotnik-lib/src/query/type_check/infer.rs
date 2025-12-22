@@ -498,9 +498,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return;
         };
 
-        let Some(fields) = self.ctx.get_struct_fields(*type_id) else {
-            return;
-        };
+        let fields = self
+            .ctx
+            .get_struct_fields(*type_id)
+            .expect("Bubble flow must point to a Struct type");
         if fields.is_empty() {
             return;
         }

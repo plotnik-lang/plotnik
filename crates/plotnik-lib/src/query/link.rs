@@ -338,7 +338,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         parent_range: TextRange,
     ) {
         let valid_fields = self.lang.fields_for_node_type(parent_id);
-        let parent_name = self.lang.node_type_name(parent_id).unwrap_or("(unknown)");
+        let parent_name = self
+            .lang
+            .node_type_name(parent_id)
+            .expect("validated parent_id must have a name");
 
         let mut builder = self
             .diagnostics

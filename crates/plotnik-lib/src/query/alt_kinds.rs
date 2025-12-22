@@ -55,8 +55,8 @@ impl AltKindsValidator<'_> {
 
         let tagged_range = tagged_branch
             .label()
-            .map(|t| t.text_range())
-            .unwrap_or_else(|| branch_range(tagged_branch));
+            .expect("tagged branch found via filter must have label")
+            .text_range();
 
         let untagged_range = branch_range(untagged_branch);
 
