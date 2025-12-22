@@ -34,8 +34,8 @@ pub struct DependencyAnalysis {
 /// Analyze dependencies between definitions.
 ///
 /// Returns the SCCs in reverse topological order.
-pub fn analyze_dependencies(registry: &SymbolTable) -> DependencyAnalysis {
-    let sccs = SccFinder::find(registry);
+pub fn analyze_dependencies(symbol_table: &SymbolTable) -> DependencyAnalysis {
+    let sccs = SccFinder::find(symbol_table);
     DependencyAnalysis { sccs }
 }
 
@@ -43,12 +43,12 @@ pub fn analyze_dependencies(registry: &SymbolTable) -> DependencyAnalysis {
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
     ast_map: &IndexMap<SourceId, Root>,
-    registry: &SymbolTable,
+    symbol_table: &SymbolTable,
     diag: &mut Diagnostics,
 ) {
     let mut validator = RecursionValidator {
         ast_map,
-        registry,
+        symbol_table,
         diag,
     };
     validator.validate(&analysis.sccs);
@@ -56,7 +56,7 @@ pub fn validate_recursion(
 
 struct RecursionValidator<'a, 'd> {
     ast_map: &'a IndexMap<SourceId, Root>,
-    registry: &'a SymbolTable,
+    symbol_table: &'a SymbolTable,
     diag: &'d mut Diagnostics,
 }
 
@@ -72,10 +72,10 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         // A component is recursive if it has >1 node, or 1 node that references itself.
         if scc.len() == 1 {
             let name = &scc[0];
-            let Some(body) = self.registry.get(name) else {
+            let Some(body) = self.symbol_table.get(name) else {
                 return;
             };
-            if !collect_refs(body, self.registry).contains(name.as_str()) {
+            if !collect_refs(body, self.symbol_table).contains(name.as_str()) {
                 return;
             }
         }
@@ -87,7 +87,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         // If NO definition in the SCC has an escape path, the whole group is invalid.
         let has_escape = scc
             .iter()
-            .filter_map(|name| self.registry.get(name))
+            .filter_map(|name| self.symbol_table.get(name))
             .any(|body| expr_has_escape(body, &scc_set));
 
         if !has_escape {
@@ -123,7 +123,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
     ) -> Option<Vec<(SourceId, TextRange, &'s str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
-            if let Some((source_id, body)) = self.registry.get_full(name) {
+            if let Some((source_id, body)) = self.symbol_table.get_full(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
@@ -205,7 +205,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         range: TextRange,
     ) -> Option<(SourceId, String, TextRange)> {
         let name = scc.iter().find(|name| {
-            self.registry
+            self.symbol_table
                 .get(name.as_str())
                 .is_some_and(|body| body.text_range().contains_range(range))
         })?;
@@ -228,7 +228,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 }
 
 struct SccFinder<'a> {
-    registry: &'a SymbolTable,
+    symbol_table: &'a SymbolTable,
     index: usize,
     stack: Vec<&'a str>,
     on_stack: IndexSet<&'a str>,
@@ -238,9 +238,9 @@ struct SccFinder<'a> {
 }
 
 impl<'a> SccFinder<'a> {
-    fn find(registry: &'a SymbolTable) -> Vec<Vec<String>> {
+    fn find(symbol_table: &'a SymbolTable) -> Vec<Vec<String>> {
         let mut finder = Self {
-            registry,
+            symbol_table,
             index: 0,
             stack: Vec::new(),
             on_stack: IndexSet::new(),
@@ -249,7 +249,7 @@ impl<'a> SccFinder<'a> {
             sccs: Vec::new(),
         };
 
-        for name in registry.keys() {
+        for name in symbol_table.keys() {
             if !finder.indices.contains_key(name as &str) {
                 finder.strongconnect(name);
             }
@@ -269,8 +269,8 @@ impl<'a> SccFinder<'a> {
         self.stack.push(name);
         self.on_stack.insert(name);
 
-        if let Some(body) = self.registry.get(name) {
-            let refs = collect_refs(body, self.registry);
+        if let Some(body) = self.symbol_table.get(name) {
+            let refs = collect_refs(body, self.symbol_table);
             for ref_name in refs {
                 if !self.indices.contains_key(ref_name) {
                     self.strongconnect(ref_name);
@@ -424,14 +424,14 @@ fn expr_guarantees_consumption(expr: &Expr) -> bool {
     }
 }
 
-fn collect_refs<'a>(expr: &Expr, registry: &'a SymbolTable) -> IndexSet<&'a str> {
+fn collect_refs<'a>(expr: &Expr, symbol_table: &'a SymbolTable) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
     for descendant in expr.as_cst().descendants() {
         let Some(r) = Ref::cast(descendant) else {
             continue;
         };
         let Some(name_tok) = r.name() else { continue };
-        let Some(key) = registry.keys().find(|&k| k == name_tok.text()) else {
+        let Some(key) = symbol_table.keys().find(|&k| k == name_tok.text()) else {
             continue;
         };
         refs.insert(key);

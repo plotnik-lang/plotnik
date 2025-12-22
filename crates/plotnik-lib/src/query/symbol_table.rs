@@ -74,12 +74,12 @@ impl SymbolTable {
         Some((source_id, expr))
     }
 
-    /// Number of symbols in the registry.
+    /// Number of symbols in the symbol table.
     pub fn len(&self) -> usize {
         self.table.len()
     }
 
-    /// Check if the registry is empty.
+    /// Check if the symbol table is empty.
     pub fn is_empty(&self) -> bool {
         self.table.is_empty()
     }
@@ -108,7 +108,7 @@ pub fn resolve_names(
     ast_map: &IndexMap<SourceId, Root>,
     diag: &mut Diagnostics,
 ) -> SymbolTable {
-    let mut registry = SymbolTable::new();
+    let mut symbol_table = SymbolTable::new();
 
     // Pass 1: collect definitions from all sources
     for (&source_id, ast) in ast_map {
@@ -117,7 +117,7 @@ pub fn resolve_names(
             src,
             source_id,
             diag,
-            registry: &mut registry,
+            symbol_table: &mut symbol_table,
         };
         resolver.visit(ast);
     }
@@ -127,19 +127,19 @@ pub fn resolve_names(
         let mut validator = ReferenceValidator {
             source_id,
             diag,
-            registry: &registry,
+            symbol_table: &symbol_table,
         };
         validator.visit(ast);
     }
 
-    registry
+    symbol_table
 }
 
 struct ReferenceResolver<'q, 'd, 't> {
     src: &'q str,
     source_id: SourceId,
     diag: &'d mut Diagnostics,
-    registry: &'t mut SymbolTable,
+    symbol_table: &'t mut SymbolTable,
 }
 
 impl Visitor for ReferenceResolver<'_, '_, '_> {
@@ -149,7 +149,7 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
         if let Some(token) = def.name() {
             // Named definition: `Name = ...`
             let name = token_src(&token, self.src);
-            if self.registry.contains(name) {
+            if self.symbol_table.contains(name) {
                 self.diag
                     .report(
                         self.source_id,
@@ -159,15 +159,15 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
                     .message(name)
                     .emit();
             } else {
-                self.registry.insert(name, self.source_id, body);
+                self.symbol_table.insert(name, self.source_id, body);
             }
         } else {
             // Unnamed definition: `...` (root expression)
             // Parser already validates multiple unnamed defs; we keep the last one.
-            if self.registry.contains(UNNAMED_DEF) {
-                self.registry.remove(UNNAMED_DEF);
+            if self.symbol_table.contains(UNNAMED_DEF) {
+                self.symbol_table.remove(UNNAMED_DEF);
             }
-            self.registry.insert(UNNAMED_DEF, self.source_id, body);
+            self.symbol_table.insert(UNNAMED_DEF, self.source_id, body);
         }
     }
 }
@@ -175,7 +175,7 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
 struct ReferenceValidator<'d, 't> {
     source_id: SourceId,
     diag: &'d mut Diagnostics,
-    registry: &'t SymbolTable,
+    symbol_table: &'t SymbolTable,
 }
 
 impl Visitor for ReferenceValidator<'_, '_> {
@@ -183,7 +183,7 @@ impl Visitor for ReferenceValidator<'_, '_> {
         let Some(name_token) = r.name() else { return };
         let name = name_token.text();
 
-        if self.registry.contains(name) {
+        if self.symbol_table.contains(name) {
             return;
         }
 
