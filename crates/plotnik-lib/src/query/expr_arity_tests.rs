@@ -182,6 +182,11 @@ fn field_with_seq_error() {
       |
     1 | Q = (call name: {(a) (b)})
       |                 ^^^^^^^^^
+
+    error: field `name` must match exactly one node, not a sequence
+      |
+    1 | Q = (call name: {(a) (b)})
+      |                 ^^^^^^^^^
     ");
 }
 
@@ -195,6 +200,13 @@ fn field_with_ref_to_seq_error() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: field `name` must match exactly one node, not a sequence
+      |
+    1 | X = {(a) (b)}
+      |     --------- defined here
+    2 | Q = (call name: (X))
+      |                 ^^^
+
     error: field `name` must match exactly one node, not a sequence
       |
     1 | X = {(a) (b)}

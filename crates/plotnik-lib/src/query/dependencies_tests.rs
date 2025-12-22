@@ -42,6 +42,11 @@ fn invalid_unguarded_recursion_in_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | E = [(call) (E)]
+      |     ^^^^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | E = [(call) (E)]
@@ -206,6 +211,11 @@ fn invalid_diamond_dependency_recursion() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | A = (a [(B) (C)])
+      |        ^^^^^^^^^
+
     error: infinite recursion: cycle has no escape path
       |
     1 | A = (a [(B) (C)])
@@ -343,6 +353,11 @@ fn invalid_direct_left_recursion_in_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | E = [(E) (x)]
+      |     ^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | E = [(E) (x)]
@@ -359,6 +374,11 @@ fn invalid_direct_right_recursion_in_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | E = [(x) (E)]
+      |     ^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | E = [(x) (E)]
@@ -393,6 +413,11 @@ fn invalid_unguarded_left_recursion_branch() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | A = [(A) 'escape']
+      |     ^^^^^^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) 'escape']
@@ -411,6 +436,11 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | A = [(A) _]
+      |     ^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) _]
@@ -429,6 +459,11 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | A = [(A) (leaf)]
+      |     ^^^^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | A = [(A) (leaf)]
@@ -502,6 +537,15 @@ fn invalid_simple_unguarded_recursion() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 |   A = [
+      |  _____^
+    2 | |   (foo)
+    3 | |   (A)
+    4 | | ]
+      | |_^
+
     error: infinite recursion: cycle consumes no input
       |
     3 |   (A)
@@ -521,6 +565,11 @@ fn invalid_unguarded_mutual_recursion_chain() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: incompatible types: scalar type in untagged alternation; use tagged alternation instead
+      |
+    1 | A = [(B) (x)]
+      |     ^^^^^^^^^
+
     error: infinite recursion: cycle consumes no input
       |
     1 | A = [(B) (x)]

@@ -74,13 +74,29 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Named node: matches one position, produces nothing
+    /// Named node: matches one position, bubbles up child captures
     fn infer_named_node(&mut self, node: &NamedNode) -> TermInfo {
-        // Recursively infer children first
+        let mut merged_fields: BTreeMap<String, FieldInfo> = BTreeMap::new();
+
         for child in node.children() {
-            self.infer_expr(&child);
+            let child_info = self.infer_expr(&child);
+
+            if let TypeFlow::Fields(fields) = child_info.flow {
+                for (name, info) in fields {
+                    if !merged_fields.contains_key(&name) {
+                        merged_fields.insert(name, info);
+                    }
+                }
+            }
         }
-        TermInfo::new(Arity::One, TypeFlow::Void)
+
+        let flow = if merged_fields.is_empty() {
+            TypeFlow::Void
+        } else {
+            TypeFlow::Fields(merged_fields)
+        };
+
+        TermInfo::new(Arity::One, flow)
     }
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing
@@ -88,7 +104,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(Arity::One, TypeFlow::Void)
     }
 
-    /// Reference: delegate arity, but refs are scope boundaries so produce Scalar(Ref)
+    /// Reference: transparent - propagate body's flow and arity
     fn infer_ref(&mut self, r: &Ref) -> TermInfo {
         let Some(name_tok) = r.name() else {
             return TermInfo::void();
@@ -101,12 +117,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return TermInfo::void();
         };
 
-        // Infer the body to get its arity
-        let body_info = self.infer_expr(body);
-
-        // Refs are scope boundaries - they produce a Scalar(Ref) regardless of what's inside
-        let ref_type = self.ctx.intern_type(TypeKind::Ref(name.to_string()));
-        TermInfo::new(body_info.arity, TypeFlow::Scalar(ref_type))
+        // Refs are transparent - propagate body's flow and arity
+        self.infer_expr(body)
     }
 
     /// Sequence: One if 0-1 children, else Many; merge children's fields
@@ -264,7 +276,21 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             );
         };
 
-        let inner_info = self.infer_expr(&inner);
+        // Special handling: if inner is a * or + quantifier, this capture serves as
+        // the row capture, so we skip strict dimensionality check
+        let inner_info = if let Expr::QuantifiedExpr(q) = &inner {
+            let quantifier = self.parse_quantifier(q);
+            if matches!(
+                quantifier,
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore
+            ) {
+                self.infer_quantified_expr_as_row(q)
+            } else {
+                self.infer_expr(&inner)
+            }
+        } else {
+            self.infer_expr(&inner)
+        };
 
         // Transform based on inner's flow
         let captured_type = match &inner_info.flow {
@@ -294,6 +320,19 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Quantified expression: applies quantifier to inner's flow
     fn infer_quantified_expr(&mut self, quant: &QuantifiedExpr) -> TermInfo {
+        self.infer_quantified_expr_impl(quant, false)
+    }
+
+    /// Quantified expression when used as a row capture (skip strict dimensionality check)
+    fn infer_quantified_expr_as_row(&mut self, quant: &QuantifiedExpr) -> TermInfo {
+        self.infer_quantified_expr_impl(quant, true)
+    }
+
+    fn infer_quantified_expr_impl(
+        &mut self,
+        quant: &QuantifiedExpr,
+        is_row_capture: bool,
+    ) -> TermInfo {
         let Some(inner) = quant.inner() else {
             return TermInfo::void();
         };
@@ -322,11 +361,20 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             }
 
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                // * and + require strict dimensionality
-                self.check_strict_dimensionality(quant, &inner_info);
+                // * and + require strict dimensionality (unless this is a row capture)
+                if !is_row_capture {
+                    self.check_strict_dimensionality(quant, &inner_info);
+                }
 
                 let flow = match inner_info.flow {
-                    TypeFlow::Void => TypeFlow::Void,
+                    TypeFlow::Void => {
+                        // Scalar list: void inner becomes array of Node
+                        let array_type = self.ctx.intern_type(TypeKind::Array {
+                            element: TYPE_NODE,
+                            non_empty: quantifier.is_non_empty(),
+                        });
+                        TypeFlow::Scalar(array_type)
+                    }
                     TypeFlow::Scalar(t) => {
                         // Scalar becomes array
                         let array_type = self.ctx.intern_type(TypeKind::Array {
@@ -337,7 +385,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                     }
                     TypeFlow::Fields(fields) => {
                         // Fields with * or + and no row capture is an error
-                        // (already reported by check_strict_dimensionality)
+                        // (already reported by check_strict_dimensionality if !is_row_capture)
                         // Return array of struct as best-effort
                         let struct_type = self.ctx.intern_type(TypeKind::Struct(fields));
                         let array_type = self.ctx.intern_type(TypeKind::Array {
