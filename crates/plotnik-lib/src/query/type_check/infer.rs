@@ -535,19 +535,6 @@ impl Visitor for InferenceVisitor<'_, '_> {
     }
 }
 
-/// Run inference on a single definition.
-pub fn infer_definition(
-    ctx: &mut TypeContext,
-    symbol_table: &SymbolTable,
-    diag: &mut Diagnostics,
-    source_id: SourceId,
-    def_name: &str,
-) -> Option<TermInfo> {
-    let body = symbol_table.get(def_name)?;
-    let mut visitor = InferenceVisitor::new(ctx, symbol_table, diag, source_id);
-    Some(visitor.infer_expr(body))
-}
-
 /// Run inference on all definitions in a root.
 pub fn infer_root(
     ctx: &mut TypeContext,

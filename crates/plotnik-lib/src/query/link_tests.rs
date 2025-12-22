@@ -319,10 +319,10 @@ fn wildcard_node_skips_validation() {
 
 #[test]
 fn def_reference_with_link() {
+    // Test linking with definition reference as scalar list (no internal captures)
     let input = indoc! {r#"
-        Func = (function_declaration
-            name: (identifier) @name) @fn
-        Q = (program (Func)+)
+        Func = (function_declaration)
+        Q = (program (Func)+ @funcs)
     "#};
 
     Query::expect_valid_linking(input, &LANG);

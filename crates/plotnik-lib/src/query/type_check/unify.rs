@@ -131,66 +131,6 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: &str) -> Result<TypeId, UnifyErro
     })
 }
 
-/// Check if two TypeKinds are structurally compatible.
-///
-/// Used for deeper compatibility checking when TypeIds differ
-/// but the underlying structures might be equivalent.
-pub fn types_compatible(a: &TypeKind, b: &TypeKind) -> bool {
-    match (a, b) {
-        (TypeKind::Void, TypeKind::Void) => true,
-        (TypeKind::Node, TypeKind::Node) => true,
-        (TypeKind::String, TypeKind::String) => true,
-        (TypeKind::Custom(a), TypeKind::Custom(b)) => a == b,
-        (TypeKind::Ref(a), TypeKind::Ref(b)) => a == b,
-
-        (TypeKind::Optional(a), TypeKind::Optional(b)) => a == b,
-
-        (
-            TypeKind::Array {
-                element: a_elem,
-                non_empty: a_ne,
-            },
-            TypeKind::Array {
-                element: b_elem,
-                non_empty: b_ne,
-            },
-        ) => {
-            // Elements must match; looser cardinality wins (non_empty false wins)
-            a_elem == b_elem && (!a_ne || !b_ne || a_ne == b_ne)
-        }
-
-        (TypeKind::Struct(a), TypeKind::Struct(b)) => {
-            // Must have identical field sets
-            if a.len() != b.len() {
-                return false;
-            }
-            a.iter().all(|(k, a_info)| {
-                b.get(k)
-                    .map(|b_info| a_info.type_id == b_info.type_id)
-                    .unwrap_or(false)
-            })
-        }
-
-        (TypeKind::Enum(a), TypeKind::Enum(b)) => {
-            // Must have identical variant sets
-            if a.len() != b.len() {
-                return false;
-            }
-            a.iter()
-                .all(|(k, a_ty)| b.get(k).map(|b_ty| a_ty == b_ty).unwrap_or(false))
-        }
-
-        _ => false,
-    }
-}
-
-/// Merge array cardinalities: looser cardinality wins.
-///
-/// `+` ∪ `*` → `*` (because branch could be empty)
-pub fn merge_array_cardinality(a_non_empty: bool, b_non_empty: bool) -> bool {
-    a_non_empty && b_non_empty
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
