@@ -79,17 +79,19 @@ impl<'a> TsEmitter<'a> {
     pub fn emit(mut self) -> String {
         self.prepare_emission();
 
-        // Collect definition names for lookup
-        let def_names: HashMap<TypeId, String> = self
-            .ctx
-            .iter_def_types()
-            .map(|(def_id, type_id)| {
-                (
-                    type_id,
-                    self.ctx.def_name(self.interner, def_id).to_string(),
-                )
-            })
-            .collect();
+        // Collect all definitions, tracking primary name per TypeId and aliases
+        let mut primary_names: HashMap<TypeId, String> = HashMap::new();
+        let mut aliases: Vec<(String, TypeId)> = Vec::new();
+
+        for (def_id, type_id) in self.ctx.iter_def_types() {
+            let name = self.ctx.def_name(self.interner, def_id).to_string();
+            if primary_names.contains_key(&type_id) {
+                // This TypeId already has a primary definition; this becomes an alias
+                aliases.push((name, type_id));
+            } else {
+                primary_names.insert(type_id, name);
+            }
+        }
 
         // Collect all reachable types starting from definitions
         let mut to_emit = HashSet::new();
@@ -99,10 +101,17 @@ impl<'a> TsEmitter<'a> {
 
         // Emit in topological order
         for type_id in self.sort_topologically(to_emit) {
-            if let Some(def_name) = def_names.get(&type_id) {
+            if let Some(def_name) = primary_names.get(&type_id) {
                 self.emit_type_definition(def_name, type_id);
             } else {
                 self.emit_generated_or_custom(type_id);
+            }
+        }
+
+        // Emit type aliases for definitions that share a TypeId with another definition
+        for (alias_name, type_id) in aliases {
+            if let Some(primary_name) = primary_names.get(&type_id) {
+                self.emit_type_alias(&alias_name, primary_name);
             }
         }
 
@@ -453,6 +462,14 @@ impl<'a> TsEmitter<'a> {
         let export = if self.config.export { "export " } else { "" };
         self.output
             .push_str(&format!("{}type {} = Node;\n\n", export, name));
+    }
+
+    fn emit_type_alias(&mut self, alias_name: &str, target_name: &str) {
+        let export = if self.config.export { "export " } else { "" };
+        self.output.push_str(&format!(
+            "{}type {} = {};\n\n",
+            export, alias_name, target_name
+        ));
     }
 
     fn emit_node_interface(&mut self) {

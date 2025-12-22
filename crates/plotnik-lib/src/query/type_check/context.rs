@@ -211,11 +211,15 @@ impl TypeContext {
         self.types.len()
     }
 
-    /// Iterate over all definition types as (DefId, TypeId).
+    /// Iterate over all definition types as (DefId, TypeId) in DefId order.
+    /// DefId order corresponds to SCC processing order (leaves first).
     pub fn iter_def_types(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
-        self.def_types
-            .iter()
-            .map(|(&def_id, &type_id)| (def_id, type_id))
+        (0..self.def_names.len()).filter_map(|i| {
+            let def_id = DefId::from_raw(i as u32);
+            self.def_types
+                .get(&def_id)
+                .map(|&type_id| (def_id, type_id))
+        })
     }
 
     /// Number of registered definitions.

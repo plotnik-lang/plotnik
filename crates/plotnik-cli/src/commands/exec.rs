@@ -52,7 +52,9 @@ pub fn run(args: ExecArgs) {
 
     let _ = (args.pretty, args.verbose_nodes, args.check, args.entry);
 
-    todo!("IR emission and query execution not yet implemented")
+    eprintln!("error: query execution not yet implemented");
+    eprintln!("hint: use `plotnik types` to generate TypeScript types from queries");
+    std::process::exit(1);
 }
 
 fn load_query(args: &ExecArgs) -> String {

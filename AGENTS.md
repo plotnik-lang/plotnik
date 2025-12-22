@@ -154,7 +154,7 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, docs, exec, langs, types)
+    src/commands/      # Subcommands (debug, exec, langs, types)
   plotnik-core/        # Common code
   plotnik-lib/         # Plotnik as library
     src/
@@ -172,23 +172,44 @@ docs/
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-| Command | Purpose                         |
-| ------- | ------------------------------- |
-| `debug` | Inspect queries and source ASTs |
-| `exec`  | Execute query, output JSON      |
-| `types` | Generate TypeScript types       |
-| `langs` | List supported languages        |
+| Command | Purpose                         | Status  |
+| ------- | ------------------------------- | ------- |
+| `debug` | Inspect queries and source ASTs | Working |
+| `types` | Generate TypeScript types       | Working |
+| `langs` | List supported languages        | Working |
+| `exec`  | Execute query, output JSON      | Not yet |
 
-Common: `-q/--query <Q>`, `--query-file <F>`, `--source <S>`, `-s/--source-file <F>`, `-l/--lang <L>`
+## debug
 
-`debug`: `--only-symbols`, `--cst`, `--raw`, `--spans`, `--arities`, `--graph`, `--graph-raw`, `--types`
-`exec`: `--pretty`, `--verbose-nodes`, `--check`, `--entry <NAME>`
-`types`: `--format <F>`, `--root-type <N>`, `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <F>`
+Inspect query AST/CST or parse source files with tree-sitter.
 
 ```sh
-cargo run -p plotnik-cli -- debug -q '(identifier) @id' --graph -l javascript
-cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s app.js --pretty
-cargo run -p plotnik-cli -- types -q '(identifier) @id' -l javascript -o types.d.ts
+cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id'
+cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --only-symbols
+cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --types
+cargo run -p plotnik-cli -- debug -s app.ts
+cargo run -p plotnik-cli -- debug -s app.ts --raw
+```
+
+Options: `--only-symbols`, `--cst`, `--raw`, `--spans`, `--arities`, `--types`
+
+## types
+
+Generate TypeScript type definitions from a query. Requires `-l/--lang` to validate node types against grammar.
+
+```sh
+cargo run -p plotnik-cli -- types -q 'Test = (identifier) @id' -l javascript
+cargo run -p plotnik-cli -- types --query-file query.ptk -l typescript -o types.d.ts
+```
+
+Options: `--root-type <N>`, `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <F>`
+
+## langs
+
+List supported tree-sitter languages.
+
+```sh
+cargo run -p plotnik-cli -- langs
 ```
 
 # Coding Rules

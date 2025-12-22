@@ -40,19 +40,12 @@ pub fn run(args: DebugArgs) {
         None
     };
 
-    let mut query = query_source.as_ref().map(|src| {
+    let query = query_source.as_ref().map(|src| {
         Query::try_from(src.as_str()).unwrap_or_else(|e| {
             eprintln!("error: {}", e);
             std::process::exit(1);
         })
     });
-
-    // Auto-link when --lang is provided with a query
-    if args.lang.is_some()
-        && let Some(ref mut _q) = query
-    {
-        unimplemented!();
-    }
 
     let show_query = has_query_input && !args.symbols && !args.graph && !args.types;
     let show_source = has_source_input;
@@ -81,11 +74,17 @@ pub fn run(args: DebugArgs) {
         );
     }
 
-    // Build graph if needed for --graph, --graph-raw, or --types
-    if (args.graph || args.graph_raw || args.types)
-        && let Some(_) = query.take()
+    if args.graph || args.graph_raw {
+        eprintln!("error: --graph and --graph-raw are not yet implemented");
+        std::process::exit(1);
+    }
+
+    if args.types
+        && let Some(ref q) = query
     {
-        unimplemented!();
+        let output =
+            plotnik_lib::query::type_check::emit_typescript(q.type_context(), q.interner());
+        print!("{}", output);
     }
 
     if show_source {
