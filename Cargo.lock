@@ -73,9 +73,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-ada"
-version = "2.3.2"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31db007efb22604df412c2a7da24ea6cd4d9700e561b1dab23dc9038233040e6"
+checksum = "1661fe8e79f55aba15574820a83d9e0d219058d8bdaedabe238382fa93e329b8"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -935,9 +935,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-sysroot"
-version = "2.3.2"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b6551bc2ed104f8a79c0d518a286af5ad6c498bfb243780fa17d6c192150851"
+checksum = "76f1e8fb3a4d3de99747a999a9da49e023a1dd4742d0be17d72c606d51d2e0f6"
 dependencies = [
  "cc",
  "dlmalloc",
@@ -1305,7 +1305,7 @@ checksum = "6738d2e996274e499bc7b0d693c858b7720b9cd2543a0643a3087e6cb0a4fa16"
 dependencies = [
  "cfg-if",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1327,7 +1327,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1835,7 +1835,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1948,7 +1948,7 @@ dependencies = [
  "getrandom",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
