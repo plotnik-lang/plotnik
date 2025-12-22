@@ -4,12 +4,14 @@
 //! Symbols are interned to enable cheap string comparison.
 //! TermInfo is cached per-expression to avoid recomputation.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::parser::ast::Expr;
 
 use super::symbol::{DefId, Interner, Symbol};
-use super::types::{Arity, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeId, TypeKind};
+use super::types::{
+    Arity, FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeId, TypeKind,
+};
 
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Debug, Clone)]
@@ -110,6 +112,26 @@ impl TypeContext {
     pub fn get_or_intern(&mut self, kind: TypeKind) -> (TypeId, &TypeKind) {
         let id = self.intern_type(kind);
         (id, &self.types[id.0 as usize])
+    }
+
+    /// Intern a struct type from fields.
+    pub fn intern_struct(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
+        self.intern_type(TypeKind::Struct(fields))
+    }
+
+    /// Intern a struct type with a single field.
+    pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
+        let mut fields = BTreeMap::new();
+        fields.insert(name, info);
+        self.intern_type(TypeKind::Struct(fields))
+    }
+
+    /// Get struct fields from a TypeId, if it points to a Struct.
+    pub fn get_struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
+        match self.get_type(id)? {
+            TypeKind::Struct(fields) => Some(fields),
+            _ => None,
+        }
     }
 
     // ========== Term info cache ==========

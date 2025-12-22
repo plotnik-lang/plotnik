@@ -5,8 +5,9 @@
 
 use std::collections::BTreeMap;
 
+use super::context::TypeContext;
 use super::symbol::Symbol;
-use super::types::{FieldInfo, TYPE_NODE, TypeFlow, TypeId};
+use super::types::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeFlow, TypeId};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
@@ -36,18 +37,25 @@ impl UnifyError {
 ///
 /// Rules:
 /// - Void ∪ Void → Void
-/// - Void ∪ Fields(f) → Fields(make_all_optional(f))
-/// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
+/// - Void ∪ Bubble(s) → Bubble(make_all_optional(s))
+/// - Bubble(a) ∪ Bubble(b) → Bubble(merge_fields(a, b))
 /// - Scalar in untagged → Error (use tagged alternation instead)
-pub fn unify_flow(a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
+pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
     match (a, b) {
         (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
 
-        (TypeFlow::Void, TypeFlow::Fields(f)) | (TypeFlow::Fields(f), TypeFlow::Void) => {
-            Ok(TypeFlow::Fields(make_all_optional(f)))
+        (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
+            let fields = ctx.get_struct_fields(id).cloned().unwrap_or_default();
+            let optional_fields = make_all_optional(fields);
+            Ok(TypeFlow::Bubble(ctx.intern_struct(optional_fields)))
         }
 
-        (TypeFlow::Fields(a), TypeFlow::Fields(b)) => Ok(TypeFlow::Fields(merge_fields(a, b)?)),
+        (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
+            let a_fields = ctx.get_struct_fields(a_id).cloned().unwrap_or_default();
+            let b_fields = ctx.get_struct_fields(b_id).cloned().unwrap_or_default();
+            let merged = merge_fields(a_fields, b_fields)?;
+            Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
+        }
 
         // Scalars can't appear in untagged alternations
         (TypeFlow::Scalar(_), _) | (_, TypeFlow::Scalar(_)) => Err(UnifyError::ScalarInUntagged),
@@ -55,13 +63,16 @@ pub fn unify_flow(a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
 }
 
 /// Unify multiple flows from alternation branches.
-pub fn unify_flows(flows: impl IntoIterator<Item = TypeFlow>) -> Result<TypeFlow, UnifyError> {
+pub fn unify_flows(
+    ctx: &mut TypeContext,
+    flows: impl IntoIterator<Item = TypeFlow>,
+) -> Result<TypeFlow, UnifyError> {
     let mut iter = flows.into_iter();
     let Some(first) = iter.next() else {
         return Ok(TypeFlow::Void);
     };
 
-    iter.try_fold(first, unify_flow)
+    iter.try_fold(first, |acc, flow| unify_flow(ctx, acc, flow))
 }
 
 /// Make all fields in a map optional.
@@ -126,6 +137,14 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
         return Ok(TYPE_NODE);
     }
 
+    // Void is compatible with anything (treat as identity)
+    if a == TYPE_VOID {
+        return Ok(b);
+    }
+    if b == TYPE_VOID {
+        return Ok(a);
+    }
+
     // Type mismatch
     Err(UnifyError::IncompatibleTypes { field })
 }
@@ -134,62 +153,61 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
 mod tests {
     use super::*;
 
-    fn make_symbol(n: u32) -> Symbol {
-        // For tests, create symbols directly. In real code, use Interner.
-        // This is safe because tests don't need actual string resolution.
-        unsafe { std::mem::transmute(n) }
-    }
-
     #[test]
     fn unify_void_void() {
-        let result = unify_flow(TypeFlow::Void, TypeFlow::Void);
+        let mut ctx = TypeContext::new();
+        let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Void);
         assert!(matches!(result, Ok(TypeFlow::Void)));
     }
 
     #[test]
-    fn unify_void_fields() {
-        let x = make_symbol(0);
-        let mut fields = BTreeMap::new();
-        fields.insert(x, FieldInfo::required(TYPE_NODE));
+    fn unify_void_bubble() {
+        let mut ctx = TypeContext::new();
+        let x = ctx.intern("x");
+        let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 
-        let result = unify_flow(TypeFlow::Void, TypeFlow::Fields(fields)).unwrap();
+        let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Bubble(struct_id)).unwrap();
 
         match result {
-            TypeFlow::Fields(f) => {
-                assert!(f.get(&x).unwrap().optional);
+            TypeFlow::Bubble(id) => {
+                let fields = ctx.get_struct_fields(id).unwrap();
+                assert!(fields.get(&x).unwrap().optional);
             }
-            _ => panic!("expected Fields"),
+            _ => panic!("expected Bubble"),
         }
     }
 
     #[test]
-    fn unify_fields_merge() {
-        let x = make_symbol(0);
-        let y = make_symbol(1);
+    fn unify_bubble_merge() {
+        let mut ctx = TypeContext::new();
+        let x = ctx.intern("x");
+        let y = ctx.intern("y");
 
-        let mut a = BTreeMap::new();
-        a.insert(x, FieldInfo::required(TYPE_NODE));
+        let a_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 
-        let mut b = BTreeMap::new();
-        b.insert(x, FieldInfo::required(TYPE_NODE));
-        b.insert(y, FieldInfo::required(TYPE_NODE));
+        let mut b_fields = BTreeMap::new();
+        b_fields.insert(x, FieldInfo::required(TYPE_NODE));
+        b_fields.insert(y, FieldInfo::required(TYPE_NODE));
+        let b_id = ctx.intern_struct(b_fields);
 
-        let result = unify_flow(TypeFlow::Fields(a), TypeFlow::Fields(b)).unwrap();
+        let result = unify_flow(&mut ctx, TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)).unwrap();
 
         match result {
-            TypeFlow::Fields(f) => {
+            TypeFlow::Bubble(id) => {
+                let fields = ctx.get_struct_fields(id).unwrap();
                 // x is in both, so required
-                assert!(!f.get(&x).unwrap().optional);
+                assert!(!fields.get(&x).unwrap().optional);
                 // y only in b, so optional
-                assert!(f.get(&y).unwrap().optional);
+                assert!(fields.get(&y).unwrap().optional);
             }
-            _ => panic!("expected Fields"),
+            _ => panic!("expected Bubble"),
         }
     }
 
     #[test]
     fn unify_scalar_error() {
-        let result = unify_flow(TypeFlow::Scalar(TYPE_NODE), TypeFlow::Void);
+        let mut ctx = TypeContext::new();
+        let result = unify_flow(&mut ctx, TypeFlow::Scalar(TYPE_NODE), TypeFlow::Void);
         assert!(matches!(result, Err(UnifyError::ScalarInUntagged)));
     }
 }

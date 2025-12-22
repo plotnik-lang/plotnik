@@ -96,9 +96,8 @@ pub fn infer_types(
 /// Convert a TypeFlow to a TypeId for storage.
 fn flow_to_type_id(ctx: &mut TypeContext, flow: &TypeFlow) -> TypeId {
     match flow {
-        TypeFlow::Void => ctx.intern_type(TypeKind::Struct(BTreeMap::new())),
-        TypeFlow::Scalar(type_id) => *type_id,
-        TypeFlow::Fields(fields) => ctx.intern_type(TypeKind::Struct(fields.clone())),
+        TypeFlow::Void => ctx.intern_struct(BTreeMap::new()),
+        TypeFlow::Scalar(type_id) | TypeFlow::Bubble(type_id) => *type_id,
     }
 }
 

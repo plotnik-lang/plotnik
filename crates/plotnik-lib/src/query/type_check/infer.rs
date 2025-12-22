@@ -83,9 +83,11 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         for child in node.children() {
             let child_info = self.infer_expr(&child);
 
-            if let TypeFlow::Fields(fields) = child_info.flow {
+            if let TypeFlow::Bubble(type_id) = child_info.flow
+                && let Some(fields) = self.ctx.get_struct_fields(type_id)
+            {
                 for (name, info) in fields {
-                    merged_fields.entry(name).or_insert(info);
+                    merged_fields.entry(*name).or_insert(*info);
                 }
             }
         }
@@ -93,7 +95,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let flow = if merged_fields.is_empty() {
             TypeFlow::Void
         } else {
-            TypeFlow::Fields(merged_fields)
+            TypeFlow::Bubble(self.ctx.intern_struct(merged_fields))
         };
 
         TermInfo::new(Arity::One, flow)
@@ -140,8 +142,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         for child in &children {
             let child_info = self.infer_expr(child);
 
-            if let TypeFlow::Fields(fields) = child_info.flow {
-                for (name, info) in fields {
+            if let TypeFlow::Bubble(type_id) = child_info.flow
+                && let Some(fields) = self.ctx.get_struct_fields(type_id)
+            {
+                for (&name, &info) in fields {
                     use std::collections::btree_map::Entry;
                     match merged_fields.entry(name) {
                         Entry::Vacant(e) => {
@@ -168,7 +172,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let flow = if merged_fields.is_empty() {
             TypeFlow::Void
         } else {
-            TypeFlow::Fields(merged_fields)
+            TypeFlow::Bubble(self.ctx.intern_struct(merged_fields))
         };
 
         TermInfo::new(arity, flow)
@@ -236,7 +240,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
 
         // Unify all flows
-        let unified_flow = match unify_flows(flows) {
+        let unified_flow = match unify_flows(self.ctx, flows) {
             Ok(flow) => flow,
             Err(err) => {
                 self.report_unify_error(alt.text_range(), &err);
@@ -276,7 +280,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let type_id = annotation_type.unwrap_or(TYPE_NODE);
             return TermInfo::new(
                 Arity::One,
-                TypeFlow::single_field(capture_name, FieldInfo::required(type_id)),
+                TypeFlow::Bubble(
+                    self.ctx
+                        .intern_single_field(capture_name, FieldInfo::required(type_id)),
+                ),
             );
         };
 
@@ -305,13 +312,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 // @name on Scalar → capture that scalar type
                 annotation_type.unwrap_or(*type_id)
             }
-            TypeFlow::Fields(fields) => {
-                // @name on Fields → create Struct from fields, capture that
-                if let Some(annotated) = annotation_type {
-                    annotated
-                } else {
-                    self.ctx.intern_type(TypeKind::Struct(fields.clone()))
-                }
+            TypeFlow::Bubble(type_id) => {
+                // @name on Bubble → capture the struct type directly
+                annotation_type.unwrap_or(*type_id)
             }
         };
 
@@ -323,7 +326,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
         TermInfo::new(
             inner_info.arity,
-            TypeFlow::single_field(capture_name, field_info),
+            TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field_info)),
         )
     }
 
@@ -357,13 +360,18 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                     TypeFlow::Scalar(t) => {
                         TypeFlow::Scalar(self.ctx.intern_type(TypeKind::Optional(t)))
                     }
-                    TypeFlow::Fields(fields) => {
+                    TypeFlow::Bubble(type_id) => {
                         // Make all fields optional
+                        let fields = self
+                            .ctx
+                            .get_struct_fields(type_id)
+                            .cloned()
+                            .unwrap_or_default();
                         let optional_fields = fields
                             .into_iter()
                             .map(|(k, v)| (k, v.make_optional()))
                             .collect();
-                        TypeFlow::Fields(optional_fields)
+                        TypeFlow::Bubble(self.ctx.intern_struct(optional_fields))
                     }
                 };
                 TermInfo::new(inner_info.arity, flow)
@@ -392,11 +400,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                         });
                         TypeFlow::Scalar(array_type)
                     }
-                    TypeFlow::Fields(fields) => {
+                    TypeFlow::Bubble(struct_type) => {
                         // Fields with * or + and no row capture is an error
                         // (already reported by check_strict_dimensionality if !is_row_capture)
                         // Return array of struct as best-effort
-                        let struct_type = self.ctx.intern_type(TypeKind::Struct(fields));
                         let array_type = self.ctx.intern_type(TypeKind::Array {
                             element: struct_type,
                             non_empty: quantifier.is_non_empty(),
@@ -449,7 +456,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// Check strict dimensionality rule for * and + quantifiers.
     fn check_strict_dimensionality(&mut self, quant: &QuantifiedExpr, inner_info: &TermInfo) {
         // If inner has fields (captures), that's a violation
-        if let TypeFlow::Fields(fields) = &inner_info.flow
+        if let TypeFlow::Bubble(type_id) = &inner_info.flow
+            && let Some(fields) = self.ctx.get_struct_fields(*type_id)
             && !fields.is_empty()
         {
             let op = quant
@@ -494,9 +502,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// Convert a TypeFlow to a TypeId for storage in enum variants, etc.
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
-            TypeFlow::Void => self.ctx.intern_type(TypeKind::Struct(BTreeMap::new())),
-            TypeFlow::Scalar(t) => *t,
-            TypeFlow::Fields(fields) => self.ctx.intern_type(TypeKind::Struct(fields.clone())),
+            TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
+            TypeFlow::Scalar(t) | TypeFlow::Bubble(t) => *t,
         }
     }
 

@@ -131,10 +131,10 @@ impl TermInfo {
         }
     }
 
-    pub fn fields(arity: Arity, fields: BTreeMap<Symbol, FieldInfo>) -> Self {
+    pub fn bubble(arity: Arity, struct_type_id: TypeId) -> Self {
         Self {
             arity,
-            flow: TypeFlow::Fields(fields),
+            flow: TypeFlow::Bubble(struct_type_id),
         }
     }
 }
@@ -164,16 +164,17 @@ impl Arity {
 ///
 /// Determines what data an expression contributes to output:
 /// - Void: Transparent, produces nothing (used for structural matching)
-/// - Scalar: Opaque single value (captures, refs create scope boundaries)
-/// - Fields: Transparent field contributions that bubble to parent
+/// - Scalar: Opaque single value that doesn't bubble (scope boundary)
+/// - Bubble: Struct type whose fields bubble to parent scope
 #[derive(Clone, Debug)]
 pub enum TypeFlow {
     /// Transparent, produces nothing
     Void,
     /// Opaque single value that doesn't bubble
     Scalar(TypeId),
-    /// Transparent fields that bubble to parent scope (keys are interned Symbols)
-    Fields(BTreeMap<Symbol, FieldInfo>),
+    /// Struct type with fields that bubble to parent scope.
+    /// The TypeId must point to a TypeKind::Struct.
+    Bubble(TypeId),
 }
 
 impl TypeFlow {
@@ -185,31 +186,16 @@ impl TypeFlow {
         matches!(self, TypeFlow::Scalar(_))
     }
 
-    pub fn is_fields(&self) -> bool {
-        matches!(self, TypeFlow::Fields(_))
+    pub fn is_bubble(&self) -> bool {
+        matches!(self, TypeFlow::Bubble(_))
     }
 
-    pub fn has_captures(&self) -> bool {
+    /// Get the TypeId if this is Scalar or Bubble
+    pub fn type_id(&self) -> Option<TypeId> {
         match self {
-            TypeFlow::Void => false,
-            TypeFlow::Scalar(_) => false,
-            TypeFlow::Fields(f) => !f.is_empty(),
+            TypeFlow::Void => None,
+            TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => Some(*id),
         }
-    }
-
-    /// Get field symbols if this is a Fields flow
-    pub fn field_symbols(&self) -> Option<Vec<Symbol>> {
-        match self {
-            TypeFlow::Fields(f) => Some(f.keys().copied().collect()),
-            _ => None,
-        }
-    }
-
-    /// Create a single-field flow
-    pub fn single_field(name: Symbol, info: FieldInfo) -> Self {
-        let mut fields = BTreeMap::new();
-        fields.insert(name, info);
-        TypeFlow::Fields(fields)
     }
 }
 
