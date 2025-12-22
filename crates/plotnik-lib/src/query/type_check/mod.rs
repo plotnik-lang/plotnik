@@ -3,7 +3,7 @@
 //! Computes both structural arity (for field validation) and data flow types
 //! (for TypeScript emission) in a single traversal.
 //!
-//! Replaces the previous `expr_arity.rs` with a more comprehensive type system.
+//! Provides arity validation and type inference for TypeScript emission.
 
 mod context;
 mod emit_ts;

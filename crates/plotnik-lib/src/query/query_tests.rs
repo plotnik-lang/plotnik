@@ -151,16 +151,5 @@ fn multifile_field_with_ref_to_seq_error() {
       |
     1 | X = {(a) (b)}
       |     --------- defined here
-
-    error: field `name` must match exactly one node, not a sequence
-     --> main.ptk:1:17
-      |
-    1 | Q = (call name: (X))
-      |                 ^^^
-      |
-     ::: defs.ptk:1:5
-      |
-    1 | X = {(a) (b)}
-      |     --------- defined here
     ");
 }

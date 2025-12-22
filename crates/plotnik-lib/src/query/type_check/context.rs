@@ -203,7 +203,7 @@ impl TypeContext {
             .and_then(|id| self.def_types.get(&id).copied())
     }
 
-    /// Get arity for an expression (for backward compatibility with expr_arity).
+    /// Get arity for an expression.
     pub fn get_arity(&self, expr: &Expr) -> Option<Arity> {
         self.term_info.get(expr).map(|info| info.arity)
     }

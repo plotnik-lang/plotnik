@@ -8,8 +8,8 @@ use rowan::NodeOrToken;
 use crate::parser::{self as ast, Expr, SyntaxNode};
 
 use super::Query;
-use super::expr_arity::ExprArity;
 use super::source_map::SourceKind;
+use super::type_check::Arity;
 
 pub struct QueryPrinter<'q> {
     query: &'q Query,
@@ -385,9 +385,8 @@ impl<'q> QueryPrinter<'q> {
             return "";
         }
         match self.query.get_arity(node) {
-            Some(ExprArity::One) => "¹",
-            Some(ExprArity::Many) => "⁺",
-            Some(ExprArity::Invalid) => "⁻",
+            Some(Arity::One) => "¹",
+            Some(Arity::Many) => "⁺",
             None => "ˣ",
         }
     }
