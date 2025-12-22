@@ -6,6 +6,7 @@ mod utils;
 pub use printer::QueryPrinter;
 pub use query::{Query, QueryBuilder};
 pub use source_map::{SourceId, SourceMap};
+pub use symbol_table::SymbolTable;
 
 pub mod alt_kinds;
 mod dependencies;

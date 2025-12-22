@@ -14,7 +14,7 @@ use crate::query::dependencies;
 use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
-use crate::query::symbol_table::{SymbolTableOwned, resolve_names};
+use crate::query::symbol_table::{SymbolTable, resolve_names};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -116,11 +116,10 @@ impl QueryParsed {
         );
 
         let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
-        let symbol_table_owned = crate::query::symbol_table::to_owned(symbol_table);
 
         QueryAnalyzed {
             query_parsed: self,
-            symbol_table: symbol_table_owned,
+            symbol_table,
             arity_table,
         }
     }
@@ -142,7 +141,7 @@ pub type Query = QueryAnalyzed;
 
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
-    pub symbol_table: SymbolTableOwned,
+    pub symbol_table: SymbolTable,
     arity_table: ExprArityTable,
 }
 

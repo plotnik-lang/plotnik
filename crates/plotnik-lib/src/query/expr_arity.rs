@@ -27,14 +27,14 @@ pub type ExprArityTable = HashMap<Expr, ExprArity>;
 
 pub fn infer_arities(
     ast_map: &AstMap,
-    symbol_table: &SymbolTable,
+    registry: &SymbolTable,
     diag: &mut Diagnostics,
 ) -> ExprArityTable {
     let mut arity_table = ExprArityTable::default();
 
     for (&source_id, root) in ast_map {
         let ctx = ArityContext {
-            symbol_table,
+            registry,
             arity_table,
             diag,
             source_id,
@@ -46,7 +46,7 @@ pub fn infer_arities(
 
     for (&source_id, root) in ast_map {
         let ctx = ArityContext {
-            symbol_table,
+            registry,
             arity_table,
             diag,
             source_id,
@@ -92,7 +92,7 @@ pub fn resolve_arity(node: &SyntaxNode, table: &ExprArityTable) -> Option<ExprAr
 }
 
 struct ArityContext<'a, 'd> {
-    symbol_table: &'a SymbolTable<'a>,
+    registry: &'a SymbolTable,
     arity_table: ExprArityTable,
     diag: &'d mut Diagnostics,
     source_id: SourceId,
@@ -156,9 +156,9 @@ impl ArityContext<'_, '_> {
         );
         let name = name_tok.text();
 
-        self.symbol_table
+        self.registry
             .get(name)
-            .map(|(_, body)| self.compute_arity(body))
+            .map(|body| self.compute_arity(body))
             .unwrap_or(ExprArity::Invalid)
     }
 
@@ -191,9 +191,9 @@ impl ArityContext<'_, '_> {
             // If value is a reference, add related info pointing to definition
             if let Expr::Ref(r) = &value
                 && let Some(name_tok) = r.name()
-                && let Some((def_source, def_body)) = self.symbol_table.get(name_tok.text())
+                && let Some((def_source, def_body)) = self.registry.get_full(name_tok.text())
             {
-                builder = builder.related_to(*def_source, def_body.text_range(), "defined here");
+                builder = builder.related_to(def_source, def_body.text_range(), "defined here");
             }
 
             builder.emit();

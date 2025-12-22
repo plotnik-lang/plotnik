@@ -113,7 +113,7 @@ impl<'q> QueryPrinter<'q> {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.keys().map(String::as_str).collect();
+        let defined: IndexSet<&str> = symbols.keys().collect();
 
         // Collect body nodes from all files
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
@@ -161,7 +161,7 @@ impl<'q> QueryPrinter<'q> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some((_, body)) = self.query.symbol_table.get(name) {
+        if let Some(body) = self.query.symbol_table.get(name) {
             let refs_set = collect_refs(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
