@@ -4,17 +4,17 @@ use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
 
-use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
 use crate::query::dependencies;
-use crate::query::expr_arity::{ExprArity, ExprArityTable, infer_arities, resolve_arity};
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
 use crate::query::symbol_table::{SymbolTable, resolve_names};
+use crate::query::type_check::{self, Arity, TypeContext};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -104,10 +104,13 @@ impl QueryParsed {
 
 impl QueryParsed {
     pub fn analyze(mut self) -> QueryAnalyzed {
+        // Create shared interner for all phases
+        let mut interner = Interner::new();
+
         // Use reference-based structures for processing
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
-        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table);
+        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
         dependencies::validate_recursion(
             &dependency_analysis,
             &self.ast_map,
@@ -115,12 +118,20 @@ impl QueryParsed {
             &mut self.diag,
         );
 
-        let arity_table = infer_arities(&self.ast_map, &symbol_table, &mut self.diag);
+        // Unified type checking pass
+        let type_context = type_check::infer_types(
+            &mut interner,
+            &self.ast_map,
+            &symbol_table,
+            &dependency_analysis,
+            &mut self.diag,
+        );
 
         QueryAnalyzed {
             query_parsed: self,
+            interner,
             symbol_table,
-            arity_table,
+            type_context,
         }
     }
 
@@ -141,8 +152,9 @@ pub type Query = QueryAnalyzed;
 
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
+    interner: Interner,
     pub symbol_table: SymbolTable,
-    arity_table: ExprArityTable,
+    type_context: TypeContext,
 }
 
 impl QueryAnalyzed {
@@ -150,39 +162,61 @@ impl QueryAnalyzed {
         !self.diag.has_errors()
     }
 
-    pub fn get_arity(&self, node: &SyntaxNode) -> Option<ExprArity> {
-        resolve_arity(node, &self.arity_table)
+    pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {
+        use crate::parser::ast::{self, Expr};
+
+        // Try casting to Expr first as it's the most common query
+        if let Some(expr) = ast::Expr::cast(node.clone()) {
+            return self.type_context.get_arity(&expr);
+        }
+
+        // Root: arity based on definition count
+        if let Some(root) = ast::Root::cast(node.clone()) {
+            return Some(if root.defs().nth(1).is_some() {
+                Arity::Many
+            } else {
+                Arity::One
+            });
+        }
+
+        // Def: delegate to body's arity
+        if let Some(def) = ast::Def::cast(node.clone()) {
+            return def.body().and_then(|b| self.type_context.get_arity(&b));
+        }
+
+        // Branch: delegate to body's arity
+        if let Some(branch) = ast::Branch::cast(node.clone()) {
+            return branch.body().and_then(|b| self.type_context.get_arity(&b));
+        }
+
+        None
+    }
+
+    pub fn type_context(&self) -> &TypeContext {
+        &self.type_context
+    }
+
+    pub fn interner(&self) -> &Interner {
+        &self.interner
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
-        // Use reference-based hash maps during processing
-        let mut type_ids: HashMap<&str, Option<NodeTypeId>> = HashMap::new();
-        let mut field_ids: HashMap<&str, Option<NodeFieldId>> = HashMap::new();
+        let mut output = link::LinkOutput::default();
 
         link::link(
-            &self.query_parsed.ast_map,
-            &self.query_parsed.source_map,
+            &mut self.interner,
             lang,
+            &self.query_parsed.source_map,
+            &self.query_parsed.ast_map,
             &self.symbol_table,
-            &mut type_ids,
-            &mut field_ids,
+            &mut output,
             &mut self.query_parsed.diag,
         );
 
-        // Convert to owned for storage
-        let type_ids_owned = type_ids
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v))
-            .collect();
-        let field_ids_owned = field_ids
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v))
-            .collect();
-
         LinkedQuery {
             inner: self,
-            type_ids: type_ids_owned,
-            field_ids: field_ids_owned,
+            node_type_ids: output.node_type_ids,
+            node_field_ids: output.node_field_ids,
         }
     }
 }
@@ -211,13 +245,24 @@ impl TryFrom<&str> for QueryAnalyzed {
     }
 }
 
-type NodeTypeIdTableOwned = HashMap<String, Option<NodeTypeId>>;
-type NodeFieldIdTableOwned = HashMap<String, Option<NodeFieldId>>;
-
 pub struct LinkedQuery {
     inner: QueryAnalyzed,
-    type_ids: NodeTypeIdTableOwned,
-    field_ids: NodeFieldIdTableOwned,
+    node_type_ids: HashMap<Symbol, NodeTypeId>,
+    node_field_ids: HashMap<Symbol, NodeFieldId>,
+}
+
+impl LinkedQuery {
+    pub fn interner(&self) -> &Interner {
+        &self.inner.interner
+    }
+
+    pub fn node_type_ids(&self) -> &HashMap<Symbol, NodeTypeId> {
+        &self.node_type_ids
+    }
+
+    pub fn node_field_ids(&self) -> &HashMap<Symbol, NodeFieldId> {
+        &self.node_field_ids
+    }
 }
 
 impl Deref for LinkedQuery {

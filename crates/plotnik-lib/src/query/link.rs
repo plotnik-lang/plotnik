@@ -8,9 +8,18 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
-use plotnik_core::{NodeFieldId, NodeTypeId};
+use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 use rowan::TextRange;
+
+/// Output from the link phase for binary emission.
+#[derive(Default)]
+pub struct LinkOutput {
+    /// Interned name → NodeTypeId (for binary: StringId → NodeTypeId)
+    pub node_type_ids: HashMap<Symbol, NodeTypeId>,
+    /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
+    pub node_field_ids: HashMap<Symbol, NodeFieldId>,
+}
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{self, Expr, NamedNode};
@@ -28,22 +37,28 @@ use super::visitor::{Visitor, walk};
 /// This function is decoupled from `Query` to allow easier testing and
 /// modularity. It orchestrates the resolution and validation phases.
 pub fn link<'q>(
-    ast_map: &AstMap,
-    source_map: &'q SourceMap,
+    interner: &mut Interner,
     lang: &Lang,
+    source_map: &'q SourceMap,
+    ast_map: &AstMap,
     symbol_table: &SymbolTable,
-    node_type_ids: &mut HashMap<&'q str, Option<NodeTypeId>>,
-    node_field_ids: &mut HashMap<&'q str, Option<NodeFieldId>>,
+    output: &mut LinkOutput,
     diagnostics: &mut Diagnostics,
 ) {
+    // Local deduplication maps (not exposed in output)
+    let mut node_type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
+    let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+
     for (&source_id, root) in ast_map {
         let mut linker = Linker {
-            source_map,
-            source_id,
+            interner,
             lang,
+            source_map,
             symbol_table,
-            node_type_ids,
-            node_field_ids,
+            source_id,
+            node_type_ids: &mut node_type_ids,
+            node_field_ids: &mut node_field_ids,
+            output,
             diagnostics,
         };
         linker.link(root);
@@ -51,12 +66,15 @@ pub fn link<'q>(
 }
 
 struct Linker<'a, 'q> {
-    source_map: &'q SourceMap,
-    source_id: SourceId,
+    // Refs
+    interner: &'a mut Interner,
     lang: &'a Lang,
+    source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
+    source_id: SourceId,
     node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
+    output: &'a mut LinkOutput,
     diagnostics: &'a mut Diagnostics,
 }
 
@@ -96,6 +114,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         let resolved = self.lang.resolve_named_node(type_name);
         self.node_type_ids
             .insert(token_src(&type_token, self.source()), resolved);
+        if let Some(id) = resolved {
+            let sym = self.interner.intern(type_name);
+            self.output.node_type_ids.entry(sym).or_insert(id);
+        }
         if resolved.is_none() {
             let all_types = self.lang.all_named_node_kinds();
             let max_dist = (type_name.len() / 3).clamp(2, 4);
@@ -133,7 +155,9 @@ impl<'a, 'q> Linker<'a, 'q> {
         let resolved = self.lang.resolve_field(field_name);
         self.node_field_ids
             .insert(token_src(&name_token, self.source()), resolved);
-        if resolved.is_some() {
+        if let Some(id) = resolved {
+            let sym = self.interner.intern(field_name);
+            self.output.node_field_ids.entry(sym).or_insert(id);
             return;
         }
         let all_fields = self.lang.all_field_names();
@@ -406,6 +430,10 @@ impl Visitor for NodeTypeCollector<'_, '_, '_> {
         self.linker
             .node_type_ids
             .insert(token_src(&value_token, self.linker.source()), resolved);
+        if let Some(id) = resolved {
+            let sym = self.linker.interner.intern(value);
+            self.linker.output.node_type_ids.entry(sym).or_insert(id);
+        }
 
         if resolved.is_none() {
             self.linker

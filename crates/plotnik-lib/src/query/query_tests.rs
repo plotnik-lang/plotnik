@@ -77,6 +77,18 @@ impl QueryAnalyzed {
     }
 
     #[track_caller]
+    pub fn expect_valid_types(src: &str) -> String {
+        let query = Self::parse_and_validate(src);
+        if !query.is_valid() {
+            panic!(
+                "Expected valid types, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        query.emit_typescript()
+    }
+
+    #[track_caller]
     pub fn expect_invalid(src: &str) -> String {
         let source_map = SourceMap::one_liner(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();

@@ -8,7 +8,10 @@
 //! which is useful for passes that need to process dependencies before
 //! dependents (like type inference).
 
+use std::collections::HashMap;
+
 use indexmap::{IndexMap, IndexSet};
+use plotnik_core::{Interner, Symbol};
 
 use super::source_map::SourceId;
 use rowan::TextRange;
@@ -17,6 +20,7 @@ use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
 use crate::query::symbol_table::SymbolTable;
+use crate::query::type_check::DefId;
 use crate::query::visitor::{Visitor, walk_expr};
 
 /// Result of dependency analysis.
@@ -29,14 +33,85 @@ pub struct DependencyAnalysis {
     /// - Definitions within an SCC are mutually recursive.
     /// - Every definition in the symbol table appears exactly once.
     pub sccs: Vec<Vec<String>>,
+
+    /// Maps definition name (Symbol) to its DefId.
+    name_to_def: HashMap<Symbol, DefId>,
+
+    /// Maps DefId to definition name Symbol (indexed by DefId).
+    def_names: Vec<Symbol>,
+}
+
+impl DependencyAnalysis {
+    /// Get the DefId for a definition by Symbol.
+    pub fn def_id_by_symbol(&self, sym: Symbol) -> Option<DefId> {
+        self.name_to_def.get(&sym).copied()
+    }
+
+    /// Get the DefId for a definition name (requires interner for lookup).
+    pub fn def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
+        // Linear scan - only used during analysis, not hot path
+        for (&sym, &def_id) in &self.name_to_def {
+            if interner.resolve(sym) == name {
+                return Some(def_id);
+            }
+        }
+        None
+    }
+
+    /// Get the name Symbol for a DefId.
+    pub fn def_name_sym(&self, id: DefId) -> Symbol {
+        self.def_names[id.index()]
+    }
+
+    /// Get the name string for a DefId.
+    pub fn def_name<'a>(&self, interner: &'a Interner, id: DefId) -> &'a str {
+        interner.resolve(self.def_names[id.index()])
+    }
+
+    /// Number of definitions.
+    pub fn def_count(&self) -> usize {
+        self.def_names.len()
+    }
+
+    /// Get the def_names slice (for seeding TypeContext).
+    pub fn def_names(&self) -> &[Symbol] {
+        &self.def_names
+    }
+
+    /// Get the name_to_def map (for seeding TypeContext).
+    pub fn name_to_def(&self) -> &HashMap<Symbol, DefId> {
+        &self.name_to_def
+    }
 }
 
 /// Analyze dependencies between definitions.
 ///
-/// Returns the SCCs in reverse topological order.
-pub fn analyze_dependencies(symbol_table: &SymbolTable) -> DependencyAnalysis {
+/// Returns the SCCs in reverse topological order, with DefId mappings.
+/// The interner is used to intern definition names as Symbols.
+pub fn analyze_dependencies(
+    symbol_table: &SymbolTable,
+    interner: &mut Interner,
+) -> DependencyAnalysis {
     let sccs = SccFinder::find(symbol_table);
-    DependencyAnalysis { sccs }
+
+    // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
+    let mut name_to_def = HashMap::new();
+    let mut def_names = Vec::new();
+
+    for scc in &sccs {
+        for name in scc {
+            let sym = interner.intern(name);
+            let def_id = DefId::from_raw(def_names.len() as u32);
+            name_to_def.insert(sym, def_id);
+            def_names.push(sym);
+        }
+    }
+
+    DependencyAnalysis {
+        sccs,
+        name_to_def,
+        def_names,
+    }
 }
 
 /// Validate recursion using the pre-computed dependency analysis.

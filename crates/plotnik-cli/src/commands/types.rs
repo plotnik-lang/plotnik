@@ -1,11 +1,10 @@
-#![allow(dead_code)]
-
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
 use plotnik_langs::Lang;
 use plotnik_lib::Query;
+use plotnik_lib::query::type_check::{EmitConfig, emit_typescript_with_config};
 
 pub struct TypesArgs {
     pub query_text: Option<String>,
@@ -32,7 +31,7 @@ pub fn run(args: TypesArgs) {
     }
     let lang = resolve_lang_required(&args.lang);
 
-    // Parse and validate query
+    // Parse and analyze query
     let query = Query::try_from(query_source.as_str())
         .unwrap_or_else(|e| {
             eprintln!("error: {}", e);
@@ -45,13 +44,25 @@ pub fn run(args: TypesArgs) {
         std::process::exit(1);
     }
 
-    // Link query against language
-    if !query.is_valid() {
-        eprint!("{}", query.diagnostics().render(query.source_map()));
-        std::process::exit(1);
-    }
+    // Emit TypeScript types
+    let config = EmitConfig {
+        export: args.export,
+        emit_node_type: !args.no_node_type,
+        root_type_name: args.root_type,
+        verbose_nodes: args.verbose_nodes,
+    };
 
-    unimplemented!();
+    let output = emit_typescript_with_config(query.type_context(), query.interner(), config);
+
+    // Write output
+    if let Some(ref path) = args.output {
+        fs::write(path, &output).unwrap_or_else(|e| {
+            eprintln!("error: failed to write {}: {}", path.display(), e);
+            std::process::exit(1);
+        });
+    } else {
+        io::stdout().write_all(output.as_bytes()).unwrap();
+    }
 }
 
 fn load_query(args: &TypesArgs) -> String {
@@ -66,7 +77,10 @@ fn load_query(args: &TypesArgs) -> String {
                 .expect("failed to read stdin");
             return buf;
         }
-        return fs::read_to_string(path).expect("failed to read query file");
+        return fs::read_to_string(path).unwrap_or_else(|e| {
+            eprintln!("error: failed to read query file: {}", e);
+            std::process::exit(1);
+        });
     }
     unreachable!("validation ensures query input exists")
 }

@@ -36,5 +36,9 @@ mod test_helpers {
         pub fn dump_diagnostics_raw(&self) -> String {
             self.diagnostics().render(self.source_map())
         }
+
+        pub fn emit_typescript(&self) -> String {
+            crate::query::type_check::emit_typescript(self.type_context(), self.interner())
+        }
     }
 }
