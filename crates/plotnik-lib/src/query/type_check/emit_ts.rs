@@ -3,6 +3,7 @@
 //! Converts inferred types to TypeScript declarations.
 //! Used as a test oracle to verify type inference correctness.
 
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use plotnik_core::Interner;
@@ -85,11 +86,11 @@ impl<'a> TsEmitter<'a> {
 
         for (def_id, type_id) in self.ctx.iter_def_types() {
             let name = self.ctx.def_name(self.interner, def_id).to_string();
-            if primary_names.contains_key(&type_id) {
+            if let Entry::Vacant(e) = primary_names.entry(type_id) {
+                e.insert(name);
+            } else {
                 // This TypeId already has a primary definition; this becomes an alias
                 aliases.push((name, type_id));
-            } else {
-                primary_names.insert(type_id, name);
             }
         }
 
