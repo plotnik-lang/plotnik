@@ -85,9 +85,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             if let TypeFlow::Fields(fields) = child_info.flow {
                 for (name, info) in fields {
-                    if !merged_fields.contains_key(&name) {
-                        merged_fields.insert(name, info);
-                    }
+                    merged_fields.entry(name).or_insert(info);
                 }
             }
         }
@@ -144,18 +142,22 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             if let TypeFlow::Fields(fields) = child_info.flow {
                 for (name, info) in fields {
-                    if merged_fields.contains_key(&name) {
-                        // Duplicate capture in same scope - error
-                        self.diag
-                            .report(
-                                self.source_id,
-                                DiagnosticKind::DuplicateCaptureInScope,
-                                child.text_range(),
-                            )
-                            .message(self.ctx.resolve(name))
-                            .emit();
-                    } else {
-                        merged_fields.insert(name, info);
+                    use std::collections::btree_map::Entry;
+                    match merged_fields.entry(name) {
+                        Entry::Vacant(e) => {
+                            e.insert(info);
+                        }
+                        Entry::Occupied(_) => {
+                            // Duplicate capture in same scope - error
+                            self.diag
+                                .report(
+                                    self.source_id,
+                                    DiagnosticKind::DuplicateCaptureInScope,
+                                    child.text_range(),
+                                )
+                                .message(self.ctx.resolve(name))
+                                .emit();
+                        }
                     }
                 }
             }

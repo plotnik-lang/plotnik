@@ -61,11 +61,11 @@ pub fn infer_types(
             infer_root(&mut ctx, symbol_table, diag, source_id, root);
 
             // Register the definition's output type
-            if let Some(body) = symbol_table.get(def_name) {
-                if let Some(info) = ctx.get_term_info(body).cloned() {
-                    let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                    ctx.set_def_type_by_name(def_name, type_id);
-                }
+            if let Some(body) = symbol_table.get(def_name)
+                && let Some(info) = ctx.get_term_info(body).cloned()
+            {
+                let type_id = flow_to_type_id(&mut ctx, &info.flow);
+                ctx.set_def_type_by_name(def_name, type_id);
             }
         }
     }
@@ -82,11 +82,11 @@ pub fn infer_types(
 
         infer_root(&mut ctx, symbol_table, diag, source_id, root);
 
-        if let Some(body) = symbol_table.get(name) {
-            if let Some(info) = ctx.get_term_info(body).cloned() {
-                let type_id = flow_to_type_id(&mut ctx, &info.flow);
-                ctx.set_def_type_by_name(name, type_id);
-            }
+        if let Some(body) = symbol_table.get(name)
+            && let Some(info) = ctx.get_term_info(body).cloned()
+        {
+            let type_id = flow_to_type_id(&mut ctx, &info.flow);
+            ctx.set_def_type_by_name(name, type_id);
         }
     }
 

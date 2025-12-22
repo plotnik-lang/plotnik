@@ -328,9 +328,7 @@ impl<'a> TsEmitter<'a> {
         match kind {
             TypeKind::Struct(fields) => {
                 // Only set context if this type needs a name
-                if !contexts.contains_key(&type_id) {
-                    contexts.insert(type_id, ctx.clone());
-                }
+                contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 // Recurse into fields
                 for (&field_sym, info) in fields {
                     let field_name = self.ctx.resolve(field_sym);
@@ -342,9 +340,7 @@ impl<'a> TsEmitter<'a> {
                 }
             }
             TypeKind::Enum(variants) => {
-                if !contexts.contains_key(&type_id) {
-                    contexts.insert(type_id, ctx.clone());
-                }
+                contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 // Don't recurse into variant types - they're inlined as $data
                 let _ = variants;
             }
@@ -645,7 +641,7 @@ impl<'a> TsEmitter<'a> {
 
         let field_strs: Vec<_> = sorted_fields
             .iter()
-            .map(|&(&sym, ref info)| {
+            .map(|&(&sym, info)| {
                 let name = self.ctx.resolve(sym);
                 let ts_type = self.type_to_ts(info.type_id);
                 let optional = if info.optional { "?" } else { "" };
