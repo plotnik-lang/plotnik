@@ -16,20 +16,16 @@ use super::types::{
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Debug, Clone)]
 pub struct TypeContext {
-    // Storage
-    /// Interned types by ID
     types: Vec<TypeKind>,
-    /// Deduplication map for type interning
     type_map: HashMap<TypeKind, TypeId>,
-    /// DefId → Symbol mapping (for resolving def names)
+
     def_names: Vec<Symbol>,
-    /// Symbol → DefId reverse lookup
     def_ids: HashMap<Symbol, DefId>,
     /// Definition-level type info (for TypeScript emission), keyed by DefId
     def_types: HashMap<DefId, TypeId>,
     /// Definitions that are part of a recursive SCC
     recursive_defs: HashSet<DefId>,
-    /// Cached term info per expression
+
     term_info: HashMap<Expr, TermInfo>,
 }
 
@@ -101,9 +97,7 @@ impl TypeContext {
 
     /// Intern a struct type with a single field.
     pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
-        let mut fields = BTreeMap::new();
-        fields.insert(name, info);
-        self.intern_type(TypeKind::Struct(fields))
+        self.intern_type(TypeKind::Struct(BTreeMap::from([(name, info)])))
     }
 
     /// Get struct fields from a TypeId, if it points to a Struct.
@@ -125,16 +119,9 @@ impl TypeContext {
     }
 
     /// Register a definition by name, returning its DefId.
-    /// If already registered, returns existing DefId.
     pub fn register_def(&mut self, interner: &mut Interner, name: &str) -> DefId {
         let sym = interner.intern(name);
-        if let Some(&def_id) = self.def_ids.get(&sym) {
-            return def_id;
-        }
-        let def_id = DefId::from_raw(self.def_names.len() as u32);
-        self.def_names.push(sym);
-        self.def_ids.insert(sym, def_id);
-        def_id
+        self.register_def_sym(sym)
     }
 
     /// Register a definition by pre-interned Symbol, returning its DefId.
@@ -142,6 +129,7 @@ impl TypeContext {
         if let Some(&def_id) = self.def_ids.get(&sym) {
             return def_id;
         }
+
         let def_id = DefId::from_raw(self.def_names.len() as u32);
         self.def_names.push(sym);
         self.def_ids.insert(sym, def_id);
@@ -155,13 +143,11 @@ impl TypeContext {
 
     /// Get DefId for a definition name (requires interner for lookup).
     pub fn get_def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
-        // Linear scan - only used during analysis, not hot path
-        for (&sym, &def_id) in &self.def_ids {
-            if interner.resolve(sym) == name {
-                return Some(def_id);
-            }
-        }
-        None
+        // Linear scan - only used during analysis, not hot path.
+        // Necessary because we don't assume Interner has reverse lookup here.
+        self.def_ids
+            .iter()
+            .find_map(|(&sym, &id)| (interner.resolve(sym) == name).then_some(id))
     }
 
     /// Get the name Symbol for a DefId.
@@ -193,7 +179,7 @@ impl TypeContext {
     /// Registers the def if not already known.
     pub fn set_def_type_by_name(&mut self, interner: &mut Interner, name: &str, type_id: TypeId) {
         let def_id = self.register_def(interner, name);
-        self.def_types.insert(def_id, type_id);
+        self.set_def_type(def_id, type_id);
     }
 
     /// Get the output type for a definition by DefId.
@@ -203,8 +189,8 @@ impl TypeContext {
 
     /// Get the output type for a definition by string name.
     pub fn get_def_type_by_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {
-        self.get_def_id(interner, name)
-            .and_then(|id| self.def_types.get(&id).copied())
+        let id = self.get_def_id(interner, name)?;
+        self.get_def_type(id)
     }
 
     /// Get arity for an expression.
