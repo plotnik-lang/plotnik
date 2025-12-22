@@ -19,7 +19,7 @@ use crate::parser::token_src;
 
 use super::query::AstMap;
 use super::source_map::{SourceId, SourceMap};
-use super::symbol_table::SymbolTableOwned;
+use super::symbol_table::SymbolTable;
 use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
 
@@ -31,7 +31,7 @@ pub fn link<'q>(
     ast_map: &AstMap,
     source_map: &'q SourceMap,
     lang: &Lang,
-    symbol_table: &SymbolTableOwned,
+    symbol_table: &SymbolTable,
     node_type_ids: &mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &mut Diagnostics,
@@ -54,7 +54,7 @@ struct Linker<'a, 'q> {
     source_map: &'q SourceMap,
     source_id: SourceId,
     lang: &'a Lang,
-    symbol_table: &'a SymbolTableOwned,
+    symbol_table: &'a SymbolTable,
     node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     diagnostics: &'a mut Diagnostics,
@@ -167,36 +167,21 @@ impl<'a, 'q> Linker<'a, 'q> {
     fn validate_expr_structure(
         &mut self,
         expr: &Expr,
-        ctx: Option<ValidationContext<'a>>,
+        ctx: Option<ValidationContext>,
         visited: &mut IndexSet<String>,
     ) {
         match expr {
             Expr::NamedNode(node) => {
-                // Validate this node against the context (if any)
-                if let Some(ref ctx) = ctx {
-                    self.validate_terminal_type(expr, ctx, visited);
-                }
-
-                // Set up context for children
                 let child_ctx = self.make_node_context(node);
 
                 for child in node.children() {
-                    match &child {
-                        Expr::FieldExpr(f) => {
-                            // Fields get special handling
-                            self.validate_field_expr(f, child_ctx.as_ref(), visited);
-                        }
-                        _ => {
-                            // Non-field children: validate as non-field children
-                            if let Some(ref ctx) = child_ctx {
-                                self.validate_non_field_children(&child, ctx, visited);
-                            }
-                            self.validate_expr_structure(&child, child_ctx, visited);
-                        }
+                    if let Expr::FieldExpr(f) = &child {
+                        self.validate_field_expr(f, child_ctx.as_ref(), visited);
+                    } else {
+                        self.validate_expr_structure(&child, child_ctx, visited);
                     }
                 }
 
-                // Handle negated fields
                 if let Some(ctx) = child_ctx {
                     for child in node.as_cst().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
@@ -205,12 +190,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                     }
                 }
             }
-            Expr::AnonymousNode(_) => {
-                // Validate this anonymous node against the context (if any)
-                if let Some(ref ctx) = ctx {
-                    self.validate_terminal_type(expr, ctx, visited);
-                }
-            }
+            Expr::AnonymousNode(_) => {}
             Expr::FieldExpr(f) => {
                 // Should be handled by parent NamedNode, but handle gracefully
                 self.validate_field_expr(f, ctx.as_ref(), visited);
@@ -240,7 +220,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 if !visited.insert(name.to_string()) {
                     return;
                 }
-                let Some((_, body)) = self.symbol_table.get(name).cloned() else {
+                let Some(body) = self.symbol_table.get(name).cloned() else {
                     visited.swap_remove(name);
                     return;
                 };
@@ -251,7 +231,7 @@ impl<'a, 'q> Linker<'a, 'q> {
     }
 
     /// Create validation context for a named node's children.
-    fn make_node_context(&self, node: &NamedNode) -> Option<ValidationContext<'a>> {
+    fn make_node_context(&self, node: &NamedNode) -> Option<ValidationContext> {
         if node.is_any() {
             return None;
         }
@@ -264,78 +244,48 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
         let type_name = type_token.text();
         let parent_id = self.node_type_ids.get(type_name).copied().flatten()?;
-        let parent_name = self.lang.node_type_name(parent_id)?;
+        // Verify the node type exists in the grammar
+        self.lang.node_type_name(parent_id)?;
         Some(ValidationContext {
             parent_id,
-            parent_name,
             parent_range: type_token.text_range(),
         })
     }
 
-    /// Validate a field expression.
     fn validate_field_expr(
         &mut self,
         field: &ast::FieldExpr,
-        ctx: Option<&ValidationContext<'a>>,
+        ctx: Option<&ValidationContext>,
         visited: &mut IndexSet<String>,
     ) {
         let Some(name_token) = field.name() else {
             return;
         };
-        let field_name = name_token.text();
-
-        let Some(field_id) = self.node_field_ids.get(field_name).copied().flatten() else {
+        let Some(field_id) = self
+            .node_field_ids
+            .get(name_token.text())
+            .copied()
+            .flatten()
+        else {
             return;
         };
+        let Some(ctx) = ctx else { return };
 
-        let Some(ctx) = ctx else {
-            return;
-        };
-
-        // Check field exists on parent
         if !self.lang.has_field(ctx.parent_id, field_id) {
             self.emit_field_not_on_node(
                 name_token.text_range(),
-                field_name,
+                name_token.text(),
                 ctx.parent_id,
                 ctx.parent_range,
             );
             return;
         }
 
-        let Some(value) = field.value() else {
-            return;
-        };
-
-        // Create context for validating the value
-        let field_ctx = ValidationContext {
-            parent_id: ctx.parent_id,
-            parent_name: ctx.parent_name,
-            parent_range: ctx.parent_range,
-        };
-
-        // Validate field value - this will traverse through alt/seq/quantifier/capture
-        // and validate each terminal type against the field requirements
-        self.validate_expr_structure(&value, Some(field_ctx), visited);
+        let Some(value) = field.value() else { return };
+        self.validate_expr_structure(&value, Some(*ctx), visited);
     }
 
-    fn validate_non_field_children(
-        &mut self,
-        _expr: &Expr,
-        _ctx: &ValidationContext<'a>,
-        _visited: &mut IndexSet<String>,
-    ) {
-    }
-
-    fn validate_terminal_type(
-        &mut self,
-        _expr: &Expr,
-        _ctx: &ValidationContext<'a>,
-        _visited: &mut IndexSet<String>,
-    ) {
-    }
-
-    fn validate_negated_field(&mut self, neg: &ast::NegatedField, ctx: &ValidationContext<'a>) {
+    fn validate_negated_field(&mut self, neg: &ast::NegatedField, ctx: &ValidationContext) {
         let Some(name_token) = neg.name() else {
             return;
         };
@@ -419,11 +369,9 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 
 /// Context for validating child types.
 #[derive(Clone, Copy)]
-struct ValidationContext<'a> {
+struct ValidationContext {
     /// The parent node type being validated against.
     parent_id: NodeTypeId,
-    /// The parent node's name for error messages.
-    parent_name: &'a str,
     /// The parent node type token range for related_to.
     parent_range: TextRange,
 }

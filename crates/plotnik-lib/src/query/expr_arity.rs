@@ -92,7 +92,7 @@ pub fn resolve_arity(node: &SyntaxNode, table: &ExprArityTable) -> Option<ExprAr
 }
 
 struct ArityContext<'a, 'd> {
-    symbol_table: &'a SymbolTable<'a>,
+    symbol_table: &'a SymbolTable,
     arity_table: ExprArityTable,
     diag: &'d mut Diagnostics,
     source_id: SourceId,
@@ -158,7 +158,7 @@ impl ArityContext<'_, '_> {
 
         self.symbol_table
             .get(name)
-            .map(|(_, body)| self.compute_arity(body))
+            .map(|body| self.compute_arity(body))
             .unwrap_or(ExprArity::Invalid)
     }
 
@@ -191,9 +191,9 @@ impl ArityContext<'_, '_> {
             // If value is a reference, add related info pointing to definition
             if let Expr::Ref(r) = &value
                 && let Some(name_tok) = r.name()
-                && let Some((def_source, def_body)) = self.symbol_table.get(name_tok.text())
+                && let Some((def_source, def_body)) = self.symbol_table.get_full(name_tok.text())
             {
-                builder = builder.related_to(*def_source, def_body.text_range(), "defined here");
+                builder = builder.related_to(def_source, def_body.text_range(), "defined here");
             }
 
             builder.emit();

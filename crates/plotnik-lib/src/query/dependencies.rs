@@ -21,29 +21,29 @@ use crate::query::visitor::{Visitor, walk_expr};
 
 /// Result of dependency analysis.
 #[derive(Debug, Clone, Default)]
-pub struct DependencyAnalysis<'q> {
+pub struct DependencyAnalysis {
     /// Strongly connected components in reverse topological order.
     ///
     /// - `sccs[0]` has no dependencies (or depends only on things not in this list).
     /// - `sccs.last()` depends on everything else.
     /// - Definitions within an SCC are mutually recursive.
     /// - Every definition in the symbol table appears exactly once.
-    pub sccs: Vec<Vec<&'q str>>,
+    pub sccs: Vec<Vec<String>>,
 }
 
 /// Analyze dependencies between definitions.
 ///
 /// Returns the SCCs in reverse topological order.
-pub fn analyze_dependencies<'q>(symbol_table: &SymbolTable<'q>) -> DependencyAnalysis<'q> {
+pub fn analyze_dependencies(symbol_table: &SymbolTable) -> DependencyAnalysis {
     let sccs = SccFinder::find(symbol_table);
     DependencyAnalysis { sccs }
 }
 
 /// Validate recursion using the pre-computed dependency analysis.
-pub fn validate_recursion<'q>(
-    analysis: &DependencyAnalysis<'q>,
+pub fn validate_recursion(
+    analysis: &DependencyAnalysis,
     ast_map: &IndexMap<SourceId, Root>,
-    symbol_table: &SymbolTable<'q>,
+    symbol_table: &SymbolTable,
     diag: &mut Diagnostics,
 ) {
     let mut validator = RecursionValidator {
@@ -54,50 +54,41 @@ pub fn validate_recursion<'q>(
     validator.validate(&analysis.sccs);
 }
 
-// -----------------------------------------------------------------------------
-// Recursion Validator
-// -----------------------------------------------------------------------------
-
-struct RecursionValidator<'a, 'q, 'd> {
+struct RecursionValidator<'a, 'd> {
     ast_map: &'a IndexMap<SourceId, Root>,
-    symbol_table: &'a SymbolTable<'q>,
+    symbol_table: &'a SymbolTable,
     diag: &'d mut Diagnostics,
 }
 
-impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
-    fn validate(&mut self, sccs: &[Vec<&'q str>]) {
+impl<'a, 'd> RecursionValidator<'a, 'd> {
+    fn validate(&mut self, sccs: &[Vec<String>]) {
         for scc in sccs {
             self.validate_scc(scc);
         }
     }
 
-    fn validate_scc(&mut self, scc: &[&'q str]) {
+    fn validate_scc(&mut self, scc: &[String]) {
         // Filter out trivial non-recursive components.
         // A component is recursive if it has >1 node, or 1 node that references itself.
         if scc.len() == 1 {
-            let name = scc[0];
-            let is_self_recursive = self
-                .symbol_table
-                .get(name)
-                .map(|(_, body)| collect_refs(body, self.symbol_table).contains(name))
-                .unwrap_or(false);
-
-            if !is_self_recursive {
+            let name = &scc[0];
+            let Some(body) = self.symbol_table.get(name) else {
+                return;
+            };
+            if !collect_refs(body, self.symbol_table).contains(name.as_str()) {
                 return;
             }
         }
 
-        let scc_set: IndexSet<&'q str> = scc.iter().copied().collect();
+        let scc_set: IndexSet<&str> = scc.iter().map(String::as_str).collect();
 
         // 1. Check for infinite tree structure (Escape Analysis)
         // A valid recursive definition must have a non-recursive path.
         // If NO definition in the SCC has an escape path, the whole group is invalid.
-        let has_escape = scc.iter().any(|name| {
-            self.symbol_table
-                .get(*name)
-                .map(|(_, body)| expr_has_escape(body, &scc_set))
-                .unwrap_or(true)
-        });
+        let has_escape = scc
+            .iter()
+            .filter_map(|name| self.symbol_table.get(name))
+            .any(|body| expr_has_escape(body, &scc_set));
 
         if !has_escape {
             // Find a cycle to report. Any cycle within the SCC is an infinite recursion loop
@@ -124,15 +115,15 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
 
     /// Finds a cycle within the given set of nodes (SCC).
     /// `get_edge_location` returns the location of a reference from `expr` to `target`.
-    fn find_cycle(
+    fn find_cycle<'s>(
         &self,
-        nodes: &[&'q str],
-        domain: &IndexSet<&'q str>,
+        nodes: &'s [String],
+        domain: &IndexSet<&'s str>,
         get_edge_location: impl Fn(&Self, SourceId, &Expr, &str) -> Option<TextRange>,
-    ) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
+    ) -> Option<Vec<(SourceId, TextRange, &'s str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
-            if let Some(&(source_id, ref body)) = self.symbol_table.get(*name) {
+            if let Some((source_id, body)) = self.symbol_table.get_full(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
@@ -140,20 +131,21 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
                             .map(|range| (*target, source_id, range))
                     })
                     .collect::<Vec<_>>();
-                adj.insert(*name, neighbors);
+                adj.insert(name.as_str(), neighbors);
             }
         }
 
-        CycleFinder::find(nodes, &adj)
+        let node_strs: Vec<&str> = nodes.iter().map(String::as_str).collect();
+        CycleFinder::find(&node_strs, &adj)
     }
 
     fn format_chain(
         &self,
-        chain: Vec<(SourceId, TextRange, &'q str)>,
+        raw_chain: Vec<(SourceId, TextRange, &str)>,
         is_unguarded: bool,
     ) -> Vec<(SourceId, TextRange, String)> {
-        if chain.len() == 1 {
-            let (source_id, range, target) = &chain[0];
+        if raw_chain.len() == 1 {
+            let (source_id, range, target) = &raw_chain[0];
             let msg = if is_unguarded {
                 "references itself".to_string()
             } else {
@@ -162,8 +154,8 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
             return vec![(*source_id, *range, msg)];
         }
 
-        let len = chain.len();
-        chain
+        let len = raw_chain.len();
+        raw_chain
             .into_iter()
             .enumerate()
             .map(|(i, (source_id, range, target))| {
@@ -180,7 +172,7 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
     fn report_cycle(
         &mut self,
         kind: DiagnosticKind,
-        scc: &[&'q str],
+        scc: &[String],
         chain: Vec<(SourceId, TextRange, String)>,
     ) {
         let (primary_source, primary_loc) = chain
@@ -209,27 +201,21 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
 
     fn find_def_info_containing(
         &self,
-        scc: &[&'q str],
+        scc: &[String],
         range: TextRange,
     ) -> Option<(SourceId, String, TextRange)> {
-        scc.iter()
-            .find(|name| {
-                self.symbol_table
-                    .get(*name)
-                    .map(|(_, body)| body.text_range().contains_range(range))
-                    .unwrap_or(false)
-            })
-            .and_then(|name| {
-                self.find_def_by_name(name).and_then(|(source_id, def)| {
-                    def.name().map(|n| {
-                        (
-                            source_id,
-                            format!("{} is defined here", name),
-                            n.text_range(),
-                        )
-                    })
-                })
-            })
+        let name = scc.iter().find(|name| {
+            self.symbol_table
+                .get(name.as_str())
+                .is_some_and(|body| body.text_range().contains_range(range))
+        })?;
+        let (source_id, def) = self.find_def_by_name(name)?;
+        let n = def.name()?;
+        Some((
+            source_id,
+            format!("{} is defined here", name),
+            n.text_range(),
+        ))
     }
 
     fn find_def_by_name(&self, name: &str) -> Option<(SourceId, Def)> {
@@ -241,22 +227,18 @@ impl<'a, 'q, 'd> RecursionValidator<'a, 'q, 'd> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// SCC Finder (Tarjan's Algorithm)
-// -----------------------------------------------------------------------------
-
-struct SccFinder<'a, 'q> {
-    symbol_table: &'a SymbolTable<'q>,
+struct SccFinder<'a> {
+    symbol_table: &'a SymbolTable,
     index: usize,
-    stack: Vec<&'q str>,
-    on_stack: IndexSet<&'q str>,
-    indices: IndexMap<&'q str, usize>,
-    lowlinks: IndexMap<&'q str, usize>,
-    sccs: Vec<Vec<&'q str>>,
+    stack: Vec<&'a str>,
+    on_stack: IndexSet<&'a str>,
+    indices: IndexMap<&'a str, usize>,
+    lowlinks: IndexMap<&'a str, usize>,
+    sccs: Vec<Vec<&'a str>>,
 }
 
-impl<'a, 'q> SccFinder<'a, 'q> {
-    fn find(symbol_table: &'a SymbolTable<'q>) -> Vec<Vec<&'q str>> {
+impl<'a> SccFinder<'a> {
+    fn find(symbol_table: &'a SymbolTable) -> Vec<Vec<String>> {
         let mut finder = Self {
             symbol_table,
             index: 0,
@@ -267,27 +249,29 @@ impl<'a, 'q> SccFinder<'a, 'q> {
             sccs: Vec::new(),
         };
 
-        for &name in symbol_table.keys() {
-            if !finder.indices.contains_key(name) {
+        for name in symbol_table.keys() {
+            if !finder.indices.contains_key(name as &str) {
                 finder.strongconnect(name);
             }
         }
 
-        finder.sccs
+        finder
+            .sccs
+            .into_iter()
+            .map(|scc| scc.into_iter().map(String::from).collect())
+            .collect()
     }
 
-    fn strongconnect(&mut self, name: &'q str) {
+    fn strongconnect(&mut self, name: &'a str) {
         self.indices.insert(name, self.index);
         self.lowlinks.insert(name, self.index);
         self.index += 1;
         self.stack.push(name);
         self.on_stack.insert(name);
 
-        if let Some((_, body)) = self.symbol_table.get(name) {
+        if let Some(body) = self.symbol_table.get(name) {
             let refs = collect_refs(body, self.symbol_table);
             for ref_name in refs {
-                // We've already resolved to canonical &'q str in collect_refs
-                // so we can use it directly.
                 if !self.indices.contains_key(ref_name) {
                     self.strongconnect(ref_name);
                     let ref_lowlink = self.lowlinks[ref_name];
@@ -305,9 +289,10 @@ impl<'a, 'q> SccFinder<'a, 'q> {
             let mut scc = Vec::new();
             loop {
                 let w = self.stack.pop().unwrap();
-                self.on_stack.swap_remove(w);
+                self.on_stack.swap_remove(&w);
+                let done = w == name;
                 scc.push(w);
-                if w == name {
+                if done {
                     break;
                 }
             }
@@ -315,10 +300,6 @@ impl<'a, 'q> SccFinder<'a, 'q> {
         }
     }
 }
-
-// -----------------------------------------------------------------------------
-// Cycle Finder
-// -----------------------------------------------------------------------------
 
 struct CycleFinder<'a, 'q> {
     adj: &'a IndexMap<&'q str, Vec<(&'q str, SourceId, TextRange)>>,
@@ -389,35 +370,38 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Helper Visitors
-// -----------------------------------------------------------------------------
-
-fn expr_has_escape(expr: &Expr, scc: &IndexSet<&str>) -> bool {
+fn expr_has_escape(expr: &Expr, scc_names: &IndexSet<&str>) -> bool {
     match expr {
         Expr::Ref(r) => {
             let Some(name_token) = r.name() else {
                 return true;
             };
-            !scc.contains(name_token.text())
+            !scc_names.contains(name_token.text())
         }
         Expr::NamedNode(node) => {
             let children: Vec<_> = node.children().collect();
-            children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc))
+            children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc_names))
         }
-        Expr::AltExpr(_) => expr.children().iter().any(|c| expr_has_escape(c, scc)),
-        Expr::SeqExpr(_) => expr.children().iter().all(|c| expr_has_escape(c, scc)),
+        Expr::AltExpr(_) => expr
+            .children()
+            .iter()
+            .any(|c| expr_has_escape(c, scc_names)),
+        Expr::SeqExpr(_) => expr
+            .children()
+            .iter()
+            .all(|c| expr_has_escape(c, scc_names)),
         Expr::QuantifiedExpr(q) => {
             if q.is_optional() {
                 return true;
             }
             q.inner()
-                .map(|inner| expr_has_escape(&inner, scc))
+                .map(|inner| expr_has_escape(&inner, scc_names))
                 .unwrap_or(true)
         }
-        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => {
-            expr.children().iter().all(|c| expr_has_escape(c, scc))
-        }
+        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => expr
+            .children()
+            .iter()
+            .all(|c| expr_has_escape(c, scc_names)),
         Expr::AnonymousNode(_) => true,
     }
 }
@@ -440,29 +424,18 @@ fn expr_guarantees_consumption(expr: &Expr) -> bool {
     }
 }
 
-struct RefCollector<'a, 'q> {
-    symbol_table: &'a SymbolTable<'q>,
-    refs: &'a mut IndexSet<&'q str>,
-}
-
-impl<'a, 'q> Visitor for RefCollector<'a, 'q> {
-    fn visit_ref(&mut self, r: &Ref) {
-        if let Some(name) = r.name() {
-            // We immediately resolve to canonical &'q str keys to avoid allocations
-            if let Some((&k, _)) = self.symbol_table.get_key_value(name.text()) {
-                self.refs.insert(k);
-            }
-        }
-    }
-}
-
-fn collect_refs<'q>(expr: &Expr, symbol_table: &SymbolTable<'q>) -> IndexSet<&'q str> {
+fn collect_refs<'a>(expr: &Expr, symbol_table: &'a SymbolTable) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
-    let mut visitor = RefCollector {
-        symbol_table,
-        refs: &mut refs,
-    };
-    visitor.visit_expr(expr);
+    for descendant in expr.as_cst().descendants() {
+        let Some(r) = Ref::cast(descendant) else {
+            continue;
+        };
+        let Some(name_tok) = r.name() else { continue };
+        let Some(key) = symbol_table.keys().find(|&k| k == name_tok.text()) else {
+            continue;
+        };
+        refs.insert(key);
+    }
     refs
 }
 
