@@ -16,20 +16,21 @@ use super::types::{
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Debug, Clone)]
 pub struct TypeContext {
+    // Storage
     /// Interned types by ID
     types: Vec<TypeKind>,
     /// Deduplication map for type interning
     type_map: HashMap<TypeKind, TypeId>,
-    /// Cached term info per expression
-    term_info: HashMap<Expr, TermInfo>,
-    /// Definition-level type info (for TypeScript emission), keyed by DefId
-    def_types: HashMap<DefId, TypeId>,
     /// DefId → Symbol mapping (for resolving def names)
     def_names: Vec<Symbol>,
     /// Symbol → DefId reverse lookup
     def_ids: HashMap<Symbol, DefId>,
+    /// Definition-level type info (for TypeScript emission), keyed by DefId
+    def_types: HashMap<DefId, TypeId>,
     /// Definitions that are part of a recursive SCC
     recursive_defs: HashSet<DefId>,
+    /// Cached term info per expression
+    term_info: HashMap<Expr, TermInfo>,
 }
 
 impl Default for TypeContext {
@@ -43,11 +44,11 @@ impl TypeContext {
         let mut ctx = Self {
             types: Vec::new(),
             type_map: HashMap::new(),
-            term_info: HashMap::new(),
-            def_types: HashMap::new(),
             def_names: Vec::new(),
             def_ids: HashMap::new(),
+            def_types: HashMap::new(),
             recursive_defs: HashSet::new(),
+            term_info: HashMap::new(),
         };
 
         // Pre-register builtin types at their expected IDs

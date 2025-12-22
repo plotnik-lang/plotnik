@@ -37,12 +37,12 @@ use super::visitor::{Visitor, walk};
 /// This function is decoupled from `Query` to allow easier testing and
 /// modularity. It orchestrates the resolution and validation phases.
 pub fn link<'q>(
-    ast_map: &AstMap,
-    source_map: &'q SourceMap,
+    interner: &mut Interner,
     lang: &Lang,
+    source_map: &'q SourceMap,
+    ast_map: &AstMap,
     symbol_table: &SymbolTable,
     output: &mut LinkOutput,
-    interner: &mut Interner,
     diagnostics: &mut Diagnostics,
 ) {
     // Local deduplication maps (not exposed in output)
@@ -51,14 +51,14 @@ pub fn link<'q>(
 
     for (&source_id, root) in ast_map {
         let mut linker = Linker {
-            source_map,
-            source_id,
+            interner,
             lang,
+            source_map,
             symbol_table,
+            source_id,
             node_type_ids: &mut node_type_ids,
             node_field_ids: &mut node_field_ids,
             output,
-            interner,
             diagnostics,
         };
         linker.link(root);
@@ -66,14 +66,15 @@ pub fn link<'q>(
 }
 
 struct Linker<'a, 'q> {
-    source_map: &'q SourceMap,
-    source_id: SourceId,
+    // Refs
+    interner: &'a mut Interner,
     lang: &'a Lang,
+    source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
+    source_id: SourceId,
     node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     output: &'a mut LinkOutput,
-    interner: &'a mut Interner,
     diagnostics: &'a mut Diagnostics,
 }
 

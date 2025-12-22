@@ -29,11 +29,12 @@ use super::unify::{UnifyError, unify_flows};
 
 /// Inference context for a single pass over the AST.
 pub struct InferenceVisitor<'a, 'd> {
+    // References / Contexts
     pub ctx: &'a mut TypeContext,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
-    pub diag: &'d mut Diagnostics,
     pub source_id: SourceId,
+    pub diag: &'d mut Diagnostics,
 }
 
 impl<'a, 'd> InferenceVisitor<'a, 'd> {
@@ -41,15 +42,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         ctx: &'a mut TypeContext,
         interner: &'a mut Interner,
         symbol_table: &'a SymbolTable,
-        diag: &'d mut Diagnostics,
         source_id: SourceId,
+        diag: &'d mut Diagnostics,
     ) -> Self {
         Self {
             ctx,
             interner,
             symbol_table,
-            diag,
             source_id,
+            diag,
         }
     }
 
@@ -602,10 +603,10 @@ pub fn infer_root(
     ctx: &mut TypeContext,
     interner: &mut Interner,
     symbol_table: &SymbolTable,
-    diag: &mut Diagnostics,
     source_id: SourceId,
     root: &Root,
+    diag: &mut Diagnostics,
 ) {
-    let mut visitor = InferenceVisitor::new(ctx, interner, symbol_table, diag, source_id);
+    let mut visitor = InferenceVisitor::new(ctx, interner, symbol_table, source_id, diag);
     visitor.visit(root);
 }

@@ -38,11 +38,11 @@ use infer::infer_root;
 /// Processes definitions in dependency order (leaves first) to handle
 /// recursive definitions correctly.
 pub fn infer_types(
+    interner: &mut Interner,
     ast_map: &IndexMap<SourceId, Root>,
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
-    interner: &mut Interner,
 ) -> TypeContext {
     let mut ctx = TypeContext::new();
 
@@ -88,7 +88,7 @@ pub fn infer_types(
             };
 
             // Run inference on this root
-            infer_root(&mut ctx, interner, symbol_table, diag, source_id, root);
+            infer_root(&mut ctx, interner, symbol_table, source_id, root, diag);
 
             // Register the definition's output type
             if let Some(body) = symbol_table.get(def_name)
@@ -110,7 +110,7 @@ pub fn infer_types(
             continue;
         };
 
-        infer_root(&mut ctx, interner, symbol_table, diag, source_id, root);
+        infer_root(&mut ctx, interner, symbol_table, source_id, root, diag);
 
         if let Some(body) = symbol_table.get(name)
             && let Some(info) = ctx.get_term_info(body).cloned()

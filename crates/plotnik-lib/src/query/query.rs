@@ -120,11 +120,11 @@ impl QueryParsed {
 
         // Unified type checking pass
         let type_context = type_check::infer_types(
+            &mut interner,
             &self.ast_map,
             &symbol_table,
             &dependency_analysis,
             &mut self.diag,
-            &mut interner,
         );
 
         QueryAnalyzed {
@@ -204,12 +204,12 @@ impl QueryAnalyzed {
         let mut output = link::LinkOutput::default();
 
         link::link(
-            &self.query_parsed.ast_map,
-            &self.query_parsed.source_map,
+            &mut self.interner,
             lang,
+            &self.query_parsed.source_map,
+            &self.query_parsed.ast_map,
             &self.symbol_table,
             &mut output,
-            &mut self.interner,
             &mut self.query_parsed.diag,
         );
 
