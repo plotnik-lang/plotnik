@@ -8,6 +8,8 @@
 //! which is useful for passes that need to process dependencies before
 //! dependents (like type inference).
 
+use std::collections::HashMap;
+
 use indexmap::{IndexMap, IndexSet};
 
 use super::source_map::SourceId;
@@ -17,6 +19,7 @@ use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
 use crate::query::symbol_table::SymbolTable;
+use crate::query::type_check::DefId;
 use crate::query::visitor::{Visitor, walk_expr};
 
 /// Result of dependency analysis.
@@ -29,14 +32,54 @@ pub struct DependencyAnalysis {
     /// - Definitions within an SCC are mutually recursive.
     /// - Every definition in the symbol table appears exactly once.
     pub sccs: Vec<Vec<String>>,
+
+    /// Maps definition name to its DefId.
+    name_to_def: HashMap<String, DefId>,
+
+    /// Maps DefId to definition name (indexed by DefId).
+    def_names: Vec<String>,
+}
+
+impl DependencyAnalysis {
+    /// Get the DefId for a definition name.
+    pub fn def_id(&self, name: &str) -> Option<DefId> {
+        self.name_to_def.get(name).copied()
+    }
+
+    /// Get the name for a DefId.
+    pub fn def_name(&self, id: DefId) -> &str {
+        &self.def_names[id.index()]
+    }
+
+    /// Number of definitions.
+    pub fn def_count(&self) -> usize {
+        self.def_names.len()
+    }
 }
 
 /// Analyze dependencies between definitions.
 ///
-/// Returns the SCCs in reverse topological order.
+/// Returns the SCCs in reverse topological order, with DefId mappings.
 pub fn analyze_dependencies(symbol_table: &SymbolTable) -> DependencyAnalysis {
     let sccs = SccFinder::find(symbol_table);
-    DependencyAnalysis { sccs }
+
+    // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
+    let mut name_to_def = HashMap::new();
+    let mut def_names = Vec::new();
+
+    for scc in &sccs {
+        for name in scc {
+            let def_id = DefId::from_raw(def_names.len() as u32);
+            name_to_def.insert(name.clone(), def_id);
+            def_names.push(name.clone());
+        }
+    }
+
+    DependencyAnalysis {
+        sccs,
+        name_to_def,
+        def_names,
+    }
 }
 
 /// Validate recursion using the pre-computed dependency analysis.

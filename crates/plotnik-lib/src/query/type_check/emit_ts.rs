@@ -87,7 +87,7 @@ impl<'a> TsEmitter<'a> {
         let def_names: HashMap<TypeId, String> = self
             .ctx
             .iter_def_types()
-            .map(|(sym, id)| (id, self.ctx.resolve(sym).to_string()))
+            .map(|(def_id, type_id)| (type_id, self.ctx.def_name(def_id).to_string()))
             .collect();
 
         // Compute topological order (leaves first)
@@ -277,8 +277,8 @@ impl<'a> TsEmitter<'a> {
 
     fn collect_type_names_with_context(&mut self) {
         // Reserve definition names first
-        for (sym, _) in self.ctx.iter_def_types() {
-            let name = self.ctx.resolve(sym);
+        for (def_id, _) in self.ctx.iter_def_types() {
+            let name = self.ctx.def_name(def_id);
             let pascal_name = to_pascal_case(name);
             self.used_names.insert(pascal_name);
         }
@@ -286,8 +286,8 @@ impl<'a> TsEmitter<'a> {
         // Collect naming contexts by traversing definition types
         let mut type_contexts: HashMap<TypeId, NamingContext> = HashMap::new();
 
-        for (sym, type_id) in self.ctx.iter_def_types() {
-            let def_name = self.ctx.resolve(sym);
+        for (def_id, type_id) in self.ctx.iter_def_types() {
+            let def_name = self.ctx.def_name(def_id);
             self.collect_contexts_for_type(
                 type_id,
                 &NamingContext {
@@ -600,7 +600,7 @@ impl<'a> TsEmitter<'a> {
             TypeKind::Node => "Node".to_string(),
             TypeKind::String => "string".to_string(),
             TypeKind::Custom(sym) => self.ctx.resolve(*sym).to_string(),
-            TypeKind::Ref(sym) => to_pascal_case(self.ctx.resolve(*sym)),
+            TypeKind::Ref(def_id) => to_pascal_case(self.ctx.def_name(*def_id)),
 
             TypeKind::Struct(fields) => {
                 if let Some(name) = self.type_names.get(&type_id) {

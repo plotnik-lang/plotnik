@@ -14,7 +14,7 @@ mod unify;
 
 pub use context::TypeContext;
 pub use emit_ts::{EmitConfig, TsEmitter, emit_typescript, emit_typescript_with_config};
-pub use symbol::{Interner, Symbol};
+pub use symbol::{DefId, Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,
     TypeId, TypeKind,

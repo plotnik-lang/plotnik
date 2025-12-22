@@ -1,7 +1,9 @@
-//! Symbol interning for field and type names.
+//! Symbol interning for field and type names, plus definition identifiers.
 //!
 //! Converts heap-allocated strings into cheap integer handles.
 //! Comparing two symbols is O(1) integer comparison.
+//!
+//! `DefId` identifies named definitions (like `Foo = ...`) by stable index.
 
 use std::collections::HashMap;
 
@@ -31,6 +33,33 @@ impl PartialOrd for Symbol {
 impl Ord for Symbol {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
+    }
+}
+
+/// A lightweight handle to a named definition.
+///
+/// Assigned during dependency analysis. Enables O(1) lookup of definition
+/// properties without string comparison.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct DefId(u32);
+
+impl DefId {
+    /// Create a DefId from a raw index. Use only for deserialization.
+    #[inline]
+    pub fn from_raw(index: u32) -> Self {
+        Self(index)
+    }
+
+    /// Raw index for serialization/debugging.
+    #[inline]
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Index for array access.
+    #[inline]
+    pub fn index(self) -> usize {
+        self.0 as usize
     }
 }
 
@@ -156,5 +185,22 @@ mod tests {
 
         // z was inserted first, so z < a by insertion order
         assert!(z < a);
+    }
+
+    #[test]
+    fn def_id_roundtrip() {
+        let id = DefId::from_raw(42);
+        assert_eq!(id.as_u32(), 42);
+        assert_eq!(id.index(), 42);
+    }
+
+    #[test]
+    fn def_id_equality() {
+        let a = DefId::from_raw(1);
+        let b = DefId::from_raw(1);
+        let c = DefId::from_raw(2);
+
+        assert_eq!(a, b);
+        assert_ne!(a, c);
     }
 }

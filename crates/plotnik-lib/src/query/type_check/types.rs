@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use super::symbol::Symbol;
+use super::symbol::{DefId, Symbol};
 
 /// Interned type identifier. Types are stored in TypeContext and referenced by ID.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
@@ -44,8 +44,8 @@ pub enum TypeKind {
     Array { element: TypeId, non_empty: bool },
     /// Optional wrapper
     Optional(TypeId),
-    /// Forward reference to a recursive type (name as Symbol)
-    Ref(Symbol),
+    /// Forward reference to a recursive type (resolved DefId)
+    Ref(DefId),
 }
 
 impl TypeKind {
