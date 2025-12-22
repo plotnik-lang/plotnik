@@ -4,12 +4,17 @@
 //! Reports diagnostics for type errors like strict dimensionality violations.
 
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 use plotnik_core::Interner;
-
-use super::symbol::Symbol;
-
 use rowan::TextRange;
+
+use super::context::TypeContext;
+use super::symbol::Symbol;
+use super::types::{
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TermInfo, TypeFlow, TypeId, TypeKind,
+};
+use super::unify::{UnifyError, unify_flows};
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{
@@ -21,15 +26,8 @@ use crate::query::source_map::SourceId;
 use crate::query::symbol_table::SymbolTable;
 use crate::query::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
 
-use super::context::TypeContext;
-use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TermInfo, TypeFlow, TypeId, TypeKind,
-};
-use super::unify::{UnifyError, unify_flows};
-
 /// Inference context for a single pass over the AST.
 pub struct InferenceVisitor<'a, 'd> {
-    // References / Contexts
     pub ctx: &'a mut TypeContext,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
@@ -56,12 +54,11 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Infer the TermInfo for an expression, caching the result.
     pub fn infer_expr(&mut self, expr: &Expr) -> TermInfo {
-        // Check cache first
         if let Some(info) = self.ctx.get_term_info(expr) {
             return info.clone();
         }
 
-        // Insert sentinel to break cycles
+        // Sentinel to break recursion cycles
         self.ctx.set_term_info(expr.clone(), TermInfo::void());
 
         let info = self.compute_expr(expr);
@@ -82,7 +79,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Named node: matches one position, bubbles up child captures
+    /// Named node: matches one position, bubbles up child captures.
     fn infer_named_node(&mut self, node: &NamedNode) -> TermInfo {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
 
@@ -93,6 +90,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 && let Some(fields) = self.ctx.get_struct_fields(type_id)
             {
                 for (name, info) in fields {
+                    // Named nodes merge fields silently (union behavior)
                     merged_fields.entry(*name).or_insert(*info);
                 }
             }
@@ -107,29 +105,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(Arity::One, flow)
     }
 
-    /// Anonymous node (literal or wildcard): matches one position, produces nothing
+    /// Anonymous node (literal or wildcard): matches one position, produces nothing.
     fn infer_anonymous_node(&mut self, _node: &AnonymousNode) -> TermInfo {
         TermInfo::new(Arity::One, TypeFlow::Void)
-    }
-
-    /// If expr is (or contains at its core) a recursive Ref, return its Ref type.
-    fn get_recursive_ref_type(&mut self, expr: &Expr) -> Option<TypeId> {
-        match expr {
-            Expr::Ref(r) => {
-                let name_tok = r.name()?;
-                let name_sym = self.interner.intern(name_tok.text());
-                let def_id = self.ctx.get_def_id_sym(name_sym)?;
-                if self.ctx.is_recursive(def_id) {
-                    Some(self.ctx.intern_type(TypeKind::Ref(def_id)))
-                } else {
-                    None
-                }
-            }
-            Expr::QuantifiedExpr(q) => q.inner().and_then(|i| self.get_recursive_ref_type(&i)),
-            Expr::CapturedExpr(c) => c.inner().and_then(|i| self.get_recursive_ref_type(&i)),
-            Expr::FieldExpr(f) => f.value().and_then(|v| self.get_recursive_ref_type(&v)),
-            _ => None,
-        }
     }
 
     /// Reference: transparent for non-recursive defs, opaque boundary for recursive ones.
@@ -148,21 +126,18 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return TermInfo::new(Arity::One, TypeFlow::Void);
         }
 
-        // Get the body expression for this definition
         let Some(body) = self.symbol_table.get(name) else {
-            // Undefined ref - already reported by symbol_table pass
             return TermInfo::void();
         };
 
-        // Non-recursive refs are transparent - propagate body's flow and arity
+        // Non-recursive refs are transparent
         self.infer_expr(body)
     }
 
-    /// Sequence: One if 0-1 children, else Many; merge children's fields
+    /// Sequence: Arity aggregation and strict field merging (no duplicates).
     fn infer_seq_expr(&mut self, seq: &SeqExpr) -> TermInfo {
         let children: Vec<_> = seq.children().collect();
 
-        // Compute arity based on child count
         let arity = match children.len() {
             0 | 1 => children
                 .first()
@@ -171,37 +146,18 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             _ => Arity::Many,
         };
 
-        // Merge fields from all children
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
 
         for child in &children {
             let child_info = self.infer_expr(child);
 
-            if let TypeFlow::Bubble(type_id) = child_info.flow
-                && let Some(fields) = self.ctx.get_struct_fields(type_id)
-            {
-                for (&name, &info) in fields {
-                    use std::collections::btree_map::Entry;
-                    match merged_fields.entry(name) {
-                        Entry::Vacant(e) => {
-                            e.insert(info);
-                        }
-                        Entry::Occupied(_) => {
-                            // Duplicate capture in same scope - error
-                            self.diag
-                                .report(
-                                    self.source_id,
-                                    DiagnosticKind::DuplicateCaptureInScope,
-                                    child.text_range(),
-                                )
-                                .message(self.interner.resolve(name))
-                                .emit();
-                        }
-                    }
+            if let TypeFlow::Bubble(type_id) = child_info.flow {
+                // Clone fields to release immutable borrow on self.ctx,
+                // allowing mutable borrow of self for merge_seq_fields.
+                if let Some(fields) = self.ctx.get_struct_fields(type_id).cloned() {
+                    self.merge_seq_fields(&mut merged_fields, &fields, child.text_range());
                 }
             }
-            // Void and Scalar children don't contribute fields
-            // (Scalar would be from refs, which are scope boundaries)
         }
 
         let flow = if merged_fields.is_empty() {
@@ -213,11 +169,34 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(arity, flow)
     }
 
-    /// Alternation: arity is Many if ANY branch is Many; type depends on tagged vs untagged
-    fn infer_alt_expr(&mut self, alt: &AltExpr) -> TermInfo {
-        let kind = alt.kind();
+    fn merge_seq_fields(
+        &mut self,
+        target: &mut BTreeMap<Symbol, FieldInfo>,
+        source: &BTreeMap<Symbol, FieldInfo>,
+        range: TextRange,
+    ) {
+        for (&name, &info) in source {
+            match target.entry(name) {
+                Entry::Vacant(e) => {
+                    e.insert(info);
+                }
+                Entry::Occupied(_) => {
+                    self.diag
+                        .report(
+                            self.source_id,
+                            DiagnosticKind::DuplicateCaptureInScope,
+                            range,
+                        )
+                        .message(self.interner.resolve(name))
+                        .emit();
+                }
+            }
+        }
+    }
 
-        match kind {
+    /// Alternation: arity is Many if ANY branch is Many.
+    fn infer_alt_expr(&mut self, alt: &AltExpr) -> TermInfo {
+        match alt.kind() {
             AltKind::Tagged => self.infer_tagged_alt(alt),
             AltKind::Untagged | AltKind::Mixed => self.infer_untagged_alt(alt),
         }
@@ -234,23 +213,17 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let label_sym = self.interner.intern(label.text());
 
             let Some(body) = branch.body() else {
-                // Empty variant gets void/empty struct type
-                variants.insert(
-                    label_sym,
-                    self.ctx.intern_type(TypeKind::Struct(BTreeMap::new())),
-                );
+                // Empty variant -> empty struct
+                let empty_struct = self.ctx.intern_struct(BTreeMap::new());
+                variants.insert(label_sym, empty_struct);
                 continue;
             };
 
             let body_info = self.infer_expr(&body);
             combined_arity = combined_arity.combine(body_info.arity);
-
-            // Convert flow to a type for this variant
-            let variant_type = self.flow_to_type(&body_info.flow);
-            variants.insert(label_sym, variant_type);
+            variants.insert(label_sym, self.flow_to_type(&body_info.flow));
         }
 
-        // Tagged alternation produces an Enum type
         let enum_type = self.ctx.intern_type(TypeKind::Enum(variants));
         TermInfo::new(combined_arity, TypeFlow::Scalar(enum_type))
     }
@@ -259,22 +232,22 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let mut flows: Vec<TypeFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
-        // Handle both direct exprs and branches without labels
+        // Collect from branches
         for branch in alt.branches() {
             if let Some(body) = branch.body() {
-                let body_info = self.infer_expr(&body);
-                combined_arity = combined_arity.combine(body_info.arity);
-                flows.push(body_info.flow);
+                let info = self.infer_expr(&body);
+                combined_arity = combined_arity.combine(info.arity);
+                flows.push(info.flow);
             }
         }
 
+        // Collect from direct expressions
         for expr in alt.exprs() {
-            let expr_info = self.infer_expr(&expr);
-            combined_arity = combined_arity.combine(expr_info.arity);
-            flows.push(expr_info.flow);
+            let info = self.infer_expr(&expr);
+            combined_arity = combined_arity.combine(info.arity);
+            flows.push(info.flow);
         }
 
-        // Unify all flows
         let unified_flow = match unify_flows(self.ctx, flows) {
             Ok(flow) => flow,
             Err(err) => {
@@ -286,79 +259,33 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(combined_arity, unified_flow)
     }
 
-    /// Captured expression: wraps inner's flow into a field
+    /// Captured expression: wraps inner's flow into a field.
     fn infer_captured_expr(&mut self, cap: &CapturedExpr) -> TermInfo {
         let Some(name_tok) = cap.name() else {
-            // Missing name - recover gracefully
+            // Recover gracefully
             return cap
                 .inner()
-                .map(|inner| self.infer_expr(&inner))
+                .map(|i| self.infer_expr(&i))
                 .unwrap_or_else(TermInfo::void);
         };
         let capture_name = self.interner.intern(name_tok.text());
 
-        // Check for type annotation
-        let annotation_type = cap.type_annotation().and_then(|t| {
-            t.name().map(|n| {
-                let type_name = n.text();
-                if type_name == "string" {
-                    TYPE_STRING
-                } else {
-                    let type_sym = self.interner.intern(type_name);
-                    self.ctx.intern_type(TypeKind::Custom(type_sym))
-                }
-            })
-        });
-
+        let annotation_type = self.resolve_annotation(cap);
         let Some(inner) = cap.inner() else {
-            // Capture without inner - still produces a field
+            // Capture without inner -> creates a Node field
             let type_id = annotation_type.unwrap_or(TYPE_NODE);
+            let field = FieldInfo::required(type_id);
             return TermInfo::new(
                 Arity::One,
-                TypeFlow::Bubble(
-                    self.ctx
-                        .intern_single_field(capture_name, FieldInfo::required(type_id)),
-                ),
+                TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field)),
             );
         };
 
-        // Special handling for quantifiers:
-        // - * or +: this capture serves as row capture, skip strict dimensionality
-        // - ?: capture produces an optional field
-        let (inner_info, is_optional_capture) = if let Expr::QuantifiedExpr(q) = &inner {
-            let quantifier = self.parse_quantifier(q);
-            match quantifier {
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                    (self.infer_quantified_expr_as_row(q), false)
-                }
-                QuantifierKind::Optional => (self.infer_expr(&inner), true),
-            }
-        } else {
-            (self.infer_expr(&inner), false)
-        };
+        // Determine how inner flow relates to capture (e.g., ? makes field optional)
+        let (inner_info, is_optional) = self.resolve_capture_inner(&inner);
 
-        // Transform based on inner's flow
-        let captured_type = match &inner_info.flow {
-            TypeFlow::Void => {
-                // Check if inner is a recursive ref - if so, capture produces Ref type
-                if let Some(ref_type) = self.get_recursive_ref_type(&inner) {
-                    annotation_type.unwrap_or(ref_type)
-                } else {
-                    // @name on Void → capture produces Node (or annotated type)
-                    annotation_type.unwrap_or(TYPE_NODE)
-                }
-            }
-            TypeFlow::Scalar(type_id) => {
-                // @name on Scalar → capture that scalar type
-                annotation_type.unwrap_or(*type_id)
-            }
-            TypeFlow::Bubble(type_id) => {
-                // @name on Bubble → capture the struct type directly
-                annotation_type.unwrap_or(*type_id)
-            }
-        };
-
-        let field_info = if is_optional_capture {
+        let captured_type = self.determine_captured_type(&inner, &inner_info, annotation_type);
+        let field_info = if is_optional {
             FieldInfo::optional(captured_type)
         } else {
             FieldInfo::required(captured_type)
@@ -370,12 +297,84 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         )
     }
 
-    /// Quantified expression: applies quantifier to inner's flow
+    /// Resolves explicit type annotation like `@foo: string`.
+    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<TypeId> {
+        cap.type_annotation().and_then(|t| {
+            t.name().map(|n| {
+                let text = n.text();
+                if text == "string" {
+                    TYPE_STRING
+                } else {
+                    let sym = self.interner.intern(text);
+                    self.ctx.intern_type(TypeKind::Custom(sym))
+                }
+            })
+        })
+    }
+
+    /// Logic for how quantifier on the inner expression affects the capture field.
+    /// Returns (Info, is_optional).
+    fn resolve_capture_inner(&mut self, inner: &Expr) -> (TermInfo, bool) {
+        if let Expr::QuantifiedExpr(q) = inner {
+            let quantifier = self.parse_quantifier(q);
+            match quantifier {
+                // * or + acts as row capture here (skipping strict dimensionality)
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                    (self.infer_quantified_expr_as_row(q), false)
+                }
+                // ? makes the resulting capture field optional
+                QuantifierKind::Optional => (self.infer_expr(inner), true),
+            }
+        } else {
+            (self.infer_expr(inner), false)
+        }
+    }
+
+    /// Transforms the inner flow into a specific TypeId for the field.
+    fn determine_captured_type(
+        &mut self,
+        inner: &Expr,
+        inner_info: &TermInfo,
+        annotation: Option<TypeId>,
+    ) -> TypeId {
+        match &inner_info.flow {
+            TypeFlow::Void => {
+                if let Some(ref_type) = self.get_recursive_ref_type(inner) {
+                    annotation.unwrap_or(ref_type)
+                } else {
+                    annotation.unwrap_or(TYPE_NODE)
+                }
+            }
+            TypeFlow::Scalar(type_id) => annotation.unwrap_or(*type_id),
+            TypeFlow::Bubble(type_id) => annotation.unwrap_or(*type_id),
+        }
+    }
+
+    /// If expr is (or contains) a recursive Ref, return its Ref type.
+    fn get_recursive_ref_type(&mut self, expr: &Expr) -> Option<TypeId> {
+        match expr {
+            Expr::Ref(r) => {
+                let name_tok = r.name()?;
+                let name = name_tok.text();
+                let sym = self.interner.intern(name);
+                let def_id = self.ctx.get_def_id_sym(sym)?;
+                if self.ctx.is_recursive(def_id) {
+                    Some(self.ctx.intern_type(TypeKind::Ref(def_id)))
+                } else {
+                    None
+                }
+            }
+            Expr::QuantifiedExpr(q) => self.get_recursive_ref_type(&q.inner()?),
+            Expr::CapturedExpr(c) => self.get_recursive_ref_type(&c.inner()?),
+            Expr::FieldExpr(f) => self.get_recursive_ref_type(&f.value()?),
+            _ => None,
+        }
+    }
+
     fn infer_quantified_expr(&mut self, quant: &QuantifiedExpr) -> TermInfo {
         self.infer_quantified_expr_impl(quant, false)
     }
 
-    /// Quantified expression when used as a row capture (skip strict dimensionality check)
     fn infer_quantified_expr_as_row(&mut self, quant: &QuantifiedExpr) -> TermInfo {
         self.infer_quantified_expr_impl(quant, true)
     }
@@ -392,72 +391,66 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let inner_info = self.infer_expr(&inner);
         let quantifier = self.parse_quantifier(quant);
 
-        match quantifier {
-            QuantifierKind::Optional => {
-                // `?` makes fields optional, doesn't add dimensionality
-                let flow = match inner_info.flow {
-                    TypeFlow::Void => TypeFlow::Void,
-                    TypeFlow::Scalar(t) => {
-                        TypeFlow::Scalar(self.ctx.intern_type(TypeKind::Optional(t)))
-                    }
-                    TypeFlow::Bubble(type_id) => {
-                        // Make all fields optional
-                        let fields = self
-                            .ctx
-                            .get_struct_fields(type_id)
-                            .cloned()
-                            .unwrap_or_default();
-                        let optional_fields = fields
-                            .into_iter()
-                            .map(|(k, v)| (k, v.make_optional()))
-                            .collect();
-                        TypeFlow::Bubble(self.ctx.intern_struct(optional_fields))
-                    }
-                };
-                TermInfo::new(inner_info.arity, flow)
-            }
-
+        let flow = match quantifier {
+            QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                // * and + require strict dimensionality (unless this is a row capture)
                 if !is_row_capture {
                     self.check_strict_dimensionality(quant, &inner_info);
                 }
+                self.make_flow_array(inner_info.flow, &inner, quantifier.is_non_empty())
+            }
+        };
 
-                let flow = match inner_info.flow {
-                    TypeFlow::Void => {
-                        // Scalar list: void inner becomes array of Node (or Ref for recursive)
-                        let element = self.get_recursive_ref_type(&inner).unwrap_or(TYPE_NODE);
-                        let array_type = self.ctx.intern_type(TypeKind::Array {
-                            element,
-                            non_empty: quantifier.is_non_empty(),
-                        });
-                        TypeFlow::Scalar(array_type)
-                    }
-                    TypeFlow::Scalar(t) => {
-                        // Scalar becomes array
-                        let array_type = self.ctx.intern_type(TypeKind::Array {
-                            element: t,
-                            non_empty: quantifier.is_non_empty(),
-                        });
-                        TypeFlow::Scalar(array_type)
-                    }
-                    TypeFlow::Bubble(struct_type) => {
-                        // Fields with * or + and no row capture is an error
-                        // (already reported by check_strict_dimensionality if !is_row_capture)
-                        // Return array of struct as best-effort
-                        let array_type = self.ctx.intern_type(TypeKind::Array {
-                            element: struct_type,
-                            non_empty: quantifier.is_non_empty(),
-                        });
-                        TypeFlow::Scalar(array_type)
-                    }
-                };
-                TermInfo::new(inner_info.arity, flow)
+        TermInfo::new(inner_info.arity, flow)
+    }
+
+    fn make_flow_optional(&mut self, flow: TypeFlow) -> TypeFlow {
+        match flow {
+            TypeFlow::Void => TypeFlow::Void,
+            TypeFlow::Scalar(t) => TypeFlow::Scalar(self.ctx.intern_type(TypeKind::Optional(t))),
+            TypeFlow::Bubble(type_id) => {
+                let fields = self
+                    .ctx
+                    .get_struct_fields(type_id)
+                    .cloned()
+                    .unwrap_or_default();
+                let optional_fields = fields
+                    .into_iter()
+                    .map(|(k, v)| (k, v.make_optional()))
+                    .collect();
+                TypeFlow::Bubble(self.ctx.intern_struct(optional_fields))
             }
         }
     }
 
-    /// Field expression: arity One, delegates type to value
+    fn make_flow_array(&mut self, flow: TypeFlow, inner: &Expr, non_empty: bool) -> TypeFlow {
+        match flow {
+            TypeFlow::Void => {
+                // Scalar list: void inner -> array of Node (or Ref)
+                let element = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+                let array_type = self.ctx.intern_type(TypeKind::Array { element, non_empty });
+                TypeFlow::Scalar(array_type)
+            }
+            TypeFlow::Scalar(t) => {
+                let array_type = self.ctx.intern_type(TypeKind::Array {
+                    element: t,
+                    non_empty,
+                });
+                TypeFlow::Scalar(array_type)
+            }
+            TypeFlow::Bubble(struct_type) => {
+                // Note: Bubble with * or + is strictly invalid unless it's a row capture,
+                // but we construct a valid type as fallback.
+                let array_type = self.ctx.intern_type(TypeKind::Array {
+                    element: struct_type,
+                    non_empty,
+                });
+                TypeFlow::Scalar(array_type)
+            }
+        }
+    }
+
+    /// Field expression: arity One, delegates type to value.
     fn infer_field_expr(&mut self, field: &FieldExpr) -> TermInfo {
         let Some(value) = field.value() else {
             return TermInfo::void();
@@ -465,66 +458,76 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
         let value_info = self.infer_expr(&value);
 
-        // Field validation: value must have arity One
+        // Validation: Fields cannot be assigned 'Many' arity values directly
         if value_info.arity == Arity::Many {
-            let field_name = field
-                .name()
-                .map(|t| t.text().to_string())
-                .unwrap_or_else(|| "field".to_string());
-
-            let mut builder = self.diag.report(
-                self.source_id,
-                DiagnosticKind::FieldSequenceValue,
-                value.text_range(),
-            );
-            builder = builder.message(field_name);
-
-            // If value is a reference, add related info
-            if let Expr::Ref(r) = &value
-                && let Some(name_tok) = r.name()
-                && let Some((def_source, def_body)) = self.symbol_table.get_full(name_tok.text())
-            {
-                builder = builder.related_to(def_source, def_body.text_range(), "defined here");
-            }
-
-            builder.emit();
+            self.report_field_arity_error(field, &value);
         }
 
-        // Field itself has arity One; flow passes through
         TermInfo::new(Arity::One, value_info.flow)
     }
 
-    /// Check strict dimensionality rule for * and + quantifiers.
-    fn check_strict_dimensionality(&mut self, quant: &QuantifiedExpr, inner_info: &TermInfo) {
-        // If inner has fields (captures), that's a violation
-        if let TypeFlow::Bubble(type_id) = &inner_info.flow
-            && let Some(fields) = self.ctx.get_struct_fields(*type_id)
-            && !fields.is_empty()
+    fn report_field_arity_error(&mut self, field: &FieldExpr, value: &Expr) {
+        let field_name = field
+            .name()
+            .map(|t| t.text().to_string())
+            .unwrap_or_else(|| "field".to_string());
+
+        let mut builder = self.diag.report(
+            self.source_id,
+            DiagnosticKind::FieldSequenceValue,
+            value.text_range(),
+        );
+        builder = builder.message(field_name);
+
+        if let Expr::Ref(r) = value
+            && let Some(name_tok) = r.name()
         {
-            let op = quant
-                .operator()
-                .map(|t| t.text().to_string())
-                .unwrap_or_else(|| "*".to_string());
-
-            let capture_names: Vec<_> = fields
-                .keys()
-                .map(|s| format!("`@{}`", self.interner.resolve(*s)))
-                .collect();
-            let captures_str = capture_names.join(", ");
-
-            self.diag
-                .report(
-                    self.source_id,
-                    DiagnosticKind::StrictDimensionalityViolation,
-                    quant.text_range(),
-                )
-                .message(format!(
-                    "quantifier `{}` contains captures ({}) but no row capture",
-                    op, captures_str
-                ))
-                .hint("wrap as `{...}* @rows`")
-                .emit();
+            let name = name_tok.text();
+            if let Some((src, body)) = self.symbol_table.get_full(name) {
+                builder = builder.related_to(src, body.text_range(), "defined here");
+            }
         }
+
+        builder.emit();
+    }
+
+    /// Check strict dimensionality rule for * and + quantifiers.
+    /// Captures inside a quantifier are forbidden unless marked as a row capture.
+    fn check_strict_dimensionality(&mut self, quant: &QuantifiedExpr, inner_info: &TermInfo) {
+        let TypeFlow::Bubble(type_id) = &inner_info.flow else {
+            return;
+        };
+
+        let Some(fields) = self.ctx.get_struct_fields(*type_id) else {
+            return;
+        };
+        if fields.is_empty() {
+            return;
+        }
+
+        let op = quant
+            .operator()
+            .map(|t| t.text().to_string())
+            .unwrap_or_else(|| "*".to_string());
+
+        let capture_names: Vec<_> = fields
+            .keys()
+            .map(|s| format!("`@{}`", self.interner.resolve(*s)))
+            .collect();
+        let captures_str = capture_names.join(", ");
+
+        self.diag
+            .report(
+                self.source_id,
+                DiagnosticKind::StrictDimensionalityViolation,
+                quant.text_range(),
+            )
+            .message(format!(
+                "quantifier `{}` contains captures ({}) but no row capture",
+                op, captures_str
+            ))
+            .hint("wrap as `{...}* @rows`")
+            .emit();
     }
 
     fn parse_quantifier(&self, quant: &QuantifiedExpr) -> QuantifierKind {
@@ -540,7 +543,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Convert a TypeFlow to a TypeId for storage in enum variants, etc.
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
             TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
@@ -585,7 +587,7 @@ impl Visitor for InferenceVisitor<'_, '_> {
     }
 
     fn visit_named_node(&mut self, node: &NamedNode) {
-        // Visit children first (bottom-up)
+        // Bottom-up traversal
         walk_named_node(self, node);
     }
 
