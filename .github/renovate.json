@@ -1,20 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices"
-  ],
-  "ignoreDeps": [
-    "taiki-e/install-action"
-  ],
+  "extends": ["config:best-practices"],
+  "ignoreDeps": ["taiki-e/install-action"],
   "packageRules": [
     {
-      "matchManagers": [
-        "cargo"
-      ],
+      "matchManagers": ["cargo"],
       "groupName": "arborium crates",
-      "matchPackageNames": [
-        "/^arborium-/"
-      ]
+      "matchPackageNames": ["/^arborium-/"]
     }
   ]
 }

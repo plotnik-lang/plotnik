@@ -195,9 +195,10 @@ impl<'a> TsEmitter<'a> {
             return;
         }
 
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return;
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for naming context");
 
         match kind {
             TypeKind::Struct(fields) => {
@@ -239,9 +240,10 @@ impl<'a> TsEmitter<'a> {
             return;
         }
 
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return;
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for builtin collection");
 
         match kind {
             TypeKind::Node | TypeKind::Custom(_) => {
@@ -319,9 +321,10 @@ impl<'a> TsEmitter<'a> {
             return;
         }
 
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return;
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for reachability");
 
         match kind {
             TypeKind::Struct(fields) => {
@@ -340,9 +343,10 @@ impl<'a> TsEmitter<'a> {
     }
 
     fn get_direct_deps(&self, type_id: TypeId) -> Vec<TypeId> {
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return vec![];
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for dependency calculation");
         match kind {
             TypeKind::Struct(fields) => fields
                 .values()
@@ -362,9 +366,10 @@ impl<'a> TsEmitter<'a> {
         if type_id.is_builtin() {
             return vec![];
         }
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return vec![];
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for unwrapping");
         match kind {
             TypeKind::Array { element, .. } => self.unwrap_for_deps(*element),
             TypeKind::Optional(inner) => self.unwrap_for_deps(*inner),
@@ -389,9 +394,10 @@ impl<'a> TsEmitter<'a> {
     fn emit_generated_type_def(&mut self, type_id: TypeId, name: &str) {
         self.emitted.insert(type_id);
         let export = if self.config.export { "export " } else { "" };
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return;
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for generation");
 
         match kind {
             TypeKind::Struct(fields) => self.emit_interface(name, fields, export),
@@ -405,9 +411,10 @@ impl<'a> TsEmitter<'a> {
         let export = if self.config.export { "export " } else { "" };
         let type_name = to_pascal_case(name);
 
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return;
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for definition emission");
 
         match kind {
             TypeKind::Struct(fields) => {
@@ -496,9 +503,10 @@ impl<'a> TsEmitter<'a> {
             _ => {}
         }
 
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return "unknown".to_string();
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for TS conversion");
 
         match kind {
             TypeKind::Void => "void".to_string(),
@@ -567,9 +575,10 @@ impl<'a> TsEmitter<'a> {
     }
 
     fn inline_data_type(&self, type_id: TypeId) -> String {
-        let Some(kind) = self.ctx.get_type(type_id) else {
-            return "unknown".to_string();
-        };
+        let kind = self
+            .ctx
+            .get_type(type_id)
+            .expect("valid TypeId required for inline data emission");
 
         match kind {
             TypeKind::Struct(fields) => self.inline_struct(fields),

@@ -147,9 +147,10 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         // A component is recursive if it has >1 node, or 1 node that references itself.
         if scc.len() == 1 {
             let name = &scc[0];
-            let Some(body) = self.symbol_table.get(name) else {
-                return;
-            };
+            let body = self
+                .symbol_table
+                .get(name)
+                .expect("node in SCC must exist in symbol table");
             if !collect_refs(body, self.symbol_table).contains(name.as_str()) {
                 return;
             }
