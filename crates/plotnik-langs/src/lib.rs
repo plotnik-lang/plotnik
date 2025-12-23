@@ -1,3 +1,4 @@
+use std::num::NonZeroU16;
 use std::sync::Arc;
 
 use arborium_tree_sitter::Language;
@@ -100,18 +101,13 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
 
     fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
         let id = self.ts_lang.id_for_node_kind(kind, true);
-        // For named nodes, 0 always means "not found"
-        (id != 0).then_some(id)
+        NonZeroU16::new(id)
     }
 
     fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
         let id = self.ts_lang.id_for_node_kind(kind, false);
-        // Tree-sitter returns 0 for both "not found" AND the valid anonymous "end" node.
-        // We disambiguate via reverse lookup.
-        if id != 0 {
-            return Some(id);
-        }
-        (self.ts_lang.node_kind_for_id(0) == Some(kind)).then_some(0)
+        // Node ID 0 is tree-sitter internal; we never obtain it via cursor walk.
+        NonZeroU16::new(id)
     }
 
     fn resolve_field(&self, name: &str) -> Option<NodeFieldId> {
@@ -134,7 +130,7 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
     }
 
     fn node_type_name(&self, node_type_id: NodeTypeId) -> Option<&'static str> {
-        self.ts_lang.node_kind_for_id(node_type_id)
+        self.ts_lang.node_kind_for_id(node_type_id.get())
     }
 
     fn field_name(&self, field_id: NodeFieldId) -> Option<&'static str> {
@@ -156,11 +152,11 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
     }
 
     fn is_supertype(&self, node_type_id: NodeTypeId) -> bool {
-        self.ts_lang.node_kind_is_supertype(node_type_id)
+        self.ts_lang.node_kind_is_supertype(node_type_id.get())
     }
 
     fn subtypes(&self, supertype: NodeTypeId) -> &[u16] {
-        self.ts_lang.subtypes_for_supertype(supertype)
+        self.ts_lang.subtypes_for_supertype(supertype.get())
     }
 
     fn root(&self) -> Option<NodeTypeId> {
@@ -280,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: wait for arborium to use ABI v15
+    #[ignore] // TODO: investigate why we always obtain empty subtypes
     #[cfg(feature = "lang-javascript")]
     fn supertype_via_lang_trait() {
         let lang = javascript();
@@ -293,19 +289,6 @@ mod tests {
 
         let func_id = lang.resolve_named_node("function_declaration").unwrap();
         assert!(!lang.is_supertype(func_id));
-    }
-
-    #[test]
-    #[cfg(feature = "lang-json")]
-    fn find_nonempty_subtypes() {
-        let lang = javascript();
-        for id in 0..500u16 {
-            let subtypes = lang.subtypes(id);
-            if !subtypes.is_empty() {
-                let name = lang.node_type_name(id).unwrap_or("?");
-                println!("id={id} name={name} subtypes={subtypes:?}");
-            }
-        }
     }
 
     #[test]
@@ -357,46 +340,31 @@ mod tests {
 
     #[test]
     #[cfg(feature = "lang-javascript")]
-    fn tree_sitter_id_zero_disambiguation() {
+    fn resolve_nonexistent_nodes() {
         let lang = javascript();
 
-        // For named nodes: 0 unambiguously means "not found"
+        // Non-existent nodes return None
+        assert!(lang.resolve_named_node("end").is_none());
         assert!(lang.resolve_named_node("fake_named").is_none());
+        assert!(lang.resolve_anonymous_node("totally_fake_node").is_none());
 
-        // For anonymous nodes: we disambiguate via reverse lookup
-        let end_resolved = lang.resolve_anonymous_node("end");
-        let fake_resolved = lang.resolve_anonymous_node("totally_fake_node");
-
-        assert!(end_resolved.is_some(), "Valid 'end' node should resolve");
-        assert_eq!(end_resolved, Some(0), "'end' should have ID 0");
-
-        assert!(fake_resolved.is_none(), "Non-existent node should be None");
-
-        // Our wrapper preserves field cleanliness
+        // Field resolution
         assert!(lang.resolve_field("name").is_some());
         assert!(lang.resolve_field("fake_field").is_none());
     }
 
     /// Verifies that languages with "end" keyword assign it a non-zero ID.
-    /// This proves that ID 0 ("end" sentinel) is internal to tree-sitter
-    /// and never exposed via the Cursor API for actual syntax nodes.
     #[test]
     #[cfg(all(feature = "lang-ruby", feature = "lang-lua"))]
-    fn end_keyword_has_nonzero_id() {
+    fn end_keyword_resolves() {
         // Ruby has "end" keyword for blocks, methods, classes, etc.
         let ruby = ruby();
         let ruby_end = ruby.resolve_anonymous_node("end");
         assert!(ruby_end.is_some(), "Ruby should have 'end' keyword");
-        assert_ne!(ruby_end, Some(0), "Ruby 'end' keyword must not be ID 0");
 
         // Lua has "end" keyword for blocks, functions, etc.
         let lua = lua();
         let lua_end = lua.resolve_anonymous_node("end");
         assert!(lua_end.is_some(), "Lua should have 'end' keyword");
-        assert_ne!(lua_end, Some(0), "Lua 'end' keyword must not be ID 0");
-
-        // Both languages still have internal "end" sentinel at ID 0
-        assert_eq!(ruby.node_type_name(0), Some("end"));
-        assert_eq!(lua.node_type_name(0), Some("end"));
     }
 }

@@ -250,22 +250,24 @@ struct FieldCodeGen {
 
 fn generate_field_code(
     prefix: &str,
-    node_id: u16,
+    node_id: std::num::NonZeroU16,
     field_id: &std::num::NonZeroU16,
     field_info: &plotnik_core::FieldInfo,
 ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
-    let valid_types = field_info.valid_types.to_vec();
+    let valid_types_raw: Vec<u16> = field_info.valid_types.iter().map(|id| id.get()).collect();
     let valid_types_name = syn::Ident::new(
-        &format!("{}_N{}_F{}_TYPES", prefix, node_id, field_id),
+        &format!("{}_N{}_F{}_TYPES", prefix, node_id.get(), field_id),
         Span::call_site(),
     );
 
     let multiple = field_info.cardinality.multiple;
     let required = field_info.cardinality.required;
-    let types_len = valid_types.len();
+    let types_len = valid_types_raw.len();
 
     let array_def = quote! {
-        static #valid_types_name: [u16; #types_len] = [#(#valid_types),*];
+        static #valid_types_name: [std::num::NonZeroU16; #types_len] = [
+            #(std::num::NonZeroU16::new(#valid_types_raw).unwrap()),*
+        ];
     };
 
     let field_id_raw = field_id.get();
@@ -284,7 +286,7 @@ fn generate_field_code(
 
 fn generate_fields_for_node(
     prefix: &str,
-    node_id: u16,
+    node_id: std::num::NonZeroU16,
     fields: &std::collections::HashMap<std::num::NonZeroU16, plotnik_core::FieldInfo>,
 ) -> FieldCodeGen {
     let mut sorted_fields: Vec<_> = fields.iter().collect();
@@ -307,19 +309,21 @@ fn generate_fields_for_node(
 
 fn generate_children_code(
     prefix: &str,
-    node_id: u16,
+    node_id: std::num::NonZeroU16,
     children: &plotnik_core::ChildrenInfo,
     static_defs: &mut Vec<proc_macro2::TokenStream>,
 ) -> proc_macro2::TokenStream {
-    let valid_types = children.valid_types.to_vec();
+    let valid_types_raw: Vec<u16> = children.valid_types.iter().map(|id| id.get()).collect();
     let children_types_name = syn::Ident::new(
-        &format!("{}_N{}_CHILDREN_TYPES", prefix, node_id),
+        &format!("{}_N{}_CHILDREN_TYPES", prefix, node_id.get()),
         Span::call_site(),
     );
-    let types_len = valid_types.len();
+    let types_len = valid_types_raw.len();
 
     static_defs.push(quote! {
-        static #children_types_name: [u16; #types_len] = [#(#valid_types),*];
+        static #children_types_name: [std::num::NonZeroU16; #types_len] = [
+            #(std::num::NonZeroU16::new(#valid_types_raw).unwrap()),*
+        ];
     });
 
     let multiple = children.cardinality.multiple;
@@ -346,7 +350,7 @@ fn generate_static_node_types_code(
         raw_nodes,
         |name, named| {
             let id = ts_lang.id_for_node_kind(name, named);
-            if id == 0 && named { None } else { Some(id) }
+            std::num::NonZeroU16::new(id)
         },
         |name| ts_lang.field_id_for_name(name),
     );
@@ -355,13 +359,18 @@ fn generate_static_node_types_code(
     let mut static_defs = Vec::new();
     let mut node_entries = Vec::new();
 
-    let extras = node_types.sorted_extras();
+    let extras_raw: Vec<u16> = node_types
+        .sorted_extras()
+        .iter()
+        .map(|id| id.get())
+        .collect();
     let root = node_types.root();
     let sorted_node_ids = node_types.sorted_node_ids();
 
     for &node_id in &sorted_node_ids {
         let info = node_types.get(node_id).unwrap();
 
+        let node_id_raw = node_id.get();
         let field_gen = generate_fields_for_node(&prefix, node_id, &info.fields);
         static_defs.extend(field_gen.array_defs);
 
@@ -369,7 +378,7 @@ fn generate_static_node_types_code(
             quote! { &[] }
         } else {
             let fields_array_name = syn::Ident::new(
-                &format!("{}_N{}_FIELDS", prefix, node_id),
+                &format!("{}_N{}_FIELDS", prefix, node_id_raw),
                 Span::call_site(),
             );
             let fields_len = field_gen.entries.len();
@@ -393,7 +402,7 @@ fn generate_static_node_types_code(
         let named = info.named;
 
         node_entries.push(quote! {
-            (#node_id, plotnik_core::StaticNodeTypeInfo {
+            (std::num::NonZeroU16::new(#node_id_raw).unwrap(), plotnik_core::StaticNodeTypeInfo {
                 name: #name,
                 named: #named,
                 fields: #fields_ref,
@@ -406,21 +415,26 @@ fn generate_static_node_types_code(
     let nodes_len = sorted_node_ids.len();
 
     let extras_array_name = syn::Ident::new(&format!("{}_EXTRAS", prefix), Span::call_site());
-    let extras_len = extras.len();
+    let extras_len = extras_raw.len();
 
     let root_code = match root {
-        Some(id) => quote! { Some(#id) },
+        Some(id) => {
+            let id_raw = id.get();
+            quote! { Some(std::num::NonZeroU16::new(#id_raw).unwrap()) }
+        }
         None => quote! { None },
     };
 
     quote! {
         #(#static_defs)*
 
-        static #nodes_array_name: [(u16, plotnik_core::StaticNodeTypeInfo); #nodes_len] = [
+        static #nodes_array_name: [(std::num::NonZeroU16, plotnik_core::StaticNodeTypeInfo); #nodes_len] = [
             #(#node_entries),*
         ];
 
-        static #extras_array_name: [u16; #extras_len] = [#(#extras),*];
+        static #extras_array_name: [std::num::NonZeroU16; #extras_len] = [
+            #(std::num::NonZeroU16::new(#extras_raw).unwrap()),*
+        ];
 
         pub static #const_name: plotnik_core::StaticNodeTypes = plotnik_core::StaticNodeTypes::new(
             &#nodes_array_name,
