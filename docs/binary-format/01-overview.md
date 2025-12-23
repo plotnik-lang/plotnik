@@ -11,13 +11,13 @@
 
 ### Addressing
 
-| Type                | Description                       |
-| ------------------- | --------------------------------- |
-| `StepId` (u16)      | 8-byte block index in Transitions |
-| `StringId` (u16)    | String Table index                |
-| `TypeId` (u16)      | Type Definition index             |
-| `NodeTypeId` (u16)  | Tree-sitter node type ID          |
-| `NodeFieldId` (u16) | Tree-sitter field ID              |
+| Type                | Description                      |
+| ------------------- | -------------------------------- |
+| `StepId` (u16)      | 8-byte step index in Transitions |
+| `StringId` (u16)    | String Table index               |
+| `TypeId` (u16)      | Type Definition index            |
+| `NodeTypeId` (u16)  | Tree-sitter node type ID         |
+| `NodeFieldId` (u16) | Tree-sitter field ID             |
 
 ## Memory Layout
 
@@ -72,7 +72,7 @@ struct Header {
     node_fields_count: u16,
     trivia_count: u16,
     type_defs_count: u16,
-    type_members_count: u16, // Number of TypeMember blocks
+    type_members_count: u16, // Number of TypeMembers
     entrypoints_count: u16,
     transitions_count: u16,
 }

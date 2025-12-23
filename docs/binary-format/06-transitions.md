@@ -1,37 +1,53 @@
 # Binary Format: Transitions
 
-This section contains the Virtual Machine (VM) instructions and associated data blocks. It is a heap of 8-byte aligned blocks addressed by `StepId`. See [runtime-engine.md](../runtime-engine.md) for execution semantics.
+This section contains the Virtual Machine (VM) instructions. It is a heap of 8-byte aligned steps addressed by `StepId`. See [runtime-engine.md](../runtime-engine.md) for execution semantics.
 
 ## 1. Addressing
 
-**StepId (u16)**: Zero-based index into this section.
+**StepId (u16)**: Zero-based index into this section. Byte offset = `header.transitions_offset + (StepId * 8)`.
 
-- Byte offset = `header.transitions_offset + (index * 8)`.
-- Limit: 65,536 blocks (512 KB section size).
+- **StepId 0 is reserved as the Terminal Sentinel.** Jumping to StepId 0 means the match is complete (Accept).
+- Limit: 65,536 steps (512 KB section size).
 
-## 2. Block Types
+Multi-step instructions (Match16–Match64) consume consecutive StepIds. A Match32 at StepId 5 occupies StepIds 5–8; the next instruction starts at StepId 9.
 
-The first byte of every block encodes both type and terminal status:
+### Future: Segment-Based Addressing
+
+The `type_id` byte reserves 4 bits for segment selection, enabling future expansion to 16 segments × 512 KB = 8 MB. Currently, only segment 0 is used. Compilers must emit `segment = 0`; runtimes should reject non-zero segments until implemented.
+
+When implemented: Address = `(segment * 512KB) + (StepId * 8)`. Each instruction's successors must reside in the same segment; cross-segment jumps require trampoline steps.
+
+## 2. Step Types
+
+The first byte of every step encodes segment and opcode:
 
 ```text
 type_id (u8)
-┌──────────┬───────────────┐
-│ term (1) │  type (7)     │
-└──────────┴───────────────┘
+┌────────────┬────────────┐
+│ segment(4) │ opcode(4)  │
+└────────────┴────────────┘
 ```
 
-- **Bit 7**: Terminal flag (`type_id & 0x80`). If set, this is an accept state—match complete.
-- **Bits 0-6**: Block type (`type_id & 0x7F`).
+- **Bits 4-7 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
+- **Bits 0-3 (Opcode)**: Step type and size.
 
-| Code | Name           | Category    |
-| :--- | :------------- | :---------- |
-| 0x00 | `Match`        | Instruction |
-| 0x01 | `MatchExt`     | Instruction |
-| 0x02 | `Call`         | Instruction |
-| 0x03 | `Return`       | Instruction |
-| 0x10 | `MatchPayload` | Data        |
+| Opcode | Name    | Size     | Description                          |
+| :----- | :------ | :------- | :----------------------------------- |
+| 0x0    | Match8  | 8 bytes  | Fast-path match (1 successor, no fx) |
+| 0x1    | Match16 | 16 bytes | Extended match with inline payload   |
+| 0x2    | Match24 | 24 bytes | Extended match with inline payload   |
+| 0x3    | Match32 | 32 bytes | Extended match with inline payload   |
+| 0x4    | Match48 | 48 bytes | Extended match with inline payload   |
+| 0x5    | Match64 | 64 bytes | Extended match with inline payload   |
+| 0x6    | Call    | 8 bytes  | Function call                        |
+| 0x7    | Return  | 8 bytes  | Return from call                     |
 
-Terminal variants: `0x80` (Match), `0x81` (MatchExt). `Call`, `Return`, and `MatchPayload` are never terminal.
+### Terminal States
+
+- **Match8**: Terminal if `next == 0`.
+- **Match16–64**: Terminal if `succ_count == 0`.
+
+`Call` and `Return` are never terminal.
 
 ## 3. Primitives
 
@@ -48,7 +64,7 @@ Bit-packed navigation command.
 
 **Standard Modes**:
 
-- `0`: `Stay` (Entry only)
+- `0`: `Stay` (No movement)
 - `1`: `Next` (Sibling, skip any)
 - `2`: `NextSkip` (Sibling, skip trivia)
 - `3`: `NextExact` (Sibling, exact)
@@ -67,10 +83,10 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-- **Opcode**: 6 bits (0-63), currently 12 defined
-- **Payload**: 10 bits (0-1023), member/variant index. Limits struct/enum members to 1024.
+- **Opcode**: 6 bits (0-63), currently 12 defined.
+- **Payload**: 10 bits (0-1023), member/variant index.
 
-| Opcode | Name           | Payload (10b)          |
+| Opcode | Name           | Payload                |
 | :----- | :------------- | :--------------------- |
 | 0      | `CaptureNode`  | -                      |
 | 1      | `StartArray`   | -                      |
@@ -85,186 +101,193 @@ EffectOp (u16)
 | 10     | `ClearCurrent` | -                      |
 | 11     | `PushNull`     | -                      |
 
-**Object vs Scalar List Context**:
-
-The VM builds **Array of Structs** (AoS), not Structure of Arrays (SoA). This affects opcode usage:
-
-- **Scalar lists** (`(x)* @items`): `StartArray` → loop(`CaptureNode`, `PushElement`) → `EndArray`, `SetField`
-- **Row lists** (`{ (x) @x }* @rows`): `StartArray` → loop(`StartObject`, `CaptureNode`, `SetField`, `EndObject`, `PushElement`) → `EndArray`, `SetField`
-
-Arrays are built on a value stack and assigned to fields via `SetField`.
-
-`PushNull` emits explicit null values for:
-
-- Optional fields when the optional branch is skipped
-- Alternation branches missing a capture present in other branches
-
-Member/variant indices are resolved via `type_members[struct_or_enum.members.start + index]`.
-
-### Opcode Ranges (Future Extensibility)
-
-Opcodes are partitioned by argument size:
+**Opcode Ranges** (future extensibility):
 
 | Range | Format      | Payload                        |
 | :---- | :---------- | :----------------------------- |
 | 0-31  | Single word | 10-bit payload in same word    |
 | 32-63 | Extended    | Next u16 word is full argument |
 
-Current opcodes (0-11) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format:
-
-```
-// Single word (current)
-SetField:     [opcode=6 | member_idx]
-
-// Extended (future)
-AssertEqText: [opcode=32 | reserved], [StringId]
-AssertMatch:  [opcode=33 | flags],    [RegexId]
-```
-
-This maintains backwards compatibility—existing binaries use only opcodes < 32.
+Current opcodes (0-11) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
 
 ## 4. Instructions
 
-All instructions are exactly 8 bytes.
+### 4.1. Match8
 
-**Note**: In tree-sitter, `NodeTypeId` 0 is reserved for an internal "end" sentinel and is never exposed via the Cursor API. Languages with an actual `end` keyword (Ruby, Lua, etc.) assign it a different non-zero ID. Similarly, `NodeFieldId` 0 is never valid. We use `Option<NonZeroU16>` to represent these values, where `None` (stored as `0`) indicates no check (wildcard).
-
-**Epsilon Transitions**: A `MatchExt` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This is critical for:
-
-- **Branching at EOF**: `(a)?` must succeed when no node exists to match
-- **Trailing navigation**: Many queries end with epsilon + `Up(n)` to restore cursor position after matching descendants
-
-Epsilon transitions bypass the normal "check node exists → check type → check field" logic entirely. They execute effects and select successors without touching the cursor.
-
-### 4.1. Match
-
-Optimized fast-path transition.
+Optimized fast-path transition. Used when there are no side effects, no negated fields, and exactly one destination (linear path).
 
 ```rust
 #[repr(C)]
-struct Match {
-    type_id: u8,                     // 0x00 or 0x80 (terminal)
+struct Match8 {
+    type_id: u8,                     // segment(4) | 0x0
     nav: u8,                         // Nav
-    node_type: Option<NodeTypeId>,   // None means "any"
-    node_field: Option<NodeFieldId>, // None means "any"
-    next: u16,                       // Next StepId (ignored if terminal)
+    node_type: Option<NodeTypeId>,   // None (0) means "any"
+    node_field: Option<NodeFieldId>, // None (0) means "any"
+    next: u16,                       // Next StepId. 0 = Accept.
 }
 ```
 
-When `type_id & 0x80` is set, the match succeeds and accepts—`next` is ignored.
+**Note**: `NodeTypeId` 0 and `NodeFieldId` 0 are never valid in tree-sitter, so we use `Option<NonZeroU16>` where `None` (stored as 0) indicates wildcard.
 
-### 4.2. MatchExt
+### 4.2. Match16–Match64
 
-Extended transition pointing to a payload block.
+Extended transitions with inline payload. Used for side effects, negated fields, or branching (multiple successors).
+
+**Header (8 bytes)**:
 
 ```rust
 #[repr(C)]
-struct MatchExt {
-    type_id: u8,                     // 0x01
+struct MatchHeader {
+    type_id: u8,                     // segment(4) | opcode(1-5)
     nav: u8,                         // Nav
-    node_type: Option<NodeTypeId>,   // None means "any"
-    node_field: Option<NodeFieldId>, // None means "any"
-    payload: u16,                    // StepId to MatchPayload
+    node_type: Option<NodeTypeId>,   // None (0) means "any"
+    node_field: Option<NodeFieldId>, // None (0) means "any"
+    counts: u16,                     // Bit-packed element counts
 }
 ```
 
-### 4.3. Call
+**Counts Layout (u16)**:
 
-Invokes another definition (recursion). Pushes `next` to the call stack and jumps to `target`.
+```text
+counts (u16)
+┌─────────┬─────────┬──────────┬──────────┬───┐
+│ pre (3) │ neg (3) │ post (3) │ succ (6) │ 0 │
+└─────────┴─────────┴──────────┴──────────┴───┘
+  bits       bits      bits       bits     bit
+ 15-13      12-10      9-7        6-1       0
+```
+
+- **Bits 15-13**: `pre_count` (0-7)
+- **Bits 12-10**: `neg_count` (0-7)
+- **Bits 9-7**: `post_count` (0-7)
+- **Bits 6-1**: `succ_count` (0-63)
+- **Bit 0**: Reserved (must be 0)
+
+Extraction:
 
 ```rust
-#[repr(C)]
-struct Call {
-    type_id: u8,        // 0x02
-    reserved: u8,
-    next: u16,          // Return address (StepId)
-    target: u16,        // Callee StepId
-    ref_id: u16,        // Must match Return.ref_id
-}
+let pre_count  = (counts >> 13) & 0x7;
+let neg_count  = (counts >> 10) & 0x7;
+let post_count = (counts >> 7) & 0x7;
+let succ_count = (counts >> 1) & 0x3F;
 ```
 
-### 4.4. Return
+**Payload** (immediately follows header):
 
-Returns from a definition. Pops the return address from the call stack.
+| Order | Content          | Type                     |
+| :---- | :--------------- | :----------------------- |
+| 1     | `pre_effects`    | `[EffectOp; pre_count]`  |
+| 2     | `negated_fields` | `[u16; neg_count]`       |
+| 3     | `post_effects`   | `[EffectOp; post_count]` |
+| 4     | `successors`     | `[u16; succ_count]`      |
+| 5     | Padding          | Zero bytes to step size  |
 
-```rust
-#[repr(C)]
-struct Return {
-    type_id: u8,        // 0x03
-    reserved: u8,
-    ref_id: u16,        // Must match Call.ref_id (invariant check)
-    _pad: u32,
-}
-```
+**Payload Capacity**:
 
-### 4.5. The `ref_id` Invariant
+| Step    | Total Size | Payload Bytes | Max u16 Slots |
+| :------ | :--------- | :------------ | :------------ |
+| Match16 | 16         | 8             | 4             |
+| Match24 | 24         | 16            | 8             |
+| Match32 | 32         | 24            | 12            |
+| Match48 | 48         | 40            | 20            |
+| Match64 | 64         | 56            | 28            |
 
-The `ref_id` field enforces stack discipline between `Call` and `Return` instructions. Each definition gets a unique `ref_id` at compile time. At runtime:
+The compiler selects the smallest step size that fits the payload. If the total exceeds 28 slots, the transition must be split into a chain.
 
-1. `Call` pushes a frame with its `ref_id` onto the call stack.
-2. `Return` verifies its `ref_id` matches the current frame's `ref_id`.
-3. Mismatch indicates a malformed query or VM bug—panic in debug builds.
+**Continuation Logic**:
 
-This catches errors like mismatched call/return pairs or corrupted stack state during backtracking. The check is O(1) and provides strong guarantees about control flow integrity.
-
-## 5. Data Blocks
-
-Variable-length blocks. The total size must be padded to a multiple of 8 bytes.
-
-> **Note**: These blocks are included in the Transitions segment to allow co-location with related instructions (e.g., placing `MatchPayload` immediately after `MatchExt`) to optimize for CPU cache locality.
-
-### 5.1. MatchPayload
-
-Contains extended logic for `MatchExt`.
-
-```rust
-#[repr(C)]
-struct MatchPayloadHeader {
-    type_id: u8,       // 0x10
-    reserved: u8,
-    pre_count: u8,     // Count of Pre-Effects
-    neg_count: u8,     // Count of Negated Fields
-    post_count: u8,    // Count of Post-Effects
-    succ_count: u8,    // Count of Successors
-    _pad: u16,
-}
-```
-
-**Body Layout** (contiguous, u16 aligned, matches header order):
-
-1. `pre_effects`: `[EffectOp; pre_count]`
-2. `negated_fields`: `[u16; neg_count]`
-3. `post_effects`: `[EffectOp; post_count]`
-4. `successors`: `[u16; succ_count]` (StepIds)
+| `succ_count` | Behavior                      | Use case                   |
+| :----------- | :---------------------------- | :------------------------- |
+| 0            | Accept (terminal state)       | Final state with effects   |
+| 1            | `ip = successors[0]`          | Linear continuation        |
+| 2+           | Branch via `successors[0..n]` | Alternation (backtracking) |
 
 **Pre vs Post Effects**:
 
 - `pre_effects`: Execute before match attempt. Used for scope openers (`StartObject`, `StartArray`, `StartVariant`) that must run regardless of which branch succeeds.
 - `post_effects`: Execute after successful match. Used for capture/assignment ops (`CaptureNode`, `SetField`, `EndObject`, etc.) that depend on `matched_node`.
 
-**Continuation Logic**:
+### 4.3. Epsilon Transitions
 
-| `succ_count` | Behavior                      | Use case                   |
-| :----------- | :---------------------------- | :------------------------- |
-| 0            | Check terminal bit            | Accept or invalid          |
-| 1            | `ip = successors[0]`          | Linear continuation        |
-| 2+           | Branch via `successors[0..n]` | Alternation (backtracking) |
+A Match8 or Match16–64 with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables:
 
-When `succ_count == 0`, the owning `MatchExt` must have the terminal bit set (`type_id == 0x81`). This executes effects and accepts. A non-terminal `MatchExt` with `succ_count == 0` is invalid (no continuation path).
+- **Branching at EOF**: `(a)?` must succeed when no node exists to match.
+- **Pure control flow**: Decision points for quantifiers.
+- **Trailing navigation**: Queries ending with `Up(n)` to restore cursor position.
 
-**Contrast with `Match`**: The simpler `Match` block has inline `next` and uses the terminal bit directly. `MatchExt` uses `succ_count` for branching, with `succ_count == 0` + terminal bit for accept states that need effects.
+### 4.4. Call
+
+Invokes another definition (recursion). Pushes return address to the call stack and jumps to target.
+
+```rust
+#[repr(C)]
+struct Call {
+    type_id: u8,        // segment(4) | 0x6
+    reserved: u8,
+    next: u16,          // Return address (StepId, current segment)
+    target: u16,        // Callee StepId (segment from type_id)
+    ref_id: u16,        // Must match Return.ref_id
+}
+```
+
+- **Target Segment**: Defined by `type_id >> 4`.
+- **Return Segment**: Implicitly the current segment.
+
+### 4.5. Return
+
+Returns from a definition. Pops the return address from the call stack.
+
+```rust
+#[repr(C)]
+struct Return {
+    type_id: u8,        // segment(4) | 0x7
+    reserved: u8,
+    ref_id: u16,        // Must match Call.ref_id
+    _pad: u32,
+}
+```
+
+### 4.6. The `ref_id` Invariant
+
+The `ref_id` field enforces stack discipline between `Call` and `Return`. Each definition gets a unique `ref_id` at compile time. At runtime:
+
+1. `Call` pushes a frame with its `ref_id` onto the call stack.
+2. `Return` verifies its `ref_id` matches the current frame's `ref_id`.
+3. Mismatch indicates a malformed query or VM bug—panic in debug builds.
+
+This catches errors like mismatched call/return pairs or corrupted stack state during backtracking. The check is O(1).
+
+## 5. Execution Semantics
+
+### 5.1. Match8 Execution
+
+1. Execute `nav` movement.
+2. Check `node_type` (if not wildcard).
+3. Check `node_field` (if not wildcard).
+4. On failure: backtrack.
+5. On success: if `next == 0` → accept; else `ip = next`.
+
+### 5.2. Match16–64 Execution
+
+1. Execute `pre_effects`.
+2. Clear `matched_node`.
+3. Execute `nav` movement (skip for epsilon transitions).
+4. Check `node_type` and `node_field` (skip for epsilon).
+5. On success: `matched_node = cursor.node()`.
+6. Verify all `negated_fields` are absent on current node.
+7. Execute `post_effects`.
+8. Continuation:
+   - `succ_count == 0` → accept.
+   - `succ_count == 1` → `ip = successors[0]`.
+   - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.
+
+### 5.3. Backtracking
+
+On failure, pop checkpoint and resume at saved `ip`. Checkpoints store cursor position (`descendant_index`), effect watermark, and call stack state. See [runtime-engine.md](../runtime-engine.md) for details.
 
 ## 6. Quantifier Compilation
 
-Quantifiers compile to branching patterns in the transition graph.
-
-**Note on "Branch" blocks**: The diagrams below use "Branch" as a logical construct. In the actual bytecode, a Branch is implemented as a `MatchExt` with:
-
-- `node_type: None` (no type check)
-- `nav: Stay` (no cursor movement)
-- `succ_count >= 2` (multiple successors)
-
-This combination creates an **epsilon transition**—a decision point that doesn't consume input, only selects which path to follow.
+Quantifiers compile to branching patterns using epsilon transitions.
 
 ### Greedy `*` (Zero or More)
 
@@ -275,7 +298,7 @@ Entry ─ε→ Branch ─ε→ Match ─┘
            │
            └─ε→ Exit
 
-Branch.successors = [match, exit]  // try match first
+Branch.successors = [match_path, exit_path]  // try match first
 ```
 
 ### Greedy `+` (One or More)
@@ -287,15 +310,15 @@ Entry ─→ Match ─ε→ Branch ─┘
                      │
                      └─ε→ Exit
 
-Branch.successors = [match, exit]
+Branch.successors = [match_path, exit_path]
 ```
 
 ### Non-Greedy `*?` / `+?`
 
-Same structure as greedy, but successor order is reversed:
+Same structure, reversed successor order:
 
 ```
-Branch.successors = [exit, match]  // try exit first
+Branch.successors = [exit_path, match_path]  // try exit first
 ```
 
 ### Greedy `?` (Optional)
@@ -305,18 +328,22 @@ Entry ─ε→ Branch ─ε→ Match ─ε→ Exit
            │
            └─ε→ [PushNull] ─ε→ Exit
 
-Branch.successors = [match, skip]  // try match first
+Branch.successors = [match_path, skip_path]
 ```
 
-The `PushNull` effect on the skip path emits an explicit null value when the optional pattern doesn't match. This distinguishes "not present" (`null`) from "not attempted." In alternations and optional captures, downstream consumers can differentiate between a missing match and a match that produced no value.
+`PushNull` emits explicit null when the optional pattern doesn't match.
+
+### Non-Greedy `??`
+
+```
+Branch.successors = [skip_path, match_path]  // try skip first
+```
 
 ## 7. Alternation Compilation
 
-Untagged alternations `[ A  B ]` compile to branching with **symmetric null injection** for type consistency.
+Untagged alternations `[ A  B ]` compile to branching with null injection for type consistency.
 
-### Null Injection in Alternations
-
-When a capture appears in some branches but not others, the type system produces an optional field (`x?: T`). The compiler injects `PushNull` into branches missing that capture:
+When a capture appears in some branches but not others, the compiler injects `PushNull` into branches missing that capture:
 
 ```
 Query: [ (a) @x  (b) ]
@@ -324,47 +351,6 @@ Type:  { x?: Node }
 
 Branch 1 (a): [CaptureNode, SetField(x)] → Exit
 Branch 2 (b): [PushNull, SetField(x)]    → Exit
-                 ↑ injected
 ```
 
-The output object always has the `x` field set—either to a node or to null. This matches the type system's merged struct model.
-
-### Multiple Captures
-
-Each missing capture gets its own `PushNull`:
-
-```
-Query: [
-  { (a) @x (b) @y }
-  { (c) @x }
-  (d)
-]
-Type: { x?: Node, y?: Node }
-
-Branch 1: [CaptureNode, SetField(x), CaptureNode, SetField(y)]
-Branch 2: [CaptureNode, SetField(x), PushNull, SetField(y)]
-Branch 3: [PushNull, SetField(x), PushNull, SetField(y)]
-```
-
-This ensures the output object has all fields defined, with nulls for unmatched captures.
-
-### Non-Greedy `??`
-
-Same structure as `?`, but successor order is reversed:
-
-```
-Branch.successors = [skip, match]  // try skip first
-```
-
-### Example: Array Capture
-
-Query: `(parameters (identifier)* @params)`
-
-Compiled graph (after epsilon elimination):
-
-```
-T0: MatchExt(identifier) [StartArray, CaptureNode, PushElement]  → [T0, T1]
-T1: Match [EndArray, SetField("params")]                         → next
-```
-
-The first iteration gets `StartArray` from the entry path. Loop iterations execute only `CaptureNode, PushElement`. On exit, `EndArray` finalizes the array.
+This ensures the output object always has all fields defined, matching the type system's merged struct model.

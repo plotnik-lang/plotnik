@@ -1,13 +1,13 @@
 # Runtime Engine
 
-Executes compiled query graphs against Tree-sitter syntax trees. See [06-transitions.md](binary-format/06-transitions.md) for block types.
+Executes compiled query graphs against Tree-sitter syntax trees. See [06-transitions.md](binary-format/06-transitions.md) for step types.
 
 ## VM State
 
 ```rust
 struct VM<'a> {
     cursor: TreeCursor<'a>,          // Never reset—preserves descendant_index for O(1) backtrack
-    ip: StepId,                      // Current block index
+    ip: StepId,                      // Current step index
     frames: Vec<Frame>,              // Call stack
     effects: EffectStream<'a>,       // Side-effect log
     matched_node: Option<Node<'a>>,  // Current match slot
@@ -21,28 +21,28 @@ struct Frame {
 
 ## Execution Cycle
 
-Fetch block at `ip` → dispatch by `type_id` → execute → update `ip`.
+Fetch step at `ip` → dispatch by `type_id` → execute → update `ip`.
 
-### Match — Fast Path
+### Match8 — Fast Path
 
 1. Execute `nav` → check `node_type` → check `node_field`
 2. Fail → backtrack
-3. Success: if terminal (`type_id & 0x80`) → accept; else `ip = next`
+3. Success: if `next == 0` → accept; else `ip = next`
 
-### MatchExt — Extended Path
+### Match16–64 — Extended Path
 
-1. Fetch `MatchPayload`, execute `pre_effects`, clear `matched_node`
+1. Execute `pre_effects`, clear `matched_node`
 2. Execute `nav`, check `node_type`/`node_field` (see Epsilon Transitions below)
 3. Success: `matched_node = cursor.node()`, verify negated fields absent
 4. Execute `post_effects`
 5. Continuation:
-   - Terminal (`type_id & 0x80`) → accept (requires `succ_count == 0`)
+   - `succ_count == 0` → accept
    - `succ_count == 1` → `ip = successors[0]`
    - `succ_count >= 2` → branch via `successors` (backtracking)
 
 ### Epsilon Transitions
 
-A `MatchExt` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
+A `Match8` or `Match16–64` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
 
 Common patterns:
 
