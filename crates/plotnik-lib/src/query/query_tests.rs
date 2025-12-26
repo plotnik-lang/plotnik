@@ -97,6 +97,25 @@ impl QueryAnalyzed {
         }
         query.dump_diagnostics()
     }
+
+    #[track_caller]
+    pub fn expect_warning(src: &str) -> String {
+        let source_map = SourceMap::one_liner(src);
+        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+
+        if !query.is_valid() {
+            panic!(
+                "Expected valid query with warning, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+
+        if !query.diagnostics().has_warnings() {
+            panic!("Expected warning, got none:\n{}", query.dump_cst());
+        }
+
+        query.dump_diagnostics()
+    }
 }
 
 #[test]

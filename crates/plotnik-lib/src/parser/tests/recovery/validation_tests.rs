@@ -1309,3 +1309,42 @@ fn single_colon_primitive_type() {
       |        ^^^^^^
     ");
 }
+
+#[test]
+fn treesitter_sequence_syntax_warning() {
+    // Tree-sitter uses ((a) (b)) for sequences, Plotnik uses {(a) (b)}
+    let input = "Test = ((a) (b))";
+
+    let res = Query::expect_warning(input);
+
+    insta::assert_snapshot!(res, @r"
+    warning: Tree-sitter sequence syntax
+      |
+    1 | Test = ((a) (b))
+      |        ^
+      |
+    help: use `{...}` for sequences
+    ");
+}
+
+#[test]
+fn treesitter_sequence_single_child_warning() {
+    let input = "Test = ((a))";
+
+    let res = Query::expect_warning(input);
+
+    insta::assert_snapshot!(res, @r"
+    warning: Tree-sitter sequence syntax
+      |
+    1 | Test = ((a))
+      |        ^
+      |
+    help: use `{...}` for sequences
+    ");
+}
+
+#[test]
+fn named_node_with_children_no_warning() {
+    // Normal node with children - NOT a tree-sitter sequence
+    Query::expect_valid("Test = (identifier (child))");
+}
