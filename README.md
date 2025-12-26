@@ -2,7 +2,8 @@
 <br/>
 
 <p align="center">
-  <img width="400" alt="The logo: a curled wood shaving on a workbench" src="https://github.com/user-attachments/assets/1fcef0a9-20f8-4500-960b-f31db3e9fd94" />
+  <img width="400" alt="The logo: a curled wood shaving on a workbench" src="https://github.com/user-attachments/assets/be3bc03d-ba44-457f-9caf-a6546235f6e8" />
+
 </p>
 
 <h1><p align="center">Plotnik</p></h1>
