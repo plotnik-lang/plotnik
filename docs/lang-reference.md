@@ -195,18 +195,18 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 
 ### Strict Dimensionality
 
-**Quantifiers (`*`, `+`) containing internal captures require an explicit row capture.**
+**Quantifiers (`*`, `+`) containing internal captures require a struct capture.**
 
 ```
-// ERROR: internal capture without row structure
+// ERROR: internal capture without struct capture
 (method_definition name: (identifier) @name)*
 
-// OK: explicit row capture
+// OK: struct capture on the group
 { (method_definition name: (identifier) @name) @method }* @methods
 → { methods: { method: Node, name: Node }[] }
 ```
 
-This prevents association loss—each row is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
+This prevents association loss—each struct is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
 
 ### The Node Type
 
@@ -232,13 +232,13 @@ Quantifiers determine whether a field is singular, optional, or an array:
 | `(x)* @a` | `a: T[]`         | zero or more (scalar list) |
 | `(x)+ @a` | `a: [T, ...T[]]` | one or more (scalar list)  |
 
-Scalar lists work when the quantified pattern has **no internal captures**. For patterns with internal captures, use row lists:
+Node arrays work when the quantified pattern has **no internal captures**. For patterns with internal captures, use struct arrays:
 
-| Pattern        | Output Type      | Meaning                              |
-| -------------- | ---------------- | ------------------------------------ |
-| `{...}* @rows` | `rows: T[]`      | zero or more rows                    |
-| `{...}+ @rows` | `rows: [T, ...]` | one or more rows                     |
-| `{...}? @row`  | `row?: T`        | optional row (bubbles if uncaptured) |
+| Pattern         | Output Type       | Meaning                                 |
+| --------------- | ----------------- | --------------------------------------- |
+| `{...}* @items` | `items: T[]`      | zero or more structs                    |
+| `{...}+ @items` | `items: [T, ...]` | one or more structs                     |
+| `{...}? @item`  | `item?: T`        | optional struct (bubbles if uncaptured) |
 
 ### Creating Nested Structure
 
@@ -300,15 +300,15 @@ interface FunctionDeclaration {
 
 ### Summary
 
-| Pattern                 | Output                              |
-| ----------------------- | ----------------------------------- |
-| `@name`                 | Field in current scope              |
-| `(x)? @a`               | Optional field                      |
-| `(x)* @a`               | Scalar array (no internal captures) |
-| `{...}* @rows`          | Row array (with internal captures)  |
-| `{...} @x` / `[...] @x` | Nested object (new scope)           |
-| `@x :: string`          | String value                        |
-| `@x :: T`               | Custom type name                    |
+| Pattern                 | Output                                |
+| ----------------------- | ------------------------------------- |
+| `@name`                 | Field in current scope                |
+| `(x)? @a`               | Optional field                        |
+| `(x)* @a`               | Node array (no internal captures)     |
+| `{...}* @items`         | Struct array (with internal captures) |
+| `{...} @x` / `[...] @x` | Nested object (new scope)             |
+| `@x :: string`          | String value                          |
+| `@x :: T`               | Custom type name                      |
 
 ---
 

@@ -10,12 +10,12 @@ fn missing_paren() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | (identifier
       | -^^^^^^^^^^
       | |
-      | tree started here
+      | node started here
     ");
 }
 
@@ -28,7 +28,7 @@ fn missing_bracket() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `]`; expected `]`
+    error: missing closing `]`
       |
     1 | [(identifier) (string)
       | -^^^^^^^^^^^^^^^^^^^^^
@@ -46,7 +46,7 @@ fn missing_brace() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `}`; expected `}`
+    error: missing closing `}`
       |
     1 | {(a) (b)
       | -^^^^^^^
@@ -64,12 +64,12 @@ fn nested_unclosed() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | (a (b (c)
       |    -^^^^^
       |    |
-      |    tree started here
+      |    node started here
     ");
 }
 
@@ -82,12 +82,12 @@ fn deeply_nested_unclosed() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | (a (b (c (d
       |          -^
       |          |
-      |          tree started here
+      |          node started here
     ");
 }
 
@@ -100,12 +100,12 @@ fn unclosed_alternation_nested() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | [(a) (b
       |      -^
       |      |
-      |      tree started here
+      |      node started here
     ");
 }
 
@@ -118,10 +118,12 @@ fn empty_parens() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: empty parentheses are not allowed
+    error: empty `()` is not allowed
       |
     1 | ()
-      |  ^
+      | ^
+      |
+    help: use `(_)` to match any named node, or `_` for any node
     ");
 }
 
@@ -135,10 +137,10 @@ fn unclosed_tree_shows_open_location() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 |   (call
-      |   ^ tree started here
+      |   ^ node started here
       |  _|
       | |
     2 | |     (identifier)
@@ -157,7 +159,7 @@ fn unclosed_alternation_shows_open_location() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `]`; expected `]`
+    error: missing closing `]`
       |
     1 |   [
       |   ^ alternation started here
@@ -180,7 +182,7 @@ fn unclosed_sequence_shows_open_location() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `}`; expected `}`
+    error: missing closing `}`
       |
     1 |   {
       |   ^ sequence started here
@@ -199,12 +201,12 @@ fn unclosed_double_quote_string() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | (call "foo)
       | -^^^^^^^^^^
       | |
-      | tree started here
+      | node started here
     "#);
 }
 
@@ -215,11 +217,11 @@ fn unclosed_single_quote_string() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: missing closing `)`; expected `)`
+    error: missing closing `)`
       |
     1 | (call 'foo)
       | -^^^^^^^^^^
       | |
-      | tree started here
+      | node started here
     ");
 }

@@ -144,15 +144,23 @@ fn named_def_missing_equals_with_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     1 | Q = Expr ^^^ (identifier)
       |     ^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - Q = Expr ^^^ (identifier)
+    1 + Q = (Expr) ^^^ (identifier)
+      |
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | Q = Expr ^^^ (identifier)
       |          ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -166,15 +174,23 @@ fn named_def_missing_equals_recovers_to_next_def() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     1 | Broken ^^^
       | ^^^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - Broken ^^^
+    1 + (Broken) ^^^
+      |
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | Broken ^^^
       |        ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 

@@ -129,37 +129,57 @@ impl DiagnosticKind {
         matches!(self, Self::UnnamedDef)
     }
 
+    /// Default hint for this kind, automatically included in diagnostics.
+    /// Call sites can add additional hints for context-specific information.
+    pub fn default_hint(&self) -> Option<&'static str> {
+        match self {
+            Self::ExpectedSubtype => Some("e.g., `expression/binary_expression`"),
+            Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
+            Self::ExpectedFieldName => Some("e.g., `!value`"),
+            Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
+            Self::TreeSitterSequenceSyntax => Some("use `{...}` for sequences"),
+            Self::MixedAltBranches => {
+                Some("use all labels for a tagged union, or none for a merged struct")
+            }
+            Self::RecursionNoEscape => {
+                Some("add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`")
+            }
+            Self::DirectRecursion => {
+                Some("recursive references must consume input before recursing")
+            }
+            _ => None,
+        }
+    }
+
     /// Base message for this diagnostic kind, used when no custom message is provided.
     pub fn fallback_message(&self) -> &'static str {
         match self {
-            // Unclosed delimiters - clear about what's missing
+            // Unclosed delimiters
             Self::UnclosedTree => "missing closing `)`",
             Self::UnclosedSequence => "missing closing `}`",
             Self::UnclosedAlternation => "missing closing `]`",
 
-            // Expected token errors - specific about what's needed
+            // Expected token errors
             Self::ExpectedExpression => "expected an expression",
-            Self::ExpectedTypeName => "expected type name after `::`",
-            Self::ExpectedCaptureName => "expected name after `@`",
+            Self::ExpectedTypeName => "expected type name",
+            Self::ExpectedCaptureName => "expected capture name",
             Self::ExpectedFieldName => "expected field name",
-            Self::ExpectedSubtype => "expected subtype after `/`",
+            Self::ExpectedSubtype => "expected subtype name",
 
-            // Invalid syntax - explain what's wrong
-            Self::EmptyTree => "empty parentheses are not allowed",
-            Self::BareIdentifier => "bare identifier is not a valid expression",
-            Self::InvalidSeparator => "separators are not needed",
-            Self::InvalidFieldEquals => "use `:` for field constraints, not `=`",
-            Self::InvalidSupertypeSyntax => "supertype syntax not allowed on references",
-            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations, not `:`",
-            Self::ErrorTakesNoArguments => "`(ERROR)` cannot have child nodes",
+            // Invalid syntax
+            Self::EmptyTree => "empty `()` is not allowed",
+            Self::BareIdentifier => "bare identifier is not valid",
+            Self::InvalidSeparator => "unexpected separator",
+            Self::InvalidFieldEquals => "use `:` instead of `=`",
+            Self::InvalidSupertypeSyntax => "references cannot have supertypes",
+            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations",
+            Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
             Self::RefCannotHaveChildren => "references cannot have children",
-            Self::ErrorMissingOutsideParens => {
-                "`ERROR` and `MISSING` must be wrapped in parentheses"
-            }
-            Self::UnsupportedPredicate => "predicates like `#match?` are not supported",
+            Self::ErrorMissingOutsideParens => "special node requires parentheses",
+            Self::UnsupportedPredicate => "predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
-            Self::CaptureWithoutTarget => "`@` must follow an expression to capture",
-            Self::LowercaseBranchLabel => "branch labels must be capitalized",
+            Self::CaptureWithoutTarget => "capture has no target",
+            Self::LowercaseBranchLabel => "branch label must start with uppercase",
 
             // Naming convention violations
             Self::CaptureNameHasDots => "capture names cannot contain `.`",
@@ -172,23 +192,25 @@ impl DiagnosticKind {
             Self::FieldNameHasHyphens => "field names cannot contain `-`",
             Self::FieldNameUppercase => "field names must be lowercase",
             Self::TypeNameInvalidChars => "type names cannot contain `.` or `-`",
-            Self::TreeSitterSequenceSyntax => "Tree-sitter sequence syntax",
+            Self::TreeSitterSequenceSyntax => "tree-sitter sequence syntax",
 
             // Semantic errors
-            Self::DuplicateDefinition => "name already defined",
+            Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
-            Self::RecursionNoEscape => "infinite recursion: cycle has no escape path",
+            Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
-            Self::FieldSequenceValue => "field must match exactly one node",
+            Self::FieldSequenceValue => "field cannot match a sequence",
 
             // Type inference
-            Self::IncompatibleTypes => "incompatible types in alternation branches",
+            Self::IncompatibleTypes => "incompatible types",
             Self::MultiCaptureQuantifierNoName => {
-                "quantified expression with multiple captures requires `@name`"
+                "quantified expression with multiple captures requires a struct capture"
             }
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
-            Self::StrictDimensionalityViolation => "quantifier requires row capture",
+            Self::StrictDimensionalityViolation => {
+                "quantifier with captures requires a struct capture"
+            }
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
@@ -201,7 +223,7 @@ impl DiagnosticKind {
             Self::InvalidChildType => "node type not valid as child",
 
             // Structural
-            Self::UnnamedDef => "definitions must be named",
+            Self::UnnamedDef => "definition must be named",
         }
     }
 
@@ -212,9 +234,7 @@ impl DiagnosticKind {
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
             }
-            Self::FieldSequenceValue => {
-                "field `{}` must match exactly one node, not a sequence".to_string()
-            }
+            Self::FieldSequenceValue => "field `{}` cannot match a sequence".to_string(),
 
             // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
@@ -249,15 +269,13 @@ impl DiagnosticKind {
             }
 
             // Type annotation specifics
-            Self::InvalidTypeAnnotationSyntax => {
-                "type annotations use `::`, not `:` — {}".to_string()
-            }
+            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations: {}".to_string(),
 
-            // Named def
-            Self::UnnamedDef => "definitions must be named — {}".to_string(),
+            // Named def (no custom message needed; suggestion goes in hint)
+            Self::UnnamedDef => self.fallback_message().to_string(),
 
             // Standard pattern: fallback + context
-            _ => format!("{}; {{}}", self.fallback_message()),
+            _ => format!("{}: {{}}", self.fallback_message()),
         }
     }
 

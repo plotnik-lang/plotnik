@@ -10,7 +10,7 @@ fn missing_capture_name() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected name after `@`
+    error: expected capture name
       |
     1 | (identifier) @
       |               ^
@@ -26,7 +26,7 @@ fn missing_field_value() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected an expression; after `field:`
+    error: expected an expression
       |
     1 | (call name:)
       |            ^
@@ -40,7 +40,7 @@ fn named_def_eof_after_equals() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected an expression; after `=` in definition
+    error: expected an expression
       |
     1 | Expr = 
       |        ^
@@ -56,10 +56,12 @@ fn missing_type_name() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected type name after `::`; e.g., `::MyType` or `::string`
+    error: expected type name
       |
     1 | (identifier) @name ::
       |                      ^
+      |
+    help: e.g., `::MyType` or `::string`
     ");
 }
 
@@ -72,10 +74,12 @@ fn missing_negated_field_name() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected field name; e.g., `!value`
+    error: expected field name
       |
     1 | (call !)
       |        ^
+      |
+    help: e.g., `!value`
     ");
 }
 
@@ -88,10 +92,12 @@ fn missing_subtype() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected subtype after `/`; e.g., `expression/binary_expression`
+    error: expected subtype name
       |
     1 | (expression/)
       |             ^
+      |
+    help: e.g., `expression/binary_expression`
     ");
 }
 
@@ -104,7 +110,7 @@ fn tagged_branch_missing_expression() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected an expression; after `Label:`
+    error: expected an expression
       |
     1 | [Label:]
       |        ^
@@ -118,10 +124,12 @@ fn type_annotation_missing_name_at_eof() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected type name after `::`; e.g., `::MyType` or `::string`
+    error: expected type name
       |
     1 | (a) @x ::
       |          ^
+      |
+    help: e.g., `::MyType` or `::string`
     ");
 }
 
@@ -132,10 +140,12 @@ fn type_annotation_missing_name_with_bracket() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected type name after `::`; e.g., `::MyType` or `::string`
+    error: expected type name
       |
     1 | [(a) @x :: ]
       |            ^
+      |
+    help: e.g., `::MyType` or `::string`
     ");
 }
 
@@ -148,10 +158,12 @@ fn type_annotation_invalid_token_after() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected type name after `::`; e.g., `::MyType` or `::string`
+    error: expected type name
       |
     1 | (identifier) @name :: (
       |                       ^
+      |
+    help: e.g., `::MyType` or `::string`
     ");
 }
 
@@ -164,7 +176,7 @@ fn field_value_is_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected an expression; after `field:`
+    error: expected an expression
       |
     1 | (call name: %%%)
       |             ^^^
@@ -180,7 +192,7 @@ fn capture_with_invalid_char() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected name after `@`
+    error: expected capture name
       |
     1 | (identifier) @123
       |               ^^^
@@ -194,7 +206,7 @@ fn bare_capture_at_eof_triggers_sync() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: `@` must follow an expression to capture
+    error: capture has no target
       |
     1 | @
       | ^
@@ -210,7 +222,7 @@ fn bare_capture_at_root() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: `@` must follow an expression to capture
+    error: capture has no target
       |
     1 | @name
       | ^
@@ -226,10 +238,12 @@ fn capture_at_start_of_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+    error: unexpected token
       |
     1 | [@x (a)]
       |  ^
+      |
+    help: try `(node)` or close with `]`
     ");
 }
 
@@ -242,15 +256,21 @@ fn mixed_valid_invalid_captures() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: `@` must follow an expression to capture
+    error: capture has no target
       |
     1 | (a) @ok @ @name
       |         ^
 
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     1 | (a) @ok @ @name
       |            ^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - (a) @ok @ @name
+    1 + (a) @ok @ @(name)
+      |
     ");
 }
 
@@ -263,7 +283,7 @@ fn field_equals_typo_missing_value() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: use `:` for field constraints, not `=`; this isn't a definition
+    error: use `:` instead of `=`: this isn't a definition
       |
     1 | (call name = )
       |            ^
@@ -274,7 +294,7 @@ fn field_equals_typo_missing_value() {
     1 + (call name : )
       |
 
-    error: expected an expression; after `field =`
+    error: expected an expression
       |
     1 | (call name = )
       |              ^
@@ -288,7 +308,7 @@ fn lowercase_branch_label_missing_expression() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: branch labels must be capitalized; branch labels map to enum variants
+    error: branch label must start with uppercase: branch labels map to enum variants
       |
     1 | [label:]
       |  ^^^^^
@@ -299,7 +319,7 @@ fn lowercase_branch_label_missing_expression() {
     1 + [Label:]
       |
 
-    error: expected an expression; after `label:`
+    error: expected an expression
       |
     1 | [label:]
       |        ^

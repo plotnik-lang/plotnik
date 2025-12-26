@@ -10,7 +10,10 @@ test:
 	@cargo nextest run --no-fail-fast --hide-progress-bar --status-level none --failure-output final
 
 shot:
+	@# See AGENTS.md for diagnostic guidelines
+	@cargo nextest run --no-fail-fast --hide-progress-bar --status-level none --failure-output final || true
 	@cargo insta accept
+	@cargo nextest run --no-fail-fast --hide-progress-bar --status-level none --failure-output final
 
 coverage-lines:
 	@cargo llvm-cov --package plotnik-lib --text --show-missing-lines 2>/dev/null | grep '\.rs: [0-9]' | sed 's|.*/crates/|crates/|'

@@ -47,6 +47,8 @@ fn mixed_alternation_tagged_first() {
       |      -      ^^^
       |      |
       |      tagged branch here
+      |
+    help: use all labels for a tagged union, or none for a merged struct
     ");
 }
 
@@ -68,6 +70,8 @@ fn mixed_alternation_untagged_first() {
       |       ^^^
     4 |       B: (b)
       |       - tagged branch here
+      |
+    help: use all labels for a tagged union, or none for a merged struct
     ");
 }
 
@@ -84,6 +88,8 @@ fn nested_mixed_alternation() {
       |            -      ^^^
       |            |
       |            tagged branch here
+      |
+    help: use all labels for a tagged union, or none for a merged struct
     ");
 }
 
@@ -100,6 +106,8 @@ fn multiple_mixed_alternations() {
       |           -      ^^^
       |           |
       |           tagged branch here
+      |
+    help: use all labels for a tagged union, or none for a merged struct
 
     error: cannot mix labeled and unlabeled branches
       |
@@ -107,6 +115,8 @@ fn multiple_mixed_alternations() {
       |                        -      ^^^
       |                        |
       |                        tagged branch here
+      |
+    help: use all labels for a tagged union, or none for a merged struct
     ");
 }
 

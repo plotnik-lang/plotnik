@@ -10,7 +10,7 @@ Two principles guide the type system:
 
 1. **Flat structure**: Captures bubble up to the nearest scope boundary.
 
-2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require an explicit row capture. The alternative could be creating parallel arrays, but it's hard to maintain the per-iteration association for `a[i]` and `b[i]`.
+2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require a struct capture. The alternative—parallel arrays—loses per-iteration association between `a[i]` and `b[i]`.
 
 ### Why Transparent Scoping
 
@@ -35,16 +35,16 @@ This is the core rule that prevents association loss.
 
 ### The Rule
 
-**Any quantified pattern (`*`, `+`) containing captures must have an explicit row capture.**
+**Any quantified pattern (`*`, `+`) containing captures must have a struct capture.**
 
-| Pattern                           | Status  | Reason                                     |
-| --------------------------------- | ------- | ------------------------------------------ |
-| `(identifier)* @ids`              | ✓ Valid | No internal captures → scalar list         |
-| `{ (a) @a (b) @b }* @rows`        | ✓ Valid | Internal captures + row capture → row list |
-| `{ (a) @a (b) @b }*`              | ✗ Error | Internal captures, no row capture          |
-| `(func (id) @name)*`              | ✗ Error | Internal capture, no row structure         |
-| `(func (id) @name)* @funcs`       | ✗ Error | `@funcs` captures nodes, not rows          |
-| `(Item)*` where Item has captures | ✗ Error | Transitive: definition's captures count    |
+| Pattern                           | Status  | Reason                                            |
+| --------------------------------- | ------- | ------------------------------------------------- |
+| `(identifier)* @ids`              | ✓ Valid | No internal captures → node array                 |
+| `{ (a) @a (b) @b }* @items`       | ✓ Valid | Internal captures + struct capture → struct array |
+| `{ (a) @a (b) @b }*`              | ✗ Error | Internal captures, no struct capture              |
+| `(func (id) @name)*`              | ✗ Error | Internal capture, no struct capture               |
+| `(func (id) @name)* @funcs`       | ✗ Error | `@funcs` captures nodes, not structs              |
+| `(Item)*` where Item has captures | ✗ Error | Transitive: definition's captures count           |
 
 ### Transitive Application
 
@@ -58,13 +58,13 @@ Item = (pair (key) @k (value) @v)
 (Item)*                              // ✗ Error
 (pair (key) @k (value) @v)*          // ✗ Error (same thing)
 
-// Fix: wrap in row capture
+// Fix: add struct capture
 { (Item) @item }* @items             // ✓ Valid
 ```
 
 The compiler expands definitions before validating strict dimensionality. This prevents a loophole where extracting a pattern into a definition would bypass the rule.
 
-### Scalar Lists
+### Node Arrays
 
 When the quantified pattern has **no internal captures**, the outer capture collects nodes directly:
 
@@ -78,7 +78,7 @@ When the quantified pattern has **no internal captures**, the outer capture coll
 
 Use case: collecting simple tokens (identifiers, keywords, literals).
 
-### Row Lists
+### Struct Arrays
 
 When the quantified pattern **has internal captures**, wrap in a sequence and capture the sequence:
 
@@ -93,10 +93,10 @@ When the quantified pattern **has internal captures**, wrap in a sequence and ca
 For node patterns with internal captures, wrap explicitly:
 
 ```
-// ERROR: internal capture without row structure
+// ERROR: internal capture without struct capture
 (parameter (identifier) @name)*
 
-// OK: explicit row
+// OK: struct capture on the group
 { (parameter (identifier) @name) @param }* @params
 → { params: { param: Node, name: string }[] }
 ```
@@ -188,29 +188,29 @@ Quantifiers determine whether a field is singular, optional, or an array:
 | `(A)* @a` | `a: T[]`         | zero or more |
 | `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
 
-### Row Cardinality
+### Struct Array Cardinality
 
-When using row lists, the outer quantifier determines list cardinality:
+When using struct arrays, the outer quantifier determines cardinality:
 
 ```
-{ (a) @a (b) @b }* @rows   → rows: { a: T, b: T }[]
-{ (a) @a (b) @b }+ @rows   → rows: [{ a: T, b: T }, ...]
-{ (a) @a (b) @b }? @row    → row?: { a: T, b: T }
+{ (a) @a (b) @b }* @items   → items: { a: T, b: T }[]
+{ (a) @a (b) @b }+ @items   → items: [{ a: T, b: T }, ...]
+{ (a) @a (b) @b }? @item    → item?: { a: T, b: T }
 ```
 
 ### Nested Quantifiers
 
-Within a row, inner quantifiers apply to fields:
+Within each struct, inner quantifiers apply to fields:
 
 ```
 {
-  (decorator)* @decs      // Array field within each row
-  (function) @fn          // Singular field within each row
+  (decorator)* @decs      // Array field within each struct
+  (function) @fn          // Singular field within each struct
 }* @items
 → { items: { decs: Node[], fn: Node }[] }
 ```
 
-Each row has its own `decs` array—no cross-row mixing.
+Each struct has its own `decs` array—no cross-struct mixing.
 
 ## 5. Type Unification in Alternations
 

@@ -24,7 +24,9 @@ impl Parser<'_, '_> {
         match self.current() {
             SyntaxKind::ParenClose => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
-                self.error(DiagnosticKind::EmptyTree);
+                self.diagnostics
+                    .report(self.source_id, DiagnosticKind::EmptyTree, open_paren_span)
+                    .emit();
                 // Fall through to close
             }
             SyntaxKind::Underscore => {
@@ -55,7 +57,6 @@ impl Parser<'_, '_> {
                             DiagnosticKind::TreeSitterSequenceSyntax,
                             open_paren_span,
                         )
-                        .hint("use `{...}` for sequences")
                         .emit();
                 }
             }
@@ -94,10 +95,7 @@ impl Parser<'_, '_> {
                     self.bump_string_tokens();
                 }
                 _ => {
-                    self.error_msg(
-                        DiagnosticKind::ExpectedSubtype,
-                        "e.g., `expression/binary_expression`",
-                    );
+                    self.error(DiagnosticKind::ExpectedSubtype);
                 }
             }
         }
@@ -182,27 +180,21 @@ impl Parser<'_, '_> {
     fn parse_children(&mut self, until: SyntaxKind, recovery: TokenSet) {
         loop {
             if self.eof() {
-                let (construct, delim, kind) = match until {
-                    SyntaxKind::ParenClose => ("tree", "`)`", DiagnosticKind::UnclosedTree),
-                    SyntaxKind::BraceClose => ("sequence", "`}`", DiagnosticKind::UnclosedSequence),
+                let (construct, kind) = match until {
+                    SyntaxKind::ParenClose => ("node", DiagnosticKind::UnclosedTree),
+                    SyntaxKind::BraceClose => ("sequence", DiagnosticKind::UnclosedSequence),
                     _ => panic!(
                         "parse_children: unexpected delimiter {:?} (only ParenClose/BraceClose supported)",
                         until
                     ),
                 };
-                let msg = format!("expected {delim}");
                 let open = self.delimiter_stack.last().unwrap_or_else(|| {
                     panic!(
                         "parse_children: unclosed {construct} at EOF but delimiter_stack is empty \
                          (caller must push delimiter before calling)"
                     )
                 });
-                self.error_unclosed_delimiter(
-                    kind,
-                    msg,
-                    format!("{construct} started here"),
-                    open.span,
-                );
+                self.error_unclosed_delimiter(kind, format!("{construct} started here"), open.span);
                 break;
             }
             if self.has_fatal_error() {
@@ -226,9 +218,9 @@ impl Parser<'_, '_> {
             if self.currently_is_one_of(recovery) {
                 break;
             }
-            self.error_and_bump_msg(
+            self.error_and_bump_with_hint(
                 DiagnosticKind::UnexpectedToken,
-                "not valid inside a node — try `(child)` or close with `)`",
+                "try `(child)` or close with `)`",
             );
         }
     }
@@ -250,7 +242,6 @@ impl Parser<'_, '_> {
     fn parse_alt_children(&mut self) {
         loop {
             if self.eof() {
-                let msg = "expected `]`";
                 let open = self.delimiter_stack.last().unwrap_or_else(|| {
                     panic!(
                         "parse_alt_children: unclosed alternation at EOF but delimiter_stack is empty \
@@ -259,7 +250,6 @@ impl Parser<'_, '_> {
                 });
                 self.error_unclosed_delimiter(
                     DiagnosticKind::UnclosedAlternation,
-                    msg,
                     "alternation started here",
                     open.span,
                 );
@@ -296,9 +286,9 @@ impl Parser<'_, '_> {
             if self.currently_is_one_of(ALT_RECOVERY_TOKENS) {
                 break;
             }
-            self.error_and_bump_msg(
+            self.error_and_bump_with_hint(
                 DiagnosticKind::UnexpectedToken,
-                "not valid inside alternation — try `(node)` or close with `]`",
+                "try `(node)` or close with `]`",
             );
         }
     }
@@ -317,7 +307,7 @@ impl Parser<'_, '_> {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
-            self.error_msg(DiagnosticKind::ExpectedExpression, "after `Label:`");
+            self.error(DiagnosticKind::ExpectedExpression);
         }
 
         self.finish_node();
@@ -345,7 +335,7 @@ impl Parser<'_, '_> {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
-            self.error_msg(DiagnosticKind::ExpectedExpression, "after `label:`");
+            self.error(DiagnosticKind::ExpectedExpression);
         }
 
         self.finish_node();

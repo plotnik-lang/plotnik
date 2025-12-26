@@ -524,10 +524,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 quant.text_range(),
             )
             .message(format!(
-                "quantifier `{}` contains captures ({}) but no row capture",
+                "quantifier `{}` contains captures ({}) but has no struct capture",
                 op, captures_str
             ))
-            .hint("wrap as `{...}* @rows`")
+            .hint(format!("add a struct capture: `{{...}}{} @name`", op))
             .emit();
     }
 
@@ -552,29 +552,34 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     fn report_unify_error(&mut self, range: TextRange, err: &UnifyError) {
-        let (kind, msg) = match err {
+        let (kind, msg, hint) = match err {
             UnifyError::ScalarInUntagged => (
                 DiagnosticKind::IncompatibleTypes,
-                "scalar type in untagged alternation; use tagged alternation instead".to_string(),
+                "scalar type in untagged alternation".to_string(),
+                Some("use tagged alternation if branches need different types"),
             ),
             UnifyError::IncompatibleTypes { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
                 self.interner.resolve(*field).to_string(),
+                Some("all branches must produce the same type for merged captures"),
             ),
             UnifyError::IncompatibleStructs { field } => (
                 DiagnosticKind::IncompatibleStructShapes,
                 self.interner.resolve(*field).to_string(),
+                Some("use tagged alternation if branches need different fields"),
             ),
             UnifyError::IncompatibleArrayElements { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
                 self.interner.resolve(*field).to_string(),
+                Some("array element types must be compatible across branches"),
             ),
         };
 
-        self.diag
-            .report(self.source_id, kind, range)
-            .message(msg)
-            .emit();
+        let mut builder = self.diag.report(self.source_id, kind, range).message(msg);
+        if let Some(h) = hint {
+            builder = builder.hint(h);
+        }
+        builder.emit();
     }
 }
 
