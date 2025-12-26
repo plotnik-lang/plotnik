@@ -15,6 +15,7 @@ impl Parser<'_, '_> {
     pub(crate) fn parse_tree(&mut self) {
         let checkpoint = self.checkpoint();
         self.push_delimiter(SyntaxKind::ParenOpen);
+        let open_paren_span = self.current_span(); // save span before bump
         self.bump(); // consume '('
 
         let mut is_ref = false;
@@ -45,6 +46,18 @@ impl Parser<'_, '_> {
             }
             _ => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
+                // Warn about tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
+                // Only warn when it looks like an expression (not predicates or other invalid tokens)
+                if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
+                    self.diagnostics
+                        .report(
+                            self.source_id,
+                            DiagnosticKind::TreeSitterSequenceSyntax,
+                            open_paren_span,
+                        )
+                        .hint("use `{...}` for sequences")
+                        .emit();
+                }
             }
         }
 

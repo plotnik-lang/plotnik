@@ -54,6 +54,7 @@ pub enum DiagnosticKind {
     FieldNameHasHyphens,
     FieldNameUppercase,
     TypeNameInvalidChars,
+    TreeSitterSequenceSyntax,
 
     // Valid syntax, invalid semantics
     DuplicateDefinition,
@@ -87,7 +88,7 @@ impl DiagnosticKind {
     /// Default severity for this kind. Can be overridden by policy.
     pub fn default_severity(&self) -> Severity {
         match self {
-            Self::UnusedBranchLabels => Severity::Warning,
+            Self::UnusedBranchLabels | Self::TreeSitterSequenceSyntax => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -171,6 +172,7 @@ impl DiagnosticKind {
             Self::FieldNameHasHyphens => "field names cannot contain `-`",
             Self::FieldNameUppercase => "field names must be lowercase",
             Self::TypeNameInvalidChars => "type names cannot contain `.` or `-`",
+            Self::TreeSitterSequenceSyntax => "Tree-sitter sequence syntax",
 
             // Semantic errors
             Self::DuplicateDefinition => "name already defined",
