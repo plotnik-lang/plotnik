@@ -78,7 +78,7 @@ fn mutual_recursion() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (B))
       |           - references B (completing cycle)
@@ -87,6 +87,8 @@ fn mutual_recursion() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 

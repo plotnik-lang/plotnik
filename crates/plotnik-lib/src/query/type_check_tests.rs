@@ -541,12 +541,12 @@ fn error_star_with_internal_captures_no_row() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: quantifier `*` contains captures (`@a`, `@b`) but no row capture
+    error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
       |
     1 | Bad = {(a) @a (b) @b}*
       |       ^^^^^^^^^^^^^^^^
       |
-    help: wrap as `{...}* @rows`
+    help: add a struct capture: `{...}* @name`
     ");
 }
 
@@ -559,12 +559,12 @@ fn error_plus_with_internal_capture_no_row() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: quantifier `+` contains captures (`@c`) but no row capture
+    error: quantifier `+` contains captures (`@c`) but has no struct capture
       |
     1 | Bad = {(c) @c}+
       |       ^^^^^^^^^
       |
-    help: wrap as `{...}* @rows`
+    help: add a struct capture: `{...}+ @name`
     ");
 }
 
@@ -577,12 +577,12 @@ fn error_named_node_with_capture_quantified() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: quantifier `*` contains captures (`@name`) but no row capture
+    error: quantifier `*` contains captures (`@name`) but has no struct capture
       |
     1 | Bad = (func (identifier) @name)*
       |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-    help: wrap as `{...}* @rows`
+    help: add a struct capture: `{...}* @name`
     ");
 }
 

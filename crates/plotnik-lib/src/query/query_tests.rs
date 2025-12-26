@@ -129,7 +129,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
      --> c.ptk:1:9
       |
     1 | C = (c (A))
@@ -147,6 +147,8 @@ fn invalid_three_way_mutual_recursion_across_files() {
       |
     1 | B = (b (C))
       |         - references C (completing cycle)
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -160,7 +162,7 @@ fn multifile_field_with_ref_to_seq_error() {
 
     assert!(!query.is_valid());
     insta::assert_snapshot!(query.dump_diagnostics(), @r"
-    error: field `name` must match exactly one node, not a sequence
+    error: field `name` cannot match a sequence
      --> main.ptk:1:17
       |
     1 | Q = (call name: (X))

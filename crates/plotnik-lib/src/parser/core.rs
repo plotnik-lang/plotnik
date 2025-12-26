@@ -260,7 +260,7 @@ impl<'src, 'diag> Parser<'src, 'diag> {
         true
     }
 
-    fn bump_as_error(&mut self) {
+    pub(super) fn bump_as_error(&mut self) {
         if !self.eof() {
             self.start_node(SyntaxKind::Error);
             self.bump();
@@ -298,11 +298,32 @@ impl<'src, 'diag> Parser<'src, 'diag> {
             .emit();
     }
 
+    pub(super) fn error_with_hint(&mut self, kind: DiagnosticKind, hint: impl Into<String>) {
+        let Some((range, suppression)) = self.get_error_ranges() else {
+            return;
+        };
+        self.diagnostics
+            .report(self.source_id, kind, range)
+            .hint(hint)
+            .suppression_range(suppression)
+            .emit();
+    }
+
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
         self.error(kind);
         self.bump_as_error();
     }
 
+    pub(super) fn error_and_bump_with_hint(
+        &mut self,
+        kind: DiagnosticKind,
+        hint: impl Into<String>,
+    ) {
+        self.error_with_hint(kind, hint);
+        self.bump_as_error();
+    }
+
+    #[allow(dead_code)]
     pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
         self.error_msg(kind, message);
         self.bump_as_error();
@@ -359,7 +380,6 @@ impl<'src, 'diag> Parser<'src, 'diag> {
     pub(super) fn error_unclosed_delimiter(
         &mut self,
         kind: DiagnosticKind,
-        message: impl Into<String>,
         related_msg: impl Into<String>,
         open_range: TextRange,
     ) {
@@ -371,7 +391,6 @@ impl<'src, 'diag> Parser<'src, 'diag> {
         let full_range = TextRange::new(open_range.start(), current.end());
         self.diagnostics
             .report(self.source_id, kind, full_range)
-            .message(message)
             .related_to(self.source_id, open_range, related_msg)
             .emit();
     }

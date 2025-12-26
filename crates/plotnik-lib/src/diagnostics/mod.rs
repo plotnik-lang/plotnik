@@ -245,7 +245,11 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
-    pub fn emit(self) {
+    pub fn emit(mut self) {
+        // Prepend default hint if one exists for this kind
+        if let Some(default_hint) = self.message.kind.default_hint() {
+            self.message.hints.insert(0, default_hint.to_string());
+        }
         self.diagnostics.messages.push(self.message);
     }
 }

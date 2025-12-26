@@ -22,7 +22,7 @@ impl Parser<'_, '_> {
             return false;
         }
 
-        self.error_and_bump_msg(
+        self.error_and_bump_with_hint(
             DiagnosticKind::UnexpectedToken,
             "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
         );
@@ -65,7 +65,7 @@ impl Parser<'_, '_> {
                 self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }
             _ => {
-                self.error_and_bump_msg(DiagnosticKind::UnexpectedToken, "not a valid expression");
+                self.error_and_bump(DiagnosticKind::UnexpectedToken);
             }
         }
 

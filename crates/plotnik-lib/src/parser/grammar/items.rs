@@ -30,7 +30,7 @@ impl Parser<'_, '_> {
                 let def_text = &self.source[usize::from(start)..usize::from(end)];
                 self.diagnostics
                     .report(self.source_id, DiagnosticKind::UnnamedDef, span)
-                    .message(format!("give it a name like `Name = {}`", def_text.trim()))
+                    .hint(format!("give it a name like `Name = {}`", def_text.trim()))
                     .emit();
             }
         }
@@ -83,10 +83,7 @@ impl Parser<'_, '_> {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedExpression,
-                "after `=` in definition",
-            );
+            self.error(DiagnosticKind::ExpectedExpression);
         }
 
         self.finish_node();

@@ -42,10 +42,7 @@ impl Parser<'_, '_> {
             self.bump();
             self.validate_type_name(text, span);
         } else {
-            self.error_msg(
-                DiagnosticKind::ExpectedTypeName,
-                "e.g., `::MyType` or `::string`",
-            );
+            self.error(DiagnosticKind::ExpectedTypeName);
         }
 
         self.finish_node();
@@ -84,7 +81,7 @@ impl Parser<'_, '_> {
         self.expect(SyntaxKind::Negation, "'!' for negated field");
 
         if !self.currently_is(SyntaxKind::Id) {
-            self.error_msg(DiagnosticKind::ExpectedFieldName, "e.g., `!value`");
+            self.error(DiagnosticKind::ExpectedFieldName);
             self.finish_node();
             return;
         }
@@ -110,10 +107,13 @@ impl Parser<'_, '_> {
         }
 
         // Bare identifiers are not valid expressions; trees require parentheses
-        self.error_and_bump_msg(
-            DiagnosticKind::BareIdentifier,
-            "wrap in parentheses: `(identifier)`",
-        );
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        self.diagnostics
+            .report(self.source_id, DiagnosticKind::BareIdentifier, span)
+            .fix("wrap in parentheses", format!("({})", text))
+            .emit();
+        self.bump_as_error();
     }
 
     /// Field constraint: `field_name: expr`
@@ -134,7 +134,7 @@ impl Parser<'_, '_> {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr_no_suffix();
         } else {
-            self.error_msg(DiagnosticKind::ExpectedExpression, "after `field:`");
+            self.error(DiagnosticKind::ExpectedExpression);
         }
 
         self.finish_node();
@@ -158,7 +158,7 @@ impl Parser<'_, '_> {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
             self.parse_expr();
         } else {
-            self.error_msg(DiagnosticKind::ExpectedExpression, "after `field =`");
+            self.error(DiagnosticKind::ExpectedExpression);
         }
 
         self.finish_node();

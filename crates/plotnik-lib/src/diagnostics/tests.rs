@@ -89,7 +89,7 @@ fn builder_with_fix() {
 
     let result = diagnostics.printer(&map).render();
     insta::assert_snapshot!(result, @r"
-    error: use `:` for field constraints, not `=`; fixable
+    error: use `:` instead of `=`: fixable
       |
     1 | hello world
       | ^^^^^
@@ -207,7 +207,7 @@ fn printer_zero_width_span() {
 
     let result = diagnostics.printer(&map).render();
     insta::assert_snapshot!(result, @r"
-    error: expected an expression; zero width error
+    error: expected an expression: zero width error
       |
     1 | hello
       | ^

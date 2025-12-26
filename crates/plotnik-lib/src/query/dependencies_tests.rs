@@ -26,12 +26,14 @@ fn invalid_recursion_with_plus() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | E = (call (E)+)
       |            ^
       |            |
       |            E references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -48,6 +50,8 @@ fn invalid_unguarded_recursion_in_alternation() {
       |              ^
       |              |
       |              references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -65,12 +69,14 @@ fn invalid_mandatory_recursion_in_tree_child() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | E = (call (E))
       |            ^
       |            |
       |            E references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -81,12 +87,14 @@ fn invalid_mandatory_recursion_in_field() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | E = (call body: (E))
       |                  ^
       |                  |
       |                  E references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -97,12 +105,14 @@ fn invalid_mandatory_recursion_in_capture() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | E = (call (E) @inner)
       |            ^
       |            |
       |            E references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -113,12 +123,14 @@ fn invalid_mandatory_recursion_in_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | E = (call {(a) (E)})
       |                 ^
       |                 |
       |                 E references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -138,7 +150,7 @@ fn invalid_mutual_recursion_without_base_case() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (B))
       |           - references B (completing cycle)
@@ -147,6 +159,8 @@ fn invalid_mutual_recursion_without_base_case() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -170,7 +184,7 @@ fn invalid_three_way_mutual_recursion() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (a (B))
       |         - references B
@@ -181,6 +195,8 @@ fn invalid_three_way_mutual_recursion() {
       | |       |
       | |       references A
       | C is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -206,7 +222,7 @@ fn invalid_diamond_dependency_recursion() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (a [(B) (C)])
       |              - references C (completing cycle)
@@ -218,6 +234,8 @@ fn invalid_diamond_dependency_recursion() {
       | C is defined here
     4 | D = (d (A))
       |         - references A
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -231,7 +249,7 @@ fn invalid_mutual_recursion_via_field() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo body: (B))
       |                 - references B (completing cycle)
@@ -240,6 +258,8 @@ fn invalid_mutual_recursion_via_field() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -253,7 +273,7 @@ fn invalid_mutual_recursion_via_capture() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (B) @cap)
       |           - references B (completing cycle)
@@ -262,6 +282,8 @@ fn invalid_mutual_recursion_via_capture() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -275,7 +297,7 @@ fn invalid_mutual_recursion_via_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo {(x) (B)})
       |                - references B (completing cycle)
@@ -284,6 +306,8 @@ fn invalid_mutual_recursion_via_sequence() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -306,7 +330,7 @@ fn invalid_mutual_recursion_with_plus_quantifier() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (B)+)
       |           - references B (completing cycle)
@@ -315,6 +339,8 @@ fn invalid_mutual_recursion_with_plus_quantifier() {
       | |         |
       | |         references A
       | B is defined here
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -349,6 +375,8 @@ fn invalid_direct_left_recursion_in_alternation() {
       |       ^
       |       |
       |       references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -365,6 +393,8 @@ fn invalid_direct_right_recursion_in_alternation() {
       |           ^
       |           |
       |           references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -381,6 +411,8 @@ fn invalid_direct_left_recursion_in_tagged_alternation() {
       |             ^
       |             |
       |             references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -399,6 +431,8 @@ fn invalid_unguarded_left_recursion_branch() {
       |       ^
       |       |
       |       references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -417,6 +451,8 @@ fn invalid_unguarded_left_recursion_with_wildcard_alt() {
       |       ^
       |       |
       |       references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -435,6 +471,8 @@ fn invalid_unguarded_left_recursion_with_tree_alt() {
       |       ^
       |       |
       |       references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -455,12 +493,14 @@ fn invalid_mandatory_recursion_direct_child() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (A))
       |           ^
       |           |
       |           A references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -481,12 +521,14 @@ fn invalid_mandatory_recursion_nested_plus() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: infinite recursion: cycle has no escape path
+    error: infinite recursion: no escape path
       |
     1 | A = (foo (A)+)
       |           ^
       |           |
       |           A references itself
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -508,6 +550,8 @@ fn invalid_simple_unguarded_recursion() {
       |    ^
       |    |
       |    references itself
+      |
+    help: recursive references must consume input before recursing
     ");
 }
 
@@ -530,5 +574,7 @@ fn invalid_unguarded_mutual_recursion_chain() {
       | |    |
       | |    references A
       | B is defined here
+      |
+    help: recursive references must consume input before recursing
     ");
 }

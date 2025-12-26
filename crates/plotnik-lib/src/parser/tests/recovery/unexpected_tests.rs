@@ -10,10 +10,12 @@ fn unexpected_token() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | (identifier) ^^^ (string)
       |              ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -26,10 +28,12 @@ fn multiple_consecutive_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | ^^^ $$$ %%% (ok)
       | ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -42,10 +46,12 @@ fn garbage_at_start() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | ^^^ (a)
       | ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -58,10 +64,12 @@ fn only_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | ^^^ $$$
       | ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -74,10 +82,12 @@ fn garbage_inside_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+    error: unexpected token
       |
     1 | [(a) ^^^ (b)]
       |      ^^^
+      |
+    help: try `(node)` or close with `]`
     ");
 }
 
@@ -90,7 +100,7 @@ fn garbage_inside_node() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected name after `@`
+    error: expected capture name
       |
     1 | (a (b) @@@ (c)) (d)
       |         ^
@@ -106,15 +116,19 @@ fn xml_tag_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | <div>(identifier)</div>
       | ^^^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | <div>(identifier)</div>
       |                  ^^^^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -127,10 +141,12 @@ fn xml_self_closing() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | <br/> (a)
       | ^^^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -143,20 +159,28 @@ fn predicate_unsupported() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates like `#match?` are not supported
+    error: predicates are not supported
       |
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
 
-    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+    error: unexpected token
       |
     1 | (a (#eq? @x "foo") b)
       |          ^
+      |
+    help: try `(child)` or close with `)`
 
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     1 | (a (#eq? @x "foo") b)
       |                    ^
+      |
+    help: wrap in parentheses
+      |
+    1 - (a (#eq? @x "foo") b)
+    1 + (a (#eq? @x "foo") (b))
+      |
     "#);
 }
 
@@ -169,15 +193,21 @@ fn predicate_match() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates like `#match?` are not supported
+    error: predicates are not supported
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
 
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     1 | (identifier) #match? @name "test"
       |                       ^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - (identifier) #match? @name "test"
+    1 + (identifier) #match? @(name) "test"
+      |
     "#);
 }
 
@@ -188,15 +218,17 @@ fn predicate_in_tree() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates like `#match?` are not supported
+    error: predicates are not supported
       |
     1 | (function #eq? @name "test")
       |           ^^^^
 
-    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+    error: unexpected token
       |
     1 | (function #eq? @name "test")
       |                ^
+      |
+    help: try `(child)` or close with `)`
     "#);
 }
 
@@ -209,10 +241,12 @@ fn predicate_in_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+    error: unexpected token
       |
     1 | [(a) #eq? (b)]
       |      ^^^^
+      |
+    help: try `(node)` or close with `]`
     ");
 }
 
@@ -225,7 +259,7 @@ fn predicate_in_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: predicates like `#match?` are not supported
+    error: predicates are not supported
       |
     1 | {(a) #set! (b)}
       |      ^^^^^
@@ -243,15 +277,23 @@ fn multiline_garbage_recovery() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+    error: unexpected token
       |
     2 | ^^^
       | ^^^
+      |
+    help: try `(child)` or close with `)`
 
-    error: bare identifier is not a valid expression; wrap in parentheses: `(identifier)`
+    error: bare identifier is not valid
       |
     3 | b)
       | ^
+      |
+    help: wrap in parentheses
+      |
+    3 - b)
+    3 + (b))
+      |
     ");
 }
 
@@ -264,10 +306,12 @@ fn top_level_garbage_recovery() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | Expr = (a) ^^^ Expr2 = (b)
       |            ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -284,15 +328,19 @@ fn multiple_definitions_with_garbage_between() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     2 | ^^^
       | ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     4 | $$$
       | ^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -305,15 +353,19 @@ fn alternation_recovery_to_capture() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+    error: unexpected token
       |
     1 | [^^^ @name]
       |  ^^^
+      |
+    help: try `(node)` or close with `]`
 
-    error: unexpected token; not valid inside alternation — try `(node)` or close with `]`
+    error: unexpected token
       |
     1 | [^^^ @name]
       |      ^
+      |
+    help: try `(node)` or close with `]`
     ");
 }
 
@@ -326,10 +378,12 @@ fn comma_between_defs() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | A = (a), B = (b)
       |        ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -340,10 +394,12 @@ fn bare_colon_in_tree() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: unexpected token; not valid inside a node — try `(child)` or close with `)`
+    error: unexpected token
       |
     1 | (a : (b))
       |    ^
+      |
+    help: try `(child)` or close with `)`
     ");
 }
 
@@ -354,15 +410,17 @@ fn paren_close_inside_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; expected closing ']' for alternation
+    error: unexpected token: expected closing ']' for alternation
       |
     1 | [(a) ) (b)]
       |      ^
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | [(a) ) (b)]
       |           ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -373,15 +431,17 @@ fn bracket_close_inside_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; expected closing '}' for sequence
+    error: unexpected token: expected closing '}' for sequence
       |
     1 | {(a) ] (b)}
       |      ^
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | {(a) ] (b)}
       |           ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -392,15 +452,17 @@ fn paren_close_inside_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; expected closing '}' for sequence
+    error: unexpected token: expected closing '}' for sequence
       |
     1 | {(a) ) (b)}
       |      ^
 
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | {(a) ) (b)}
       |           ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -411,10 +473,12 @@ fn single_colon_type_annotation_followed_by_non_id() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | (a) @x : (b)
       |        ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }
 
@@ -425,9 +489,11 @@ fn single_colon_type_annotation_at_eof() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token; try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    error: unexpected token
       |
     1 | (a) @x :
       |        ^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
     "#);
 }

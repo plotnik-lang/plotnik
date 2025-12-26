@@ -171,10 +171,12 @@ fn named_def_then_expression() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: definitions must be named — give it a name like `Name = (program (Expr) @value)`
+    error: definition must be named
       |
     2 | (program (Expr) @value)
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
+    help: give it a name like `Name = (program (Expr) @value)`
     ");
 }
 
