@@ -128,9 +128,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-bash"
-version = "2.4.5"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "458cc976e2a95e21e7322315c7863735f6272b1c384c952d6ce2d62f9cf3807d"
+checksum = "39887087c52cbd8a8c73c29e9346d4454e743e4958923a2ed03d9d5302e21e38"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -405,9 +405,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-go"
-version = "2.4.5"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1435ee0fec5c36a225c5ca97632110ebc95f8adf3597168230c6bd33f4b640ed"
+checksum = "1149d8ae537d343dfc8c96fc264bcc5d58390b2456f187cba6d4aaa6fcb7a408"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -753,9 +753,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-python"
-version = "2.4.5"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76390b769131a5a8e2dcc56c54f26870eaf30306b4bf318be61b63ca5cdce85c"
+checksum = "52aa943e2ee443c23f6355001c06ff95c41615d5ae5bc1fc4ceb8b151dab9b94"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -819,9 +819,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-rust"
-version = "2.4.5"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5e840704bdc8d85a083e5f4ca49e4725e25678084949ccfd8adda5628f7946"
+checksum = "2111efc44bb3579fac7d968997cda89f1c4064fbff0986ecdf25960192d94ff3"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1003,9 +1003,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-tsx"
-version = "2.4.5"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b8a48ea4b77152758f2ab6824b51785a2aa826da82dc498c1b8d42dc38956c3"
+checksum = "fa9b253e787180f998719774a3df754954b25f843074a13eb59522581e8d695d"
 dependencies = [
  "arborium-javascript",
  "arborium-sysroot",
@@ -1305,7 +1305,7 @@ checksum = "6738d2e996274e499bc7b0d693c858b7720b9cd2543a0643a3087e6cb0a4fa16"
 dependencies = [
  "cfg-if",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1327,7 +1327,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1835,7 +1835,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1942,7 +1942,7 @@ dependencies = [
  "getrandom",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
