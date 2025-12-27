@@ -276,7 +276,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: investigate why we always obtain empty subtypes
     #[cfg(feature = "lang-javascript")]
     fn supertype_via_lang_trait() {
         let lang = javascript();
