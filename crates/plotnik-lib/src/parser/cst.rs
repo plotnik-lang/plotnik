@@ -119,6 +119,7 @@ pub enum SyntaxKind {
     Newline,
 
     #[regex(r"//[^\n]*", allow_greedy = true)]
+    #[regex(r";[^\n]*", allow_greedy = true)]
     LineComment,
 
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]

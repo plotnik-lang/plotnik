@@ -182,3 +182,29 @@ fn comment_only_raw() {
       Newline "\n"
     "#);
 }
+
+#[test]
+fn semicolon_comment() {
+    let input = indoc! {r#"
+    ; semicolon comment
+    Q = (identifier)
+    "#};
+
+    let res = Query::expect_valid_cst_full(input);
+
+    insta::assert_snapshot!(res, @r#"
+    Root
+      LineComment "; semicolon comment"
+      Newline "\n"
+      Def
+        Id "Q"
+        Whitespace " "
+        Equals "="
+        Whitespace " "
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Newline "\n"
+    "#);
+}
