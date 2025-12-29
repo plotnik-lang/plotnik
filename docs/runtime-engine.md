@@ -155,17 +155,17 @@ struct EffectStream<'a> {
 }
 ```
 
-| Effect              | Action                                  |
-| ------------------- | --------------------------------------- |
-| CaptureNode         | Push `matched_node`                     |
-| Start/EndObject     | Object boundaries                       |
-| SetField(id)        | Assign to field                         |
-| Start/EndArray      | Array boundaries                        |
-| PushElement         | Append to array                         |
-| Start/EndVariant(t) | Tagged union boundaries                 |
-| ToString            | Node → source text                      |
-| ClearCurrent        | Reset current value                     |
-| PushNull            | Null placeholder (optional/alternation) |
+| Effect   | Action                                  |
+| -------- | --------------------------------------- |
+| Node     | Push `matched_node`                     |
+| S/EndS   | Object boundaries                       |
+| Set(id)  | Assign to field                         |
+| A/EndA   | Array boundaries                        |
+| Push     | Append to array                         |
+| E/EndE   | Tagged union boundaries                 |
+| Text     | Node → source text                      |
+| Clear    | Reset current value                     |
+| Null     | Null placeholder (optional/alternation) |
 
 ### Materialization
 
