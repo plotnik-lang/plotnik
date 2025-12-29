@@ -7,6 +7,7 @@ mod effects;
 mod entrypoint;
 mod header;
 mod ids;
+mod instructions;
 mod nav;
 mod sections;
 mod type_meta;
@@ -29,3 +30,10 @@ pub use effects::{EffectOp, EffectOpcode};
 pub use entrypoint::Entrypoint;
 
 pub use type_meta::{TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
+
+pub use instructions::{
+    Call, Match, MatchView, Opcode, Return, align_to_section, select_match_opcode,
+};
+
+#[cfg(test)]
+mod instructions_tests;
