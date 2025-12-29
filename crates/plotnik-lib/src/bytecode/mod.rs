@@ -8,6 +8,7 @@ mod entrypoint;
 mod header;
 mod ids;
 mod instructions;
+mod module;
 mod nav;
 mod sections;
 mod type_meta;
@@ -21,19 +22,26 @@ pub use ids::{QTypeId, StepId, StringId};
 
 pub use header::Header;
 
-pub use nav::Nav;
-
 pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
-
-pub use effects::{EffectOp, EffectOpcode};
 
 pub use entrypoint::Entrypoint;
 
 pub use type_meta::{TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
 
+pub use nav::Nav;
+
+pub use effects::{EffectOp, EffectOpcode};
+
 pub use instructions::{
     Call, Match, MatchView, Opcode, Return, align_to_section, select_match_opcode,
 };
 
+pub use module::{
+    ByteStorage, EntrypointsView, Instruction, InstructionView, Module, ModuleError, StringsView,
+    SymbolsView, TriviaView, TypesView,
+};
+
 #[cfg(test)]
 mod instructions_tests;
+#[cfg(test)]
+mod module_tests;

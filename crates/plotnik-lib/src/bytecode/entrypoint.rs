@@ -3,7 +3,7 @@
 use super::{QTypeId, StepId, StringId};
 
 /// Named query definition entry point (8 bytes).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(C)]
 pub struct Entrypoint {
     /// Definition name.
