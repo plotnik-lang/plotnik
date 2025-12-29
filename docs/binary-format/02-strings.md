@@ -6,8 +6,6 @@ Strings are stored in a centralized pool to eliminate redundancy and alignment p
 
 **StringId (u16)**: Zero-based index into the String Table.
 
-- `0xFFFF` is reserved as a sentinel for "None" or "Anonymous".
-
 ## 1. String Blob
 
 Contains the raw UTF-8 bytes for all strings concatenated together.

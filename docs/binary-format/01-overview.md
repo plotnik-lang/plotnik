@@ -31,9 +31,15 @@ Section offsets defined in Header for robust parsing.
 | [NodeTypes]   | NodeTypeId → StringId    | 4           |
 | [NodeFields]  | NodeFieldId → StringId   | 4           |
 | [Trivia]      | List of NodeTypeId       | 2           |
-| [TypeMeta]    | Types                    | Var         |
+| [TypeMeta]    | Types (3 sub-sections)   | 4           |
 | [Entrypoints] | Definitions              | 8           |
 | [Transitions] | Tree walking graph       | 8           |
+
+**TypeMeta sub-sections** (contiguous, offsets computed from counts):
+
+- **TypeDefs**: Structural topology
+- **TypeMembers**: Fields and variants
+- **TypeNames**: Name → TypeId mapping
 
 [StringBlob]: 02-strings.md
 [StringTable]: 02-strings.md
@@ -62,7 +68,7 @@ struct Header {
     node_types_offset: u32,
     node_fields_offset: u32,
     trivia_offset: u32,
-    type_meta_offset: u32,
+    type_meta_offset: u32,   // Points to TypeMeta header (see 04-types.md)
     entrypoints_offset: u32,
     transitions_offset: u32,
 
@@ -71,9 +77,12 @@ struct Header {
     node_types_count: u16,
     node_fields_count: u16,
     trivia_count: u16,
-    type_defs_count: u16,
-    type_members_count: u16, // Number of TypeMembers
     entrypoints_count: u16,
     transitions_count: u16,
+    _pad: u32,
 }
+// Size: 16 + 32 + 16 = 64 bytes
+//
+// Note: TypeMeta sub-section counts are stored in the TypeMeta header,
+// not in the main header. See 04-types.md for details.
 ```
