@@ -19,6 +19,7 @@
 pub mod diagnostics;
 pub mod parser;
 pub mod query;
+pub mod type_system;
 
 /// Result type for analysis passes that produce both output and diagnostics.
 ///
