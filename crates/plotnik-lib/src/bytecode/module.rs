@@ -1,14 +1,11 @@
 //! Bytecode module with unified storage.
 //!
-//! The [`Module`] struct holds compiled bytecode in either owned or memory-mapped
-//! form, decoding instructions lazily when the VM steps into them.
+//! The [`Module`] struct holds compiled bytecode, decoding instructions lazily
+//! when the VM steps into them.
 
-use std::fs::File;
 use std::io;
 use std::ops::Deref;
 use std::path::Path;
-
-use memmap2::Mmap;
 
 use super::header::Header;
 use super::ids::{QTypeId, StepId, StringId};
@@ -34,40 +31,28 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
-/// Storage for bytecode bytes—either owned or memory-mapped.
+/// Storage for bytecode bytes.
 #[derive(Debug)]
-pub enum ByteStorage {
-    /// Owned byte vector (from compilation or read into memory).
-    Owned(Vec<u8>),
-    /// Memory-mapped file.
-    Mapped(Mmap),
-}
+pub struct ByteStorage(Vec<u8>);
 
 impl Deref for ByteStorage {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        match self {
-            ByteStorage::Owned(v) => v,
-            ByteStorage::Mapped(m) => m,
-        }
+        &self.0
     }
 }
 
 impl ByteStorage {
     /// Create from owned bytes.
     pub fn from_vec(bytes: Vec<u8>) -> Self {
-        Self::Owned(bytes)
+        Self(bytes)
     }
 
-    /// Memory-map a file.
-    ///
-    /// # Safety
-    /// The file must not be modified while the mapping is active.
-    pub fn from_file(file: &File) -> io::Result<Self> {
-        // SAFETY: Caller ensures the file is not modified while mapped.
-        let mmap = unsafe { Mmap::map(file)? };
-        Ok(Self::Mapped(mmap))
+    /// Read a file into memory.
+    pub fn from_file(path: impl AsRef<Path>) -> io::Result<Self> {
+        let bytes = std::fs::read(path)?;
+        Ok(Self(bytes))
     }
 }
 
@@ -162,13 +147,12 @@ pub struct Module {
 impl Module {
     /// Load a module from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::Owned(bytes))
+        Self::from_storage(ByteStorage::from_vec(bytes))
     }
 
-    /// Load a module from a file path (memory-mapped).
+    /// Load a module from a file path.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, ModuleError> {
-        let file = File::open(path)?;
-        let storage = ByteStorage::from_file(&file)?;
+        let storage = ByteStorage::from_file(&path)?;
         Self::from_storage(storage)
     }
 
