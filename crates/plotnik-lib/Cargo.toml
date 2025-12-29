@@ -28,6 +28,6 @@ plotnik-langs = { version = "0.1", path = "../plotnik-langs", optional = true }
 default = ["plotnik-langs"]
 
 [dev-dependencies]
-insta = { version = "=1.45.0", features = ["yaml"] }
+insta = { version = "=1.45.1", features = ["yaml"] }
 indoc = "=2.0.7"
 serde_json = "=1.0.148"
