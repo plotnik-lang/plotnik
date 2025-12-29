@@ -86,20 +86,20 @@ EffectOp (u16)
 - **Opcode**: 6 bits (0-63), currently 12 defined.
 - **Payload**: 10 bits (0-1023), member/variant index.
 
-| Opcode | Name           | Payload                |
-| :----- | :------------- | :--------------------- |
-| 0      | `CaptureNode`  | -                      |
-| 1      | `StartArray`   | -                      |
-| 2      | `PushElement`  | -                      |
-| 3      | `EndArray`     | -                      |
-| 4      | `StartObject`  | -                      |
-| 5      | `EndObject`    | -                      |
-| 6      | `SetField`     | Member index (0-1023)  |
-| 7      | `StartVariant` | Variant index (0-1023) |
-| 8      | `EndVariant`   | -                      |
-| 9      | `ToString`     | -                      |
-| 10     | `ClearCurrent` | -                      |
-| 11     | `PushNull`     | -                      |
+| Opcode | Name   | Payload                |
+| :----- | :----- | :--------------------- |
+| 0      | `Node` | -                      |
+| 1      | `A`    | -                      |
+| 2      | `Push` | -                      |
+| 3      | `EndA` | -                      |
+| 4      | `S`    | -                      |
+| 5      | `EndS` | -                      |
+| 6      | `Set`  | Member index (0-1023)  |
+| 7      | `E`    | Variant index (0-1023) |
+| 8      | `EndE` | -                      |
+| 9      | `Text` | -                      |
+| 10     | `Clear`| -                      |
+| 11     | `Null` | -                      |
 
 **Opcode Ranges** (future extensibility):
 
@@ -204,8 +204,8 @@ The compiler selects the smallest step size that fits the payload. If the total 
 
 **Pre vs Post Effects**:
 
-- `pre_effects`: Execute before match attempt. Used for scope openers (`StartObject`, `StartArray`, `StartVariant`) that must run regardless of which branch succeeds.
-- `post_effects`: Execute after successful match. Used for capture/assignment ops (`CaptureNode`, `SetField`, `EndObject`, etc.) that depend on `matched_node`.
+- `pre_effects`: Execute before match attempt. Used for scope openers (`S`, `A`, `E`) that must run regardless of which branch succeeds.
+- `post_effects`: Execute after successful match. Used for capture/assignment ops (`Node`, `Set`, `EndS`, etc.) that depend on `matched_node`.
 
 ### 4.3. Epsilon Transitions
 
@@ -326,12 +326,12 @@ Branch.successors = [exit_path, match_path]  // try exit first
 ```
 Entry ─ε→ Branch ─ε→ Match ─ε→ Exit
            │
-           └─ε→ [PushNull] ─ε→ Exit
+           └─ε→ [Null] ─ε→ Exit
 
 Branch.successors = [match_path, skip_path]
 ```
 
-`PushNull` emits explicit null when the optional pattern doesn't match.
+`Null` emits explicit null when the optional pattern doesn't match.
 
 ### Non-Greedy `??`
 
@@ -343,14 +343,14 @@ Branch.successors = [skip_path, match_path]  // try skip first
 
 Untagged alternations `[ A  B ]` compile to branching with null injection for type consistency.
 
-When a capture appears in some branches but not others, the compiler injects `PushNull` into branches missing that capture:
+When a capture appears in some branches but not others, the compiler injects `Null` into branches missing that capture:
 
 ```
 Query: [ (a) @x  (b) ]
 Type:  { x?: Node }
 
-Branch 1 (a): [CaptureNode, SetField(x)] → Exit
-Branch 2 (b): [PushNull, SetField(x)]    → Exit
+Branch 1 (a): [Node, Set(x)] → Exit
+Branch 2 (b): [Null, Set(x)] → Exit
 ```
 
 This ensures the output object always has all fields defined, matching the type system's merged struct model.
