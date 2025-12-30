@@ -4,7 +4,6 @@
 //! (for TypeScript emission) in a single traversal.
 
 mod context;
-mod emit_ts;
 mod infer;
 mod symbol;
 mod types;
@@ -14,7 +13,6 @@ mod unify;
 mod tests;
 
 pub use context::TypeContext;
-pub use emit_ts::{EmitConfig, TsEmitter, emit_typescript, emit_typescript_with_config};
 pub use symbol::{DefId, Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,

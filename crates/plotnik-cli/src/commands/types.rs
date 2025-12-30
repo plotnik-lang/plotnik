@@ -4,14 +4,13 @@ use std::path::PathBuf;
 
 use plotnik_langs::Lang;
 use plotnik_lib::Query;
-use plotnik_lib::query::type_check::{EmitConfig, emit_typescript_with_config};
+use plotnik_lib::bytecode::emit::{TsEmitConfig, emit_typescript_with_config};
 
 pub struct TypesArgs {
     pub query_text: Option<String>,
     pub query_file: Option<PathBuf>,
     pub lang: Option<String>,
     pub format: String,
-    pub root_type: String,
     pub verbose_nodes: bool,
     pub no_node_type: bool,
     pub export: bool,
@@ -44,15 +43,19 @@ pub fn run(args: TypesArgs) {
         std::process::exit(1);
     }
 
-    // Emit TypeScript types
-    let config = EmitConfig {
+    // Emit to bytecode first
+    let bytecode = query.emit().expect("bytecode emission failed");
+    let module =
+        plotnik_lib::bytecode::Module::from_bytes(bytecode).expect("module loading failed");
+
+    // Emit TypeScript types from bytecode
+    let config = TsEmitConfig {
         export: args.export,
         emit_node_type: !args.no_node_type,
-        root_type_name: args.root_type,
         verbose_nodes: args.verbose_nodes,
     };
 
-    let output = emit_typescript_with_config(query.type_context(), query.interner(), config);
+    let output = emit_typescript_with_config(&module, config);
 
     // Write output
     if let Some(ref path) = args.output {

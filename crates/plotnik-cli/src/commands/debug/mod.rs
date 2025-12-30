@@ -82,8 +82,10 @@ pub fn run(args: DebugArgs) {
     if args.types
         && let Some(ref q) = query
     {
-        let output =
-            plotnik_lib::query::type_check::emit_typescript(q.type_context(), q.interner());
+        let bytecode = q.emit().expect("bytecode emission failed");
+        let module =
+            plotnik_lib::bytecode::Module::from_bytes(bytecode).expect("module loading failed");
+        let output = plotnik_lib::bytecode::emit::emit_typescript(&module);
         print!("{}", output);
     }
 
