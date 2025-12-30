@@ -154,6 +154,35 @@ fn named_node_multiple_field_captures() {
 }
 
 #[test]
+fn named_node_captured_with_internal_captures() {
+    // Capturing a named node does NOT create a scope boundary.
+    // Internal captures bubble up alongside the outer capture.
+    let input = indoc! {r#"
+    Q = (function
+      name: (identifier) @name :: string
+      body: (block) @body
+    ) @func :: FunctionInfo
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    insta::assert_snapshot!(res, @r"
+    export interface Node {
+      kind: string;
+      text: string;
+    }
+
+    export type FunctionInfo = Node;
+
+    export interface Q {
+      body: Node;
+      func: FunctionInfo;
+      name: string;
+    }
+    ");
+}
+
+#[test]
 fn nested_named_node_captures() {
     let input = indoc! {r#"
     Q = (call
