@@ -10,6 +10,7 @@ pub use symbol_table::SymbolTable;
 
 pub mod alt_kinds;
 mod dependencies;
+pub mod emit;
 pub mod link;
 #[allow(clippy::module_inception)]
 pub mod query;
@@ -21,6 +22,8 @@ pub mod visitor;
 mod alt_kinds_tests;
 #[cfg(test)]
 mod dependencies_tests;
+#[cfg(all(test, feature = "plotnik-langs"))]
+mod emit_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
