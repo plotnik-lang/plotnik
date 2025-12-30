@@ -29,5 +29,3 @@ mod printer_tests;
 mod query_tests;
 #[cfg(test)]
 mod symbol_table_tests;
-#[cfg(test)]
-mod type_check_tests;
