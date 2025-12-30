@@ -4,11 +4,11 @@
 //! multi-source compilation sessions.
 
 /// Lightweight handle to a source in a compilation session.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct SourceId(u32);
 
 /// Describes the origin of a source.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceKind {
     /// A one-liner query passed directly (e.g., CLI `-q` argument).
     OneLiner,
