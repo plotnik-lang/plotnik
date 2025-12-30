@@ -4,6 +4,7 @@
 
 mod constants;
 mod effects;
+pub mod emit;
 mod entrypoint;
 mod header;
 mod ids;

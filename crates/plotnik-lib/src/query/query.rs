@@ -200,6 +200,11 @@ impl QueryAnalyzed {
         &self.interner
     }
 
+    /// Emit bytecode (types only, no node validation).
+    pub fn emit(&self) -> Result<Vec<u8>, super::emit::EmitError> {
+        super::emit::emit(&self.type_context, &self.interner)
+    }
+
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
         let mut output = link::LinkOutput::default();
 
@@ -262,6 +267,11 @@ impl LinkedQuery {
 
     pub fn node_field_ids(&self) -> &HashMap<Symbol, NodeFieldId> {
         &self.node_field_ids
+    }
+
+    /// Emit bytecode (includes node type/field validation info).
+    pub fn emit(&self) -> Result<Vec<u8>, super::emit::EmitError> {
+        super::emit::emit_linked(self)
     }
 }
 
