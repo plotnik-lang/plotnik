@@ -10,6 +10,9 @@ mod symbol;
 mod types;
 mod unify;
 
+#[cfg(test)]
+mod tests;
+
 pub use context::TypeContext;
 pub use emit_ts::{EmitConfig, TsEmitter, emit_typescript, emit_typescript_with_config};
 pub use symbol::{DefId, Interner, Symbol};
