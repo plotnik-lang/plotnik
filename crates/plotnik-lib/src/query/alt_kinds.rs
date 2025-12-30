@@ -3,8 +3,6 @@
 //! Checks constraints that are easier to express after parsing:
 //! - Mixed tagged/untagged alternations
 
-use rowan::TextRange;
-
 use super::invariants::ensure_both_branch_kinds;
 use super::visitor::{Visitor, walk, walk_alt_expr};
 use crate::SourceId;
@@ -58,19 +56,13 @@ impl AltKindsValidator<'_> {
             .expect("tagged branch found via filter must have label")
             .text_range();
 
-        let untagged_range = branch_range(untagged_branch);
-
         self.diag
             .report(
                 self.source_id,
                 DiagnosticKind::MixedAltBranches,
-                untagged_range,
+                untagged_branch.text_range(),
             )
             .related_to(self.source_id, tagged_range, "tagged branch here")
             .emit();
     }
-}
-
-fn branch_range(branch: &Branch) -> TextRange {
-    branch.text_range()
 }
