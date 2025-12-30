@@ -260,6 +260,12 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Captured expression: wraps inner's flow into a field.
+    ///
+    /// Scope creation rules:
+    /// - Sequences `{...} @x` and alternations `[...] @x` create new scopes.
+    ///   Inner fields become the captured type's fields.
+    /// - Other expressions (named nodes, refs) don't create scopes.
+    ///   Inner fields bubble up alongside the capture field.
     fn infer_captured_expr(&mut self, cap: &CapturedExpr) -> TermInfo {
         let Some(name_tok) = cap.name() else {
             // Recover gracefully
@@ -284,17 +290,79 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // Determine how inner flow relates to capture (e.g., ? makes field optional)
         let (inner_info, is_optional) = self.resolve_capture_inner(&inner);
 
-        let captured_type = self.determine_captured_type(&inner, &inner_info, annotation_type);
-        let field_info = if is_optional {
-            FieldInfo::optional(captured_type)
-        } else {
-            FieldInfo::required(captured_type)
-        };
+        // Determine if we need to merge bubbling fields with the capture.
+        // Only applies when inner has Bubble flow AND doesn't create a scope boundary.
+        // Sequences and alternations create scopes; named nodes/refs don't.
+        let should_merge_fields =
+            matches!(&inner_info.flow, TypeFlow::Bubble(_)) && !Self::inner_creates_scope(&inner);
 
-        TermInfo::new(
-            inner_info.arity,
-            TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field_info)),
-        )
+        if should_merge_fields {
+            // Named node/ref/etc with bubbling fields: capture adds a field,
+            // inner fields bubble up alongside.
+            let captured_type = self.determine_non_scope_captured_type(&inner, annotation_type);
+            let field_info = if is_optional {
+                FieldInfo::optional(captured_type)
+            } else {
+                FieldInfo::required(captured_type)
+            };
+
+            // Merge capture field with inner's bubbling fields
+            let TypeFlow::Bubble(type_id) = &inner_info.flow else {
+                unreachable!()
+            };
+            let mut fields = self
+                .ctx
+                .get_struct_fields(*type_id)
+                .cloned()
+                .unwrap_or_default();
+            fields.insert(capture_name, field_info);
+
+            TermInfo::new(
+                inner_info.arity,
+                TypeFlow::Bubble(self.ctx.intern_struct(fields)),
+            )
+        } else {
+            // All other cases: scope-creating captures, scalar flows, void flows.
+            // Inner becomes the captured type (if applicable).
+            let captured_type = self.determine_captured_type(&inner, &inner_info, annotation_type);
+            let field_info = if is_optional {
+                FieldInfo::optional(captured_type)
+            } else {
+                FieldInfo::required(captured_type)
+            };
+
+            TermInfo::new(
+                inner_info.arity,
+                TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field_info)),
+            )
+        }
+    }
+
+    /// Determines if an expression creates a scope boundary when captured.
+    fn inner_creates_scope(inner: &Expr) -> bool {
+        match inner {
+            Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
+            Expr::QuantifiedExpr(q) => {
+                // Look through quantifier to the actual expression
+                q.inner()
+                    .map(|i| Self::inner_creates_scope(&i))
+                    .unwrap_or(false)
+            }
+            _ => false,
+        }
+    }
+
+    /// Determines captured type for non-scope-creating expressions.
+    fn determine_non_scope_captured_type(
+        &mut self,
+        inner: &Expr,
+        annotation: Option<TypeId>,
+    ) -> TypeId {
+        if let Some(ref_type) = self.get_recursive_ref_type(inner) {
+            annotation.unwrap_or(ref_type)
+        } else {
+            annotation.unwrap_or(TYPE_NODE)
+        }
     }
 
     /// Resolves explicit type annotation like `@foo: string`.
