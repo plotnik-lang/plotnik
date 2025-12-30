@@ -11,6 +11,11 @@ use super::Query;
 use super::source_map::SourceKind;
 use super::type_check::Arity;
 
+/// Returns indentation string for the given level.
+fn indent(level: usize) -> String {
+    "  ".repeat(level)
+}
+
 pub struct QueryPrinter<'q> {
     query: &'q Query,
     raw: bool,
@@ -135,13 +140,13 @@ impl<'q> QueryPrinter<'q> {
     fn format_symbol_tree(
         &self,
         name: &str,
-        indent: usize,
+        depth: usize,
         defined: &indexmap::IndexSet<&str>,
         body_nodes: &std::collections::HashMap<String, SyntaxNode>,
         visited: &mut indexmap::IndexSet<String>,
         w: &mut impl Write,
     ) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+        let prefix = indent(depth);
 
         if visited.contains(name) {
             writeln!(w, "{}{} (cycle)", prefix, name)?;
@@ -166,7 +171,7 @@ impl<'q> QueryPrinter<'q> {
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
-                self.format_symbol_tree(r, indent + 1, defined, body_nodes, visited, w)?;
+                self.format_symbol_tree(r, depth + 1, defined, body_nodes, visited, w)?;
             }
         }
 
@@ -174,8 +179,8 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn format_cst(&self, node: &SyntaxNode, indent: usize, w: &mut impl Write) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+    fn format_cst(&self, node: &SyntaxNode, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+        let prefix = indent(depth);
         let card = self.arity_mark(node);
         let span = self.span_str(node.text_range());
 
@@ -183,12 +188,12 @@ impl<'q> QueryPrinter<'q> {
 
         for child in node.children_with_tokens() {
             match child {
-                NodeOrToken::Node(n) => self.format_cst(&n, indent + 1, w)?,
+                NodeOrToken::Node(n) => self.format_cst(&n, depth + 1, w)?,
                 NodeOrToken::Token(t) => {
                     if !self.trivia && t.kind().is_trivia() {
                         continue;
                     }
-                    let child_prefix = "  ".repeat(indent + 1);
+                    let child_prefix = indent(depth + 1);
                     let child_span = self.span_str(t.text_range());
                     writeln!(
                         w,
@@ -220,8 +225,8 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn format_def(&self, def: &ast::Def, indent: usize, w: &mut impl Write) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+    fn format_def(&self, def: &ast::Def, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+        let prefix = indent(depth);
         let card = self.arity_mark(def.as_cst());
         let span = self.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
@@ -234,11 +239,11 @@ impl<'q> QueryPrinter<'q> {
         let Some(body) = def.body() else {
             return Ok(());
         };
-        self.format_expr(&body, indent + 1, w)
+        self.format_expr(&body, depth + 1, w)
     }
 
-    fn format_expr(&self, expr: &ast::Expr, indent: usize, w: &mut impl Write) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+    fn format_expr(&self, expr: &ast::Expr, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+        let prefix = indent(depth);
         let card = self.arity_mark(expr.as_cst());
         let span = self.span_str(expr.text_range());
 
@@ -253,7 +258,7 @@ impl<'q> QueryPrinter<'q> {
                         None => writeln!(w, "{}NamedNode{}{}", prefix, card, span)?,
                     }
                 }
-                self.format_tree_children(n.as_cst(), indent + 1, w)?;
+                self.format_tree_children(n.as_cst(), depth + 1, w)?;
             }
             ast::Expr::Ref(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
@@ -270,15 +275,15 @@ impl<'q> QueryPrinter<'q> {
             ast::Expr::AltExpr(a) => {
                 writeln!(w, "{}Alt{}{}", prefix, card, span)?;
                 for branch in a.branches() {
-                    self.format_branch(&branch, indent + 1, w)?;
+                    self.format_branch(&branch, depth + 1, w)?;
                 }
                 for expr in a.exprs() {
-                    self.format_expr(&expr, indent + 1, w)?;
+                    self.format_expr(&expr, depth + 1, w)?;
                 }
             }
             ast::Expr::SeqExpr(s) => {
                 writeln!(w, "{}Seq{}{}", prefix, card, span)?;
-                self.format_tree_children(s.as_cst(), indent + 1, w)?;
+                self.format_tree_children(s.as_cst(), depth + 1, w)?;
             }
             ast::Expr::CapturedExpr(c) => {
                 let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
@@ -297,7 +302,7 @@ impl<'q> QueryPrinter<'q> {
                 let Some(inner) = c.inner() else {
                     return Ok(());
                 };
-                self.format_expr(&inner, indent + 1, w)?;
+                self.format_expr(&inner, depth + 1, w)?;
             }
             ast::Expr::QuantifiedExpr(q) => {
                 let op = q
@@ -308,7 +313,7 @@ impl<'q> QueryPrinter<'q> {
                 let Some(inner) = q.inner() else {
                     return Ok(());
                 };
-                self.format_expr(&inner, indent + 1, w)?;
+                self.format_expr(&inner, depth + 1, w)?;
             }
             ast::Expr::FieldExpr(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
@@ -316,7 +321,7 @@ impl<'q> QueryPrinter<'q> {
                 let Some(value) = f.value() else {
                     return Ok(());
                 };
-                self.format_expr(&value, indent + 1, w)?;
+                self.format_expr(&value, depth + 1, w)?;
             }
         }
         Ok(())
@@ -325,34 +330,33 @@ impl<'q> QueryPrinter<'q> {
     fn format_tree_children(
         &self,
         node: &SyntaxNode,
-        indent: usize,
+        depth: usize,
         w: &mut impl Write,
     ) -> std::fmt::Result {
         use crate::parser::cst::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
-                self.mark_anchor(indent, w)?;
+                self.mark_anchor(depth, w)?;
             } else if child.kind() == SyntaxKind::NegatedField {
-                self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), indent, w)?;
+                self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), depth, w)?;
             } else if let Some(expr) = ast::Expr::cast(child) {
-                self.format_expr(&expr, indent, w)?;
+                self.format_expr(&expr, depth, w)?;
             }
         }
         Ok(())
     }
 
-    fn mark_anchor(&self, indent: usize, w: &mut impl Write) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
-        writeln!(w, "{}.", prefix)
+    fn mark_anchor(&self, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+        writeln!(w, "{}.", indent(depth))
     }
 
     fn format_negated_field(
         &self,
         nf: &ast::NegatedField,
-        indent: usize,
+        depth: usize,
         w: &mut impl Write,
     ) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+        let prefix = indent(depth);
         let span = self.span_str(nf.text_range());
         let name = nf.name().map(|t| t.text().to_string()).unwrap_or_default();
         writeln!(w, "{}NegatedField{} !{}", prefix, span, name)
@@ -361,10 +365,10 @@ impl<'q> QueryPrinter<'q> {
     fn format_branch(
         &self,
         branch: &ast::Branch,
-        indent: usize,
+        depth: usize,
         w: &mut impl Write,
     ) -> std::fmt::Result {
-        let prefix = "  ".repeat(indent);
+        let prefix = indent(depth);
         let card = self.arity_mark(branch.as_cst());
         let span = self.span_str(branch.text_range());
         let label = branch.label().map(|t| t.text().to_string());
@@ -377,7 +381,7 @@ impl<'q> QueryPrinter<'q> {
         let Some(body) = branch.body() else {
             return Ok(());
         };
-        self.format_expr(&body, indent + 1, w)
+        self.format_expr(&body, depth + 1, w)
     }
 
     fn arity_mark(&self, node: &SyntaxNode) -> &'static str {
