@@ -31,4 +31,4 @@ default = ["plotnik-langs"]
 insta = { version = "=1.45.1", features = ["yaml"] }
 indoc = "=2.0.7"
 serde_json = "=1.0.148"
-tempfile = "=3.23.0"
+tempfile = "=3.24.0"
