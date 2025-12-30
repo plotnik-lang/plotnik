@@ -8,17 +8,24 @@ use std::collections::BTreeMap;
 
 use super::symbol::{DefId, Symbol};
 
+// Re-export shared type system components
+pub use crate::type_system::{Arity, QuantifierKind};
+use crate::type_system::{PrimitiveType, TYPE_STRING as PRIM_TYPE_STRING};
+
 /// Interned type identifier.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+///
+/// Index into the type registry. Values 0-2 are reserved for builtins
+/// (Void, Node, String); custom types start at index 3.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TypeId(pub u32);
 
-pub const TYPE_VOID: TypeId = TypeId(0);
-pub const TYPE_NODE: TypeId = TypeId(1);
-pub const TYPE_STRING: TypeId = TypeId(2);
+pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
+pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
+pub const TYPE_STRING: TypeId = TypeId(PrimitiveType::String.index() as u32);
 
 impl TypeId {
     pub fn is_builtin(self) -> bool {
-        self.0 <= TYPE_STRING.0
+        self.0 <= PRIM_TYPE_STRING as u32
     }
 }
 
@@ -58,7 +65,9 @@ impl TypeKind {
 /// Field information within a struct type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FieldInfo {
+    /// The type of this field's value.
     pub type_id: TypeId,
+    /// Whether this field may be absent (from alternation branches).
     pub optional: bool,
 }
 
@@ -82,25 +91,6 @@ impl FieldInfo {
             optional: true,
             ..self
         }
-    }
-}
-
-/// Structural arity - whether an expression matches one or many positions.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum Arity {
-    /// Exactly one node position.
-    One,
-    /// Multiple sequential positions.
-    Many,
-}
-
-impl Arity {
-    /// Combine arities: Many wins.
-    pub fn combine(self, other: Self) -> Self {
-        if self == Self::One && other == Self::One {
-            return Self::One;
-        }
-        Self::Many
     }
 }
 
@@ -139,7 +129,9 @@ impl TypeFlow {
 /// Combined arity and type flow information for an expression.
 #[derive(Clone, Debug)]
 pub struct TermInfo {
+    /// How many times this expression matches (one vs many).
     pub arity: Arity,
+    /// What data flows through this expression.
     pub flow: TypeFlow,
 }
 
@@ -174,27 +166,5 @@ impl TermInfo {
             arity,
             flow: TypeFlow::Bubble(struct_type_id),
         }
-    }
-}
-
-/// Quantifier kind for type inference.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum QuantifierKind {
-    /// `?` or `??` - zero or one.
-    Optional,
-    /// `*` or `*?` - zero or more.
-    ZeroOrMore,
-    /// `+` or `+?` - one or more.
-    OneOrMore,
-}
-
-impl QuantifierKind {
-    /// Whether this quantifier requires strict dimensionality (row capture).
-    pub fn requires_row_capture(self) -> bool {
-        matches!(self, Self::ZeroOrMore | Self::OneOrMore)
-    }
-
-    pub fn is_non_empty(self) -> bool {
-        matches!(self, Self::OneOrMore)
     }
 }

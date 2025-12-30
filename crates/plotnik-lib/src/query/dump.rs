@@ -38,7 +38,10 @@ mod test_helpers {
         }
 
         pub fn emit_typescript(&self) -> String {
-            crate::query::type_check::emit_typescript(self.type_context(), self.interner())
+            let bytecode = self.emit().expect("bytecode emission should succeed");
+            let module = crate::bytecode::Module::from_bytes(bytecode)
+                .expect("module loading should succeed");
+            crate::bytecode::emit::emit_typescript(&module)
         }
     }
 }

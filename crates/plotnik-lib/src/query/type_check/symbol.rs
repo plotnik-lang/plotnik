@@ -2,7 +2,8 @@ pub use plotnik_core::{Interner, Symbol};
 
 /// A lightweight handle to a named definition.
 ///
-/// Assigned during dependency analysis.
+/// Assigned during dependency analysis. Used as a key for looking up
+/// definition-level metadata (types, recursion status) in TypeContext.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct DefId(u32);
 

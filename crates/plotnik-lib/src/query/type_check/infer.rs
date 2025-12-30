@@ -330,7 +330,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             } else {
                 FieldInfo::required(captured_type)
             };
-
             TermInfo::new(
                 inner_info.arity,
                 TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field_info)),

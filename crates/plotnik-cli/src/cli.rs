@@ -124,10 +124,6 @@ pub struct TypesOutputArgs {
     #[arg(long, default_value = "typescript", value_name = "FORMAT")]
     pub format: String,
 
-    /// Name for the root type (for anonymous expressions)
-    #[arg(long, default_value = "Query", value_name = "NAME")]
-    pub root_type: String,
-
     /// Use verbose node shape (matches exec --verbose-nodes)
     #[arg(long)]
     pub verbose_nodes: bool,

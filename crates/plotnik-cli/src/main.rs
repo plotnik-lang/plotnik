@@ -64,7 +64,6 @@ fn main() {
                 query_file: query.query_file,
                 lang,
                 format: output.format,
-                root_type: output.root_type,
                 verbose_nodes: output.verbose_nodes,
                 no_node_type: output.no_node_type,
                 export: !output.no_export,

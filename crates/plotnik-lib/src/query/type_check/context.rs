@@ -14,7 +14,7 @@ use super::types::{
 };
 
 /// Central registry for types, symbols, and expression metadata.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct TypeContext {
     types: Vec<TypeKind>,
     type_map: HashMap<TypeKind, TypeId>,

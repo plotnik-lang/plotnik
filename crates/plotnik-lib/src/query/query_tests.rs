@@ -2,6 +2,7 @@ use plotnik_langs::Lang;
 
 use crate::{
     SourceMap,
+    bytecode::Module,
     query::query::{LinkedQuery, QueryAnalyzed, QueryBuilder},
 };
 
@@ -85,7 +86,11 @@ impl QueryAnalyzed {
                 query.dump_diagnostics()
             );
         }
-        query.emit_typescript()
+
+        // Emit to bytecode and then emit TypeScript from the bytecode module
+        let bytecode = query.emit().expect("bytecode emission should succeed");
+        let module = Module::from_bytes(bytecode).expect("module loading should succeed");
+        crate::bytecode::emit::emit_typescript(&module)
     }
 
     #[track_caller]

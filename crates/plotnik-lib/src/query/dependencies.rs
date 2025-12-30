@@ -24,7 +24,7 @@ use crate::query::type_check::DefId;
 use crate::query::visitor::{Visitor, walk_expr};
 
 /// Result of dependency analysis.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DependencyAnalysis {
     /// Strongly connected components in reverse topological order.
     ///

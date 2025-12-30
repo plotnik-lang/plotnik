@@ -21,7 +21,7 @@ pub const UNNAMED_DEF: &str = "_";
 ///
 /// Stores the mapping from definition names to their AST expressions,
 /// along with source file information for diagnostics.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SymbolTable {
     /// Maps symbol name to its AST expression.
     table: IndexMap<String, ast::Expr>,
