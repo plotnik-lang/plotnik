@@ -5,7 +5,7 @@ use std::fmt::Write;
 use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
-use crate::parser::{self as ast, Expr, SyntaxNode};
+use crate::parser::{self as ast, SyntaxNode};
 
 use super::Query;
 use super::source_map::SourceKind;
@@ -167,7 +167,7 @@ impl<'q> QueryPrinter<'q> {
         visited.insert(name.to_string());
 
         if let Some(body) = self.query.symbol_table.get(name) {
-            let refs_set = collect_refs(body);
+            let refs_set = super::refs::collect_ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
@@ -413,11 +413,3 @@ impl Query {
     }
 }
 
-fn collect_refs(expr: &Expr) -> IndexSet<String> {
-    expr.as_cst()
-        .descendants()
-        .filter_map(ast::Ref::cast)
-        .filter_map(|r| r.name())
-        .map(|tok| tok.text().to_string())
-        .collect()
-}

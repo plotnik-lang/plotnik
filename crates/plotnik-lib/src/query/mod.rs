@@ -1,6 +1,7 @@
 mod dump;
 mod invariants;
 mod printer;
+mod refs;
 mod source_map;
 mod utils;
 pub use printer::QueryPrinter;

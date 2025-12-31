@@ -8,7 +8,7 @@
 //! which is useful for passes that need to process dependencies before
 //! dependents (like type inference).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use indexmap::{IndexMap, IndexSet};
 use plotnik_core::{Interner, Symbol};
@@ -39,6 +39,12 @@ pub struct DependencyAnalysis {
 
     /// Maps DefId to definition name Symbol (indexed by DefId).
     def_names: Vec<Symbol>,
+
+    /// Set of recursive definition names.
+    ///
+    /// A definition is recursive if it's in an SCC with >1 member,
+    /// or it's a single-member SCC that references itself.
+    recursive_defs: HashSet<String>,
 }
 
 impl DependencyAnalysis {
@@ -82,6 +88,14 @@ impl DependencyAnalysis {
     pub fn name_to_def(&self) -> &HashMap<Symbol, DefId> {
         &self.name_to_def
     }
+
+    /// Returns true if this definition is recursive.
+    ///
+    /// A definition is recursive if it's part of a mutual recursion group (SCC > 1),
+    /// or it's a single definition that references itself.
+    pub fn is_recursive(&self, name: &str) -> bool {
+        self.recursive_defs.contains(name)
+    }
 }
 
 /// Analyze dependencies between definitions.
@@ -97,8 +111,20 @@ pub fn analyze_dependencies(
     // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
     let mut name_to_def = HashMap::new();
     let mut def_names = Vec::new();
+    let mut recursive_defs = HashSet::new();
 
     for scc in &sccs {
+        // Mark recursive definitions
+        if scc.len() > 1 {
+            // Mutual recursion: all members are recursive
+            recursive_defs.extend(scc.iter().cloned());
+        } else if let Some(name) = scc.first()
+            && let Some(body) = symbol_table.get(name)
+            && super::refs::contains_ref(body, name)
+        {
+            recursive_defs.insert(name.clone());
+        }
+
         for name in scc {
             let sym = interner.intern(name);
             let def_id = DefId::from_raw(def_names.len() as u32);
@@ -111,6 +137,7 @@ pub fn analyze_dependencies(
         sccs,
         name_to_def,
         def_names,
+        recursive_defs,
     }
 }
 
