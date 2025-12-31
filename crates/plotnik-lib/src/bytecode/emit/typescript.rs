@@ -6,6 +6,8 @@
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use plotnik_core::utils::to_pascal_case;
+
 use crate::bytecode::module::{Module, StringsView, TypesView};
 use crate::bytecode::type_meta::{TypeDef, TypeKind};
 use crate::bytecode::{EntrypointsView, QTypeId};
@@ -768,23 +770,6 @@ impl<'a> TsEmitter<'a> {
 struct NamingContext {
     def_name: String,
     field_name: Option<String>,
-}
-
-fn to_pascal_case(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut capitalize_next = true;
-
-    for c in s.chars() {
-        if c == '_' || c == '-' || c == '.' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.extend(c.to_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(c);
-        }
-    }
-    result
 }
 
 /// Emit TypeScript from a bytecode module.

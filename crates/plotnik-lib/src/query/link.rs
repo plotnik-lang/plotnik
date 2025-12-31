@@ -1,9 +1,8 @@
 //! Link pass: resolve node types and fields against tree-sitter grammar.
 //!
-//! Three-phase approach:
-//! 1. Collect and resolve all node type names (NamedNode, AnonymousNode)
-//! 2. Collect and resolve all field names (FieldExpr, NegatedField)
-//! 3. Validate structural constraints (field on node type, child type for field)
+//! Two-phase approach:
+//! 1. Resolve all symbols (node types and fields) against grammar
+//! 2. Validate structural constraints (field on node type, child type for field)
 
 use std::collections::HashMap;
 
@@ -84,14 +83,13 @@ impl<'a, 'q> Linker<'a, 'q> {
     }
 
     fn link(&mut self, root: &ast::Root) {
-        self.resolve_node_types(root);
-        self.resolve_fields(root);
+        self.resolve_symbols(root);
         self.validate_structure(root);
     }
 
-    fn resolve_node_types(&mut self, root: &ast::Root) {
-        let mut collector = NodeTypeCollector { linker: self };
-        collector.visit(root);
+    fn resolve_symbols(&mut self, root: &ast::Root) {
+        let mut resolver = SymbolResolver { linker: self };
+        resolver.visit(root);
     }
 
     fn resolve_named_node(&mut self, node: &NamedNode) {
@@ -137,11 +135,6 @@ impl<'a, 'q> Linker<'a, 'q> {
             }
             builder.emit();
         }
-    }
-
-    fn resolve_fields(&mut self, root: &ast::Root) {
-        let mut collector = FieldCollector { linker: self };
-        collector.visit(root);
     }
 
     fn resolve_field_by_token(&mut self, name_token: Option<SyntaxToken>) {
@@ -403,17 +396,23 @@ struct ValidationContext {
     parent_range: TextRange,
 }
 
-struct NodeTypeCollector<'l, 'a, 'q> {
+/// Combined symbol resolver for node types and fields.
+struct SymbolResolver<'l, 'a, 'q> {
     linker: &'l mut Linker<'a, 'q>,
 }
 
-impl Visitor for NodeTypeCollector<'_, '_, '_> {
+impl Visitor for SymbolResolver<'_, '_, '_> {
     fn visit(&mut self, root: &ast::Root) {
         walk(self, root);
     }
 
     fn visit_named_node(&mut self, node: &ast::NamedNode) {
         self.linker.resolve_named_node(node);
+
+        for neg in node.as_cst().children().filter_map(ast::NegatedField::cast) {
+            self.linker.resolve_field_by_token(neg.name());
+        }
+
         super::visitor::walk_named_node(self, node);
     }
 
@@ -433,47 +432,26 @@ impl Visitor for NodeTypeCollector<'_, '_, '_> {
         self.linker
             .node_type_ids
             .insert(token_src(&value_token, self.linker.source()), resolved);
+
         if let Some(id) = resolved {
             let sym = self.linker.interner.intern(value);
             self.linker.output.node_type_ids.entry(sym).or_insert(id);
+            return;
         }
 
-        if resolved.is_none() {
-            self.linker
-                .diagnostics
-                .report(
-                    self.linker.source_id,
-                    DiagnosticKind::UnknownNodeType,
-                    value_token.text_range(),
-                )
-                .message(value)
-                .emit();
-        }
-    }
-}
-
-struct FieldCollector<'l, 'a, 'q> {
-    linker: &'l mut Linker<'a, 'q>,
-}
-
-impl Visitor for FieldCollector<'_, '_, '_> {
-    fn visit(&mut self, root: &ast::Root) {
-        walk(self, root);
-    }
-
-    fn visit_named_node(&mut self, node: &ast::NamedNode) {
-        for child in node.as_cst().children() {
-            if let Some(neg) = ast::NegatedField::cast(child) {
-                self.linker.resolve_field_by_token(neg.name());
-            }
-        }
-
-        super::visitor::walk_named_node(self, node);
+        self.linker
+            .diagnostics
+            .report(
+                self.linker.source_id,
+                DiagnosticKind::UnknownNodeType,
+                value_token.text_range(),
+            )
+            .message(value)
+            .emit();
     }
 
     fn visit_field_expr(&mut self, field: &ast::FieldExpr) {
         self.linker.resolve_field_by_token(field.name());
-
         super::visitor::walk_field_expr(self, field);
     }
 }

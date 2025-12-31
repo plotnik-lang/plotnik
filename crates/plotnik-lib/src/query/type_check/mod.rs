@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use indexmap::IndexMap;
 
 use crate::diagnostics::Diagnostics;
-use crate::parser::ast::{self, Root};
+use crate::parser::ast::Root;
 use crate::query::dependencies::DependencyAnalysis;
 use crate::query::source_map::SourceId;
 use crate::query::symbol_table::{SymbolTable, UNNAMED_DEF};
@@ -80,16 +80,17 @@ impl<'a> InferencePass<'a> {
     }
 
     /// Identify and mark recursive definitions.
-    /// A def is recursive if it's in an SCC with >1 member, or it references itself directly.
     fn mark_recursion(&mut self) {
         for scc in &self.dependency_analysis.sccs {
-            if self.is_scc_recursive(scc) {
-                for def_name in scc {
-                    let sym = self.interner.intern(def_name);
-                    if let Some(def_id) = self.ctx.get_def_id_sym(sym) {
-                        self.ctx.mark_recursive(def_id);
-                    }
+            for def_name in scc {
+                if !self.dependency_analysis.is_recursive(def_name) {
+                    continue;
                 }
+                let sym = self.interner.intern(def_name);
+                let Some(def_id) = self.ctx.get_def_id_sym(sym) else {
+                    continue;
+                };
+                self.ctx.mark_recursive(def_id);
             }
         }
     }
@@ -140,43 +141,12 @@ impl<'a> InferencePass<'a> {
         }
     }
 
-    fn is_scc_recursive(&self, scc: &[String]) -> bool {
-        if scc.len() > 1 {
-            return true;
-        }
-
-        let Some(name) = scc.first() else {
-            return false;
-        };
-
-        let Some(body) = self.symbol_table.get(name) else {
-            return false;
-        };
-
-        body_references_self(body, name)
-    }
-
     fn flow_to_type_id(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
             TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
             TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => *id,
         }
     }
-}
-
-/// Check if an expression body contains a reference to the given name.
-fn body_references_self(body: &ast::Expr, name: &str) -> bool {
-    body.as_cst().descendants().any(|descendant| {
-        let Some(r) = ast::Ref::cast(descendant) else {
-            return false;
-        };
-
-        let Some(name_tok) = r.name() else {
-            return false;
-        };
-
-        name_tok.text() == name
-    })
 }
 
 /// Get the primary definition name (first non-underscore, or underscore if none).

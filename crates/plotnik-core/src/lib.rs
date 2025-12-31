@@ -15,6 +15,7 @@ use std::num::NonZeroU16;
 
 mod interner;
 mod invariants;
+pub mod utils;
 
 pub use interner::{Interner, Symbol};
 
