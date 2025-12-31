@@ -107,7 +107,7 @@ fn format_node_with_field(
         let text = node
             .utf8_text(source.as_bytes())
             .unwrap_or("<invalid utf8>");
-        if text == kind {
+        return if text == kind {
             format!("{}{}(\"{}\")", indent, field_prefix, escape_string(kind))
         } else {
             format!(
@@ -117,22 +117,22 @@ fn format_node_with_field(
                 kind,
                 escape_string(text)
             )
-        }
-    } else {
-        let mut out = format!("{}{}({}", indent, field_prefix, kind);
-        for (child, child_field) in children {
-            out.push('\n');
-            out.push_str(&format_node_with_field(
-                child,
-                child_field,
-                source,
-                depth + 1,
-                include_anonymous,
-            ));
-        }
-        out.push(')');
-        out
+        };
     }
+
+    let mut out = format!("{}{}({}", indent, field_prefix, kind);
+    for (child, child_field) in children {
+        out.push('\n');
+        out.push_str(&format_node_with_field(
+            child,
+            child_field,
+            source,
+            depth + 1,
+            include_anonymous,
+        ));
+    }
+    out.push(')');
+    out
 }
 
 fn escape_string(s: &str) -> String {

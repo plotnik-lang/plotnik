@@ -716,11 +716,10 @@ impl<'a> TsEmitter<'a> {
         let Some(type_def) = self.types.get(type_id) else {
             return (type_id, false);
         };
-        if type_def.type_kind() == Some(TypeKind::Optional) {
-            (QTypeId(type_def.data), true)
-        } else {
-            (type_id, false)
+        if type_def.type_kind() != Some(TypeKind::Optional) {
+            return (type_id, false);
         }
+        (QTypeId(type_def.data), true)
     }
 
     fn needs_generated_name(&self, type_def: &TypeDef) -> bool {

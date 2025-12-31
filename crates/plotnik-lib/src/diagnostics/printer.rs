@@ -63,20 +63,21 @@ impl<'a> DiagnosticsPrinter<'a> {
                             .span(adjust_range(related.span.range, primary_content.len()))
                             .label(&related.message),
                     );
-                } else {
-                    // Different file: create separate snippet
-                    let related_content = self.sources.content(related.span.source);
-                    let mut snippet = Snippet::source(related_content).line_start(1);
-                    if let Some(name) = self.source_path(related.span.source) {
-                        snippet = snippet.path(name);
-                    }
-                    snippet = snippet.annotation(
-                        AnnotationKind::Context
-                            .span(adjust_range(related.span.range, related_content.len()))
-                            .label(&related.message),
-                    );
-                    cross_file_snippets.push(snippet);
+                    continue;
                 }
+
+                // Different file: create separate snippet
+                let related_content = self.sources.content(related.span.source);
+                let mut snippet = Snippet::source(related_content).line_start(1);
+                if let Some(name) = self.source_path(related.span.source) {
+                    snippet = snippet.path(name);
+                }
+                snippet = snippet.annotation(
+                    AnnotationKind::Context
+                        .span(adjust_range(related.span.range, related_content.len()))
+                        .label(&related.message),
+                );
+                cross_file_snippets.push(snippet);
             }
 
             let level = severity_to_level(diag.severity());
