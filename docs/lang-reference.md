@@ -783,9 +783,19 @@ Anchors require parent node context to be meaningful:
 Q = . (a)                  ; definition level (no parent node)
 Q = {. (a)}                ; sequence boundary without parent
 Q = {(a) .}                ; sequence boundary without parent
+Q = [(a) . (b)]            ; directly in alternation
 ```
 
-The rule: **boundary anchors need a parent named node** to provide first/last child or adjacent sibling semantics. Interior anchors (between items in a sequence) are always valid because both sides are explicitly defined.
+To anchor within alternation branches, wrap in a sequence:
+
+```
+Q = [{(a) . (b)} (c)]      ; valid: anchor inside sequence branch
+```
+
+The rules:
+- **Boundary anchors** (at start/end of sequence) need a parent named node to provide first/last child or adjacent sibling semantics
+- **Interior anchors** (between items in a sequence) are always valid because both sides are explicitly defined
+- **Alternations** cannot contain anchors directly—anchors must be inside a branch expression
 
 ---
 

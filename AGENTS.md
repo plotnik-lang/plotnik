@@ -105,6 +105,9 @@ Rule: anchor is as strict as its strictest operand.
 
 ; WRONG: boundary anchors without parent node
 {. (a)}  ; use (parent {. (a)})
+
+; WRONG: anchors directly in alternations
+[(a) . (b)]  ; use [{(a) . (b)} (c)]
 ```
 
 ## Type System Rules

@@ -32,6 +32,7 @@ pub enum DiagnosticKind {
     EmptyTree,
     BareIdentifier,
     InvalidSeparator,
+    AnchorInAlternation,
     InvalidFieldEquals,
     InvalidSupertypeSyntax,
     InvalidTypeAnnotationSyntax,
@@ -151,6 +152,9 @@ impl DiagnosticKind {
             Self::AnchorWithoutContext => {
                 Some("wrap in a named node: `(parent . (child))`")
             }
+            Self::AnchorInAlternation => {
+                Some("use `[{(a) . (b)} (c)]` to anchor within a branch")
+            }
             _ => None,
         }
     }
@@ -174,6 +178,7 @@ impl DiagnosticKind {
             Self::EmptyTree => "empty `()` is not allowed",
             Self::BareIdentifier => "bare identifier is not valid",
             Self::InvalidSeparator => "unexpected separator",
+            Self::AnchorInAlternation => "anchors cannot appear directly in alternations",
             Self::InvalidFieldEquals => "use `:` instead of `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
             Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations",
