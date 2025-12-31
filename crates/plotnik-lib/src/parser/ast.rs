@@ -243,6 +243,37 @@ impl NamedNode {
             .unwrap_or(false)
     }
 
+    /// Returns true if this is a MISSING node: `(MISSING ...)`.
+    pub fn is_missing(&self) -> bool {
+        self.node_type()
+            .map(|t| t.kind() == SyntaxKind::KwMissing)
+            .unwrap_or(false)
+    }
+
+    /// For MISSING nodes, returns the inner type constraint if present.
+    ///
+    /// `(MISSING identifier)` → Some("identifier")
+    /// `(MISSING ";")` → Some(";")
+    /// `(MISSING)` → None
+    pub fn missing_constraint(&self) -> Option<SyntaxToken> {
+        if !self.is_missing() {
+            return None;
+        }
+        // After KwMissing, look for Id or StrVal token
+        let mut found_missing = false;
+        for child in self.0.children_with_tokens() {
+            if let Some(token) = child.into_token() {
+                if token.kind() == SyntaxKind::KwMissing {
+                    found_missing = true;
+                } else if found_missing && matches!(token.kind(), SyntaxKind::Id | SyntaxKind::StrVal)
+                {
+                    return Some(token);
+                }
+            }
+        }
+        None
+    }
+
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
         self.0.children().filter_map(Expr::cast)
     }
