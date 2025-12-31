@@ -48,6 +48,8 @@ pub use module::{
 pub use dump::dump;
 
 #[cfg(test)]
+mod dump_tests;
+#[cfg(test)]
 mod instructions_tests;
 #[cfg(test)]
 mod layout_tests;

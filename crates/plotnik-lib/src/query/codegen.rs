@@ -4,15 +4,20 @@
 
 use std::collections::{HashMap, HashSet};
 
+use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
+use crate::bytecode::ir::Label;
+use crate::bytecode::layout::CacheAligned;
 use crate::bytecode::{
     Entrypoint, FieldSymbol, Header, NodeSymbol, QTypeId, SECTION_ALIGN, StepId, StringId,
     TriviaEntry, TypeDef, TypeMember, TypeMetaHeader, TypeName,
 };
 use crate::type_system::TypeKind;
 
+use super::compile::Compiler;
 use super::query::LinkedQuery;
+use super::symbol_table::SymbolTable;
 use super::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
@@ -20,6 +25,8 @@ use super::type_check::{
 /// Error during bytecode emission.
 #[derive(Clone, Debug)]
 pub enum EmitError {
+    /// Query has validation errors (must be valid before emitting).
+    InvalidQuery,
     /// Too many strings (exceeds u16 max).
     TooManyStrings(usize),
     /// Too many types (exceeds u16 max).
@@ -28,29 +35,43 @@ pub enum EmitError {
     TooManyTypeMembers(usize),
     /// Too many entrypoints (exceeds u16 max).
     TooManyEntrypoints(usize),
+    /// Too many transitions (exceeds u16 max).
+    TooManyTransitions(usize),
     /// String not found in interner.
     StringNotFound(Symbol),
+    /// Compilation error.
+    Compile(super::compile::CompileError),
 }
 
 impl std::fmt::Display for EmitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::InvalidQuery => write!(f, "query has validation errors"),
             Self::TooManyStrings(n) => write!(f, "too many strings: {n} (max 65534)"),
             Self::TooManyTypes(n) => write!(f, "too many types: {n} (max 65533)"),
             Self::TooManyTypeMembers(n) => write!(f, "too many type members: {n} (max 65535)"),
             Self::TooManyEntrypoints(n) => write!(f, "too many entrypoints: {n} (max 65535)"),
+            Self::TooManyTransitions(n) => write!(f, "too many transitions: {n} (max 65535)"),
             Self::StringNotFound(sym) => write!(f, "string not found for symbol: {sym:?}"),
+            Self::Compile(e) => write!(f, "compilation error: {e}"),
         }
     }
 }
 
 impl std::error::Error for EmitError {}
 
+/// Easter egg string at index 0 (Dostoevsky, The Idiot).
+/// StringId(0) is reserved and never referenced by instructions.
+pub const EASTER_EGG: &str = "Beauty will save the world";
+
 /// Builds the string table, remapping query Symbols to bytecode StringIds.
 ///
 /// The bytecode format requires a subset of the query interner's strings.
 /// This builder collects only the strings that are actually used and assigns
 /// compact StringId indices.
+///
+/// StringId(0) is reserved for an easter egg and is never referenced by
+/// instructions. Actual strings start at index 1.
 #[derive(Debug)]
 pub struct StringTableBuilder {
     /// Map from query Symbol to bytecode StringId.
@@ -63,11 +84,15 @@ pub struct StringTableBuilder {
 
 impl StringTableBuilder {
     pub fn new() -> Self {
-        Self {
+        let mut builder = Self {
             mapping: HashMap::new(),
             str_lookup: HashMap::new(),
             strings: Vec::new(),
-        }
+        };
+        // Reserve index 0 for easter egg
+        builder.strings.push(EASTER_EGG.to_string());
+        builder.str_lookup.insert(EASTER_EGG.to_string(), StringId(0));
+        builder
     }
 
     /// Get or create a StringId for a Symbol.
@@ -115,7 +140,8 @@ impl StringTableBuilder {
 
     /// Validate that the string count fits in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
-        // Max count is 65534 because the table needs count+1 entries
+        // Max count is 65534 because the table needs count+1 entries.
+        // Index 0 is reserved for the easter egg, so we can have 65533 user strings.
         if self.strings.len() > 65534 {
             return Err(EmitError::TooManyStrings(self.strings.len()));
         }
@@ -211,10 +237,10 @@ impl TypeTableBuilder {
 
         // Emit TypeDefs and TypeMembers - fill in the placeholders.
         for (slot_index, &type_id) in ordered_types.iter().enumerate() {
-            let type_kind = type_ctx
+            let type_shape = type_ctx
                 .get_type(type_id)
                 .expect("collected type must exist");
-            self.emit_type_at_slot(slot_index, type_id, type_kind, type_ctx, interner, strings)?;
+            self.emit_type_at_slot(slot_index, type_id, type_shape, type_ctx, interner, strings)?;
         }
 
         // Collect TypeName entries for named definitions
@@ -236,12 +262,12 @@ impl TypeTableBuilder {
         &mut self,
         slot_index: usize,
         _type_id: TypeId,
-        type_kind: &TypeShape,
+        type_shape: &TypeShape,
         type_ctx: &TypeContext,
         interner: &Interner,
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
-        match type_kind {
+        match type_shape {
             TypeShape::Void | TypeShape::Node | TypeShape::String => {
                 // Builtins - should not reach here
                 unreachable!("builtins should be handled separately")
@@ -362,8 +388,8 @@ impl TypeTableBuilder {
         }
 
         // Handle Ref types by following the reference
-        if let Some(type_kind) = type_ctx.get_type(type_id)
-            && let TypeShape::Ref(def_id) = type_kind
+        if let Some(type_shape) = type_ctx.get_type(type_id)
+            && let TypeShape::Ref(def_id) = type_shape
             && let Some(def_type_id) = type_ctx.get_def_type(*def_id)
         {
             return self.resolve_type(def_type_id, type_ctx);
@@ -486,12 +512,12 @@ fn collect_types_dfs(
         return;
     }
 
-    let Some(type_kind) = type_ctx.get_type(type_id) else {
+    let Some(type_shape) = type_ctx.get_type(type_id) else {
         return;
     };
 
     // Resolve Ref types to their target
-    if let TypeShape::Ref(def_id) = type_kind {
+    if let TypeShape::Ref(def_id) = type_shape {
         if let Some(target_id) = type_ctx.get_def_type(*def_id) {
             collect_types_dfs(target_id, type_ctx, out, seen);
         }
@@ -501,7 +527,7 @@ fn collect_types_dfs(
     seen.insert(type_id);
 
     // Collect children first (depth-first), then add self
-    match type_kind {
+    match type_shape {
         TypeShape::Struct(fields) => {
             for field_info in fields.values() {
                 collect_types_dfs(field_info.type_id, type_ctx, out, seen);
@@ -542,8 +568,12 @@ fn pad_to_section(buf: &mut Vec<u8>) {
 }
 
 /// Emit bytecode from type context only (no node validation).
-pub fn emit(type_ctx: &TypeContext, interner: &Interner) -> Result<Vec<u8>, EmitError> {
-    emit_inner(type_ctx, interner, None, None)
+pub fn emit(
+    type_ctx: &TypeContext,
+    interner: &Interner,
+    symbol_table: &SymbolTable,
+) -> Result<Vec<u8>, EmitError> {
+    emit_inner(type_ctx, interner, symbol_table, None, None)
 }
 
 /// Emit bytecode from a LinkedQuery (includes node type/field validation info).
@@ -551,6 +581,7 @@ pub fn emit_linked(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     emit_inner(
         query.type_context(),
         query.interner(),
+        &query.symbol_table,
         Some(query.node_type_ids()),
         Some(query.node_field_ids()),
     )
@@ -560,12 +591,27 @@ pub fn emit_linked(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 fn emit_inner(
     type_ctx: &TypeContext,
     interner: &Interner,
-    node_type_ids: Option<&HashMap<Symbol, NodeTypeId>>,
-    node_field_ids: Option<&HashMap<Symbol, NodeFieldId>>,
+    symbol_table: &SymbolTable,
+    node_type_ids: Option<&IndexMap<Symbol, NodeTypeId>>,
+    node_field_ids: Option<&IndexMap<Symbol, NodeFieldId>>,
 ) -> Result<Vec<u8>, EmitError> {
+    let is_linked = node_type_ids.is_some();
     let mut strings = StringTableBuilder::new();
     let mut types = TypeTableBuilder::new();
     types.build(type_ctx, interner, &mut strings)?;
+
+    // Compile transitions (strings are interned here for unlinked mode)
+    let compile_result = Compiler::compile(interner, type_ctx, symbol_table, &mut strings, node_type_ids, node_field_ids)
+        .map_err(EmitError::Compile)?;
+
+    // Layout with cache alignment
+    let entry_labels: Vec<Label> = compile_result.def_entries.values().copied().collect();
+    let layout = CacheAligned::layout(&compile_result.instructions, &entry_labels);
+
+    // Validate transition count
+    if layout.total_steps as usize > 65535 {
+        return Err(EmitError::TooManyTransitions(layout.total_steps as usize));
+    }
 
     // Collect node symbols (empty if not linked)
     let mut node_symbols: Vec<NodeSymbol> = Vec::new();
@@ -591,15 +637,24 @@ fn emit_inner(
         }
     }
 
-    // Collect entrypoints
+    // Collect entrypoints with actual targets from layout
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
         let name = strings.get_or_intern(name_sym, interner)?;
         let result_type = types.get(type_id).unwrap_or(QTypeId::VOID);
+
+        // Get actual target from compiled result
+        let target = compile_result
+            .def_entries
+            .get(&def_id)
+            .and_then(|label| layout.label_to_step.get(label))
+            .copied()
+            .unwrap_or(StepId::ACCEPT);
+
         entrypoints.push(Entrypoint {
             name,
-            target: StepId::ACCEPT,
+            target,
             result_type,
             _pad: 0,
         });
@@ -614,6 +669,9 @@ fn emit_inner(
 
     // Trivia (empty for now)
     let trivia_entries: Vec<TriviaEntry> = Vec::new();
+
+    // Resolve and serialize transitions
+    let transitions_bytes = emit_transitions(&compile_result.instructions, &layout);
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -649,7 +707,7 @@ fn emit_inner(
     emit_section(&mut output, &type_names_bytes);
 
     let entrypoints_offset = emit_section(&mut output, &entrypoints_bytes);
-    let transitions_offset = emit_section(&mut output, &[]); // Empty for now
+    let transitions_offset = emit_section(&mut output, &transitions_bytes);
 
     pad_to_section(&mut output);
     let total_size = output.len() as u32;
@@ -669,14 +727,42 @@ fn emit_inner(
         node_fields_count: field_symbols.len() as u16,
         trivia_count: trivia_entries.len() as u16,
         entrypoints_count: entrypoints.len() as u16,
-        transitions_count: 0,
+        transitions_count: layout.total_steps,
         total_size,
         ..Default::default()
     };
+    header.set_linked(is_linked);
     header.checksum = crc32fast::hash(&output[64..]);
     output[..64].copy_from_slice(&header.to_bytes());
 
     Ok(output)
+}
+
+/// Emit transitions section from instructions and layout.
+fn emit_transitions(
+    instructions: &[crate::bytecode::ir::Instruction],
+    layout: &crate::bytecode::ir::LayoutResult,
+) -> Vec<u8> {
+    // Allocate buffer for all steps (8 bytes each)
+    let mut bytes = vec![0u8; layout.total_steps as usize * 8];
+
+    for instr in instructions {
+        let label = instr.label();
+        let Some(&step_id) = layout.label_to_step.get(&label) else {
+            continue;
+        };
+
+        let offset = step_id.byte_offset();
+        let resolved = instr.resolve(&layout.label_to_step);
+
+        // Copy instruction bytes to the correct position
+        let end = offset + resolved.len();
+        if end <= bytes.len() {
+            bytes[offset..end].copy_from_slice(&resolved);
+        }
+    }
+
+    bytes
 }
 
 fn emit_section(output: &mut Vec<u8>, data: &[u8]) -> u32 {

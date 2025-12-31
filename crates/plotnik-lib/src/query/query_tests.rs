@@ -1,10 +1,14 @@
-use plotnik_langs::Lang;
+use plotnik_langs::{Lang, from_name};
 
 use crate::{
     SourceMap,
     bytecode::Module,
     query::query::{LinkedQuery, QueryAnalyzed, QueryBuilder},
 };
+
+fn javascript() -> Lang {
+    from_name("javascript").expect("javascript lang")
+}
 
 impl QueryAnalyzed {
     #[track_caller]
@@ -91,6 +95,46 @@ impl QueryAnalyzed {
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::from_bytes(bytecode).expect("module loading should succeed");
         crate::bytecode::emit::emit_typescript(&module)
+    }
+
+    #[track_caller]
+    pub fn expect_valid_bytecode(src: &str) -> String {
+        let query = Self::parse_and_validate(src);
+        let bytecode = query.emit().expect("bytecode emission should succeed");
+        let module = Module::from_bytes(bytecode).expect("module loading should succeed");
+        crate::bytecode::dump(&module)
+    }
+
+    #[track_caller]
+    pub fn expect_valid_linked_bytecode(src: &str) -> String {
+        let query = Self::parse_and_validate(src).link(&javascript());
+        if !query.is_valid() {
+            panic!(
+                "Expected valid linking, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        let bytecode = query.emit().expect("bytecode emission should succeed");
+        let module = Module::from_bytes(bytecode).expect("module loading should succeed");
+        crate::bytecode::dump(&module)
+    }
+
+    #[track_caller]
+    pub fn expect_valid_bytes(src: &str) -> Vec<u8> {
+        let query = Self::parse_and_validate(src);
+        query.emit().expect("bytecode emission should succeed")
+    }
+
+    #[track_caller]
+    pub fn expect_valid_linked_bytes(src: &str) -> Vec<u8> {
+        let query = Self::parse_and_validate(src).link(&javascript());
+        if !query.is_valid() {
+            panic!(
+                "Expected valid linking, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        query.emit().expect("bytecode emission should succeed")
     }
 
     #[track_caller]

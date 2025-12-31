@@ -1,5 +1,3 @@
-#![allow(unused)]
-use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
@@ -8,7 +6,7 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
-use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
+use crate::parser::{Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
 use crate::query::anchors::validate_anchors;
 use crate::query::dependencies;
@@ -165,7 +163,7 @@ impl QueryAnalyzed {
     }
 
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {
-        use crate::parser::ast::{self, Expr};
+        use crate::parser::ast;
 
         // Try casting to Expr first as it's the most common query
         if let Some(expr) = ast::Expr::cast(node.clone()) {
@@ -202,9 +200,14 @@ impl QueryAnalyzed {
         &self.interner
     }
 
-    /// Emit bytecode (types only, no node validation).
-    pub fn emit(&self) -> Result<Vec<u8>, super::emit::EmitError> {
-        super::emit::emit(&self.type_context, &self.interner)
+    /// Emit bytecode without language linking (no node type/field validation).
+    ///
+    /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
+    pub fn emit(&self) -> Result<Vec<u8>, super::codegen::EmitError> {
+        if !self.is_valid() {
+            return Err(super::codegen::EmitError::InvalidQuery);
+        }
+        super::codegen::emit(&self.type_context, &self.interner, &self.symbol_table)
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
@@ -254,8 +257,8 @@ impl TryFrom<&str> for QueryAnalyzed {
 
 pub struct LinkedQuery {
     inner: QueryAnalyzed,
-    node_type_ids: HashMap<Symbol, NodeTypeId>,
-    node_field_ids: HashMap<Symbol, NodeFieldId>,
+    node_type_ids: IndexMap<Symbol, NodeTypeId>,
+    node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
 
 impl LinkedQuery {
@@ -263,17 +266,22 @@ impl LinkedQuery {
         &self.inner.interner
     }
 
-    pub fn node_type_ids(&self) -> &HashMap<Symbol, NodeTypeId> {
+    pub fn node_type_ids(&self) -> &IndexMap<Symbol, NodeTypeId> {
         &self.node_type_ids
     }
 
-    pub fn node_field_ids(&self) -> &HashMap<Symbol, NodeFieldId> {
+    pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
         &self.node_field_ids
     }
 
-    /// Emit bytecode (includes node type/field validation info).
-    pub fn emit(&self) -> Result<Vec<u8>, super::emit::EmitError> {
-        super::emit::emit_linked(self)
+    /// Emit bytecode with node type/field symbols from language linking.
+    ///
+    /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
+    pub fn emit(&self) -> Result<Vec<u8>, super::codegen::EmitError> {
+        if !self.is_valid() {
+            return Err(super::codegen::EmitError::InvalidQuery);
+        }
+        super::codegen::emit_linked(self)
     }
 }
 
