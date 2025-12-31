@@ -9,6 +9,8 @@ mod entrypoint;
 mod header;
 mod ids;
 mod instructions;
+pub mod ir;
+pub mod layout;
 mod module;
 mod nav;
 mod sections;
@@ -44,5 +46,7 @@ pub use module::{
 
 #[cfg(test)]
 mod instructions_tests;
+#[cfg(test)]
+mod layout_tests;
 #[cfg(test)]
 mod module_tests;
