@@ -30,6 +30,7 @@ fn main() {
                 graph: output.graph,
                 graph_raw: output.graph_raw,
                 types: output.types,
+                bytecode: output.bytecode,
                 color: output.color.should_colorize(),
             });
         }

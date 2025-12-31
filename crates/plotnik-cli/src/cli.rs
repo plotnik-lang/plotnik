@@ -32,11 +32,12 @@ pub struct Cli {
 pub enum Command {
     /// Debug and inspect queries and source files
     #[command(after_help = r#"EXAMPLES:
-  plotnik debug -q '(identifier) @id'
-  plotnik debug -q '(identifier) @id' --only-symbols
+  plotnik debug -q 'Q = (identifier) @id'
+  plotnik debug -q 'Q = (identifier) @id' --only-symbols
+  plotnik debug -q 'Q = (identifier) @id' --bytecode
   plotnik debug -s app.ts
   plotnik debug -s app.ts --raw
-  plotnik debug -q '(function_declaration) @fn' -s app.ts -l typescript"#)]
+  plotnik debug -q 'Q = (function_declaration) @fn' -s app.ts -l typescript"#)]
     Debug {
         #[command(flatten)]
         query: QueryArgs,
@@ -57,10 +58,10 @@ pub enum Command {
 
     /// Execute a query against source code and output JSON
     #[command(after_help = r#"EXAMPLES:
-  plotnik exec -q '(identifier) @id' -s app.js
-  plotnik exec -q '(identifier) @id' -s app.js --pretty
-  plotnik exec -q '(function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
-  plotnik exec -q '(identifier) @id' -s app.js --check
+  plotnik exec -q 'Q = (identifier) @id' -s app.js
+  plotnik exec -q 'Q = (identifier) @id' -s app.js --pretty
+  plotnik exec -q 'Q = (function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+  plotnik exec -q 'Q = (identifier) @id' -s app.js --check
   plotnik exec --query-file query.ptk -s app.js --entry FunctionDef"#)]
     Exec {
         #[command(flatten)]
@@ -79,11 +80,11 @@ pub enum Command {
 
     /// Generate type definitions from a query
     #[command(after_help = r#"EXAMPLES:
-  plotnik types -q '(identifier) @id' -l javascript
+  plotnik types -q 'Q = (identifier) @id' -l javascript
   plotnik types --query-file query.ptk -l typescript
-  plotnik types -q '(function_declaration) @fn' -l js --format ts
-  plotnik types -q '(identifier) @id' -l js --verbose-nodes
-  plotnik types -q '(identifier) @id' -l js -o types.d.ts
+  plotnik types -q 'Q = (function_declaration) @fn' -l js --format ts
+  plotnik types -q 'Q = (identifier) @id' -l js --verbose-nodes
+  plotnik types -q 'Q = (identifier) @id' -l js -o types.d.ts
 
 NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
     Types {
@@ -202,4 +203,8 @@ pub struct OutputArgs {
     /// Show inferred types
     #[arg(long)]
     pub types: bool,
+
+    /// Show bytecode dump
+    #[arg(long)]
+    pub bytecode: bool,
 }
