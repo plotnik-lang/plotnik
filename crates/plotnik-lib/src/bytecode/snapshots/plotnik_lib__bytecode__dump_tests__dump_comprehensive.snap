@@ -67,15 +67,15 @@ Assignment:
   09  *↓   (assignment_expression)          10
   10   𝜀   left: _                          11
   11  *↓   (identifier)                     12
-  12   𝜀   [Node Set(M1)]                   14
+  12   𝜀   [Node Set(M6)]                   14
   14   𝜀   right: _                         ▶(Expression)
-  15   𝜀   [Node Set(M0)]                   17
+  15   𝜀   [Node Set(M5)]                   17
   17  *↑¹                                   ◼
   18   𝜀   [EndE]                           ◼
-  20   𝜀   [Node]                           18
+  20   𝜀   [Node Set(M1)]                   18
   22  *↓   (number)                         20
-  23   𝜀   [E(M0)]                          22
+  23   𝜀   [E(M3)]                          22
   25   𝜀   [EndE]                           ◼
-  27   𝜀   [Node]                           25
+  27   𝜀   [Node Set(M2)]                   25
   29  *↓   (identifier)                     27
-  30   𝜀   [E(M1)]                          29
+  30   𝜀   [E(M4)]                          29

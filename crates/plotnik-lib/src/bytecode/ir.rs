@@ -2,14 +2,16 @@
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
 //! After layout, labels are resolved to `StepId` for serialization.
+//! Member indices use deferred resolution via `MemberRef`.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use super::effects::EffectOp;
+use super::effects::{EffectOp, EffectOpcode};
 use super::ids::StepId;
 use super::instructions::{Call, Match, Return, select_match_opcode};
 use super::nav::Nav;
+use crate::query::type_check::TypeId;
 
 /// Symbolic reference, resolved to StepId at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -31,6 +33,77 @@ impl Label {
             return StepId::ACCEPT;
         }
         *map.get(&self).unwrap_or(&StepId::ACCEPT)
+    }
+}
+
+/// Symbolic reference to a struct field or enum variant.
+/// Resolved to absolute member index during bytecode emission.
+#[derive(Clone, Copy, Debug)]
+pub enum MemberRef {
+    /// Already resolved to absolute index (for cases where it's known).
+    Absolute(u16),
+    /// Deferred resolution: (struct/enum type, relative field/variant index).
+    Deferred { type_id: TypeId, relative_index: u16 },
+}
+
+impl MemberRef {
+    /// Create an absolute reference.
+    pub fn absolute(index: u16) -> Self {
+        Self::Absolute(index)
+    }
+
+    /// Create a deferred reference.
+    pub fn deferred(type_id: TypeId, relative_index: u16) -> Self {
+        Self::Deferred { type_id, relative_index }
+    }
+
+    /// Resolve this reference using a member base lookup function.
+    pub fn resolve<F>(self, get_member_base: F) -> u16
+    where
+        F: Fn(TypeId) -> Option<u16>,
+    {
+        match self {
+            Self::Absolute(n) => n,
+            Self::Deferred { type_id, relative_index } => {
+                get_member_base(type_id).unwrap_or(0) + relative_index
+            }
+        }
+    }
+}
+
+/// Effect operation with symbolic member references.
+/// Used during compilation; resolved to EffectOp during emission.
+#[derive(Clone, Debug)]
+pub struct EffectIR {
+    pub opcode: EffectOpcode,
+    /// Payload for effects that don't use member indices.
+    pub payload: usize,
+    /// Member reference for Set/E effects (None for other effects).
+    pub member_ref: Option<MemberRef>,
+}
+
+impl EffectIR {
+    /// Create a simple effect without member reference.
+    pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
+        Self { opcode, payload, member_ref: None }
+    }
+
+    /// Create an effect with a member reference.
+    pub fn with_member(opcode: EffectOpcode, member_ref: MemberRef) -> Self {
+        Self { opcode, payload: 0, member_ref: Some(member_ref) }
+    }
+
+    /// Resolve this IR effect to a concrete EffectOp.
+    pub fn resolve<F>(&self, get_member_base: F) -> EffectOp
+    where
+        F: Fn(TypeId) -> Option<u16>,
+    {
+        let payload = if let Some(member_ref) = self.member_ref {
+            member_ref.resolve(&get_member_base) as usize
+        } else {
+            self.payload
+        };
+        EffectOp { opcode: self.opcode, payload }
     }
 }
 
@@ -71,9 +144,12 @@ impl Instruction {
     }
 
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> Vec<u8> {
+    pub fn resolve<F>(&self, map: &BTreeMap<Label, StepId>, get_member_base: F) -> Vec<u8>
+    where
+        F: Fn(TypeId) -> Option<u16>,
+    {
         match self {
-            Self::Match(m) => m.resolve(map),
+            Self::Match(m) => m.resolve(map, get_member_base),
             Self::Call(c) => c.resolve(map).to_vec(),
             Self::Return(r) => r.resolve().to_vec(),
         }
@@ -92,11 +168,11 @@ pub struct MatchIR {
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
     /// Effects to execute before match attempt.
-    pub pre_effects: Vec<EffectOp>,
+    pub pre_effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
     pub neg_fields: Vec<u16>,
     /// Effects to execute after successful match.
-    pub post_effects: Vec<EffectOp>,
+    pub post_effects: Vec<EffectIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
     pub successors: Vec<Label>,
 }
@@ -126,17 +202,32 @@ impl MatchIR {
     }
 
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> Vec<u8> {
+    pub fn resolve<F>(&self, map: &BTreeMap<Label, StepId>, get_member_base: F) -> Vec<u8>
+    where
+        F: Fn(TypeId) -> Option<u16>,
+    {
         let successors: Vec<StepId> = self.successors.iter().map(|&l| l.resolve(map)).collect();
+
+        // Resolve effect member references to absolute indices
+        let pre_effects: Vec<EffectOp> = self
+            .pre_effects
+            .iter()
+            .map(|e| e.resolve(&get_member_base))
+            .collect();
+        let post_effects: Vec<EffectOp> = self
+            .post_effects
+            .iter()
+            .map(|e| e.resolve(&get_member_base))
+            .collect();
 
         let m = Match {
             segment: 0,
             nav: self.nav,
             node_type: self.node_type,
             node_field: self.node_field,
-            pre_effects: self.pre_effects.clone(),
+            pre_effects,
             neg_fields: self.neg_fields.clone(),
-            post_effects: self.post_effects.clone(),
+            post_effects,
             successors,
         };
 
@@ -240,15 +331,9 @@ mod tests {
             nav: Nav::Down,
             node_type: NonZeroU16::new(10),
             node_field: None,
-            pre_effects: vec![EffectOp {
-                opcode: super::super::effects::EffectOpcode::S,
-                payload: 0,
-            }],
+            pre_effects: vec![EffectIR::simple(EffectOpcode::S, 0)],
             neg_fields: vec![],
-            post_effects: vec![EffectOp {
-                opcode: super::super::effects::EffectOpcode::Node,
-                payload: 0,
-            }],
+            post_effects: vec![EffectIR::simple(EffectOpcode::Node, 0)],
             successors: vec![Label(1)],
         };
 
@@ -304,12 +389,44 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert(Label(0), StepId(1));
 
-        let bytes = m.resolve(&map);
+        let bytes = m.resolve(&map, |_| None);
         assert_eq!(bytes.len(), 8);
 
         // Verify opcode is Match8 (0x0)
         assert_eq!(bytes[0] & 0xF, 0);
         // Verify next is ACCEPT (0)
         assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 0);
+    }
+
+    #[test]
+    fn member_ref_resolution() {
+        // Test absolute reference
+        let abs = MemberRef::absolute(42);
+        assert_eq!(abs.resolve(|_| None), 42);
+
+        // Test deferred reference with base lookup
+        let deferred = MemberRef::deferred(TypeId(10), 2);
+        assert_eq!(deferred.resolve(|id| if id.0 == 10 { Some(100) } else { None }), 102);
+
+        // Test deferred reference with no base (defaults to 0)
+        assert_eq!(deferred.resolve(|_| None), 2);
+    }
+
+    #[test]
+    fn effect_ir_resolution() {
+        // Simple effect without member ref
+        let simple = EffectIR::simple(EffectOpcode::Node, 5);
+        let resolved = simple.resolve(|_| None);
+        assert_eq!(resolved.opcode, EffectOpcode::Node);
+        assert_eq!(resolved.payload, 5);
+
+        // Effect with deferred member ref
+        let set_effect = EffectIR::with_member(
+            EffectOpcode::Set,
+            MemberRef::deferred(TypeId(10), 1),
+        );
+        let resolved = set_effect.resolve(|id| if id.0 == 10 { Some(50) } else { None });
+        assert_eq!(resolved.opcode, EffectOpcode::Set);
+        assert_eq!(resolved.payload, 51); // base 50 + relative 1
     }
 }

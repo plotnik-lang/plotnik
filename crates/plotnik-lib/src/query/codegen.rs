@@ -452,6 +452,24 @@ impl TypeTableBuilder {
         self.mapping.get(&type_id).copied()
     }
 
+    /// Get the absolute member base index for a struct/enum type.
+    ///
+    /// For Struct and Enum types, returns the starting index in the TypeMembers table.
+    /// Fields/variants are at indices [base..base+count).
+    pub fn get_member_base(&self, type_id: TypeId) -> Option<u16> {
+        let bc_type_id = self.mapping.get(&type_id)?;
+        let slot_index = bc_type_id.custom_index()?;
+        let type_def = self.type_defs.get(slot_index)?;
+
+        // Only Struct and Enum have member bases
+        let kind = TypeKind::from_u8(type_def.kind)?;
+        if kind.is_composite() {
+            Some(type_def.data)
+        } else {
+            None
+        }
+    }
+
     /// Emit type definitions, members, and names as bytes.
     ///
     /// Returns (type_defs_bytes, type_members_bytes, type_names_bytes).
@@ -671,7 +689,7 @@ fn emit_inner(
     let trivia_entries: Vec<TriviaEntry> = Vec::new();
 
     // Resolve and serialize transitions
-    let transitions_bytes = emit_transitions(&compile_result.instructions, &layout);
+    let transitions_bytes = emit_transitions(&compile_result.instructions, &layout, &types);
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -742,9 +760,13 @@ fn emit_inner(
 fn emit_transitions(
     instructions: &[crate::bytecode::ir::Instruction],
     layout: &crate::bytecode::ir::LayoutResult,
+    types: &TypeTableBuilder,
 ) -> Vec<u8> {
     // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps as usize * 8];
+
+    // Create a resolver closure for member indices
+    let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
 
     for instr in instructions {
         let label = instr.label();
@@ -753,7 +775,7 @@ fn emit_transitions(
         };
 
         let offset = step_id.byte_offset();
-        let resolved = instr.resolve(&layout.label_to_step);
+        let resolved = instr.resolve(&layout.label_to_step, get_member_base);
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();

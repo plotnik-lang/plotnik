@@ -2,20 +2,21 @@
 //!
 //! Compiles query AST expressions into bytecode IR with symbolic labels.
 //! Labels are resolved to concrete StepIds during the layout phase.
+//! Member indices use deferred resolution via MemberRef for correct absolute indices.
 
 use std::num::NonZeroU16;
 
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
-use crate::bytecode::ir::{CallIR, Instruction, Label, MatchIR, ReturnIR};
-use crate::bytecode::{EffectOp, EffectOpcode, Nav};
+use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, MemberRef, ReturnIR};
+use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
 use crate::parser::cst::SyntaxKind;
 
 use super::codegen::StringTableBuilder;
 use super::symbol_table::SymbolTable;
-use super::type_check::{Arity, DefId, TypeContext, TypeShape};
+use super::type_check::{Arity, DefId, TypeContext, TypeId, TypeShape};
 
 /// Error during compilation.
 #[derive(Clone, Debug)]
@@ -46,6 +47,11 @@ pub struct CompileResult {
     pub def_entries: IndexMap<DefId, Label>,
 }
 
+/// Struct scope for tracking captures in nested contexts.
+/// Each scope represents a struct type whose fields can receive captures.
+#[derive(Clone, Copy, Debug)]
+struct StructScope(TypeId);
+
 /// Compiler state for Thompson construction.
 pub struct Compiler<'a> {
     interner: &'a Interner,
@@ -58,8 +64,9 @@ pub struct Compiler<'a> {
     next_label_id: u32,
     def_entries: IndexMap<DefId, Label>,
     ref_id_counter: u16,
-    /// Currently compiling definition (for member index lookup).
-    current_def_id: Option<DefId>,
+    /// Stack of active struct scopes for capture lookup.
+    /// Innermost scope is at the end.
+    scope_stack: Vec<StructScope>,
 }
 
 impl<'a> Compiler<'a> {
@@ -83,7 +90,7 @@ impl<'a> Compiler<'a> {
             next_label_id: 0,
             def_entries: IndexMap::new(),
             ref_id_counter: 0,
-            current_def_id: None,
+            scope_stack: Vec::new(),
         }
     }
 
@@ -140,18 +147,18 @@ impl<'a> Compiler<'a> {
 
         let entry_label = self.def_entries[&def_id];
 
-        // Track current definition for member index lookup
-        self.current_def_id = Some(def_id);
-
-        // Compile body, targeting accept state
-        let body_entry = self.compile_expr(body, Label::ACCEPT);
+        // Compile body with root scope, targeting accept state
+        let body_entry = if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
+            self.with_scope(type_id, |this| this.compile_expr(body, Label::ACCEPT))
+        } else {
+            self.compile_expr(body, Label::ACCEPT)
+        };
 
         // If body_entry differs from our pre-allocated entry, emit an epsilon jump
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
 
-        self.current_def_id = None;
         Ok(())
     }
 
@@ -494,14 +501,31 @@ impl<'a> Compiler<'a> {
             return exit;
         }
 
-        // Check if this is a tagged alternation (Enum type)
+        // Check if this is a tagged alternation (Enum type) and get type_id
         let alt_expr = Expr::AltExpr(alt.clone());
-        let is_enum = self
+        let enum_type_id = self
             .type_ctx
             .get_term_info(&alt_expr)
-            .and_then(|info| info.flow.type_id())
+            .and_then(|info| info.flow.type_id());
+        let is_enum = enum_type_id
             .and_then(|type_id| self.type_ctx.get_type(type_id))
             .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+
+        // Get the enum's variant types for scope pushing
+        let variant_types: Vec<TypeId> = if is_enum {
+            enum_type_id
+                .and_then(|type_id| self.type_ctx.get_type(type_id))
+                .and_then(|shape| {
+                    if let TypeShape::Enum(variants) = shape {
+                        Some(variants.values().copied().collect())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
 
         // Compile each branch, collecting entry labels
         // Each branch gets the same nav override since any branch could match first
@@ -512,7 +536,7 @@ impl<'a> Compiler<'a> {
             };
 
             if is_enum {
-                // Tagged branch: E(variant_idx) → body → EndE → exit
+                // Tagged branch: E(variant_ref) → body → EndE → exit
                 let ende_step = self.fresh_label();
                 self.instructions.push(Instruction::Match(MatchIR {
                     label: ende_step,
@@ -521,14 +545,25 @@ impl<'a> Compiler<'a> {
                     node_field: None,
                     pre_effects: vec![],
                     neg_fields: vec![],
-                    post_effects: vec![EffectOp {
-                        opcode: EffectOpcode::EndE,
-                        payload: 0,
-                    }],
+                    post_effects: vec![EffectIR::simple(EffectOpcode::EndE, 0)],
                     successors: vec![exit],
                 }));
 
-                let body_entry = self.compile_expr_with_nav(&body, ende_step, first_nav);
+                // Compile body with variant's scope
+                let body_entry = if let Some(&payload_type_id) = variant_types.get(variant_idx) {
+                    self.with_scope(payload_type_id, |this| {
+                        this.compile_expr_with_nav(&body, ende_step, first_nav)
+                    })
+                } else {
+                    self.compile_expr_with_nav(&body, ende_step, first_nav)
+                };
+
+                // Create deferred member reference for the enum variant
+                let e_effect = if let Some(type_id) = enum_type_id {
+                    EffectIR::with_member(EffectOpcode::E, MemberRef::deferred(type_id, variant_idx as u16))
+                } else {
+                    EffectIR::simple(EffectOpcode::E, variant_idx)
+                };
 
                 let e_step = self.fresh_label();
                 self.instructions.push(Instruction::Match(MatchIR {
@@ -536,10 +571,7 @@ impl<'a> Compiler<'a> {
                     nav: Nav::Stay,
                     node_type: None,
                     node_field: None,
-                    pre_effects: vec![EffectOp {
-                        opcode: EffectOpcode::E,
-                        payload: variant_idx,
-                    }],
+                    pre_effects: vec![e_effect],
                     neg_fields: vec![],
                     post_effects: vec![],
                     successors: vec![body_entry],
@@ -712,32 +744,54 @@ impl<'a> Compiler<'a> {
             t.name().map(|n| n.text() == "string").unwrap_or(false)
         });
 
-        // Build capture effects: Node/Text followed by Set(member_index)
-        let mut capture_effects = Vec::with_capacity(2);
-
-        let capture_effect = if is_text {
-            EffectOp { opcode: EffectOpcode::Text, payload: 0 }
-        } else {
-            EffectOp { opcode: EffectOpcode::Node, payload: 0 }
-        };
-        capture_effects.push(capture_effect);
-
-        // Add Set effect if we can resolve the member index
-        if let Some(name_token) = cap.name()
-            && let Some(member_idx) = self.lookup_member_index(name_token.text())
-        {
-            capture_effects.push(EffectOp {
-                opcode: EffectOpcode::Set,
-                payload: member_idx as usize,
-            });
-        }
-
         // Query type system to determine structural effects needed
         // - S/EndS: Check if INNER's flow is Bubble (has fields to collect)
         // - A/Push/EndA: Check if INNER's arity is Many (star/plus quantifier)
         let inner = cap.inner();
         let inner_info = inner.as_ref().and_then(|inner| self.type_ctx.get_term_info(inner));
-        let inner_is_bubble = inner_info.map(|info| info.flow.is_bubble()).unwrap_or(false);
+        let inner_is_bubble = inner_info.as_ref().map(|info| info.flow.is_bubble()).unwrap_or(false);
+
+        // Determine which type to push for scope:
+        // - If inner creates scope (sequence/alternation): use inner's type
+        //   because the capture wraps it in another struct level
+        // - If inner doesn't create scope (named node/ref): use capture's type
+        //   because fields merge into one struct
+        let inner_creates_scope = inner.as_ref().map(Self::inner_creates_scope).unwrap_or(false);
+        let scope_type_id = if inner_creates_scope {
+            // Use inner's type (e.g., for `{a b} @row`, inner's type has a, b fields)
+            inner_info.as_ref().and_then(|info| info.flow.type_id())
+        } else {
+            // Use capture's type (e.g., for `(x @a) @b`, capture's type has a, b merged)
+            let cap_expr = Expr::CapturedExpr(cap.clone());
+            self.type_ctx
+                .get_term_info(&cap_expr)
+                .and_then(|info| info.flow.type_id())
+        };
+
+        // Build capture effects: Node/Text followed by Set(member_ref)
+        // We compute this after determining scope_type_id so we can use it for member lookup
+        let mut capture_effects: Vec<EffectIR> = Vec::with_capacity(2);
+
+        let capture_effect = if is_text {
+            EffectIR::simple(EffectOpcode::Text, 0)
+        } else {
+            EffectIR::simple(EffectOpcode::Node, 0)
+        };
+        capture_effects.push(capture_effect);
+
+        // Add Set effect if we can resolve the member reference
+        // Bubble captures: look up in scope_type_id (the struct being collected)
+        // Non-bubble captures: look up in current scope stack (parent struct)
+        if let Some(name_token) = cap.name() {
+            let member_ref = if inner_is_bubble {
+                scope_type_id.and_then(|t| self.lookup_member(name_token.text(), t))
+            } else {
+                self.lookup_member_in_scope(name_token.text())
+            };
+            if let Some(member_ref) = member_ref {
+                capture_effects.push(EffectIR::with_member(EffectOpcode::Set, member_ref));
+            }
+        }
 
         // Check for Many arity (star/plus) - use type system if available, else syntactic check
         let inner_is_many = inner_info
@@ -764,10 +818,7 @@ impl<'a> Compiler<'a> {
 
             if inner_is_bubble {
                 // Struct scope: S → inner → EndS + capture_effects → exit
-                let mut post_effects = vec![EffectOp {
-                    opcode: EffectOpcode::EndS,
-                    payload: 0,
-                }];
+                let mut post_effects = vec![EffectIR::simple(EffectOpcode::EndS, 0)];
                 post_effects.extend(capture_effects);
 
                 self.instructions.push(Instruction::Match(MatchIR {
@@ -781,7 +832,14 @@ impl<'a> Compiler<'a> {
                     successors: vec![exit],
                 }));
 
-                let inner_entry = self.compile_expr_with_nav(&inner, effect_label, nav_override);
+                // Compile inner with scope for captures
+                let inner_entry = if let Some(type_id) = scope_type_id {
+                    self.with_scope(type_id, |this| {
+                        this.compile_expr_with_nav(&inner, effect_label, nav_override)
+                    })
+                } else {
+                    self.compile_expr_with_nav(&inner, effect_label, nav_override)
+                };
 
                 // S step before inner
                 let s_step = self.fresh_label();
@@ -790,10 +848,7 @@ impl<'a> Compiler<'a> {
                     nav: Nav::Stay,
                     node_type: None,
                     node_field: None,
-                    pre_effects: vec![EffectOp {
-                        opcode: EffectOpcode::S,
-                        payload: 0,
-                    }],
+                    pre_effects: vec![EffectIR::simple(EffectOpcode::S, 0)],
                     neg_fields: vec![],
                     post_effects: vec![],
                     successors: vec![inner_entry],
@@ -802,10 +857,7 @@ impl<'a> Compiler<'a> {
                 s_step
             } else if inner_is_many {
                 // Array: A → quantifier (with Push) → EndA + capture_effects → exit
-                let mut post_effects = vec![EffectOp {
-                    opcode: EffectOpcode::EndA,
-                    payload: 0,
-                }];
+                let mut post_effects = vec![EffectIR::simple(EffectOpcode::EndA, 0)];
                 post_effects.extend(capture_effects);
 
                 self.instructions.push(Instruction::Match(MatchIR {
@@ -833,10 +885,7 @@ impl<'a> Compiler<'a> {
                     nav: Nav::Stay,
                     node_type: None,
                     node_field: None,
-                    pre_effects: vec![EffectOp {
-                        opcode: EffectOpcode::A,
-                        payload: 0,
-                    }],
+                    pre_effects: vec![EffectIR::simple(EffectOpcode::A, 0)],
                     neg_fields: vec![],
                     post_effects: vec![],
                     successors: vec![inner_entry],
@@ -897,6 +946,10 @@ impl<'a> Compiler<'a> {
             SyntaxKind::Question | SyntaxKind::Star | SyntaxKind::Plus
         );
 
+        // Get the row struct type for scoping: inner expression's type
+        // This is the struct type that captures inside the loop body belong to
+        let row_type_id = self.type_ctx.get_term_info(&inner).and_then(|info| info.flow.type_id());
+
         // Push step: fires after each iteration completes
         let push_step = self.fresh_label();
         self.instructions.push(Instruction::Match(MatchIR {
@@ -906,21 +959,26 @@ impl<'a> Compiler<'a> {
             node_field: None,
             pre_effects: vec![],
             neg_fields: vec![],
-            post_effects: vec![EffectOp {
-                opcode: EffectOpcode::Push,
-                payload: 0,
-            }],
+            post_effects: vec![EffectIR::simple(EffectOpcode::Push, 0)],
             successors: vec![], // Will be set below
         }));
         let push_idx = self.instructions.len() - 1;
+
+        // Helper to compile with optional scope
+        let compile_with_row_scope = |this: &mut Self, exit: Label, nav: Option<Nav>| {
+            if let Some(type_id) = row_type_id {
+                this.with_scope(type_id, |t| t.compile_expr_with_nav(&inner, exit, nav))
+            } else {
+                this.compile_expr_with_nav(&inner, exit, nav)
+            }
+        };
 
         if is_plus {
             // +: first_body → push → loop_entry → [repeat_body → push, exit]
             let loop_entry = self.fresh_label();
 
-            // Bodies target push_step
-            let first_body_entry = self.compile_expr_with_nav(&inner, push_step, nav_override);
-            let repeat_body_entry = self.compile_expr(&inner, push_step);
+            let first_body_entry = compile_with_row_scope(self, push_step, nav_override);
+            let repeat_body_entry = compile_with_row_scope(self, push_step, None);
 
             // Push leads to loop_entry
             if let Instruction::Match(ref mut m) = self.instructions[push_idx] {
@@ -940,9 +998,8 @@ impl<'a> Compiler<'a> {
             // *: entry → [first_body → push → loop_entry → [repeat_body → push, exit], exit]
             let loop_entry = self.fresh_label();
 
-            // Bodies target push_step
-            let first_body_entry = self.compile_expr_with_nav(&inner, push_step, nav_override);
-            let repeat_body_entry = self.compile_expr(&inner, push_step);
+            let first_body_entry = compile_with_row_scope(self, push_step, nav_override);
+            let repeat_body_entry = compile_with_row_scope(self, push_step, None);
 
             // Push leads to loop_entry
             if let Instruction::Match(ref mut m) = self.instructions[push_idx] {
@@ -969,7 +1026,8 @@ impl<'a> Compiler<'a> {
             entry
         } else {
             // ?: branch to body or exit (no Push needed for optional)
-            let body_entry = self.compile_expr_with_nav(&inner, exit, nav_override);
+            let body_entry = compile_with_row_scope(self, exit, nav_override);
+
             let entry = self.fresh_label();
 
             let successors = if is_greedy {
@@ -1091,24 +1149,42 @@ impl<'a> Compiler<'a> {
             .collect()
     }
 
-    /// Look up a capture name's member index in the current definition's type.
-    ///
-    /// Returns the position (0-based) of the field in the struct's BTreeMap order,
-    /// or None if not found or not in a struct context.
-    fn lookup_member_index(&self, capture_name: &str) -> Option<u16> {
-        let def_id = self.current_def_id?;
-        let type_id = self.type_ctx.get_def_type(def_id)?;
-        let fields = self.type_ctx.get_struct_fields(type_id)?;
+    /// Determines if an expression creates a scope boundary when captured.
+    /// Sequences and alternations create scopes; named nodes/refs don't.
+    fn inner_creates_scope(inner: &Expr) -> bool {
+        match inner {
+            Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
+            Expr::QuantifiedExpr(q) => {
+                q.inner().is_some_and(|i| Self::inner_creates_scope(&i))
+            }
+            _ => false,
+        }
+    }
 
-        // BTreeMap iterates in key order (Symbol order)
-        for (index, (&sym, _)) in fields.iter().enumerate() {
+    /// Execute a closure with a scope pushed, automatically popping afterward.
+    fn with_scope<T>(&mut self, type_id: TypeId, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.scope_stack.push(StructScope(type_id));
+        let result = f(self);
+        self.scope_stack.pop();
+        result
+    }
+
+    /// Look up a capture name in a type, returning a deferred member reference.
+    fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
+        let fields = self.type_ctx.get_struct_fields(type_id)?;
+        for (relative_index, (&sym, _)) in fields.iter().enumerate() {
             if self.interner.resolve(sym) == capture_name {
-                return Some(index as u16);
+                return Some(MemberRef::deferred(type_id, relative_index as u16));
             }
         }
         None
     }
 
+    /// Look up a capture name in the current scope stack.
+    fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
+        let StructScope(type_id) = *self.scope_stack.last()?;
+        self.lookup_member(capture_name, type_id)
+    }
 }
 
 #[cfg(test)]

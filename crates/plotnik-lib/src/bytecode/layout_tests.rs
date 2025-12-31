@@ -1,9 +1,9 @@
 use std::num::NonZeroU16;
 
 use super::ids::StepId;
-use super::ir::{CallIR, Instruction, Label, MatchIR, ReturnIR};
+use super::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
 use super::layout::CacheAligned;
-use crate::bytecode::effects::{EffectOp, EffectOpcode};
+use crate::bytecode::effects::EffectOpcode;
 use crate::bytecode::nav::Nav;
 
 #[test]
@@ -191,16 +191,16 @@ fn layout_large_instruction_cache_alignment() {
         node_type: NonZeroU16::new(10),
         node_field: None,
         pre_effects: vec![
-            EffectOp { opcode: EffectOpcode::S, payload: 0 },
-            EffectOp { opcode: EffectOpcode::S, payload: 0 },
-            EffectOp { opcode: EffectOpcode::S, payload: 0 },
+            EffectIR::simple(EffectOpcode::S, 0),
+            EffectIR::simple(EffectOpcode::S, 0),
+            EffectIR::simple(EffectOpcode::S, 0),
         ],
         neg_fields: vec![],
         post_effects: vec![
-            EffectOp { opcode: EffectOpcode::Node, payload: 0 },
-            EffectOp { opcode: EffectOpcode::EndS, payload: 0 },
-            EffectOp { opcode: EffectOpcode::EndS, payload: 0 },
-            EffectOp { opcode: EffectOpcode::EndS, payload: 0 },
+            EffectIR::simple(EffectOpcode::Node, 0),
+            EffectIR::simple(EffectOpcode::EndS, 0),
+            EffectIR::simple(EffectOpcode::EndS, 0),
+            EffectIR::simple(EffectOpcode::EndS, 0),
         ],
         successors: vec![
             Label::ACCEPT,
