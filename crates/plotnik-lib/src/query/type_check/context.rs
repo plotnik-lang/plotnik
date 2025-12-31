@@ -10,14 +10,14 @@ use crate::parser::ast::Expr;
 
 use super::symbol::{DefId, Interner, Symbol};
 use super::types::{
-    Arity, FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeId, TypeKind,
+    Arity, FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeId, TypeShape,
 };
 
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Clone, Debug)]
 pub struct TypeContext {
-    types: Vec<TypeKind>,
-    type_map: HashMap<TypeKind, TypeId>,
+    types: Vec<TypeShape>,
+    type_map: HashMap<TypeShape, TypeId>,
 
     def_names: Vec<Symbol>,
     def_ids: HashMap<Symbol, DefId>,
@@ -48,13 +48,13 @@ impl TypeContext {
         };
 
         // Pre-register builtin types at their expected IDs
-        let void_id = ctx.intern_type(TypeKind::Void);
+        let void_id = ctx.intern_type(TypeShape::Void);
         debug_assert_eq!(void_id, TYPE_VOID);
 
-        let node_id = ctx.intern_type(TypeKind::Node);
+        let node_id = ctx.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
 
-        let string_id = ctx.intern_type(TypeKind::String);
+        let string_id = ctx.intern_type(TypeShape::String);
         debug_assert_eq!(string_id, TYPE_STRING);
 
         ctx
@@ -68,42 +68,42 @@ impl TypeContext {
     }
 
     /// Intern a type, returning its ID. Deduplicates identical types.
-    pub fn intern_type(&mut self, kind: TypeKind) -> TypeId {
-        if let Some(&id) = self.type_map.get(&kind) {
+    pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
+        if let Some(&id) = self.type_map.get(&shape) {
             return id;
         }
 
         let id = TypeId(self.types.len() as u32);
-        self.types.push(kind.clone());
-        self.type_map.insert(kind, id);
+        self.types.push(shape.clone());
+        self.type_map.insert(shape, id);
         id
     }
 
-    /// Get the TypeKind for a TypeId.
-    pub fn get_type(&self, id: TypeId) -> Option<&TypeKind> {
+    /// Get the TypeShape for a TypeId.
+    pub fn get_type(&self, id: TypeId) -> Option<&TypeShape> {
         self.types.get(id.0 as usize)
     }
 
     /// Get or create a type, returning both the ID and a reference.
-    pub fn get_or_intern(&mut self, kind: TypeKind) -> (TypeId, &TypeKind) {
-        let id = self.intern_type(kind);
+    pub fn get_or_intern(&mut self, shape: TypeShape) -> (TypeId, &TypeShape) {
+        let id = self.intern_type(shape);
         (id, &self.types[id.0 as usize])
     }
 
     /// Intern a struct type from fields.
     pub fn intern_struct(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
-        self.intern_type(TypeKind::Struct(fields))
+        self.intern_type(TypeShape::Struct(fields))
     }
 
     /// Intern a struct type with a single field.
     pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
-        self.intern_type(TypeKind::Struct(BTreeMap::from([(name, info)])))
+        self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
     /// Get struct fields from a TypeId, if it points to a Struct.
     pub fn get_struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
         match self.get_type(id)? {
-            TypeKind::Struct(fields) => Some(fields),
+            TypeShape::Struct(fields) => Some(fields),
             _ => None,
         }
     }
@@ -199,7 +199,7 @@ impl TypeContext {
     }
 
     /// Iterate over all interned types.
-    pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeKind)> {
+    pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeShape)> {
         self.types
             .iter()
             .enumerate()
@@ -239,17 +239,17 @@ mod tests {
     fn builtin_types_have_correct_ids() {
         let ctx = TypeContext::new();
 
-        assert_eq!(ctx.get_type(TYPE_VOID), Some(&TypeKind::Void));
-        assert_eq!(ctx.get_type(TYPE_NODE), Some(&TypeKind::Node));
-        assert_eq!(ctx.get_type(TYPE_STRING), Some(&TypeKind::String));
+        assert_eq!(ctx.get_type(TYPE_VOID), Some(&TypeShape::Void));
+        assert_eq!(ctx.get_type(TYPE_NODE), Some(&TypeShape::Node));
+        assert_eq!(ctx.get_type(TYPE_STRING), Some(&TypeShape::String));
     }
 
     #[test]
     fn type_interning_deduplicates() {
         let mut ctx = TypeContext::new();
 
-        let id1 = ctx.intern_type(TypeKind::Node);
-        let id2 = ctx.intern_type(TypeKind::Node);
+        let id1 = ctx.intern_type(TypeShape::Node);
+        let id2 = ctx.intern_type(TypeShape::Node);
 
         assert_eq!(id1, id2);
         assert_eq!(id1, TYPE_NODE);
@@ -264,8 +264,8 @@ mod tests {
         let mut fields = BTreeMap::new();
         fields.insert(x_sym, FieldInfo::required(TYPE_NODE));
 
-        let id1 = ctx.intern_type(TypeKind::Struct(fields.clone()));
-        let id2 = ctx.intern_type(TypeKind::Struct(fields));
+        let id1 = ctx.intern_type(TypeShape::Struct(fields.clone()));
+        let id2 = ctx.intern_type(TypeShape::Struct(fields));
 
         assert_eq!(id1, id2);
     }

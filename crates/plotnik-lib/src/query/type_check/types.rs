@@ -29,9 +29,13 @@ impl TypeId {
     }
 }
 
-/// The kind of a type, determining its structure.
+/// The shape of an inferred type, determining its structure.
+///
+/// This represents the inference-time type representation which carries
+/// actual data (fields, variants, inner types). Distinct from
+/// `type_system::TypeKind` which is the bytecode format discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum TypeKind {
+pub enum TypeShape {
     /// Produces nothing, transparent to parent scope.
     Void,
     /// A tree-sitter node.
@@ -52,7 +56,7 @@ pub enum TypeKind {
     Ref(DefId),
 }
 
-impl TypeKind {
+impl TypeShape {
     pub fn is_void(&self) -> bool {
         matches!(self, Self::Void)
     }
