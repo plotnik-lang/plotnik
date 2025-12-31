@@ -3,6 +3,7 @@
 //! Implements the binary format specified in `docs/binary-format/`.
 
 mod constants;
+mod dump;
 mod effects;
 pub mod emit;
 mod entrypoint;
@@ -23,7 +24,7 @@ pub use constants::{
 
 pub use ids::{QTypeId, StepId, StringId};
 
-pub use header::Header;
+pub use header::{flags, Header};
 
 pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
 
@@ -43,6 +44,8 @@ pub use module::{
     ByteStorage, EntrypointsView, Instruction, InstructionView, Module, ModuleError, StringsView,
     SymbolsView, TriviaView, TypesView,
 };
+
+pub use dump::dump;
 
 #[cfg(test)]
 mod instructions_tests;
