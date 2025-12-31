@@ -169,3 +169,71 @@ fn nested_named_node_provides_context() {
             NamedNode first
     ");
 }
+
+// Parser-level: anchors in alternations
+
+#[test]
+fn anchor_in_alternation_error() {
+    let input = "Q = [(a) . (b)]";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: anchors cannot appear directly in alternations
+      |
+    1 | Q = [(a) . (b)]
+      |          ^
+      |
+    help: use `[{(a) . (b)} (c)]` to anchor within a branch
+    ");
+}
+
+#[test]
+fn multiple_anchors_in_alternation_error() {
+    let input = "Q = [. (a) . (b) .]";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: anchors cannot appear directly in alternations
+      |
+    1 | Q = [. (a) . (b) .]
+      |      ^
+      |
+    help: use `[{(a) . (b)} (c)]` to anchor within a branch
+
+    error: anchors cannot appear directly in alternations
+      |
+    1 | Q = [. (a) . (b) .]
+      |            ^
+      |
+    help: use `[{(a) . (b)} (c)]` to anchor within a branch
+
+    error: anchors cannot appear directly in alternations
+      |
+    1 | Q = [. (a) . (b) .]
+      |                  ^
+      |
+    help: use `[{(a) . (b)} (c)]` to anchor within a branch
+    ");
+}
+
+#[test]
+fn anchor_in_seq_inside_alt_ok() {
+    let input = "Q = [{(a) . (b)} (c)]";
+
+    let res = Query::expect_valid_ast(input);
+
+    insta::assert_snapshot!(res, @r"
+    Root
+      Def Q
+        Alt
+          Branch
+            Seq
+              NamedNode a
+              .
+              NamedNode b
+          Branch
+            NamedNode c
+    ");
+}

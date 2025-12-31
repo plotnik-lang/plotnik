@@ -277,6 +277,12 @@ impl Parser<'_, '_> {
                 }
                 continue;
             }
+            // Anchors cannot appear directly in alternations - they create empty branches
+            if self.currently_is(SyntaxKind::Dot) {
+                self.error(DiagnosticKind::AnchorInAlternation);
+                self.skip_token();
+                continue;
+            }
             if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
                 self.start_node(SyntaxKind::Branch);
                 self.parse_expr();
