@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 use rowan::TextRange;
@@ -16,9 +16,9 @@ use rowan::TextRange;
 #[derive(Default)]
 pub struct LinkOutput {
     /// Interned name → NodeTypeId (for binary: StringId → NodeTypeId)
-    pub node_type_ids: HashMap<Symbol, NodeTypeId>,
+    pub node_type_ids: IndexMap<Symbol, NodeTypeId>,
     /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
-    pub node_field_ids: HashMap<Symbol, NodeFieldId>,
+    pub node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
 
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
