@@ -16,7 +16,7 @@ pub use context::TypeContext;
 pub use symbol::{DefId, Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,
-    TypeId, TypeKind,
+    TypeId, TypeShape,
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 

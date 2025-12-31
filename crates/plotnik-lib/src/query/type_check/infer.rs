@@ -12,7 +12,7 @@ use rowan::TextRange;
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TermInfo, TypeFlow, TypeId, TypeKind,
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TermInfo, TypeFlow, TypeId, TypeShape,
 };
 use super::unify::{UnifyError, unify_flows};
 
@@ -224,7 +224,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             variants.insert(label_sym, self.flow_to_type(&body_info.flow));
         }
 
-        let enum_type = self.ctx.intern_type(TypeKind::Enum(variants));
+        let enum_type = self.ctx.intern_type(TypeShape::Enum(variants));
         TermInfo::new(combined_arity, TypeFlow::Scalar(enum_type))
     }
 
@@ -373,7 +373,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                     TYPE_STRING
                 } else {
                     let sym = self.interner.intern(text);
-                    self.ctx.intern_type(TypeKind::Custom(sym))
+                    self.ctx.intern_type(TypeShape::Custom(sym))
                 }
             })
         })
@@ -426,7 +426,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 let sym = self.interner.intern(name);
                 let def_id = self.ctx.get_def_id_sym(sym)?;
                 if self.ctx.is_recursive(def_id) {
-                    Some(self.ctx.intern_type(TypeKind::Ref(def_id)))
+                    Some(self.ctx.intern_type(TypeShape::Ref(def_id)))
                 } else {
                     None
                 }
@@ -474,7 +474,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     fn make_flow_optional(&mut self, flow: TypeFlow) -> TypeFlow {
         match flow {
             TypeFlow::Void => TypeFlow::Void,
-            TypeFlow::Scalar(t) => TypeFlow::Scalar(self.ctx.intern_type(TypeKind::Optional(t))),
+            TypeFlow::Scalar(t) => TypeFlow::Scalar(self.ctx.intern_type(TypeShape::Optional(t))),
             TypeFlow::Bubble(type_id) => {
                 let fields = self
                     .ctx
@@ -495,11 +495,11 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             TypeFlow::Void => {
                 // Scalar list: void inner -> array of Node (or Ref)
                 let element = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
-                let array_type = self.ctx.intern_type(TypeKind::Array { element, non_empty });
+                let array_type = self.ctx.intern_type(TypeShape::Array { element, non_empty });
                 TypeFlow::Scalar(array_type)
             }
             TypeFlow::Scalar(t) => {
-                let array_type = self.ctx.intern_type(TypeKind::Array {
+                let array_type = self.ctx.intern_type(TypeShape::Array {
                     element: t,
                     non_empty,
                 });
@@ -508,7 +508,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             TypeFlow::Bubble(struct_type) => {
                 // Note: Bubble with * or + is strictly invalid unless it's a row capture,
                 // but we construct a valid type as fallback.
-                let array_type = self.ctx.intern_type(TypeKind::Array {
+                let array_type = self.ctx.intern_type(TypeShape::Array {
                     element: struct_type,
                     non_empty,
                 });

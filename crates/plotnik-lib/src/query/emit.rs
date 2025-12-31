@@ -14,7 +14,7 @@ use crate::type_system::TypeKind;
 
 use super::query::LinkedQuery;
 use super::type_check::{
-    FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeKind as InferredTypeKind,
+    FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
 
 /// Error during bytecode emission.
@@ -236,18 +236,18 @@ impl TypeTableBuilder {
         &mut self,
         slot_index: usize,
         _type_id: TypeId,
-        type_kind: &InferredTypeKind,
+        type_kind: &TypeShape,
         type_ctx: &TypeContext,
         interner: &Interner,
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
         match type_kind {
-            InferredTypeKind::Void | InferredTypeKind::Node | InferredTypeKind::String => {
+            TypeShape::Void | TypeShape::Node | TypeShape::String => {
                 // Builtins - should not reach here
                 unreachable!("builtins should be handled separately")
             }
 
-            InferredTypeKind::Custom(sym) => {
+            TypeShape::Custom(sym) => {
                 // Custom type annotation: @x :: Identifier → type Identifier = Node
                 let bc_type_id = QTypeId::from_custom_index(slot_index);
 
@@ -266,7 +266,7 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            InferredTypeKind::Optional(inner) => {
+            TypeShape::Optional(inner) => {
                 let inner_bc = self.resolve_type(*inner, type_ctx)?;
 
                 self.type_defs[slot_index] = TypeDef {
@@ -277,7 +277,7 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            InferredTypeKind::Array { element, non_empty } => {
+            TypeShape::Array { element, non_empty } => {
                 let element_bc = self.resolve_type(*element, type_ctx)?;
 
                 let kind = if *non_empty {
@@ -293,7 +293,7 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            InferredTypeKind::Struct(fields) => {
+            TypeShape::Struct(fields) => {
                 // Resolve field types (this may create Optional wrappers at later indices)
                 let mut resolved_fields = Vec::with_capacity(fields.len());
                 for (field_sym, field_info) in fields {
@@ -320,7 +320,7 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            InferredTypeKind::Enum(variants) => {
+            TypeShape::Enum(variants) => {
                 // Resolve variant types (this may create types at later indices)
                 let mut resolved_variants = Vec::with_capacity(variants.len());
                 for (variant_sym, variant_type_id) in variants {
@@ -347,7 +347,7 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            InferredTypeKind::Ref(_def_id) => {
+            TypeShape::Ref(_def_id) => {
                 // Ref types are not emitted - they resolve to their target
                 unreachable!("Ref types should not be collected for emission")
             }
@@ -363,7 +363,7 @@ impl TypeTableBuilder {
 
         // Handle Ref types by following the reference
         if let Some(type_kind) = type_ctx.get_type(type_id)
-            && let InferredTypeKind::Ref(def_id) = type_kind
+            && let TypeShape::Ref(def_id) = type_kind
             && let Some(def_type_id) = type_ctx.get_def_type(*def_id)
         {
             return self.resolve_type(def_type_id, type_ctx);
@@ -491,7 +491,7 @@ fn collect_types_dfs(
     };
 
     // Resolve Ref types to their target
-    if let InferredTypeKind::Ref(def_id) = type_kind {
+    if let TypeShape::Ref(def_id) = type_kind {
         if let Some(target_id) = type_ctx.get_def_type(*def_id) {
             collect_types_dfs(target_id, type_ctx, out, seen);
         }
@@ -502,29 +502,29 @@ fn collect_types_dfs(
 
     // Collect children first (depth-first), then add self
     match type_kind {
-        InferredTypeKind::Struct(fields) => {
+        TypeShape::Struct(fields) => {
             for field_info in fields.values() {
                 collect_types_dfs(field_info.type_id, type_ctx, out, seen);
             }
             out.push(type_id);
         }
-        InferredTypeKind::Enum(variants) => {
+        TypeShape::Enum(variants) => {
             for &variant_type_id in variants.values() {
                 collect_types_dfs(variant_type_id, type_ctx, out, seen);
             }
             out.push(type_id);
         }
-        InferredTypeKind::Array { element, .. } => {
+        TypeShape::Array { element, .. } => {
             // Collect element type first, then add the Array itself
             collect_types_dfs(*element, type_ctx, out, seen);
             out.push(type_id);
         }
-        InferredTypeKind::Optional(inner) => {
+        TypeShape::Optional(inner) => {
             // Collect inner type first, then add the Optional itself
             collect_types_dfs(*inner, type_ctx, out, seen);
             out.push(type_id);
         }
-        InferredTypeKind::Custom(_) => {
+        TypeShape::Custom(_) => {
             // Custom types alias Node, no children to collect
             out.push(type_id);
         }
