@@ -79,10 +79,22 @@ struct Header {
     trivia_count: u16,
     entrypoints_count: u16,
     transitions_count: u16,
-    _pad: u32,
+    flags: u16,              // Bit 0: linked flag
+    _pad: u16,
 }
 // Size: 16 + 32 + 16 = 64 bytes
 //
 // Note: TypeMeta sub-section counts are stored in the TypeMeta header,
 // not in the main header. See 04-types.md for details.
 ```
+
+### Flags Field
+
+| Bit | Name    | Description                                              |
+| --- | ------- | -------------------------------------------------------- |
+| 0   | LINKED  | If set, bytecode contains grammar NodeTypeId/NodeFieldId |
+
+**Linked vs Unlinked Bytecode**:
+
+- **Linked** (`flags & 0x01 != 0`): Match instructions store tree-sitter `NodeTypeId` and `NodeFieldId` in bytes 2-5. Executable directly. NodeTypes and NodeFields sections contain symbol tables for verification.
+- **Unlinked** (`flags & 0x01 == 0`): Match instructions store `StringId` references in bytes 2-5 pointing to type/field names in the string table. Requires linking against a grammar before execution. NodeTypes and NodeFields sections are empty.
