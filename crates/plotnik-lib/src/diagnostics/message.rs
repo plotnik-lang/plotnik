@@ -63,6 +63,7 @@ pub enum DiagnosticKind {
     RecursionNoEscape,
     DirectRecursion,
     FieldSequenceValue,
+    AnchorWithoutContext,
 
     // Type inference errors
     IncompatibleTypes,
@@ -147,6 +148,9 @@ impl DiagnosticKind {
             Self::DirectRecursion => {
                 Some("recursive references must consume input before recursing")
             }
+            Self::AnchorWithoutContext => {
+                Some("wrap in a named node: `(parent . (child))`")
+            }
             _ => None,
         }
     }
@@ -201,6 +205,7 @@ impl DiagnosticKind {
             Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field cannot match a sequence",
+            Self::AnchorWithoutContext => "boundary anchor requires parent node context",
 
             // Type inference
             Self::IncompatibleTypes => "incompatible types",

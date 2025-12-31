@@ -159,8 +159,9 @@ fn anchor_multiple_adjacent() {
 
 #[test]
 fn anchor_in_sequence() {
+    // Boundary anchors in sequences require parent node context
     let input = indoc! {r#"
-    Q = {. (first) (second) .}
+    Q = (parent {. (first) (second) .})
     "#};
 
     let res = Query::expect_valid_cst(input);
@@ -170,20 +171,24 @@ fn anchor_in_sequence() {
       Def
         Id "Q"
         Equals "="
-        Seq
-          BraceOpen "{"
-          Anchor
-            Dot "."
-          Tree
-            ParenOpen "("
-            Id "first"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "second"
-            ParenClose ")"
-          Anchor
-            Dot "."
-          BraceClose "}"
+        Tree
+          ParenOpen "("
+          Id "parent"
+          Seq
+            BraceOpen "{"
+            Anchor
+              Dot "."
+            Tree
+              ParenOpen "("
+              Id "first"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              Id "second"
+              ParenClose ")"
+            Anchor
+              Dot "."
+            BraceClose "}"
+          ParenClose ")"
     "#);
 }
