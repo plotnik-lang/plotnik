@@ -2,6 +2,13 @@
 
 use super::{MAGIC, VERSION};
 
+/// Header flags (bit field).
+pub mod flags {
+    /// Bit 0: If set, bytecode is linked (instructions contain NodeTypeId/NodeFieldId).
+    /// If clear, bytecode is unlinked (instructions contain StringId references).
+    pub const LINKED: u16 = 0x0001;
+}
+
 /// File header - first 64 bytes of the bytecode file.
 ///
 /// Note: TypeMeta sub-section counts are stored in the TypeMetaHeader,
@@ -35,8 +42,10 @@ pub struct Header {
     pub trivia_count: u16,
     pub entrypoints_count: u16,
     pub transitions_count: u16,
+    /// Header flags (see `flags` module for bit definitions).
+    pub flags: u16,
     /// Padding to maintain 64-byte size.
-    pub(crate) _pad: u32,
+    pub(crate) _pad: u16,
 }
 
 const _: () = assert!(std::mem::size_of::<Header>() == 64);
@@ -62,6 +71,7 @@ impl Default for Header {
             trivia_count: 0,
             entrypoints_count: 0,
             transitions_count: 0,
+            flags: 0,
             _pad: 0,
         }
     }
@@ -91,7 +101,8 @@ impl Header {
             trivia_count: u16::from_le_bytes([bytes[54], bytes[55]]),
             entrypoints_count: u16::from_le_bytes([bytes[56], bytes[57]]),
             transitions_count: u16::from_le_bytes([bytes[58], bytes[59]]),
-            _pad: u32::from_le_bytes([bytes[60], bytes[61], bytes[62], bytes[63]]),
+            flags: u16::from_le_bytes([bytes[60], bytes[61]]),
+            _pad: u16::from_le_bytes([bytes[62], bytes[63]]),
         }
     }
 
@@ -116,7 +127,8 @@ impl Header {
         bytes[54..56].copy_from_slice(&self.trivia_count.to_le_bytes());
         bytes[56..58].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[58..60].copy_from_slice(&self.transitions_count.to_le_bytes());
-        bytes[60..64].copy_from_slice(&self._pad.to_le_bytes());
+        bytes[60..62].copy_from_slice(&self.flags.to_le_bytes());
+        bytes[62..64].copy_from_slice(&self._pad.to_le_bytes());
         bytes
     }
 
@@ -126,6 +138,20 @@ impl Header {
 
     pub fn validate_version(&self) -> bool {
         self.version == VERSION
+    }
+
+    /// Returns true if the bytecode is linked (contains resolved grammar IDs).
+    pub fn is_linked(&self) -> bool {
+        self.flags & flags::LINKED != 0
+    }
+
+    /// Set the linked flag.
+    pub fn set_linked(&mut self, linked: bool) {
+        if linked {
+            self.flags |= flags::LINKED;
+        } else {
+            self.flags &= !flags::LINKED;
+        }
     }
 }
 
@@ -175,5 +201,31 @@ mod tests {
 
         let decoded = Header::from_bytes(&bytes);
         assert_eq!(decoded, h);
+    }
+
+    #[test]
+    fn header_linked_flag() {
+        let mut h = Header::default();
+        assert!(!h.is_linked());
+
+        h.set_linked(true);
+        assert!(h.is_linked());
+        assert_eq!(h.flags, flags::LINKED);
+
+        h.set_linked(false);
+        assert!(!h.is_linked());
+        assert_eq!(h.flags, 0);
+    }
+
+    #[test]
+    fn header_flags_roundtrip() {
+        let mut h = Header::default();
+        h.set_linked(true);
+
+        let bytes = h.to_bytes();
+        let decoded = Header::from_bytes(&bytes);
+
+        assert!(decoded.is_linked());
+        assert_eq!(decoded.flags, flags::LINKED);
     }
 }
