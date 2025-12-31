@@ -272,8 +272,9 @@ fn sequence_comma_separated_expression() {
 
 #[test]
 fn sequence_with_anchor() {
+    // Boundary anchors require parent node context
     let input = indoc! {r#"
-    Q = {. (first) (second) .}
+    Q = (parent {. (first) (second) .})
     "#};
 
     let res = Query::expect_valid_cst(input);
@@ -283,20 +284,24 @@ fn sequence_with_anchor() {
       Def
         Id "Q"
         Equals "="
-        Seq
-          BraceOpen "{"
-          Anchor
-            Dot "."
-          Tree
-            ParenOpen "("
-            Id "first"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "second"
-            ParenClose ")"
-          Anchor
-            Dot "."
-          BraceClose "}"
+        Tree
+          ParenOpen "("
+          Id "parent"
+          Seq
+            BraceOpen "{"
+            Anchor
+              Dot "."
+            Tree
+              ParenOpen "("
+              Id "first"
+              ParenClose ")"
+            Tree
+              ParenOpen "("
+              Id "second"
+              ParenClose ")"
+            Anchor
+              Dot "."
+            BraceClose "}"
+          ParenClose ")"
     "#);
 }

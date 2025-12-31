@@ -10,6 +10,7 @@ use plotnik_langs::Lang;
 use crate::Diagnostics;
 use crate::parser::{ParseResult, Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::alt_kinds::validate_alt_kinds;
+use crate::query::anchors::validate_anchors;
 use crate::query::dependencies;
 use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
@@ -75,6 +76,7 @@ impl QueryBuilder {
             let res = parser.parse()?;
 
             validate_alt_kinds(source.id, &res.ast, &mut diag);
+            validate_anchors(source.id, &res.ast, &mut diag);
             total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed);
             ast.insert(source.id, res.ast);
         }

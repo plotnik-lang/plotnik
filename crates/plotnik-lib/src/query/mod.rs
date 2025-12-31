@@ -9,6 +9,7 @@ pub use source_map::{SourceId, SourceMap};
 pub use symbol_table::SymbolTable;
 
 pub mod alt_kinds;
+pub mod anchors;
 mod dependencies;
 pub mod emit;
 pub mod link;
@@ -20,6 +21,8 @@ pub mod visitor;
 
 #[cfg(test)]
 mod alt_kinds_tests;
+#[cfg(test)]
+mod anchors_tests;
 #[cfg(test)]
 mod dependencies_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]

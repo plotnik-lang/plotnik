@@ -82,6 +82,15 @@ The `.` anchor adapts to what it's anchoring:
 
 Rule: anchor is as strict as its strictest operand.
 
+**Placement**: Boundary anchors require parent node context:
+
+```
+(parent . (first))    ; ✓ valid
+(parent (last) .)     ; ✓ valid
+{(a) . (b)}           ; ✓ interior anchor OK
+{. (a)}               ; ✗ boundary without parent
+```
+
 ## Anti-patterns
 
 ```
@@ -93,6 +102,9 @@ Rule: anchor is as strict as its strictest operand.
 
 ; WRONG: predicates (unsupported)
 (id) @x (#eq? @x "foo")
+
+; WRONG: boundary anchors without parent node
+{. (a)}  ; use (parent {. (a)})
 ```
 
 ## Type System Rules
