@@ -75,6 +75,7 @@ Bit-packed navigation command.
 ### 3.2. EffectOp (u16)
 
 Side-effect operation code packed into 16 bits.
+[]
 
 ```text
 EffectOp (u16)
@@ -86,20 +87,20 @@ EffectOp (u16)
 - **Opcode**: 6 bits (0-63), currently 12 defined.
 - **Payload**: 10 bits (0-1023), member/variant index.
 
-| Opcode | Name   | Payload                |
-| :----- | :----- | :--------------------- |
-| 0      | `Node` | -                      |
-| 1      | `A`    | -                      |
-| 2      | `Push` | -                      |
-| 3      | `EndA` | -                      |
-| 4      | `S`    | -                      |
-| 5      | `EndS` | -                      |
-| 6      | `Set`  | Member index (0-1023)  |
-| 7      | `E`    | Variant index (0-1023) |
-| 8      | `EndE` | -                      |
-| 9      | `Text` | -                      |
-| 10     | `Clear`| -                      |
-| 11     | `Null` | -                      |
+| Opcode | Name    | Payload                |
+| :----- | :------ | :--------------------- |
+| 0      | `Node`  | -                      |
+| 1      | `A`     | -                      |
+| 2      | `Push`  | -                      |
+| 3      | `EndA`  | -                      |
+| 4      | `S`     | -                      |
+| 5      | `EndS`  | -                      |
+| 6      | `Set`   | Member index (0-1023)  |
+| 7      | `E`     | Variant index (0-1023) |
+| 8      | `EndE`  | -                      |
+| 9      | `Text`  | -                      |
+| 10     | `Clear` | -                      |
+| 11     | `Null`  | -                      |
 
 **Opcode Ranges** (future extensibility):
 
@@ -121,13 +122,25 @@ Optimized fast-path transition. Used when there are no side effects, no negated 
 struct Match8 {
     type_id: u8,                     // segment(4) | 0x0
     nav: u8,                         // Nav
-    node_type: Option<NodeTypeId>,   // None (0) means "any"
-    node_field: Option<NodeFieldId>, // None (0) means "any"
+    node_type: Option<NonZeroU16>,   // None (0) means "any"
+    node_field: Option<NonZeroU16>,  // None (0) means "any"
     next: u16,                       // Next StepId. 0 = Accept.
 }
 ```
 
-**Note**: `NodeTypeId` 0 and `NodeFieldId` 0 are never valid in tree-sitter, so we use `Option<NonZeroU16>` where `None` (stored as 0) indicates wildcard.
+**Note**: The value 0 indicates wildcard (no constraint).
+
+**Linked vs Unlinked Interpretation**:
+
+Bytes 2-5 (`node_type` and `node_field`) have different meanings based on the header's `linked` flag:
+
+| Mode     | `node_type` (bytes 2-3)         | `node_field` (bytes 4-5)         |
+| -------- | ------------------------------- | -------------------------------- |
+| Linked   | `NodeTypeId` from tree-sitter   | `NodeFieldId` from tree-sitter   |
+| Unlinked | `StringId` pointing to type name | `StringId` pointing to field name |
+
+In **linked mode**, the runtime can directly compare against tree-sitter node types/fields.
+In **unlinked mode**, a linking step must first resolve the `StringId` references to grammar IDs before execution.
 
 ### 4.2. Match16–Match64
 

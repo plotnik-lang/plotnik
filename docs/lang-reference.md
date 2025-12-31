@@ -763,6 +763,30 @@ Anchors are structural constraints only—they don't affect output types:
 
 Anchors ignore anonymous nodes.
 
+### Anchor Placement Rules
+
+Anchors require parent node context to be meaningful:
+
+**Valid positions:**
+
+```
+(parent . (first))         ; first child anchor
+(parent (last) .)          ; last child anchor
+(parent (a) . (b))         ; adjacent siblings
+(parent {. (a) (b) .})     ; anchors in sequence inside node
+{(a) . (b)}                ; interior anchor (between items)
+```
+
+**Invalid positions:**
+
+```
+Q = . (a)                  ; definition level (no parent node)
+Q = {. (a)}                ; sequence boundary without parent
+Q = {(a) .}                ; sequence boundary without parent
+```
+
+The rule: **boundary anchors need a parent named node** to provide first/last child or adjacent sibling semantics. Interior anchors (between items in a sequence) are always valid because both sides are explicitly defined.
+
 ---
 
 ## Named Expressions
