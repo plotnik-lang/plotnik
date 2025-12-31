@@ -22,6 +22,7 @@ pub struct DebugArgs {
     pub graph: bool,
     pub graph_raw: bool,
     pub types: bool,
+    pub bytecode: bool,
     pub color: bool,
 }
 
@@ -47,7 +48,7 @@ pub fn run(args: DebugArgs) {
         })
     });
 
-    let show_query = has_query_input && !args.symbols && !args.graph && !args.types;
+    let show_query = has_query_input && !args.symbols && !args.graph && !args.types && !args.bytecode;
     let show_source = has_source_input;
 
     if show_query && let Some(ref q) = query {
@@ -82,10 +83,22 @@ pub fn run(args: DebugArgs) {
     if args.types
         && let Some(ref q) = query
     {
+        ensure_valid(q, args.color);
         let bytecode = q.emit().expect("bytecode emission failed");
         let module =
             plotnik_lib::bytecode::Module::from_bytes(bytecode).expect("module loading failed");
         let output = plotnik_lib::bytecode::emit::emit_typescript(&module);
+        print!("{}", output);
+    }
+
+    if args.bytecode
+        && let Some(ref q) = query
+    {
+        ensure_valid(q, args.color);
+        let bytecode = q.emit().expect("bytecode emission failed");
+        let module =
+            plotnik_lib::bytecode::Module::from_bytes(bytecode).expect("module loading failed");
+        let output = plotnik_lib::bytecode::dump(&module);
         print!("{}", output);
     }
 
@@ -99,15 +112,21 @@ pub fn run(args: DebugArgs) {
         print!("{}", dump_source(&tree, &source_code, args.raw));
     }
 
-    if let Some(ref q) = query
-        && !q.is_valid()
-    {
-        eprint!(
-            "{}",
-            q.diagnostics().render_colored(q.source_map(), args.color)
-        );
-        std::process::exit(1);
+    if let Some(ref q) = query {
+        ensure_valid(q, args.color);
     }
+}
+
+/// Ensure query is valid, exiting with diagnostics if not.
+fn ensure_valid(q: &Query, color: bool) {
+    if q.is_valid() {
+        return;
+    }
+    eprint!(
+        "{}",
+        q.diagnostics().render_colored(q.source_map(), color)
+    );
+    std::process::exit(1);
 }
 
 fn load_query(args: &DebugArgs) -> String {

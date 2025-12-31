@@ -199,11 +199,12 @@ Inspect query AST/CST or parse source files with tree-sitter.
 cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id'
 cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --only-symbols
 cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --types
+cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --bytecode
 cargo run -p plotnik-cli -- debug -s app.ts
 cargo run -p plotnik-cli -- debug -s app.ts --raw
 ```
 
-Options: `--only-symbols`, `--cst`, `--raw`, `--spans`, `--arities`, `--types`
+Options: `--only-symbols`, `--cst`, `--raw`, `--spans`, `--arities`, `--types`, `--bytecode`
 
 ## types
 
