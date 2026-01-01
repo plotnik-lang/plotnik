@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use crate::bytecode::ir::EffectIR;
 use crate::bytecode::EffectOpcode;
 use crate::parser::ast::{self, Expr};
-use crate::query::type_check::{TypeContext, TypeId, TypeShape};
+use crate::analyze::type_check::{TypeContext, TypeId, TypeShape};
 
 use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier};
 use super::Compiler;

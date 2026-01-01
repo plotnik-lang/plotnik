@@ -143,7 +143,7 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::type_check::TYPE_NODE;
+    use crate::analyze::type_check::TYPE_NODE;
     use plotnik_core::Interner;
 
     #[test]

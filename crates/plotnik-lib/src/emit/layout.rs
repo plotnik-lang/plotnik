@@ -5,8 +5,8 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use super::ids::StepId;
-use super::ir::{Instruction, Label, LayoutResult};
+use crate::bytecode::StepId;
+use crate::bytecode::ir::{Instruction, Label, LayoutResult};
 
 const CACHE_LINE: usize = 64;
 const STEP_SIZE: usize = 8;

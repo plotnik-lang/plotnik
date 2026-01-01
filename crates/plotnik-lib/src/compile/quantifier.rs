@@ -10,7 +10,7 @@ use crate::bytecode::ir::{EffectIR, Label};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 use crate::parser::cst::SyntaxKind;
-use crate::query::type_check::TypeId;
+use crate::analyze::type_check::TypeId;
 
 use super::capture::{check_needs_struct_wrapper, get_row_type_id, CaptureEffects};
 use super::navigation::{is_star_or_plus_quantifier, repeat_nav_for};

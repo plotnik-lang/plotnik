@@ -16,6 +16,8 @@ use super::types::{
 };
 use super::unify::{UnifyError, unify_flows};
 
+use crate::analyze::symbol_table::SymbolTable;
+use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{
     AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
@@ -23,8 +25,6 @@ use crate::parser::ast::{
 };
 use crate::parser::cst::SyntaxKind;
 use crate::query::source_map::SourceId;
-use crate::query::symbol_table::SymbolTable;
-use crate::query::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
 
 /// Inference context for a single pass over the AST.
 pub struct InferenceVisitor<'a, 'd> {

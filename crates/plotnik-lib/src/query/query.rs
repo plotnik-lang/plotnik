@@ -6,14 +6,13 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
+use crate::analyze::dependencies;
+use crate::analyze::link;
+use crate::analyze::symbol_table::{SymbolTable, resolve_names};
+use crate::analyze::type_check::{self, Arity, TypeContext};
+use crate::analyze::validation::{validate_alt_kinds, validate_anchors};
 use crate::parser::{Parser, Root, SyntaxNode, lexer::lex};
-use crate::query::alt_kinds::validate_alt_kinds;
-use crate::query::anchors::validate_anchors;
-use crate::query::dependencies;
-use crate::query::link;
 use crate::query::source_map::{SourceId, SourceMap};
-use crate::query::symbol_table::{SymbolTable, resolve_names};
-use crate::query::type_check::{self, Arity, TypeContext};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
@@ -203,11 +202,11 @@ impl QueryAnalyzed {
     /// Emit bytecode without language linking (no node type/field validation).
     ///
     /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
-    pub fn emit(&self) -> Result<Vec<u8>, super::codegen::EmitError> {
+    pub fn emit(&self) -> Result<Vec<u8>, crate::emit::EmitError> {
         if !self.is_valid() {
-            return Err(super::codegen::EmitError::InvalidQuery);
+            return Err(crate::emit::EmitError::InvalidQuery);
         }
-        super::codegen::emit(&self.type_context, &self.interner, &self.symbol_table)
+        crate::emit::emit(&self.type_context, &self.interner, &self.symbol_table)
     }
 
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
@@ -277,11 +276,11 @@ impl LinkedQuery {
     /// Emit bytecode with node type/field symbols from language linking.
     ///
     /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
-    pub fn emit(&self) -> Result<Vec<u8>, super::codegen::EmitError> {
+    pub fn emit(&self) -> Result<Vec<u8>, crate::emit::EmitError> {
         if !self.is_valid() {
-            return Err(super::codegen::EmitError::InvalidQuery);
+            return Err(crate::emit::EmitError::InvalidQuery);
         }
-        super::codegen::emit_linked(self)
+        crate::emit::emit_linked(self)
     }
 }
 

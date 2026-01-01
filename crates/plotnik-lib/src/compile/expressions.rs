@@ -12,7 +12,7 @@ use std::num::NonZeroU16;
 use crate::bytecode::ir::{CallIR, Instruction, Label, MatchIR};
 use crate::bytecode::Nav;
 use crate::parser::ast::{self, Expr};
-use crate::query::type_check::Arity;
+use crate::analyze::type_check::Arity;
 
 use super::capture::CaptureEffects;
 use super::navigation::{check_trailing_anchor, inner_creates_scope, is_skippable_quantifier, is_star_or_plus_quantifier};

@@ -5,7 +5,7 @@
 use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::Expr;
-use crate::query::type_check::TypeId;
+use crate::analyze::type_check::TypeId;
 
 use super::capture::CaptureEffects;
 use super::Compiler;

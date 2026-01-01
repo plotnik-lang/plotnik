@@ -28,9 +28,9 @@ use crate::bytecode::ir::{Instruction, Label, ReturnIR};
 use crate::bytecode::Nav;
 use crate::parser::ast::Expr;
 
-use super::codegen::StringTableBuilder;
-use super::symbol_table::SymbolTable;
-use super::type_check::{DefId, TypeContext};
+use crate::emit::StringTableBuilder;
+use crate::analyze::symbol_table::SymbolTable;
+use crate::analyze::type_check::{DefId, TypeContext};
 
 pub use capture::CaptureEffects;
 use scope::StructScope;

@@ -5,13 +5,11 @@
 mod constants;
 mod dump;
 mod effects;
-pub mod emit;
 mod entrypoint;
 mod header;
 mod ids;
 mod instructions;
 pub mod ir;
-pub mod layout;
 mod module;
 mod nav;
 mod sections;
@@ -51,7 +49,5 @@ pub use dump::dump;
 mod dump_tests;
 #[cfg(test)]
 mod instructions_tests;
-#[cfg(test)]
-mod layout_tests;
 #[cfg(test)]
 mod module_tests;

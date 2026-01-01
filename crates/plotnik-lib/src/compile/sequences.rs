@@ -7,7 +7,7 @@
 use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
-use crate::query::type_check::TypeShape;
+use crate::analyze::type_check::TypeShape;
 
 use super::capture::CaptureEffects;
 use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};

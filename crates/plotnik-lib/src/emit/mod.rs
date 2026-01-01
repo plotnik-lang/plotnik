@@ -1,6 +1,21 @@
-//! Bytecode emission from LinkedQuery.
+//! Bytecode emission from compiled queries.
 //!
-//! Converts the analyzed query representation into the binary bytecode format.
+//! Converts the compiled IR into the binary bytecode format. This module handles:
+//! - String table construction and interning
+//! - Type table building with field resolution
+//! - Cache-aligned instruction layout
+//! - Section assembly and header generation
+//!
+//! Entry points:
+//! - [`emit`]: Emit bytecode without language linking
+//! - [`emit_linked`]: Emit bytecode with node type/field validation
+
+pub mod layout;
+
+#[cfg(all(test, feature = "plotnik-langs"))]
+mod codegen_tests;
+#[cfg(test)]
+mod layout_tests;
 
 use std::collections::{HashMap, HashSet};
 
@@ -8,19 +23,19 @@ use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
 use crate::bytecode::ir::Label;
-use crate::bytecode::layout::CacheAligned;
 use crate::bytecode::{
     Entrypoint, FieldSymbol, Header, NodeSymbol, QTypeId, SECTION_ALIGN, StepId, StringId,
     TriviaEntry, TypeDef, TypeMember, TypeMetaHeader, TypeName,
 };
 use crate::type_system::TypeKind;
 
-use super::compile::Compiler;
-use super::query::LinkedQuery;
-use super::symbol_table::SymbolTable;
-use super::type_check::{
+use crate::compile::Compiler;
+use crate::query::query::LinkedQuery;
+use crate::analyze::symbol_table::SymbolTable;
+use crate::analyze::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
+use layout::CacheAligned;
 
 /// Error during bytecode emission.
 #[derive(Clone, Debug)]
@@ -40,7 +55,7 @@ pub enum EmitError {
     /// String not found in interner.
     StringNotFound(Symbol),
     /// Compilation error.
-    Compile(super::compile::CompileError),
+    Compile(crate::compile::CompileError),
 }
 
 impl std::fmt::Display for EmitError {

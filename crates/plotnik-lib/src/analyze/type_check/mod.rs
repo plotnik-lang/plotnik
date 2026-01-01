@@ -6,7 +6,7 @@
 mod context;
 mod infer;
 mod symbol;
-mod types;
+pub(crate) mod types;
 mod unify;
 
 #[cfg(test)]
@@ -24,11 +24,11 @@ use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
 
+use crate::analyze::dependencies::DependencyAnalysis;
+use crate::analyze::symbol_table::{SymbolTable, UNNAMED_DEF};
 use crate::diagnostics::Diagnostics;
 use crate::parser::ast::Root;
-use crate::query::dependencies::DependencyAnalysis;
 use crate::query::source_map::SourceId;
-use crate::query::symbol_table::{SymbolTable, UNNAMED_DEF};
 
 use infer::infer_root;
 

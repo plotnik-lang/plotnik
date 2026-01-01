@@ -4,7 +4,7 @@ use indoc::indoc;
 
 use crate::Query;
 use crate::bytecode::{Header, MAGIC, Module, QTypeId, VERSION};
-use crate::query::codegen::{StringTableBuilder, TypeTableBuilder};
+use super::{StringTableBuilder, TypeTableBuilder};
 
 #[test]
 fn emit_minimal_query() {
@@ -182,12 +182,12 @@ fn string_table_builder_intern_str() {
 
 #[test]
 fn type_table_builder_builtins() {
-    use crate::query::type_check::{TYPE_NODE, TYPE_STRING, TYPE_VOID};
+    use crate::analyze::type_check::{TYPE_NODE, TYPE_STRING, TYPE_VOID};
 
     let mut builder = TypeTableBuilder::new();
 
     // Build with empty context
-    let type_ctx = crate::query::type_check::TypeContext::new();
+    let type_ctx = crate::analyze::type_check::TypeContext::new();
     let interner = plotnik_core::Interner::new();
     let mut strings = StringTableBuilder::new();
 

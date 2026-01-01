@@ -233,7 +233,6 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::query::type_check::types::FieldInfo;
 
     #[test]
     fn builtin_types_have_correct_ids() {
