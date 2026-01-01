@@ -12,6 +12,16 @@ use crate::bytecode::{
     EntrypointsView, Module, QTypeId, StringsView, TypeDef, TypeKind, TypesView,
 };
 
+/// How to represent the void type in TypeScript.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VoidType {
+    /// `undefined` - the absence of a value
+    #[default]
+    Undefined,
+    /// `null` - explicit null value
+    Null,
+}
+
 /// Configuration for TypeScript emission.
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -21,6 +31,8 @@ pub struct Config {
     pub emit_node_type: bool,
     /// Use verbose node representation (with kind, text, etc.)
     pub verbose_nodes: bool,
+    /// How to represent the void type
+    pub void_type: VoidType,
 }
 
 impl Default for Config {
@@ -29,6 +41,7 @@ impl Default for Config {
             export: true,
             emit_node_type: true,
             verbose_nodes: false,
+            void_type: VoidType::default(),
         }
     }
 }
@@ -106,6 +119,20 @@ impl<'a> Emitter<'a> {
                 self.emit_type_definition(def_name, type_id);
             } else {
                 self.emit_generated_or_custom(type_id);
+            }
+        }
+
+        // Emit entrypoints with primitive result types (like VOID)
+        // These are not in to_emit because collect_reachable_types skips primitives
+        for (&type_id, name) in &primary_names {
+            if self.emitted.contains(&type_id) {
+                continue;
+            }
+            let Some(type_def) = self.types.get(type_id) else {
+                continue;
+            };
+            if let Some(kind) = type_def.type_kind() && kind.is_primitive() {
+                self.emit_type_definition(name, type_id);
             }
         }
 
@@ -251,7 +278,9 @@ impl<'a> Emitter<'a> {
             TypeKind::Node => {
                 self.node_referenced = true;
             }
-            TypeKind::String | TypeKind::Void => {}
+            TypeKind::String | TypeKind::Void => {
+                // No action needed for primitives
+            }
             TypeKind::Struct | TypeKind::Enum => {
                 let member_types: Vec<_> = self
                     .types
@@ -266,6 +295,7 @@ impl<'a> Emitter<'a> {
                 self.collect_refs_recursive(QTypeId(type_def.data));
             }
             TypeKind::Alias => {
+                // Alias to Node
                 self.node_referenced = true;
             }
         }
@@ -361,11 +391,14 @@ impl<'a> Emitter<'a> {
             return;
         };
 
+        // For struct payloads, don't add the struct itself (it will be inlined),
+        // but recurse into its fields to find named types.
         if type_def.type_kind() == Some(TypeKind::Struct) {
             for member in self.types.members_of(&type_def) {
                 self.collect_reachable_types(member.type_id, out);
             }
         } else {
+            // For non-struct payloads, fall back to regular collection.
             self.collect_reachable_types(type_id, out);
         }
     }
@@ -574,7 +607,10 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
-            TypeKind::Void => "undefined".to_string(),
+            TypeKind::Void => match self.config.void_type {
+                VoidType::Undefined => "undefined".to_string(),
+                VoidType::Null => "null".to_string(),
+            },
             TypeKind::Node => "Node".to_string(),
             TypeKind::String => "string".to_string(),
             TypeKind::Struct | TypeKind::Enum => {

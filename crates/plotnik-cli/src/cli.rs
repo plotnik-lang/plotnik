@@ -197,6 +197,10 @@ pub struct InferOutputArgs {
     #[arg(long)]
     pub no_export: bool,
 
+    /// Type for void results: undefined (default) or null
+    #[arg(long, value_name = "TYPE")]
+    pub void_type: Option<String>,
+
     /// Write output to file
     #[arg(short = 'o', long, value_name = "FILE")]
     pub output: Option<PathBuf>,
