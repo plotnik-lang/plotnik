@@ -149,6 +149,17 @@ impl QueryParsed {
 
 pub type Query = QueryAnalyzed;
 
+/// A unified view of the core analysis context.
+///
+/// Bundles references to the three main analysis artifacts that downstream
+/// modules (compile, emit) commonly need together.
+#[derive(Clone, Copy)]
+pub struct QueryContext<'a> {
+    pub interner: &'a Interner,
+    pub type_ctx: &'a TypeContext,
+    pub symbol_table: &'a SymbolTable,
+}
+
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     interner: Interner,
@@ -159,6 +170,15 @@ pub struct QueryAnalyzed {
 impl QueryAnalyzed {
     pub fn is_valid(&self) -> bool {
         !self.diag.has_errors()
+    }
+
+    /// Returns a unified context view for downstream modules.
+    pub fn context(&self) -> QueryContext<'_> {
+        QueryContext {
+            interner: &self.interner,
+            type_ctx: &self.type_context,
+            symbol_table: &self.symbol_table,
+        }
     }
 
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {
@@ -224,8 +244,7 @@ impl QueryAnalyzed {
 
         LinkedQuery {
             inner: self,
-            node_type_ids: output.node_type_ids,
-            node_field_ids: output.node_field_ids,
+            linking: output,
         }
     }
 }
@@ -256,8 +275,7 @@ impl TryFrom<&str> for QueryAnalyzed {
 
 pub struct LinkedQuery {
     inner: QueryAnalyzed,
-    node_type_ids: IndexMap<Symbol, NodeTypeId>,
-    node_field_ids: IndexMap<Symbol, NodeFieldId>,
+    linking: link::LinkOutput,
 }
 
 impl LinkedQuery {
@@ -266,11 +284,11 @@ impl LinkedQuery {
     }
 
     pub fn node_type_ids(&self) -> &IndexMap<Symbol, NodeTypeId> {
-        &self.node_type_ids
+        &self.linking.node_type_ids
     }
 
     pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
-        &self.node_field_ids
+        &self.linking.node_field_ids
     }
 
     /// Emit bytecode with node type/field symbols from language linking.

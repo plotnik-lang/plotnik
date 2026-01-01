@@ -3,7 +3,7 @@ mod printer;
 pub mod source_map;
 
 pub use printer::QueryPrinter;
-pub use query::{Query, QueryBuilder};
+pub use query::{Query, QueryBuilder, QueryContext};
 pub use source_map::{SourceId, SourceMap};
 
 #[allow(clippy::module_inception)]
