@@ -29,7 +29,7 @@ placed directly on match instructions rather than in separate epsilon steps. Str
 effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) remain in epsilons.
 
 ```
-[header]
+[flags]
 linked = true
 
 [strings]
@@ -48,36 +48,36 @@ S11 "assignment_expression"
 S12 "left"
 S13 "right"
 
-[types.defs]
+[type_defs]
 T00 = void
 T01 = Node
 T02 = str
-T03 = Struct(M0, 1)  ; { name }
-T04 = Struct(M1, 1)  ; { value }
-T05 = Struct(M2, 1)  ; { name }
-T06 = Enum(M3, 2)  ; Literal | Variable
-T07 = Struct(M5, 2)  ; { value, target }
+T03 = Struct  M0[1]  ; { name }
+T04 = Struct  M1[1]  ; { value }
+T05 = Struct  M2[1]  ; { name }
+T06 = Enum    M3[2]  ; Literal | Variable
+T07 = Struct  M5[2]  ; { value, target }
 
-[types.members]
-M0 = (S01, T02)  ; name: str
-M1 = (S02, T01)  ; value: Node
-M2 = (S01, T01)  ; name: Node
-M3 = (S03, T04)  ; Literal: T04
-M4 = (S04, T05)  ; Variable: T05
-M5 = (S02, T06)  ; value: Expression
-M6 = (S05, T01)  ; target: Node
+[type_members]
+M0: S01 → T02  ; name: str
+M1: S02 → T01  ; value: Node
+M2: S01 → T01  ; name: Node
+M3: S03 → T04  ; Literal: T04
+M4: S04 → T05  ; Variable: T05
+M5: S02 → T06  ; value: Expression
+M6: S05 → T01  ; target: Node
 
-[types.names]
-N0 = (S06, T03)  ; Ident
-N1 = (S07, T06)  ; Expression
-N2 = (S08, T07)  ; Assignment
+[type_names]
+N0: S06 → T03  ; Ident
+N1: S07 → T06  ; Expression
+N2: S08 → T07  ; Assignment
 
-[entry]
+[entrypoints]
 Assignment = 08 :: T07
 Expression = 05 :: T06
 Ident      = 01 :: T03
 
-[code]
+[transitions]
   00  𝜀                                     ◼
 
 Ident:
@@ -92,7 +92,7 @@ Expression:
 Assignment:
   08  𝜀                                     09
   09       (assignment_expression)          10
-  10  ↓*   left: (identifier) [Node Set(M6)]12
+  10  ↓*   left: (identifier) [Node Set(M6)]  12
   12  *  ▶ right: (Expression)              13
   13  𝜀    [Set(M5)]                        15
   15 *↑¹                                    16
@@ -187,30 +187,30 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Prefix | Section       | Description |
 | ------ | ------------- | ----------- |
 | S##    | strings       | StringId    |
-| T##    | types.defs    | TypeId      |
-| M##    | types.members | MemberIndex |
-| N##    | types.names   | NameIndex   |
+| T##    | type_defs    | TypeId      |
+| M##    | type_members | MemberIndex |
+| N##    | type_names   | NameIndex   |
 
 ## Type Format
 
-### types.defs
+### type_defs
 
-| Kind     | Format               | Example                |
-| -------- | -------------------- | ---------------------- |
-| void     | `void`               | `T00 = void`           |
-| Node     | `Node`               | `T01 = Node`           |
-| str      | `str`                | `T02 = str`            |
-| Struct   | `Struct(Mxx, count)` | `T03 = Struct(M0, 1)`  |
-| Enum     | `Enum(Mxx, count)`   | `T05 = Enum(M2, 2)`    |
-| Optional | `Optional(Txx)`      | `T07 = Optional(T05)`  |
-| Array\*  | `ArrayStar(Txx)`     | `ArrayStar(T09)`       |
-| Array+   | `ArrayPlus(Txx)`     | `T10 = ArrayPlus(T09)` |
-| Alias    | `Alias(Txx)`         | `T03 = Alias(T01)`     |
+| Kind     | Format              | Example                  |
+| -------- | ------------------- | ------------------------ |
+| void     | `void`              | `T00 = void`             |
+| Node     | `Node`              | `T01 = Node`             |
+| str      | `str`               | `T02 = str`              |
+| Struct   | `Struct  Mxx[n]`    | `T03 = Struct  M0[1]`    |
+| Enum     | `Enum    Mxx[n]`    | `T06 = Enum    M3[2]`    |
+| Optional | `Optional(Txx)`     | `T07 = Optional(T05)`    |
+| Array\*  | `ArrayStar(Txx)`    | `T03 = ArrayStar(T01)`   |
+| Array+   | `ArrayPlus(Txx)`    | `T10 = ArrayPlus(T09)`   |
+| Alias    | `Alias(Txx)`        | `T03 = Alias(T01)`       |
 
-### types.members
+### type_members
 
-Format: `Mx = (Sxx, Txx)  ; comment`
+Format: `Mx: Sxx → Txx  ; comment`
 
-### types.names
+### type_names
 
-Format: `Nx = (Sxx, Txx)  ; comment`
+Format: `Nx: Sxx → Txx  ; comment`

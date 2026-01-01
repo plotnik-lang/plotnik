@@ -1,0 +1,43 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (a (b (c) @c) @b) @a
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "Test"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[3]  ; { a, b, c }
+
+[type_members]
+M0: S01 → T01  ; a: Node
+M1: S02 → T01  ; b: Node
+M2: S03 → T01  ; c: Node
+
+[type_names]
+N0: S04 → T03  ; Test
+
+[entrypoints]
+Test = 01 :: T03
+
+[transitions]
+  00  𝜀                                     ◼
+
+Test:
+  01  𝜀                                     02
+  02       (a) [Node Set(M0)]               04
+  04  ↓*   (b) [Node Set(M1)]               06
+  06  ↓*   (c) [Node Set(M2)]               08
+  08 *↑¹                                    09
+  09 *↑¹                                    10
+  10                                        ▶

@@ -1,0 +1,80 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Expr = [
+  Lit: (number) @value :: string
+  Nested: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+]
+
+Test = (program (Expr) @expr)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "fn"
+S03 "inner"
+S04 "Lit"
+S05 "Nested"
+S06 "expr"
+S07 "Expr"
+S08 "Test"
+S09 "number"
+S10 "call_expression"
+S11 "arguments"
+S12 "function"
+S13 "identifier"
+S14 "program"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[1]  ; { value }
+T04 = Struct  M1[2]  ; { fn, inner }
+T05 = Enum    M3[2]  ; Lit | Nested
+T06 = Struct  M5[1]  ; { expr }
+
+[type_members]
+M0: S01 → T02  ; value: str
+M1: S02 → T01  ; fn: Node
+M2: S03 → T05  ; inner: Expr
+M3: S04 → T03  ; Lit: T03
+M4: S05 → T04  ; Nested: T04
+M5: S06 → T05  ; expr: Expr
+
+[type_names]
+N0: S07 → T05  ; Expr
+N1: S08 → T06  ; Test
+
+[entrypoints]
+Expr = 01 :: T05
+Test = 04 :: T06
+
+[transitions]
+  00  𝜀                                     ◼
+
+Expr:
+  01  𝜀                                     02
+  02  𝜀                                     19, 27
+
+Test:
+  04  𝜀                                     05
+  05       (program)                        06
+  06  ↓* ▶ (Expr)                           07
+  07  𝜀    [Set(M5)]                        09
+  09 *↑¹                                    10
+  10                                        ▶
+  11  𝜀    [Set(M2)]                        13
+  13 *↑¹                                    21
+  14                                        ▶
+  15  𝜀    [EndEnum]                        14
+  17       (number) [Text Set(M0)]          15
+  19  𝜀    [Enum(M3)]                       17
+  21  𝜀    [EndEnum]                        14
+  23  *  ▶ arguments: (Expr)                11
+  24  ↓*   function: (identifier) [Node Set(M1)]  23
+  26       (call_expression)                24
+  27  𝜀    [Enum(M4)]                       26

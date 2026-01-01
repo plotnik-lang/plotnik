@@ -30,7 +30,7 @@ pub fn dump(module: &Module) -> String {
 
 fn dump_header(out: &mut String, module: &Module) {
     let header = module.header();
-    out.push_str("[header]\n");
+    out.push_str("[flags]\n");
     writeln!(out, "linked = {}", header.is_linked()).unwrap();
     out.push('\n');
 }
@@ -139,7 +139,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
 
-    out.push_str("[types.defs]\n");
+    out.push_str("[type_defs]\n");
 
     // Builtins (T00-T02)
     out.push_str("T00 = void\n");
@@ -153,8 +153,8 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 
         let kind = def.type_kind().expect("valid type kind");
         let formatted = match kind {
-            TypeKind::Struct => format!("Struct(M{}, {})", def.data, def.count),
-            TypeKind::Enum => format!("Enum(M{}, {})", def.data, def.count),
+            TypeKind::Struct => format!("Struct  M{}[{}]", def.data, def.count),
+            TypeKind::Enum => format!("Enum    M{}[{}]", def.data, def.count),
             TypeKind::Optional => format!("Optional(T{:02})", def.data),
             TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:02})", def.data),
             TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:02})", def.data),
@@ -201,14 +201,14 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
 
-    out.push_str("[types.members]\n");
+    out.push_str("[type_members]\n");
     for i in 0..types.members_count() {
         let member = types.get_member(i);
         let name = strings.get(member.name);
         let type_name = format_type_name(member.type_id, module, ctx);
         writeln!(
             out,
-            "M{i} = (S{:02}, T{:02})  ; {name}: {type_name}",
+            "M{i}: S{:02} → T{:02}  ; {name}: {type_name}",
             member.name.0, member.type_id.0
         )
         .unwrap();
@@ -220,13 +220,13 @@ fn dump_types_names(out: &mut String, module: &Module, _ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
 
-    out.push_str("[types.names]\n");
+    out.push_str("[type_names]\n");
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         let name = strings.get(entry.name);
         writeln!(
             out,
-            "N{i} = (S{:02}, T{:02})  ; {name}",
+            "N{i}: S{:02} → T{:02}  ; {name}",
             entry.name.0, entry.type_id.0
         )
         .unwrap();
@@ -264,7 +264,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, _ctx: &DumpContext) {
     let strings = module.strings();
     let entrypoints = module.entrypoints();
 
-    out.push_str("[entry]\n");
+    out.push_str("[entrypoints]\n");
 
     // Collect and sort by name for display
     let mut entries: Vec<_> = (0..entrypoints.len())
@@ -302,7 +302,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         ((transitions_count as f64).log10().floor() as usize + 1).max(2)
     };
 
-    out.push_str("[code]\n");
+    out.push_str("[transitions]\n");
 
     let mut step = 0u16;
     while (step as usize) < transitions_count {
@@ -323,8 +323,9 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
 }
 
 /// Pad a base string to a target column width, then append a suffix.
+/// Ensures at least 2 spaces between base and suffix.
 fn pad_to_column(base: String, col: usize, suffix: &str) -> String {
-    let padding = col.saturating_sub(base.chars().count());
+    let padding = col.saturating_sub(base.chars().count()).max(2);
     format!("{base}{:padding$}{suffix}", "")
 }
 
