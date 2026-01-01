@@ -1,0 +1,49 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (parent {(a) (b)}* @items)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "items"
+S02 "Test"
+S03 "parent"
+S04 "b"
+S05 "a"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = ArrayStar(T01)  ; Node*
+T04 = Struct  M0[1]  ; { items }
+
+[type_members]
+M0: S01 → T03  ; items: T03
+
+[type_names]
+N0: S02 → T04  ; Test
+
+[entrypoints]
+Test = 01 :: T04
+
+[transitions]
+  00  𝜀                                     ◼
+
+Test:
+  01  𝜀                                     02
+  02       (parent)                         03
+  03  𝜀    [Arr]                            05
+  05  𝜀                                     15, 11
+  07  𝜀    [EndArr Set(M0)]                 09
+  09 *↑¹                                    10
+  10                                        ▶
+  11  𝜀    [EndArr Set(M0)]                 10
+  13  *    (b) [Push]                       19
+  15  ↓*   (a)                              13
+  16  *    (b) [Push]                       19
+  18  *    (a)                              16
+  19  𝜀                                     18, 07

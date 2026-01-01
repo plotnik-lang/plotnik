@@ -1,0 +1,58 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Expression = [(identifier) @name (number) @value]
+Root = (function_declaration name: (identifier) @name)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "value"
+S03 "Expression"
+S04 "Root"
+S05 "identifier"
+S06 "number"
+S07 "function_declaration"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[2]  ; { name, value }
+T04 = Struct  M2[1]  ; { name }
+T05 = Optional(T01)  ; Node?
+
+[type_members]
+M0: S01 → T05  ; name: T05
+M1: S02 → T05  ; value: T05
+M2: S01 → T01  ; name: Node
+
+[type_names]
+N0: S03 → T03  ; Expression
+N1: S04 → T04  ; Root
+
+[entrypoints]
+Expression = 01 :: T03
+Root       = 04 :: T04
+
+[transitions]
+  00  𝜀                                     ◼
+
+Expression:
+  01  𝜀                                     02
+  02  𝜀                                     13, 17
+
+Root:
+  04  𝜀                                     05
+  05       (function_declaration)           06
+  06  ↓*   name: (identifier) [Node Set(M2)]  08
+  08 *↑¹                                    09
+  09                                        ▶
+  10                                        ▶
+  11       (identifier) [Node Set(M0)]      10
+  13  𝜀    [Null Set(M1)]                   11
+  15       (number) [Node Set(M1)]          10
+  17  𝜀    [Null Set(M0)]                   15

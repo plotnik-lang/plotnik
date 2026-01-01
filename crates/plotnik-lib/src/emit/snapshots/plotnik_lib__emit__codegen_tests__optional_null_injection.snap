@@ -1,0 +1,42 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (function_declaration (decorator)? @dec)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "dec"
+S02 "Test"
+S03 "function_declaration"
+S04 "decorator"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[1]  ; { dec }
+T04 = Optional(T01)  ; Node?
+
+[type_members]
+M0: S01 → T04  ; dec: T04
+
+[type_names]
+N0: S02 → T03  ; Test
+
+[entrypoints]
+Test = 01 :: T03
+
+[transitions]
+  00  𝜀                                     ◼
+
+Test:
+  01  𝜀                                     02
+  02       (function_declaration)           03
+  03  𝜀                                     05, 09
+  05  ↓*   (decorator) [Node Set(M0)]       07
+  07 *↑¹                                    08
+  08                                        ▶
+  09  𝜀    [Null Set(M0)]                   08

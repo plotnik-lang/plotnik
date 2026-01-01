@@ -1,0 +1,39 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (binary_expression "+" @op)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "op"
+S02 "Test"
+S03 "binary_expression"
+S04 "+"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[1]  ; { op }
+
+[type_members]
+M0: S01 → T01  ; op: Node
+
+[type_names]
+N0: S02 → T03  ; Test
+
+[entrypoints]
+Test = 01 :: T03
+
+[transitions]
+  00  𝜀                                     ◼
+
+Test:
+  01  𝜀                                     02
+  02       (binary_expression)              03
+  03  ↓*   (+) [Node Set(M0)]               05
+  05 *↑¹                                    06
+  06                                        ▶

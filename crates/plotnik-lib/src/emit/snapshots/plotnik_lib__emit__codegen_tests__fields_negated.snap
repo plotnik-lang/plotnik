@@ -1,0 +1,40 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (function_declaration name: (identifier) @name !type_parameters)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "Test"
+S03 "function_declaration"
+S04 "type_parameters"
+S05 "identifier"
+
+[type_defs]
+T00 = void
+T01 = Node
+T02 = str
+T03 = Struct  M0[1]  ; { name }
+
+[type_members]
+M0: S01 → T01  ; name: Node
+
+[type_names]
+N0: S02 → T03  ; Test
+
+[entrypoints]
+Test = 01 :: T03
+
+[transitions]
+  00  𝜀                                     ◼
+
+Test:
+  01  𝜀                                     02
+  02       !type_parameters (function_declaration)  04
+  04  ↓*   name: (identifier) [Node Set(M0)]  06
+  06 *↑¹                                    07
+  07                                        ▶
