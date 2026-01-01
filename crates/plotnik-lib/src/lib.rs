@@ -17,6 +17,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod bytecode;
+pub mod codegen;
 pub mod diagnostics;
 pub mod parser;
 pub mod query;
