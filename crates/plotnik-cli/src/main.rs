@@ -70,6 +70,7 @@ fn main() {
                 export: !infer_output.no_export,
                 output: infer_output.output,
                 color: output.color.should_colorize(),
+                void_type: infer_output.void_type,
             });
         }
         Command::Exec {
