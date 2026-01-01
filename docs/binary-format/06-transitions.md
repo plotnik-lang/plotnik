@@ -87,20 +87,20 @@ EffectOp (u16)
 - **Opcode**: 6 bits (0-63), currently 12 defined.
 - **Payload**: 10 bits (0-1023), member/variant index.
 
-| Opcode | Name    | Payload                |
-| :----- | :------ | :--------------------- |
-| 0      | `Node`  | -                      |
-| 1      | `A`     | -                      |
-| 2      | `Push`  | -                      |
-| 3      | `EndA`  | -                      |
-| 4      | `S`     | -                      |
-| 5      | `EndS`  | -                      |
-| 6      | `Set`   | Member index (0-1023)  |
-| 7      | `E`     | Variant index (0-1023) |
-| 8      | `EndE`  | -                      |
-| 9      | `Text`  | -                      |
-| 10     | `Clear` | -                      |
-| 11     | `Null`  | -                      |
+| Opcode | Name      | Payload                |
+| :----- | :-------- | :--------------------- |
+| 0      | `Node`    | -                      |
+| 1      | `Arr`     | -                      |
+| 2      | `Push`    | -                      |
+| 3      | `EndArr`  | -                      |
+| 4      | `Obj`     | -                      |
+| 5      | `EndObj`  | -                      |
+| 6      | `Set`     | Member index (0-1023)  |
+| 7      | `Enum`    | Variant index (0-1023) |
+| 8      | `EndEnum` | -                      |
+| 9      | `Text`    | -                      |
+| 10     | `Clear`   | -                      |
+| 11     | `Null`    | -                      |
 
 **Opcode Ranges** (future extensibility):
 
@@ -134,9 +134,9 @@ struct Match8 {
 
 Bytes 2-5 (`node_type` and `node_field`) have different meanings based on the header's `linked` flag:
 
-| Mode     | `node_type` (bytes 2-3)         | `node_field` (bytes 4-5)         |
-| -------- | ------------------------------- | -------------------------------- |
-| Linked   | `NodeTypeId` from tree-sitter   | `NodeFieldId` from tree-sitter   |
+| Mode     | `node_type` (bytes 2-3)          | `node_field` (bytes 4-5)          |
+| -------- | -------------------------------- | --------------------------------- |
+| Linked   | `NodeTypeId` from tree-sitter    | `NodeFieldId` from tree-sitter    |
 | Unlinked | `StringId` pointing to type name | `StringId` pointing to field name |
 
 In **linked mode**, the runtime can directly compare against tree-sitter node types/fields.
@@ -217,8 +217,10 @@ The compiler selects the smallest step size that fits the payload. If the total 
 
 **Pre vs Post Effects**:
 
-- `pre_effects`: Execute before match attempt. Used for scope openers (`S`, `A`, `E`) that must run regardless of which branch succeeds.
-- `post_effects`: Execute after successful match. Used for capture/assignment ops (`Node`, `Set`, `EndS`, etc.) that depend on `matched_node`.
+- `pre_effects`: Execute before match attempt (before nav, before node checks). Any effect can appear here.
+- `post_effects`: Execute after successful match (after `matched_node` is set). Any effect can appear here.
+
+The compiler places effects based on semantic requirements: scope openers often go in pre (to run regardless of which branch succeeds), captures often go in post (to access `matched_node`). But this is a compiler decision, not a bytecode-level restriction.
 
 ### 4.3. Epsilon Transitions
 
@@ -230,19 +232,20 @@ A Match8 or Match16–64 with `node_type: None`, `node_field: None`, and `nav: S
 
 ### 4.4. Call
 
-Invokes another definition (recursion). Pushes return address to the call stack and jumps to target.
+Invokes another definition (recursion). Executes navigation (with optional field constraint), pushes return address to the call stack, and jumps to target.
 
 ```rust
 #[repr(C)]
 struct Call {
-    type_id: u8,        // segment(4) | 0x6
-    reserved: u8,
-    next: u16,          // Return address (StepId, current segment)
-    target: u16,        // Callee StepId (segment from type_id)
-    ref_id: u16,        // Must match Return.ref_id
+    type_id: u8,                    // segment(4) | 0x6
+    nav: u8,                        // Nav
+    node_field: Option<NonZeroU16>, // None (0) means "any"
+    next: u16,                      // Return address (StepId, current segment)
+    target: u16,                    // Callee StepId (segment from type_id)
 }
 ```
 
+- **Nav + Field**: Call handles navigation and field constraint. The callee's first Match checks node type. This allows `field: (Ref)` patterns to check field and type on the same node.
 - **Target Segment**: Defined by `type_id >> 4`.
 - **Return Segment**: Implicitly the current segment.
 
@@ -254,21 +257,9 @@ Returns from a definition. Pops the return address from the call stack.
 #[repr(C)]
 struct Return {
     type_id: u8,        // segment(4) | 0x7
-    reserved: u8,
-    ref_id: u16,        // Must match Call.ref_id
-    _pad: u32,
+    _pad: [u8; 7],
 }
 ```
-
-### 4.6. The `ref_id` Invariant
-
-The `ref_id` field enforces stack discipline between `Call` and `Return`. Each definition gets a unique `ref_id` at compile time. At runtime:
-
-1. `Call` pushes a frame with its `ref_id` onto the call stack.
-2. `Return` verifies its `ref_id` matches the current frame's `ref_id`.
-3. Mismatch indicates a malformed query or VM bug—panic in debug builds.
-
-This catches errors like mismatched call/return pairs or corrupted stack state during backtracking. The check is O(1).
 
 ## 5. Execution Semantics
 

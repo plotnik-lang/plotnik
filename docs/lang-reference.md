@@ -793,6 +793,7 @@ Q = [{(a) . (b)} (c)]      ; valid: anchor inside sequence branch
 ```
 
 The rules:
+
 - **Boundary anchors** (at start/end of sequence) need a parent named node to provide first/last child or adjacent sibling semantics
 - **Interior anchors** (between items in a sequence) are always valid because both sides are explicitly defined
 - **Alternations** cannot contain anchors directly—anchors must be inside a branch expression

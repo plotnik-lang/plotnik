@@ -6,6 +6,7 @@ Plotnik is a strongly-typed pattern matching language for tree-sitter syntax tre
 
 ### Users
 
+- [CLI Guide](cli.md) — Command-line tool usage
 - [Language Reference](lang-reference.md) — Complete syntax and semantics
 - [Type System](type-system.md) — How output types are inferred from queries
 
@@ -21,6 +22,7 @@ Plotnik is a strongly-typed pattern matching language for tree-sitter syntax tre
 AGENTS.md              # Project constitution (coding rules, testing, ADRs)
 docs/
 ├── README.md          # You are here
+├── cli.md             # CLI tool usage guide
 ├── lang-reference.md  # Query language syntax and semantics
 ├── type-system.md     # Type inference rules and output shapes
 ├── runtime-engine.md  # VM state, backtracking, effects
@@ -37,8 +39,9 @@ docs/
 
 New to Plotnik:
 
-1. `lang-reference.md` — Learn the query syntax
-2. `type-system.md` — Understand output shapes
+1. `cli.md` — Get started with the CLI
+2. `lang-reference.md` — Learn the query syntax
+3. `type-system.md` — Understand output shapes
 
 Building tooling:
 

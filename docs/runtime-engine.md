@@ -14,7 +14,6 @@ struct VM<'a> {
 }
 
 struct Frame {
-    ref_id: u16,        // For Return verification
     return_addr: u16,   // Where to jump on Return
 }
 ```
@@ -49,13 +48,13 @@ Common patterns:
 - **Quantifier branches**: `(a)?` uses epsilon to decide match-or-skip
 - **Trailing cleanup**: Many queries end with epsilon + `Up(n)` to restore cursor position after matching, regardless of tree depth
 
-### Call (0x02)
+### Call (0x06)
 
-Push `{ ref_id, return_addr: next }` → `ip = target`
+Execute `nav` (with optional `node_field` check) → push `{ return_addr: next }` → `ip = target`
 
-### Return (0x03)
+### Return (0x07)
 
-Pop frame → verify `ref_id` match (panic on mismatch) → `ip = return_addr`
+Pop frame → `ip = return_addr`
 
 ## Navigation
 
@@ -91,7 +90,6 @@ struct FrameArena {
     current: Option<u32>, // "Stack pointer"
 }
 struct Frame {
-    ref_id: u16,
     return_addr: u16,
     parent: Option<u32>,  // Caller's frame index
 }
@@ -121,7 +119,7 @@ Amortized analysis: each checkpoint contributes to at most one recomputation ove
 
 ### Call/Return
 
-Each call site stores its return address in the pushed frame. The `ref_id` check catches stack corruption (malformed IR or VM bug).
+Each call site stores its return address in the pushed frame.
 
 ## Backtracking
 
@@ -155,17 +153,17 @@ struct EffectStream<'a> {
 }
 ```
 
-| Effect  | Action                                  |
-| ------- | --------------------------------------- |
-| Node    | Push `matched_node`                     |
-| S/EndS  | Object boundaries                       |
-| Set(id) | Assign to field                         |
-| A/EndA  | Array boundaries                        |
-| Push    | Append to array                         |
-| E/EndE  | Tagged union boundaries                 |
-| Text    | Node → source text                      |
-| Clear   | Reset current value                     |
-| Null    | Null placeholder (optional/alternation) |
+| Effect       | Action                                  |
+| ------------ | --------------------------------------- |
+| Node         | Push `matched_node`                     |
+| Obj/EndObj   | Object boundaries                       |
+| Set(id)      | Assign to field                         |
+| Arr/EndArr   | Array boundaries                        |
+| Push         | Append to array                         |
+| Enum/EndEnum | Tagged union boundaries                 |
+| Text         | Node → source text                      |
+| Clear        | Reset current value                     |
+| Null         | Null placeholder (optional/alternation) |
 
 ### Materialization
 

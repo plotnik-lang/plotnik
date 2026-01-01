@@ -90,9 +90,9 @@ struct Header {
 
 ### Flags Field
 
-| Bit | Name    | Description                                              |
-| --- | ------- | -------------------------------------------------------- |
-| 0   | LINKED  | If set, bytecode contains grammar NodeTypeId/NodeFieldId |
+| Bit | Name   | Description                                              |
+| --- | ------ | -------------------------------------------------------- |
+| 0   | LINKED | If set, bytecode contains grammar NodeTypeId/NodeFieldId |
 
 **Linked vs Unlinked Bytecode**:
 
