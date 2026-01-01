@@ -7,7 +7,7 @@
 
 # Documentation
 
-[docs/README.md](docs/README.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Binary Format](docs/binary-format/01-overview.md)
+[docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Binary Format](docs/binary-format/01-overview.md)
 
 # Query Syntax Quick Reference
 
@@ -187,38 +187,56 @@ docs/
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-| Command | Purpose                         | Status  |
-| ------- | ------------------------------- | ------- |
-| `debug` | Inspect queries and source ASTs | Working |
-| `types` | Generate TypeScript types       | Working |
-| `langs` | List supported languages        | Working |
-| `exec`  | Execute query, output JSON      | Not yet |
+| Command | Purpose                    | Status  |
+| ------- | -------------------------- | ------- |
+| `tree`  | Explore tree-sitter AST    | Working |
+| `check` | Validate query             | Working |
+| `dump`  | Show compiled bytecode     | Working |
+| `infer` | Generate TypeScript types  | Working |
+| `langs` | List supported languages   | Working |
+| `exec`  | Execute query, output JSON | Not yet |
 
-## debug
+## tree
 
-Inspect query AST/CST or parse source files with tree-sitter.
-
-```sh
-cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id'
-cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --only-symbols
-cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --types
-cargo run -p plotnik-cli -- debug -q 'Test = (identifier) @id' --bytecode
-cargo run -p plotnik-cli -- debug -s app.ts
-cargo run -p plotnik-cli -- debug -s app.ts --raw
-```
-
-Options: `--only-symbols`, `--cst`, `--raw`, `--spans`, `--arities`, `--types`, `--bytecode`
-
-## types
-
-Generate TypeScript type definitions from a query. Requires `-l/--lang` to validate node types against grammar.
+Explore a source file's tree-sitter AST.
 
 ```sh
-cargo run -p plotnik-cli -- types -q 'Test = (identifier) @id' -l javascript
-cargo run -p plotnik-cli -- types --query-file query.ptk -l typescript -o types.d.ts
+cargo run -p plotnik-cli -- tree app.ts
+cargo run -p plotnik-cli -- tree app.ts --raw
+cargo run -p plotnik-cli -- tree app.ts --spans
 ```
 
-Options: `--root-type <N>`, `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <F>`
+## check
+
+Validate a query (silent on success, like `cargo check`).
+
+```sh
+cargo run -p plotnik-cli -- check query.ptk -l typescript
+cargo run -p plotnik-cli -- check queries.ts/              # workspace with lang inference
+cargo run -p plotnik-cli -- check -q '(identifier) @id' -l javascript
+```
+
+## dump
+
+Show compiled bytecode.
+
+```sh
+cargo run -p plotnik-cli -- dump query.ptk                 # unlinked
+cargo run -p plotnik-cli -- dump query.ptk -l typescript   # linked
+cargo run -p plotnik-cli -- dump -q '(identifier) @id'
+```
+
+## infer
+
+Generate TypeScript type definitions from a query.
+
+```sh
+cargo run -p plotnik-cli -- infer query.ptk -l javascript
+cargo run -p plotnik-cli -- infer queries.ts/ -o types.d.ts
+cargo run -p plotnik-cli -- infer -q '(identifier) @id' -l typescript
+```
+
+Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
 
 ## langs
 

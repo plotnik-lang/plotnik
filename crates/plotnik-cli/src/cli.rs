@@ -30,24 +30,139 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Debug and inspect queries and source files
+    /// Explore a source file's tree-sitter AST
     #[command(after_help = r#"EXAMPLES:
-  plotnik debug -q 'Q = (identifier) @id'
-  plotnik debug -q 'Q = (identifier) @id' --only-symbols
-  plotnik debug -q 'Q = (identifier) @id' --bytecode
-  plotnik debug -s app.ts
-  plotnik debug -s app.ts --raw
-  plotnik debug -q 'Q = (function_declaration) @fn' -s app.ts -l typescript"#)]
-    Debug {
-        #[command(flatten)]
-        query: QueryArgs,
+  plotnik tree app.ts
+  plotnik tree app.ts --raw
+  plotnik tree app.ts --spans"#)]
+    Tree {
+        /// Source file to parse (use "-" for stdin)
+        #[arg(value_name = "SOURCE")]
+        source: PathBuf,
 
-        #[command(flatten)]
-        source: SourceArgs,
-
-        /// Language for source (required for inline text, inferred from extension otherwise)
-        #[arg(long, short = 'l', value_name = "LANG")]
+        /// Language (inferred from extension if not specified)
+        #[arg(short = 'l', long, value_name = "LANG")]
         lang: Option<String>,
+
+        /// Include anonymous nodes (literals, punctuation)
+        #[arg(long)]
+        raw: bool,
+
+        /// Show source positions
+        #[arg(long)]
+        spans: bool,
+    },
+
+    /// Validate a query
+    #[command(after_help = r#"EXAMPLES:
+  plotnik check query.ptk
+  plotnik check query.ptk -l typescript
+  plotnik check queries.ts/
+  plotnik check -q '(identifier) @id' -l javascript"#)]
+    Check {
+        /// Query file or workspace directory
+        #[arg(value_name = "QUERY")]
+        query_path: Option<PathBuf>,
+
+        /// Inline query text
+        #[arg(short = 'q', long = "query", value_name = "TEXT")]
+        query_text: Option<String>,
+
+        /// Language for grammar validation (inferred from workspace name if possible)
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: Option<String>,
+
+        /// Treat warnings as errors
+        #[arg(long)]
+        strict: bool,
+
+        #[command(flatten)]
+        output: OutputArgs,
+    },
+
+    /// Show compiled bytecode
+    #[command(after_help = r#"EXAMPLES:
+  plotnik dump query.ptk
+  plotnik dump query.ptk -l typescript
+  plotnik dump -q '(identifier) @id'"#)]
+    Dump {
+        /// Query file or workspace directory
+        #[arg(value_name = "QUERY")]
+        query_path: Option<PathBuf>,
+
+        /// Inline query text
+        #[arg(short = 'q', long = "query", value_name = "TEXT")]
+        query_text: Option<String>,
+
+        /// Language for linking (inferred from workspace name if possible)
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: Option<String>,
+
+        #[command(flatten)]
+        output: OutputArgs,
+    },
+
+    /// Generate type definitions from a query
+    #[command(after_help = r#"EXAMPLES:
+  plotnik infer query.ptk -l javascript
+  plotnik infer queries.ts/ -o types.d.ts
+  plotnik infer -q '(function_declaration) @fn' -l typescript
+  plotnik infer query.ptk -l js --verbose-nodes
+
+NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
+    Infer {
+        /// Query file or workspace directory
+        #[arg(value_name = "QUERY")]
+        query_path: Option<PathBuf>,
+
+        /// Inline query text
+        #[arg(short = 'q', long = "query", value_name = "TEXT")]
+        query_text: Option<String>,
+
+        /// Target language (required, or inferred from workspace name)
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: Option<String>,
+
+        #[command(flatten)]
+        infer_output: InferOutputArgs,
+
+        #[command(flatten)]
+        output: OutputArgs,
+    },
+
+    /// Execute a query against source code and output JSON
+    #[command(after_help = r#"EXAMPLES:
+  plotnik exec query.ptk app.js
+  plotnik exec -q '(identifier) @id' -s app.js
+  plotnik exec query.ptk app.ts --pretty
+  plotnik exec query.ptk app.ts --verbose-nodes"#)]
+    Exec {
+        /// Query file or workspace directory
+        #[arg(value_name = "QUERY")]
+        query_path: Option<PathBuf>,
+
+        /// Source file to execute against
+        #[arg(value_name = "SOURCE")]
+        source_path: Option<PathBuf>,
+
+        /// Inline query text
+        #[arg(short = 'q', long = "query", value_name = "TEXT")]
+        query_text: Option<String>,
+
+        /// Source code as inline text
+        #[arg(long = "source", value_name = "TEXT")]
+        source_text: Option<String>,
+
+        /// Source file (alternative to positional)
+        #[arg(short = 's', long = "source-file", value_name = "FILE")]
+        source_file: Option<PathBuf>,
+
+        /// Language (inferred from source extension if not specified)
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: Option<String>,
+
+        #[command(flatten)]
+        exec_output: ExecOutputArgs,
 
         #[command(flatten)]
         output: OutputArgs,
@@ -55,72 +170,17 @@ pub enum Command {
 
     /// List supported languages
     Langs,
-
-    /// Execute a query against source code and output JSON
-    #[command(after_help = r#"EXAMPLES:
-  plotnik exec -q 'Q = (identifier) @id' -s app.js
-  plotnik exec -q 'Q = (identifier) @id' -s app.js --pretty
-  plotnik exec -q 'Q = (function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
-  plotnik exec -q 'Q = (identifier) @id' -s app.js --check
-  plotnik exec --query-file query.ptk -s app.js --entry FunctionDef"#)]
-    Exec {
-        #[command(flatten)]
-        query: QueryArgs,
-
-        #[command(flatten)]
-        source: SourceArgs,
-
-        /// Language for source (required for inline text, inferred from extension otherwise)
-        #[arg(long, short = 'l', value_name = "LANG")]
-        lang: Option<String>,
-
-        #[command(flatten)]
-        output: ExecOutputArgs,
-    },
-
-    /// Generate type definitions from a query
-    #[command(after_help = r#"EXAMPLES:
-  plotnik types -q 'Q = (identifier) @id' -l javascript
-  plotnik types --query-file query.ptk -l typescript
-  plotnik types -q 'Q = (function_declaration) @fn' -l js --format ts
-  plotnik types -q 'Q = (identifier) @id' -l js --verbose-nodes
-  plotnik types -q 'Q = (identifier) @id' -l js -o types.d.ts
-
-NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
-    Types {
-        #[command(flatten)]
-        query: QueryArgs,
-
-        /// Target language (required)
-        #[arg(long, short = 'l', value_name = "LANG")]
-        lang: Option<String>,
-
-        #[command(flatten)]
-        output: TypesOutputArgs,
-    },
 }
 
 #[derive(Args)]
-pub struct ExecOutputArgs {
-    /// Pretty-print JSON output
-    #[arg(long)]
-    pub pretty: bool,
-
-    /// Include verbose node information (line/column positions)
-    #[arg(long)]
-    pub verbose_nodes: bool,
-
-    /// Validate output against inferred types
-    #[arg(long)]
-    pub check: bool,
-
-    /// Entry point name (definition to match from)
-    #[arg(long, value_name = "NAME")]
-    pub entry: Option<String>,
+pub struct OutputArgs {
+    /// Colorize output
+    #[arg(long, default_value = "auto", value_name = "WHEN")]
+    pub color: ColorChoice,
 }
 
 #[derive(Args)]
-pub struct TypesOutputArgs {
+pub struct InferOutputArgs {
     /// Output format (typescript, ts)
     #[arg(long, default_value = "typescript", value_name = "FORMAT")]
     pub format: String,
@@ -143,68 +203,20 @@ pub struct TypesOutputArgs {
 }
 
 #[derive(Args)]
-#[group(id = "query_input", multiple = false)]
-pub struct QueryArgs {
-    /// Query as inline text
-    #[arg(short = 'q', long = "query", value_name = "QUERY")]
-    pub query_text: Option<String>,
-
-    /// Query from file (use "-" for stdin)
-    #[arg(long = "query-file", value_name = "FILE")]
-    pub query_file: Option<PathBuf>,
-}
-
-#[derive(Args)]
-#[group(id = "source_input", multiple = false)]
-pub struct SourceArgs {
-    /// Source code as inline text
-    #[arg(long = "source", value_name = "SOURCE")]
-    pub source_text: Option<String>,
-
-    /// Source code from file (use "-" for stdin)
-    #[arg(short = 's', long = "source-file", value_name = "FILE")]
-    pub source_file: Option<PathBuf>,
-}
-
-#[derive(Args)]
-pub struct OutputArgs {
-    /// Colorize output (auto-detected by default)
-    #[arg(long, default_value = "auto", value_name = "WHEN")]
-    pub color: ColorChoice,
-
-    /// Show only symbol table (instead of query AST)
-    #[arg(long = "only-symbols")]
-    pub symbols: bool,
-
-    /// Show query CST instead of AST (no effect on source)
+pub struct ExecOutputArgs {
+    /// Pretty-print JSON output
     #[arg(long)]
-    pub cst: bool,
+    pub pretty: bool,
 
-    /// Include trivia tokens (whitespace, comments)
+    /// Include verbose node information (line/column positions)
     #[arg(long)]
-    pub raw: bool,
+    pub verbose_nodes: bool,
 
-    /// Show source spans
+    /// Validate output against inferred types
     #[arg(long)]
-    pub spans: bool,
+    pub check: bool,
 
-    /// Show inferred arities
-    #[arg(long)]
-    pub arities: bool,
-
-    /// Show compiled graph
-    #[arg(long)]
-    pub graph: bool,
-
-    /// Show unoptimized graph (before epsilon elimination)
-    #[arg(long)]
-    pub graph_raw: bool,
-
-    /// Show inferred types
-    #[arg(long)]
-    pub types: bool,
-
-    /// Show bytecode dump
-    #[arg(long)]
-    pub bytecode: bool,
+    /// Entry point name (definition to match from)
+    #[arg(long, value_name = "NAME")]
+    pub entry: Option<String>,
 }
