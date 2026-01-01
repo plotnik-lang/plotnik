@@ -51,31 +51,29 @@ Expression = 05 :: T06
 Ident      = 01 :: T03
 
 [code]
-  00   𝜀                                    ◼
+  00  𝜀                                     ◼
 
 Ident:
-  01   𝜀                                    02
-  02  *↓   (identifier)                     03
-  03   𝜀   [Text Set(M0)]                   ◼
+  01  𝜀                                     02
+  02       (identifier) [Text Set(M0)]      04
+  04                                        ▶
 
 Expression:
-  05   𝜀                                    06
-  06   𝜀                                    23, 30
+  05  𝜀                                     06
+  06  𝜀                                     22, 28
 
 Assignment:
-  08   𝜀                                    09
-  09  *↓   (assignment_expression)          10
-  10   𝜀   left: _                          11
-  11  *↓   (identifier)                     12
-  12   𝜀   [Node Set(M6)]                   14
-  14   𝜀   right: _                         ▶(Expression)
-  15   𝜀   [Node Set(M5)]                   17
-  17  *↑¹                                   ◼
-  18   𝜀   [EndE]                           ◼
-  20   𝜀   [Node Set(M1)]                   18
-  22  *↓   (number)                         20
-  23   𝜀   [E(M3)]                          22
-  25   𝜀   [EndE]                           ◼
-  27   𝜀   [Node Set(M2)]                   25
-  29  *↓   (identifier)                     27
-  30   𝜀   [E(M4)]                          29
+  08  𝜀                                     09
+  09       (assignment_expression)          10
+  10  ↓*   left: (identifier) [Node Set(M6)]12
+  12  *  ▶ right: (Expression)              13
+  13  𝜀    [Set(M5)]                        15
+  15 *↑¹                                    16
+  16                                        ▶
+  17                                        ▶
+  18  𝜀    [EndEnum]                        17
+  20       (number) [Node Set(M1)]          18
+  22  𝜀    [Enum(M3)]                       20
+  24  𝜀    [EndEnum]                        17
+  26       (identifier) [Node Set(M2)]      24
+  28  𝜀    [Enum(M4)]                       26

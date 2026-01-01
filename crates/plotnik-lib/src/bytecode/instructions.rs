@@ -467,12 +467,14 @@ impl<'a> MatchView<'a> {
 pub struct Call {
     /// Segment index (0-15).
     pub segment: u8,
+    /// Navigation to apply before jumping to target.
+    pub nav: Nav,
+    /// Field constraint (None = no constraint).
+    pub node_field: Option<NonZeroU16>,
     /// Return address (current segment).
     pub next: StepId,
     /// Callee entry point (target segment from type_id).
     pub target: StepId,
-    /// Definition identifier for stack validation.
-    pub ref_id: u16,
 }
 
 impl Call {
@@ -489,9 +491,10 @@ impl Call {
 
         Self {
             segment,
-            next: StepId(u16::from_le_bytes([bytes[2], bytes[3]])),
-            target: StepId(u16::from_le_bytes([bytes[4], bytes[5]])),
-            ref_id: u16::from_le_bytes([bytes[6], bytes[7]]),
+            nav: Nav::from_byte(bytes[1]),
+            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])),
+            next: StepId(u16::from_le_bytes([bytes[4], bytes[5]])),
+            target: StepId(u16::from_le_bytes([bytes[6], bytes[7]])),
         }
     }
 
@@ -499,10 +502,10 @@ impl Call {
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = (self.segment << 4) | (Opcode::Call as u8);
-        // bytes[1] is reserved
-        bytes[2..4].copy_from_slice(&self.next.0.to_le_bytes());
-        bytes[4..6].copy_from_slice(&self.target.0.to_le_bytes());
-        bytes[6..8].copy_from_slice(&self.ref_id.to_le_bytes());
+        bytes[1] = self.nav.to_byte();
+        bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
+        bytes[4..6].copy_from_slice(&self.next.0.to_le_bytes());
+        bytes[6..8].copy_from_slice(&self.target.0.to_le_bytes());
         bytes
     }
 }
@@ -512,8 +515,6 @@ impl Call {
 pub struct Return {
     /// Segment index (0-15).
     pub segment: u8,
-    /// Definition identifier for stack validation.
-    pub ref_id: u16,
 }
 
 impl Return {
@@ -528,19 +529,14 @@ impl Return {
         let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert_eq!(opcode, Opcode::Return, "expected Return opcode");
 
-        Self {
-            segment,
-            ref_id: u16::from_le_bytes([bytes[2], bytes[3]]),
-        }
+        Self { segment }
     }
 
     /// Encode to 8-byte bytecode.
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = (self.segment << 4) | (Opcode::Return as u8);
-        // bytes[1] is reserved
-        bytes[2..4].copy_from_slice(&self.ref_id.to_le_bytes());
-        // bytes[4..8] are padding
+        // bytes[1..8] are reserved/padding
         bytes
     }
 }

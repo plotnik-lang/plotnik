@@ -93,9 +93,10 @@ fn layout_call_return() {
         }),
         Instruction::Call(CallIR {
             label: Label(1),
+            nav: Nav::Down,
+            node_field: None,
             next: Label(3),
             target: Label(2),
-            ref_id: 0,
         }),
         Instruction::Match(MatchIR {
             label: Label(2),
@@ -119,7 +120,6 @@ fn layout_call_return() {
         }),
         Instruction::Return(ReturnIR {
             label: Label(4),
-            ref_id: 0,
         }),
     ];
 
@@ -191,16 +191,16 @@ fn layout_large_instruction_cache_alignment() {
         node_type: NonZeroU16::new(10),
         node_field: None,
         pre_effects: vec![
-            EffectIR::simple(EffectOpcode::S, 0),
-            EffectIR::simple(EffectOpcode::S, 0),
-            EffectIR::simple(EffectOpcode::S, 0),
+            EffectIR::simple(EffectOpcode::Obj, 0),
+            EffectIR::simple(EffectOpcode::Obj, 0),
+            EffectIR::simple(EffectOpcode::Obj, 0),
         ],
         neg_fields: vec![],
         post_effects: vec![
             EffectIR::simple(EffectOpcode::Node, 0),
-            EffectIR::simple(EffectOpcode::EndS, 0),
-            EffectIR::simple(EffectOpcode::EndS, 0),
-            EffectIR::simple(EffectOpcode::EndS, 0),
+            EffectIR::simple(EffectOpcode::EndObj, 0),
+            EffectIR::simple(EffectOpcode::EndObj, 0),
+            EffectIR::simple(EffectOpcode::EndObj, 0),
         ],
         successors: vec![
             Label::ACCEPT,

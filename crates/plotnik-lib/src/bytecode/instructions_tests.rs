@@ -110,7 +110,7 @@ fn match_extended_roundtrip() {
         node_type: NonZeroU16::new(100),
         node_field: None,
         pre_effects: vec![EffectOp {
-            opcode: EffectOpcode::S,
+            opcode: EffectOpcode::Obj,
             payload: 0,
         }],
         neg_fields: vec![5, 6],
@@ -139,9 +139,10 @@ fn match_extended_roundtrip() {
 fn call_roundtrip() {
     let c = Call {
         segment: 0,
+        nav: Nav::Down,
+        node_field: NonZeroU16::new(42),
         next: StepId(100),
         target: StepId(500),
-        ref_id: 42,
     };
 
     let bytes = c.to_bytes();
@@ -151,10 +152,7 @@ fn call_roundtrip() {
 
 #[test]
 fn return_roundtrip() {
-    let r = Return {
-        segment: 0,
-        ref_id: 99,
-    };
+    let r = Return { segment: 0 };
 
     let bytes = r.to_bytes();
     let decoded = Return::from_bytes(bytes);
@@ -218,7 +216,7 @@ fn match_view_extended() {
         node_type: NonZeroU16::new(100),
         node_field: None,
         pre_effects: vec![EffectOp {
-            opcode: EffectOpcode::S,
+            opcode: EffectOpcode::Obj,
             payload: 0,
         }],
         neg_fields: vec![5, 6],
@@ -245,7 +243,7 @@ fn match_view_extended() {
     // Check pre_effects
     let pre: Vec<_> = view.pre_effects().collect();
     assert_eq!(pre.len(), 1);
-    assert_eq!(pre[0].opcode, EffectOpcode::S);
+    assert_eq!(pre[0].opcode, EffectOpcode::Obj);
 
     // Check neg_fields
     let neg: Vec<_> = view.neg_fields().collect();

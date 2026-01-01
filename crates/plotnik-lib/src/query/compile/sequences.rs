@@ -1,0 +1,325 @@
+//! Sequence and alternation compilation.
+//!
+//! Handles compilation of:
+//! - Sequences: `{a b c}` - siblings matched in order
+//! - Alternations: `[a b c]` - first matching branch wins
+
+use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
+use crate::bytecode::{EffectOpcode, Nav};
+use crate::parser::ast::{self, Expr, SeqItem};
+use crate::query::type_check::TypeShape;
+
+use super::capture::CaptureEffects;
+use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};
+use super::Compiler;
+
+impl Compiler<'_> {
+    /// Compile a sequence: `{a b c}`.
+    pub(super) fn compile_seq(&mut self, seq: &ast::SeqExpr, exit: Label) -> Label {
+        self.compile_seq_inner(seq, exit, None, CaptureEffects::default())
+    }
+
+    /// Compile a sequence with capture effects (passed to last item).
+    pub(super) fn compile_seq_inner(
+        &mut self,
+        seq: &ast::SeqExpr,
+        exit: Label,
+        first_nav: Option<Nav>,
+        capture: CaptureEffects,
+    ) -> Label {
+        let items: Vec<_> = seq.items().collect();
+        if items.is_empty() {
+            return exit;
+        }
+
+        // Determine if we're inside a node based on the navigation override
+        // Down variants mean we're descending into a node's children
+        let is_inside_node = matches!(first_nav, Some(Nav::Down | Nav::DownSkip | Nav::DownExact));
+
+        self.compile_seq_items_inner(&items, exit, is_inside_node, first_nav, capture, None)
+    }
+
+    /// Compile sequence items with capture effects (passed to last item).
+    ///
+    /// When `skip_exit` is provided, the skip path of the first skippable item
+    /// will use this exit instead of `exit`. This is used when inside a node
+    /// where skip paths should bypass the Up instruction.
+    pub(super) fn compile_seq_items_inner(
+        &mut self,
+        items: &[SeqItem],
+        exit: Label,
+        is_inside_node: bool,
+        first_nav: Option<Nav>,
+        capture: CaptureEffects,
+        skip_exit: Option<Label>,
+    ) -> Label {
+        // Compute navigation modes first (immutable borrow)
+        let mut nav_modes = compute_nav_modes(items, is_inside_node);
+
+        if nav_modes.is_empty() {
+            return exit;
+        }
+
+        // Apply navigation to first expression
+        let first_expr_nav = if let Some((_, first_mode)) = nav_modes.first_mut()
+            && first_mode.is_none()
+        {
+            let nav = first_nav.or_else(|| is_inside_node.then_some(Nav::Down));
+            *first_mode = nav;
+            nav
+        } else {
+            nav_modes.first().and_then(|(_, n)| *n)
+        };
+
+        // Check if first expression is skippable and uses Down navigation.
+        // In this case, the skip path needs different navigation than the match path.
+        // Also trigger when skip_exit is provided (for bypassing Up in parent node).
+        let first_is_skippable = items
+            .first()
+            .and_then(|item| item.as_expr())
+            .is_some_and(is_skippable_quantifier);
+        let first_uses_down = is_down_nav(first_expr_nav);
+        let needs_skip_exit =
+            first_is_skippable && first_uses_down && (nav_modes.len() > 1 || skip_exit.is_some());
+
+        if needs_skip_exit {
+            // Special handling: first item can skip and uses Down navigation.
+            // The continuation needs two versions:
+            // - skip_exit: uses Down nav (skipping means next item becomes "first")
+            // - match_exit: uses Next nav (after matching, advance to sibling)
+            return self.compile_seq_items_with_skip_exit(
+                items,
+                &nav_modes,
+                exit,
+                is_inside_node,
+                first_expr_nav,
+                capture,
+                skip_exit,
+            );
+        }
+
+        // Build chain in reverse: last expression exits to `exit`, each prior exits to next
+        // Capture effects go to the FIRST iteration (which is the last expression)
+        let mut current_exit = exit;
+        let mut is_last = true;
+        for (expr_idx, nav_override) in nav_modes.into_iter().rev() {
+            let expr = items[expr_idx].as_expr().expect("nav_modes only contains expr indices");
+            if is_last {
+                // Last expression gets capture effects
+                current_exit = self.compile_expr_inner(expr, current_exit, nav_override, capture.clone());
+                is_last = false;
+            } else {
+                current_exit = self.compile_expr_with_nav(expr, current_exit, nav_override);
+            }
+        }
+        current_exit
+    }
+
+    /// Compile sequence items where first item is skippable and uses Down navigation.
+    ///
+    /// When the first item (optional/star) is skipped, the next item becomes the "first"
+    /// and needs to use Down navigation instead of Next. This requires compiling the
+    /// continuation twice with different navigation.
+    ///
+    /// When `caller_skip_exit` is provided and there are no remaining items, the skip
+    /// path uses this exit (to bypass Up in parent node) while match path uses `exit`.
+    #[allow(clippy::too_many_arguments)]
+    fn compile_seq_items_with_skip_exit(
+        &mut self,
+        items: &[SeqItem],
+        nav_modes: &[(usize, Option<Nav>)],
+        exit: Label,
+        is_inside_node: bool,
+        first_nav: Option<Nav>,
+        capture: CaptureEffects,
+        caller_skip_exit: Option<Label>,
+    ) -> Label {
+        let first_expr = items[nav_modes[0].0]
+            .as_expr()
+            .expect("first item must be expression");
+
+        // Build rest items once (shared between skip and match paths)
+        let rest_items: Vec<_> = nav_modes[1..]
+            .iter()
+            .filter_map(|(idx, _)| items.get(*idx).and_then(|i| i.as_expr()))
+            .map(|e| SeqItem::Expr(e.clone()))
+            .collect();
+
+        // Compile continuation with both navigations, or use exit if no continuation.
+        // When caller_skip_exit is provided and rest is empty, use it for skip path
+        // (this allows skip to bypass Up instruction in parent node).
+        let (skip_exit, match_exit) = if rest_items.is_empty() {
+            (caller_skip_exit.unwrap_or(exit), exit)
+        } else {
+            let skip = self.compile_seq_items_inner(
+                &rest_items,
+                exit,
+                is_inside_node,
+                first_nav, // Down variant for skip path
+                capture.clone(),
+                caller_skip_exit, // Propagate for nested skippables
+            );
+            let mtch = self.compile_seq_items_inner(
+                &rest_items,
+                exit,
+                is_inside_node,
+                repeat_nav_for(first_nav), // Next variant for match path
+                capture.clone(),
+                None, // Match path doesn't need skip exit
+            );
+            (skip, mtch)
+        };
+
+        self.compile_skippable_with_exits(first_expr, match_exit, skip_exit, first_nav, capture)
+    }
+
+    /// Compile an alternation: `[a b c]`.
+    pub(super) fn compile_alt(&mut self, alt: &ast::AltExpr, exit: Label) -> Label {
+        self.compile_alt_inner(alt, exit, None, CaptureEffects::default())
+    }
+
+    /// Compile an alternation with capture effects (passed to each branch).
+    pub(super) fn compile_alt_inner(
+        &mut self,
+        alt: &ast::AltExpr,
+        exit: Label,
+        first_nav: Option<Nav>,
+        capture: CaptureEffects,
+    ) -> Label {
+        let branches: Vec<_> = alt.branches().collect();
+        if branches.is_empty() {
+            return exit;
+        }
+
+        // Get alternation's type info
+        let alt_expr = Expr::AltExpr(alt.clone());
+        let alt_type_id = self
+            .type_ctx
+            .get_term_info(&alt_expr)
+            .and_then(|info| info.flow.type_id());
+        let alt_type_shape = alt_type_id.and_then(|id| self.type_ctx.get_type(id));
+        let is_enum = alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+
+        // For tagged alternations: get variant types for scope pushing
+        // For untagged alternations: get merged struct fields for Null injection
+        let variant_types: Vec<_> = match alt_type_shape {
+            Some(TypeShape::Enum(variants)) => variants.values().copied().collect(),
+            _ => vec![],
+        };
+        let merged_fields = alt_type_id.and_then(|id| self.type_ctx.get_struct_fields(id));
+
+        // Compile each branch, collecting entry labels
+        // Each branch gets the same nav override since any branch could match first
+        let mut successors = Vec::new();
+        for (variant_idx, branch) in branches.iter().enumerate() {
+            let Some(body) = branch.body() else {
+                continue;
+            };
+
+            if is_enum {
+                // Tagged branch: E(variant_ref) → body → EndE → exit
+                // Outer capture effects go on EndEnum, not on the branch body
+                let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndEnum, 0)];
+                end_effects.extend(capture.post.iter().cloned());
+
+                let ende_step = self.fresh_label();
+                self.instructions.push(Instruction::Match(MatchIR {
+                    label: ende_step,
+                    nav: Nav::Stay,
+                    node_type: None,
+                    node_field: None,
+                    pre_effects: vec![],
+                    neg_fields: vec![],
+                    post_effects: end_effects,
+                    successors: vec![exit],
+                }));
+
+                // Compile body with variant's scope (no outer capture - it's on EndEnum)
+                let body_entry = if let Some(&payload_type_id) = variant_types.get(variant_idx) {
+                    self.with_scope(payload_type_id, |this| {
+                        this.compile_expr_inner(&body, ende_step, first_nav, CaptureEffects::default())
+                    })
+                } else {
+                    self.compile_expr_inner(&body, ende_step, first_nav, CaptureEffects::default())
+                };
+
+                // Create deferred member reference for the enum variant
+                let e_effect = if let Some(type_id) = alt_type_id {
+                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::deferred(type_id, variant_idx as u16))
+                } else {
+                    EffectIR::simple(EffectOpcode::Enum, variant_idx)
+                };
+
+                let e_step = self.fresh_label();
+                self.instructions.push(Instruction::Match(MatchIR {
+                    label: e_step,
+                    nav: Nav::Stay,
+                    node_type: None,
+                    node_field: None,
+                    pre_effects: vec![e_effect],
+                    neg_fields: vec![],
+                    post_effects: vec![],
+                    successors: vec![body_entry],
+                }));
+
+                successors.push(e_step);
+            } else {
+                // Untagged branch: compile body, then inject Null for missing captures
+                let branch_entry = self.compile_expr_inner(&body, exit, first_nav, capture.clone());
+
+                let Some(fields) = merged_fields else {
+                    successors.push(branch_entry);
+                    continue;
+                };
+                let Some(type_id) = alt_type_id else {
+                    successors.push(branch_entry);
+                    continue;
+                };
+
+                // Build Null effects for fields not captured by this branch
+                let branch_captures = Self::collect_captures(&body);
+                let null_effects: Vec<_> = fields
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, (&sym, _))| !branch_captures.contains(self.interner.resolve(sym)))
+                    .flat_map(|(idx, _)| {
+                        [
+                            EffectIR::simple(EffectOpcode::Null, 0),
+                            EffectIR::with_member(EffectOpcode::Set, MemberRef::deferred(type_id, idx as u16)),
+                        ]
+                    })
+                    .collect();
+
+                if null_effects.is_empty() {
+                    successors.push(branch_entry);
+                    continue;
+                }
+
+                let null_step = self.fresh_label();
+                self.instructions.push(Instruction::Match(MatchIR {
+                    label: null_step,
+                    nav: Nav::Stay,
+                    node_type: None,
+                    node_field: None,
+                    pre_effects: null_effects,
+                    neg_fields: vec![],
+                    post_effects: vec![],
+                    successors: vec![branch_entry],
+                }));
+                successors.push(null_step);
+            }
+        }
+
+        if successors.is_empty() {
+            return exit;
+        }
+        if successors.len() == 1 {
+            return successors[0];
+        }
+
+        // Emit epsilon branch to choose among alternatives
+        let entry = self.fresh_label();
+        self.emit_epsilon(entry, successors);
+        entry
+    }
+}
