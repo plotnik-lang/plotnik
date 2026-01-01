@@ -53,22 +53,60 @@ fn dump_multiple_entrypoints() {
 
     let res = Query::expect_valid_linked_bytecode(input);
 
-    // Verify key sections exist
-    assert!(res.contains("[header]"));
-    assert!(res.contains("[strings]"));
-    assert!(res.contains("[types.defs]"));
-    assert!(res.contains("[types.members]"));
-    assert!(res.contains("[types.names]"));
-    assert!(res.contains("[entry]"));
-    assert!(res.contains("[code]"));
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = true
 
-    // Verify both entrypoints appear
-    assert!(res.contains("Expression"));
-    assert!(res.contains("Root"));
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "name"
+    S02 "value"
+    S03 "Expression"
+    S04 "Root"
+    S05 "identifier"
+    S06 "number"
+    S07 "function_declaration"
 
-    // Verify code section has entrypoint labels
-    assert!(res.contains("Expression:"));
-    assert!(res.contains("Root:"));
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 2)  ; { name, value }
+    T04 = Struct(M2, 1)  ; { name }
+    T05 = Optional(T01)  ; Node?
+
+    [types.members]
+    M0 = (S01, T05)  ; name: T05
+    M1 = (S02, T05)  ; value: T05
+    M2 = (S01, T01)  ; name: Node
+
+    [types.names]
+    N0 = (S03, T03)  ; Expression
+    N1 = (S04, T04)  ; Root
+
+    [entry]
+    Expression = 01 :: T03
+    Root       = 04 :: T04
+
+    [code]
+      00  𝜀                                     ◼
+
+    Expression:
+      01  𝜀                                     02
+      02  𝜀                                     13, 17
+
+    Root:
+      04  𝜀                                     05
+      05       (function_declaration)           06
+      06  ↓*   name: (identifier) [Node Set(M2)]08
+      08 *↑¹                                    09
+      09                                        ▶
+      10                                        ▶
+      11       (identifier) [Node Set(M0)]      10
+      13  𝜀    [Null Set(M1)]                   11
+      15       (number) [Node Set(M1)]          10
+      17  𝜀    [Null Set(M0)]                   15
+    "#);
 }
 
 #[test]
@@ -81,9 +119,44 @@ fn dump_with_field_constraints() {
 
     let res = Query::expect_valid_linked_bytecode(input);
 
-    // Should have field references in code section
-    assert!(res.contains("left:"));
-    assert!(res.contains("right:"));
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = true
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "left"
+    S02 "right"
+    S03 "Test"
+    S04 "binary_expression"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 2)  ; { left, right }
+
+    [types.members]
+    M0 = (S01, T01)  ; left: Node
+    M1 = (S02, T01)  ; right: Node
+
+    [types.names]
+    N0 = (S03, T03)  ; Test
+
+    [entry]
+    Test = 01 :: T03
+
+    [code]
+      00  𝜀                                     ◼
+
+    Test:
+      01  𝜀                                     02
+      02       (binary_expression)              03
+      03  ↓*   left: _ [Node Set(M0)]           05
+      05  *    right: _ [Node Set(M1)]          07
+      07 *↑¹                                    08
+      08                                        ▶
+    "#);
 }
 
 #[test]
@@ -92,8 +165,45 @@ fn dump_with_quantifier() {
 
     let res = Query::expect_valid_linked_bytecode(input);
 
-    // Should have array type
-    assert!(res.contains("Array") || res.contains("[]"));
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = true
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "items"
+    S02 "Test"
+    S03 "identifier"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = ArrayStar(T01)  ; Node*
+    T04 = Struct(M0, 1)  ; { items }
+
+    [types.members]
+    M0 = (S01, T03)  ; items: T03
+
+    [types.names]
+    N0 = (S02, T04)  ; Test
+
+    [entry]
+    Test = 01 :: T04
+
+    [code]
+      00  𝜀                                     ◼
+
+    Test:
+      01  𝜀                                     02
+      02  𝜀    [Arr]                            04
+      04  𝜀                                     09, 07
+      06                                        ▶
+      07  𝜀    [EndArr Set(M0)]                 06
+      09       (identifier) [Push]              13
+      11       (identifier) [Push]              13
+      13  𝜀                                     11, 07
+    "#);
 }
 
 #[test]
@@ -102,8 +212,47 @@ fn dump_with_alternation() {
 
     let res = Query::expect_valid_linked_bytecode(input);
 
-    // Should have code section with branching
-    assert!(res.contains("[code]"));
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = true
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "id"
+    S02 "str"
+    S03 "Test"
+    S04 "identifier"
+    S05 "string"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 2)  ; { id, str }
+    T04 = Optional(T01)  ; Node?
+
+    [types.members]
+    M0 = (S01, T04)  ; id: T04
+    M1 = (S02, T04)  ; str: T04
+
+    [types.names]
+    N0 = (S03, T03)  ; Test
+
+    [entry]
+    Test = 01 :: T03
+
+    [code]
+      00  𝜀                                     ◼
+
+    Test:
+      01  𝜀                                     02
+      02  𝜀                                     07, 11
+      04                                        ▶
+      05       (identifier) [Node Set(M0)]      04
+      07  𝜀    [Null Set(M1)]                   05
+      09       (string) [Node Set(M1)]          04
+      11  𝜀    [Null Set(M0)]                   09
+    "#);
 }
 
 #[test]
@@ -596,17 +745,45 @@ fn regression_alternation_capture_node_effect() {
 
     let res = Query::expect_valid_bytecode(input);
 
-    // Both branches must have [Node Set(M0)], not just [Set(M0)]
-    assert!(
-        res.contains("[Node Set(M0)]"),
-        "Missing Node effect on alternation capture"
-    );
-    // Should appear twice (once per branch)
-    assert_eq!(
-        res.matches("[Node Set(M0)]").count(),
-        2,
-        "Node effect should appear on both alternation branches"
-    );
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "x"
+    S02 "Q"
+    S03 "program"
+    S04 "identifier"
+    S05 "number"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 1)  ; { x }
+
+    [types.members]
+    M0 = (S01, T01)  ; x: Node
+
+    [types.names]
+    N0 = (S02, T03)  ; Q
+
+    [entry]
+    Q = 01 :: T03
+
+    [code]
+      00  𝜀                                     ◼
+
+    Q:
+      01  𝜀                                     02
+      02       (program)                        03
+      03  𝜀                                     06, 08
+      05                                        ▶
+      06  ↓*   (identifier) [Node Set(M0)]      10
+      08  ↓*   (number) [Node Set(M0)]          10
+      10 *↑¹                                    05
+    "#);
 }
 
 /// Regression test: optional first-child skip path needs Down navigation.
@@ -620,17 +797,50 @@ fn regression_optional_first_child_skip_navigation() {
 
     let res = Query::expect_valid_bytecode(input);
 
-    // Should have TWO versions of (number):
-    // 1. With ↓* (Down) for skip path
-    // 2. With * (Next) for after-match path
-    assert!(
-        res.contains("↓*   (number)"),
-        "Skip path should have Down navigation for (number)"
-    );
-    assert!(
-        res.contains("*    (number)"),
-        "Match path should have Next navigation for (number)"
-    );
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "id"
+    S02 "n"
+    S03 "Q"
+    S04 "program"
+    S05 "number"
+    S06 "identifier"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 2)  ; { id, n }
+    T04 = Optional(T01)  ; Node?
+
+    [types.members]
+    M0 = (S01, T04)  ; id: T04
+    M1 = (S02, T01)  ; n: Node
+
+    [types.names]
+    N0 = (S03, T03)  ; Q
+
+    [entry]
+    Q = 01 :: T03
+
+    [code]
+      00  𝜀                                     ◼
+
+    Q:
+      01  𝜀                                     02
+      02       (program)                        03
+      03  𝜀                                     12, 10
+      05                                        ▶
+      06  ↓*   (number) [Node Set(M1)]          14
+      08  *    (number) [Node Set(M1)]          14
+      10  𝜀    [Null Set(M0)]                   06
+      12  ↓*   (identifier) [Node Set(M0)]      08
+      14 *↑¹                                    05
+    "#);
 }
 
 /// Regression test: optional skip path needs Null injection for captures.
@@ -644,11 +854,45 @@ fn regression_optional_skip_null_injection() {
 
     let res = Query::expect_valid_bytecode(input);
 
-    // Skip path must have [Null Set(M0)] to set @dec to null
-    assert!(
-        res.contains("[Null Set(M0)]"),
-        "Skip path should inject Null for optional capture"
-    );
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "dec"
+    S02 "Q"
+    S03 "function_declaration"
+    S04 "decorator"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 1)  ; { dec }
+    T04 = Optional(T01)  ; Node?
+
+    [types.members]
+    M0 = (S01, T04)  ; dec: T04
+
+    [types.names]
+    N0 = (S02, T03)  ; Q
+
+    [entry]
+    Q = 01 :: T03
+
+    [code]
+      00  𝜀                                     ◼
+
+    Q:
+      01  𝜀                                     02
+      02       (function_declaration)           03
+      03  𝜀                                     05, 09
+      05  ↓*   (decorator) [Node Set(M0)]       07
+      07 *↑¹                                    08
+      08                                        ▶
+      09  𝜀    [Null Set(M0)]                   08
+    "#);
 }
 
 /// Regression test: star first-child with array capture preserves Arr/EndArr.
@@ -662,22 +906,54 @@ fn regression_star_first_child_array_capture() {
 
     let res = Query::expect_valid_bytecode(input);
 
-    // Must have Arr and EndArr for array semantics
-    assert!(res.contains("[Arr]"), "Array capture must have Arr effect");
-    assert!(
-        res.contains("[EndArr Set(M0)]"),
-        "Array capture must have EndArr with Set"
-    );
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
 
-    // Must have TWO versions of (number) for skip/match paths
-    assert!(
-        res.contains("↓*   (number)"),
-        "Skip path should have Down navigation"
-    );
-    assert!(
-        res.contains("*    (number)"),
-        "Match path should have Next navigation"
-    );
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "ids"
+    S02 "n"
+    S03 "Q"
+    S04 "array"
+    S05 "number"
+    S06 "identifier"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = ArrayStar(T01)  ; Node*
+    T04 = Struct(M0, 2)  ; { ids, n }
+
+    [types.members]
+    M0 = (S01, T03)  ; ids: T03
+    M1 = (S02, T01)  ; n: Node
+
+    [types.names]
+    N0 = (S03, T04)  ; Q
+
+    [entry]
+    Q = 01 :: T04
+
+    [code]
+      00  𝜀                                     ◼
+
+    Q:
+      01  𝜀                                     02
+      02       (array)                          03
+      03  𝜀    [Arr]                            05
+      05  𝜀                                     16, 14
+      07                                        ▶
+      08  ↓*   (number) [Node Set(M1)]          22
+      10  *    (number) [Node Set(M1)]          22
+      12  𝜀    [EndArr Set(M0)]                 10
+      14  𝜀    [EndArr Set(M0)]                 08
+      16  ↓*   (identifier) [Push]              20
+      18  *    (identifier) [Push]              20
+      20  𝜀                                     18, 12
+      22 *↑¹                                    07
+    "#);
 }
 
 /// Regression test: struct array with internal captures needs Obj/EndObj.
@@ -691,18 +967,6 @@ fn regression_struct_array_internal_captures() {
 
     let res = Query::expect_valid_bytecode(input);
 
-    // Must have Obj/EndObj for struct boundaries
-    assert!(res.contains("[Obj]"), "Struct array must have Obj effect");
-    assert!(
-        res.contains("[EndObj"),
-        "Struct array must have EndObj effect"
-    );
-
-    // Must have Set effects for internal captures
-    assert!(res.contains("Set(M0)"), "Must have Set effect for @a");
-    assert!(res.contains("Set(M1)"), "Must have Set effect for @b");
-
-    // Full snapshot to verify correct structure
     insta::assert_snapshot!(res, @r#"
     [header]
     linked = false

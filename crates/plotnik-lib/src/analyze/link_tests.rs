@@ -1,9 +1,5 @@
 use crate::Query;
 use indoc::indoc;
-use plotnik_langs::Lang;
-use std::sync::LazyLock;
-
-static LANG: LazyLock<Lang> = LazyLock::new(|| plotnik_langs::javascript());
 
 #[test]
 fn valid_query_with_field() {
@@ -11,7 +7,7 @@ fn valid_query_with_field() {
         Q = (function_declaration
             name: (identifier) @name) @fn
     "#};
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -20,7 +16,7 @@ fn unknown_node_type_with_suggestion() {
         Q = (function_declaraton) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
@@ -38,7 +34,7 @@ fn unknown_node_type_no_suggestion() {
         Q = (xyzzy_foobar_baz) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `xyzzy_foobar_baz` is not a valid node type
@@ -55,7 +51,7 @@ fn unknown_field_with_suggestion() {
             nme: (identifier) @name) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `nme` is not a valid field
@@ -74,7 +70,7 @@ fn unknown_field_no_suggestion() {
             xyzzy: (identifier) @name) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `xyzzy` is not a valid field
@@ -91,7 +87,7 @@ fn field_not_on_node_type() {
             condition: (identifier) @name) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: field `condition` is not valid on this node type
@@ -113,7 +109,7 @@ fn field_not_on_node_type_with_suggestion() {
         ) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: field `parameter` is not valid on this node type
@@ -134,7 +130,7 @@ fn negated_field_unknown() {
         Q = (function_declaration !nme) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `nme` is not a valid field
@@ -152,7 +148,7 @@ fn negated_field_not_on_node_type() {
         Q = (function_declaration !condition) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: field `condition` is not valid on this node type
@@ -172,7 +168,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
         Q = (function_declaration !parameter) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: field `parameter` is not valid on this node type
@@ -193,7 +189,7 @@ fn negated_field_valid() {
         Q = (function_declaration !name) @fn
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -202,7 +198,7 @@ fn anonymous_node_unknown() {
         Q = (function_declaration "xyzzy_fake_token") @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r#"
     error: `xyzzy_fake_token` is not a valid node type
@@ -217,7 +213,7 @@ fn error_nodes_skip_validation() {
     let input = indoc! {r#"
         Q = (ERROR) @err
     "#};
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -225,7 +221,7 @@ fn missing_nodes_skip_validation() {
     let input = indoc! {r#"
         Q = (MISSING) @miss
     "#};
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -235,7 +231,7 @@ fn multiple_errors_in_query() {
             nme: (identifer) @name) @fn
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
@@ -269,7 +265,7 @@ fn nested_field_validation() {
                 (return_statement) @ret) @body) @fn
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -279,7 +275,7 @@ fn alternation_with_link_errors() {
          (class_declaraton)] @decl
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: `function_declaraton` is not a valid node type
@@ -305,7 +301,7 @@ fn quantified_expr_validation() {
             (function_declaration)+ @fns) @block
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -314,7 +310,7 @@ fn wildcard_node_skips_validation() {
         Q = (_) @any
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -325,7 +321,7 @@ fn def_reference_with_link() {
         Q = (program (Func)+ @funcs)
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -335,7 +331,7 @@ fn field_on_node_without_fields() {
             name: (identifier) @inner) @id
     "#};
 
-    let res = Query::expect_invalid_linking(input, &LANG);
+    let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @r"
     error: field `name` is not valid on this node type
@@ -356,7 +352,7 @@ fn valid_child_via_supertype() {
             (function_declaration)) @block
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -366,7 +362,7 @@ fn valid_child_via_nested_supertype() {
             (function_declaration)) @prog
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -375,7 +371,7 @@ fn deeply_nested_sequences_valid() {
         Q = (statement_block {{{(function_declaration)}}}) @block
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -384,7 +380,7 @@ fn deeply_nested_alternations_in_field_valid() {
         Q = (function_declaration name: [[[(identifier)]]]) @fn
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }
 
 #[test]
@@ -394,5 +390,5 @@ fn ref_followed_valid_case() {
         Q = (function_declaration name: (Foo))
     "#};
 
-    Query::expect_valid_linking(input, &LANG);
+    Query::expect_valid_linking(input);
 }

@@ -10,6 +10,18 @@ fn javascript() -> Lang {
     from_name("javascript").expect("javascript lang")
 }
 
+macro_rules! expect_invalid {
+    ($($name:literal: $content:literal),+ $(,)?) => {{
+        let mut source_map = SourceMap::new();
+        $(source_map.add_file($name, $content);)+
+        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        if query.is_valid() {
+            panic!("Expected invalid query, got valid");
+        }
+        query.dump_diagnostics()
+    }};
+}
+
 impl QueryAnalyzed {
     #[track_caller]
     fn parse_and_validate(src: &str) -> Self {
@@ -61,8 +73,8 @@ impl QueryAnalyzed {
     }
 
     #[track_caller]
-    pub fn expect_valid_linking(src: &str, lang: &Lang) -> LinkedQuery {
-        let query = Self::parse_and_validate(src).link(lang);
+    pub fn expect_valid_linking(src: &str) -> LinkedQuery {
+        let query = Self::parse_and_validate(src).link(&javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -73,8 +85,8 @@ impl QueryAnalyzed {
     }
 
     #[track_caller]
-    pub fn expect_invalid_linking(src: &str, lang: &Lang) -> String {
-        let query = Self::parse_and_validate(src).link(lang);
+    pub fn expect_invalid_linking(src: &str) -> String {
+        let query = Self::parse_and_validate(src).link(&javascript());
         if query.is_valid() {
             panic!("Expected failed linking, got valid");
         }
@@ -169,15 +181,13 @@ impl QueryAnalyzed {
 
 #[test]
 fn invalid_three_way_mutual_recursion_across_files() {
-    let mut source_map = SourceMap::new();
-    source_map.add_file("a.ptk", "A = (a (B))");
-    source_map.add_file("b.ptk", "B = (b (C))");
-    source_map.add_file("c.ptk", "C = (c (A))");
+    let res = expect_invalid! {
+        "a.ptk": "A = (a (B))",
+        "b.ptk": "B = (b (C))",
+        "c.ptk": "C = (c (A))",
+    };
 
-    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
-
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: infinite recursion: no escape path
      --> c.ptk:1:9
       |
@@ -203,14 +213,12 @@ fn invalid_three_way_mutual_recursion_across_files() {
 
 #[test]
 fn multifile_field_with_ref_to_seq_error() {
-    let mut source_map = SourceMap::new();
-    source_map.add_file("defs.ptk", "X = {(a) (b)}");
-    source_map.add_file("main.ptk", "Q = (call name: (X))");
+    let res = expect_invalid! {
+        "defs.ptk": "X = {(a) (b)}",
+        "main.ptk": "Q = (call name: (X))",
+    };
 
-    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
-
-    assert!(!query.is_valid());
-    insta::assert_snapshot!(query.dump_diagnostics(), @r"
+    insta::assert_snapshot!(res, @r"
     error: field `name` cannot match a sequence
      --> main.ptk:1:17
       |
