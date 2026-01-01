@@ -20,8 +20,6 @@ pub use types::{
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 
-use std::collections::BTreeMap;
-
 use indexmap::IndexMap;
 
 use crate::analyze::dependencies::DependencyAnalysis;
@@ -143,7 +141,7 @@ impl<'a> InferencePass<'a> {
 
     fn flow_to_type_id(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
-            TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
+            TypeFlow::Void => TYPE_VOID,
             TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => *id,
         }
     }

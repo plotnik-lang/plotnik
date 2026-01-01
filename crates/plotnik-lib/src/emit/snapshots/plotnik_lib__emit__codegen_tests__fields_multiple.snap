@@ -9,35 +9,33 @@ Test = (binary_expression
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "left"
-S02 "right"
-S03 "Test"
-S04 "binary_expression"
+S0 "Beauty will save the world"
+S1 "left"
+S2 "right"
+S3 "Test"
+S4 "binary_expression"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[2]  ; { left, right }
+T0 = <Node>
+T1 = Struct  M0:2  ; { left, right }
 
 [type_members]
-M0: S01 → T01  ; left: Node
-M1: S02 → T01  ; right: Node
+M0: S1 → T0  ; left: <Node>
+M1: S2 → T0  ; right: <Node>
 
 [type_names]
-N0: S03 → T03  ; Test
+N0: S3 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 1 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  0  𝜀                                      ◼
 
 Test:
-  01  𝜀                                     02
-  02       (binary_expression)              03
-  03  ↓*   left: _ [Node Set(M0)]           05
-  05  *    right: _ [Node Set(M1)]          07
-  07 *↑¹                                    08
-  08                                        ▶
+  1  𝜀                                      2
+  2       (binary_expression)               3
+  3  ↓*   left: _ [Node Set(M0)]            5
+  5  *    right: _ [Node Set(M1)]           7
+  7 *↑¹                                     8
+  8                                         ▶

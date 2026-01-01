@@ -18,7 +18,7 @@ pub fn dump(module: &Module) -> String {
     let ctx = DumpContext::new(module);
 
     dump_header(&mut out, module);
-    dump_strings(&mut out, module);
+    dump_strings(&mut out, module, &ctx);
     dump_types_defs(&mut out, module, &ctx);
     dump_types_members(&mut out, module, &ctx);
     dump_types_names(&mut out, module, &ctx);
@@ -35,6 +35,15 @@ fn dump_header(out: &mut String, module: &Module) {
     out.push('\n');
 }
 
+/// Calculate the minimum width needed to display numbers up to `count - 1`.
+fn width_for_count(count: usize) -> usize {
+    if count <= 1 {
+        1
+    } else {
+        ((count - 1) as f64).log10().floor() as usize + 1
+    }
+}
+
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
     /// Whether the bytecode is linked (contains grammar IDs vs StringIds).
@@ -47,6 +56,16 @@ struct DumpContext {
     node_field_names: BTreeMap<u16, String>,
     /// All strings (for unlinked mode lookups).
     all_strings: Vec<String>,
+    /// Width for string indices (S#).
+    str_width: usize,
+    /// Width for type indices (T#).
+    type_width: usize,
+    /// Width for member indices (M#).
+    member_width: usize,
+    /// Width for name indices (N#).
+    name_width: usize,
+    /// Width for step indices.
+    step_width: usize,
 }
 
 impl DumpContext {
@@ -83,12 +102,26 @@ impl DumpContext {
             .map(|i| strings.get(StringId(i as u16)).to_string())
             .collect();
 
+        // Compute widths for index formatting
+        let types = module.types();
+        let type_count = 3 + types.defs_count(); // 3 builtins + custom types
+        let str_width = width_for_count(str_count);
+        let type_width = width_for_count(type_count);
+        let member_width = width_for_count(types.members_count());
+        let name_width = width_for_count(types.names_count());
+        let step_width = width_for_count(header.transitions_count as usize);
+
         Self {
             is_linked,
             step_labels,
             node_type_names,
             node_field_names,
             all_strings,
+            str_width,
+            type_width,
+            member_width,
+            name_width,
+            step_width,
         }
     }
 
@@ -123,14 +156,15 @@ impl DumpContext {
     }
 }
 
-fn dump_strings(out: &mut String, module: &Module) {
+fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
     let strings = module.strings();
     let count = module.header().str_table_count as usize;
+    let w = ctx.str_width;
 
     out.push_str("[strings]\n");
     for i in 0..count {
         let s = strings.get(StringId(i as u16));
-        writeln!(out, "S{i:02} {s:?}").unwrap();
+        writeln!(out, "S{i:0w$} {s:?}").unwrap();
     }
     out.push('\n');
 }
@@ -138,31 +172,34 @@ fn dump_strings(out: &mut String, module: &Module) {
 fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
+    let tw = ctx.type_width;
+    let mw = ctx.member_width;
 
     out.push_str("[type_defs]\n");
 
-    // Builtins (T00-T02)
-    out.push_str("T00 = void\n");
-    out.push_str("T01 = Node\n");
-    out.push_str("T02 = str\n");
-
-    // Custom types (T03+)
+    // All types are now in type_defs, including builtins
     for i in 0..types.defs_count() {
         let def = types.get_def(i);
-        let type_id = i + 3; // Custom types start at index 3
-
         let kind = def.type_kind().expect("valid type kind");
+
         let formatted = match kind {
-            TypeKind::Struct => format!("Struct  M{}[{}]", def.data, def.count),
-            TypeKind::Enum => format!("Enum    M{}[{}]", def.data, def.count),
-            TypeKind::Optional => format!("Optional(T{:02})", def.data),
-            TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:02})", def.data),
-            TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:02})", def.data),
-            TypeKind::Alias => format!("Alias(T{:02})", def.data),
+            // Primitive types
+            TypeKind::Void => "<Void>".to_string(),
+            TypeKind::Node => "<Node>".to_string(),
+            TypeKind::String => "<String>".to_string(),
+            // Composite types
+            TypeKind::Struct => format!("Struct  M{:0mw$}:{}", def.data, def.count),
+            TypeKind::Enum => format!("Enum    M{:0mw$}:{}", def.data, def.count),
+            // Wrapper types
+            TypeKind::Optional => format!("Optional(T{:0tw$})", def.data),
+            TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", def.data),
+            TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", def.data),
+            TypeKind::Alias => format!("Alias(T{:0tw$})", def.data),
         };
 
-        // Generate comment for composites
+        // Generate comment for non-primitives
         let comment = match kind {
+            TypeKind::Void | TypeKind::Node | TypeKind::String => String::new(),
             TypeKind::Struct => {
                 let fields: Vec<_> = types
                     .members_of(&def)
@@ -192,7 +229,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             TypeKind::Alias => String::new(),
         };
 
-        writeln!(out, "T{type_id:02} = {formatted}{comment}").unwrap();
+        writeln!(out, "T{i:0tw$} = {formatted}{comment}").unwrap();
     }
     out.push('\n');
 }
@@ -200,6 +237,9 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
+    let mw = ctx.member_width;
+    let sw = ctx.str_width;
+    let tw = ctx.type_width;
 
     out.push_str("[type_members]\n");
     for i in 0..types.members_count() {
@@ -208,7 +248,7 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
         let type_name = format_type_name(member.type_id, module, ctx);
         writeln!(
             out,
-            "M{i}: S{:02} → T{:02}  ; {name}: {type_name}",
+            "M{i:0mw$}: S{:0sw$} → T{:0tw$}  ; {name}: {type_name}",
             member.name.0, member.type_id.0
         )
         .unwrap();
@@ -216,9 +256,12 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
     out.push('\n');
 }
 
-fn dump_types_names(out: &mut String, module: &Module, _ctx: &DumpContext) {
+fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
     let types = module.types();
     let strings = module.strings();
+    let nw = ctx.name_width;
+    let sw = ctx.str_width;
+    let tw = ctx.type_width;
 
     out.push_str("[type_names]\n");
     for i in 0..types.names_count() {
@@ -226,7 +269,7 @@ fn dump_types_names(out: &mut String, module: &Module, _ctx: &DumpContext) {
         let name = strings.get(entry.name);
         writeln!(
             out,
-            "N{i}: S{:02} → T{:02}  ; {name}",
+            "N{i:0nw$}: S{:0sw$} → T{:0tw$}  ; {name}",
             entry.name.0, entry.type_id.0
         )
         .unwrap();
@@ -235,20 +278,19 @@ fn dump_types_names(out: &mut String, module: &Module, _ctx: &DumpContext) {
 }
 
 /// Format a type ID as a human-readable name.
-fn format_type_name(type_id: QTypeId, module: &Module, _ctx: &DumpContext) -> String {
-    if type_id.is_builtin() {
-        return match type_id.0 {
-            0 => "void".to_string(),
-            1 => "Node".to_string(),
-            2 => "str".to_string(),
-            _ => unreachable!(),
-        };
-    }
-
-    // Try to find a name in types.names
+fn format_type_name(type_id: QTypeId, module: &Module, ctx: &DumpContext) -> String {
     let types = module.types();
     let strings = module.strings();
 
+    // Check if it's a primitive type
+    if let Some(def) = types.get(type_id)
+        && let Some(kind) = def.type_kind()
+        && let Some(name) = kind.primitive_name()
+    {
+        return format!("<{}>", name);
+    }
+
+    // Try to find a name in types.names
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         if entry.type_id == type_id {
@@ -256,13 +298,16 @@ fn format_type_name(type_id: QTypeId, module: &Module, _ctx: &DumpContext) -> St
         }
     }
 
-    // Fall back to T## format
-    format!("T{:02}", type_id.0)
+    // Fall back to T# format
+    let tw = ctx.type_width;
+    format!("T{:0tw$}", type_id.0)
 }
 
-fn dump_entrypoints(out: &mut String, module: &Module, _ctx: &DumpContext) {
+fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let strings = module.strings();
     let entrypoints = module.entrypoints();
+    let stw = ctx.step_width;
+    let tw = ctx.type_width;
 
     out.push_str("[entrypoints]\n");
 
@@ -282,7 +327,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, _ctx: &DumpContext) {
     for (name, target, type_id) in entries {
         writeln!(
             out,
-            "{name:width$} = {:02} :: T{type_id:02}",
+            "{name:width$} = {:0stw$} :: T{type_id:0tw$}",
             target,
             width = max_len
         )
@@ -294,13 +339,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, _ctx: &DumpContext) {
 fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let header = module.header();
     let transitions_count = header.transitions_count as usize;
-
-    // Calculate step number width based on total steps
-    let step_width = if transitions_count == 0 {
-        2
-    } else {
-        ((transitions_count as f64).log10().floor() as usize + 1).max(2)
-    };
+    let step_width = ctx.step_width;
 
     out.push_str("[transitions]\n");
 

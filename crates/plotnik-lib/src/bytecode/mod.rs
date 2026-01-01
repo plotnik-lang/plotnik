@@ -15,10 +15,7 @@ mod nav;
 mod sections;
 mod type_meta;
 
-pub use constants::{
-    MAGIC, SECTION_ALIGN, STEP_ACCEPT, STEP_SIZE, TYPE_CUSTOM_START, TYPE_NODE, TYPE_STRING,
-    TYPE_VOID, VERSION,
-};
+pub use constants::{MAGIC, SECTION_ALIGN, STEP_ACCEPT, STEP_SIZE, VERSION};
 
 pub use ids::{QTypeId, StepId, StringId};
 

@@ -7,27 +7,25 @@ Test = (program [(identifier) (number)] @x)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "x"
-S02 "Test"
-S03 "program"
-S04 "identifier"
-S05 "number"
+S0 "Beauty will save the world"
+S1 "x"
+S2 "Test"
+S3 "program"
+S4 "identifier"
+S5 "number"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { x }
+T0 = <Node>
+T1 = Struct  M0:1  ; { x }
 
 [type_members]
-M0: S01 → T01  ; x: Node
+M0: S1 → T0  ; x: <Node>
 
 [type_names]
-N0: S02 → T03  ; Test
+N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 01 :: T1
 
 [transitions]
   00  𝜀                                     ◼

@@ -7,27 +7,25 @@ Test = (function_declaration (decorator)? @dec)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "dec"
-S02 "Test"
-S03 "function_declaration"
-S04 "decorator"
+S0 "Beauty will save the world"
+S1 "dec"
+S2 "Test"
+S3 "function_declaration"
+S4 "decorator"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { dec }
-T04 = Optional(T01)  ; Node?
+T0 = <Node>
+T1 = Struct  M0:1  ; { dec }
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S01 → T04  ; dec: T04
+M0: S1 → T2  ; dec: T2
 
 [type_names]
-N0: S02 → T03  ; Test
+N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 01 :: T1
 
 [transitions]
   00  𝜀                                     ◼

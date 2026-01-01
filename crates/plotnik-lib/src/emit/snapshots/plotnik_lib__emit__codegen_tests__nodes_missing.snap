@@ -7,30 +7,28 @@ Test = (MISSING) @m
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "m"
-S02 "Test"
-S03 "MISSING"
+S0 "Beauty will save the world"
+S1 "m"
+S2 "Test"
+S3 "MISSING"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { m }
+T0 = <Node>
+T1 = Struct  M0:1  ; { m }
 
 [type_members]
-M0: S01 → T01  ; m: Node
+M0: S1 → T0  ; m: <Node>
 
 [type_names]
-N0: S02 → T03  ; Test
+N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 1 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  0  𝜀                                      ◼
 
 Test:
-  01  𝜀                                     02
-  02       (MISSING) [Node Set(M0)]         04
-  04                                        ▶
+  1  𝜀                                      2
+  2       (MISSING) [Node Set(M0)]          4
+  4                                         ▶

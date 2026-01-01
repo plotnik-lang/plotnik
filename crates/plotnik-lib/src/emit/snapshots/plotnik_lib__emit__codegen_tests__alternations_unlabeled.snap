@@ -7,29 +7,27 @@ Test = [(identifier) @id (string) @str]
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "id"
-S02 "str"
-S03 "Test"
-S04 "identifier"
-S05 "string"
+S0 "Beauty will save the world"
+S1 "id"
+S2 "str"
+S3 "Test"
+S4 "identifier"
+S5 "string"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[2]  ; { id, str }
-T04 = Optional(T01)  ; Node?
+T0 = <Node>
+T1 = Struct  M0:2  ; { id, str }
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S01 → T04  ; id: T04
-M1: S02 → T04  ; str: T04
+M0: S1 → T2  ; id: T2
+M1: S2 → T2  ; str: T2
 
 [type_names]
-N0: S03 → T03  ; Test
+N0: S3 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 01 :: T1
 
 [transitions]
   00  𝜀                                     ◼

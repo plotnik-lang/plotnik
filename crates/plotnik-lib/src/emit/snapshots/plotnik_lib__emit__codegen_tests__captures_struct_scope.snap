@@ -7,29 +7,27 @@ Test = {(a) @a (b) @b} @item
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "a"
-S02 "b"
-S03 "item"
-S04 "Test"
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "item"
+S4 "Test"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[2]  ; { a, b }
-T04 = Struct  M2[1]  ; { item }
+T0 = <Node>
+T1 = Struct  M0:2  ; { a, b }
+T2 = Struct  M2:1  ; { item }
 
 [type_members]
-M0: S01 → T01  ; a: Node
-M1: S02 → T01  ; b: Node
-M2: S03 → T03  ; item: T03
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T1  ; item: T1
 
 [type_names]
-N0: S04 → T04  ; Test
+N0: S4 → T2  ; Test
 
 [entrypoints]
-Test = 01 :: T04
+Test = 01 :: T2
 
 [transitions]
   00  𝜀                                     ◼

@@ -7,28 +7,26 @@ Test = (parent {(a) (b)}* @items)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "items"
-S02 "Test"
-S03 "parent"
-S04 "b"
-S05 "a"
+S0 "Beauty will save the world"
+S1 "items"
+S2 "Test"
+S3 "parent"
+S4 "b"
+S5 "a"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = ArrayStar(T01)  ; Node*
-T04 = Struct  M0[1]  ; { items }
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { items }
 
 [type_members]
-M0: S01 → T03  ; items: T03
+M0: S1 → T1  ; items: T1
 
 [type_names]
-N0: S02 → T04  ; Test
+N0: S2 → T2  ; Test
 
 [entrypoints]
-Test = 01 :: T04
+Test = 01 :: T2
 
 [transitions]
   00  𝜀                                     ◼

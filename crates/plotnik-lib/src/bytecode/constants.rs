@@ -1,8 +1,5 @@
 //! Bytecode format constants.
 
-// Re-export primitive type constants from the shared type system
-pub use crate::type_system::{TYPE_CUSTOM_START, TYPE_NODE, TYPE_STRING, TYPE_VOID};
-
 /// Magic bytes identifying a Plotnik bytecode file.
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 

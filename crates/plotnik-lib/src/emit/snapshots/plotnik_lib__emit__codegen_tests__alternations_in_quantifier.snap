@@ -20,29 +20,27 @@ S09 "pair"
 S10 "shorthand_property_identifier"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { a }
-T04 = Struct  M1[1]  ; { b }
-T05 = Enum    M2[2]  ; A | B
-T06 = Struct  M4[1]  ; { item }
-T07 = ArrayStar(T06)  ; T06*
-T08 = Struct  M5[1]  ; { items }
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Struct  M1:1  ; { b }
+T3 = Enum    M2:2  ; A | B
+T4 = Struct  M4:1  ; { item }
+T5 = ArrayStar(T4)  ; T4*
+T6 = Struct  M5:1  ; { items }
 
 [type_members]
-M0: S01 → T01  ; a: Node
-M1: S02 → T01  ; b: Node
-M2: S03 → T03  ; A: T03
-M3: S04 → T04  ; B: T04
-M4: S05 → T05  ; item: T05
-M5: S06 → T07  ; items: T07
+M0: S01 → T0  ; a: <Node>
+M1: S02 → T0  ; b: <Node>
+M2: S03 → T1  ; A: T1
+M3: S04 → T2  ; B: T2
+M4: S05 → T3  ; item: T3
+M5: S06 → T5  ; items: T5
 
 [type_names]
-N0: S07 → T08  ; Test
+N0: S07 → T6  ; Test
 
 [entrypoints]
-Test = 01 :: T08
+Test = 01 :: T6
 
 [transitions]
   00  𝜀                                     ◼

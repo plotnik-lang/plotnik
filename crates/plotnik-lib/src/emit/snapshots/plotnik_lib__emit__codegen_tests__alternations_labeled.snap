@@ -10,34 +10,32 @@ Test = [
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "a"
-S02 "b"
-S03 "A"
-S04 "B"
-S05 "Test"
-S06 "identifier"
-S07 "number"
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "A"
+S4 "B"
+S5 "Test"
+S6 "identifier"
+S7 "number"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { a }
-T04 = Struct  M1[1]  ; { b }
-T05 = Enum    M2[2]  ; A | B
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Struct  M1:1  ; { b }
+T3 = Enum    M2:2  ; A | B
 
 [type_members]
-M0: S01 → T01  ; a: Node
-M1: S02 → T01  ; b: Node
-M2: S03 → T03  ; A: T03
-M3: S04 → T04  ; B: T04
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T1  ; A: T1
+M3: S4 → T2  ; B: T2
 
 [type_names]
-N0: S05 → T05  ; Test
+N0: S5 → T3  ; Test
 
 [entrypoints]
-Test = 01 :: T05
+Test = 01 :: T3
 
 [transitions]
   00  𝜀                                     ◼

@@ -7,27 +7,25 @@ Test = (function_declaration (decorator)* @decs)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "decs"
-S02 "Test"
-S03 "function_declaration"
-S04 "decorator"
+S0 "Beauty will save the world"
+S1 "decs"
+S2 "Test"
+S3 "function_declaration"
+S4 "decorator"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = ArrayStar(T01)  ; Node*
-T04 = Struct  M0[1]  ; { decs }
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { decs }
 
 [type_members]
-M0: S01 → T03  ; decs: T03
+M0: S1 → T1  ; decs: T1
 
 [type_names]
-N0: S02 → T04  ; Test
+N0: S2 → T2  ; Test
 
 [entrypoints]
-Test = 01 :: T04
+Test = 01 :: T2
 
 [transitions]
   00  𝜀                                     ◼

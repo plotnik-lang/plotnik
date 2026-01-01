@@ -24,25 +24,24 @@ S10 "function"
 S11 "identifier"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { value }
-T04 = Struct  M1[2]  ; { fn, inner }
-T05 = Enum    M3[2]  ; Lit | Rec
+T0 = <Node>
+T1 = <String>
+T2 = Struct  M0:1  ; { value }
+T3 = Struct  M1:2  ; { fn, inner }
+T4 = Enum    M3:2  ; Lit | Rec
 
 [type_members]
-M0: S01 → T02  ; value: str
-M1: S02 → T01  ; fn: Node
-M2: S03 → T05  ; inner: Expr
-M3: S04 → T03  ; Lit: T03
-M4: S05 → T04  ; Rec: T04
+M0: S01 → T1  ; value: <String>
+M1: S02 → T0  ; fn: <Node>
+M2: S03 → T4  ; inner: Expr
+M3: S04 → T2  ; Lit: T2
+M4: S05 → T3  ; Rec: T3
 
 [type_names]
-N0: S06 → T05  ; Expr
+N0: S06 → T4  ; Expr
 
 [entrypoints]
-Expr = 01 :: T05
+Expr = 01 :: T4
 
 [transitions]
   00  𝜀                                     ◼

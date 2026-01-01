@@ -430,7 +430,12 @@ impl<'a> TypesView<'a> {
 
     /// Get a type definition by QTypeId.
     pub fn get(&self, id: QTypeId) -> Option<TypeDef> {
-        id.custom_index().map(|idx| self.get_def(idx))
+        let idx = id.0 as usize;
+        if idx < self.defs_count {
+            Some(self.get_def(idx))
+        } else {
+            None
+        }
     }
 
     /// Get a type member by index.

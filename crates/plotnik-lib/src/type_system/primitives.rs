@@ -53,6 +53,15 @@ impl PrimitiveType {
     pub fn is_builtin(index: u16) -> bool {
         index <= TYPE_STRING
     }
+
+    /// Get the display name for this primitive (for bytecode dumps).
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Void => "Void",
+            Self::Node => "Node",
+            Self::String => "String",
+        }
+    }
 }
 
 #[cfg(test)]

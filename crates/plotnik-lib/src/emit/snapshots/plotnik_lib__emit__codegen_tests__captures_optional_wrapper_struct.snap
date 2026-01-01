@@ -7,33 +7,31 @@ Test = {{(identifier) @id} @inner}? @outer
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "id"
-S02 "inner"
-S03 "outer"
-S04 "Test"
-S05 "identifier"
+S0 "Beauty will save the world"
+S1 "id"
+S2 "inner"
+S3 "outer"
+S4 "Test"
+S5 "identifier"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { id }
-T04 = Struct  M1[1]  ; { inner }
-T05 = Struct  M2[1]  ; { outer }
-T06 = Optional(T03)  ; T03?
-T07 = Optional(T04)  ; T04?
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+T2 = Struct  M1:1  ; { inner }
+T3 = Struct  M2:1  ; { outer }
+T4 = Optional(T1)  ; T1?
+T5 = Optional(T2)  ; T2?
 
 [type_members]
-M0: S01 → T01  ; id: Node
-M1: S02 → T06  ; inner: T06
-M2: S03 → T07  ; outer: T07
+M0: S1 → T0  ; id: <Node>
+M1: S2 → T4  ; inner: T4
+M2: S3 → T5  ; outer: T5
 
 [type_names]
-N0: S04 → T05  ; Test
+N0: S4 → T3  ; Test
 
 [entrypoints]
-Test = 01 :: T05
+Test = 01 :: T3
 
 [transitions]
   00  𝜀                                     ◼

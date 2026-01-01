@@ -29,29 +29,28 @@ S13 "identifier"
 S14 "program"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { value }
-T04 = Struct  M1[2]  ; { fn, inner }
-T05 = Enum    M3[2]  ; Lit | Nested
-T06 = Struct  M5[1]  ; { expr }
+T0 = <Node>
+T1 = <String>
+T2 = Struct  M0:1  ; { value }
+T3 = Struct  M1:2  ; { fn, inner }
+T4 = Enum    M3:2  ; Lit | Nested
+T5 = Struct  M5:1  ; { expr }
 
 [type_members]
-M0: S01 → T02  ; value: str
-M1: S02 → T01  ; fn: Node
-M2: S03 → T05  ; inner: Expr
-M3: S04 → T03  ; Lit: T03
-M4: S05 → T04  ; Nested: T04
-M5: S06 → T05  ; expr: Expr
+M0: S01 → T1  ; value: <String>
+M1: S02 → T0  ; fn: <Node>
+M2: S03 → T4  ; inner: Expr
+M3: S04 → T2  ; Lit: T2
+M4: S05 → T3  ; Nested: T3
+M5: S06 → T4  ; expr: Expr
 
 [type_names]
-N0: S07 → T05  ; Expr
-N1: S08 → T06  ; Test
+N0: S07 → T4  ; Expr
+N1: S08 → T5  ; Test
 
 [entrypoints]
-Expr = 01 :: T05
-Test = 04 :: T06
+Expr = 01 :: T4
+Test = 04 :: T5
 
 [transitions]
   00  𝜀                                     ◼
