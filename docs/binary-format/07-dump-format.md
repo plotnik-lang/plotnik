@@ -3,47 +3,50 @@
 ## Example Query
 
 ```
+Ident = (identifier) @name :: string
 Expression = [
-  Ident: (identifier) @name :: string
-  Num: (number) @value :: string
+    Literal: (number) @value
+    Variable: (identifier) @name
 ]
-
-Statement = [
-  Assign: (assignment_expression
-    left: (identifier) @target :: string
+Assignment = (assignment_expression
+    left: (identifier) @target
     right: (Expression) @value)
-  Return: (return_statement (Expression)? @value)
-]
-
-Root = (program (Statement)+ @statements)
 ```
 
 ## Bytecode Dump
 
+**Epsilon transitions** (`𝜀`) succeed unconditionally without cursor interaction.
+They require all three conditions:
+- `nav == Stay` (no cursor movement)
+- `node_type == None` (no type constraint)
+- `node_field == None` (no field constraint)
+
+A step with `nav == Stay` but with a type constraint (e.g., `(identifier)`) is NOT
+epsilon—it matches at the current cursor position.
+
+**Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
+placed directly on match instructions rather than in separate epsilon steps. Structural
+effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) remain in epsilons.
+
 ```
 [header]
-linked = false
+linked = true
 
 [strings]
 S00 "Beauty will save the world"
-S01 "Assign"
-S02 "Expression"
-S03 "Ident"
-S04 "Num"
-S05 "Return"
-S06 "Root"
-S07 "Statement"
-S08 "assignment_expression"
+S01 "name"
+S02 "value"
+S03 "Literal"
+S04 "Variable"
+S05 "target"
+S06 "Ident"
+S07 "Expression"
+S08 "Assignment"
 S09 "identifier"
-S10 "left"
-S11 "name"
-S12 "number"
-S13 "program"
-S14 "return_statement"
-S15 "right"
-S16 "statements"
-S17 "target"
-S18 "value"
+S10 "number"
+S11 "assignment_expression"
+S12 "left"
+S13 "right"
 
 [types.defs]
 T00 = void
@@ -51,73 +54,56 @@ T01 = Node
 T02 = str
 T03 = Struct(M0, 1)  ; { name }
 T04 = Struct(M1, 1)  ; { value }
-T05 = Enum(M2, 2)  ; Ident | Num
-T06 = Struct(M4, 2)  ; { target, value }
-T07 = Optional(T05)  ; Expression?
-T08 = Struct(M6, 1)  ; { value }
-T09 = Enum(M7, 2)  ; Assign | Return
-T10 = ArrayPlus(T09)  ; Statement+
-T11 = Struct(M9, 1)  ; { statements }
+T05 = Struct(M2, 1)  ; { name }
+T06 = Enum(M3, 2)  ; Literal | Variable
+T07 = Struct(M5, 2)  ; { value, target }
 
 [types.members]
-M0 = (S11, T02)  ; name: str
-M1 = (S18, T02)  ; value: str
-M2 = (S03, T03)  ; Ident => T03
-M3 = (S04, T04)  ; Num => T04
-M4 = (S17, T02)  ; target: str
-M5 = (S18, T05)  ; value: Expression
-M6 = (S18, T07)  ; value: Expression?
-M7 = (S01, T06)  ; Assign => T06
-M8 = (S05, T08)  ; Return => T08
-M9 = (S16, T10)  ; statements: Statement+
+M0 = (S01, T02)  ; name: str
+M1 = (S02, T01)  ; value: Node
+M2 = (S01, T01)  ; name: Node
+M3 = (S03, T04)  ; Literal: T04
+M4 = (S04, T05)  ; Variable: T05
+M5 = (S02, T06)  ; value: Expression
+M6 = (S05, T01)  ; target: Node
 
 [types.names]
-N0 = (S02, T05)  ; Expression
-N1 = (S06, T11)  ; Root
-N2 = (S07, T09)  ; Statement
+N0 = (S06, T03)  ; Ident
+N1 = (S07, T06)  ; Expression
+N2 = (S08, T07)  ; Assignment
 
-[entry]  ; sorted lexicographically for binary search
-Expression = 46 :: T05
-Root       = 01 :: T11
-Statement  = 14 :: T09
+[entry]
+Assignment = 08 :: T07
+Expression = 05 :: T06
+Ident      = 01 :: T03
 
 [code]
-  00   𝜀                                    ◼
+  00  𝜀                                     ◼
 
-Root:
-  01  *↓   [S] (program)                    03
-  03   𝜀   [A]                              05
-  05   ▶   (Statement)                      06
-  06   𝜀   [Push]                           08
-  08   𝜀                                    05, 10
-  10   𝜀   [EndA Set(M9) EndS]              12
-  12  *↑¹                                   ◼
-
-Statement:
-  14   𝜀                                    16, 32
-  16  *↓   [E(M7) S] (assignment_expression)                      18
-  18  *↓   left: (identifier) [Node Text Set(M4)]                 20
-  20  *    right: _                         21
-  21       ▷(Expression)                    22
-  22   𝜀   [Set(M5) EndS EndE]              24
-  24  *↑²                                   26
-  26       (Statement)                      ▶
-  32  *↓   [E(M8) S] (return_statement)     34
-  34   𝜀                                    36, 40
-  36  *↓                                    37
-  37   ▶   (Expression)                     38
-  38   𝜀   [Set(M6)]                        42
-  40   𝜀   [Null Set(M6)]                   42
-  42   𝜀   [EndS EndE]                      44
-  44  *↑¹                                   26
+Ident:
+  01  𝜀                                     02
+  02       (identifier) [Text Set(M0)]      04
+  04                                        ▶
 
 Expression:
-  46   𝜀                                    48, 54
-  48  *↓   [E(M2) S] (identifier) [Node Text Set(M0) EndS EndE]   50
-  50  *↑¹                                   52
-  52       (Expression)                     ▶
-  54  *↓   [E(M3) S] (number) [Node Text Set(M1) EndS EndE]       56
-  56  *↑¹                                   52
+  05  𝜀                                     06
+  06  𝜀                                     22, 28
+
+Assignment:
+  08  𝜀                                     09
+  09       (assignment_expression)          10
+  10  ↓*   left: (identifier) [Node Set(M6)]12
+  12  *  ▶ right: (Expression)              13
+  13  𝜀    [Set(M5)]                        15
+  15 *↑¹                                    16
+  16                                        ▶
+  17                                        ▶
+  18  𝜀    [EndEnum]                        17
+  20       (number) [Node Set(M1)]          18
+  22  𝜀    [Enum(M3)]                       20
+  24  𝜀    [EndEnum]                        17
+  26       (identifier) [Node Set(M2)]      24
+  28  𝜀    [Enum(M4)]                       26
 ```
 
 ## Files
@@ -136,51 +122,65 @@ Future: options for verbosity levels, hiding sections, etc.
 
 ## Instruction Format
 
+Each line follows the column layout: `<indent><step><gap><nav><marker><content>...<successors>`
+
+| Column     | Width | Description                              |
+| ---------- | ----- | ---------------------------------------- |
+| indent     | 2     | Leading spaces                           |
+| step       | var   | Step number, zero-padded                 |
+| gap        | 1     | Space separator                          |
+| nav        | 3     | Navigation symbol (↓\*, \*↑¹, etc.) or 𝜀 |
+| marker     | 3     | Call marker ( ▶ ) or spaces              |
+| content    | var   | Instruction content                      |
+| successors | -     | Right-aligned at column 44               |
+
 | Instruction      | Format                                        |
 | ---------------- | --------------------------------------------- |
-| Match (terminal) | `step  nav [pre] (type) [post]        ◼`      |
-| Match            | `step  nav [pre] field: (type) [post] succ`   |
-| Match (branch)   | `step  nav [pre] (type) [post]        s1, s2` |
-| Epsilon          | `step   𝜀   [effects]                 succ`   |
-| Call             | `step   ▶  (Name)                     return` |
-| Return           | `step      (Name)                     ▶`      |
+| Match (terminal) | `step nav    [pre] (type) [post]      ◼`      |
+| Match            | `step nav    [pre] field: (type) [post] succ` |
+| Match (branch)   | `step nav    [pre] (type) [post]      s1, s2` |
+| Epsilon          | `step  𝜀    [effects]                 succ`   |
+| Call             | `step nav ▶ field: (Name)             return` |
+| Return           | `step  𝜀                              ▶`      |
 
-Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`.
+Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`, `field:`.
 
-Pre-effects (before match): `S`, `A`, `E(n)`
-Post-effects (after match): `EndS`, `EndA`, `EndE`, `Push`, `Node`, `Text`, `Set(n)`, `Null`, `Clear`
+Effects in `[pre]` execute before match attempt; effects in `[post]` execute after successful match. Any effect can appear in either position.
 
 ## Nav Symbols
 
-| Nav             | Symbol |
-| --------------- | ------ |
-| Stay            | _omit_ |
-| Down            | \*↓    |
-| DownSkip        | ~↓     |
-| DownExact       | .↓     |
-| Next            | \*     |
-| NextSkip        | ~      |
-| NextExact       | .      |
-| Up(n)           | \*↑ⁿ   |
-| UpSkipTrivia(n) | ~↑ⁿ    |
-| UpExact(n)      | .↑ⁿ    |
+| Nav             | Symbol     | Notes                                    |
+| --------------- | ---------- | ---------------------------------------- |
+| Stay            | (3 spaces) | No movement                              |
+| Stay (epsilon)  | 𝜀          | Only when no type/field constraints      |
+| Down            | ↓\*        | First child, skip any                    |
+| DownSkip        | ↓~         | First child, skip trivia                 |
+| DownExact       | ↓.         | First child, exact                       |
+| Next            | \*         | Next sibling, skip any                   |
+| NextSkip        | ~          | Next sibling, skip trivia                |
+| NextExact       | .          | Next sibling, exact                      |
+| Up(n)           | \*↑ⁿ       | Ascend n levels, skip any                |
+| UpSkipTrivia(n) | ~↑ⁿ        | Ascend n, must be last non-trivia        |
+| UpExact(n)      | .↑ⁿ        | Ascend n, must be last child             |
+
+**Note**: `𝜀` only appears when all three conditions are met: Stay nav, no type constraint, no field constraint. A step matching `(identifier)` at current position shows spaces, not `𝜀`.
 
 ## Effects
 
-| Effect   | Description            |
-| -------- | ---------------------- |
-| S        | Start struct           |
-| EndS     | End struct             |
-| A        | Start array            |
-| EndA     | End array              |
-| Push     | Push to array          |
-| E(Mxx)   | Start enum variant Mxx |
-| EndE     | End enum variant       |
-| Node     | Capture matched node   |
-| Text     | Convert node to string |
-| Set(Mxx) | Set field/member Mxx   |
-| Null     | Null value             |
-| Clear    | Clear current          |
+| Effect    | Description            |
+| --------- | ---------------------- |
+| Obj       | Start struct           |
+| EndObj    | End struct             |
+| Arr       | Start array            |
+| EndArr    | End array              |
+| Push      | Push to array          |
+| Enum(Mxx) | Start enum variant Mxx |
+| EndEnum   | End enum variant       |
+| Node      | Capture matched node   |
+| Text      | Convert node to string |
+| Set(Mxx)  | Set field/member Mxx   |
+| Null      | Null value             |
+| Clear     | Clear current          |
 
 ## Index Prefixes
 
