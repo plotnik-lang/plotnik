@@ -9,7 +9,7 @@ use crate::parser::{self as ast, SyntaxNode};
 
 use super::Query;
 use super::source_map::SourceKind;
-use super::type_check::Arity;
+use crate::analyze::type_check::Arity;
 
 /// Returns indentation string for the given level.
 fn indent(level: usize) -> String {
@@ -167,7 +167,7 @@ impl<'q> QueryPrinter<'q> {
         visited.insert(name.to_string());
 
         if let Some(body) = self.query.symbol_table.get(name) {
-            let refs_set = super::refs::collect_ref_names(body);
+            let refs_set = crate::analyze::refs::collect_ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {

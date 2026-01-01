@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::Module;
-use plotnik_lib::codegen::typescript;
+use plotnik_lib::typegen::typescript;
 
 use super::lang_resolver::{resolve_lang, resolve_lang_required, suggest_language};
 use super::query_loader::load_query_source;

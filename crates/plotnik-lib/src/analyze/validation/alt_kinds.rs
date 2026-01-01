@@ -3,9 +3,9 @@
 //! Checks constraints that are easier to express after parsing:
 //! - Mixed tagged/untagged alternations
 
-use super::invariants::ensure_both_branch_kinds;
-use super::visitor::{Visitor, walk, walk_alt_expr};
 use crate::SourceId;
+use crate::analyze::invariants::ensure_both_branch_kinds;
+use crate::analyze::visitor::{Visitor, walk, walk_alt_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{AltExpr, AltKind, Branch, Root};
 

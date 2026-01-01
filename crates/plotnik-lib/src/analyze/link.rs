@@ -20,16 +20,15 @@ pub struct LinkOutput {
     pub node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
 
+use super::symbol_table::SymbolTable;
+use super::utils::find_similar;
+use super::visitor::{Visitor, walk};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::cst::{SyntaxKind, SyntaxToken};
 use crate::parser::token_src;
-
-use super::query::AstMap;
-use super::source_map::{SourceId, SourceMap};
-use super::symbol_table::SymbolTable;
-use super::utils::find_similar;
-use super::visitor::{Visitor, walk};
+use crate::query::query::AstMap;
+use crate::query::source_map::{SourceId, SourceMap};
 
 /// Link query against a language grammar.
 ///

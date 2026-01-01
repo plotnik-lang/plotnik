@@ -12,16 +12,15 @@ use std::collections::{HashMap, HashSet};
 
 use indexmap::{IndexMap, IndexSet};
 use plotnik_core::{Interner, Symbol};
-
-use super::source_map::SourceId;
 use rowan::TextRange;
 
+use super::symbol_table::SymbolTable;
+use super::type_check::DefId;
+use super::visitor::{Visitor, walk_expr};
 use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
-use crate::query::symbol_table::SymbolTable;
-use crate::query::type_check::DefId;
-use crate::query::visitor::{Visitor, walk_expr};
+use crate::query::source_map::SourceId;
 
 /// Result of dependency analysis.
 #[derive(Clone, Debug, Default)]

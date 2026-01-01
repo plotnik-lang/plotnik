@@ -1,10 +1,10 @@
 use std::num::NonZeroU16;
 
-use super::ids::StepId;
-use super::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
+use crate::bytecode::StepId;
+use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
+use crate::bytecode::EffectOpcode;
+use crate::bytecode::Nav;
 use super::layout::CacheAligned;
-use crate::bytecode::effects::EffectOpcode;
-use crate::bytecode::nav::Nav;
 
 #[test]
 fn layout_empty() {

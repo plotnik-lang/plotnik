@@ -94,7 +94,7 @@ impl QueryAnalyzed {
         // Emit to bytecode and then emit TypeScript from the bytecode module
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::from_bytes(bytecode).expect("module loading should succeed");
-        crate::bytecode::emit::emit_typescript(&module)
+        crate::typegen::typescript::emit(&module)
     }
 
     #[track_caller]

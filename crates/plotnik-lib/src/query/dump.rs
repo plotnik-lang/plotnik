@@ -41,7 +41,7 @@ mod test_helpers {
             let bytecode = self.emit().expect("bytecode emission should succeed");
             let module = crate::bytecode::Module::from_bytes(bytecode)
                 .expect("module loading should succeed");
-            crate::bytecode::emit::emit_typescript(&module)
+            crate::typegen::typescript::emit(&module)
         }
     }
 }

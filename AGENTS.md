@@ -169,17 +169,24 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (debug, exec, langs, types)
-  plotnik-core/        # Common code
+    src/commands/      # Subcommands (check, dump, infer, tree, langs)
+  plotnik-core/        # Common code (Interner, Symbol)
   plotnik-lib/         # Plotnik as library
     src/
-      diagnostics/     # Diagnostics (user-friendly errors)
-      parser/          # Syntactic parsing of the query
-      query/           # Analysis and representation of the parsed query
-  plotnik-langs/       # Tree-sitter language bindings (wrapped)
-  plotnik-macros/      # Proc macros of the project
+      analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)
+      bytecode/        # Binary format definitions
+      typegen/         # Type declaration extraction (bytecode → .d.ts)
+      compile/         # Thompson NFA construction (AST → IR)
+      diagnostics/     # User-friendly error reporting
+      emit/            # Bytecode emission (IR → binary)
+      parser/          # Syntactic parsing (lexer, grammar, AST)
+      query/           # Query facade (Query, QueryBuilder, SourceMap)
+      type_system/     # Shared type primitives
+  plotnik-langs/       # Tree-sitter language bindings
+  plotnik-macros/      # Proc macros
 docs/
-  adr/                 # Architecture Decision Records (ADRs)
+  adr/                 # Architecture Decision Records
+  binary-format/       # Bytecode format specification
   lang-reference.md    # Language specification
 ```
 

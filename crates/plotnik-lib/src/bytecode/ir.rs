@@ -11,7 +11,7 @@ use super::effects::{EffectOp, EffectOpcode};
 use super::ids::StepId;
 use super::instructions::{Call, Match, Return, select_match_opcode};
 use super::nav::Nav;
-use crate::query::type_check::TypeId;
+use crate::analyze::type_check::TypeId;
 
 /// Symbolic reference, resolved to StepId at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

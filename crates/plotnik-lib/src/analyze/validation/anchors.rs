@@ -6,8 +6,8 @@
 //!
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
-use super::visitor::{Visitor, walk_named_node, walk_seq_expr};
 use crate::SourceId;
+use crate::analyze::visitor::{Visitor, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{NamedNode, Root, SeqExpr, SeqItem};
 
