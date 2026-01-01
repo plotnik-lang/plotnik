@@ -1,35 +1,39 @@
 use std::fs;
 use std::io::{self, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 
-pub fn load_source(text: &Option<String>, file: &Option<PathBuf>) -> String {
-    if let Some(t) = text {
-        return t.clone();
-    }
-    if let Some(path) = file {
-        if path.as_os_str() == "-" {
-            let mut buf = String::new();
-            io::stdin()
-                .read_to_string(&mut buf)
-                .expect("failed to read stdin");
-            return buf;
-        }
-        return fs::read_to_string(path).unwrap_or_else(|_| {
-            eprintln!("error: file not found: {}", path.display());
-            std::process::exit(1);
-        });
-    }
-    unreachable!()
+pub struct TreeArgs {
+    pub source_path: PathBuf,
+    pub lang: Option<String>,
+    pub raw: bool,
+    pub spans: bool,
 }
 
-pub fn resolve_lang(
-    lang: &Option<String>,
-    _source_text: &Option<String>,
-    source_file: &Option<PathBuf>,
-) -> Lang {
+pub fn run(args: TreeArgs) {
+    let lang = resolve_lang(&args.lang, &args.source_path);
+    let source = load_source(&args.source_path);
+    let tree = lang.parse(&source);
+    print!("{}", dump_tree(&tree, &source, args.raw, args.spans));
+}
+
+fn load_source(path: &PathBuf) -> String {
+    if path.as_os_str() == "-" {
+        let mut buf = String::new();
+        io::stdin()
+            .read_to_string(&mut buf)
+            .expect("failed to read stdin");
+        return buf;
+    }
+    fs::read_to_string(path).unwrap_or_else(|_| {
+        eprintln!("error: file not found: {}", path.display());
+        std::process::exit(1);
+    })
+}
+
+fn resolve_lang(lang: &Option<String>, source_path: &Path) -> Lang {
     if let Some(name) = lang {
         return plotnik_langs::from_name(name).unwrap_or_else(|| {
             eprintln!("error: unknown language: {}", name);
@@ -37,9 +41,8 @@ pub fn resolve_lang(
         });
     }
 
-    if let Some(path) = source_file
-        && path.as_os_str() != "-"
-        && let Some(ext) = path.extension().and_then(|e| e.to_str())
+    if source_path.as_os_str() != "-"
+        && let Some(ext) = source_path.extension().and_then(|e| e.to_str())
     {
         return plotnik_langs::from_ext(ext).unwrap_or_else(|| {
             eprintln!(
@@ -50,16 +53,12 @@ pub fn resolve_lang(
         });
     }
 
-    eprintln!("error: --lang is required (cannot infer from input)");
+    eprintln!("error: --lang is required (cannot infer from stdin)");
     std::process::exit(1);
 }
 
-pub fn parse_tree(source: &str, lang: Lang) -> tree_sitter::Tree {
-    lang.parse(source)
-}
-
-pub fn dump_source(tree: &tree_sitter::Tree, source: &str, include_anonymous: bool) -> String {
-    format_node(tree.root_node(), source, 0, include_anonymous) + "\n"
+fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool, spans: bool) -> String {
+    format_node(tree.root_node(), source, 0, raw, spans) + "\n"
 }
 
 fn format_node(
@@ -67,8 +66,9 @@ fn format_node(
     source: &str,
     depth: usize,
     include_anonymous: bool,
+    show_spans: bool,
 ) -> String {
-    format_node_with_field(node, None, source, depth, include_anonymous)
+    format_node_with_field(node, None, source, depth, include_anonymous, show_spans)
 }
 
 fn format_node_with_field(
@@ -77,6 +77,7 @@ fn format_node_with_field(
     source: &str,
     depth: usize,
     include_anonymous: bool,
+    show_spans: bool,
 ) -> String {
     if !include_anonymous && !node.is_named() {
         return String::new();
@@ -85,6 +86,13 @@ fn format_node_with_field(
     let indent = "  ".repeat(depth);
     let kind = node.kind();
     let field_prefix = field_name.map(|f| format!("{}: ", f)).unwrap_or_default();
+    let span_suffix = if show_spans {
+        let start = node.start_position();
+        let end = node.end_position();
+        format!(" [{}:{}-{}:{}]", start.row, start.column, end.row, end.column)
+    } else {
+        String::new()
+    };
 
     let children: Vec<_> = {
         let mut cursor = node.walk();
@@ -108,19 +116,26 @@ fn format_node_with_field(
             .utf8_text(source.as_bytes())
             .unwrap_or("<invalid utf8>");
         return if text == kind {
-            format!("{}{}(\"{}\")", indent, field_prefix, escape_string(kind))
+            format!(
+                "{}{}(\"{}\"){}",
+                indent,
+                field_prefix,
+                escape_string(kind),
+                span_suffix
+            )
         } else {
             format!(
-                "{}{}({} \"{}\")",
+                "{}{}({} \"{}\"){}",
                 indent,
                 field_prefix,
                 kind,
-                escape_string(text)
+                escape_string(text),
+                span_suffix
             )
         };
     }
 
-    let mut out = format!("{}{}({}", indent, field_prefix, kind);
+    let mut out = format!("{}{}({}{}", indent, field_prefix, kind, span_suffix);
     for (child, child_field) in children {
         out.push('\n');
         out.push_str(&format_node_with_field(
@@ -129,6 +144,7 @@ fn format_node_with_field(
             source,
             depth + 1,
             include_anonymous,
+            show_spans,
         ));
     }
     out.push(')');
