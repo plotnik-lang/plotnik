@@ -7,37 +7,34 @@ Test = (parent {(a) {(b) (c)} (d)})
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "Test"
-S02 "parent"
-S03 "d"
-S04 "c"
-S05 "b"
-S06 "a"
+S0 "Beauty will save the world"
+S1 "Test"
+S2 "parent"
+S3 "d"
+S4 "c"
+S5 "b"
+S6 "a"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[0]  ; {  }
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S01 → T03  ; Test
+N0: S1 → T0  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 1 :: T0
 
 [transitions]
-  00  𝜀                                     ◼
+  0  𝜀                                      ◼
 
 Test:
-  01  𝜀                                     02
-  02       (parent)                         03
-  03  ↓*   (a)                              04
-  04  *    (b)                              05
-  05  *    (c)                              06
-  06  *    (d)                              07
-  07 *↑¹                                    08
-  08                                        ▶
+  1  𝜀                                      2
+  2       (parent)                          3
+  3  ↓*   (a)                               4
+  4  *    (b)                               5
+  5  *    (c)                               6
+  6  *    (d)                               7
+  7 *↑¹                                     8
+  8                                         ▶

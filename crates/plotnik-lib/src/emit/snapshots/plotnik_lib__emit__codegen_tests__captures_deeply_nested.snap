@@ -7,30 +7,28 @@ Test = (a (b (c (d) @d) @c) @b) @a
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "a"
-S02 "b"
-S03 "c"
-S04 "d"
-S05 "Test"
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "c"
+S4 "d"
+S5 "Test"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[4]  ; { a, b, c, d }
+T0 = <Node>
+T1 = Struct  M0:4  ; { a, b, c, d }
 
 [type_members]
-M0: S01 → T01  ; a: Node
-M1: S02 → T01  ; b: Node
-M2: S03 → T01  ; c: Node
-M3: S04 → T01  ; d: Node
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T0  ; c: <Node>
+M3: S4 → T0  ; d: <Node>
 
 [type_names]
-N0: S05 → T03  ; Test
+N0: S5 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 01 :: T1
 
 [transitions]
   00  𝜀                                     ◼

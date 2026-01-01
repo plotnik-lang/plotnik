@@ -7,35 +7,33 @@ Test = {{(identifier) @id (number) @num} @row}* @rows
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "id"
-S02 "num"
-S03 "row"
-S04 "rows"
-S05 "Test"
-S06 "number"
-S07 "identifier"
+S0 "Beauty will save the world"
+S1 "id"
+S2 "num"
+S3 "row"
+S4 "rows"
+S5 "Test"
+S6 "number"
+S7 "identifier"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[2]  ; { id, num }
-T04 = Struct  M2[1]  ; { row }
-T05 = ArrayStar(T04)  ; T04*
-T06 = Struct  M3[1]  ; { rows }
+T0 = <Node>
+T1 = Struct  M0:2  ; { id, num }
+T2 = Struct  M2:1  ; { row }
+T3 = ArrayStar(T2)  ; T2*
+T4 = Struct  M3:1  ; { rows }
 
 [type_members]
-M0: S01 → T01  ; id: Node
-M1: S02 → T01  ; num: Node
-M2: S03 → T03  ; row: T03
-M3: S04 → T05  ; rows: T05
+M0: S1 → T0  ; id: <Node>
+M1: S2 → T0  ; num: <Node>
+M2: S3 → T1  ; row: T1
+M3: S4 → T3  ; rows: T3
 
 [type_names]
-N0: S05 → T06  ; Test
+N0: S5 → T4  ; Test
 
 [entrypoints]
-Test = 01 :: T06
+Test = 01 :: T4
 
 [transitions]
   00  𝜀                                     ◼

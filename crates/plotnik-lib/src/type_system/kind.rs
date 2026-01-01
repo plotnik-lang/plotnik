@@ -5,38 +5,51 @@
 
 /// Semantic type kinds.
 ///
-/// This is the canonical enumeration of composite type kinds.
-/// Primitive types (Void, Node, String) are handled via reserved indices,
-/// not as variants here.
+/// This is the canonical enumeration of all type kinds, including primitives.
+/// Primitive types (Void, Node, String) are stored as TypeDefs like any other type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum TypeKind {
+    /// Unit type - used for definitions with no captures.
+    Void = 0,
+    /// AST node reference.
+    Node = 1,
+    /// Text content extracted from node.
+    String = 2,
     /// `T?` - optional wrapper, contains zero or one value.
-    Optional = 0,
+    Optional = 3,
     /// `T*` - array of zero or more values.
-    ArrayZeroOrMore = 1,
+    ArrayZeroOrMore = 4,
     /// `T+` - array of one or more values (non-empty).
-    ArrayOneOrMore = 2,
+    ArrayOneOrMore = 5,
     /// Record with named fields.
-    Struct = 3,
+    Struct = 6,
     /// Discriminated union with tagged variants.
-    Enum = 4,
+    Enum = 7,
     /// Named reference to another type (e.g., `type Foo = Bar`).
-    Alias = 5,
+    Alias = 8,
 }
 
 impl TypeKind {
     /// Convert from raw discriminant.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
-            0 => Some(Self::Optional),
-            1 => Some(Self::ArrayZeroOrMore),
-            2 => Some(Self::ArrayOneOrMore),
-            3 => Some(Self::Struct),
-            4 => Some(Self::Enum),
-            5 => Some(Self::Alias),
+            0 => Some(Self::Void),
+            1 => Some(Self::Node),
+            2 => Some(Self::String),
+            3 => Some(Self::Optional),
+            4 => Some(Self::ArrayZeroOrMore),
+            5 => Some(Self::ArrayOneOrMore),
+            6 => Some(Self::Struct),
+            7 => Some(Self::Enum),
+            8 => Some(Self::Alias),
             _ => None,
         }
+    }
+
+    /// Whether this is a primitive/builtin type (Void, Node, String).
+    pub fn is_primitive(self) -> bool {
+        matches!(self, Self::Void | Self::Node | Self::String)
     }
 
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
@@ -69,6 +82,16 @@ impl TypeKind {
     pub fn is_alias(self) -> bool {
         matches!(self, Self::Alias)
     }
+
+    /// Get the display name for primitive types.
+    pub fn primitive_name(self) -> Option<&'static str> {
+        match self {
+            Self::Void => Some("Void"),
+            Self::Node => Some("Node"),
+            Self::String => Some("String"),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -77,18 +100,30 @@ mod tests {
 
     #[test]
     fn from_u8_valid() {
-        assert_eq!(TypeKind::from_u8(0), Some(TypeKind::Optional));
-        assert_eq!(TypeKind::from_u8(1), Some(TypeKind::ArrayZeroOrMore));
-        assert_eq!(TypeKind::from_u8(2), Some(TypeKind::ArrayOneOrMore));
-        assert_eq!(TypeKind::from_u8(3), Some(TypeKind::Struct));
-        assert_eq!(TypeKind::from_u8(4), Some(TypeKind::Enum));
-        assert_eq!(TypeKind::from_u8(5), Some(TypeKind::Alias));
+        assert_eq!(TypeKind::from_u8(0), Some(TypeKind::Void));
+        assert_eq!(TypeKind::from_u8(1), Some(TypeKind::Node));
+        assert_eq!(TypeKind::from_u8(2), Some(TypeKind::String));
+        assert_eq!(TypeKind::from_u8(3), Some(TypeKind::Optional));
+        assert_eq!(TypeKind::from_u8(4), Some(TypeKind::ArrayZeroOrMore));
+        assert_eq!(TypeKind::from_u8(5), Some(TypeKind::ArrayOneOrMore));
+        assert_eq!(TypeKind::from_u8(6), Some(TypeKind::Struct));
+        assert_eq!(TypeKind::from_u8(7), Some(TypeKind::Enum));
+        assert_eq!(TypeKind::from_u8(8), Some(TypeKind::Alias));
     }
 
     #[test]
     fn from_u8_invalid() {
-        assert_eq!(TypeKind::from_u8(6), None);
+        assert_eq!(TypeKind::from_u8(9), None);
         assert_eq!(TypeKind::from_u8(255), None);
+    }
+
+    #[test]
+    fn is_primitive() {
+        assert!(TypeKind::Void.is_primitive());
+        assert!(TypeKind::Node.is_primitive());
+        assert!(TypeKind::String.is_primitive());
+        assert!(!TypeKind::Optional.is_primitive());
+        assert!(!TypeKind::Struct.is_primitive());
     }
 
     #[test]
@@ -99,6 +134,7 @@ mod tests {
         assert!(!TypeKind::Struct.is_wrapper());
         assert!(!TypeKind::Enum.is_wrapper());
         assert!(!TypeKind::Alias.is_wrapper());
+        assert!(!TypeKind::Void.is_wrapper());
     }
 
     #[test]
@@ -109,6 +145,7 @@ mod tests {
         assert!(TypeKind::Struct.is_composite());
         assert!(TypeKind::Enum.is_composite());
         assert!(!TypeKind::Alias.is_composite());
+        assert!(!TypeKind::Node.is_composite());
     }
 
     #[test]
@@ -135,5 +172,13 @@ mod tests {
         assert!(!TypeKind::Struct.is_alias());
         assert!(!TypeKind::Enum.is_alias());
         assert!(TypeKind::Alias.is_alias());
+    }
+
+    #[test]
+    fn primitive_name() {
+        assert_eq!(TypeKind::Void.primitive_name(), Some("Void"));
+        assert_eq!(TypeKind::Node.primitive_name(), Some("Node"));
+        assert_eq!(TypeKind::String.primitive_name(), Some("String"));
+        assert_eq!(TypeKind::Struct.primitive_name(), None);
     }
 }

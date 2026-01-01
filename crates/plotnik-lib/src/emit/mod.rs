@@ -218,18 +218,14 @@ impl TypeTableBuilder {
     /// Build type table from TypeContext.
     ///
     /// Types are collected in definition order, depth-first, to mirror query structure.
+    /// Used builtins are emitted first, then custom types - no reserved slots.
     pub fn build(
         &mut self,
         type_ctx: &TypeContext,
         interner: &Interner,
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
-        // Pre-populate builtin mappings
-        self.mapping.insert(TYPE_VOID, QTypeId::VOID);
-        self.mapping.insert(TYPE_NODE, QTypeId::NODE);
-        self.mapping.insert(TYPE_STRING, QTypeId::STRING);
-
-        // Collect types in definition order, depth-first to mirror query structure
+        // Collect custom types in definition order, depth-first
         let mut ordered_types: Vec<TypeId> = Vec::new();
         let mut seen: HashSet<TypeId> = HashSet::new();
 
@@ -237,12 +233,41 @@ impl TypeTableBuilder {
             collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
         }
 
-        // Pre-assign QTypeIds and reserve slots for all collected types.
-        // This ensures that forward references (e.g., recursive types) can be resolved.
-        for (i, &type_id) in ordered_types.iter().enumerate() {
-            let bc_id = QTypeId::from_custom_index(i);
+        // Determine which builtins are actually used by scanning all types
+        let mut used_builtins = [false; 3]; // [Void, Node, String]
+        let mut seen = HashSet::new();
+        for &type_id in &ordered_types {
+            collect_builtin_refs(type_id, type_ctx, &mut used_builtins, &mut seen);
+        }
+        // Also check entrypoint result types directly
+        for (_def_id, type_id) in type_ctx.iter_def_types() {
+            if type_id == TYPE_VOID {
+                used_builtins[0] = true;
+            } else if type_id == TYPE_NODE {
+                used_builtins[1] = true;
+            } else if type_id == TYPE_STRING {
+                used_builtins[2] = true;
+            }
+        }
+
+        // Phase 1: Emit used builtins first (in order: Void, Node, String)
+        let builtin_types = [(TYPE_VOID, TypeKind::Void), (TYPE_NODE, TypeKind::Node), (TYPE_STRING, TypeKind::String)];
+        for (i, &(builtin_id, kind)) in builtin_types.iter().enumerate() {
+            if used_builtins[i] {
+                let bc_id = QTypeId(self.type_defs.len() as u16);
+                self.mapping.insert(builtin_id, bc_id);
+                self.type_defs.push(TypeDef {
+                    data: 0,
+                    count: 0,
+                    kind: kind as u8,
+                });
+            }
+        }
+
+        // Phase 2: Pre-assign QTypeIds for custom types and reserve slots
+        for &type_id in &ordered_types {
+            let bc_id = QTypeId(self.type_defs.len() as u16);
             self.mapping.insert(type_id, bc_id);
-            // Push a placeholder that will be filled in during emit
             self.type_defs.push(TypeDef {
                 data: 0,
                 count: 0,
@@ -250,8 +275,11 @@ impl TypeTableBuilder {
             });
         }
 
-        // Emit TypeDefs and TypeMembers - fill in the placeholders.
-        for (slot_index, &type_id) in ordered_types.iter().enumerate() {
+        // Phase 3: Fill in custom type definitions
+        // We need to calculate slot index as offset from where custom types start
+        let builtin_count = used_builtins.iter().filter(|&&b| b).count();
+        for (i, &type_id) in ordered_types.iter().enumerate() {
+            let slot_index = builtin_count + i;
             let type_shape = type_ctx
                 .get_type(type_id)
                 .expect("collected type must exist");
@@ -262,7 +290,7 @@ impl TypeTableBuilder {
         for (def_id, type_id) in type_ctx.iter_def_types() {
             let name_sym = type_ctx.def_name_sym(def_id);
             let name = strings.get_or_intern(name_sym, interner)?;
-            let bc_type_id = self.mapping.get(&type_id).copied().unwrap_or(QTypeId::VOID);
+            let bc_type_id = self.mapping.get(&type_id).copied().unwrap_or(QTypeId(0));
             self.type_names.push(TypeName {
                 name,
                 type_id: bc_type_id,
@@ -290,7 +318,7 @@ impl TypeTableBuilder {
 
             TypeShape::Custom(sym) => {
                 // Custom type annotation: @x :: Identifier → type Identifier = Node
-                let bc_type_id = QTypeId::from_custom_index(slot_index);
+                let bc_type_id = QTypeId(slot_index as u16);
 
                 // Add TypeName entry for the custom type
                 let name = strings.get_or_intern(*sym, interner)?;
@@ -299,8 +327,10 @@ impl TypeTableBuilder {
                     type_id: bc_type_id,
                 });
 
+                // Custom types alias Node - look up Node's actual bytecode ID
+                let node_bc_id = self.mapping.get(&TYPE_NODE).copied().unwrap_or(QTypeId(0));
                 self.type_defs[slot_index] = TypeDef {
-                    data: QTypeId::NODE.0, // Custom types alias Node
+                    data: node_bc_id.0,
                     count: 0,
                     kind: TypeKind::Alias as u8,
                 };
@@ -410,8 +440,8 @@ impl TypeTableBuilder {
             return self.resolve_type(def_type_id, type_ctx);
         }
 
-        // If not found, default to VOID (should not happen for well-formed types)
-        Ok(QTypeId::VOID)
+        // If not found, default to first type (should not happen for well-formed types)
+        Ok(QTypeId(0))
     }
 
     /// Resolve a field's type, handling optionality.
@@ -437,8 +467,8 @@ impl TypeTableBuilder {
             return Ok(optional_id);
         }
 
-        // Create new Optional wrapper
-        let optional_id = QTypeId::from_custom_index(self.type_defs.len());
+        // Create new Optional wrapper at the next available index
+        let optional_id = QTypeId(self.type_defs.len() as u16);
 
         self.type_defs.push(TypeDef {
             data: base_type.0,
@@ -452,8 +482,7 @@ impl TypeTableBuilder {
 
     /// Validate that counts fit in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
-        // Max 65533 custom types (65535 - 3 builtins)
-        if self.type_defs.len() > 65533 {
+        if self.type_defs.len() > 65535 {
             return Err(EmitError::TooManyTypes(self.type_defs.len()));
         }
         if self.type_members.len() > 65535 {
@@ -473,8 +502,7 @@ impl TypeTableBuilder {
     /// Fields/variants are at indices [base..base+count).
     pub fn get_member_base(&self, type_id: TypeId) -> Option<u16> {
         let bc_type_id = self.mapping.get(&type_id)?;
-        let slot_index = bc_type_id.custom_index()?;
-        let type_def = self.type_defs.get(slot_index)?;
+        let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
 
         // Only Struct and Enum have member bases
         let kind = TypeKind::from_u8(type_def.kind)?;
@@ -591,6 +619,50 @@ fn collect_types_dfs(
     }
 }
 
+/// Collect which builtin types are referenced by a type.
+fn collect_builtin_refs(
+    type_id: TypeId,
+    type_ctx: &TypeContext,
+    used: &mut [bool; 3],
+    seen: &mut HashSet<TypeId>,
+) {
+    if !seen.insert(type_id) {
+        return;
+    }
+
+    let Some(type_shape) = type_ctx.get_type(type_id) else {
+        return;
+    };
+
+    match type_shape {
+        TypeShape::Void => used[0] = true,
+        TypeShape::Node => used[1] = true,
+        TypeShape::String => used[2] = true,
+        TypeShape::Custom(_) => used[1] = true, // Custom types alias Node
+        TypeShape::Struct(fields) => {
+            for field_info in fields.values() {
+                collect_builtin_refs(field_info.type_id, type_ctx, used, seen);
+            }
+        }
+        TypeShape::Enum(variants) => {
+            for &variant_type_id in variants.values() {
+                collect_builtin_refs(variant_type_id, type_ctx, used, seen);
+            }
+        }
+        TypeShape::Array { element, .. } => {
+            collect_builtin_refs(*element, type_ctx, used, seen);
+        }
+        TypeShape::Optional(inner) => {
+            collect_builtin_refs(*inner, type_ctx, used, seen);
+        }
+        TypeShape::Ref(def_id) => {
+            if let Some(target_id) = type_ctx.get_def_type(*def_id) {
+                collect_builtin_refs(target_id, type_ctx, used, seen);
+            }
+        }
+    }
+}
+
 /// Pad a buffer to the section alignment boundary.
 fn pad_to_section(buf: &mut Vec<u8>) {
     let rem = buf.len() % SECTION_ALIGN;
@@ -675,7 +747,7 @@ fn emit_inner(
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
         let name = strings.get_or_intern(name_sym, interner)?;
-        let result_type = types.get(type_id).unwrap_or(QTypeId::VOID);
+        let result_type = types.get(type_id).expect("all def types should be mapped");
 
         // Get actual target from compiled result
         let target = compile_result

@@ -7,33 +7,31 @@ Test = (array {(identifier) @a (number) @b}* @items)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "a"
-S02 "b"
-S03 "items"
-S04 "Test"
-S05 "array"
-S06 "number"
-S07 "identifier"
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "items"
+S4 "Test"
+S5 "array"
+S6 "number"
+S7 "identifier"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[2]  ; { a, b }
-T04 = ArrayStar(T03)  ; T03*
-T05 = Struct  M2[1]  ; { items }
+T0 = <Node>
+T1 = Struct  M0:2  ; { a, b }
+T2 = ArrayStar(T1)  ; T1*
+T3 = Struct  M2:1  ; { items }
 
 [type_members]
-M0: S01 → T01  ; a: Node
-M1: S02 → T01  ; b: Node
-M2: S03 → T04  ; items: T04
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T2  ; items: T2
 
 [type_names]
-N0: S04 → T05  ; Test
+N0: S4 → T3  ; Test
 
 [entrypoints]
-Test = 01 :: T05
+Test = 01 :: T3
 
 [transitions]
   00  𝜀                                     ◼

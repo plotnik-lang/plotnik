@@ -166,7 +166,7 @@ impl<'a> Emitter<'a> {
 
         // Assign names to types that need them
         for i in 0..self.types.defs_count() {
-            let type_id = QTypeId::from_custom_index(i);
+            let type_id = QTypeId(i as u16);
             if self.type_names.contains_key(&type_id) {
                 continue;
             }
@@ -191,7 +191,7 @@ impl<'a> Emitter<'a> {
         ctx: &NamingContext,
         contexts: &mut HashMap<QTypeId, NamingContext>,
     ) {
-        if type_id.is_builtin() || contexts.contains_key(&type_id) {
+        if contexts.contains_key(&type_id) {
             return;
         }
 
@@ -204,11 +204,11 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Void | TypeKind::Node | TypeKind::String | TypeKind::Alias => {}
             TypeKind::Struct => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 for member in self.types.members_of(&type_def) {
                     let field_name = self.strings.get(member.name);
-                    // Unwrap Optional wrappers to get the actual type
                     let (inner_type, _) = self.unwrap_optional(member.type_id);
                     let field_ctx = NamingContext {
                         def_name: ctx.def_name.clone(),
@@ -220,16 +220,8 @@ impl<'a> Emitter<'a> {
             TypeKind::Enum => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
             }
-            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore => {
-                let inner = QTypeId(type_def.data);
-                self.collect_naming_contexts(inner, ctx, contexts);
-            }
-            TypeKind::Optional => {
-                let inner = QTypeId(type_def.data);
-                self.collect_naming_contexts(inner, ctx, contexts);
-            }
-            TypeKind::Alias => {
-                // Aliases don't need contexts
+            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
+                self.collect_naming_contexts(QTypeId(type_def.data), ctx, contexts);
             }
         }
     }
@@ -242,14 +234,6 @@ impl<'a> Emitter<'a> {
     }
 
     fn collect_refs_recursive(&mut self, type_id: QTypeId) {
-        if type_id == QTypeId::NODE {
-            self.node_referenced = true;
-            return;
-        }
-        if type_id == QTypeId::STRING || type_id == QTypeId::VOID {
-            return;
-        }
-
         // Cycle detection
         if !self.refs_visited.insert(type_id) {
             return;
@@ -264,6 +248,10 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Node => {
+                self.node_referenced = true;
+            }
+            TypeKind::String | TypeKind::Void => {}
             TypeKind::Struct | TypeKind::Enum => {
                 let member_types: Vec<_> = self
                     .types
@@ -278,7 +266,6 @@ impl<'a> Emitter<'a> {
                 self.collect_refs_recursive(QTypeId(type_def.data));
             }
             TypeKind::Alias => {
-                // Alias to Node
                 self.node_referenced = true;
             }
         }
@@ -332,7 +319,7 @@ impl<'a> Emitter<'a> {
     }
 
     fn collect_reachable_types(&self, type_id: QTypeId, out: &mut HashSet<QTypeId>) {
-        if type_id.is_builtin() || out.contains(&type_id) {
+        if out.contains(&type_id) {
             return;
         }
 
@@ -345,6 +332,7 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Void | TypeKind::Node | TypeKind::String => {}
             TypeKind::Struct => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
@@ -354,18 +342,13 @@ impl<'a> Emitter<'a> {
             TypeKind::Enum => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
-                    // For enum variants, recurse into payload fields but don't
-                    // add the payload struct itself - it will be inlined.
                     self.collect_enum_variant_refs(member.type_id, out);
                 }
             }
             TypeKind::Alias => {
                 out.insert(type_id);
             }
-            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore => {
-                self.collect_reachable_types(QTypeId(type_def.data), out);
-            }
-            TypeKind::Optional => {
+            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
                 self.collect_reachable_types(QTypeId(type_def.data), out);
             }
         }
@@ -374,31 +357,16 @@ impl<'a> Emitter<'a> {
     /// Collect reachable types from enum variant payloads.
     /// Recurses into struct fields but doesn't add the payload struct itself.
     fn collect_enum_variant_refs(&self, type_id: QTypeId, out: &mut HashSet<QTypeId>) {
-        if type_id.is_builtin() {
-            return;
-        }
-
         let Some(type_def) = self.types.get(type_id) else {
             return;
         };
 
-        let Some(kind) = type_def.type_kind() else {
-            return;
-        };
-
-        match kind {
-            TypeKind::Struct => {
-                // DON'T add the struct - it will be inlined as $data.
-                // But DO recurse into its fields to find named types.
-                for member in self.types.members_of(&type_def) {
-                    self.collect_reachable_types(member.type_id, out);
-                }
+        if type_def.type_kind() == Some(TypeKind::Struct) {
+            for member in self.types.members_of(&type_def) {
+                self.collect_reachable_types(member.type_id, out);
             }
-            _ => {
-                // For non-struct payloads (shouldn't happen normally),
-                // fall back to regular collection.
-                self.collect_reachable_types(type_id, out);
-            }
+        } else {
+            self.collect_reachable_types(type_id, out);
         }
     }
 
@@ -412,24 +380,19 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Void | TypeKind::Node | TypeKind::String | TypeKind::Alias => vec![],
             TypeKind::Struct | TypeKind::Enum => self
                 .types
                 .members_of(&type_def)
                 .flat_map(|member| self.unwrap_for_deps(member.type_id))
                 .collect(),
-            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore => {
+            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
                 self.unwrap_for_deps(QTypeId(type_def.data))
             }
-            TypeKind::Optional => self.unwrap_for_deps(QTypeId(type_def.data)),
-            TypeKind::Alias => vec![],
         }
     }
 
     fn unwrap_for_deps(&self, type_id: QTypeId) -> Vec<QTypeId> {
-        if type_id.is_builtin() {
-            return vec![];
-        }
-
         let Some(type_def) = self.types.get(type_id) else {
             return vec![];
         };
@@ -439,6 +402,7 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Void | TypeKind::Node | TypeKind::String => vec![],
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
                 self.unwrap_for_deps(QTypeId(type_def.data))
             }
@@ -447,13 +411,21 @@ impl<'a> Emitter<'a> {
     }
 
     fn emit_generated_or_custom(&mut self, type_id: QTypeId) {
-        if self.emitted.contains(&type_id) || type_id.is_builtin() {
+        if self.emitted.contains(&type_id) {
             return;
         }
 
         let Some(type_def) = self.types.get(type_id) else {
             return;
         };
+
+        let Some(kind) = type_def.type_kind() else {
+            return;
+        };
+
+        if kind.is_primitive() {
+            return;
+        }
 
         // Check if this is an alias type (custom type annotation)
         if type_def.is_alias() {
@@ -593,15 +565,6 @@ impl<'a> Emitter<'a> {
     }
 
     fn type_to_ts(&self, type_id: QTypeId) -> String {
-        match type_id {
-            QTypeId::VOID => "void".to_string(),
-            QTypeId::NODE => "Node".to_string(),
-            QTypeId::STRING => "string".to_string(),
-            _ => self.custom_type_to_ts(type_id),
-        }
-    }
-
-    fn custom_type_to_ts(&self, type_id: QTypeId) -> String {
         let Some(type_def) = self.types.get(type_id) else {
             return "unknown".to_string();
         };
@@ -611,6 +574,9 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
+            TypeKind::Void => "undefined".to_string(),
+            TypeKind::Node => "Node".to_string(),
+            TypeKind::String => "string".to_string(),
             TypeKind::Struct | TypeKind::Enum => {
                 if let Some(name) = self.type_names.get(&type_id) {
                     name.clone()
@@ -691,10 +657,6 @@ impl<'a> Emitter<'a> {
     }
 
     fn inline_data_type(&self, type_id: QTypeId) -> String {
-        if type_id == QTypeId::VOID {
-            return "{}".to_string();
-        }
-
         let Some(type_def) = self.types.get(type_id) else {
             return self.type_to_ts(type_id);
         };
@@ -702,6 +664,10 @@ impl<'a> Emitter<'a> {
         let Some(kind) = type_def.type_kind() else {
             return self.type_to_ts(type_id);
         };
+
+        if kind == TypeKind::Void {
+            return "{}".to_string();
+        }
 
         if kind == TypeKind::Struct {
             self.inline_struct(&type_def)
@@ -712,9 +678,6 @@ impl<'a> Emitter<'a> {
 
     /// Unwrap Optional wrappers and return (inner_type, is_optional).
     fn unwrap_optional(&self, type_id: QTypeId) -> (QTypeId, bool) {
-        if type_id.is_builtin() {
-            return (type_id, false);
-        }
         let Some(type_def) = self.types.get(type_id) else {
             return (type_id, false);
         };

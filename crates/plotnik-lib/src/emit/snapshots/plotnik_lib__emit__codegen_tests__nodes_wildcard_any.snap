@@ -7,32 +7,30 @@ Test = (pair key: _ @key)
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "key"
-S02 "Test"
-S03 "pair"
+S0 "Beauty will save the world"
+S1 "key"
+S2 "Test"
+S3 "pair"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { key }
+T0 = <Node>
+T1 = Struct  M0:1  ; { key }
 
 [type_members]
-M0: S01 → T01  ; key: Node
+M0: S1 → T0  ; key: <Node>
 
 [type_names]
-N0: S02 → T03  ; Test
+N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T03
+Test = 1 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  0  𝜀                                      ◼
 
 Test:
-  01  𝜀                                     02
-  02       (pair)                           03
-  03  ↓*   key: _ [Node Set(M0)]            05
-  05 *↑¹                                    06
-  06                                        ▶
+  1  𝜀                                      2
+  2       (pair)                            3
+  3  ↓*   key: _ [Node Set(M0)]             5
+  5 *↑¹                                     6
+  6                                         ▶
