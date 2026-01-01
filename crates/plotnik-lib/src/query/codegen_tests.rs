@@ -236,14 +236,15 @@ fn emit_anchor_between_siblings() {
     Test = 01 :: T03
 
     [code]
-      00   𝜀                                    ◼
+      00  𝜀                                     ◼
 
     Test:
-      01   𝜀                                    02
-      02  *↓   (parent)                         03
-      03  *↓   (a)                              04
+      01  𝜀                                     02
+      02       (parent)                         03
+      03  ↓*   (a)                              04
       04  ~    (b)                              05
-      05  *↑¹                                   ◼
+      05 *↑¹                                    06
+      06                                        ▶
     "#);
 }
 
@@ -279,13 +280,14 @@ fn emit_anchor_first_child() {
     Test = 01 :: T03
 
     [code]
-      00   𝜀                                    ◼
+      00  𝜀                                     ◼
 
     Test:
-      01   𝜀                                    02
-      02  *↓   (parent)                         03
-      03  ~↓   (first)                          04
-      04  *↑¹                                   ◼
+      01  𝜀                                     02
+      02       (parent)                         03
+      03  ↓~   (first)                          04
+      04 *↑¹                                    05
+      05                                        ▶
     "#);
 }
 
@@ -321,13 +323,14 @@ fn emit_anchor_last_child() {
     Test = 01 :: T03
 
     [code]
-      00   𝜀                                    ◼
+      00  𝜀                                     ◼
 
     Test:
-      01   𝜀                                    02
-      02  *↓   (parent)                         03
-      03  *↓   (last)                           04
-      04  ~↑¹                                   ◼
+      01  𝜀                                     02
+      02       (parent)                         03
+      03  ↓*   (last)                           04
+      04 ~↑¹                                    05
+      05                                        ▶
     "#);
 }
 
@@ -364,14 +367,15 @@ fn emit_anchor_with_anonymous_node() {
     Test = 01 :: T03
 
     [code]
-      00   𝜀                                    ◼
+      00  𝜀                                     ◼
 
     Test:
-      01   𝜀                                    02
-      02  *↓   (parent)                         03
-      03  *↓   (+)                              04
+      01  𝜀                                     02
+      02       (parent)                         03
+      03  ↓*   (+)                              04
       04  .    (next)                           05
-      05  *↑¹                                   ◼
+      05 *↑¹                                    06
+      06                                        ▶
     "#);
 }
 
@@ -408,13 +412,236 @@ fn emit_no_anchor_uses_next() {
     Test = 01 :: T03
 
     [code]
-      00   𝜀                                    ◼
+      00  𝜀                                     ◼
 
     Test:
-      01   𝜀                                    02
-      02  *↓   (parent)                         03
-      03  *↓   (a)                              04
+      01  𝜀                                     02
+      02       (parent)                         03
+      03  ↓*   (a)                              04
       04  *    (b)                              05
-      05  *↑¹                                   ◼
+      05 *↑¹                                    06
+      06                                        ▶
+    "#);
+}
+
+// Tests for wrapper struct Set() emission (Issue 1 fix)
+
+#[test]
+fn emit_wrapper_struct_set() {
+    // Wrapper struct captures should emit Set() for the wrapper field.
+    // Pattern: {{inner captures} @wrapper}* @outer
+    // The @wrapper capture should Set into the array element type.
+    let input = "Test = {{(identifier) @id (number) @num} @row}* @rows";
+
+    let res = Query::expect_valid_bytecode(input);
+
+    // Verify Set(M2) is emitted for the @row wrapper field
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "id"
+    S02 "num"
+    S03 "row"
+    S04 "rows"
+    S05 "Test"
+    S06 "number"
+    S07 "identifier"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 2)  ; { id, num }
+    T04 = Struct(M2, 1)  ; { row }
+    T05 = ArrayStar(T04)  ; T04*
+    T06 = Struct(M3, 1)  ; { rows }
+
+    [types.members]
+    M0 = (S01, T01)  ; id: Node
+    M1 = (S02, T01)  ; num: Node
+    M2 = (S03, T03)  ; row: T03
+    M3 = (S04, T05)  ; rows: T05
+
+    [types.names]
+    N0 = (S05, T06)  ; Test
+
+    [entry]
+    Test = 01 :: T06
+
+    [code]
+      00  𝜀                                     ◼
+
+    Test:
+      01  𝜀                                     02
+      02  𝜀    [Arr]                            04
+      04  𝜀                                     19, 07
+      06                                        ▶
+      07  𝜀    [EndArr Set(M3)]                 06
+      09  𝜀    [EndObj Push]                    33
+      11  𝜀    [EndObj Set(M2)]                 09
+      13  *    (number) [Node Set(M1)]          11
+      15       (identifier) [Node Set(M0)]      13
+      17  𝜀    [Obj]                            15
+      19  𝜀    [Obj]                            17
+      21  𝜀    [EndObj Push]                    33
+      23  𝜀    [EndObj Set(M2)]                 21
+      25  *    (number) [Node Set(M1)]          23
+      27       (identifier) [Node Set(M0)]      25
+      29  𝜀    [Obj]                            27
+      31  𝜀    [Obj]                            29
+      33  𝜀                                     31, 07
+    "#);
+}
+
+#[test]
+fn emit_optional_wrapper_struct_set() {
+    // Optional wrapper struct captures should also emit Set() for the wrapper field.
+    let input = "Test = {{(identifier) @id} @inner}? @outer";
+
+    let res = Query::expect_valid_bytecode(input);
+
+    // Verify Set(M1) is emitted for the @inner wrapper field
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "id"
+    S02 "inner"
+    S03 "outer"
+    S04 "Test"
+    S05 "identifier"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 1)  ; { id }
+    T04 = Struct(M1, 1)  ; { inner }
+    T05 = Struct(M2, 1)  ; { outer }
+    T06 = Optional(T03)  ; T03?
+    T07 = Optional(T04)  ; T04?
+
+    [types.members]
+    M0 = (S01, T01)  ; id: Node
+    M1 = (S02, T06)  ; inner: T06
+    M2 = (S03, T07)  ; outer: T07
+
+    [types.names]
+    N0 = (S04, T05)  ; Test
+
+    [entry]
+    Test = 01 :: T05
+
+    [code]
+      00  𝜀                                     ◼
+
+    Test:
+      01  𝜀                                     02
+      02  𝜀    [Obj]                            04
+      04  𝜀                                     13, 15
+      06                                        ▶
+      07  𝜀    [EndObj Set(M2)]                 06
+      09  𝜀    [EndObj Set(M1)]                 07
+      11       (identifier) [Node Set(M0)]      09
+      13  𝜀    [Obj]                            11
+      15  𝜀    [Null Set(M1)]                   07
+    "#);
+}
+
+// Tests for recursive ref structured result (Issue 2 fix)
+
+#[test]
+fn emit_recursive_ref_structured_result() {
+    // Recursive refs returning structured types should not emit Node before Set.
+    // The Call leaves the structured result pending, which Set directly consumes.
+    let input = indoc! {r#"
+        Expr = [
+          Lit: (number) @value :: string
+          Nested: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+        ]
+
+        Test = (program (Expr) @expr)
+    "#};
+
+    let res = Query::expect_valid_bytecode(input);
+
+    // Verify [Set(M5)] without Node for @expr capture of recursive ref
+    // Verify [Set(M2)] without Node for @inner capture of recursive ref
+    insta::assert_snapshot!(res, @r#"
+    [header]
+    linked = false
+
+    [strings]
+    S00 "Beauty will save the world"
+    S01 "value"
+    S02 "fn"
+    S03 "inner"
+    S04 "Lit"
+    S05 "Nested"
+    S06 "expr"
+    S07 "Expr"
+    S08 "Test"
+    S09 "number"
+    S10 "call_expression"
+    S11 "arguments"
+    S12 "function"
+    S13 "identifier"
+    S14 "program"
+
+    [types.defs]
+    T00 = void
+    T01 = Node
+    T02 = str
+    T03 = Struct(M0, 1)  ; { value }
+    T04 = Struct(M1, 2)  ; { fn, inner }
+    T05 = Enum(M3, 2)  ; Lit | Nested
+    T06 = Struct(M5, 1)  ; { expr }
+
+    [types.members]
+    M0 = (S01, T02)  ; value: str
+    M1 = (S02, T01)  ; fn: Node
+    M2 = (S03, T05)  ; inner: Expr
+    M3 = (S04, T03)  ; Lit: T03
+    M4 = (S05, T04)  ; Nested: T04
+    M5 = (S06, T05)  ; expr: Expr
+
+    [types.names]
+    N0 = (S07, T05)  ; Expr
+    N1 = (S08, T06)  ; Test
+
+    [entry]
+    Expr = 01 :: T05
+    Test = 04 :: T06
+
+    [code]
+      00  𝜀                                     ◼
+
+    Expr:
+      01  𝜀                                     02
+      02  𝜀                                     19, 27
+
+    Test:
+      04  𝜀                                     05
+      05       (program)                        06
+      06  ↓* ▶ (Expr)                           07
+      07  𝜀    [Set(M5)]                        09
+      09 *↑¹                                    10
+      10                                        ▶
+      11  𝜀    [Set(M2)]                        13
+      13 *↑¹                                    21
+      14                                        ▶
+      15  𝜀    [EndEnum]                        14
+      17       (number) [Text Set(M0)]          15
+      19  𝜀    [Enum(M3)]                       17
+      21  𝜀    [EndEnum]                        14
+      23  *  ▶ arguments: (Expr)                11
+      24  ↓*   function: (identifier) [Node Set(M1)]23
+      26       (call_expression)                24
+      27  𝜀    [Enum(M4)]                       26
     "#);
 }

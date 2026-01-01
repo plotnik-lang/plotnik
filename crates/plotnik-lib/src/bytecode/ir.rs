@@ -246,12 +246,14 @@ impl MatchIR {
 pub struct CallIR {
     /// Where this instruction lives.
     pub label: Label,
+    /// Navigation to apply before jumping to target.
+    pub nav: Nav,
+    /// Field constraint (None = no constraint).
+    pub node_field: Option<NonZeroU16>,
     /// Return address (where to continue after callee returns).
     pub next: Label,
     /// Callee entry point.
     pub target: Label,
-    /// Definition identifier for stack validation.
-    pub ref_id: u16,
 }
 
 impl CallIR {
@@ -259,9 +261,10 @@ impl CallIR {
     pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> [u8; 8] {
         let c = Call {
             segment: 0,
+            nav: self.nav,
+            node_field: self.node_field,
             next: self.next.resolve(map),
             target: self.target.resolve(map),
-            ref_id: self.ref_id,
         };
         c.to_bytes()
     }
@@ -272,18 +275,12 @@ impl CallIR {
 pub struct ReturnIR {
     /// Where this instruction lives.
     pub label: Label,
-    /// Definition identifier for stack validation.
-    pub ref_id: u16,
 }
 
 impl ReturnIR {
     /// Serialize to bytecode bytes (no labels to resolve).
     pub fn resolve(&self) -> [u8; 8] {
-        let r = Return {
-            segment: 0,
-            ref_id: self.ref_id,
-        };
-
+        let r = Return { segment: 0 };
         r.to_bytes()
     }
 }
@@ -331,7 +328,7 @@ mod tests {
             nav: Nav::Down,
             node_type: NonZeroU16::new(10),
             node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::S, 0)],
+            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
             neg_fields: vec![],
             post_effects: vec![EffectIR::simple(EffectOpcode::Node, 0)],
             successors: vec![Label(1)],
@@ -358,16 +355,16 @@ mod tests {
 
         let c = Instruction::Call(CallIR {
             label: Label(3),
+            nav: Nav::Down,
+            node_field: None,
             next: Label(4),
             target: Label(5),
-            ref_id: 0,
         });
 
         assert_eq!(c.successors(), vec![Label(4)]);
 
         let r = Instruction::Return(ReturnIR {
             label: Label(6),
-            ref_id: 0,
         });
 
         assert!(r.successors().is_empty());

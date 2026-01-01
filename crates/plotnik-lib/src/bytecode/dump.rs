@@ -45,8 +45,6 @@ struct DumpContext {
     node_type_names: BTreeMap<u16, String>,
     /// Maps node field ID to name (linked mode only).
     node_field_names: BTreeMap<u16, String>,
-    /// Entrypoint names by index (for Return formatting).
-    entrypoint_names: Vec<String>,
     /// All strings (for unlinked mode lookups).
     all_strings: Vec<String>,
 }
@@ -61,12 +59,10 @@ impl DumpContext {
         let node_fields = module.node_fields();
 
         let mut step_labels = BTreeMap::new();
-        let mut entrypoint_names = Vec::with_capacity(entrypoints.len());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name).to_string();
-            step_labels.insert(ep.target.0, name.clone());
-            entrypoint_names.push(name);
+            step_labels.insert(ep.target.0, name);
         }
 
         let mut node_type_names = BTreeMap::new();
@@ -92,7 +88,6 @@ impl DumpContext {
             step_labels,
             node_type_names,
             node_field_names,
-            entrypoint_names,
             all_strings,
         }
     }
@@ -125,10 +120,6 @@ impl DumpContext {
             // In unlinked mode, id is a StringId
             self.all_strings.get(id as usize).map(|s| s.as_str())
         }
-    }
-
-    fn entrypoint_name(&self, index: usize) -> Option<&str> {
-        self.entrypoint_names.get(index).map(|s| s.as_str())
     }
 }
 
@@ -367,6 +358,36 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
     }
 }
 
+// =============================================================================
+// Instruction Line Format
+// =============================================================================
+//
+// Each instruction line follows this column layout:
+//
+//   <indent><step><gap><nav><marker><content>...<successors>
+//   ├──────┤├───┤├─┤├──┤├────┤├──────────────┤├──────────┤
+//      2     var  1   3   3       variable      pad to 44
+//
+// - indent:  2 spaces
+// - step:    step number, zero-padded to `step_width`
+// - gap:     1 space
+// - nav:     3-char navigation symbol (↓*, *↑¹, etc.) or 𝜀 for Stay
+// - marker:  3-char marker column (" ▶ " for Call, "   " otherwise)
+// - content: variable-width instruction content
+// - successors: right-aligned at column 44
+//
+// =============================================================================
+
+/// Column widths for instruction formatting.
+#[allow(dead_code)]
+mod cols {
+    pub const INDENT: usize = 2;
+    pub const GAP: usize = 1;
+    pub const NAV: usize = 3;
+    pub const MARKER: usize = 3;
+    pub const TOTAL_WIDTH: usize = 44;
+}
+
 fn format_instruction(
     step: u16,
     instr: &Instruction,
@@ -381,6 +402,33 @@ fn format_instruction(
     }
 }
 
+/// Build instruction line prefix: `  <step>  <nav>`
+///
+/// The `is_epsilon` flag controls whether to display `𝜀` for the navigation column.
+/// True epsilon transitions require all three conditions:
+/// - `nav == Stay` (no cursor movement)
+/// - `node_type == None` (no type constraint)
+/// - `node_field == None` (no field constraint)
+///
+/// A Match with `nav == Stay` but type/field constraints is NOT epsilon—it matches
+/// at the current position. Only true epsilon transitions display the `𝜀` symbol.
+fn line_prefix(step: u16, nav: Nav, is_epsilon: bool, step_width: usize) -> String {
+    let nav_str = if is_epsilon {
+        " 𝜀 ".to_string()
+    } else {
+        format_nav(nav)
+    };
+    format!(
+        "{:indent$}{:0sw$}{:gap$}{nav_str}",
+        "",
+        step,
+        "",
+        indent = cols::INDENT,
+        sw = step_width,
+        gap = cols::GAP,
+    )
+}
+
 fn format_match(
     step: u16,
     m: &Match,
@@ -388,86 +436,89 @@ fn format_match(
     ctx: &DumpContext,
     step_width: usize,
 ) -> String {
-    // Nav column: 7 chars total for content alignment
-    // 𝜀 (epsilon) centered for Stay, others left-aligned with 2-char gap
-    let nav_col = if m.nav == Nav::Stay {
-        "   𝜀   ".to_string()
-    } else {
-        let sym = format_nav(m.nav);
-        let sym_len = sym.chars().count();
-        let gap2 = 7usize.saturating_sub(2 + sym_len).max(1);
-        format!("  {sym}{:gap2$}", "")
-    };
+    let prefix = line_prefix(step, m.nav, m.is_epsilon(), step_width);
+    let marker = "   "; // No marker for Match
 
-    let mut content_parts = Vec::new();
+    let content = format_match_content(m, ctx);
+    let successors = format_successors(&m.successors, ctx, step_width);
+
+    let base = format!("{prefix}{marker}{content}");
+    pad_to_column(base, cols::TOTAL_WIDTH, &successors)
+}
+
+/// Format Match instruction content (effects, node pattern, etc.)
+fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
+    let mut parts = Vec::new();
 
     // Pre-effects
     if !m.pre_effects.is_empty() {
         let effects: Vec<_> = m.pre_effects.iter().map(format_effect).collect();
-        content_parts.push(format!("[{}]", effects.join(" ")));
+        parts.push(format!("[{}]", effects.join(" ")));
     }
 
     // Negated fields
     for &field_id in &m.neg_fields {
         let name = ctx
             .node_field_name(field_id)
-            .map(|s| s.to_string())
+            .map(String::from)
             .unwrap_or_else(|| format!("field#{field_id}"));
-        content_parts.push(format!("!{name}"));
+        parts.push(format!("!{name}"));
     }
 
     // Field constraint and node type
-    let mut node_part = String::new();
-
-    if let Some(field_id) = m.node_field {
-        let name = ctx
-            .node_field_name(field_id.get())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("field#{}", field_id.get()));
-        node_part.push_str(&name);
-        node_part.push_str(": ");
-    }
-
-    if let Some(type_id) = m.node_type {
-        let name = ctx
-            .node_type_name(type_id.get())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("node#{}", type_id.get()));
-        node_part.push('(');
-        node_part.push_str(&name);
-        node_part.push(')');
-    } else if m.node_field.is_some() {
-        node_part.push('_');
-    }
-
+    let node_part = format_node_pattern(m, ctx);
     if !node_part.is_empty() {
-        content_parts.push(node_part);
+        parts.push(node_part);
     }
 
     // Post-effects
     if !m.post_effects.is_empty() {
         let effects: Vec<_> = m.post_effects.iter().map(format_effect).collect();
-        content_parts.push(format!("[{}]", effects.join(" ")));
+        parts.push(format!("[{}]", effects.join(" ")));
     }
 
-    // Successors
-    let succ_str = if m.successors.is_empty() {
+    parts.join(" ")
+}
+
+/// Format node pattern: `field: (type)` or `(type)` or `field: _`
+fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
+    let mut result = String::new();
+
+    if let Some(field_id) = m.node_field {
+        let name = ctx
+            .node_field_name(field_id.get())
+            .map(String::from)
+            .unwrap_or_else(|| format!("field#{}", field_id.get()));
+        result.push_str(&name);
+        result.push_str(": ");
+    }
+
+    if let Some(type_id) = m.node_type {
+        let name = ctx
+            .node_type_name(type_id.get())
+            .map(String::from)
+            .unwrap_or_else(|| format!("node#{}", type_id.get()));
+        result.push('(');
+        result.push_str(&name);
+        result.push(')');
+    } else if m.node_field.is_some() {
+        result.push('_');
+    }
+
+    result
+}
+
+/// Format successors list or terminal symbol.
+fn format_successors(successors: &[StepId], ctx: &DumpContext, step_width: usize) -> String {
+    if successors.is_empty() {
         "◼".to_string()
     } else {
-        m.successors
+        successors
             .iter()
             .map(|s| format_step(*s, ctx, step_width))
             .collect::<Vec<_>>()
             .join(", ")
-    };
-
-    let content = content_parts.join(" ");
-    let base = if content.is_empty() {
-        format!("  {:0sw$}{nav_col}", step, sw = step_width)
-    } else {
-        format!("  {:0sw$}{nav_col}{content}", step, sw = step_width)
-    };
-    pad_to_column(base, 44, &succ_str)
+    }
 }
 
 fn format_call(
@@ -477,29 +528,44 @@ fn format_call(
     ctx: &DumpContext,
     step_width: usize,
 ) -> String {
+    // Call is never epsilon—it always invokes a target definition
+    let prefix = line_prefix(step, c.nav, false, step_width);
+    let marker = " ▶ "; // Call marker (centered)
+
+    // Format field constraint if present
+    let field_part = if let Some(field_id) = c.node_field {
+        let name = ctx
+            .node_field_name(field_id.get())
+            .map(String::from)
+            .unwrap_or_else(|| format!("field#{}", field_id.get()));
+        format!("{name}: ")
+    } else {
+        String::new()
+    };
+
     let target_name = ctx
         .label_for(c.target)
-        .map(|s| s.to_string())
+        .map(String::from)
         .unwrap_or_else(|| format!("@{:0w$}", c.target.0, w = step_width));
+    let content = format!("{field_part}({target_name})");
+    let successors = format_step(c.next, ctx, step_width);
 
-    let base = format!("  {:0w$}   ▶   ({target_name})", step, w = step_width);
-    pad_to_column(base, 44, &format_step(c.next, ctx, step_width))
+    let base = format!("{prefix}{marker}{content}");
+    pad_to_column(base, cols::TOTAL_WIDTH, &successors)
 }
 
 fn format_return(
     step: u16,
-    r: &Return,
+    _r: &Return,
     _module: &Module,
-    ctx: &DumpContext,
+    _ctx: &DumpContext,
     step_width: usize,
 ) -> String {
-    let name = ctx
-        .entrypoint_name(r.ref_id as usize)
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("ref#{}", r.ref_id));
-
-    let base = format!("  {:0w$}      ({name})", step, w = step_width);
-    pad_to_column(base, 44, "▶")
+    // Return is never epsilon—it's a control flow instruction, not a match
+    let prefix = line_prefix(step, Nav::Stay, false, step_width);
+    // Return just shows the return marker - context makes the definition clear
+    let base = prefix.to_string();
+    pad_to_column(base, cols::TOTAL_WIDTH, "▶")
 }
 
 /// Format a step ID, showing entrypoint label or numeric ID.
@@ -514,16 +580,21 @@ fn format_step(step: StepId, ctx: &DumpContext, step_width: usize) -> String {
     }
 }
 
-/// Format navigation symbol. Called only for non-Stay navigation.
+/// Format navigation symbol as exactly 3 chars (except multi-digit Up levels).
 fn format_nav(nav: Nav) -> String {
     match nav {
-        Nav::Stay => unreachable!("Stay is handled specially in format_match"),
-        Nav::Down => "*↓".to_string(),
-        Nav::DownSkip => "~↓".to_string(),
-        Nav::DownExact => ".↓".to_string(),
-        Nav::Next => "* ".to_string(),
-        Nav::NextSkip => "~ ".to_string(),
-        Nav::NextExact => ". ".to_string(),
+        // Stay: 3 spaces (no movement). The 𝜀 symbol is handled separately
+        // for true epsilon transitions (Stay + no type + no field).
+        Nav::Stay => "   ".to_string(),
+        // Down: space + arrow + modifier
+        Nav::Down => " ↓*".to_string(),
+        Nav::DownSkip => " ↓~".to_string(),
+        Nav::DownExact => " ↓.".to_string(),
+        // Next: centered modifier (no arrow)
+        Nav::Next => " * ".to_string(),
+        Nav::NextSkip => " ~ ".to_string(),
+        Nav::NextExact => " . ".to_string(),
+        // Up: modifier + arrow + superscript level
         Nav::Up(n) => format!("*↑{}", superscript(n)),
         Nav::UpSkipTrivia(n) => format!("~↑{}", superscript(n)),
         Nav::UpExact(n) => format!(".↑{}", superscript(n)),
@@ -545,14 +616,14 @@ fn superscript(n: u8) -> String {
 fn format_effect(effect: &super::EffectOp) -> String {
     match effect.opcode {
         EffectOpcode::Node => "Node".to_string(),
-        EffectOpcode::A => "A".to_string(),
+        EffectOpcode::Arr => "Arr".to_string(),
         EffectOpcode::Push => "Push".to_string(),
-        EffectOpcode::EndA => "EndA".to_string(),
-        EffectOpcode::S => "S".to_string(),
-        EffectOpcode::EndS => "EndS".to_string(),
+        EffectOpcode::EndArr => "EndArr".to_string(),
+        EffectOpcode::Obj => "Obj".to_string(),
+        EffectOpcode::EndObj => "EndObj".to_string(),
         EffectOpcode::Set => format!("Set(M{})", effect.payload),
-        EffectOpcode::E => format!("E(M{})", effect.payload),
-        EffectOpcode::EndE => "EndE".to_string(),
+        EffectOpcode::Enum => format!("Enum(M{})", effect.payload),
+        EffectOpcode::EndEnum => "EndEnum".to_string(),
         EffectOpcode::Text => "Text".to_string(),
         EffectOpcode::Clear => "Clear".to_string(),
         EffectOpcode::Null => "Null".to_string(),

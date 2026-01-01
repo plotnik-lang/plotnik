@@ -4,14 +4,14 @@
 #[repr(u8)]
 pub enum EffectOpcode {
     Node = 0,
-    A = 1,
+    Arr = 1,
     Push = 2,
-    EndA = 3,
-    S = 4,
-    EndS = 5,
+    EndArr = 3,
+    Obj = 4,
+    EndObj = 5,
     Set = 6,
-    E = 7,
-    EndE = 8,
+    Enum = 7,
+    EndEnum = 8,
     Text = 9,
     Clear = 10,
     Null = 11,
@@ -21,14 +21,14 @@ impl EffectOpcode {
     fn from_u8(v: u8) -> Self {
         match v {
             0 => Self::Node,
-            1 => Self::A,
+            1 => Self::Arr,
             2 => Self::Push,
-            3 => Self::EndA,
-            4 => Self::S,
-            5 => Self::EndS,
+            3 => Self::EndArr,
+            4 => Self::Obj,
+            5 => Self::EndObj,
             6 => Self::Set,
-            7 => Self::E,
-            8 => Self::EndE,
+            7 => Self::Enum,
+            8 => Self::EndEnum,
             9 => Self::Text,
             10 => Self::Clear,
             11 => Self::Null,
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn max_payload() {
         let op = EffectOp {
-            opcode: EffectOpcode::E,
+            opcode: EffectOpcode::Enum,
             payload: 1023,
         };
         let bytes = op.to_bytes();
