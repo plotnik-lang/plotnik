@@ -31,15 +31,15 @@ impl SourceKind {
 
 /// A borrowed view of a source: id, kind, and content.
 #[derive(Clone, Debug)]
-pub struct Source<'a> {
+pub struct Source<'q> {
     pub id: SourceId,
-    pub kind: &'a SourceKind,
-    pub content: &'a str,
+    pub kind: &'q SourceKind,
+    pub content: &'q str,
 }
 
-impl<'a> Source<'a> {
+impl<'q> Source<'q> {
     /// Returns the content string.
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_str(&self) -> &'q str {
         self.content
     }
 }

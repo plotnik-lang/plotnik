@@ -109,6 +109,6 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
 
 /// Retrieves the text slice for a token. O(1) slice into source.
 #[inline]
-pub fn token_text<'src>(source: &'src str, token: &Token) -> &'src str {
+pub fn token_text<'q>(source: &'q str, token: &Token) -> &'q str {
     &source[std::ops::Range::<usize>::from(token.span)]
 }

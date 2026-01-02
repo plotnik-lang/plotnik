@@ -33,8 +33,8 @@ pub struct Diagnostics {
 }
 
 #[must_use = "diagnostic not emitted, call .emit()"]
-pub struct DiagnosticBuilder<'a> {
-    diagnostics: &'a mut Diagnostics,
+pub struct DiagnosticBuilder<'d> {
+    diagnostics: &'d mut Diagnostics,
     message: DiagnosticMessage,
 }
 
@@ -169,12 +169,12 @@ impl Diagnostics {
     }
 
     /// Create a printer with a source map (multi-file support).
-    pub fn printer<'a>(&self, sources: &'a SourceMap) -> DiagnosticsPrinter<'a> {
+    pub fn printer<'q>(&self, sources: &'q SourceMap) -> DiagnosticsPrinter<'q> {
         DiagnosticsPrinter::new(self.messages.clone(), sources)
     }
 
     /// Filtered printer with source map (cascading errors suppressed).
-    pub fn filtered_printer<'a>(&self, sources: &'a SourceMap) -> DiagnosticsPrinter<'a> {
+    pub fn filtered_printer<'q>(&self, sources: &'q SourceMap) -> DiagnosticsPrinter<'q> {
         DiagnosticsPrinter::new(self.filtered(), sources)
     }
 
@@ -203,7 +203,7 @@ impl Diagnostics {
     }
 }
 
-impl<'a> DiagnosticBuilder<'a> {
+impl<'d> DiagnosticBuilder<'d> {
     /// Provide custom detail for this diagnostic, rendered using the kind's template.
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         let detail = msg.into();

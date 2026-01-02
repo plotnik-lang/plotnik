@@ -6,19 +6,19 @@
 //! ## String Lifetime Limitation
 //!
 //! `SyntaxToken::text()` returns `&str` tied to the token's lifetime, not to the
-//! source `&'src str`. This is a rowan design: tokens store interned strings, not
+//! source `&'q str`. This is a rowan design: tokens store interned strings, not
 //! spans into the original source.
 //!
 //! When building data structures that need source-lifetime strings (e.g.,
-//! `SymbolTable<'src>`), use [`token_src`] instead of `token.text()`.
+//! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
 use super::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::TextRange;
 
 /// Extracts token text with source lifetime.
 ///
-/// Use this instead of `token.text()` when you need `&'src str`.
-pub fn token_src<'src>(token: &SyntaxToken, source: &'src str) -> &'src str {
+/// Use this instead of `token.text()` when you need `&'q str`.
+pub fn token_src<'q>(token: &SyntaxToken, source: &'q str) -> &'q str {
     let range = token.text_range();
     &source[range.start().into()..range.end().into()]
 }
