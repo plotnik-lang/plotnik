@@ -8,14 +8,14 @@ use rowan::TextRange;
 use super::SourceMap;
 use super::message::{DiagnosticMessage, Severity};
 
-pub struct DiagnosticsPrinter<'a> {
+pub struct DiagnosticsPrinter<'q> {
     diagnostics: Vec<DiagnosticMessage>,
-    sources: &'a SourceMap,
+    sources: &'q SourceMap,
     colored: bool,
 }
 
-impl<'a> DiagnosticsPrinter<'a> {
-    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, sources: &'a SourceMap) -> Self {
+impl<'q> DiagnosticsPrinter<'q> {
+    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, sources: &'q SourceMap) -> Self {
         Self {
             diagnostics,
             sources,
@@ -112,7 +112,7 @@ impl<'a> DiagnosticsPrinter<'a> {
         Ok(())
     }
 
-    fn source_path(&self, source: crate::query::SourceId) -> Option<&'a str> {
+    fn source_path(&self, source: crate::query::SourceId) -> Option<&'q str> {
         self.sources.path(source)
     }
 }

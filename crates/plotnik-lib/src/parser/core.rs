@@ -22,14 +22,14 @@ pub(super) struct OpenDelimiter {
 }
 
 /// Trivia tokens are buffered and flushed when starting a new node.
-pub struct Parser<'src, 'diag> {
-    pub(super) source: &'src str,
+pub struct Parser<'q, 'd> {
+    pub(super) source: &'q str,
     pub(super) source_id: SourceId,
     pub(super) tokens: Vec<Token>,
     pub(super) pos: usize,
     pub(super) trivia_buffer: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
-    pub(super) diagnostics: &'diag mut Diagnostics,
+    pub(super) diagnostics: &'d mut Diagnostics,
     pub(super) depth: u32,
     pub(super) last_diagnostic_pos: Option<TextSize>,
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
@@ -40,12 +40,12 @@ pub struct Parser<'src, 'diag> {
     fatal_error: Option<Error>,
 }
 
-impl<'src, 'diag> Parser<'src, 'diag> {
+impl<'q, 'd> Parser<'q, 'd> {
     pub fn new(
-        source: &'src str,
+        source: &'q str,
         source_id: SourceId,
         tokens: Vec<Token>,
-        diagnostics: &'diag mut Diagnostics,
+        diagnostics: &'d mut Diagnostics,
         fuel: u32,
         max_depth: u32,
     ) -> Self {

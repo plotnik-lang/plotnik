@@ -259,6 +259,16 @@ cargo run -p plotnik-cli -- langs
 - Comments for seniors, not juniors
 - Rust 2024 `let` chains: `if let Some(x) = a && let Some(y) = b { ... }`
 
+## Lifetime Conventions
+
+| Lifetime | Meaning                                          |
+| -------- | ------------------------------------------------ |
+| `'q`     | Query source string (`.ptk` file content)        |
+| `'d`     | Diagnostics reference                            |
+| `'s`     | Source code string (tree-sitter input)           |
+| `'t`     | Parsed tree-sitter tree                          |
+| `'a`     | Any other (generic borrows, bytecode views)      |
+
 # Testing Rules
 
 Code: `foo.rs` → tests: `foo_tests.rs` (include via `#[cfg(test)] mod foo_tests;`)
