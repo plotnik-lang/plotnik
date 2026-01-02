@@ -236,7 +236,7 @@ impl<'a> Emitter<'a> {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 for member in self.types.members_of(&type_def) {
                     let field_name = self.strings.get(member.name);
-                    let (inner_type, _) = self.unwrap_optional(member.type_id);
+                    let (inner_type, _) = self.types.unwrap_optional(member.type_id);
                     let field_ctx = NamingContext {
                         def_name: ctx.def_name.clone(),
                         field_name: Some(field_name.to_string()),
@@ -532,7 +532,7 @@ impl<'a> Emitter<'a> {
             .members_of(type_def)
             .map(|member| {
                 let field_name = self.strings.get(member.name).to_string();
-                let (inner_type, optional) = self.unwrap_optional(member.type_id);
+                let (inner_type, optional) = self.types.unwrap_optional(member.type_id);
                 (field_name, inner_type, optional)
             })
             .collect();
@@ -660,7 +660,7 @@ impl<'a> Emitter<'a> {
             .members_of(type_def)
             .map(|member| {
                 let field_name = self.strings.get(member.name).to_string();
-                let (inner_type, optional) = self.unwrap_optional(member.type_id);
+                let (inner_type, optional) = self.types.unwrap_optional(member.type_id);
                 (field_name, inner_type, optional)
             })
             .collect();
@@ -710,17 +710,6 @@ impl<'a> Emitter<'a> {
         } else {
             self.type_to_ts(type_id)
         }
-    }
-
-    /// Unwrap Optional wrappers and return (inner_type, is_optional).
-    fn unwrap_optional(&self, type_id: QTypeId) -> (QTypeId, bool) {
-        let Some(type_def) = self.types.get(type_id) else {
-            return (type_id, false);
-        };
-        if type_def.type_kind() != Some(TypeKind::Optional) {
-            return (type_id, false);
-        }
-        (QTypeId(type_def.data), true)
     }
 
     fn needs_generated_name(&self, type_def: &TypeDef) -> bool {

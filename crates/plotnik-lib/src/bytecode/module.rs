@@ -479,6 +479,18 @@ impl<'a> TypesView<'a> {
         let count = def.count as usize;
         (0..count).map(move |i| self.get_member(start + i))
     }
+
+    /// Unwrap Optional wrapper and return (inner_type, is_optional).
+    /// If not Optional, returns (type_id, false).
+    pub fn unwrap_optional(&self, type_id: QTypeId) -> (QTypeId, bool) {
+        let Some(type_def) = self.get(type_id) else {
+            return (type_id, false);
+        };
+        if !type_def.is_optional() {
+            return (type_id, false);
+        }
+        (QTypeId(type_def.data), true)
+    }
 }
 
 /// View into entrypoints.

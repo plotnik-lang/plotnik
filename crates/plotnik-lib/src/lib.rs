@@ -18,13 +18,13 @@
 
 pub mod analyze;
 pub mod bytecode;
-pub mod typegen;
 pub mod compile;
 pub mod diagnostics;
 pub mod emit;
 pub mod parser;
 pub mod query;
 pub mod type_system;
+pub mod typegen;
 
 /// Result type for analysis passes that produce both output and diagnostics.
 ///
