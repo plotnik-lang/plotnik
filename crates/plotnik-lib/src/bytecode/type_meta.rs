@@ -95,6 +95,12 @@ impl TypeDef {
         TypeKind::from_u8(self.kind).is_some_and(|k| k.is_alias())
     }
 
+    /// Whether this is an Optional wrapper type.
+    #[inline]
+    pub fn is_optional(&self) -> bool {
+        TypeKind::from_u8(self.kind).is_some_and(|k| k == TypeKind::Optional)
+    }
+
     /// For alias types, get the target type.
     #[inline]
     pub fn alias_target(&self) -> Option<QTypeId> {
