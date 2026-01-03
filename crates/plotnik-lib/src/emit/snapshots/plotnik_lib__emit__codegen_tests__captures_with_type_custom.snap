@@ -29,9 +29,9 @@ N1: S3 → T2  ; Test
 Test = 1 :: T2
 
 [transitions]
-  0  𝜀                                      ◼
+  0   ε                                     ◼
 
 Test:
-  1  𝜀                                      2
+  1   ε                                     2
   2       (identifier) [Node Set(M0)]       4
   4                                         ▶

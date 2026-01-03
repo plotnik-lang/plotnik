@@ -170,9 +170,11 @@ impl Match {
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
         if opcode == Opcode::Match8 {
-            // Match8: single successor in bytes 6-7
-            let next = StepId(u16::from_le_bytes([bytes[6], bytes[7]]));
-            let successors = if next.is_accept() { vec![] } else { vec![next] };
+            // Match8: single successor in bytes 6-7 (0 = terminal)
+            let next_raw = u16::from_le_bytes([bytes[6], bytes[7]]);
+            let successors = NonZeroU16::new(next_raw)
+                .map(|n| vec![StepId(n)])
+                .unwrap_or_default();
 
             Self {
                 segment,
@@ -206,7 +208,7 @@ impl Match {
                 .collect();
             let successors = read_u16_vec(payload, &mut offset, succ_count)
                 .into_iter()
-                .map(StepId)
+                .map(StepId::new)
                 .collect();
 
             Self {
@@ -257,9 +259,9 @@ impl Match {
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
 
         if opcode == Opcode::Match8 {
-            // Match8: single successor or accept
-            let next = self.successors.first().copied().unwrap_or(StepId::ACCEPT);
-            bytes[6..8].copy_from_slice(&next.0.to_le_bytes());
+            // Match8: single successor or terminal (0)
+            let next = self.successors.first().map(|s| s.get()).unwrap_or(0);
+            bytes[6..8].copy_from_slice(&next.to_le_bytes());
         } else {
             // Extended match: pack counts and payload
             let pre_count = self.pre_effects.len() as u16;
@@ -293,7 +295,7 @@ impl Match {
 
             // Write successors
             for succ in &self.successors {
-                bytes[offset..offset + 2].copy_from_slice(&succ.0.to_le_bytes());
+                bytes[offset..offset + 2].copy_from_slice(&succ.get().to_le_bytes());
                 offset += 2;
             }
 
@@ -409,10 +411,11 @@ impl<'a> MatchView<'a> {
         );
         if self.is_match8 {
             debug_assert!(idx == 0);
-            StepId(self.match8_next)
+            // Safe: we only call this when succ_count > 0, meaning match8_next != 0
+            StepId(NonZeroU16::new(self.match8_next).unwrap())
         } else {
             let offset = self.succ_offset() + idx * 2;
-            StepId(u16::from_le_bytes([
+            StepId::new(u16::from_le_bytes([
                 self.bytes[offset],
                 self.bytes[offset + 1],
             ]))
@@ -493,8 +496,8 @@ impl Call {
             segment,
             nav: Nav::from_byte(bytes[1]),
             node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])),
-            next: StepId(u16::from_le_bytes([bytes[4], bytes[5]])),
-            target: StepId(u16::from_le_bytes([bytes[6], bytes[7]])),
+            next: StepId::new(u16::from_le_bytes([bytes[4], bytes[5]])),
+            target: StepId::new(u16::from_le_bytes([bytes[6], bytes[7]])),
         }
     }
 
@@ -504,8 +507,8 @@ impl Call {
         bytes[0] = (self.segment << 4) | (Opcode::Call as u8);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
-        bytes[4..6].copy_from_slice(&self.next.0.to_le_bytes());
-        bytes[6..8].copy_from_slice(&self.target.0.to_le_bytes());
+        bytes[4..6].copy_from_slice(&self.next.get().to_le_bytes());
+        bytes[6..8].copy_from_slice(&self.target.get().to_le_bytes());
         bytes
     }
 }

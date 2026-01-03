@@ -21,12 +21,14 @@ S7 "function_declaration"
 T0 = <Node>
 T1 = Struct  M0:2  ; { name, value }
 T2 = Struct  M2:1  ; { name }
-T3 = Optional(T0)  ; <Node>?
+T3 = Struct  M3:1  ; { value }
+T4 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T3  ; name: T3
-M1: S2 → T3  ; value: T3
+M0: S1 → T4  ; name: T4
+M1: S2 → T4  ; value: T4
 M2: S1 → T0  ; name: <Node>
+M3: S2 → T0  ; value: <Node>
 
 [type_names]
 N0: S3 → T1  ; Expression
@@ -37,20 +39,20 @@ Expression = 01 :: T1
 Root       = 04 :: T2
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Expression:
-  01  𝜀                                     02
-  02  𝜀                                     13, 17
+  01   ε                                    02
+  02   ε                                    13, 17
 
 Root:
-  04  𝜀                                     05
+  04   ε                                    05
   05       (function_declaration)           06
-  06  ↓*   name: (identifier) [Node Set(M2)]  08
-  08 *↑¹                                    09
+  06   ▽   name: (identifier) [Node Set(M2)]  08
+  08   △                                    09
   09                                        ▶
   10                                        ▶
   11       (identifier) [Node Set(M0)]      10
-  13  𝜀    [Null Set(M1)]                   11
+  13   ε   [Null Set(M1)]                   11
   15       (number) [Node Set(M1)]          10
-  17  𝜀    [Null Set(M0)]                   15
+  17   ε   [Null Set(M0)]                   15

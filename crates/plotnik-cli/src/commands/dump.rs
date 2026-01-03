@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Module, dump};
+use plotnik_lib::Colors;
 
 use super::lang_resolver::{resolve_lang, resolve_lang_required, suggest_language};
 use super::query_loader::load_query_source;
@@ -80,5 +81,6 @@ pub fn run(args: DumpArgs) {
     };
 
     let module = Module::from_bytes(bytecode).expect("module loading failed");
-    print!("{}", dump(&module));
+    let colors = Colors::new(args.color);
+    print!("{}", dump(&module, colors));
 }

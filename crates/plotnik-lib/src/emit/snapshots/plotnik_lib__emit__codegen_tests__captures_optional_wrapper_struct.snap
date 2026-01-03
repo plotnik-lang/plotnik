@@ -19,13 +19,15 @@ T0 = <Node>
 T1 = Struct  M0:1  ; { id }
 T2 = Struct  M1:1  ; { inner }
 T3 = Struct  M2:1  ; { outer }
-T4 = Optional(T1)  ; T1?
-T5 = Optional(T2)  ; T2?
+T4 = Struct  M3:1  ; { inner }
+T5 = Optional(T1)  ; T1?
+T6 = Optional(T2)  ; T2?
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
-M1: S2 → T4  ; inner: T4
-M2: S3 → T5  ; outer: T5
+M1: S2 → T5  ; inner: T5
+M2: S3 → T6  ; outer: T6
+M3: S2 → T1  ; inner: T1
 
 [type_names]
 N0: S4 → T3  ; Test
@@ -34,15 +36,15 @@ N0: S4 → T3  ; Test
 Test = 01 :: T3
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀    [Obj]                            04
-  04  𝜀                                     13, 15
+  01   ε                                    02
+  02   ε   [Obj]                            04
+  04   ε                                    13, 15
   06                                        ▶
-  07  𝜀    [EndObj Set(M2)]                 06
-  09  𝜀    [EndObj Set(M1)]                 07
+  07   ε   [EndObj Set(M2)]                 06
+  09   ε   [EndObj Set(M1)]                 07
   11       (identifier) [Node Set(M0)]      09
-  13  𝜀    [Obj]                            11
-  15  𝜀    [Null Set(M1)]                   07
+  13   ε   [Obj]                            11
+  15   ε   [Null Set(M1)]                   07

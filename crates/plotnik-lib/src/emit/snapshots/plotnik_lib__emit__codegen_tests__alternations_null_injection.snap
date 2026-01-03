@@ -17,11 +17,15 @@ S5 "number"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { x, y }
-T2 = Optional(T0)  ; <Node>?
+T2 = Struct  M2:1  ; { x }
+T3 = Struct  M3:1  ; { y }
+T4 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T2  ; x: T2
-M1: S2 → T2  ; y: T2
+M0: S1 → T4  ; x: T4
+M1: S2 → T4  ; y: T4
+M2: S1 → T0  ; x: <Node>
+M3: S2 → T0  ; y: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test
@@ -30,13 +34,13 @@ N0: S3 → T1  ; Test
 Test = 01 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀                                     07, 11
+  01   ε                                    02
+  02   ε                                    07, 11
   04                                        ▶
   05       (identifier) [Node Set(M0)]      04
-  07  𝜀    [Null Set(M1)]                   05
+  07   ε   [Null Set(M1)]                   05
   09       (number) [Node Set(M1)]          04
-  11  𝜀    [Null Set(M0)]                   09
+  11   ε   [Null Set(M0)]                   09

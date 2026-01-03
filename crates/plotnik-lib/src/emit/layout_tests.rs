@@ -10,8 +10,9 @@ use super::layout::CacheAligned;
 fn layout_empty() {
     let result = CacheAligned::layout(&[], &[]);
 
+    // With no instructions, we start at step 1 (step 0 is reserved as unrepresentable)
     assert_eq!(result.total_steps, 1);
-    assert_eq!(result.label_to_step.get(&Label::ACCEPT), Some(&StepId::ACCEPT));
+    assert!(result.label_to_step.is_empty());
 }
 
 #[test]
@@ -24,12 +25,12 @@ fn layout_single_instruction() {
         pre_effects: vec![],
         neg_fields: vec![],
         post_effects: vec![],
-        successors: vec![Label::ACCEPT],
+        successors: vec![], // Terminal - empty successors
     })];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId(1)));
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
     assert_eq!(result.total_steps, 2); // 1 instruction + 1 step
 }
 
@@ -65,16 +66,16 @@ fn layout_linear_chain() {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![Label::ACCEPT],
+            successors: vec![], // Terminal
         }),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
     // Should be contiguous: 1, 2, 3
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId(1)));
-    assert_eq!(result.label_to_step.get(&Label(1)), Some(&StepId(2)));
-    assert_eq!(result.label_to_step.get(&Label(2)), Some(&StepId(3)));
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
+    assert_eq!(result.label_to_step.get(&Label(1)), Some(&StepId::new(2)));
+    assert_eq!(result.label_to_step.get(&Label(2)), Some(&StepId::new(3)));
 }
 
 #[test]
@@ -116,7 +117,7 @@ fn layout_call_return() {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![Label::ACCEPT],
+            successors: vec![], // Terminal
         }),
         Instruction::Return(ReturnIR {
             label: Label(4),
@@ -155,7 +156,7 @@ fn layout_branch() {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![Label::ACCEPT],
+            successors: vec![], // Terminal
         }),
         Instruction::Match(MatchIR {
             label: Label(2),
@@ -165,7 +166,7 @@ fn layout_branch() {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![Label::ACCEPT],
+            successors: vec![], // Terminal
         }),
     ];
 
@@ -203,14 +204,14 @@ fn layout_large_instruction_cache_alignment() {
             EffectIR::simple(EffectOpcode::EndObj, 0),
         ],
         successors: vec![
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
-            Label::ACCEPT,
+            Label(100),
+            Label(101),
+            Label(102),
+            Label(103),
+            Label(104),
+            Label(105),
+            Label(106),
+            Label(107),
         ],
     };
 
@@ -218,7 +219,7 @@ fn layout_large_instruction_cache_alignment() {
     assert!(large_match.size() >= 48);
 
     let instructions = vec![
-        // 5 small instructions to push offset to 40
+        // Small instruction first
         Instruction::Match(MatchIR {
             label: Label(0),
             nav: Nav::Stay,
@@ -235,9 +236,9 @@ fn layout_large_instruction_cache_alignment() {
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
     // Label 0 at step 1 (offset 8)
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId(1)));
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
 
     // Label 1 should be aligned - either at step 2 or padded to cache line
     let step1 = result.label_to_step.get(&Label(1)).unwrap();
-    assert!(step1.0 >= 2);
+    assert!(step1.get() >= 2);
 }

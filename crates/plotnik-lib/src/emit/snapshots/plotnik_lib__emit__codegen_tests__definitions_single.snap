@@ -26,9 +26,9 @@ N0: S2 → T1  ; Foo
 Foo = 1 :: T1
 
 [transitions]
-  0  𝜀                                      ◼
+  0   ε                                     ◼
 
 Foo:
-  1  𝜀                                      2
+  1   ε                                     2
   2       (identifier) [Node Set(M0)]       4
   4                                         ▶

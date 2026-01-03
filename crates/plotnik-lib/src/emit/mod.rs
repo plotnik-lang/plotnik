@@ -24,8 +24,8 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
 use crate::bytecode::ir::Label;
 use crate::bytecode::{
-    Entrypoint, FieldSymbol, Header, NodeSymbol, QTypeId, SECTION_ALIGN, StepId, StringId,
-    TriviaEntry, TypeDef, TypeMember, TypeMetaHeader, TypeName,
+    Entrypoint, FieldSymbol, Header, NodeSymbol, QTypeId, SECTION_ALIGN, StringId, TriviaEntry,
+    TypeDef, TypeMember, TypeMetaHeader, TypeName,
 };
 use crate::type_system::TypeKind;
 
@@ -104,9 +104,8 @@ impl StringTableBuilder {
             str_lookup: HashMap::new(),
             strings: Vec::new(),
         };
-        // Reserve index 0 for easter egg
+        // Reserve index 0 for easter egg (never looked up via str_lookup)
         builder.strings.push(EASTER_EGG.to_string());
-        builder.str_lookup.insert(EASTER_EGG.to_string(), StringId(0));
         builder
     }
 
@@ -124,7 +123,7 @@ impl StringTableBuilder {
             .try_resolve(sym)
             .ok_or(EmitError::StringNotFound(sym))?;
 
-        let id = StringId(self.strings.len() as u16);
+        let id = StringId::new(self.strings.len() as u16);
         self.strings.push(text.to_string());
         self.str_lookup.insert(text.to_string(), id);
         self.mapping.insert(sym, id);
@@ -137,7 +136,7 @@ impl StringTableBuilder {
             return id;
         }
 
-        let id = StringId(self.strings.len() as u16);
+        let id = StringId::new(self.strings.len() as u16);
         self.strings.push(s.to_string());
         self.str_lookup.insert(s.to_string(), id);
         id
@@ -229,7 +228,14 @@ impl TypeTableBuilder {
         let mut ordered_types: Vec<TypeId> = Vec::new();
         let mut seen: HashSet<TypeId> = HashSet::new();
 
+        // First walk from definition types (maintains order for entrypoints)
         for (_def_id, type_id) in type_ctx.iter_def_types() {
+            collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
+        }
+
+        // Then collect any remaining interned types not reachable from definitions
+        // (e.g., enum types inside named nodes that don't propagate TypeFlow::Scalar)
+        for (type_id, _) in type_ctx.iter_types() {
             collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
         }
 
@@ -526,13 +532,13 @@ impl TypeTableBuilder {
 
         let mut members_bytes = Vec::with_capacity(self.type_members.len() * 4);
         for member in &self.type_members {
-            members_bytes.extend_from_slice(&member.name.0.to_le_bytes());
+            members_bytes.extend_from_slice(&member.name.get().to_le_bytes());
             members_bytes.extend_from_slice(&member.type_id.0.to_le_bytes());
         }
 
         let mut names_bytes = Vec::with_capacity(self.type_names.len() * 4);
         for type_name in &self.type_names {
-            names_bytes.extend_from_slice(&type_name.name.0.to_le_bytes());
+            names_bytes.extend_from_slice(&type_name.name.get().to_le_bytes());
             names_bytes.extend_from_slice(&type_name.type_id.0.to_le_bytes());
         }
 
@@ -755,7 +761,7 @@ fn emit_inner(
             .get(&def_id)
             .and_then(|label| layout.label_to_step.get(label))
             .copied()
-            .unwrap_or(StepId::ACCEPT);
+            .expect("entrypoint must have compiled target");
 
         entrypoints.push(Entrypoint {
             name,
@@ -885,7 +891,7 @@ fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(symbols.len() * 4);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.0.to_le_bytes());
+        bytes.extend_from_slice(&sym.name.get().to_le_bytes());
     }
     bytes
 }
@@ -894,7 +900,7 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(symbols.len() * 4);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.0.to_le_bytes());
+        bytes.extend_from_slice(&sym.name.get().to_le_bytes());
     }
     bytes
 }
@@ -910,8 +916,8 @@ fn emit_trivia(entries: &[TriviaEntry]) -> Vec<u8> {
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * 8);
     for ep in entrypoints {
-        bytes.extend_from_slice(&ep.name.0.to_le_bytes());
-        bytes.extend_from_slice(&ep.target.0.to_le_bytes());
+        bytes.extend_from_slice(&ep.name.get().to_le_bytes());
+        bytes.extend_from_slice(&ep.target.get().to_le_bytes());
         bytes.extend_from_slice(&ep.result_type.0.to_le_bytes());
         bytes.extend_from_slice(&ep._pad.to_le_bytes());
     }

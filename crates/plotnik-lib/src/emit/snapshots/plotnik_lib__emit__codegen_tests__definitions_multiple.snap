@@ -34,14 +34,14 @@ Bar = 5 :: T2
 Foo = 1 :: T1
 
 [transitions]
-  0  𝜀                                      ◼
+  0   ε                                     ◼
 
 Foo:
-  1  𝜀                                      2
+  1   ε                                     2
   2       (identifier) [Node Set(M0)]       4
   4                                         ▶
 
 Bar:
-  5  𝜀                                      6
+  5   ε                                     6
   6       (string) [Node Set(M1)]           8
   8                                         ▶

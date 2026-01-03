@@ -16,10 +16,14 @@ S4 "parent"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { a, b }
+T2 = Struct  M2:1  ; { a }
+T3 = Struct  M3:1  ; { b }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
+M2: S1 → T0  ; a: <Node>
+M3: S2 → T0  ; b: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test
@@ -28,12 +32,12 @@ N0: S3 → T1  ; Test
 Test = 1 :: T1
 
 [transitions]
-  0  𝜀                                      ◼
+  0   ε                                     ◼
 
 Test:
-  1  𝜀                                      2
+  1   ε                                     2
   2       (parent)                          3
-  3  ↓*   (a) [Node Set(M0)]                5
-  5  *    (b) [Node Set(M1)]                7
-  7 *↑¹                                     8
+  3   ▽   (a) [Node Set(M0)]                5
+  5   ▷   (b) [Node Set(M1)]                7
+  7   △                                     8
   8                                         ▶

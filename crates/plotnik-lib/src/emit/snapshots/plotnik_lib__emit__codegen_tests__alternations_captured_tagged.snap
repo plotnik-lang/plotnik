@@ -38,15 +38,15 @@ N0: S6 → T4  ; Test
 Test = 01 :: T4
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀                                     09, 15
+  01   ε                                    02
+  02   ε                                    09, 15
   04                                        ▶
-  05  𝜀    [EndEnum Set(M4)]                04
+  05   ε   [EndEnum Set(M4)]                04
   07       (identifier) [Node Set(M0)]      05
-  09  𝜀    [Enum(M2)]                       07
-  11  𝜀    [EndEnum Set(M4)]                04
+  09   ε   [Enum(M2)]                       07
+  11   ε   [EndEnum Set(M4)]                04
   13       (number) [Node Set(M1)]          11
-  15  𝜀    [Enum(M3)]                       13
+  15   ε   [Enum(M3)]                       13

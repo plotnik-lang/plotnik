@@ -30,57 +30,61 @@ S12 "right"
 S13 "left"
 
 [type_defs]
-T0 = <Node>
-T1 = <String>
-T2 = Struct  M0:1  ; { name }
-T3 = Struct  M1:1  ; { value }
-T4 = Struct  M2:1  ; { name }
-T5 = Enum    M3:2  ; Literal | Variable
-T6 = Struct  M5:2  ; { value, target }
+T00 = <Node>
+T01 = <String>
+T02 = Struct  M0:1  ; { name }
+T03 = Struct  M1:1  ; { value }
+T04 = Struct  M2:1  ; { name }
+T05 = Enum    M3:2  ; Literal | Variable
+T06 = Struct  M5:2  ; { value, target }
+T07 = Struct  M7:1  ; { target }
+T08 = Struct  M8:1  ; { value }
 
 [type_members]
-M0: S01 → T1  ; name: <String>
-M1: S02 → T0  ; value: <Node>
-M2: S01 → T0  ; name: <Node>
-M3: S03 → T3  ; Literal: T3
-M4: S04 → T4  ; Variable: T4
-M5: S02 → T5  ; value: Expression
-M6: S05 → T0  ; target: <Node>
+M0: S01 → T01  ; name: <String>
+M1: S02 → T00  ; value: <Node>
+M2: S01 → T00  ; name: <Node>
+M3: S03 → T03  ; Literal: T03
+M4: S04 → T04  ; Variable: T04
+M5: S02 → T05  ; value: Expression
+M6: S05 → T00  ; target: <Node>
+M7: S05 → T00  ; target: <Node>
+M8: S02 → T05  ; value: Expression
 
 [type_names]
-N0: S06 → T2  ; Ident
-N1: S07 → T5  ; Expression
-N2: S08 → T6  ; Assignment
+N0: S06 → T02  ; Ident
+N1: S07 → T05  ; Expression
+N2: S08 → T06  ; Assignment
 
 [entrypoints]
-Assignment = 08 :: T6
-Expression = 05 :: T5
-Ident      = 01 :: T2
+Assignment = 08 :: T06
+Expression = 05 :: T05
+Ident      = 01 :: T02
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Ident:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (identifier) [Text Set(M0)]      04
   04                                        ▶
 
 Expression:
-  05  𝜀                                     06
-  06  𝜀                                     22, 28
+  05   ε                                    06
+  06   ε                                    22, 28
 
 Assignment:
-  08  𝜀                                     09
+  08   ε                                    09
   09       (assignment_expression)          10
-  10  ↓*   left: (identifier) [Node Set(M6)]  12
-  12  *  ▶ right: (Expression)              13
-  13  𝜀    [Set(M5)]                        15
-  15 *↑¹                                    16
+  10   ▽   left: (identifier) [Node Set(M6)]  12
+  12   ▷   right: (Expression)              13 ⯇
+  13   ε   [Set(M5)]                        15
+  15   △                                    16
   16                                        ▶
   17                                        ▶
-  18  𝜀    [EndEnum]                        17
+  18   ε   [EndEnum]                        17
   20       (number) [Node Set(M1)]          18
-  22  𝜀    [Enum(M3)]                       20
-  24  𝜀    [EndEnum]                        17
+  22   ε   [Enum(M3)]                       20
+  24   ε   [EndEnum]                        17
   26       (identifier) [Node Set(M2)]      24
-  28  𝜀    [Enum(M4)]                       26
+  28   ε   [Enum(M4)]                       26

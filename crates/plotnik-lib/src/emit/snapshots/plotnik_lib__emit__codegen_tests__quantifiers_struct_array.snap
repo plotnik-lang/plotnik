@@ -21,11 +21,15 @@ T0 = <Node>
 T1 = Struct  M0:2  ; { a, b }
 T2 = ArrayStar(T1)  ; T1*
 T3 = Struct  M2:1  ; { items }
+T4 = Struct  M3:1  ; { a }
+T5 = Struct  M4:1  ; { b }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
 M2: S3 → T2  ; items: T2
+M3: S1 → T0  ; a: <Node>
+M4: S2 → T0  ; b: <Node>
 
 [type_names]
 N0: S4 → T3  ; Test
@@ -34,23 +38,23 @@ N0: S4 → T3  ; Test
 Test = 01 :: T3
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (array)                          03
-  03  𝜀    [Arr]                            05
-  05  𝜀                                     19, 11
-  07  𝜀    [EndArr Set(M2)]                 09
-  09 *↑¹                                    10
+  03   ε   [Arr]                            05
+  05   ε                                    19, 11
+  07   ε   [EndArr Set(M2)]                 09
+  09   △                                    10
   10                                        ▶
-  11  𝜀    [EndArr Set(M2)]                 10
-  13  𝜀    [EndObj Push]                    29
-  15  *    (number) [Node Set(M1)]          13
-  17  ↓*   (identifier) [Node Set(M0)]      15
-  19  𝜀    [Obj]                            17
-  21  𝜀    [EndObj Push]                    29
-  23  *    (number) [Node Set(M1)]          21
-  25  *    (identifier) [Node Set(M0)]      23
-  27  𝜀    [Obj]                            25
-  29  𝜀                                     27, 07
+  11   ε   [EndArr Set(M2)]                 10
+  13   ε   [EndObj Push]                    29
+  15   ▷   (number) [Node Set(M1)]          13
+  17   ▽   (identifier) [Node Set(M0)]      15
+  19   ε   [Obj]                            17
+  21   ε   [EndObj Push]                    29
+  23   ▷   (number) [Node Set(M1)]          21
+  25   ▷   (identifier) [Node Set(M0)]      23
+  27   ε   [Obj]                            25
+  29   ε                                    27, 07

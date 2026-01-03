@@ -158,6 +158,16 @@ fn fields_negated() {
     "#});
 }
 
+#[test]
+fn fields_alternation() {
+    // Regression test: alternation in field position must have navigation on
+    // the field-checking wrapper, not on the alternation branches.
+    // See: wrapper navigates Down + checks field, branches use Stay.
+    snap!(indoc! {r#"
+        Test = (call_expression function: [(identifier) @fn (number) @num])
+    "#});
+}
+
 // ============================================================================
 // 4. QUANTIFIERS
 // ============================================================================

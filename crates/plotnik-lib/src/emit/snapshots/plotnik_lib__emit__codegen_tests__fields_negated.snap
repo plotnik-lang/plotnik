@@ -28,11 +28,11 @@ N0: S2 → T1  ; Test
 Test = 1 :: T1
 
 [transitions]
-  0  𝜀                                      ◼
+  0   ε                                     ◼
 
 Test:
-  1  𝜀                                      2
-  2       !type_parameters (function_declaration)  4
-  4  ↓*   name: (identifier) [Node Set(M0)]  6
-  6 *↑¹                                     7
+  1   ε                                     2
+  2       -type_parameters (function_declaration)  4
+  4   ▽   name: (identifier) [Node Set(M0)]  6
+  6   △                                     7
   7                                         ▶

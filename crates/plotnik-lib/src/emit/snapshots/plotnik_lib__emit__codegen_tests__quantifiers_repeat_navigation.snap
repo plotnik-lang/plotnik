@@ -28,17 +28,17 @@ N0: S2 → T2  ; Test
 Test = 01 :: T2
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (function_declaration)           03
-  03  𝜀    [Arr]                            05
-  05  𝜀                                     13, 11
-  07  𝜀    [EndArr Set(M0)]                 09
-  09 *↑¹                                    10
+  03   ε   [Arr]                            05
+  05   ε                                    13, 11
+  07   ε   [EndArr Set(M0)]                 09
+  09   △                                    10
   10                                        ▶
-  11  𝜀    [EndArr Set(M0)]                 10
-  13  ↓*   (decorator) [Push]               17
-  15  *    (decorator) [Push]               17
-  17  𝜀                                     15, 07
+  11   ε   [EndArr Set(M0)]                 10
+  13   ▽   (decorator) [Push]               17
+  15   ▷   (decorator) [Push]               17
+  17   ε                                    15, 07

@@ -27,13 +27,13 @@ N0: S2 → T2  ; Test
 Test = 01 :: T2
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀    [Arr]                            04
+  01   ε                                    02
+  02   ε   [Arr]                            04
   04       (identifier) [Push]              11
   06                                        ▶
-  07  𝜀    [EndArr Set(M0)]                 06
+  07   ε   [EndArr Set(M0)]                 06
   09       (identifier) [Push]              11
-  11  𝜀                                     07, 09
+  11   ε                                    07, 09
