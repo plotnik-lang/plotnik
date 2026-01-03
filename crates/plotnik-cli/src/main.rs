@@ -13,13 +13,15 @@ fn main() {
 
     match cli.command {
         Command::Tree {
-            source,
+            source_path,
+            source_text,
             lang,
             raw,
             spans,
         } => {
             commands::tree::run(TreeArgs {
-                source_path: source,
+                source_path,
+                source_text,
                 lang,
                 raw,
                 spans,

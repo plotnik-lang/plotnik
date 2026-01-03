@@ -6,15 +6,28 @@ use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 
 pub struct TreeArgs {
-    pub source_path: PathBuf,
+    pub source_path: Option<PathBuf>,
+    pub source_text: Option<String>,
     pub lang: Option<String>,
     pub raw: bool,
     pub spans: bool,
 }
 
 pub fn run(args: TreeArgs) {
-    let lang = resolve_lang(&args.lang, &args.source_path);
-    let source = load_source(&args.source_path);
+    let source = match (&args.source_text, &args.source_path) {
+        (Some(text), None) => text.clone(),
+        (None, Some(path)) => load_source(path),
+        (Some(_), Some(_)) => {
+            eprintln!("error: cannot use both --source and positional SOURCE");
+            std::process::exit(1);
+        }
+        (None, None) => {
+            eprintln!("error: source required (positional or --source)");
+            std::process::exit(1);
+        }
+    };
+
+    let lang = resolve_lang(&args.lang, args.source_path.as_deref(), args.source_text.is_some());
     let tree = lang.parse(&source);
     print!("{}", dump_tree(&tree, &source, args.raw, args.spans));
 }
@@ -33,7 +46,7 @@ fn load_source(path: &PathBuf) -> String {
     })
 }
 
-fn resolve_lang(lang: &Option<String>, source_path: &Path) -> Lang {
+fn resolve_lang(lang: &Option<String>, source_path: Option<&Path>, is_inline: bool) -> Lang {
     if let Some(name) = lang {
         return plotnik_langs::from_name(name).unwrap_or_else(|| {
             eprintln!("error: unknown language: {}", name);
@@ -41,19 +54,24 @@ fn resolve_lang(lang: &Option<String>, source_path: &Path) -> Lang {
         });
     }
 
-    if source_path.as_os_str() != "-"
-        && let Some(ext) = source_path.extension().and_then(|e| e.to_str())
+    if let Some(path) = source_path
+        && path.as_os_str() != "-"
+        && let Some(ext) = path.extension().and_then(|e| e.to_str())
     {
         return plotnik_langs::from_ext(ext).unwrap_or_else(|| {
             eprintln!(
-                "error: cannot infer language from extension '.{}', use --lang",
+                "error: cannot infer language from extension '.{}', use -l/--lang",
                 ext
             );
             std::process::exit(1);
         });
     }
 
-    eprintln!("error: --lang is required (cannot infer from stdin)");
+    if is_inline {
+        eprintln!("error: -l/--lang is required when using inline source");
+    } else {
+        eprintln!("error: -l/--lang is required (cannot infer from stdin)");
+    }
     std::process::exit(1);
 }
 
