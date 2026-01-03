@@ -321,6 +321,14 @@ fn alternations_captured_tagged() {
 }
 
 #[test]
+fn alternations_tagged_with_definition_ref() {
+    snap!(indoc! {r#"
+        Inner = (identifier) @name
+        Test = [A: (Inner)  B: (number) @b] @item
+    "#});
+}
+
+#[test]
 fn alternations_in_quantifier() {
     snap!(indoc! {r#"
         Test = (object { [A: (pair) @a  B: (shorthand_property_identifier) @b] @item }* @items)
