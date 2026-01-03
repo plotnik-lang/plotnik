@@ -34,11 +34,15 @@ pub enum Command {
     #[command(after_help = r#"EXAMPLES:
   plotnik tree app.ts
   plotnik tree app.ts --raw
-  plotnik tree app.ts --spans"#)]
+  plotnik tree -s 'let x = 1' -l javascript"#)]
     Tree {
         /// Source file to parse (use "-" for stdin)
         #[arg(value_name = "SOURCE")]
-        source: PathBuf,
+        source_path: Option<PathBuf>,
+
+        /// Inline source text
+        #[arg(short = 's', long = "source", value_name = "TEXT")]
+        source_text: Option<String>,
 
         /// Language (inferred from extension if not specified)
         #[arg(short = 'l', long, value_name = "LANG")]
