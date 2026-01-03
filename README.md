@@ -11,9 +11,8 @@
 <br/>
 
 <p align="center">
-  Plotnik is a query language for source code.<br/>
-  Queries extract relevant structured data.<br/>
-  Transactions allow granular, atomic edits.
+  A type-safe query language for source code.<br/>
+  Query in, typed data out.
 </p>
   
 <br/>
@@ -28,7 +27,7 @@
 <br/>
 
 <p align="center">
-  ⚠️ <a href="#roadmap">ALPHA STAGE</a>: not for production use ⚠️<br/>
+  ⚠️ <a href="#status">ALPHA STAGE</a>: not for production use ⚠️<br/>
 </p>
 
 <br/>
@@ -38,7 +37,7 @@
 
 Tree-sitter solved parsing. It powers syntax highlighting and code navigation at GitHub, drives the editing experience in Zed, Helix, and Neovim. It gives you a fast, accurate, incremental syntax tree for virtually any language.
 
-The hard problem now is what comes _after_ parsing: extraction of meaning from the tree, and safe transformation back to source:
+The hard problem now is what comes _after_ parsing: extracting structured data from the tree:
 
 ```typescript
 function extractFunction(node: SyntaxNode): FunctionInfo | null {
@@ -57,7 +56,7 @@ function extractFunction(node: SyntaxNode): FunctionInfo | null {
 }
 ```
 
-Every extraction requires a new function, each one a potential source of bugs that won't surface until production. And once you've extracted what you need, applying changes back to the source requires careful span tracking, validation, and error handling—another layer of brittle code.
+Every extraction requires a new function, each one a potential source of bugs that won't surface until production.
 
 ## The solution
 
@@ -80,8 +79,6 @@ interface FunctionInfo {
 ```
 
 This structure is guaranteed by the query engine. No defensive programming needed.
-
-Once extraction is complete, Plotnik will support **transactions** to apply validated changes back to the source. The same typed nodes used for extraction become targets for transformation—completing the loop from source to structured data and back to source.
 
 ## But what about Tree-sitter queries?
 
@@ -138,7 +135,22 @@ Plotnik extends Tree-sitter's query syntax with:
 
 ## Language design
 
-Plotnik builds on Tree-sitter's query syntax, extending it with the features needed for typed extraction:
+Start simple—extract all function names from a file:
+
+```clojure
+Functions = (program
+  {(function_declaration name: (identifier) @name :: string)}* @functions)
+```
+
+Plotnik infers the output type:
+
+```typescript
+type Functions = {
+  functions: { name: string }[];
+};
+```
+
+Scale up to tagged unions for richer structure:
 
 ```clojure
 Statement = [
@@ -193,53 +205,24 @@ for (const stmt of result.statements) {
 
 For the detailed specification, see the [Language Reference](docs/lang-reference.md).
 
+## Documentation
+
+- [CLI Guide](docs/cli.md) — Command-line tool usage
+- [Language Reference](docs/lang-reference.md) — Complete syntax and semantics
+- [Type System](docs/type-system.md) — How output types are inferred from queries
+- [Runtime Engine](docs/runtime-engine.md) — VM execution model (for contributors)
+
 ## Supported Languages
 
-Plotnik uses [arborium](https://github.com/bearcove/arborium), a batteries-included tree-sitter grammar collection with 60+ permissively-licensed languages out of the box.
+Plotnik bundles 15 languages out of the box: Bash, C, C++, CSS, Go, HTML, Java, JavaScript, JSON, Python, Rust, TOML, TSX, TypeScript, and YAML. The underlying [arborium](https://github.com/bearcove/arborium) collection includes 60+ permissively-licensed grammars—additional languages can be enabled as needed.
 
-## Roadmap
+## Status
 
-### Ignition: the parser ✓
+**Working now:** Parser with error recovery, type inference, query execution, CLI tools (`check`, `dump`, `infer`, `exec`, `trace`, `tree`, `langs`).
 
-The foundation is complete: a resilient parser that recovers from errors and keeps going.
+**Next up:** CLI distribution (Homebrew, npm), language bindings (TypeScript/WASM, Python), LSP server, editor extensions.
 
-- [x] Resilient parser
-- [x] Rich diagnostics
-- [x] Name resolution
-- [x] Recursion validation
-- [x] Structural validation
-
-### Liftoff: type inference
-
-The schema infrastructure is built. Type inference is next.
-
-- [x] `node-types.json` parsing and schema representation
-- [x] Proc macro for compile-time schema embedding
-- [x] Statically bundled languages with node type info
-- [x] Query validation against language schemas (unstable)
-- [x] Type inference
-
-### Acceleration: query engine
-
-- [x] Runtime execution with backtracking cursor walker
-- [x] Query IR
-- [ ] Advanced validation powered by `grammar.json` (production rules, precedence)
-- [ ] Match result API with typed accessors
-
-### Orbit: developer experience
-
-The CLI foundation exists. The full developer experience is ahead.
-
-- [x] CLI framework with `debug`, `docs`, `langs`, `exec`, `types` commands
-- [x] Query inspection: AST dump, symbol table, node arities, spans, transition graph, inferred types
-- [x] Source inspection: Tree-sitter parse tree visualization
-- [x] Execute queries against source code and output JSON (`exec`)
-- [x] Generate TypeScript types from queries (`types`)
-- [ ] CLI distribution: Homebrew, cargo-binstall, npm wrapper
-- [ ] Compiled queries via Rust proc macros (zero-cost: query → native code)
-- [ ] Language bindings: TypeScript (WASM), Python, Ruby
-- [ ] LSP server: diagnostics, completions, hover, go-to-definition
-- [ ] Editor extensions: VS Code, Zed, Neovim
+⚠️ Alpha stage—API may change. Not for production use.
 
 ## Acknowledgments
 
