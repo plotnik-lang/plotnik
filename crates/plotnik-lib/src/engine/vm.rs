@@ -231,8 +231,12 @@ impl<'t> VM<'t> {
 
         self.navigate_to_field(c.nav, c.node_field, tracer)?;
 
+        // Save cursor position AFTER navigation - this is where the callee starts matching.
+        // On Return, we restore to this position so Nav::Next in quantifier loops works correctly.
+        let saved_cursor = self.cursor.descendant_index();
+
         tracer.trace_call(c.target.get());
-        self.frames.push(c.next.get());
+        self.frames.push(c.next.get(), saved_cursor);
         self.recursion_depth += 1;
         self.ip = c.target.get();
         Ok(())
@@ -292,15 +296,18 @@ impl<'t> VM<'t> {
             return Err(RuntimeError::Accept);
         }
 
-        let return_addr = self.frames.pop();
+        let (return_addr, saved_cursor) = self.frames.pop();
         self.recursion_depth -= 1;
 
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
 
-        // Set matched_node to current cursor position so effects after
+        // Set matched_node BEFORE restoring cursor so effects after
         // a Call can capture the node that the callee matched.
         self.matched_node = Some(self.cursor.node());
+
+        // Restore cursor position for subsequent navigation (e.g., Nav::Next in quantifier loop)
+        self.cursor.goto_descendant(saved_cursor);
 
         self.ip = return_addr;
         Ok(())
