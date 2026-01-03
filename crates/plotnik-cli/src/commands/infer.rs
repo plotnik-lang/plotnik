@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+use plotnik_lib::Colors;
 use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::typegen::typescript;
@@ -101,11 +102,14 @@ pub fn run(args: InferArgs) {
         Some("null") => typescript::VoidType::Null,
         _ => typescript::VoidType::Undefined,
     };
+    // Only use colors when outputting to stdout (not to file)
+    let use_colors = args.color && args.output.is_none();
     let config = typescript::Config {
         export: args.export,
         emit_node_type: !args.no_node_type,
         verbose_nodes: args.verbose_nodes,
         void_type,
+        colors: Colors::new(use_colors),
     };
     let output = typescript::emit_with_config(&module, config);
 
