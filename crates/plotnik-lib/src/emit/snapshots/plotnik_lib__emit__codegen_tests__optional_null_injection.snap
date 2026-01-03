@@ -34,9 +34,13 @@ Test:
   01   ε                                    02
   02   ε   [Obj]                            04
   04       (function_declaration)           05
-  05   ε                                    07, 13
-  07   ▽   (decorator) [Node Set(M0)]       09
+  05   ε                                    20, 13
+  07       (decorator) [Node Set(M0)]       09
   09   △                                    11
   10                                        ▶
   11   ε   [EndObj]                         10
   13   ε   [Null Set(M0)]                   11
+  15   ▷                                    18
+  16   ε                                    15, 13
+  18   ε                                    07, 16
+  20   ▽                                    18

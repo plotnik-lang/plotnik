@@ -35,12 +35,19 @@ Test:
   02   ε   [Obj]                            04
   04       (function_declaration)           05
   05   ε   [Arr]                            07
-  07   ε                                    17, 15
+  07   ε                                    26, 19
   09   ε   [EndArr Set(M0)]                 11
-  11   △                                    13
-  12                                        ▶
-  13   ε   [EndObj]                         12
-  15   ε   [EndArr Set(M0)]                 13
-  17   ▽   (decorator) [Node Push]          21
-  19   ▷   (decorator) [Node Push]          21
-  21   ε                                    19, 09
+  11   △                                    17
+  12       (decorator) [Node Push]          14
+  14   ε                                    32, 09
+  16                                        ▶
+  17   ε   [EndObj]                         16
+  19   ε   [EndArr Set(M0)]                 17
+  21   ▷                                    24
+  22   ε                                    21, 19
+  24   ε                                    12, 22
+  26   ▽                                    24
+  27   ▷                                    30
+  28   ε                                    27, 09
+  30   ε                                    12, 28
+  32   ▷                                    30

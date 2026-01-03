@@ -45,18 +45,22 @@ Test:
   02   ε   [Obj]                            04
   04       (array)                          05
   05   ε   [Arr]                            07
-  07   ε                                    23, 15
+  07   ε                                    32, 19
   09   ε   [EndArr Set(M2)]                 11
-  11   △                                    13
-  12                                        ▶
-  13   ε   [EndObj]                         12
-  15   ε   [EndArr Set(M2)]                 13
-  17   ε   [EndObj Push]                    33
-  19   ▷   (number) [Node Set(M1)]          17
-  21   ▽   (identifier) [Node Set(M0)]      19
-  23   ε   [Obj]                            21
-  25   ε   [EndObj Push]                    33
-  27   ▷   (number) [Node Set(M1)]          25
-  29   ▷   (identifier) [Node Set(M0)]      27
-  31   ε   [Obj]                            29
-  33   ε                                    31, 09
+  11   △                                    17
+  12   ε   [EndObj Push]                    14
+  14   ε                                    38, 09
+  16                                        ▶
+  17   ε   [EndObj]                         16
+  19   ε   [EndArr Set(M2)]                 17
+  21   ▷   (number) [Node Set(M1)]          12
+  23       (identifier) [Node Set(M0)]      21
+  25   ε   [Obj]                            23
+  27   ▷                                    30
+  28   ε                                    27, 19
+  30   ε                                    25, 28
+  32   ▽                                    30
+  33   ▷                                    36
+  34   ε                                    33, 09
+  36   ε                                    25, 34
+  38   ▷                                    36

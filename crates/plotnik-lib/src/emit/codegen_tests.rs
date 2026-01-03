@@ -400,6 +400,14 @@ fn definitions_reference() {
     "#});
 }
 
+#[test]
+fn definitions_nested_capture() {
+    snap!(indoc! {r#"
+        Inner = (call (identifier) @name)
+        Outer = (parent {(Inner) @item}* @items)
+    "#});
+}
+
 // ============================================================================
 // 9. RECURSION
 // ============================================================================
