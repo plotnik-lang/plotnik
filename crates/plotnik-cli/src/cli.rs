@@ -31,10 +31,15 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     /// Explore a source file's tree-sitter AST
-    #[command(after_help = r#"EXAMPLES:
-  plotnik tree app.ts
-  plotnik tree app.ts --raw
-  plotnik tree -s 'let x = 1' -l javascript"#)]
+    #[command(
+        override_usage = "\
+  plotnik tree <SOURCE>
+  plotnik tree -s <TEXT> -l <LANG>",
+        after_help = r#"EXAMPLES:
+  plotnik tree app.ts                 # source file
+  plotnik tree app.ts --raw           # include anonymous nodes
+  plotnik tree -s 'let x = 1' -l js   # inline source"#
+    )]
     Tree {
         /// Source file to parse (use "-" for stdin)
         #[arg(value_name = "SOURCE")]
@@ -58,11 +63,17 @@ pub enum Command {
     },
 
     /// Validate a query
-    #[command(after_help = r#"EXAMPLES:
-  plotnik check query.ptk
-  plotnik check query.ptk -l typescript
-  plotnik check queries.ts/
-  plotnik check -q '(identifier) @id' -l javascript"#)]
+    #[command(
+        override_usage = "\
+  plotnik check <QUERY>
+  plotnik check <QUERY> -l <LANG>
+  plotnik check -q <TEXT> [-l <LANG>]",
+        after_help = r#"EXAMPLES:
+  plotnik check query.ptk             # validate syntax only
+  plotnik check query.ptk -l ts       # also check against grammar
+  plotnik check queries.ts/           # workspace directory
+  plotnik check -q 'Q = ...' -l js    # inline query"#
+    )]
     Check {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]
@@ -85,10 +96,16 @@ pub enum Command {
     },
 
     /// Show compiled bytecode
-    #[command(after_help = r#"EXAMPLES:
-  plotnik dump query.ptk
-  plotnik dump query.ptk -l typescript
-  plotnik dump -q '(identifier) @id'"#)]
+    #[command(
+        override_usage = "\
+  plotnik dump <QUERY>
+  plotnik dump <QUERY> -l <LANG>
+  plotnik dump -q <TEXT> [-l <LANG>]",
+        after_help = r#"EXAMPLES:
+  plotnik dump query.ptk             # unlinked bytecode
+  plotnik dump query.ptk -l ts       # linked (resolved node types)
+  plotnik dump -q 'Q = ...'          # inline query"#
+    )]
     Dump {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]
@@ -107,13 +124,17 @@ pub enum Command {
     },
 
     /// Generate type definitions from a query
-    #[command(after_help = r#"EXAMPLES:
-  plotnik infer query.ptk -l javascript
-  plotnik infer queries.ts/ -o types.d.ts
-  plotnik infer -q '(function_declaration) @fn' -l typescript
-  plotnik infer query.ptk -l js --verbose-nodes
+    #[command(
+        override_usage = "\
+  plotnik infer <QUERY> -l <LANG>
+  plotnik infer -q <TEXT> -l <LANG>",
+        after_help = r#"EXAMPLES:
+  plotnik infer query.ptk -l js       # from file
+  plotnik infer -q 'Q = ...' -l ts    # inline query
+  plotnik infer query.ptk -l js -o types.d.ts  # write to file
 
-NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
+NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#
+    )]
     Infer {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]
@@ -135,10 +156,16 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
     },
 
     /// Execute a query against source code and output JSON
-    #[command(after_help = r#"EXAMPLES:
-  plotnik exec query.ptk app.js
-  plotnik exec -q '(identifier) @id' -s 'let x = 1' -l javascript
-  plotnik exec query.ptk app.ts --compact"#)]
+    #[command(
+        override_usage = "\
+  plotnik exec <QUERY> <SOURCE>
+  plotnik exec -q <TEXT> <SOURCE>
+  plotnik exec -q <TEXT> -s <TEXT> -l <LANG>",
+        after_help = r#"EXAMPLES:
+  plotnik exec query.ptk app.js           # two positional files
+  plotnik exec -q 'Q = ...' app.js        # inline query + source file
+  plotnik exec -q 'Q = ...' -s 'let x' -l js  # all inline"#
+    )]
     Exec {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]
@@ -168,10 +195,16 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
     },
 
     /// Trace query execution for debugging
-    #[command(after_help = r#"EXAMPLES:
-  plotnik trace -q '(identifier) @id' -s 'let x = 1' -l javascript
-  plotnik trace query.ptk app.ts
-  plotnik trace query.ptk app.ts --no-result"#)]
+    #[command(
+        override_usage = "\
+  plotnik trace <QUERY> <SOURCE>
+  plotnik trace -q <TEXT> <SOURCE>
+  plotnik trace -q <TEXT> -s <TEXT> -l <LANG>",
+        after_help = r#"EXAMPLES:
+  plotnik trace query.ptk app.js          # two positional files
+  plotnik trace -q 'Q = ...' app.js       # inline query + source file
+  plotnik trace -q 'Q = ...' -s 'let x' -l js  # all inline"#
+    )]
     Trace {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]

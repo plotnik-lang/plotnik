@@ -226,10 +226,17 @@ Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
 
 Execute a query against source code and output JSON.
 
+**Usage variants:**
+```
+exec <QUERY> <SOURCE>           # two positional files
+exec -q <TEXT> <SOURCE>         # inline query + source file
+exec -q <TEXT> -s <TEXT> -l <LANG>  # all inline
+```
+
 ```sh
 cargo run -p plotnik-cli -- exec query.ptk app.ts
-cargo run -p plotnik-cli -- exec -q '(identifier) @id' app.ts       # -q shifts positional to source
-cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s 'let x' -l javascript
+cargo run -p plotnik-cli -- exec -q 'Q = (identifier) @id' app.ts
+cargo run -p plotnik-cli -- exec -q 'Q = (identifier) @id' -s 'let x' -l javascript
 ```
 
 Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
@@ -238,9 +245,16 @@ Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
 
 Trace query execution for debugging.
 
+**Usage variants:**
+```
+trace <QUERY> <SOURCE>           # two positional files
+trace -q <TEXT> <SOURCE>         # inline query + source file
+trace -q <TEXT> -s <TEXT> -l <LANG>  # all inline
+```
+
 ```sh
 cargo run -p plotnik-cli -- trace query.ptk app.ts
-cargo run -p plotnik-cli -- trace -q '(identifier) @id' app.ts      # -q shifts positional to source
+cargo run -p plotnik-cli -- trace -q 'Q = (identifier) @id' app.ts
 cargo run -p plotnik-cli -- trace query.ptk app.ts --no-result -vv
 ```
 

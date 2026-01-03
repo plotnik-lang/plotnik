@@ -152,61 +152,113 @@ Supported languages (107):
 Execute a query against source code and output JSON matches.
 
 ```sh
-# Basic execution
-plotnik exec -q 'Q = (identifier) @id' -s app.js
+# Two positional arguments: QUERY SOURCE
+plotnik exec query.ptk app.js
 
-# Pretty-print JSON
-plotnik exec -q 'Q = (identifier) @id' -s app.js --pretty
+# Inline query + positional source (most common)
+plotnik exec -q 'Q = (identifier) @id' app.js
+
+# All inline (requires -l)
+plotnik exec -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
 
 # Include source positions in output
-plotnik exec -q 'Q = (function_declaration) @fn' -s app.ts -l typescript --verbose-nodes
+plotnik exec -q 'Q = (identifier) @id' app.ts --verbose-nodes
 
 # Start from a specific definition
-plotnik exec --query-file query.ptk -s app.js --entry FunctionDef
+plotnik exec query.ptk app.js --entry FunctionDef
 ```
+
+**Flags:**
+
+| Flag              | Purpose                               |
+| ----------------- | ------------------------------------- |
+| `-q, --query`     | Inline query text                     |
+| `-s, --source`    | Inline source text                    |
+| `-l, --lang`      | Language (inferred from file ext)     |
+| `--compact`       | Output compact JSON                   |
+| `--verbose-nodes` | Include line/column in nodes          |
+| `--check`         | Validate output against inferred types|
+| `--entry NAME`    | Start from specific definition        |
 
 ---
 
-## Input Sources
+### trace
 
-### Query Input
+Trace query execution for debugging.
 
-Mutually exclusive—pick one:
+```sh
+# Inline query + positional source
+plotnik trace -q 'Q = (identifier) @id' app.js
 
-| Option              | Usage                              |
-| ------------------- | ---------------------------------- |
-| `-q, --query TEXT`  | Inline query text                  |
-| `--query-file FILE` | Read from file (use `-` for stdin) |
+# Two positional arguments
+plotnik trace query.ptk app.js
 
-### Source Input
+# All inline
+plotnik trace -q 'Q = (identifier) @id' -s 'let x = 1' -l js
 
-Mutually exclusive—pick one:
+# Skip result, show only effects
+plotnik trace query.ptk app.js --no-result
 
-| Option                   | Usage                              |
-| ------------------------ | ---------------------------------- |
-| `--source TEXT`          | Inline source code                 |
-| `-s, --source-file FILE` | Read from file (use `-` for stdin) |
+# Increase verbosity
+plotnik trace query.ptk app.js -v   # verbose
+plotnik trace query.ptk app.js -vv  # very verbose
+```
 
-**Language detection:**
+**Flags:**
 
-- File input: language inferred from extension (`.ts` → typescript)
-- Inline text: requires `-l/--lang` flag
+| Flag          | Purpose                        |
+| ------------- | ------------------------------ |
+| `-v`          | Verbose output                 |
+| `-vv`         | Very verbose output            |
+| `--no-result` | Skip materialization           |
+| `--fuel N`    | Execution fuel limit           |
+| `--entry`     | Start from specific definition |
+
+---
+
+## Input Modes
+
+### Query-Only Commands (tree, check, dump, infer)
+
+These commands take a single input. Use either:
+- **Positional**: `plotnik tree app.ts` or `plotnik dump query.ptk`
+- **Flag**: `plotnik tree -s 'let x' -l js` or `plotnik dump -q 'Q = ...'`
+
+### Query+Source Commands (exec, trace)
+
+These commands take two inputs. Use any combination:
+
+| Pattern                         | Query from    | Source from    |
+| ------------------------------- | ------------- | -------------- |
+| `exec QUERY SOURCE`             | 1st positional| 2nd positional |
+| `exec -q '...' SOURCE`          | `-q` flag     | positional     |
+| `exec -s '...' QUERY -l lang`   | positional    | `-s` flag      |
+| `exec -q '...' -s '...' -l lang`| `-q` flag     | `-s` flag      |
+
+**Key rule**: When `-q` is provided with one positional, it becomes SOURCE.
+
+### Language Detection
+
+| Input type   | Language             |
+| ------------ | -------------------- |
+| File         | Inferred from `.ext` |
+| Inline (`-s`)| Requires `-l`        |
 
 ---
 
 ## Reading from Stdin
 
-Use `-` as the filename:
+Use `-` as the file argument:
 
 ```sh
 # Query from stdin
-echo 'Q = (identifier) @id' | plotnik debug --query-file -
+echo 'Q = (identifier) @id' | plotnik dump -
 
 # Source from stdin
-cat app.ts | plotnik debug --source-file - -l typescript
+cat app.ts | plotnik tree -
 
-# Pipe query file, source from argument
-plotnik infer --query-file - -l javascript < query.ptk
+# Exec: query from stdin, source from file
+echo 'Q = (identifier) @id' | plotnik exec - app.js
 ```
 
 ---

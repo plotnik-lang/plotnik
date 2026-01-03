@@ -1,6 +1,8 @@
 mod cli;
 mod commands;
 
+use std::path::PathBuf;
+
 use cli::{Cli, Command};
 use commands::check::CheckArgs;
 use commands::dump::DumpArgs;
@@ -8,6 +10,20 @@ use commands::exec::ExecArgs;
 use commands::infer::InferArgs;
 use commands::trace::TraceArgs;
 use commands::tree::TreeArgs;
+
+/// When -q is used with a single positional arg, shift it from query to source.
+/// This enables: `plotnik exec -q 'query' source.js`
+fn shift_positional_to_source(
+    has_query_text: bool,
+    query_path: Option<PathBuf>,
+    source_path: Option<PathBuf>,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    if has_query_text && query_path.is_some() && source_path.is_none() {
+        (None, query_path)
+    } else {
+        (query_path, source_path)
+    }
+}
 
 fn main() {
     let cli = <Cli as clap::Parser>::parse();
@@ -85,6 +101,13 @@ fn main() {
             exec_output,
             output,
         } => {
+            // When -q is used with a single positional, shift it to source
+            let (query_path, source_path) = shift_positional_to_source(
+                query_text.is_some(),
+                query_path,
+                source_path,
+            );
+
             // Pretty by default when stdout is a TTY, unless --compact is passed
             let pretty =
                 !exec_output.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
@@ -111,6 +134,13 @@ fn main() {
             fuel,
             output,
         } => {
+            // When -q is used with a single positional, shift it to source
+            let (query_path, source_path) = shift_positional_to_source(
+                query_text.is_some(),
+                query_path,
+                source_path,
+            );
+
             use plotnik_lib::engine::Verbosity;
 
             let verbosity = match verbose {
