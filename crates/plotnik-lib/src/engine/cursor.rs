@@ -104,6 +104,7 @@ impl<'t> CursorWrapper<'t> {
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
         match nav {
             Nav::Stay => Some(SkipPolicy::Any),
+            Nav::StayExact => Some(SkipPolicy::Exact),
             Nav::Down => self.go_first_child().then_some(SkipPolicy::Any),
             Nav::DownSkip => self.go_first_child().then_some(SkipPolicy::Trivia),
             Nav::DownExact => self.go_first_child().then_some(SkipPolicy::Exact),

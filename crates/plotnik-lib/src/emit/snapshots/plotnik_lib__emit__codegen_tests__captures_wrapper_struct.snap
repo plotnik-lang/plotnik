@@ -54,13 +54,13 @@ Test:
   15   ε   [EndArr Set(M3)]                 13
   17   ε   [EndObj Set(M2)]                 08
   19   ▷   (number) [Node Set(M1)]          17
-  21       (identifier) [Node Set(M0)]      19
+  21  ‼·   (identifier) [Node Set(M0)]      19
   23   ε   [Obj]                            21
   25   ε   [Obj]                            23
   27   ▷                                    30
   28   ε                                    27, 15
   30   ε                                    25, 28
-  32   ▽                                    30
+  32  ‼·                                    30
   33   ▷                                    36
   34   ε                                    33, 15
   36   ε                                    25, 34

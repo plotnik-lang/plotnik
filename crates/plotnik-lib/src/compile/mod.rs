@@ -165,6 +165,12 @@ impl<'a> Compiler<'a> {
             .and_then(|tid| self.type_ctx.get_type(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
 
+        // Definition bodies use StayExact navigation: match at current position only.
+        // The caller (alternation, sequence, quantifier, or VM top-level) owns the search.
+        // This ensures named definition calls don't advance past positions that other
+        // alternation branches should try.
+        let body_nav = Some(Nav::StayExact);
+
         let body_entry = if def_returns_struct {
             let type_id = self.type_ctx.get_def_type(def_id).expect("checked above");
 
@@ -182,7 +188,9 @@ impl<'a> Compiler<'a> {
             }));
 
             // Compile body with scope, targeting EndObj
-            let inner_entry = self.with_scope(type_id, |this| this.compile_expr(body, endobj_label));
+            let inner_entry = self.with_scope(type_id, |this| {
+                this.compile_expr_with_nav(body, endobj_label, body_nav)
+            });
 
             // Emit Obj → inner_entry
             let obj_label = self.fresh_label();
@@ -199,9 +207,9 @@ impl<'a> Compiler<'a> {
 
             obj_label
         } else if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
-            self.with_scope(type_id, |this| this.compile_expr(body, return_label))
+            self.with_scope(type_id, |this| this.compile_expr_with_nav(body, return_label, body_nav))
         } else {
-            self.compile_expr(body, return_label)
+            self.compile_expr_with_nav(body, return_label, body_nav)
         };
 
         // If body_entry differs from our pre-allocated entry, emit an epsilon jump
@@ -210,20 +218,6 @@ impl<'a> Compiler<'a> {
         }
 
         Ok(())
-    }
-
-    /// Compile an expression, returning its entry label.
-    pub(super) fn compile_expr(&mut self, expr: &Expr, exit: Label) -> Label {
-        match expr {
-            Expr::NamedNode(n) => self.compile_named_node(n, exit),
-            Expr::AnonymousNode(n) => self.compile_anonymous_node(n, exit),
-            Expr::Ref(r) => self.compile_ref(r, exit),
-            Expr::SeqExpr(s) => self.compile_seq(s, exit),
-            Expr::AltExpr(a) => self.compile_alt(a, exit),
-            Expr::QuantifiedExpr(q) => self.compile_quantified(q, exit),
-            Expr::FieldExpr(f) => self.compile_field(f, exit),
-            Expr::CapturedExpr(c) => self.compile_captured(c, exit),
-        }
     }
 
     /// Compile an expression with an optional navigation override.

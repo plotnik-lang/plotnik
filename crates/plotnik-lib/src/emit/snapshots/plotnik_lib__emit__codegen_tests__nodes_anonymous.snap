@@ -32,7 +32,7 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (binary_expression)              05
+  04  ‼·   (binary_expression)              05
   05   ▽   (+) [Node Set(M0)]               07
   07   △                                    08
   08   ε   [EndObj]                         10

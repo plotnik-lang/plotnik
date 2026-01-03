@@ -37,7 +37,7 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (parent)                         05
+  04  ‼·   (parent)                         05
   05   ▽   (a) [Node Set(M0)]               07
   07   ▷   (b) [Node Set(M1)]               09
   09   △                                    10

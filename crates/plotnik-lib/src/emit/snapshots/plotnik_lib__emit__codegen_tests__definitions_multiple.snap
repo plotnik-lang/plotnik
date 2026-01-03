@@ -39,13 +39,13 @@ Foo = 01 :: T1
 Foo:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (identifier) [Node Set(M0)]      06
+  04  ‼·   (identifier) [Node Set(M0)]      06
   06   ε   [EndObj]                         08
   08                                        ▶
 
 Bar:
   09   ε                                    10
   10   ε   [Obj]                            12
-  12       (string) [Node Set(M1)]          14
+  12  ‼·   (string) [Node Set(M1)]          14
   14   ε   [EndObj]                         16
   16                                        ▶

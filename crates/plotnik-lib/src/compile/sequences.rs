@@ -14,11 +14,6 @@ use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier,
 use super::Compiler;
 
 impl Compiler<'_> {
-    /// Compile a sequence: `{a b c}`.
-    pub(super) fn compile_seq(&mut self, seq: &ast::SeqExpr, exit: Label) -> Label {
-        self.compile_seq_inner(seq, exit, None, CaptureEffects::default())
-    }
-
     /// Compile a sequence with capture effects (passed to last item).
     pub(super) fn compile_seq_inner(
         &mut self,
@@ -173,11 +168,6 @@ impl Compiler<'_> {
         self.compile_skippable_with_exits(first_expr, match_exit, skip_exit, first_nav, capture)
     }
 
-    /// Compile an alternation: `[a b c]`.
-    pub(super) fn compile_alt(&mut self, alt: &ast::AltExpr, exit: Label) -> Label {
-        self.compile_alt_inner(alt, exit, None, CaptureEffects::default())
-    }
-
     /// Compile an alternation with capture effects (passed to each branch).
     pub(super) fn compile_alt_inner(
         &mut self,
@@ -208,8 +198,13 @@ impl Compiler<'_> {
         };
         let merged_fields = alt_type_id.and_then(|id| self.type_ctx.get_struct_fields(id));
 
+        // Convert navigation to exact variant for alternation branches.
+        // Branches should match at their exact cursor position only -
+        // the search among positions is owned by the parent context.
+        // When first_nav is None (standalone definition), use StayExact.
+        let branch_nav = Some(first_nav.map_or(Nav::StayExact, Nav::to_exact));
+
         // Compile each branch, collecting entry labels
-        // Each branch gets the same nav override since any branch could match first
         let mut successors = Vec::new();
         for (variant_idx, branch) in branches.iter().enumerate() {
             let Some(body) = branch.body() else {
@@ -237,10 +232,10 @@ impl Compiler<'_> {
                 // Compile body with variant's scope (no outer capture - it's on EndEnum)
                 let body_entry = if let Some(&payload_type_id) = variant_types.get(variant_idx) {
                     self.with_scope(payload_type_id, |this| {
-                        this.compile_expr_inner(&body, ende_step, first_nav, CaptureEffects::default())
+                        this.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
                     })
                 } else {
-                    self.compile_expr_inner(&body, ende_step, first_nav, CaptureEffects::default())
+                    self.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
                 };
 
                 // Create deferred member reference for the enum variant
@@ -265,7 +260,7 @@ impl Compiler<'_> {
                 successors.push(e_step);
             } else {
                 // Untagged branch: compile body, then inject Null for missing captures
-                let branch_entry = self.compile_expr_inner(&body, exit, first_nav, capture.clone());
+                let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, capture.clone());
 
                 let Some(fields) = merged_fields else {
                     successors.push(branch_entry);

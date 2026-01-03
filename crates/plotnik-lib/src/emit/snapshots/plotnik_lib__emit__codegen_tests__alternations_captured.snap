@@ -35,5 +35,5 @@ Test:
   04   ε                                    09, 11
   06                                        ▶
   07   ε   [EndObj]                         06
-  09       (identifier) [Node Set(M0)]      07
-  11       (number) [Node Set(M0)]          07
+  09  ‼·   (identifier) [Node Set(M0)]      07
+  11  ‼·   (number) [Node Set(M0)]          07

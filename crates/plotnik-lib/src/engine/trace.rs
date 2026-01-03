@@ -369,7 +369,7 @@ impl Tracer for PrintTracer<'_> {
             Nav::Down | Nav::DownSkip | Nav::DownExact => trace::NAV_DOWN,
             Nav::Next | Nav::NextSkip | Nav::NextExact => trace::NAV_NEXT,
             Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => trace::NAV_UP,
-            Nav::Stay => Symbol::EMPTY,
+            Nav::Stay | Nav::StayExact => Symbol::EMPTY,
         };
 
         // Text only in VeryVerbose (text is dim)

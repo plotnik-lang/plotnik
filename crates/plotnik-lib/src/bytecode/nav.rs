@@ -7,6 +7,8 @@
 pub enum Nav {
     #[default]
     Stay,
+    /// Stay at current position, exact match only (no continue_search).
+    StayExact,
     Next,
     NextSkip,
     NextExact,
@@ -31,12 +33,13 @@ impl Nav {
         match mode {
             0b00 => match payload {
                 0 => Self::Stay,
-                1 => Self::Next,
-                2 => Self::NextSkip,
-                3 => Self::NextExact,
-                4 => Self::Down,
-                5 => Self::DownSkip,
-                6 => Self::DownExact,
+                1 => Self::StayExact,
+                2 => Self::Next,
+                3 => Self::NextSkip,
+                4 => Self::NextExact,
+                5 => Self::Down,
+                6 => Self::DownSkip,
+                7 => Self::DownExact,
                 _ => panic!("invalid nav standard: {payload}"),
             },
             0b01 => {
@@ -59,12 +62,13 @@ impl Nav {
     pub fn to_byte(self) -> u8 {
         match self {
             Self::Stay => 0,
-            Self::Next => 1,
-            Self::NextSkip => 2,
-            Self::NextExact => 3,
-            Self::Down => 4,
-            Self::DownSkip => 5,
-            Self::DownExact => 6,
+            Self::StayExact => 1,
+            Self::Next => 2,
+            Self::NextSkip => 3,
+            Self::NextExact => 4,
+            Self::Down => 5,
+            Self::DownSkip => 6,
+            Self::DownExact => 7,
             Self::Up(n) => {
                 debug_assert!((1..=63).contains(&n));
                 0b01_000000 | n
@@ -79,6 +83,22 @@ impl Nav {
             }
         }
     }
+
+    /// Convert navigation to its exact variant (no search loop).
+    ///
+    /// Used by alternation branches which should match at their exact
+    /// cursor position only - the search among positions is owned by
+    /// the parent context (quantifier's skip-retry, sequence advancement).
+    pub fn to_exact(self) -> Self {
+        match self {
+            Self::Down | Self::DownSkip => Self::DownExact,
+            Self::Next | Self::NextSkip => Self::NextExact,
+            Self::Stay => Self::StayExact,
+            Self::Up(n) | Self::UpSkipTrivia(n) => Self::UpExact(n),
+            // Already exact variants
+            Self::DownExact | Self::NextExact | Self::StayExact | Self::UpExact(_) => self,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -89,6 +109,7 @@ mod tests {
     fn nav_standard_roundtrip() {
         for nav in [
             Nav::Stay,
+            Nav::StayExact,
             Nav::Next,
             Nav::NextSkip,
             Nav::NextExact,
@@ -115,7 +136,8 @@ mod tests {
     #[test]
     fn nav_byte_encoding() {
         assert_eq!(Nav::Stay.to_byte(), 0b00_000000);
-        assert_eq!(Nav::Down.to_byte(), 0b00_000100);
+        assert_eq!(Nav::StayExact.to_byte(), 0b00_000001);
+        assert_eq!(Nav::Down.to_byte(), 0b00_000101);
         assert_eq!(Nav::Up(5).to_byte(), 0b01_000101);
         assert_eq!(Nav::UpSkipTrivia(3).to_byte(), 0b10_000011);
         assert_eq!(Nav::UpExact(1).to_byte(), 0b11_000001);
