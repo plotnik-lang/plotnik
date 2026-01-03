@@ -47,7 +47,7 @@ Test  = 09 :: T4
 Inner:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (identifier) [Node Set(M0)]      06
+  04  ‼·   (identifier) [Node Set(M0)]      06
   06   ε   [EndObj]                         08
   08                                        ▶
 
@@ -58,8 +58,8 @@ Test:
   14                                        ▶
   15   ε   [EndObj]                         14
   17   ε   [EndEnum Set(M4)]                15
-  19       (Inner)                          17 ⯇
+  19  ‼·   (Inner)                          17 ⯇
   20   ε   [Enum(M2)]                       19
   22   ε   [EndEnum Set(M4)]                15
-  24       (number) [Node Set(M1)]          22
+  24  ‼·   (number) [Node Set(M1)]          22
   26   ε   [Enum(M3)]                       24

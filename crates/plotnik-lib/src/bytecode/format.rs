@@ -86,6 +86,7 @@ impl Symbol {
 /// | --------------- | ------- | ----------------------------------- |
 /// | Stay            | (blank) | No movement, 5 spaces               |
 /// | Stay (epsilon)  | ε       | Only when no type/field constraints |
+/// | StayExact       | ‼·      | Stay at position, exact match only  |
 /// | Down            | ▽       | First child, skip any               |
 /// | DownSkip        | !▽      | First child, skip trivia            |
 /// | DownExact       | ‼▽      | First child, exact                  |
@@ -98,6 +99,7 @@ impl Symbol {
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Stay => Symbol::EMPTY,
+        Nav::StayExact => Symbol::new(" ‼", "·", "  "),
         Nav::Down => Symbol::new("  ", "▽", "  "),
         Nav::DownSkip => Symbol::new(" !", "▽", "  "),
         Nav::DownExact => Symbol::new(" ‼", "▽", "  "),

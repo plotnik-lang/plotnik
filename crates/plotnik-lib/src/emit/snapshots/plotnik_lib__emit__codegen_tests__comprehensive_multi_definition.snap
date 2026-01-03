@@ -67,7 +67,7 @@ Ident      = 01 :: T02
 Ident:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (identifier) [Text Set(M0)]      06
+  04  ‼·   (identifier) [Text Set(M0)]      06
   06   ε   [EndObj]                         08
   08                                        ▶
 
@@ -78,7 +78,7 @@ Expression:
 Assignment:
   12   ε                                    13
   13   ε   [Obj]                            15
-  15       (assignment_expression)          16
+  15  ‼·   (assignment_expression)          16
   16   ▽   left: (identifier) [Node Set(M6)]  18
   18   ▷   right: (Expression)              19 ⯇
   19   ε   [Set(M5)]                        21
@@ -87,8 +87,8 @@ Assignment:
   24                                        ▶
   25                                        ▶
   26   ε   [EndEnum]                        25
-  28       (number) [Node Set(M1)]          26
+  28  ‼·   (number) [Node Set(M1)]          26
   30   ε   [Enum(M3)]                       28
   32   ε   [EndEnum]                        25
-  34       (identifier) [Node Set(M2)]      32
+  34  ‼·   (identifier) [Node Set(M2)]      32
   36   ε   [Enum(M4)]                       34

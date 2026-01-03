@@ -18,11 +18,6 @@ use super::navigation::{check_trailing_anchor, inner_creates_scope, is_skippable
 use super::Compiler;
 
 impl Compiler<'_> {
-    /// Compile a named node: `(identifier)` or `(call_expression arg: ...)`.
-    pub(super) fn compile_named_node(&mut self, node: &ast::NamedNode, exit: Label) -> Label {
-        self.compile_named_node_inner(node, exit, None, CaptureEffects::default())
-    }
-
     /// Compile a named node with capture effects.
     pub(super) fn compile_named_node_inner(
         &mut self,
@@ -109,11 +104,6 @@ impl Compiler<'_> {
         entry
     }
 
-    /// Compile an anonymous node: `"+"` or `_`.
-    pub(super) fn compile_anonymous_node(&mut self, node: &ast::AnonymousNode, exit: Label) -> Label {
-        self.compile_anonymous_node_inner(node, exit, None, CaptureEffects::default())
-    }
-
     /// Compile an anonymous node with capture effects.
     pub(super) fn compile_anonymous_node_inner(
         &mut self,
@@ -143,11 +133,6 @@ impl Compiler<'_> {
         }));
 
         entry
-    }
-
-    /// Compile a reference: `(Expr)`.
-    pub(super) fn compile_ref(&mut self, r: &ast::Ref, exit: Label) -> Label {
-        self.compile_ref_inner(r, exit, None, None, CaptureEffects::default())
     }
 
     /// Compile a reference with capture effects.
@@ -205,11 +190,6 @@ impl Compiler<'_> {
         }));
 
         call_label
-    }
-
-    /// Compile a field constraint: `name: pattern`.
-    pub(super) fn compile_field(&mut self, field: &ast::FieldExpr, exit: Label) -> Label {
-        self.compile_field_inner(field, exit, None, CaptureEffects::default())
     }
 
     /// Compile a field constraint with capture effects (passed to inner pattern).
@@ -292,11 +272,6 @@ impl Compiler<'_> {
         }
 
         value_entry
-    }
-
-    /// Compile a captured expression: `@name` or `pattern @name`.
-    pub(super) fn compile_captured(&mut self, cap: &ast::CapturedExpr, exit: Label) -> Label {
-        self.compile_captured_inner(cap, exit, None, CaptureEffects::default())
     }
 
     /// Compile a captured expression with capture effects from outer layers.

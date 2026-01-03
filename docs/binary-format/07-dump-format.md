@@ -189,6 +189,7 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | --------------- | ------- | ----------------------------------- |
 | Stay            | (blank) | No movement, 5 spaces               |
 | Stay (epsilon)  | ε       | Only when no type/field constraints |
+| StayExact       | ‼·      | No movement, exact match only       |
 | Down            | ▽       | First child, skip any               |
 | DownSkip        | !▽      | First child, skip trivia            |
 | DownExact       | ‼▽      | First child, exact                  |

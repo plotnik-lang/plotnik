@@ -65,12 +65,13 @@ Bit-packed navigation command.
 **Standard Modes**:
 
 - `0`: `Stay` (No movement)
-- `1`: `Next` (Sibling, skip any)
-- `2`: `NextSkip` (Sibling, skip trivia)
-- `3`: `NextExact` (Sibling, exact)
-- `4`: `Down` (Child, skip any)
-- `5`: `DownSkip` (Child, skip trivia)
-- `6`: `DownExact` (Child, exact)
+- `1`: `StayExact` (No movement, exact match only)
+- `2`: `Next` (Sibling, skip any)
+- `3`: `NextSkip` (Sibling, skip trivia)
+- `4`: `NextExact` (Sibling, exact)
+- `5`: `Down` (Child, skip any)
+- `6`: `DownSkip` (Child, skip trivia)
+- `7`: `DownExact` (Child, exact)
 
 ### 3.2. EffectOp (u16)
 

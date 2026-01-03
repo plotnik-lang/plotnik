@@ -75,11 +75,6 @@ pub struct QuantifierConfig<'a> {
 }
 
 impl Compiler<'_> {
-    /// Compile a quantified expression: `a?`, `a*`, `a+`.
-    pub(super) fn compile_quantified(&mut self, quant: &ast::QuantifiedExpr, exit: Label) -> Label {
-        self.compile_quantified_inner(quant, exit, None, CaptureEffects::default())
-    }
-
     /// Compile a quantified expression with capture effects (passed to body).
     pub(super) fn compile_quantified_inner(
         &mut self,
@@ -340,8 +335,9 @@ impl Compiler<'_> {
                 // First iteration has no exit fallback (backtrack propagates to caller)
                 let loop_entry = self.fresh_label();
 
-                // Compile body ONCE with Nav::Stay
-                let body_entry = compile_body(self, Some(Nav::Stay), loop_entry);
+                // Compile body ONCE with Nav::StayExact (exact match at current position,
+                // skip-retry handles advancement if all branches fail)
+                let body_entry = compile_body(self, Some(Nav::StayExact), loop_entry);
 
                 // First iteration: skip-retry but NO exit (must match at least one)
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
@@ -373,8 +369,9 @@ impl Compiler<'_> {
                     // When pattern fails (even on descendant), retry with next sibling
                     let loop_entry = self.fresh_label();
 
-                    // Compile body ONCE with Nav::Stay (navigation handled separately)
-                    let body_entry = compile_body(self, Some(Nav::Stay), loop_entry);
+                    // Compile body ONCE with Nav::StayExact (exact match at current position,
+                    // skip-retry handles advancement if all branches fail)
+                    let body_entry = compile_body(self, Some(Nav::StayExact), loop_entry);
 
                     // First iteration: Down navigation with skip-retry
                     let first_nav_mode = first_nav.unwrap_or(Nav::Down);
@@ -397,8 +394,8 @@ impl Compiler<'_> {
 
             QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
                 // Optional with skip-retry: matches 0 or 1 time
-                // Compile body with Nav::Stay
-                let body_entry = compile_body(self, Some(Nav::Stay), match_exit);
+                // Compile body with Nav::StayExact (exact match at current position)
+                let body_entry = compile_body(self, Some(Nav::StayExact), match_exit);
 
                 // Build exit-with-null path for when no match found
                 let skip_with_null = if needs_split_exits {
@@ -506,11 +503,12 @@ impl Compiler<'_> {
     ) -> Label {
         let loop_entry = self.fresh_label();
 
-        // Compile body ONCE with Nav::Stay
+        // Compile body ONCE with Nav::StayExact (exact match at current position,
+        // skip-retry handles advancement if all branches fail)
         let body_entry = if needs_struct_wrapper {
-            self.compile_struct_for_array(inner, loop_entry, Some(Nav::Stay), row_type_id)
+            self.compile_struct_for_array(inner, loop_entry, Some(Nav::StayExact), row_type_id)
         } else {
-            self.compile_expr_inner(inner, loop_entry, Some(Nav::Stay), capture)
+            self.compile_expr_inner(inner, loop_entry, Some(Nav::StayExact), capture)
         };
 
         // First iteration: skip-retry with skip_exit as fallback

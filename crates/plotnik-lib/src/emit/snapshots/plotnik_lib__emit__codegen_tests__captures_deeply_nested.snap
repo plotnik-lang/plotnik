@@ -45,7 +45,7 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (a) [Node Set(M0)]               06
+  04  ‼·   (a) [Node Set(M0)]               06
   06   ▽   (b) [Node Set(M1)]               08
   08   ▽   (c) [Node Set(M2)]               10
   10   ▽   (d) [Node Set(M3)]               12

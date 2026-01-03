@@ -33,9 +33,9 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04       (function_declaration)           05
+  04  ‼·   (function_declaration)           05
   05   ε                                    20, 13
-  07       (decorator) [Node Set(M0)]       09
+  07  ‼·   (decorator) [Node Set(M0)]       09
   09   △                                    11
   10                                        ▶
   11   ε   [EndObj]                         10
