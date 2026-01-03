@@ -6,6 +6,7 @@ mod constants;
 mod dump;
 mod effects;
 mod entrypoint;
+mod format;
 mod header;
 mod ids;
 mod instructions;
@@ -41,6 +42,11 @@ pub use module::{
 };
 
 pub use dump::dump;
+
+pub use format::{
+    cols, format_effect, nav_symbol, nav_symbol_epsilon, superscript, trace, truncate_text,
+    width_for_count, LineBuilder, Symbol,
+};
 
 #[cfg(test)]
 mod instructions_tests;
