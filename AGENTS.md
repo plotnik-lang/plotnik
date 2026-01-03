@@ -3,7 +3,6 @@
 - `AGENTS.md` is our constitution. Propose useful amendments.
 - Resilient parser with user-friendly error messages called "diagnostics" (see `diagnostics/`)
 - Stability via invariants: `panic!`/`assert!`/`.expect()` for simple cases, `invariants.rs` otherwise
-- AI agents create ADRs when architectural decisions are made
 
 # Documentation
 
@@ -141,29 +140,6 @@ A = (foo (B))  B = (bar (A))      ; OK: descends each step
 
 Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 
-# Architecture Decision Records (ADRs)
-
-- **Location**: `docs/adr/`
-- **Naming**: `ADR-XXXX-short-title-in-kebab-case.md` (`XXXX` is a sequential number).
-- **Index**:
-  - _(no ADRs yet)_
-- **Template**:
-
-```markdown
-# ADR-XXXX: Title
-
-- **Status**: Proposed | Accepted | Deprecated | Superseded by [ADR-YYYY](ADR-YYYY-...)
-- **Date**: YYYY-MM-DD
-
-## Context
-
-## Decision
-
-## Consequences
-
-- **Positive** | **Negative** | **Alternatives Considered**
-```
-
 # Project Structure
 
 ```
@@ -185,7 +161,6 @@ crates/
   plotnik-langs/       # Tree-sitter language bindings
   plotnik-macros/      # Proc macros
 docs/
-  adr/                 # Architecture Decision Records
   binary-format/       # Bytecode format specification
   lang-reference.md    # Language specification
 ```

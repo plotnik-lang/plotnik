@@ -20,7 +20,7 @@ Plotnik is a strongly-typed pattern matching language for tree-sitter syntax tre
 ## Document Map
 
 ```
-AGENTS.md              # Project constitution (coding rules, testing, ADRs)
+AGENTS.md              # Project constitution (coding rules, testing)
 docs/
 ├── README.md          # You are here
 ├── cli.md             # CLI tool usage guide
@@ -58,4 +58,3 @@ Building tooling:
 Contributing:
 
 1. `AGENTS.md` — Required reading
-2. ADRs in `docs/adr/` — Architectural context
