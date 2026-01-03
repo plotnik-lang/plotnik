@@ -6,9 +6,6 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// Current bytecode format version.
 pub const VERSION: u32 = 1;
 
-/// Terminal step - accept state.
-pub const STEP_ACCEPT: u16 = 0;
-
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
 
