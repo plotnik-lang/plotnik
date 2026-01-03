@@ -235,6 +235,17 @@ fn quantifiers_repeat_navigation() {
     "#});
 }
 
+/// Regression test: sequence quantifiers in called definitions need sibling navigation.
+/// Previously, `{...}*` compiled without navigation, causing infinite loops.
+#[test]
+fn quantifiers_sequence_in_called_def() {
+    snap!(indoc! {r#"
+        Item = (identifier) @name
+        Collect = {(Item) @item}* @items
+        Test = (parent (Collect))
+    "#});
+}
+
 // ============================================================================
 // 5. SEQUENCES
 // ============================================================================

@@ -38,5 +38,5 @@ Test:
   09   ε   [EndObj]                         08
   11   ε   [EndArr Set(M0)]                 09
   13       (identifier) [Node Push]         17
-  15       (identifier) [Node Push]         17
+  15   ▷   (identifier) [Node Push]         17
   17   ε                                    11, 15

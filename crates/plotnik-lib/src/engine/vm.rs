@@ -133,9 +133,10 @@ impl<'t> VM<'t> {
             self.emit_effect(effect_op, tracer);
         }
 
-        self.matched_node = None;
-
+        // Only clear matched_node for non-epsilon transitions.
+        // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
+            self.matched_node = None;
             self.navigate_and_match(m, tracer)?;
         }
 
@@ -213,6 +214,7 @@ impl<'t> VM<'t> {
                 descendant_index: self.cursor.descendant_index(),
                 effect_watermark: self.effects.len(),
                 frame_index: self.frames.current(),
+                recursion_depth: self.recursion_depth,
                 ip: m.successor(i).get(),
             });
             tracer.trace_checkpoint_created(self.ip);
@@ -296,6 +298,10 @@ impl<'t> VM<'t> {
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
 
+        // Set matched_node to current cursor position so effects after
+        // a Call can capture the node that the callee matched.
+        self.matched_node = Some(self.cursor.node());
+
         self.ip = return_addr;
         Ok(())
     }
@@ -306,6 +312,7 @@ impl<'t> VM<'t> {
         self.cursor.goto_descendant(cp.descendant_index);
         self.effects.truncate(cp.effect_watermark);
         self.frames.restore(cp.frame_index);
+        self.recursion_depth = cp.recursion_depth;
         self.ip = cp.ip;
         Err(RuntimeError::Backtracked)
     }
