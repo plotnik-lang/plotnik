@@ -78,6 +78,18 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.field_id()
     }
 
+    /// Get current tree depth (root is 0).
+    #[inline]
+    pub fn depth(&self) -> u32 {
+        self.cursor.depth()
+    }
+
+    /// Move cursor to parent node.
+    #[inline]
+    pub fn goto_parent(&mut self) -> bool {
+        self.cursor.goto_parent()
+    }
+
     /// Check if a node type is trivia.
     #[inline]
     pub fn is_trivia(&self, node: &Node<'_>) -> bool {
