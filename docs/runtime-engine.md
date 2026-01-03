@@ -5,18 +5,20 @@ Executes compiled query graphs against Tree-sitter syntax trees. See [06-transit
 ## VM State
 
 ```rust
-struct VM<'a> {
-    cursor: TreeCursor<'a>,          // Never reset—preserves descendant_index for O(1) backtrack
+struct VM<'t> {
+    cursor: TreeCursor<'t>,          // Never reset—preserves descendant_index for O(1) backtrack
     ip: StepId,                      // Current step index
     frames: Vec<Frame>,              // Call stack
-    effects: EffectStream<'a>,       // Side-effect log
-    matched_node: Option<Node<'a>>,  // Current match slot
+    effects: EffectLog<'t>,          // Side-effect log
+    matched_node: Option<Node<'t>>,  // Current match slot
 }
 
 struct Frame {
     return_addr: u16,   // Where to jump on Return
 }
 ```
+
+Lifetime `'t` denotes the parsed tree-sitter tree.
 
 ## Execution Cycle
 
@@ -147,27 +149,49 @@ Save checkpoint for `successors[1..]` → try `successors[0]` → on fail, resto
 Operations logged instead of inline output. Backtracking: `truncate(watermark)`.
 
 ```rust
-struct EffectStream<'a> {
-    ops: Vec<EffectOp>,
-    nodes: Vec<Node<'a>>,
+pub enum RuntimeEffect<'t> {
+    Node(tree_sitter::Node<'t>),
+    Text(tree_sitter::Node<'t>),
+    Arr,
+    Push,
+    EndArr,
+    Obj,
+    Set(u16),       // member index
+    EndObj,
+    Enum(u16),      // variant index
+    EndEnum,
+    Clear,
+    Null,
 }
+
+struct EffectLog<'t>(Vec<RuntimeEffect<'t>>);
 ```
 
-| Effect       | Action                                  |
-| ------------ | --------------------------------------- |
-| Node         | Push `matched_node`                     |
-| Obj/EndObj   | Object boundaries                       |
-| Set(id)      | Assign to field                         |
-| Arr/EndArr   | Array boundaries                        |
-| Push         | Append to array                         |
-| Enum/EndEnum | Tagged union boundaries                 |
-| Text         | Node → source text                      |
-| Clear        | Reset current value                     |
-| Null         | Null placeholder (optional/alternation) |
+Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
+
+| Effect       | Action                                     |
+| ------------ | ------------------------------------------ |
+| Node(n)      | Capture node `n`                           |
+| Text(n)      | Extract source text from node `n`          |
+| Obj/EndObj   | Object boundaries                          |
+| Set(idx)     | Assign to field at member index            |
+| Arr/EndArr   | Array boundaries                           |
+| Push         | Append to array                            |
+| Enum/EndEnum | Tagged union boundaries (variant at index) |
+| Clear        | Reset current value                        |
+| Null         | Null placeholder (optional/alternation)    |
+
+The `Node` and `Text` variants carry the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.
+
+### Bytecode vs Runtime Effects
+
+**Bytecode** (`EffectOp` in `bytecode/effects.rs`): Compact 2-byte encoding with 6-bit opcode + 10-bit payload. No embedded data—the `Node` opcode signals "capture `matched_node`" but doesn't carry it.
+
+**Runtime** (`RuntimeEffect`): The VM interprets bytecode effects and produces runtime effects with embedded data. When the VM executes a bytecode `Node` effect, it emits `RuntimeEffect::Node(matched_node)`.
 
 ### Materialization
 
-Materializer replays effects to build output. Stream is purely structural; nominal types come from `Entrypoint.result_type`.
+Materializer consumes `EffectLog` to build output. Stream is purely structural; nominal types come from `Entrypoint.result_type`. See `docs/wip/materializer.md` for the materialization API.
 
 ## Fuel Limits
 

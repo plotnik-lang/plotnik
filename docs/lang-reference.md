@@ -455,12 +455,12 @@ Output type:
 
 ### Negated Fields
 
-Assert a field is absent with `!`:
+Assert a field is absent with `-`:
 
 ```
 (function_declaration
   name: (identifier) @name
-  !type_parameters)
+  -type_parameters)
 ```
 
 Negated fields don't affect the output type—they're purely structural constraints:
@@ -909,7 +909,7 @@ type Root = {
 | Any node             | `_`              | `_`                       |
 | Any named node       | `(_)`            | `(_)`                     |
 | Field constraint     | `field: pattern` | `field: pattern`          |
-| Negated field        | `!field`         | `!field`                  |
+| Negated field        | `!field`         | `-field`                  |
 | Quantifiers          | `?` `*` `+`      | `?` `*` `+`               |
 | Non-greedy           |                  | `??` `*?` `+?`            |
 | Sequence             | `((a) (b))`      | `{(a) (b)}`               |
