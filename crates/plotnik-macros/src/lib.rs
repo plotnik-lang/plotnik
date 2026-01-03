@@ -111,6 +111,8 @@ fn get_language_for_key(key: &str) -> Language {
         "go" => arborium_go::language().into(),
         #[cfg(feature = "lang-graphql")]
         "graphql" => arborium_graphql::language().into(),
+        #[cfg(feature = "lang-groovy")]
+        "groovy" => arborium_groovy::language().into(),
         #[cfg(feature = "lang-haskell")]
         "haskell" => arborium_haskell::language().into(),
         #[cfg(feature = "lang-hcl")]
@@ -227,6 +229,8 @@ fn get_language_for_key(key: &str) -> Language {
         "vim" => arborium_vim::language().into(),
         #[cfg(feature = "lang-vue")]
         "vue" => arborium_vue::language().into(),
+        #[cfg(feature = "lang-wit")]
+        "wit" => arborium_wit::language().into(),
         #[cfg(feature = "lang-x86asm")]
         "x86asm" => arborium_x86asm::language().into(),
         #[cfg(feature = "lang-xml")]

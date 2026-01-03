@@ -426,6 +426,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arborium-groovy"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdf243628c652ab354b91fc45f684243aa88732e76e0a693e57b4848e996a8cd"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "arborium-haskell"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1108,6 +1119,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arborium-wit"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "add346dc84c766152c037abf605ca29739cb1138a490ecfb4126800e5c3cdd9b"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "arborium-x86asm"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1568,6 +1590,7 @@ dependencies = [
  "arborium-glsl",
  "arborium-go",
  "arborium-graphql",
+ "arborium-groovy",
  "arborium-haskell",
  "arborium-hcl",
  "arborium-hlsl",
@@ -1627,6 +1650,7 @@ dependencies = [
  "arborium-vhdl",
  "arborium-vim",
  "arborium-vue",
+ "arborium-wit",
  "arborium-x86asm",
  "arborium-xml",
  "arborium-yaml",
@@ -1696,6 +1720,7 @@ dependencies = [
  "arborium-glsl",
  "arborium-go",
  "arborium-graphql",
+ "arborium-groovy",
  "arborium-haskell",
  "arborium-hcl",
  "arborium-hlsl",
@@ -1755,6 +1780,7 @@ dependencies = [
  "arborium-vhdl",
  "arborium-vim",
  "arborium-vue",
+ "arborium-wit",
  "arborium-x86asm",
  "arborium-xml",
  "arborium-yaml",
