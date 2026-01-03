@@ -1,0 +1,65 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration {(variable_declarator name: (identifier) @name) @decl}* @decls))
+---
+let a, b, c
+---
+{
+  "decls": [
+    {
+      "decl": {
+        "kind": "variable_declarator",
+        "text": "a",
+        "span": [
+          4,
+          5
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "a",
+        "span": [
+          4,
+          5
+        ]
+      }
+    },
+    {
+      "decl": {
+        "kind": "variable_declarator",
+        "text": "b",
+        "span": [
+          7,
+          8
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "b",
+        "span": [
+          7,
+          8
+        ]
+      }
+    },
+    {
+      "decl": {
+        "kind": "variable_declarator",
+        "text": "c",
+        "span": [
+          10,
+          11
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "c",
+        "span": [
+          10,
+          11
+        ]
+      }
+    }
+  ]
+}

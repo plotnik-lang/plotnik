@@ -44,11 +44,13 @@ Test = 01 :: T1
 
 Test:
   01   ε                                    02
-  02       (a) [Node Set(M0)]               04
-  04   ▽   (b) [Node Set(M1)]               06
-  06   ▽   (c) [Node Set(M2)]               08
-  08   ▽   (d) [Node Set(M3)]               10
-  10   △                                    11
-  11   △                                    12
+  02   ε   [Obj]                            04
+  04       (a) [Node Set(M0)]               06
+  06   ▽   (b) [Node Set(M1)]               08
+  08   ▽   (c) [Node Set(M2)]               10
+  10   ▽   (d) [Node Set(M3)]               12
   12   △                                    13
-  13                                        ▶
+  13   △                                    14
+  14   △                                    15
+  15   ε   [EndObj]                         17
+  17                                        ▶

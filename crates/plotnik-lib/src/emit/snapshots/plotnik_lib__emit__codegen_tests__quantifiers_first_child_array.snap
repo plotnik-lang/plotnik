@@ -39,15 +39,17 @@ Test = 01 :: T2
 
 Test:
   01   ε                                    02
-  02       (array)                          03
-  03   ε   [Arr]                            05
-  05   ε                                    16, 14
-  07                                        ▶
-  08   ▽   (number) [Node Set(M1)]          22
-  10   ▷   (number) [Node Set(M1)]          22
-  12   ε   [EndArr Set(M0)]                 10
-  14   ε   [EndArr Set(M0)]                 08
-  16   ▽   (identifier) [Push]              20
-  18   ▷   (identifier) [Push]              20
-  20   ε                                    18, 12
-  22   △                                    07
+  02   ε   [Obj]                            04
+  04       (array)                          05
+  05   ε   [Arr]                            07
+  07   ε                                    20, 18
+  09                                        ▶
+  10   ε   [EndObj]                         09
+  12   ▽   (number) [Node Set(M1)]          26
+  14   ▷   (number) [Node Set(M1)]          26
+  16   ε   [EndArr Set(M0)]                 14
+  18   ε   [EndArr Set(M0)]                 12
+  20   ▽   (identifier) [Node Push]         24
+  22   ▷   (identifier) [Node Push]         24
+  24   ε                                    22, 16
+  26   △                                    10

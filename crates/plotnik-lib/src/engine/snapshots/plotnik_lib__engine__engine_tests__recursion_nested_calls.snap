@@ -1,0 +1,29 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Main = (program (expression_statement (Call)))
+Call = (call_expression function: (identifier) @name arguments: (arguments (Call)? @inner))
+---
+foo(bar())
+---
+{
+  "name": {
+    "kind": "identifier",
+    "text": "foo",
+    "span": [
+      0,
+      3
+    ]
+  },
+  "inner": {
+    "name": {
+      "kind": "identifier",
+      "text": "bar",
+      "span": [
+        4,
+        7
+      ]
+    },
+    "inner": null
+  }
+}

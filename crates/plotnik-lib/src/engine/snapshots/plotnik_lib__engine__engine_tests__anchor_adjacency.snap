@@ -1,0 +1,25 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration {(variable_declarator) @first . (variable_declarator) @second}))
+---
+let a, b, c
+---
+{
+  "first": {
+    "kind": "variable_declarator",
+    "text": "a",
+    "span": [
+      4,
+      5
+    ]
+  },
+  "second": {
+    "kind": "variable_declarator",
+    "text": "b",
+    "span": [
+      7,
+      8
+    ]
+  }
+}

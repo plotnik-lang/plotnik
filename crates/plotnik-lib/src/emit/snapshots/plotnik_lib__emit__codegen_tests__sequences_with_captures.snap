@@ -29,15 +29,17 @@ M3: S2 → T0  ; b: <Node>
 N0: S3 → T1  ; Test
 
 [entrypoints]
-Test = 1 :: T1
+Test = 01 :: T1
 
 [transitions]
-  0   ε                                     ◼
+  00   ε                                    ◼
 
 Test:
-  1   ε                                     2
-  2       (parent)                          3
-  3   ▽   (a) [Node Set(M0)]                5
-  5   ▷   (b) [Node Set(M1)]                7
-  7   △                                     8
-  8                                         ▶
+  01   ε                                    02
+  02   ε   [Obj]                            04
+  04       (parent)                         05
+  05   ▽   (a) [Node Set(M0)]               07
+  07   ▷   (b) [Node Set(M1)]               09
+  09   △                                    10
+  10   ε   [EndObj]                         12
+  12                                        ▶

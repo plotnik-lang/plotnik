@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration . (variable_declarator) @first))
+---
+let a, b, c
+---
+{
+  "first": {
+    "kind": "variable_declarator",
+    "text": "a",
+    "span": [
+      4,
+      5
+    ]
+  }
+}

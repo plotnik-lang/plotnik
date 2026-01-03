@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (statement_block (return_statement) @ret))
+---
+{ foo(); bar(); return 1; }
+---
+{
+  "ret": {
+    "kind": "return_statement",
+    "text": "return 1;",
+    "span": [
+      16,
+      25
+    ]
+  }
+}

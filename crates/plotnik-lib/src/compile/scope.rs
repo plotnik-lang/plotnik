@@ -207,7 +207,14 @@ impl Compiler<'_> {
         }));
 
         let push_effects = CaptureEffects {
-            post: vec![EffectIR::simple(EffectOpcode::Push, 0)],
+            post: if self.quantifier_needs_node_for_push(inner) {
+                vec![
+                    EffectIR::simple(EffectOpcode::Node, 0),
+                    EffectIR::simple(EffectOpcode::Push, 0),
+                ]
+            } else {
+                vec![EffectIR::simple(EffectOpcode::Push, 0)]
+            },
         };
         let inner_entry = if let Expr::QuantifiedExpr(quant) = inner {
             self.compile_quantified_for_array(quant, endarr_step, nav_override, push_effects)

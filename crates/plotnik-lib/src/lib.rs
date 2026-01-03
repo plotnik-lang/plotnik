@@ -22,6 +22,7 @@ pub mod colors;
 pub mod compile;
 pub mod diagnostics;
 pub mod emit;
+pub mod engine;
 pub mod parser;
 pub mod query;
 pub mod type_system;

@@ -23,14 +23,16 @@ M0: S1 → T0  ; key: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 1 :: T1
+Test = 01 :: T1
 
 [transitions]
-  0   ε                                     ◼
+  00   ε                                    ◼
 
 Test:
-  1   ε                                     2
-  2       (pair)                            3
-  3   ▽   key: _ [Node Set(M0)]             5
-  5   △                                     6
-  6                                         ▶
+  01   ε                                    02
+  02   ε   [Obj]                            04
+  04       (pair)                           05
+  05   ▽   key: _ [Node Set(M0)]            07
+  07   △                                    08
+  08   ε   [EndObj]                         10
+  10                                        ▶

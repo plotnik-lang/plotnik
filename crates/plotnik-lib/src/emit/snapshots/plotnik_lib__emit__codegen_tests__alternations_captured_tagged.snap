@@ -42,11 +42,13 @@ Test = 01 :: T4
 
 Test:
   01   ε                                    02
-  02   ε                                    09, 15
-  04                                        ▶
-  05   ε   [EndEnum Set(M4)]                04
-  07       (identifier) [Node Set(M0)]      05
-  09   ε   [Enum(M2)]                       07
-  11   ε   [EndEnum Set(M4)]                04
-  13       (number) [Node Set(M1)]          11
-  15   ε   [Enum(M3)]                       13
+  02   ε   [Obj]                            04
+  04   ε                                    13, 19
+  06                                        ▶
+  07   ε   [EndObj]                         06
+  09   ε   [EndEnum Set(M4)]                07
+  11       (identifier) [Node Set(M0)]      09
+  13   ε   [Enum(M2)]                       11
+  15   ε   [EndEnum Set(M4)]                07
+  17       (number) [Node Set(M1)]          15
+  19   ε   [Enum(M3)]                       17

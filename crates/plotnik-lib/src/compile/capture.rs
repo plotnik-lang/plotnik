@@ -76,6 +76,21 @@ impl Compiler<'_> {
         effects
     }
 
+    /// Check if a quantifier body needs Node effect before Push.
+    ///
+    /// For scalar array elements (simple named nodes, not structs/enums/refs),
+    /// we need [Node, Push] to capture the matched node value.
+    /// For structured elements, EndObj/EndEnum/Call already provides the value.
+    pub(super) fn quantifier_needs_node_for_push(&self, expr: &Expr) -> bool {
+        if let Expr::QuantifiedExpr(quant) = expr
+            && let Some(body) = quant.inner()
+        {
+            !inner_creates_scope(&body) && !self.is_ref_returning_structured(&body)
+        } else {
+            true
+        }
+    }
+
     /// Check if expr is (or wraps) a ref returning a structured type.
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves

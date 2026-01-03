@@ -1,0 +1,45 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement (call_expression
+    function: (identifier) @fn
+    arguments: (arguments (identifier)* @args))))
+---
+foo(a, b, c)
+---
+{
+  "fn": {
+    "kind": "identifier",
+    "text": "foo",
+    "span": [
+      0,
+      3
+    ]
+  },
+  "args": [
+    {
+      "kind": "identifier",
+      "text": "a",
+      "span": [
+        4,
+        5
+      ]
+    },
+    {
+      "kind": "identifier",
+      "text": "b",
+      "span": [
+        7,
+        8
+      ]
+    },
+    {
+      "kind": "identifier",
+      "text": "c",
+      "span": [
+        10,
+        11
+      ]
+    }
+  ]
+}

@@ -24,13 +24,13 @@ mod sequences;
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
-use crate::bytecode::ir::{Instruction, Label, ReturnIR};
-use crate::bytecode::Nav;
+use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, ReturnIR};
+use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::Expr;
 
 use crate::emit::StringTableBuilder;
 use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::type_check::{DefId, TypeContext};
+use crate::analyze::type_check::{DefId, TypeContext, TypeShape};
 
 pub use capture::CaptureEffects;
 use scope::StructScope;
@@ -157,8 +157,48 @@ impl<'a> Compiler<'a> {
         self.instructions
             .push(Instruction::Return(ReturnIR { label: return_label }));
 
-        // Compile body with root scope, targeting return instruction
-        let body_entry = if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
+        // Check if definition returns a struct type - if so, wrap in Obj/EndObj
+        // This ensures recursive calls properly scope their captures
+        let def_returns_struct = self
+            .type_ctx
+            .get_def_type(def_id)
+            .and_then(|tid| self.type_ctx.get_type(tid))
+            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
+
+        let body_entry = if def_returns_struct {
+            let type_id = self.type_ctx.get_def_type(def_id).expect("checked above");
+
+            // Emit EndObj → Return
+            let endobj_label = self.fresh_label();
+            self.instructions.push(Instruction::Match(MatchIR {
+                label: endobj_label,
+                nav: Nav::Stay,
+                node_type: None,
+                node_field: None,
+                pre_effects: vec![],
+                neg_fields: vec![],
+                post_effects: vec![EffectIR::simple(EffectOpcode::EndObj, 0)],
+                successors: vec![return_label],
+            }));
+
+            // Compile body with scope, targeting EndObj
+            let inner_entry = self.with_scope(type_id, |this| this.compile_expr(body, endobj_label));
+
+            // Emit Obj → inner_entry
+            let obj_label = self.fresh_label();
+            self.instructions.push(Instruction::Match(MatchIR {
+                label: obj_label,
+                nav: Nav::Stay,
+                node_type: None,
+                node_field: None,
+                pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
+                neg_fields: vec![],
+                post_effects: vec![],
+                successors: vec![inner_entry],
+            }));
+
+            obj_label
+        } else if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
             self.with_scope(type_id, |this| this.compile_expr(body, return_label))
         } else {
             self.compile_expr(body, return_label)

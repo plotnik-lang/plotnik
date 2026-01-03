@@ -38,9 +38,11 @@ Test = 01 :: T1
 
 Test:
   01   ε                                    02
-  02   ε                                    07, 11
-  04                                        ▶
-  05       (identifier) [Node Set(M0)]      04
-  07   ε   [Null Set(M1)]                   05
-  09       (string) [Node Set(M1)]          04
-  11   ε   [Null Set(M0)]                   09
+  02   ε   [Obj]                            04
+  04   ε                                    11, 15
+  06                                        ▶
+  07   ε   [EndObj]                         06
+  09       (identifier) [Node Set(M0)]      07
+  11   ε   [Null Set(M1)]                   09
+  13       (string) [Node Set(M1)]          07
+  15   ε   [Null Set(M0)]                   13

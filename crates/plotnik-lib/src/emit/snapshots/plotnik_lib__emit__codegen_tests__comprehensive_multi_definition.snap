@@ -57,8 +57,8 @@ N1: S07 → T05  ; Expression
 N2: S08 → T06  ; Assignment
 
 [entrypoints]
-Assignment = 08 :: T06
-Expression = 05 :: T05
+Assignment = 12 :: T06
+Expression = 09 :: T05
 Ident      = 01 :: T02
 
 [transitions]
@@ -66,25 +66,29 @@ Ident      = 01 :: T02
 
 Ident:
   01   ε                                    02
-  02       (identifier) [Text Set(M0)]      04
-  04                                        ▶
+  02   ε   [Obj]                            04
+  04       (identifier) [Text Set(M0)]      06
+  06   ε   [EndObj]                         08
+  08                                        ▶
 
 Expression:
-  05   ε                                    06
-  06   ε                                    22, 28
+  09   ε                                    10
+  10   ε                                    30, 36
 
 Assignment:
-  08   ε                                    09
-  09       (assignment_expression)          10
-  10   ▽   left: (identifier) [Node Set(M6)]  12
-  12   ▷   right: (Expression)              13 ⯇
-  13   ε   [Set(M5)]                        15
-  15   △                                    16
-  16                                        ▶
-  17                                        ▶
-  18   ε   [EndEnum]                        17
-  20       (number) [Node Set(M1)]          18
-  22   ε   [Enum(M3)]                       20
-  24   ε   [EndEnum]                        17
-  26       (identifier) [Node Set(M2)]      24
-  28   ε   [Enum(M4)]                       26
+  12   ε                                    13
+  13   ε   [Obj]                            15
+  15       (assignment_expression)          16
+  16   ▽   left: (identifier) [Node Set(M6)]  18
+  18   ▷   right: (Expression)              19 ⯇
+  19   ε   [Set(M5)]                        21
+  21   △                                    22
+  22   ε   [EndObj]                         24
+  24                                        ▶
+  25                                        ▶
+  26   ε   [EndEnum]                        25
+  28       (number) [Node Set(M1)]          26
+  30   ε   [Enum(M3)]                       28
+  32   ε   [EndEnum]                        25
+  34       (identifier) [Node Set(M2)]      32
+  36   ε   [Enum(M4)]                       34
