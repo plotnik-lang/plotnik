@@ -327,6 +327,14 @@ define_langs! {
         names: ["graphql", "gql"],
         extensions: ["graphql", "gql"],
     },
+    groovy => {
+        feature: "lang-groovy",
+        name: "groovy",
+        ts_lang: arborium_groovy::language(),
+        node_types_key: "groovy",
+        names: ["groovy", "gradle"],
+        extensions: ["groovy", "gradle", "gvy", "gy", "gsh"],
+    },
     haskell => {
         feature: "lang-haskell",
         name: "haskell",
@@ -790,6 +798,14 @@ define_langs! {
         node_types_key: "vue",
         names: ["vue"],
         extensions: ["vue"],
+    },
+    wit => {
+        feature: "lang-wit",
+        name: "wit",
+        ts_lang: arborium_wit::language(),
+        node_types_key: "wit",
+        names: ["wit"],
+        extensions: ["wit"],
     },
     x86asm => {
         feature: "lang-x86asm",

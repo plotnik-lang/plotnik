@@ -66,6 +66,7 @@ all-languages = [
     "lang-glsl",
     "lang-go",
     "lang-graphql",
+    "lang-groovy",
     "lang-haskell",
     "lang-hcl",
     "lang-hlsl",
@@ -124,6 +125,7 @@ all-languages = [
     "lang-vhdl",
     "lang-vim",
     "lang-vue",
+    "lang-wit",
     "lang-x86asm",
     "lang-xml",
     "lang-yaml",
@@ -163,6 +165,7 @@ lang-gleam = ["plotnik-langs/lang-gleam"]
 lang-glsl = ["plotnik-langs/lang-glsl"]
 lang-go = ["plotnik-langs/lang-go"]
 lang-graphql = ["plotnik-langs/lang-graphql"]
+lang-groovy = ["plotnik-langs/lang-groovy"]
 lang-haskell = ["plotnik-langs/lang-haskell"]
 lang-hcl = ["plotnik-langs/lang-hcl"]
 lang-hlsl = ["plotnik-langs/lang-hlsl"]
@@ -221,6 +224,7 @@ lang-verilog = ["plotnik-langs/lang-verilog"]
 lang-vhdl = ["plotnik-langs/lang-vhdl"]
 lang-vim = ["plotnik-langs/lang-vim"]
 lang-vue = ["plotnik-langs/lang-vue"]
+lang-wit = ["plotnik-langs/lang-wit"]
 lang-x86asm = ["plotnik-langs/lang-x86asm"]
 lang-xml = ["plotnik-langs/lang-xml"]
 lang-yaml = ["plotnik-langs/lang-yaml"]
@@ -233,7 +237,7 @@ clap = { version = "4.5", features = ["derive"] }
 plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
 plotnik-langs = { version = "0.1.0", path = "../plotnik-langs", default-features = false }
 plotnik-lib = { version = "0.1.0", path = "../plotnik-lib" }
-arborium-tree-sitter = "2.3.2"
+arborium-tree-sitter = "2.5.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

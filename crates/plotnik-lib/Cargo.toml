@@ -20,7 +20,7 @@ indexmap = "2"
 rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.17"
-arborium-tree-sitter = "2.3.2"
+arborium-tree-sitter = "2.5.0"
 crc32fast = "1.4"
 memmap2 = "0.9"
 plotnik-core = { version = "0.1", path = "../plotnik-core" }
