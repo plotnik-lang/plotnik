@@ -15,8 +15,9 @@ Assignment = (assignment_expression
 
 ## Bytecode Dump
 
-**Epsilon transitions** (`𝜀`) succeed unconditionally without cursor interaction.
+**Epsilon transitions** (`ε`) succeed unconditionally without cursor interaction.
 They require all three conditions:
+
 - `nav == Stay` (no cursor movement)
 - `node_type == None` (no type constraint)
 - `node_field == None` (no field constraint)
@@ -30,7 +31,7 @@ effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) remain in epsilons
 
 ```
 [flags]
-linked = true
+linked = false
 
 [strings]
 S00 "Beauty will save the world"
@@ -45,65 +46,72 @@ S08 "Assignment"
 S09 "identifier"
 S10 "number"
 S11 "assignment_expression"
-S12 "left"
-S13 "right"
+S12 "right"
+S13 "left"
 
 [type_defs]
-T00 = void
-T01 = Node
-T02 = str
-T03 = Struct  M0[1]  ; { name }
-T04 = Struct  M1[1]  ; { value }
-T05 = Struct  M2[1]  ; { name }
-T06 = Enum    M3[2]  ; Literal | Variable
-T07 = Struct  M5[2]  ; { value, target }
+T00 = <Node>
+T01 = <String>
+T02 = Struct  M0:1  ; { name }
+T03 = Struct  M1:1  ; { value }
+T04 = Struct  M2:1  ; { name }
+T05 = Enum    M3:2  ; Literal | Variable
+T06 = Struct  M5:2  ; { value, target }
+T07 = Struct  M7:1  ; { target }
+T08 = Struct  M8:1  ; { value }
 
 [type_members]
-M0: S01 → T02  ; name: str
-M1: S02 → T01  ; value: Node
-M2: S01 → T01  ; name: Node
-M3: S03 → T04  ; Literal: T04
-M4: S04 → T05  ; Variable: T05
-M5: S02 → T06  ; value: Expression
-M6: S05 → T01  ; target: Node
+M0: S01 → T01  ; name: <String>
+M1: S02 → T00  ; value: <Node>
+M2: S01 → T00  ; name: <Node>
+M3: S03 → T03  ; Literal: T03
+M4: S04 → T04  ; Variable: T04
+M5: S02 → T05  ; value: Expression
+M6: S05 → T00  ; target: <Node>
+M7: S05 → T00  ; target: <Node>
+M8: S02 → T05  ; value: Expression
 
 [type_names]
-N0: S06 → T03  ; Ident
-N1: S07 → T06  ; Expression
-N2: S08 → T07  ; Assignment
+N0: S06 → T02  ; Ident
+N1: S07 → T05  ; Expression
+N2: S08 → T06  ; Assignment
 
 [entrypoints]
-Assignment = 08 :: T07
-Expression = 05 :: T06
-Ident      = 01 :: T03
+Assignment = 12 :: T06
+Expression = 09 :: T05
+Ident      = 01 :: T02
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Ident:
-  01  𝜀                                     02
-  02       (identifier) [Text Set(M0)]      04
-  04                                        ▶
+  01   ε                                    02
+  02   ε   [Obj]                            04
+  04       (identifier) [Text Set(M0)]      06
+  06   ε   [EndObj]                         08
+  08                                        ▶
 
 Expression:
-  05  𝜀                                     06
-  06  𝜀                                     22, 28
+  09   ε                                    10
+  10   ε                                    30, 36
 
 Assignment:
-  08  𝜀                                     09
-  09       (assignment_expression)          10
-  10  ↓*   left: (identifier) [Node Set(M6)]  12
-  12  *  ▶ right: (Expression)              13
-  13  𝜀    [Set(M5)]                        15
-  15 *↑¹                                    16
-  16                                        ▶
-  17                                        ▶
-  18  𝜀    [EndEnum]                        17
-  20       (number) [Node Set(M1)]          18
-  22  𝜀    [Enum(M3)]                       20
-  24  𝜀    [EndEnum]                        17
-  26       (identifier) [Node Set(M2)]      24
-  28  𝜀    [Enum(M4)]                       26
+  12   ε                                    13
+  13   ε   [Obj]                            15
+  15       (assignment_expression)          16
+  16   ▽   left: (identifier) [Node Set(M6)]  18
+  18   ▷   right: (Expression)              19 ⯇
+  19   ε   [Set(M5)]                        21
+  21   △                                    22
+  22   ε   [EndObj]                         24
+  24                                        ▶
+  25                                        ▶
+  26   ε   [EndEnum]                        25
+  28       (number) [Node Set(M1)]          26
+  30   ε   [Enum(M3)]                       28
+  32   ε   [EndEnum]                        25
+  34       (identifier) [Node Set(M2)]      32
+  36   ε   [Enum(M4)]                       34
 ```
 
 ## Files
@@ -122,26 +130,54 @@ Future: options for verbosity levels, hiding sections, etc.
 
 ## Instruction Format
 
-Each line follows the column layout: `<indent><step><gap><nav><marker><content>...<successors>`
+Each line follows a fixed column layout:
 
-| Column     | Width | Description                              |
-| ---------- | ----- | ---------------------------------------- |
-| indent     | 2     | Leading spaces                           |
-| step       | var   | Step number, zero-padded                 |
-| gap        | 1     | Space separator                          |
-| nav        | 3     | Navigation symbol (↓\*, \*↑¹, etc.) or 𝜀 |
-| marker     | 3     | Call marker ( ▶ ) or spaces              |
-| content    | var   | Instruction content                      |
-| successors | -     | Right-aligned at column 44               |
+```
+| 2 | step | 1 |   5   | 1 | content              | 1 | succ |
+|   | pad  |   | (ctr) |   |                      |   |      |
+```
+
+| Column  | Width    | Description                                        |
+| ------- | -------- | -------------------------------------------------- |
+| indent  | 2        | Leading spaces                                     |
+| step    | variable | Step number, zero-padded to max step width         |
+| gap     | 1        | Space separator                                    |
+| symbol  | 5        | Nav symbol centered (e.g., `  ε  `, `  ▽  `, `△¹`) |
+| gap     | 1        | Space separator                                    |
+| content | variable | Instruction content                                |
+| gap     | 1        | Space separator                                    |
+| succ    | variable | Successors/markers, right-aligned                  |
+
+**Step padding**: Dynamic based on max step in graph. Steps 0–9 use 1 digit, 0–99 use 2 digits, etc.
+
+**Symbol column** (5 characters):
+
+```
+| left | center | right |
+|  2   |   1    |   2   |
+```
+
+- **Center**: Direction (ε, ▽, ▷, △)
+- **Left**: Mode modifier (`!` skip trivia, `‼` exact)
+- **Right**: Level suffix (¹, ², ³... for Up)
+
+Examples:
+
+- `  ε  ` — epsilon (no movement)
+- `  ▽  ` — down, skip any
+- `  ▷  ` — next, skip any
+- `  △  ` — up 1 level (no superscript)
+- `!▽ ` — down, skip trivia
+- `‼▷ ` — next, exact
 
 | Instruction      | Format                                        |
 | ---------------- | --------------------------------------------- |
 | Match (terminal) | `step nav    [pre] (type) [post]      ◼`      |
 | Match            | `step nav    [pre] field: (type) [post] succ` |
 | Match (branch)   | `step nav    [pre] (type) [post]      s1, s2` |
-| Epsilon          | `step  𝜀    [effects]                 succ`   |
-| Call             | `step nav ▶ field: (Name)             return` |
-| Return           | `step  𝜀                              ▶`      |
+| Epsilon          | `step  ε     [effects]                succ`   |
+| Call             | `step nav    field: (Name)         return ⯇`  |
+| Return           | `step                                 ▶`      |
 
 Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`, `field:`.
 
@@ -149,21 +185,22 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol     | Notes                                    |
-| --------------- | ---------- | ---------------------------------------- |
-| Stay            | (3 spaces) | No movement                              |
-| Stay (epsilon)  | 𝜀          | Only when no type/field constraints      |
-| Down            | ↓\*        | First child, skip any                    |
-| DownSkip        | ↓~         | First child, skip trivia                 |
-| DownExact       | ↓.         | First child, exact                       |
-| Next            | \*         | Next sibling, skip any                   |
-| NextSkip        | ~          | Next sibling, skip trivia                |
-| NextExact       | .          | Next sibling, exact                      |
-| Up(n)           | \*↑ⁿ       | Ascend n levels, skip any                |
-| UpSkipTrivia(n) | ~↑ⁿ        | Ascend n, must be last non-trivia        |
-| UpExact(n)      | .↑ⁿ        | Ascend n, must be last child             |
+| Nav             | Symbol  | Notes                               |
+| --------------- | ------- | ----------------------------------- |
+| Stay            | (blank) | No movement, 5 spaces               |
+| Stay (epsilon)  | ε       | Only when no type/field constraints |
+| Down            | ▽       | First child, skip any               |
+| DownSkip        | !▽      | First child, skip trivia            |
+| DownExact       | ‼▽      | First child, exact                  |
+| Next            | ▷       | Next sibling, skip any              |
+| NextSkip        | !▷      | Next sibling, skip trivia           |
+| NextExact       | ‼▷      | Next sibling, exact                 |
+| Up(1)           | △       | Ascend 1 level (no superscript)     |
+| Up(n≥2)         | △ⁿ      | Ascend n levels, skip any           |
+| UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
+| UpExact(n)      | ‼△ⁿ     | Ascend n, must be last child        |
 
-**Note**: `𝜀` only appears when all three conditions are met: Stay nav, no type constraint, no field constraint. A step matching `(identifier)` at current position shows spaces, not `𝜀`.
+**Note**: `ε` only appears when all three conditions are met: Stay nav, no type constraint, no field constraint. A step matching `(identifier)` at current position shows spaces, not `ε`.
 
 ## Effects
 
@@ -184,9 +221,9 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Index Prefixes
 
-| Prefix | Section       | Description |
-| ------ | ------------- | ----------- |
-| S##    | strings       | StringId    |
+| Prefix | Section      | Description |
+| ------ | ------------ | ----------- |
+| S##    | strings      | StringId    |
 | T##    | type_defs    | TypeId      |
 | M##    | type_members | MemberIndex |
 | N##    | type_names   | NameIndex   |
@@ -195,17 +232,19 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ### type_defs
 
-| Kind     | Format              | Example                  |
-| -------- | ------------------- | ------------------------ |
-| void     | `void`              | `T00 = void`             |
-| Node     | `Node`              | `T01 = Node`             |
-| str      | `str`               | `T02 = str`              |
-| Struct   | `Struct  Mxx[n]`    | `T03 = Struct  M0[1]`    |
-| Enum     | `Enum    Mxx[n]`    | `T06 = Enum    M3[2]`    |
-| Optional | `Optional(Txx)`     | `T07 = Optional(T05)`    |
-| Array\*  | `ArrayStar(Txx)`    | `T03 = ArrayStar(T01)`   |
-| Array+   | `ArrayPlus(Txx)`    | `T10 = ArrayPlus(T09)`   |
-| Alias    | `Alias(Txx)`        | `T03 = Alias(T01)`       |
+| Kind     | Format          | Example               |
+| -------- | --------------- | --------------------- |
+| Node     | `<Node>`        | `T0 = <Node>`         |
+| String   | `<String>`      | `T1 = <String>`       |
+| Void     | `<Void>`        | `T2 = <Void>`         |
+| Struct   | `Struct  Mx:n`  | `T2 = Struct  M0:1`   |
+| Enum     | `Enum    Mx:n`  | `T5 = Enum    M3:2`   |
+| Optional | `Optional(Tx)`  | `T7 = Optional(T5)`   |
+| Array\*  | `ArrayStar(Tx)` | `T3 = ArrayStar(T1)`  |
+| Array+   | `ArrayPlus(Tx)` | `T10 = ArrayPlus(T9)` |
+| Alias    | `Alias(Tx)`     | `T3 = Alias(T1)`      |
+
+**Note**: Type indices are zero-padded based on the total count (e.g., `T0` for <10 types, `T00` for <100 types).
 
 ### type_members
 
