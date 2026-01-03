@@ -137,9 +137,8 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
     /// Execute a query against source code and output JSON
     #[command(after_help = r#"EXAMPLES:
   plotnik exec query.ptk app.js
-  plotnik exec -q '(identifier) @id' -s app.js
-  plotnik exec query.ptk app.ts --pretty
-  plotnik exec query.ptk app.ts --verbose-nodes"#)]
+  plotnik exec -q '(identifier) @id' -s 'let x = 1' -l javascript
+  plotnik exec query.ptk app.ts --compact"#)]
     Exec {
         /// Query file or workspace directory
         #[arg(value_name = "QUERY")]
@@ -153,13 +152,9 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
         #[arg(short = 'q', long = "query", value_name = "TEXT")]
         query_text: Option<String>,
 
-        /// Source code as inline text
-        #[arg(long = "source", value_name = "TEXT")]
+        /// Inline source text
+        #[arg(short = 's', long = "source", value_name = "TEXT")]
         source_text: Option<String>,
-
-        /// Source file (alternative to positional)
-        #[arg(short = 's', long = "source-file", value_name = "FILE")]
-        source_file: Option<PathBuf>,
 
         /// Language (inferred from source extension if not specified)
         #[arg(short = 'l', long, value_name = "LANG")]
@@ -167,6 +162,52 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#)]
 
         #[command(flatten)]
         exec_output: ExecOutputArgs,
+
+        #[command(flatten)]
+        output: OutputArgs,
+    },
+
+    /// Trace query execution for debugging
+    #[command(after_help = r#"EXAMPLES:
+  plotnik trace -q '(identifier) @id' -s 'let x = 1' -l javascript
+  plotnik trace query.ptk app.ts
+  plotnik trace query.ptk app.ts --no-result"#)]
+    Trace {
+        /// Query file or workspace directory
+        #[arg(value_name = "QUERY")]
+        query_path: Option<PathBuf>,
+
+        /// Source file to execute against
+        #[arg(value_name = "SOURCE")]
+        source_path: Option<PathBuf>,
+
+        /// Inline query text
+        #[arg(short = 'q', long = "query", value_name = "TEXT")]
+        query_text: Option<String>,
+
+        /// Inline source text
+        #[arg(short = 's', long = "source", value_name = "TEXT")]
+        source_text: Option<String>,
+
+        /// Language (inferred from source extension if not specified)
+        #[arg(short = 'l', long, value_name = "LANG")]
+        lang: Option<String>,
+
+        /// Entry point name (definition to match from)
+        #[arg(long, value_name = "NAME")]
+        entry: Option<String>,
+
+        /// Verbosity level (-v for verbose, -vv for very verbose)
+        #[arg(short = 'v', action = clap::ArgAction::Count)]
+        verbose: u8,
+
+        /// Skip materialization, show effects only
+        #[arg(long)]
+        no_result: bool,
+
+        /// Execution fuel limit
+        #[arg(long, default_value = "1000000", value_name = "N")]
+        fuel: u32,
 
         #[command(flatten)]
         output: OutputArgs,
@@ -212,9 +253,9 @@ pub struct InferOutputArgs {
 
 #[derive(Args)]
 pub struct ExecOutputArgs {
-    /// Pretty-print JSON output
+    /// Output compact JSON (default: pretty when stdout is a TTY)
     #[arg(long)]
-    pub pretty: bool,
+    pub compact: bool,
 
     /// Include verbose node information (line/column positions)
     #[arg(long)]
