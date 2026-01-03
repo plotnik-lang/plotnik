@@ -50,28 +50,27 @@ Test:
   02   ε   [Obj]                            04
   04       (object)                         05
   05   ε   [Arr]                            07
-  07   ε                                    33, 15
+  07   ε                                    42, 19
   09   ε   [EndArr Set(M5)]                 11
-  11   △                                    13
-  12                                        ▶
-  13   ε   [EndObj]                         12
-  15   ε   [EndArr Set(M5)]                 13
-  17   ε   [EndObj Push]                    53
-  19   ε   [EndEnum Set(M4)]                17
-  21   ▽   (pair) [Node Set(M0)]            19
-  23   ε   [Enum(M2)]                       21
-  25   ε   [EndEnum Set(M4)]                17
-  27   ▽   (shorthand_property_identifier) [Node Set(M1)]  25
-  29   ε   [Enum(M3)]                       27
-  31   ε                                    23, 29
-  33   ε   [Obj]                            31
-  35   ε   [EndObj Push]                    53
-  37   ε   [EndEnum Set(M4)]                35
-  39   ▷   (pair) [Node Set(M0)]            37
-  41   ε   [Enum(M2)]                       39
-  43   ε   [EndEnum Set(M4)]                35
-  45   ▷   (shorthand_property_identifier) [Node Set(M1)]  43
-  47   ε   [Enum(M3)]                       45
-  49   ε                                    41, 47
-  51   ε   [Obj]                            49
-  53   ε                                    51, 09
+  11   △                                    17
+  12   ε   [EndObj Push]                    14
+  14   ε                                    48, 09
+  16                                        ▶
+  17   ε   [EndObj]                         16
+  19   ε   [EndArr Set(M5)]                 17
+  21   ε   [EndEnum Set(M4)]                12
+  23       (pair) [Node Set(M0)]            21
+  25   ε   [Enum(M2)]                       23
+  27   ε   [EndEnum Set(M4)]                12
+  29       (shorthand_property_identifier) [Node Set(M1)]  27
+  31   ε   [Enum(M3)]                       29
+  33   ε                                    25, 31
+  35   ε   [Obj]                            33
+  37   ▷                                    40
+  38   ε                                    37, 19
+  40   ε                                    35, 38
+  42   ▽                                    40
+  43   ▷                                    46
+  44   ε                                    43, 09
+  46   ε                                    35, 44
+  48   ▷                                    46

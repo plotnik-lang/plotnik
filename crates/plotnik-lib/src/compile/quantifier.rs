@@ -13,7 +13,7 @@ use crate::parser::cst::SyntaxKind;
 use crate::analyze::type_check::TypeId;
 
 use super::capture::{check_needs_struct_wrapper, get_row_type_id, CaptureEffects};
-use super::navigation::{is_star_or_plus_quantifier, repeat_nav_for};
+use super::navigation::is_star_or_plus_quantifier;
 use super::Compiler;
 
 /// Quantifier operator classification.
@@ -333,86 +333,167 @@ impl Compiler<'_> {
         };
 
         let is_greedy = kind.is_greedy();
-        let repeat_nav = repeat_nav_for(first_nav);
 
         match kind {
             QuantifierKind::Plus | QuantifierKind::PlusNonGreedy => {
-                // +: first_body → loop → [repeat_body, exit]
+                // Plus with skip-retry: must match at least once
+                // First iteration has no exit fallback (backtrack propagates to caller)
                 let loop_entry = self.fresh_label();
 
-                let first_body_entry = compile_body(self, first_nav, loop_entry);
-                let repeat_body_entry = compile_body(self, repeat_nav, loop_entry);
+                // Compile body ONCE with Nav::Stay
+                let body_entry = compile_body(self, Some(Nav::Stay), loop_entry);
 
-                let successors = if is_greedy {
-                    vec![repeat_body_entry, match_exit]
-                } else {
-                    vec![match_exit, repeat_body_entry]
-                };
-                self.emit_epsilon(loop_entry, successors);
+                // First iteration: skip-retry but NO exit (must match at least one)
+                let first_nav_mode = first_nav.unwrap_or(Nav::Down);
+                let first_iterate = self.compile_skip_retry_iteration_no_exit(
+                    first_nav_mode, body_entry, is_greedy
+                );
 
-                first_body_entry
+                // Repeat iteration: skip-retry with exit option
+                let repeat_iterate = self.compile_skip_retry_iteration(
+                    Nav::Next, body_entry, match_exit, is_greedy
+                );
+
+                // loop_entry → [repeat_iterate, exit]
+                self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
+
+                first_iterate
             }
 
             QuantifierKind::Star | QuantifierKind::StarNonGreedy => {
                 if needs_split_exits {
-                    // Star with split exits: entry → [first_body → loop → [repeat_body, match_exit], skip_exit]
+                    // Star with split exits: uses skip-retry with separate exit paths
                     let skip = skip_exit.expect("split exits requires skip_exit");
-                    self.compile_star_with_split_exits(
+                    self.compile_star_with_skip_retry_split_exits(
                         inner, match_exit, skip, first_nav, element_capture, is_greedy,
                         needs_struct_wrapper, row_type_id,
                     )
                 } else {
-                    // Regular star: entry → [first_body → loop → [repeat_body, exit], exit]
+                    // Regular star with skip-retry:
+                    // When pattern fails (even on descendant), retry with next sibling
                     let loop_entry = self.fresh_label();
 
-                    let first_body_entry = compile_body(self, first_nav, loop_entry);
-                    let repeat_body_entry = compile_body(self, repeat_nav, loop_entry);
+                    // Compile body ONCE with Nav::Stay (navigation handled separately)
+                    let body_entry = compile_body(self, Some(Nav::Stay), loop_entry);
 
-                    // Entry point branches: first iteration or exit
-                    let entry = self.fresh_label();
-                    let successors = if is_greedy {
-                        vec![first_body_entry, match_exit]
-                    } else {
-                        vec![match_exit, first_body_entry]
-                    };
-                    self.emit_epsilon(entry, successors);
+                    // First iteration: Down navigation with skip-retry
+                    let first_nav_mode = first_nav.unwrap_or(Nav::Down);
+                    let first_iterate = self.compile_skip_retry_iteration(
+                        first_nav_mode, body_entry, match_exit, is_greedy
+                    );
 
-                    // Loop point branches: repeat iteration or exit
-                    let loop_successors = if is_greedy {
-                        vec![repeat_body_entry, match_exit]
-                    } else {
-                        vec![match_exit, repeat_body_entry]
-                    };
-                    self.emit_epsilon(loop_entry, loop_successors);
+                    // Repeat iteration: Next navigation with skip-retry
+                    let repeat_iterate = self.compile_skip_retry_iteration(
+                        Nav::Next, body_entry, match_exit, is_greedy
+                    );
 
-                    entry
+                    // loop_entry → [repeat_iterate, exit]
+                    self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
+
+                    // entry → [first_iterate, exit]
+                    self.emit_branch_epsilon(first_iterate, match_exit, is_greedy)
                 }
             }
 
             QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
-                // ?: branch to body or exit
-                let body_entry = compile_body(self, first_nav, match_exit);
+                // Optional with skip-retry: matches 0 or 1 time
+                // Compile body with Nav::Stay
+                let body_entry = compile_body(self, Some(Nav::Stay), match_exit);
 
-                if needs_split_exits {
-                    // Split exits for optional
-                    let skip = skip_exit.expect("split exits requires skip_exit");
-                    self.emit_branch_epsilon(body_entry, skip, is_greedy)
+                // Build exit-with-null path for when no match found
+                let skip_with_null = if needs_split_exits {
+                    skip_exit.expect("split exits requires skip_exit")
                 } else {
-                    // Regular optional with null emission for skipped captures
-                    // First handle captures passed as effects (e.g., `(x)? @cap`)
-                    let skip_with_null = self.emit_null_for_skip_path(match_exit, &element_capture);
-                    // Then handle internal captures (e.g., `{(x) @cap}?`)
-                    let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, inner);
-                    self.emit_branch_epsilon(body_entry, skip_with_internal_null, is_greedy)
-                }
+                    let null_exit = self.emit_null_for_skip_path(match_exit, &element_capture);
+                    self.emit_null_for_internal_captures(null_exit, inner)
+                };
+
+                // Skip-retry iteration leading to null exit
+                let first_nav_mode = first_nav.unwrap_or(Nav::Down);
+                let iterate = self.compile_skip_retry_iteration(
+                    first_nav_mode, body_entry, skip_with_null, is_greedy
+                );
+
+                // entry → [iterate, skip_with_null]
+                self.emit_branch_epsilon(iterate, skip_with_null, is_greedy)
             }
         }
     }
 
-    /// Helper for star with split exits - handles the complex case where skip and match
-    /// paths need different continuations.
+    /// Compile a "try-skip-retry" iteration for quantifiers.
+    ///
+    /// Structure:
+    /// ```text
+    ///   navigate: Match(nav, wildcard) → try
+    ///   try: epsilon → [body, retry_or_exit]
+    ///   retry_or_exit: epsilon → [retry_nav, exit]
+    ///   retry_nav: Match(Nav::Next, wildcard) → try
+    /// ```
+    ///
+    /// When the body fails (even deep inside on a descendant), we backtrack to `try`,
+    /// which falls through to `retry_or_exit`, advancing to the next sibling and retrying.
+    /// Only when siblings are exhausted do we take the exit path.
+    ///
+    /// Returns the navigate label (entry point for this iteration).
+    fn compile_skip_retry_iteration(
+        &mut self,
+        nav: Nav,
+        body_entry: Label,
+        exit: Label,
+        is_greedy: bool,
+    ) -> Label {
+        let try_label = self.fresh_label();
+        let retry_or_exit = self.fresh_label();
+
+        // retry_nav: advance and loop back to try
+        let retry_nav = self.fresh_label();
+        self.emit_wildcard_nav(retry_nav, Nav::Next, try_label);
+
+        // retry_or_exit: epsilon → [retry_nav, exit]
+        self.emit_branch_epsilon_at(retry_or_exit, retry_nav, exit, is_greedy);
+
+        // try: epsilon → [body, retry_or_exit]
+        self.emit_branch_epsilon_at(try_label, body_entry, retry_or_exit, is_greedy);
+
+        // navigate: wildcard nav → try
+        let navigate = self.fresh_label();
+        self.emit_wildcard_nav(navigate, nav, try_label);
+
+        navigate
+    }
+
+    /// Like `compile_skip_retry_iteration` but with no exit fallback.
+    ///
+    /// Used for Plus quantifier's first iteration where at least one match is required.
+    /// If all siblings fail, backtrack propagates to caller (quantifier fails).
+    fn compile_skip_retry_iteration_no_exit(
+        &mut self,
+        nav: Nav,
+        body_entry: Label,
+        is_greedy: bool,
+    ) -> Label {
+        let try_label = self.fresh_label();
+
+        // retry_nav: advance and loop back to try (no exit option)
+        let retry_nav = self.fresh_label();
+        self.emit_wildcard_nav(retry_nav, Nav::Next, try_label);
+
+        // try: epsilon → [body, retry_nav]
+        // If pattern fails, we advance and retry. If no more siblings,
+        // retry_nav's navigation fails and we backtrack to outer checkpoint.
+        self.emit_branch_epsilon_at(try_label, body_entry, retry_nav, is_greedy);
+
+        // navigate: wildcard nav → try
+        let navigate = self.fresh_label();
+        self.emit_wildcard_nav(navigate, nav, try_label);
+
+        navigate
+    }
+
+    /// Helper for star with split exits and skip-retry.
+    /// Skip path goes to skip_exit, match path goes to match_exit.
     #[allow(clippy::too_many_arguments)]
-    fn compile_star_with_split_exits(
+    fn compile_star_with_skip_retry_split_exits(
         &mut self,
         inner: &Expr,
         match_exit: Label,
@@ -424,22 +505,29 @@ impl Compiler<'_> {
         row_type_id: Option<TypeId>,
     ) -> Label {
         let loop_entry = self.fresh_label();
-        let repeat_nav = repeat_nav_for(nav_override);
 
-        let first_body = if needs_struct_wrapper {
-            self.compile_struct_for_array(inner, loop_entry, nav_override, row_type_id)
+        // Compile body ONCE with Nav::Stay
+        let body_entry = if needs_struct_wrapper {
+            self.compile_struct_for_array(inner, loop_entry, Some(Nav::Stay), row_type_id)
         } else {
-            self.compile_expr_inner(inner, loop_entry, nav_override, capture.clone())
+            self.compile_expr_inner(inner, loop_entry, Some(Nav::Stay), capture)
         };
 
-        let repeat_body = if needs_struct_wrapper {
-            self.compile_struct_for_array(inner, loop_entry, repeat_nav, row_type_id)
-        } else {
-            self.compile_expr_inner(inner, loop_entry, repeat_nav, capture)
-        };
+        // First iteration: skip-retry with skip_exit as fallback
+        let first_nav_mode = nav_override.unwrap_or(Nav::Down);
+        let first_iterate = self.compile_skip_retry_iteration(
+            first_nav_mode, body_entry, skip_exit, is_greedy
+        );
 
-        let entry = self.emit_branch_epsilon(first_body, skip_exit, is_greedy);
-        self.emit_branch_epsilon_at(loop_entry, repeat_body, match_exit, is_greedy);
-        entry
+        // Repeat iteration: skip-retry with match_exit as fallback
+        let repeat_iterate = self.compile_skip_retry_iteration(
+            Nav::Next, body_entry, match_exit, is_greedy
+        );
+
+        // loop_entry → [repeat_iterate, match_exit]
+        self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
+
+        // entry → [first_iterate, skip_exit]
+        self.emit_branch_epsilon(first_iterate, skip_exit, is_greedy)
     }
 }

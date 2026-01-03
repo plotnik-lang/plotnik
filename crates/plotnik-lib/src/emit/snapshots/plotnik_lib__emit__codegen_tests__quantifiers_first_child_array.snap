@@ -42,14 +42,21 @@ Test:
   02   ε   [Obj]                            04
   04       (array)                          05
   05   ε   [Arr]                            07
-  07   ε                                    20, 18
-  09                                        ▶
-  10   ε   [EndObj]                         09
-  12   ▽   (number) [Node Set(M1)]          26
-  14   ▷   (number) [Node Set(M1)]          26
-  16   ε   [EndArr Set(M0)]                 14
-  18   ε   [EndArr Set(M0)]                 12
-  20   ▽   (identifier) [Node Push]         24
-  22   ▷   (identifier) [Node Push]         24
-  24   ε                                    22, 16
-  26   △                                    10
+  07   ε                                    29, 22
+  09       (identifier) [Node Push]         11
+  11   ε                                    35, 20
+  13                                        ▶
+  14   ε   [EndObj]                         13
+  16   ▽   (number) [Node Set(M1)]          36
+  18   ▷   (number) [Node Set(M1)]          36
+  20   ε   [EndArr Set(M0)]                 18
+  22   ε   [EndArr Set(M0)]                 16
+  24   ▷                                    27
+  25   ε                                    24, 22
+  27   ε                                    09, 25
+  29   ▽                                    27
+  30   ▷                                    33
+  31   ε                                    30, 20
+  33   ε                                    09, 31
+  35   ▷                                    33
+  36   △                                    14

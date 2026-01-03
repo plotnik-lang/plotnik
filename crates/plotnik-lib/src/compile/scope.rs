@@ -428,6 +428,24 @@ impl Compiler<'_> {
         }));
     }
 
+    /// Emit a wildcard navigation step that accepts any node.
+    ///
+    /// Used for skip-retry logic in quantifiers: navigates to the next position
+    /// and matches any node there. If navigation fails (no more siblings/children),
+    /// the VM backtracks automatically.
+    pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {
+        self.instructions.push(Instruction::Match(MatchIR {
+            label,
+            nav,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields: vec![],
+            post_effects: vec![],
+            successors: vec![successor],
+        }));
+    }
+
     /// Emit an epsilon branch preferring `prefer` when greedy, `other` when non-greedy.
     pub(super) fn emit_branch_epsilon(&mut self, prefer: Label, other: Label, is_greedy: bool) -> Label {
         let entry = self.fresh_label();

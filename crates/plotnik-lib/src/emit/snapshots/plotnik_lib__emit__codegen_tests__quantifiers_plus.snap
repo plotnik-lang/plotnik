@@ -33,9 +33,15 @@ Test:
   01   ε                                    02
   02   ε   [Obj]                            04
   04   ε   [Arr]                            06
-  06       (identifier) [Node Push]         15
-  08                                        ▶
-  09   ε   [EndObj]                         08
-  11   ε   [EndArr Set(M0)]                 09
-  13   ▷   (identifier) [Node Push]         15
-  15   ε                                    13, 11
+  06   ▽                                    17
+  07       (identifier) [Node Push]         09
+  09   ε                                    24, 14
+  11                                        ▶
+  12   ε   [EndObj]                         11
+  14   ε   [EndArr Set(M0)]                 12
+  16   ▷                                    17
+  17   ε                                    07, 16
+  19   ▷                                    22
+  20   ε                                    19, 14
+  22   ε                                    07, 20
+  24   ▷                                    22
