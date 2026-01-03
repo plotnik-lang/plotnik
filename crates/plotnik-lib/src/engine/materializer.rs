@@ -139,9 +139,12 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                 }
                 RuntimeEffect::EndEnum => {
                     if let Some(Builder::Tagged { tag, fields }) = stack.pop() {
+                        // If inner returned a structured value (via Obj/EndObj), use it as data
+                        // Otherwise use fields collected from direct Set effects
+                        let data = pending.take().unwrap_or(Value::Object(fields));
                         pending = Some(Value::Tagged {
                             tag,
-                            data: Box::new(Value::Object(fields)),
+                            data: Box::new(data),
                         });
                     }
                 }
