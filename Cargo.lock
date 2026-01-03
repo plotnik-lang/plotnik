@@ -1519,7 +1519,9 @@ dependencies = [
  "plotnik-core",
  "plotnik-langs",
  "plotnik-lib",
+ "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

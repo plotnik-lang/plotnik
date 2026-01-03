@@ -5,6 +5,8 @@ pub mod infer;
 pub mod lang_resolver;
 pub mod langs;
 pub mod query_loader;
+pub mod run_common;
+pub mod trace;
 pub mod tree;
 
 #[cfg(test)]

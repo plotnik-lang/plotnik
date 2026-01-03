@@ -6,6 +6,7 @@ use commands::check::CheckArgs;
 use commands::dump::DumpArgs;
 use commands::exec::ExecArgs;
 use commands::infer::InferArgs;
+use commands::trace::TraceArgs;
 use commands::tree::TreeArgs;
 
 fn main() {
@@ -80,23 +81,53 @@ fn main() {
             source_path,
             query_text,
             source_text,
-            source_file,
             lang,
             exec_output,
             output,
         } => {
-            // Merge source_path and source_file (positional takes precedence)
-            let resolved_source = source_path.or(source_file);
+            // Pretty by default when stdout is a TTY, unless --compact is passed
+            let pretty =
+                !exec_output.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
             commands::exec::run(ExecArgs {
                 query_path,
                 query_text,
-                source_path: resolved_source,
+                source_path,
                 source_text,
                 lang,
-                pretty: exec_output.pretty,
-                verbose_nodes: exec_output.verbose_nodes,
-                check: exec_output.check,
+                pretty,
                 entry: exec_output.entry,
+                color: output.color.should_colorize(),
+            });
+        }
+        Command::Trace {
+            query_path,
+            source_path,
+            query_text,
+            source_text,
+            lang,
+            entry,
+            verbose,
+            no_result,
+            fuel,
+            output,
+        } => {
+            use plotnik_lib::engine::Verbosity;
+
+            let verbosity = match verbose {
+                0 => Verbosity::Default,
+                1 => Verbosity::Verbose,
+                _ => Verbosity::VeryVerbose,
+            };
+            commands::trace::run(TraceArgs {
+                query_path,
+                query_text,
+                source_path,
+                source_text,
+                lang,
+                entry,
+                verbosity,
+                no_result,
+                fuel,
                 color: output.color.should_colorize(),
             });
         }
