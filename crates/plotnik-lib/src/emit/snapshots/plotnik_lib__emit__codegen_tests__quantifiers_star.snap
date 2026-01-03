@@ -31,10 +31,12 @@ Test = 01 :: T2
 
 Test:
   01   ε                                    02
-  02   ε   [Arr]                            04
-  04   ε                                    09, 07
-  06                                        ▶
-  07   ε   [EndArr Set(M0)]                 06
-  09       (identifier) [Push]              13
-  11       (identifier) [Push]              13
-  13   ε                                    11, 07
+  02   ε   [Obj]                            04
+  04   ε   [Arr]                            06
+  06   ε                                    13, 11
+  08                                        ▶
+  09   ε   [EndObj]                         08
+  11   ε   [EndArr Set(M0)]                 09
+  13       (identifier) [Node Push]         17
+  15       (identifier) [Node Push]         17
+  17   ε                                    15, 11

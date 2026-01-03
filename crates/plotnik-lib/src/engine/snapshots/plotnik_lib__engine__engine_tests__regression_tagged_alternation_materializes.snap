@@ -1,0 +1,23 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement [
+    Ident: (identifier) @x
+    Num: (number) @y
+]))
+---
+42
+---
+{
+  "$tag": "Num",
+  "$data": {
+    "y": {
+      "kind": "number",
+      "text": "42",
+      "span": [
+        0,
+        2
+      ]
+    }
+  }
+}

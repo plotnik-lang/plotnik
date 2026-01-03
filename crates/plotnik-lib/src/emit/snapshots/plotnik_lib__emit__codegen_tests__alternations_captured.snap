@@ -24,14 +24,16 @@ M0: S1 → T0  ; value: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 1 :: T1
+Test = 01 :: T1
 
 [transitions]
-  0   ε                                     ◼
+  00   ε                                    ◼
 
 Test:
-  1   ε                                     2
-  2   ε                                     5, 7
-  4                                         ▶
-  5       (identifier) [Node Set(M0)]       4
-  7       (number) [Node Set(M0)]           4
+  01   ε                                    02
+  02   ε   [Obj]                            04
+  04   ε                                    09, 11
+  06                                        ▶
+  07   ε   [EndObj]                         06
+  09       (identifier) [Node Set(M0)]      07
+  11       (number) [Node Set(M0)]          07

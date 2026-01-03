@@ -47,29 +47,31 @@ Test = 01 :: T6
 
 Test:
   01   ε                                    02
-  02       (object)                         03
-  03   ε   [Arr]                            05
-  05   ε                                    29, 11
-  07   ε   [EndArr Set(M5)]                 09
-  09   △                                    10
-  10                                        ▶
-  11   ε   [EndArr Set(M5)]                 10
-  13   ε   [EndObj Push]                    49
-  15   ε   [EndEnum Set(M4)]                13
-  17   ▽   (pair) [Node Set(M0)]            15
-  19   ε   [Enum(M2)]                       17
-  21   ε   [EndEnum Set(M4)]                13
-  23   ▽   (shorthand_property_identifier) [Node Set(M1)]  21
-  25   ε   [Enum(M3)]                       23
-  27   ε                                    19, 25
-  29   ε   [Obj]                            27
-  31   ε   [EndObj Push]                    49
-  33   ε   [EndEnum Set(M4)]                31
-  35   ▷   (pair) [Node Set(M0)]            33
-  37   ε   [Enum(M2)]                       35
-  39   ε   [EndEnum Set(M4)]                31
-  41   ▷   (shorthand_property_identifier) [Node Set(M1)]  39
-  43   ε   [Enum(M3)]                       41
-  45   ε                                    37, 43
-  47   ε   [Obj]                            45
-  49   ε                                    47, 07
+  02   ε   [Obj]                            04
+  04       (object)                         05
+  05   ε   [Arr]                            07
+  07   ε                                    33, 15
+  09   ε   [EndArr Set(M5)]                 11
+  11   △                                    13
+  12                                        ▶
+  13   ε   [EndObj]                         12
+  15   ε   [EndArr Set(M5)]                 13
+  17   ε   [EndObj Push]                    53
+  19   ε   [EndEnum Set(M4)]                17
+  21   ▽   (pair) [Node Set(M0)]            19
+  23   ε   [Enum(M2)]                       21
+  25   ε   [EndEnum Set(M4)]                17
+  27   ▽   (shorthand_property_identifier) [Node Set(M1)]  25
+  29   ε   [Enum(M3)]                       27
+  31   ε                                    23, 29
+  33   ε   [Obj]                            31
+  35   ε   [EndObj Push]                    53
+  37   ε   [EndEnum Set(M4)]                35
+  39   ▷   (pair) [Node Set(M0)]            37
+  41   ε   [Enum(M2)]                       39
+  43   ε   [EndEnum Set(M4)]                35
+  45   ▷   (shorthand_property_identifier) [Node Set(M1)]  43
+  47   ε   [Enum(M3)]                       45
+  49   ε                                    41, 47
+  51   ε   [Obj]                            49
+  53   ε                                    51, 09

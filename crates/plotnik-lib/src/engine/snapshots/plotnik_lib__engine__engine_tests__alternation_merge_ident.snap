@@ -1,0 +1,18 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration (variable_declarator value: [(identifier) @ident (number) @num])))
+---
+let x = y
+---
+{
+  "num": null,
+  "ident": {
+    "kind": "identifier",
+    "text": "y",
+    "span": [
+      8,
+      9
+    ]
+  }
+}

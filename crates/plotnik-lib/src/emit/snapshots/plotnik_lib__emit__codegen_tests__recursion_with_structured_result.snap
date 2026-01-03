@@ -61,23 +61,25 @@ Test = 04 :: T05
 
 Expr:
   01   ε                                    02
-  02   ε                                    19, 27
+  02   ε                                    23, 31
 
 Test:
   04   ε                                    05
-  05       (program)                        06
-  06   ▽   (Expr)                           07 ⯇
-  07   ε   [Set(M5)]                        09
-  09   △                                    10
-  10                                        ▶
-  11   ε   [Set(M2)]                        13
-  13   △                                    21
+  05   ε   [Obj]                            07
+  07       (program)                        08
+  08   ▽   (Expr)                           09 ⯇
+  09   ε   [Set(M5)]                        11
+  11   △                                    12
+  12   ε   [EndObj]                         14
   14                                        ▶
-  15   ε   [EndEnum]                        14
-  17       (number) [Text Set(M0)]          15
-  19   ε   [Enum(M3)]                       17
-  21   ε   [EndEnum]                        14
-  23   ▷   arguments: (Expr)                11 ⯇
-  24   ▽   function: (identifier) [Node Set(M1)]  23
-  26       (call_expression)                24
-  27   ε   [Enum(M4)]                       26
+  15   ε   [Set(M2)]                        17
+  17   △                                    25
+  18                                        ▶
+  19   ε   [EndEnum]                        18
+  21       (number) [Text Set(M0)]          19
+  23   ε   [Enum(M3)]                       21
+  25   ε   [EndEnum]                        18
+  27   ▷   arguments: (Expr)                15 ⯇
+  28   ▽   function: (identifier) [Node Set(M1)]  27
+  30       (call_expression)                28
+  31   ε   [Enum(M4)]                       30

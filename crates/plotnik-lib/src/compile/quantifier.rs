@@ -236,9 +236,15 @@ impl Compiler<'_> {
         let match_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
         let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
 
-        // Compile inner star with Push effects and split exits
         let push_effects = CaptureEffects {
-            post: vec![EffectIR::simple(EffectOpcode::Push, 0)],
+            post: if self.quantifier_needs_node_for_push(inner) {
+                vec![
+                    EffectIR::simple(EffectOpcode::Node, 0),
+                    EffectIR::simple(EffectOpcode::Push, 0),
+                ]
+            } else {
+                vec![EffectIR::simple(EffectOpcode::Push, 0)]
+            },
         };
         let inner_entry =
             self.compile_star_for_array_with_exits(inner, match_endarr, skip_endarr, nav_override, push_effects);

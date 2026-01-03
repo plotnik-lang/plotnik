@@ -42,19 +42,21 @@ Test = 01 :: T3
 
 Test:
   01   ε                                    02
-  02       (array)                          03
-  03   ε   [Arr]                            05
-  05   ε                                    19, 11
-  07   ε   [EndArr Set(M2)]                 09
-  09   △                                    10
-  10                                        ▶
-  11   ε   [EndArr Set(M2)]                 10
-  13   ε   [EndObj Push]                    29
-  15   ▷   (number) [Node Set(M1)]          13
-  17   ▽   (identifier) [Node Set(M0)]      15
-  19   ε   [Obj]                            17
-  21   ε   [EndObj Push]                    29
-  23   ▷   (number) [Node Set(M1)]          21
-  25   ▷   (identifier) [Node Set(M0)]      23
-  27   ε   [Obj]                            25
-  29   ε                                    27, 07
+  02   ε   [Obj]                            04
+  04       (array)                          05
+  05   ε   [Arr]                            07
+  07   ε                                    23, 15
+  09   ε   [EndArr Set(M2)]                 11
+  11   △                                    13
+  12                                        ▶
+  13   ε   [EndObj]                         12
+  15   ε   [EndArr Set(M2)]                 13
+  17   ε   [EndObj Push]                    33
+  19   ▷   (number) [Node Set(M1)]          17
+  21   ▽   (identifier) [Node Set(M0)]      19
+  23   ε   [Obj]                            21
+  25   ε   [EndObj Push]                    33
+  27   ▷   (number) [Node Set(M1)]          25
+  29   ▷   (identifier) [Node Set(M0)]      27
+  31   ε   [Obj]                            29
+  33   ε                                    31, 09

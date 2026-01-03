@@ -1,0 +1,10 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration (variable_declarator)*? @decls))
+---
+let a, b
+---
+{
+  "decls": []
+}
