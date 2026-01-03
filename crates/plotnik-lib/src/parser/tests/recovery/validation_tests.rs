@@ -730,7 +730,7 @@ fn field_name_with_hyphens_error() {
 #[test]
 fn negated_field_with_upper_ident_parses() {
     let input = indoc! {r#"
-    (call !Arguments)
+    (call -Arguments)
     "#};
 
     let res = Query::expect_invalid(input);
@@ -738,13 +738,13 @@ fn negated_field_with_upper_ident_parses() {
     insta::assert_snapshot!(res, @r"
     error: field names must be lowercase: field names become struct fields
       |
-    1 | (call !Arguments)
+    1 | (call -Arguments)
       |        ^^^^^^^^^
       |
     help: use `arguments:`
       |
-    1 - (call !Arguments)
-    1 + (call !arguments:)
+    1 - (call -Arguments)
+    1 + (call -arguments:)
       |
     ");
 }
@@ -1395,4 +1395,21 @@ fn treesitter_sequence_single_child_warning() {
 fn named_node_with_children_no_warning() {
     // Normal node with children - NOT a tree-sitter sequence
     Query::expect_valid("Test = (identifier (child))");
+}
+
+#[test]
+fn negation_syntax_deprecated_warning() {
+    // Old syntax `!field` is deprecated in favor of `-field`
+    let input = "Test = (call !name)";
+
+    let res = Query::expect_warning(input);
+
+    insta::assert_snapshot!(res, @r"
+    warning: deprecated negation syntax
+      |
+    1 | Test = (call !name)
+      |              ^
+      |
+    help: use `-field` instead of `!field`
+    ");
 }

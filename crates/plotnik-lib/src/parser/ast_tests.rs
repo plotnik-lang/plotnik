@@ -203,12 +203,12 @@ fn anchor() {
 
 #[test]
 fn negated_field() {
-    let res = Query::expect_valid_ast("Q = (function !async)");
+    let res = Query::expect_valid_ast("Q = (function -async)");
     insta::assert_snapshot!(res, @r"
     Root
       Def Q
         NamedNode function
-          NegatedField !async
+          NegatedField -async
     ");
 }
 

@@ -154,7 +154,7 @@ fn fields_multiple() {
 #[test]
 fn fields_negated() {
     snap!(indoc! {r#"
-        Test = (function_declaration name: (identifier) @name !type_parameters)
+        Test = (function_declaration name: (identifier) @name -type_parameters)
     "#});
 }
 

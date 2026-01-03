@@ -56,6 +56,7 @@ pub enum DiagnosticKind {
     FieldNameUppercase,
     TypeNameInvalidChars,
     TreeSitterSequenceSyntax,
+    NegationSyntaxDeprecated,
 
     // Valid syntax, invalid semantics
     DuplicateDefinition,
@@ -90,7 +91,9 @@ impl DiagnosticKind {
     /// Default severity for this kind. Can be overridden by policy.
     pub fn default_severity(&self) -> Severity {
         match self {
-            Self::UnusedBranchLabels | Self::TreeSitterSequenceSyntax => Severity::Warning,
+            Self::UnusedBranchLabels
+            | Self::TreeSitterSequenceSyntax
+            | Self::NegationSyntaxDeprecated => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -137,9 +140,10 @@ impl DiagnosticKind {
         match self {
             Self::ExpectedSubtype => Some("e.g., `expression/binary_expression`"),
             Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
-            Self::ExpectedFieldName => Some("e.g., `!value`"),
+            Self::ExpectedFieldName => Some("e.g., `-value`"),
             Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
             Self::TreeSitterSequenceSyntax => Some("use `{...}` for sequences"),
+            Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
             Self::MixedAltBranches => {
                 Some("use all labels for a tagged union, or none for a merged struct")
             }
@@ -202,6 +206,7 @@ impl DiagnosticKind {
             Self::FieldNameUppercase => "field names must be lowercase",
             Self::TypeNameInvalidChars => "type names cannot contain `.` or `-`",
             Self::TreeSitterSequenceSyntax => "tree-sitter sequence syntax",
+            Self::NegationSyntaxDeprecated => "deprecated negation syntax",
 
             // Semantic errors
             Self::DuplicateDefinition => "duplicate definition",
