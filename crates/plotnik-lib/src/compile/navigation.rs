@@ -91,6 +91,7 @@ pub fn repeat_nav_for(first_nav: Option<Nav>) -> Option<Nav> {
         Some(Nav::DownSkip) => Some(Nav::NextSkip),
         Some(Nav::DownExact) => Some(Nav::NextExact),
         Some(nav @ (Nav::Next | Nav::NextSkip | Nav::NextExact)) => Some(nav),
+        None | Some(Nav::Stay) => Some(Nav::Next),
         _ => None,
     }
 }

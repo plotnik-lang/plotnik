@@ -59,7 +59,7 @@ Test:
   25   ε   [EndObj Push]                    37
   27   ε   [EndObj Set(M2)]                 25
   29   ▷   (number) [Node Set(M1)]          27
-  31       (identifier) [Node Set(M0)]      29
+  31   ▷   (identifier) [Node Set(M0)]      29
   33   ε   [Obj]                            31
   35   ε   [Obj]                            33
   37   ε                                    35, 11

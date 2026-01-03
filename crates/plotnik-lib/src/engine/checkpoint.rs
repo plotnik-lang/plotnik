@@ -13,6 +13,8 @@ pub struct Checkpoint {
     pub effect_watermark: usize,
     /// Frame arena state at checkpoint.
     pub frame_index: Option<u32>,
+    /// Recursion depth at checkpoint.
+    pub recursion_depth: u32,
     /// Resume point (raw step index).
     pub ip: u16,
 }
