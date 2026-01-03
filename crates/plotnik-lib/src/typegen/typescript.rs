@@ -11,6 +11,7 @@ use plotnik_core::utils::to_pascal_case;
 use crate::bytecode::{
     EntrypointsView, Module, QTypeId, StringsView, TypeDef, TypeKind, TypesView,
 };
+use crate::Colors;
 
 /// How to represent the void type in TypeScript.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -33,6 +34,8 @@ pub struct Config {
     pub verbose_nodes: bool,
     /// How to represent the void type
     pub void_type: VoidType,
+    /// Color configuration for output
+    pub colors: Colors,
 }
 
 impl Default for Config {
@@ -42,6 +45,7 @@ impl Default for Config {
             emit_node_type: true,
             verbose_nodes: false,
             void_type: VoidType::default(),
+            colors: Colors::OFF,
         }
     }
 }
@@ -81,6 +85,10 @@ impl<'a> Emitter<'a> {
             refs_visited: HashSet::new(),
             output: String::new(),
         }
+    }
+
+    fn c(&self) -> Colors {
+        self.config.colors
     }
 
     /// Emit TypeScript for all entrypoint types.
@@ -143,6 +151,9 @@ impl<'a> Emitter<'a> {
             }
         }
 
+        // Ensure exactly one trailing newline
+        self.output.truncate(self.output.trim_end().len());
+        self.output.push('\n');
         self.output
     }
 
@@ -477,7 +488,6 @@ impl<'a> Emitter<'a> {
 
     fn emit_generated_type_def(&mut self, type_id: QTypeId, name: &str) {
         self.emitted.insert(type_id);
-        let export = if self.config.export { "export " } else { "" };
 
         let Some(type_def) = self.types.get(type_id) else {
             return;
@@ -488,22 +498,20 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
-            TypeKind::Struct => self.emit_interface(name, &type_def, export),
-            TypeKind::Enum => self.emit_tagged_union(name, &type_def, export),
+            TypeKind::Struct => self.emit_interface(name, &type_def),
+            TypeKind::Enum => self.emit_tagged_union(name, &type_def),
             _ => {}
         }
     }
 
     fn emit_type_definition(&mut self, name: &str, type_id: QTypeId) {
         self.emitted.insert(type_id);
-        let export = if self.config.export { "export " } else { "" };
         let type_name = to_pascal_case(name);
 
         let Some(type_def) = self.types.get(type_id) else {
             // Builtin type - emit as alias
             let ts_type = self.type_to_ts(type_id);
-            self.output
-                .push_str(&format!("{}type {} = {};\n\n", export, type_name, ts_type));
+            self.emit_type_decl(&type_name, &ts_type);
             return;
         };
 
@@ -512,19 +520,41 @@ impl<'a> Emitter<'a> {
         };
 
         match kind {
-            TypeKind::Struct => self.emit_interface(&type_name, &type_def, export),
-            TypeKind::Enum => self.emit_tagged_union(&type_name, &type_def, export),
+            TypeKind::Struct => self.emit_interface(&type_name, &type_def),
+            TypeKind::Enum => self.emit_tagged_union(&type_name, &type_def),
             _ => {
                 let ts_type = self.type_to_ts(type_id);
-                self.output
-                    .push_str(&format!("{}type {} = {};\n\n", export, type_name, ts_type));
+                self.emit_type_decl(&type_name, &ts_type);
             }
         }
     }
 
-    fn emit_interface(&mut self, name: &str, type_def: &TypeDef, export: &str) {
-        self.output
-            .push_str(&format!("{}interface {} {{\n", export, name));
+    /// Emit `export type Name = Body;` with proper coloring.
+    fn emit_type_decl(&mut self, name: &str, body: &str) {
+        let c = self.c();
+        if self.config.export {
+            self.output
+                .push_str(&format!("{}export{} ", c.dim, c.reset));
+        }
+        self.output.push_str(&format!(
+            "{}type{} {}{}{} {}={} {}{};\n\n",
+            c.dim, c.reset, c.blue, name, c.reset, c.dim, c.reset, body, c.dim
+        ));
+        self.output.push_str(c.reset);
+    }
+
+    fn emit_interface(&mut self, name: &str, type_def: &TypeDef) {
+        let c = self.c();
+
+        // Header: export interface Name {
+        if self.config.export {
+            self.output
+                .push_str(&format!("{}export{} ", c.dim, c.reset));
+        }
+        self.output.push_str(&format!(
+            "{}interface{} {}{}{} {}{{\n",
+            c.dim, c.reset, c.blue, name, c.reset, c.dim
+        ));
 
         // Collect fields and sort by name
         let mut fields: Vec<(String, QTypeId, bool)> = self
@@ -541,14 +571,17 @@ impl<'a> Emitter<'a> {
         for (field_name, field_type, optional) in fields {
             let ts_type = self.type_to_ts(field_type);
             let opt_marker = if optional { "?" } else { "" };
-            self.output
-                .push_str(&format!("  {}{}: {};\n", field_name, opt_marker, ts_type));
+            self.output.push_str(&format!(
+                "{}  {}{}{}{}: {};\n",
+                c.reset, field_name, c.dim, opt_marker, c.dim, ts_type
+            ));
         }
 
-        self.output.push_str("}\n\n");
+        self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
     }
 
-    fn emit_tagged_union(&mut self, name: &str, type_def: &TypeDef, export: &str) {
+    fn emit_tagged_union(&mut self, name: &str, type_def: &TypeDef) {
+        let c = self.c();
         let mut variant_types = Vec::new();
 
         for member in self.types.members_of(type_def) {
@@ -557,47 +590,91 @@ impl<'a> Emitter<'a> {
             variant_types.push(variant_type_name.clone());
 
             let data_str = self.inline_data_type(member.type_id);
+
+            // Header: export interface NameVariant {
+            if self.config.export {
+                self.output
+                    .push_str(&format!("{}export{} ", c.dim, c.reset));
+            }
             self.output.push_str(&format!(
-                "{}interface {} {{\n  $tag: \"{}\";\n  $data: {};\n}}\n\n",
-                export, variant_type_name, variant_name, data_str
+                "{}interface{} {}{}{} {}{{\n",
+                c.dim, c.reset, c.blue, variant_type_name, c.reset, c.dim
             ));
+            // $tag field with green string
+            self.output.push_str(&format!(
+                "{}  $tag{}:{} {}\"{}\"{}{};{}\n",
+                c.reset, c.dim, c.reset, c.green, variant_name, c.reset, c.dim, c.reset
+            ));
+            // $data field
+            self.output.push_str(&format!(
+                "  $data{}:{} {}{};\n",
+                c.dim, c.reset, data_str, c.dim
+            ));
+            self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
         }
 
-        let union = variant_types.join(" | ");
-        self.output
-            .push_str(&format!("{}type {} = {};\n\n", export, name, union));
+        // Union type declaration
+        let union = variant_types
+            .iter()
+            .map(|v| format!("{}{}{}", c.blue, v, c.reset))
+            .collect::<Vec<_>>()
+            .join(&format!(" {}|{} ", c.dim, c.reset));
+        self.emit_type_decl(name, &union);
     }
 
     fn emit_custom_type_alias(&mut self, name: &str) {
-        let export = if self.config.export { "export " } else { "" };
-        self.output
-            .push_str(&format!("{}type {} = Node;\n\n", export, name));
+        self.emit_type_decl(name, "Node");
     }
 
     fn emit_type_alias(&mut self, alias_name: &str, target_name: &str) {
-        let export = if self.config.export { "export " } else { "" };
-        self.output.push_str(&format!(
-            "{}type {} = {};\n\n",
-            export, alias_name, target_name
-        ));
+        let c = self.c();
+        self.emit_type_decl(alias_name, &format!("{}{}{}", c.blue, target_name, c.reset));
     }
 
     fn emit_node_interface(&mut self) {
-        let export = if self.config.export { "export " } else { "" };
+        let c = self.c();
+
+        // Header: export interface Node {
+        if self.config.export {
+            self.output
+                .push_str(&format!("{}export{} ", c.dim, c.reset));
+        }
+        self.output.push_str(&format!(
+            "{}interface{} {}Node{} {}{{\n",
+            c.dim, c.reset, c.blue, c.reset, c.dim
+        ));
+
+        // kind, text, span fields
+        self.output
+            .push_str(&format!("{}  kind{}:{} string{};\n", c.reset, c.dim, c.reset, c.dim));
+        self.output
+            .push_str(&format!("{}  text{}:{} string{};\n", c.reset, c.dim, c.reset, c.dim));
+        self.output.push_str(&format!(
+            "{}  span{}:{} {}[{}number{}, {}number{}]{};\n",
+            c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.dim
+        ));
+
         if self.config.verbose_nodes {
+            // startPosition and endPosition share same inline type
+            let pos_type = format!(
+                "{}{{{} row{}:{} number{}; column{}:{} number{}; {}}}",
+                c.dim, c.reset, c.dim, c.reset, c.dim, c.dim, c.reset, c.dim, c.dim
+            );
             self.output.push_str(&format!(
-                "{}interface Node {{\n  kind: string;\n  text: string;\n  startPosition: {{ row: number; column: number }};\n  endPosition: {{ row: number; column: number }};\n}}\n\n",
-                export
+                "{}  startPosition{}:{} {}{};\n",
+                c.reset, c.dim, c.reset, pos_type, c.dim
             ));
-        } else {
             self.output.push_str(&format!(
-                "{}interface Node {{\n  kind: string;\n  text: string;\n}}\n\n",
-                export
+                "{}  endPosition{}:{} {}{};\n",
+                c.reset, c.dim, c.reset, pos_type, c.dim
             ));
         }
+
+        self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
     }
 
     fn type_to_ts(&self, type_id: QTypeId) -> String {
+        let c = self.c();
         let Some(type_def) = self.types.get(type_id) else {
             return "unknown".to_string();
         };
@@ -615,29 +692,32 @@ impl<'a> Emitter<'a> {
             TypeKind::String => "string".to_string(),
             TypeKind::Struct | TypeKind::Enum => {
                 if let Some(name) = self.type_names.get(&type_id) {
-                    name.clone()
+                    format!("{}{}{}", c.blue, name, c.reset)
                 } else {
                     self.inline_composite(type_id, &type_def, &kind)
                 }
             }
             TypeKind::Alias => {
                 if let Some(name) = self.type_names.get(&type_id) {
-                    name.clone()
+                    format!("{}{}{}", c.blue, name, c.reset)
                 } else {
                     "Node".to_string()
                 }
             }
             TypeKind::ArrayZeroOrMore => {
                 let elem_type = self.type_to_ts(QTypeId(type_def.data));
-                format!("{}[]", elem_type)
+                format!("{}{}[]{}", elem_type, c.dim, c.reset)
             }
             TypeKind::ArrayOneOrMore => {
                 let elem_type = self.type_to_ts(QTypeId(type_def.data));
-                format!("[{}, ...{}[]]", elem_type, elem_type)
+                format!(
+                    "{}[{}{}{}, ...{}{}{}[]]{}",
+                    c.dim, c.reset, elem_type, c.dim, c.reset, elem_type, c.dim, c.reset
+                )
             }
             TypeKind::Optional => {
                 let inner_type = self.type_to_ts(QTypeId(type_def.data));
-                format!("{} | null", inner_type)
+                format!("{} {}|{} null", inner_type, c.dim, c.reset)
             }
         }
     }
@@ -651,8 +731,9 @@ impl<'a> Emitter<'a> {
     }
 
     fn inline_struct(&self, type_def: &TypeDef) -> String {
+        let c = self.c();
         if type_def.count == 0 {
-            return "{}".to_string();
+            return format!("{}{{}}{}", c.dim, c.reset);
         }
 
         let mut fields: Vec<(String, QTypeId, bool)> = self
@@ -670,29 +751,40 @@ impl<'a> Emitter<'a> {
             .iter()
             .map(|(name, ty, opt)| {
                 let ts_type = self.type_to_ts(*ty);
-                let opt_marker = if *opt { "?" } else { "" };
-                format!("{}{}: {}", name, opt_marker, ts_type)
+                let opt_marker = if *opt {
+                    format!("{}?{}", c.dim, c.reset)
+                } else {
+                    String::new()
+                };
+                format!("{}{}{}:{} {}", name, opt_marker, c.dim, c.reset, ts_type)
             })
             .collect();
 
-        format!("{{ {} }}", field_strs.join("; "))
+        format!(
+            "{}{{{} {} {}}}{}", c.dim, c.reset, field_strs.join(&format!("{}; ", c.dim)), c.dim, c.reset
+        )
     }
 
     fn inline_enum(&self, type_def: &TypeDef) -> String {
+        let c = self.c();
         let variant_strs: Vec<String> = self
             .types
             .members_of(type_def)
             .map(|member| {
                 let name = self.strings.get(member.name);
                 let data_type = self.type_to_ts(member.type_id);
-                format!("{{ $tag: \"{}\"; $data: {} }}", name, data_type)
+                format!(
+                    "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
+                    c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data_type, c.dim, c.reset
+                )
             })
             .collect();
 
-        variant_strs.join(" | ")
+        variant_strs.join(&format!(" {}|{} ", c.dim, c.reset))
     }
 
     fn inline_data_type(&self, type_id: QTypeId) -> String {
+        let c = self.c();
         let Some(type_def) = self.types.get(type_id) else {
             return self.type_to_ts(type_id);
         };
@@ -702,7 +794,7 @@ impl<'a> Emitter<'a> {
         };
 
         if kind == TypeKind::Void {
-            return "{}".to_string();
+            return format!("{}{{}}{}", c.dim, c.reset);
         }
 
         if kind == TypeKind::Struct {

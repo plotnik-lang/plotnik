@@ -16,6 +16,7 @@ fn multiple_definitions_all_emitted() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Id {
@@ -43,6 +44,7 @@ fn multiple_definitions_distinct_types() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Both {
@@ -70,6 +72,7 @@ fn capture_single_node() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -101,6 +104,7 @@ fn capture_with_custom_type() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export type Identifier = Node;
@@ -121,6 +125,7 @@ fn named_node_with_field_capture() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -144,6 +149,7 @@ fn named_node_multiple_field_captures() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -170,6 +176,7 @@ fn named_node_captured_with_internal_captures() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export type FunctionInfo = Node;
@@ -196,6 +203,7 @@ fn nested_named_node_captures() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -214,6 +222,7 @@ fn scalar_list_zero_or_more() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -232,6 +241,7 @@ fn scalar_list_one_or_more() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -252,6 +262,7 @@ fn row_list_basic() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QRows {
@@ -277,6 +288,7 @@ fn row_list_non_empty() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QRows {
@@ -300,6 +312,7 @@ fn optional_single_capture() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -319,6 +332,7 @@ fn optional_group_bubbles_fields() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -340,6 +354,7 @@ fn sequence_merges_fields() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -361,6 +376,7 @@ fn captured_sequence_creates_struct() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QRow {
@@ -384,6 +400,7 @@ fn untagged_alt_same_capture_all_branches() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -402,6 +419,7 @@ fn untagged_alt_different_captures() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -426,6 +444,7 @@ fn untagged_alt_partial_overlap() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface Q {
@@ -450,6 +469,7 @@ fn tagged_alt_basic() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QStr {
@@ -481,6 +501,7 @@ fn tagged_alt_with_type_annotation() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QStr {
@@ -512,6 +533,7 @@ fn tagged_alt_captured() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QResultStr {
@@ -547,6 +569,7 @@ fn nested_captured_group() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface QPair {
@@ -660,6 +683,7 @@ fn recursive_type_optional_self_ref() {
     export interface Node {
       kind: string;
       text: string;
+      span: [number, number];
     }
 
     export interface NestedCall {
