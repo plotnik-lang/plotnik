@@ -1,7 +1,7 @@
 ---
 source: crates/plotnik-lib/src/emit/codegen_tests.rs
 ---
-Test = (function_declaration name: (identifier) @name !type_parameters)
+Test = (function_declaration name: (identifier) @name -type_parameters)
 ---
 [flags]
 linked = false

@@ -131,7 +131,7 @@ fn printer_field() {
 
 #[test]
 fn printer_negated_field() {
-    let input = "Q = (call !name)";
+    let input = "Q = (call -name)";
     let q = Query::expect(input);
 
     let res = q.printer().dump();
@@ -140,7 +140,7 @@ fn printer_negated_field() {
     Root
       Def Q
         NamedNode call
-          NegatedField !name
+          NegatedField -name
     ");
 }
 
@@ -291,7 +291,7 @@ fn printer_symbols_broken_ref() {
 #[test]
 fn printer_spans_comprehensive() {
     let input = indoc! {r#"
-        Foo = (call name: (id) !bar)
+        Foo = (call name: (id) -bar)
         Q = [(a) (b)]
     "#};
     let q = Query::expect(input);
@@ -304,7 +304,7 @@ fn printer_spans_comprehensive() {
         NamedNode [6..28] call
           FieldExpr [12..22] name:
             NamedNode [18..22] id
-          NegatedField [23..27] !bar
+          NegatedField [23..27] -bar
       Def [29..42] Q
         Alt [33..42]
           Branch [34..37]

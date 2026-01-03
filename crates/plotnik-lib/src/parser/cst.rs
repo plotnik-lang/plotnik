@@ -45,6 +45,9 @@ pub enum SyntaxKind {
     #[token("!")]
     Negation,
 
+    #[token("-")]
+    Minus,
+
     #[token("~")]
     Tilde,
 
@@ -274,6 +277,7 @@ pub mod token_sets {
         SingleQuote,
         Dot,
         Negation,
+        Minus,
         KwError,
         KwMissing,
     ]);

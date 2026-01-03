@@ -75,10 +75,26 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Negated field assertion: `!field` (field must be absent)
+    /// Negated field assertion: `-field` (field must be absent)
+    ///
+    /// Also accepts deprecated `!field` syntax with a warning.
     pub(crate) fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
-        self.expect(SyntaxKind::Negation, "'!' for negated field");
+
+        // Accept both `-` (preferred) and `!` (deprecated)
+        if self.currently_is(SyntaxKind::Negation) {
+            let span = self.current_span();
+            self.diagnostics
+                .report(
+                    self.source_id,
+                    DiagnosticKind::NegationSyntaxDeprecated,
+                    span,
+                )
+                .emit();
+            self.bump();
+        } else {
+            self.expect(SyntaxKind::Minus, "'-' for negated field");
+        }
 
         if !self.currently_is(SyntaxKind::Id) {
             self.error(DiagnosticKind::ExpectedFieldName);

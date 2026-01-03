@@ -68,7 +68,7 @@ fn missing_type_name() {
 #[test]
 fn missing_negated_field_name() {
     let input = indoc! {r#"
-    (call !)
+    (call -)
     "#};
 
     let res = Query::expect_invalid(input);
@@ -76,10 +76,10 @@ fn missing_negated_field_name() {
     insta::assert_snapshot!(res, @r"
     error: expected field name
       |
-    1 | (call !)
+    1 | (call -)
       |        ^
       |
-    help: e.g., `!value`
+    help: e.g., `-value`
     ");
 }
 

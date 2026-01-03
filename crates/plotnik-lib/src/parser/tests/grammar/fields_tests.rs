@@ -67,7 +67,7 @@ fn multiple_fields() {
 #[test]
 fn negated_field() {
     let input = indoc! {r#"
-    Q = (function !async)
+    Q = (function -async)
     "#};
 
     let res = Query::expect_valid_cst(input);
@@ -81,7 +81,7 @@ fn negated_field() {
           ParenOpen "("
           Id "function"
           NegatedField
-            Negation "!"
+            Minus "-"
             Id "async"
           ParenClose ")"
     "#);
@@ -91,7 +91,7 @@ fn negated_field() {
 fn negated_and_regular_fields() {
     let input = indoc! {r#"
     Q = (function
-        !async
+        -async
         name: (identifier))
     "#};
 
@@ -106,7 +106,7 @@ fn negated_and_regular_fields() {
           ParenOpen "("
           Id "function"
           NegatedField
-            Negation "!"
+            Minus "-"
             Id "async"
           Field
             Id "name"

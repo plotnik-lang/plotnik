@@ -359,7 +359,7 @@ impl<'q> QueryPrinter<'q> {
         let prefix = indent(depth);
         let span = self.span_str(nf.text_range());
         let name = nf.name().map(|t| t.text().to_string()).unwrap_or_default();
-        writeln!(w, "{}NegatedField{} !{}", prefix, span, name)
+        writeln!(w, "{}NegatedField{} -{}", prefix, span, name)
     }
 
     fn format_branch(

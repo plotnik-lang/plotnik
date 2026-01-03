@@ -59,7 +59,7 @@ impl Parser<'_, '_> {
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_str(),
             SyntaxKind::Dot => self.parse_anchor(),
-            SyntaxKind::Negation => self.parse_negated_field(),
+            SyntaxKind::Negation | SyntaxKind::Minus => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
                 self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);

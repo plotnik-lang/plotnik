@@ -127,7 +127,7 @@ fn field_not_on_node_type_with_suggestion() {
 #[test]
 fn negated_field_unknown() {
     let input = indoc! {r#"
-        Q = (function_declaration !nme) @fn
+        Q = (function_declaration -nme) @fn
     "#};
 
     let res = Query::expect_invalid_linking(input);
@@ -135,7 +135,7 @@ fn negated_field_unknown() {
     insta::assert_snapshot!(res, @r"
     error: `nme` is not a valid field
       |
-    1 | Q = (function_declaration !nme) @fn
+    1 | Q = (function_declaration -nme) @fn
       |                            ^^^
       |
     help: did you mean `name`?
@@ -145,7 +145,7 @@ fn negated_field_unknown() {
 #[test]
 fn negated_field_not_on_node_type() {
     let input = indoc! {r#"
-        Q = (function_declaration !condition) @fn
+        Q = (function_declaration -condition) @fn
     "#};
 
     let res = Query::expect_invalid_linking(input);
@@ -153,7 +153,7 @@ fn negated_field_not_on_node_type() {
     insta::assert_snapshot!(res, @r"
     error: field `condition` is not valid on this node type
       |
-    1 | Q = (function_declaration !condition) @fn
+    1 | Q = (function_declaration -condition) @fn
       |      --------------------  ^^^^^^^^^
       |      |
       |      on `function_declaration`
@@ -165,7 +165,7 @@ fn negated_field_not_on_node_type() {
 #[test]
 fn negated_field_not_on_node_type_with_suggestion() {
     let input = indoc! {r#"
-        Q = (function_declaration !parameter) @fn
+        Q = (function_declaration -parameter) @fn
     "#};
 
     let res = Query::expect_invalid_linking(input);
@@ -173,7 +173,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
     insta::assert_snapshot!(res, @r"
     error: field `parameter` is not valid on this node type
       |
-    1 | Q = (function_declaration !parameter) @fn
+    1 | Q = (function_declaration -parameter) @fn
       |      --------------------  ^^^^^^^^^
       |      |
       |      on `function_declaration`
@@ -186,7 +186,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
 #[test]
 fn negated_field_valid() {
     let input = indoc! {r#"
-        Q = (function_declaration !name) @fn
+        Q = (function_declaration -name) @fn
     "#};
 
     Query::expect_valid_linking(input);
