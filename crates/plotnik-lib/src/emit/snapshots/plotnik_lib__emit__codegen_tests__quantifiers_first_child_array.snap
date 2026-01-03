@@ -19,10 +19,14 @@ S6 "identifier"
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
 T2 = Struct  M0:2  ; { ids, n }
+T3 = Struct  M2:1  ; { ids }
+T4 = Struct  M3:1  ; { n }
 
 [type_members]
 M0: S1 → T1  ; ids: T1
 M1: S2 → T0  ; n: <Node>
+M2: S1 → T1  ; ids: T1
+M3: S2 → T0  ; n: <Node>
 
 [type_names]
 N0: S3 → T2  ; Test
@@ -31,19 +35,19 @@ N0: S3 → T2  ; Test
 Test = 01 :: T2
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (array)                          03
-  03  𝜀    [Arr]                            05
-  05  𝜀                                     16, 14
+  03   ε   [Arr]                            05
+  05   ε                                    16, 14
   07                                        ▶
-  08  ↓*   (number) [Node Set(M1)]          22
-  10  *    (number) [Node Set(M1)]          22
-  12  𝜀    [EndArr Set(M0)]                 10
-  14  𝜀    [EndArr Set(M0)]                 08
-  16  ↓*   (identifier) [Push]              20
-  18  *    (identifier) [Push]              20
-  20  𝜀                                     18, 12
-  22 *↑¹                                    07
+  08   ▽   (number) [Node Set(M1)]          22
+  10   ▷   (number) [Node Set(M1)]          22
+  12   ε   [EndArr Set(M0)]                 10
+  14   ε   [EndArr Set(M0)]                 08
+  16   ▽   (identifier) [Push]              20
+  18   ▷   (identifier) [Push]              20
+  20   ε                                    18, 12
+  22   △                                    07

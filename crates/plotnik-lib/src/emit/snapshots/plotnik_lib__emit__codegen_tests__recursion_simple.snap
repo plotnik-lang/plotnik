@@ -29,6 +29,8 @@ T1 = <String>
 T2 = Struct  M0:1  ; { value }
 T3 = Struct  M1:2  ; { fn, inner }
 T4 = Enum    M3:2  ; Lit | Rec
+T5 = Struct  M5:1  ; { fn }
+T6 = Struct  M6:1  ; { inner }
 
 [type_members]
 M0: S01 → T1  ; value: <String>
@@ -36,6 +38,8 @@ M1: S02 → T0  ; fn: <Node>
 M2: S03 → T4  ; inner: Expr
 M3: S04 → T2  ; Lit: T2
 M4: S05 → T3  ; Rec: T3
+M5: S02 → T0  ; fn: <Node>
+M6: S03 → T4  ; inner: Expr
 
 [type_names]
 N0: S06 → T4  ; Expr
@@ -44,19 +48,19 @@ N0: S06 → T4  ; Expr
 Expr = 01 :: T4
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Expr:
-  01  𝜀                                     02
-  02  𝜀                                     12, 20
-  04  𝜀    [Set(M2)]                        06
-  06 *↑¹                                    14
+  01   ε                                    02
+  02   ε                                    12, 20
+  04   ε   [Set(M2)]                        06
+  06   △                                    14
   07                                        ▶
-  08  𝜀    [EndEnum]                        07
+  08   ε   [EndEnum]                        07
   10       (number) [Text Set(M0)]          08
-  12  𝜀    [Enum(M3)]                       10
-  14  𝜀    [EndEnum]                        07
-  16  *  ▶ arguments: (Expr)                04
-  17  ↓*   function: (identifier) [Node Set(M1)]  16
+  12   ε   [Enum(M3)]                       10
+  14   ε   [EndEnum]                        07
+  16   ▷   arguments: (Expr)                04 ⯇
+  17   ▽   function: (identifier) [Node Set(M1)]  16
   19       (call_expression)                17
-  20  𝜀    [Enum(M4)]                       19
+  20   ε   [Enum(M4)]                       19

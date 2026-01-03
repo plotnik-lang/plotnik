@@ -1,23 +1,24 @@
 //! Human-readable bytecode dump for debugging and documentation.
 //!
-//! See `docs/wip/bytecode.md` for the output format specification.
+//! See `docs/binary-format/07-dump-format.md` for the output format specification.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use super::effects::EffectOpcode;
-use super::ids::{QTypeId, StepId, StringId};
+use crate::colors::Colors;
+
+use super::format::{format_effect, nav_symbol_epsilon, width_for_count, LineBuilder, Symbol};
+use super::ids::{QTypeId, StepId};
 use super::module::{Instruction, Module};
-use super::nav::Nav;
 use super::type_meta::TypeKind;
 use super::{Call, Match, Return};
 
 /// Generate a human-readable dump of the bytecode module.
-pub fn dump(module: &Module) -> String {
+pub fn dump(module: &Module, colors: Colors) -> String {
     let mut out = String::new();
-    let ctx = DumpContext::new(module);
+    let ctx = DumpContext::new(module, colors);
 
-    dump_header(&mut out, module);
+    dump_header(&mut out, module, &ctx);
     dump_strings(&mut out, module, &ctx);
     dump_types_defs(&mut out, module, &ctx);
     dump_types_members(&mut out, module, &ctx);
@@ -28,21 +29,14 @@ pub fn dump(module: &Module) -> String {
     out
 }
 
-fn dump_header(out: &mut String, module: &Module) {
+fn dump_header(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let header = module.header();
-    out.push_str("[flags]\n");
+    writeln!(out, "{}[flags]{}", c.blue, c.reset).unwrap();
     writeln!(out, "linked = {}", header.is_linked()).unwrap();
     out.push('\n');
 }
 
-/// Calculate the minimum width needed to display numbers up to `count - 1`.
-fn width_for_count(count: usize) -> usize {
-    if count <= 1 {
-        1
-    } else {
-        ((count - 1) as f64).log10().floor() as usize + 1
-    }
-}
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
@@ -66,10 +60,12 @@ struct DumpContext {
     name_width: usize,
     /// Width for step indices.
     step_width: usize,
+    /// Color palette.
+    colors: Colors,
 }
 
 impl DumpContext {
-    fn new(module: &Module) -> Self {
+    fn new(module: &Module, colors: Colors) -> Self {
         let header = module.header();
         let is_linked = header.is_linked();
         let strings = module.strings();
@@ -81,7 +77,7 @@ impl DumpContext {
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name).to_string();
-            step_labels.insert(ep.target.0, name);
+            step_labels.insert(ep.target.get(), name);
         }
 
         let mut node_type_names = BTreeMap::new();
@@ -99,7 +95,7 @@ impl DumpContext {
         // Collect all strings for unlinked mode lookups
         let str_count = header.str_table_count as usize;
         let all_strings: Vec<String> = (0..str_count)
-            .map(|i| strings.get(StringId(i as u16)).to_string())
+            .map(|i| strings.get_by_index(i).to_string())
             .collect();
 
         // Compute widths for index formatting
@@ -122,11 +118,12 @@ impl DumpContext {
             member_width,
             name_width,
             step_width,
+            colors,
         }
     }
 
     fn label_for(&self, step: StepId) -> Option<&str> {
-        self.step_labels.get(&step.0).map(|s| s.as_str())
+        self.step_labels.get(&step.get()).map(|s| s.as_str())
     }
 
     /// Get the name for a node type ID.
@@ -157,25 +154,27 @@ impl DumpContext {
 }
 
 fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let strings = module.strings();
     let count = module.header().str_table_count as usize;
     let w = ctx.str_width;
 
-    out.push_str("[strings]\n");
+    writeln!(out, "{}[strings]{}", c.blue, c.reset).unwrap();
     for i in 0..count {
-        let s = strings.get(StringId(i as u16));
-        writeln!(out, "S{i:0w$} {s:?}").unwrap();
+        let s = strings.get_by_index(i);
+        writeln!(out, "S{i:0w$} {}{s:?}{}", c.green, c.reset).unwrap();
     }
     out.push('\n');
 }
 
 fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let types = module.types();
     let strings = module.strings();
     let tw = ctx.type_width;
     let mw = ctx.member_width;
 
-    out.push_str("[type_defs]\n");
+    writeln!(out, "{}[type_defs]{}", c.blue, c.reset).unwrap();
 
     // All types are now in type_defs, including builtins
     for i in 0..types.defs_count() {
@@ -197,7 +196,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             TypeKind::Alias => format!("Alias(T{:0tw$})", def.data),
         };
 
-        // Generate comment for non-primitives
+        // Generate comment for non-primitives (comments are dim)
         let comment = match kind {
             TypeKind::Void | TypeKind::Node | TypeKind::String => String::new(),
             TypeKind::Struct => {
@@ -205,26 +204,26 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                     .members_of(&def)
                     .map(|m| strings.get(m.name).to_string())
                     .collect();
-                format!("  ; {{ {} }}", fields.join(", "))
+                format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset)
             }
             TypeKind::Enum => {
                 let variants: Vec<_> = types
                     .members_of(&def)
                     .map(|m| strings.get(m.name).to_string())
                     .collect();
-                format!("  ; {}", variants.join(" | "))
+                format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
             }
             TypeKind::Optional => {
                 let inner_name = format_type_name(QTypeId(def.data), module, ctx);
-                format!("  ; {}?", inner_name)
+                format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
             }
             TypeKind::ArrayZeroOrMore => {
                 let inner_name = format_type_name(QTypeId(def.data), module, ctx);
-                format!("  ; {}*", inner_name)
+                format!("{}  ; {}*{}", c.dim, inner_name, c.reset)
             }
             TypeKind::ArrayOneOrMore => {
                 let inner_name = format_type_name(QTypeId(def.data), module, ctx);
-                format!("  ; {}+", inner_name)
+                format!("{}  ; {}+{}", c.dim, inner_name, c.reset)
             }
             TypeKind::Alias => String::new(),
         };
@@ -235,21 +234,25 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 }
 
 fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let types = module.types();
     let strings = module.strings();
     let mw = ctx.member_width;
     let sw = ctx.str_width;
     let tw = ctx.type_width;
 
-    out.push_str("[type_members]\n");
+    writeln!(out, "{}[type_members]{}", c.blue, c.reset).unwrap();
     for i in 0..types.members_count() {
         let member = types.get_member(i);
         let name = strings.get(member.name);
         let type_name = format_type_name(member.type_id, module, ctx);
         writeln!(
             out,
-            "M{i:0mw$}: S{:0sw$} → T{:0tw$}  ; {name}: {type_name}",
-            member.name.0, member.type_id.0
+            "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
+            member.name.0,
+            member.type_id.0,
+            c.dim,
+            c.reset
         )
         .unwrap();
     }
@@ -257,20 +260,25 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
 }
 
 fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let types = module.types();
     let strings = module.strings();
     let nw = ctx.name_width;
     let sw = ctx.str_width;
     let tw = ctx.type_width;
 
-    out.push_str("[type_names]\n");
+    writeln!(out, "{}[type_names]{}", c.blue, c.reset).unwrap();
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         let name = strings.get(entry.name);
         writeln!(
             out,
-            "N{i:0nw$}: S{:0sw$} → T{:0tw$}  ; {name}",
-            entry.name.0, entry.type_id.0
+            "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
+            entry.name.0,
+            entry.type_id.0,
+            c.dim,
+            c.blue,
+            c.reset
         )
         .unwrap();
     }
@@ -304,12 +312,13 @@ fn format_type_name(type_id: QTypeId, module: &Module, ctx: &DumpContext) -> Str
 }
 
 fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let strings = module.strings();
     let entrypoints = module.entrypoints();
     let stw = ctx.step_width;
     let tw = ctx.type_width;
 
-    out.push_str("[entrypoints]\n");
+    writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).unwrap();
 
     // Collect and sort by name for display
     let mut entries: Vec<_> = (0..entrypoints.len())
@@ -327,7 +336,9 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     for (name, target, type_id) in entries {
         writeln!(
             out,
-            "{name:width$} = {:0stw$} :: T{type_id:0tw$}",
+            "{}{name:width$}{} = {:0stw$} :: T{type_id:0tw$}",
+            c.blue,
+            c.reset,
             target,
             width = max_len
         )
@@ -337,20 +348,21 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
 }
 
 fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let c = &ctx.colors;
     let header = module.header();
     let transitions_count = header.transitions_count as usize;
     let step_width = ctx.step_width;
 
-    out.push_str("[transitions]\n");
+    writeln!(out, "{}[transitions]{}", c.blue, c.reset).unwrap();
 
     let mut step = 0u16;
     while (step as usize) < transitions_count {
-        // Check if this step has a label
-        if let Some(label) = ctx.label_for(StepId(step)) {
-            writeln!(out, "\n{label}:").unwrap();
+        // Check if this step has a label (using raw u16)
+        if let Some(label) = ctx.step_labels.get(&step) {
+            writeln!(out, "\n{}{label}{}:", c.blue, c.reset).unwrap();
         }
 
-        let instr = module.decode_step(StepId(step));
+        let instr = module.decode_step_alloc(step);
         let line = format_instruction(step, &instr, module, ctx, step_width);
         out.push_str(&line);
         out.push('\n');
@@ -361,12 +373,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     }
 }
 
-/// Pad a base string to a target column width, then append a suffix.
-/// Ensures at least 2 spaces between base and suffix.
-fn pad_to_column(base: String, col: usize, suffix: &str) -> String {
-    let padding = col.saturating_sub(base.chars().count()).max(2);
-    format!("{base}{:padding$}{suffix}", "")
-}
 
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
@@ -398,35 +404,6 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
     }
 }
 
-// =============================================================================
-// Instruction Line Format
-// =============================================================================
-//
-// Each instruction line follows this column layout:
-//
-//   <indent><step><gap><nav><marker><content>...<successors>
-//   ├──────┤├───┤├─┤├──┤├────┤├──────────────┤├──────────┤
-//      2     var  1   3   3       variable      pad to 44
-//
-// - indent:  2 spaces
-// - step:    step number, zero-padded to `step_width`
-// - gap:     1 space
-// - nav:     3-char navigation symbol (↓*, *↑¹, etc.) or 𝜀 for Stay
-// - marker:  3-char marker column (" ▶ " for Call, "   " otherwise)
-// - content: variable-width instruction content
-// - successors: right-aligned at column 44
-//
-// =============================================================================
-
-/// Column widths for instruction formatting.
-#[allow(dead_code)]
-mod cols {
-    pub const INDENT: usize = 2;
-    pub const GAP: usize = 1;
-    pub const NAV: usize = 3;
-    pub const MARKER: usize = 3;
-    pub const TOTAL_WIDTH: usize = 44;
-}
 
 fn format_instruction(
     step: u16,
@@ -442,32 +419,6 @@ fn format_instruction(
     }
 }
 
-/// Build instruction line prefix: `  <step>  <nav>`
-///
-/// The `is_epsilon` flag controls whether to display `𝜀` for the navigation column.
-/// True epsilon transitions require all three conditions:
-/// - `nav == Stay` (no cursor movement)
-/// - `node_type == None` (no type constraint)
-/// - `node_field == None` (no field constraint)
-///
-/// A Match with `nav == Stay` but type/field constraints is NOT epsilon—it matches
-/// at the current position. Only true epsilon transitions display the `𝜀` symbol.
-fn line_prefix(step: u16, nav: Nav, is_epsilon: bool, step_width: usize) -> String {
-    let nav_str = if is_epsilon {
-        " 𝜀 ".to_string()
-    } else {
-        format_nav(nav)
-    };
-    format!(
-        "{:indent$}{:0sw$}{:gap$}{nav_str}",
-        "",
-        step,
-        "",
-        indent = cols::INDENT,
-        sw = step_width,
-        gap = cols::GAP,
-    )
-}
 
 fn format_match(
     step: u16,
@@ -476,14 +427,15 @@ fn format_match(
     ctx: &DumpContext,
     step_width: usize,
 ) -> String {
-    let prefix = line_prefix(step, m.nav, m.is_epsilon(), step_width);
-    let marker = "   "; // No marker for Match
+    let builder = LineBuilder::new(step_width);
+    let symbol = nav_symbol_epsilon(m.nav, m.is_epsilon());
+    let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
     let content = format_match_content(m, ctx);
     let successors = format_successors(&m.successors, ctx, step_width);
 
-    let base = format!("{prefix}{marker}{content}");
-    pad_to_column(base, cols::TOTAL_WIDTH, &successors)
+    let base = format!("{prefix}{content}");
+    builder.pad_successors(base, &successors)
 }
 
 /// Format Match instruction content (effects, node pattern, etc.)
@@ -502,7 +454,7 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
             .node_field_name(field_id)
             .map(String::from)
             .unwrap_or_else(|| format!("field#{field_id}"));
-        parts.push(format!("!{name}"));
+        parts.push(format!("-{name}"));
     }
 
     // Field constraint and node type
@@ -563,17 +515,18 @@ fn format_successors(successors: &[StepId], ctx: &DumpContext, step_width: usize
 
 fn format_call(
     step: u16,
-    c: &Call,
+    call: &Call,
     _module: &Module,
     ctx: &DumpContext,
     step_width: usize,
 ) -> String {
-    // Call is never epsilon—it always invokes a target definition
-    let prefix = line_prefix(step, c.nav, false, step_width);
-    let marker = " ▶ "; // Call marker (centered)
+    let c = &ctx.colors;
+    let builder = LineBuilder::new(step_width);
+    let symbol = nav_symbol_epsilon(call.nav, false);
+    let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
     // Format field constraint if present
-    let field_part = if let Some(field_id) = c.node_field {
+    let field_part = if let Some(field_id) = call.node_field {
         let name = ctx
             .node_field_name(field_id.get())
             .map(String::from)
@@ -584,14 +537,15 @@ fn format_call(
     };
 
     let target_name = ctx
-        .label_for(c.target)
+        .label_for(call.target)
         .map(String::from)
-        .unwrap_or_else(|| format!("@{:0w$}", c.target.0, w = step_width));
-    let content = format!("{field_part}({target_name})");
-    let successors = format_step(c.next, ctx, step_width);
+        .unwrap_or_else(|| format!("@{:0w$}", call.target.0, w = step_width));
+    // Definition name in call is blue
+    let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
+    let successors = format!("{} ⯇", format_step(call.next, ctx, step_width));
 
-    let base = format!("{prefix}{marker}{content}");
-    pad_to_column(base, cols::TOTAL_WIDTH, &successors)
+    let base = format!("{prefix}{content}");
+    builder.pad_successors(base, &successors)
 }
 
 fn format_return(
@@ -601,71 +555,23 @@ fn format_return(
     _ctx: &DumpContext,
     step_width: usize,
 ) -> String {
-    // Return is never epsilon—it's a control flow instruction, not a match
-    let prefix = line_prefix(step, Nav::Stay, false, step_width);
-    // Return just shows the return marker - context makes the definition clear
-    let base = prefix.to_string();
-    pad_to_column(base, cols::TOTAL_WIDTH, "▶")
+    let builder = LineBuilder::new(step_width);
+    let prefix = format!(
+        "  {:0sw$} {} ",
+        step,
+        Symbol::EMPTY.format(),
+        sw = step_width
+    );
+    builder.pad_successors(prefix, "▶")
 }
 
 /// Format a step ID, showing entrypoint label or numeric ID.
 fn format_step(step: StepId, ctx: &DumpContext, step_width: usize) -> String {
-    if step == StepId::ACCEPT {
-        return "◼".to_string();
-    }
+    let c = &ctx.colors;
     if let Some(label) = ctx.label_for(step) {
-        format!("▶({label})")
+        format!("▶({}{}{})", c.blue, label, c.reset)
     } else {
-        format!("{:0w$}", step.0, w = step_width)
+        format!("{:0w$}", step.get(), w = step_width)
     }
 }
 
-/// Format navigation symbol as exactly 3 chars (except multi-digit Up levels).
-fn format_nav(nav: Nav) -> String {
-    match nav {
-        // Stay: 3 spaces (no movement). The 𝜀 symbol is handled separately
-        // for true epsilon transitions (Stay + no type + no field).
-        Nav::Stay => "   ".to_string(),
-        // Down: space + arrow + modifier
-        Nav::Down => " ↓*".to_string(),
-        Nav::DownSkip => " ↓~".to_string(),
-        Nav::DownExact => " ↓.".to_string(),
-        // Next: centered modifier (no arrow)
-        Nav::Next => " * ".to_string(),
-        Nav::NextSkip => " ~ ".to_string(),
-        Nav::NextExact => " . ".to_string(),
-        // Up: modifier + arrow + superscript level
-        Nav::Up(n) => format!("*↑{}", superscript(n)),
-        Nav::UpSkipTrivia(n) => format!("~↑{}", superscript(n)),
-        Nav::UpExact(n) => format!(".↑{}", superscript(n)),
-    }
-}
-
-fn superscript(n: u8) -> String {
-    const DIGITS: &[char] = &['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
-    if n < 10 {
-        DIGITS[n as usize].to_string()
-    } else {
-        n.to_string()
-            .chars()
-            .map(|c| DIGITS[c.to_digit(10).unwrap() as usize])
-            .collect()
-    }
-}
-
-fn format_effect(effect: &super::EffectOp) -> String {
-    match effect.opcode {
-        EffectOpcode::Node => "Node".to_string(),
-        EffectOpcode::Arr => "Arr".to_string(),
-        EffectOpcode::Push => "Push".to_string(),
-        EffectOpcode::EndArr => "EndArr".to_string(),
-        EffectOpcode::Obj => "Obj".to_string(),
-        EffectOpcode::EndObj => "EndObj".to_string(),
-        EffectOpcode::Set => format!("Set(M{})", effect.payload),
-        EffectOpcode::Enum => format!("Enum(M{})", effect.payload),
-        EffectOpcode::EndEnum => "EndEnum".to_string(),
-        EffectOpcode::Text => "Text".to_string(),
-        EffectOpcode::Clear => "Clear".to_string(),
-        EffectOpcode::Null => "Null".to_string(),
-    }
-}

@@ -12,7 +12,6 @@ use std::num::NonZeroU16;
 use crate::bytecode::ir::{CallIR, Instruction, Label, MatchIR};
 use crate::bytecode::Nav;
 use crate::parser::ast::{self, Expr};
-use crate::analyze::type_check::Arity;
 
 use super::capture::CaptureEffects;
 use super::navigation::{check_trailing_anchor, inner_creates_scope, is_skippable_quantifier, is_star_or_plus_quantifier};
@@ -232,7 +231,37 @@ impl Compiler<'_> {
             return self.compile_ref_inner(r, exit, nav_override, node_field, capture);
         }
 
-        // Compile the value pattern with nav override and capture effects
+        // Check if value is a complex pattern (alternation, sequence, quantified)
+        // that will produce an epsilon branch and thus need a wrapper instruction.
+        // For these patterns, we must:
+        // 1. Compile the value WITHOUT navigation (branches use Stay)
+        // 2. Create a wrapper WITH navigation AND field check
+        // This ensures the field is checked AFTER navigating to the child node.
+        let needs_wrapper = node_field.is_some()
+            && matches!(
+                &value,
+                Expr::AltExpr(_) | Expr::SeqExpr(_) | Expr::QuantifiedExpr(_)
+            );
+
+        if needs_wrapper {
+            // Compile value WITHOUT navigation - wrapper will handle it
+            let value_entry = self.compile_expr_inner(&value, exit, None, capture);
+
+            let entry = self.fresh_label();
+            self.instructions.push(Instruction::Match(MatchIR {
+                label: entry,
+                nav: nav_override.unwrap_or(Nav::Stay),
+                node_type: None,
+                node_field,
+                pre_effects: vec![],
+                neg_fields: vec![],
+                post_effects: vec![],
+                successors: vec![value_entry],
+            }));
+            return entry;
+        }
+
+        // Simple pattern: compile with navigation, merge field afterward
         let value_entry = self.compile_expr_inner(&value, exit, nav_override, capture);
 
         // If we have a field constraint, try to merge it into the value's instruction
@@ -246,11 +275,12 @@ impl Compiler<'_> {
                 return value_entry;
             }
 
-            // Fallback: wrap with a field-checking Match for complex patterns
+            // Fallback: wrap with field-checking Match for patterns that couldn't merge.
+            // Use Stay since value was already compiled with navigation.
             let entry = self.fresh_label();
             self.instructions.push(Instruction::Match(MatchIR {
                 label: entry,
-                nav: Nav::Stay, // Check field without moving
+                nav: Nav::Stay,
                 node_type: None,
                 node_field: Some(field_id),
                 pre_effects: vec![],
@@ -319,11 +349,10 @@ impl Compiler<'_> {
         }
 
         // Array: Arr → quantifier (with Push) → EndArr+capture → exit
-        let inner_is_many = inner_info
-            .map(|info| matches!(info.arity, Arity::Many))
-            .unwrap_or_else(|| is_star_or_plus_quantifier(Some(&inner)));
+        // Check if inner is a * or + quantifier - these produce arrays regardless of arity
+        let inner_is_array = is_star_or_plus_quantifier(Some(&inner));
 
-        if inner_is_many {
+        if inner_is_array {
             return self.compile_array_scope(&inner, exit, nav_override, capture_effects, outer_capture);
         }
 
@@ -350,7 +379,7 @@ impl Compiler<'_> {
         } else {
             // Unlinked mode: store StringId referencing the literal text
             let string_id = self.strings.intern_str(text);
-            NonZeroU16::new(string_id.0)
+            Some(string_id.0)
         }
     }
 
@@ -379,7 +408,7 @@ impl Compiler<'_> {
         } else {
             // Unlinked mode: store StringId referencing the type name
             let string_id = self.strings.intern_str(type_name);
-            NonZeroU16::new(string_id.0)
+            Some(string_id.0)
         }
     }
 
@@ -410,7 +439,7 @@ impl Compiler<'_> {
         } else {
             // Unlinked mode: store StringId referencing the field name
             let string_id = self.strings.intern_str(field_name);
-            NonZeroU16::new(string_id.0)
+            Some(string_id.0)
         }
     }
 

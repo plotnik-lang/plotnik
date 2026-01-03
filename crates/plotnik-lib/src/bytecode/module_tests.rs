@@ -3,7 +3,7 @@
 use indoc::indoc;
 
 use crate::Query;
-use crate::bytecode::{Module, ModuleError, StepId, StringId};
+use crate::bytecode::{Module, ModuleError};
 
 #[test]
 fn module_from_bytes_valid() {
@@ -75,8 +75,8 @@ fn module_strings_view() {
     let module = Module::from_bytes(bytes).unwrap();
 
     let strings = module.strings();
-    // String 0 is the easter egg
-    assert_eq!(strings.get(StringId(0)), "Beauty will save the world");
+    // String 0 is the easter egg (accessed via raw index, not StringId)
+    assert_eq!(strings.get_by_index(0), "Beauty will save the world");
     // Other strings include "id", "Test", "identifier"
     assert!(module.header().str_table_count >= 3);
 }
@@ -161,15 +161,9 @@ fn module_decode_step() {
     let bytes = Query::expect_valid_linked_bytes(input);
     let module = Module::from_bytes(bytes).unwrap();
 
-    // Step 0 is always the accept state (epsilon terminal)
-    let instr = module.decode_step(StepId(0));
-    match instr {
-        crate::bytecode::Instruction::Match(m) => {
-            assert!(m.is_epsilon());
-            assert!(m.is_terminal());
-        }
-        _ => panic!("expected Match instruction at step 0"),
-    }
+    // Step 1 is the first instruction (step 0 is reserved)
+    let instr = module.decode_step_alloc(1);
+    assert!(matches!(instr, crate::bytecode::Instruction::Match(_)));
 }
 
 #[test]
@@ -190,13 +184,13 @@ fn module_from_path_mmap() {
 
     assert!(module.header().validate_magic());
 
-    // Verify we can decode instructions
-    let instr = module.decode_step(StepId(0));
+    // Verify we can decode instructions (step 1 is the first instruction)
+    let instr = module.decode_step_alloc(1);
     assert!(matches!(instr, crate::bytecode::Instruction::Match(_)));
 
     // Verify string lookup works through mmap
     let strings = module.strings();
-    assert_eq!(strings.get(StringId(0)), "Beauty will save the world");
+    assert_eq!(strings.get_by_index(0), "Beauty will save the world");
 }
 
 #[test]

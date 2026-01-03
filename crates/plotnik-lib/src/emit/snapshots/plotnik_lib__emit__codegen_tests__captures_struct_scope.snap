@@ -17,11 +17,15 @@ S4 "Test"
 T0 = <Node>
 T1 = Struct  M0:2  ; { a, b }
 T2 = Struct  M2:1  ; { item }
+T3 = Struct  M3:1  ; { a }
+T4 = Struct  M4:1  ; { b }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
 M2: S3 → T1  ; item: T1
+M3: S1 → T0  ; a: <Node>
+M4: S2 → T0  ; b: <Node>
 
 [type_names]
 N0: S4 → T2  ; Test
@@ -30,12 +34,12 @@ N0: S4 → T2  ; Test
 Test = 01 :: T2
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀    [Obj]                            04
+  01   ε                                    02
+  02   ε   [Obj]                            04
   04       (a) [Node Set(M0)]               06
-  06  *    (b) [Node Set(M1)]               08
-  08  𝜀    [EndObj Set(M2)]                 10
+  06   ▷   (b) [Node Set(M1)]               08
+  08   ε   [EndObj Set(M2)]                 10
   10                                        ▶

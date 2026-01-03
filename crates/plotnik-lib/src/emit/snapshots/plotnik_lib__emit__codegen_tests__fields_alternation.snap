@@ -1,0 +1,51 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = (call_expression function: [(identifier) @fn (number) @num])
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "num"
+S3 "Test"
+S4 "call_expression"
+S5 "function"
+S6 "identifier"
+S7 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { fn, num }
+T2 = Struct  M2:1  ; { fn }
+T3 = Struct  M3:1  ; { num }
+T4 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T4  ; fn: T4
+M1: S2 → T4  ; num: T4
+M2: S1 → T0  ; fn: <Node>
+M3: S2 → T0  ; num: <Node>
+
+[type_names]
+N0: S3 → T1  ; Test
+
+[entrypoints]
+Test = 01 :: T1
+
+[transitions]
+  00   ε                                    ◼
+
+Test:
+  01   ε                                    02
+  02       (call_expression)                03
+  03   ▽   function: _                      04
+  04   ε                                    09, 13
+  06                                        ▶
+  07       (identifier) [Node Set(M0)]      15
+  09   ε   [Null Set(M1)]                   07
+  11       (number) [Node Set(M1)]          15
+  13   ε   [Null Set(M0)]                   11
+  15   △                                    06

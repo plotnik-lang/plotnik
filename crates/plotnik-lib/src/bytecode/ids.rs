@@ -1,30 +1,58 @@
 //! Bytecode index newtypes.
 
-use super::constants::{STEP_ACCEPT, STEP_SIZE};
+use std::num::NonZeroU16;
+
+use super::constants::STEP_SIZE;
 
 /// Index into the Transitions section (8-byte steps).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+///
+/// Uses NonZeroU16 to make StepId(0) unrepresentable - terminal state
+/// is expressed through absence (empty successors, None) rather than
+/// a magic value.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct StepId(pub u16);
+pub struct StepId(pub NonZeroU16);
 
 impl StepId {
-    pub const ACCEPT: Self = Self(STEP_ACCEPT);
-
+    /// Create a new StepId. Panics if n == 0.
     #[inline]
-    pub fn is_accept(self) -> bool {
-        self.0 == STEP_ACCEPT
+    pub fn new(n: u16) -> Self {
+        Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
+    }
+
+    /// Get the raw u16 value.
+    #[inline]
+    pub fn get(self) -> u16 {
+        self.0.get()
     }
 
     #[inline]
     pub fn byte_offset(self) -> usize {
-        self.0 as usize * STEP_SIZE
+        self.0.get() as usize * STEP_SIZE
     }
 }
 
 /// Index into the String Table.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+///
+/// Uses NonZeroU16 to make StringId(0) unrepresentable - index 0 is
+/// reserved for the easter egg and never referenced by instructions.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct StringId(pub u16);
+pub struct StringId(pub NonZeroU16);
+
+impl StringId {
+    /// Create a new StringId. Panics if n == 0.
+    #[inline]
+    pub fn new(n: u16) -> Self {
+        Self(NonZeroU16::new(n).expect("StringId cannot be 0"))
+    }
+
+    /// Get the raw u16 value.
+    #[inline]
+    pub fn get(self) -> u16 {
+        self.0.get()
+    }
+}
 
 /// Index into the Type Definition table.
 /// All types (including builtins) are stored sequentially in TypeDefs.
@@ -38,8 +66,7 @@ mod tests {
 
     #[test]
     fn step_id_byte_offset() {
-        assert_eq!(StepId(0).byte_offset(), 0);
-        assert_eq!(StepId(1).byte_offset(), 8);
-        assert_eq!(StepId(10).byte_offset(), 80);
+        assert_eq!(StepId::new(1).byte_offset(), 8);
+        assert_eq!(StepId::new(10).byte_offset(), 80);
     }
 }

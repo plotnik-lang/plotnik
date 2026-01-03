@@ -16,11 +16,16 @@ S4 "Test"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:3  ; { a, b, c }
+T2 = Struct  M3:1  ; { c }
+T3 = Struct  M4:2  ; { b, c }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
 M2: S3 → T0  ; c: <Node>
+M3: S3 → T0  ; c: <Node>
+M4: S2 → T0  ; b: <Node>
+M5: S3 → T0  ; c: <Node>
 
 [type_names]
 N0: S4 → T1  ; Test
@@ -29,13 +34,13 @@ N0: S4 → T1  ; Test
 Test = 01 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (a) [Node Set(M0)]               04
-  04  ↓*   (b) [Node Set(M1)]               06
-  06  ↓*   (c) [Node Set(M2)]               08
-  08 *↑¹                                    09
-  09 *↑¹                                    10
+  04   ▽   (b) [Node Set(M1)]               06
+  06   ▽   (c) [Node Set(M2)]               08
+  08   △                                    09
+  09   △                                    10
   10                                        ▶

@@ -22,12 +22,16 @@ T1 = Struct  M0:2  ; { id, num }
 T2 = Struct  M2:1  ; { row }
 T3 = ArrayStar(T2)  ; T2*
 T4 = Struct  M3:1  ; { rows }
+T5 = Struct  M4:1  ; { id }
+T6 = Struct  M5:1  ; { num }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>
 M1: S2 → T0  ; num: <Node>
 M2: S3 → T1  ; row: T1
 M3: S4 → T3  ; rows: T3
+M4: S1 → T0  ; id: <Node>
+M5: S2 → T0  ; num: <Node>
 
 [type_names]
 N0: S5 → T4  ; Test
@@ -36,24 +40,24 @@ N0: S5 → T4  ; Test
 Test = 01 :: T4
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
-  02  𝜀    [Arr]                            04
-  04  𝜀                                     19, 07
+  01   ε                                    02
+  02   ε   [Arr]                            04
+  04   ε                                    19, 07
   06                                        ▶
-  07  𝜀    [EndArr Set(M3)]                 06
-  09  𝜀    [EndObj Push]                    33
-  11  𝜀    [EndObj Set(M2)]                 09
-  13  *    (number) [Node Set(M1)]          11
+  07   ε   [EndArr Set(M3)]                 06
+  09   ε   [EndObj Push]                    33
+  11   ε   [EndObj Set(M2)]                 09
+  13   ▷   (number) [Node Set(M1)]          11
   15       (identifier) [Node Set(M0)]      13
-  17  𝜀    [Obj]                            15
-  19  𝜀    [Obj]                            17
-  21  𝜀    [EndObj Push]                    33
-  23  𝜀    [EndObj Set(M2)]                 21
-  25  *    (number) [Node Set(M1)]          23
+  17   ε   [Obj]                            15
+  19   ε   [Obj]                            17
+  21   ε   [EndObj Push]                    33
+  23   ε   [EndObj Set(M2)]                 21
+  25   ▷   (number) [Node Set(M1)]          23
   27       (identifier) [Node Set(M0)]      25
-  29  𝜀    [Obj]                            27
-  31  𝜀    [Obj]                            29
-  33  𝜀                                     31, 07
+  29   ε   [Obj]                            27
+  31   ε   [Obj]                            29
+  33   ε                                    31, 07

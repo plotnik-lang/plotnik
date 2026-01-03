@@ -114,7 +114,7 @@ impl QueryAnalyzed {
         let query = Self::parse_and_validate(src);
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::from_bytes(bytecode).expect("module loading should succeed");
-        crate::bytecode::dump(&module)
+        crate::bytecode::dump(&module, crate::Colors::OFF)
     }
 
     #[track_caller]
@@ -128,7 +128,7 @@ impl QueryAnalyzed {
         }
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::from_bytes(bytecode).expect("module loading should succeed");
-        crate::bytecode::dump(&module)
+        crate::bytecode::dump(&module, crate::Colors::OFF)
     }
 
     #[track_caller]

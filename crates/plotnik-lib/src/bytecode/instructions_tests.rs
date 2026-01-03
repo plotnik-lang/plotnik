@@ -70,7 +70,7 @@ fn match8_roundtrip() {
         pre_effects: vec![],
         neg_fields: vec![],
         post_effects: vec![],
-        successors: vec![StepId(10)],
+        successors: vec![StepId::new(10)],
     };
 
     let bytes = m.to_bytes().unwrap();
@@ -124,7 +124,7 @@ fn match_extended_roundtrip() {
                 payload: 42,
             },
         ],
-        successors: vec![StepId(20), StepId(30)],
+        successors: vec![StepId::new(20), StepId::new(30)],
     };
 
     let bytes = m.to_bytes().unwrap();
@@ -141,8 +141,8 @@ fn call_roundtrip() {
         segment: 0,
         nav: Nav::Down,
         node_field: NonZeroU16::new(42),
-        next: StepId(100),
-        target: StepId(500),
+        next: StepId::new(100),
+        target: StepId::new(500),
     };
 
     let bytes = c.to_bytes();
@@ -169,7 +169,7 @@ fn match_view_match8() {
         pre_effects: vec![],
         neg_fields: vec![],
         post_effects: vec![],
-        successors: vec![StepId(10)],
+        successors: vec![StepId::new(10)],
     };
 
     let bytes = m.to_bytes().unwrap();
@@ -181,7 +181,7 @@ fn match_view_match8() {
     assert!(!view.is_terminal());
     assert!(!view.is_epsilon());
     assert_eq!(view.succ_count(), 1);
-    assert_eq!(view.successor(0), StepId(10));
+    assert_eq!(view.successor(0), StepId::new(10));
     assert_eq!(view.pre_effects().count(), 0);
     assert_eq!(view.neg_fields().count(), 0);
     assert_eq!(view.post_effects().count(), 0);
@@ -230,7 +230,7 @@ fn match_view_extended() {
                 payload: 42,
             },
         ],
-        successors: vec![StepId(20), StepId(30)],
+        successors: vec![StepId::new(20), StepId::new(30)],
     };
 
     let bytes = m.to_bytes().unwrap();
@@ -258,8 +258,8 @@ fn match_view_extended() {
 
     // Check successors
     assert_eq!(view.succ_count(), 2);
-    assert_eq!(view.successor(0), StepId(20));
-    assert_eq!(view.successor(1), StepId(30));
+    assert_eq!(view.successor(0), StepId::new(20));
+    assert_eq!(view.successor(1), StepId::new(30));
     let succs: Vec<_> = view.successors().collect();
-    assert_eq!(succs, vec![StepId(20), StepId(30)]);
+    assert_eq!(succs, vec![StepId::new(20), StepId::new(30)]);
 }

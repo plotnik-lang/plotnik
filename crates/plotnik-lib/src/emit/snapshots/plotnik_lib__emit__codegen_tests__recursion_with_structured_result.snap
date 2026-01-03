@@ -29,51 +29,55 @@ S13 "identifier"
 S14 "program"
 
 [type_defs]
-T0 = <Node>
-T1 = <String>
-T2 = Struct  M0:1  ; { value }
-T3 = Struct  M1:2  ; { fn, inner }
-T4 = Enum    M3:2  ; Lit | Nested
-T5 = Struct  M5:1  ; { expr }
+T00 = <Node>
+T01 = <String>
+T02 = Struct  M0:1  ; { value }
+T03 = Struct  M1:2  ; { fn, inner }
+T04 = Enum    M3:2  ; Lit | Nested
+T05 = Struct  M5:1  ; { expr }
+T06 = Struct  M6:1  ; { fn }
+T07 = Struct  M7:1  ; { inner }
 
 [type_members]
-M0: S01 → T1  ; value: <String>
-M1: S02 → T0  ; fn: <Node>
-M2: S03 → T4  ; inner: Expr
-M3: S04 → T2  ; Lit: T2
-M4: S05 → T3  ; Nested: T3
-M5: S06 → T4  ; expr: Expr
+M0: S01 → T01  ; value: <String>
+M1: S02 → T00  ; fn: <Node>
+M2: S03 → T04  ; inner: Expr
+M3: S04 → T02  ; Lit: T02
+M4: S05 → T03  ; Nested: T03
+M5: S06 → T04  ; expr: Expr
+M6: S02 → T00  ; fn: <Node>
+M7: S03 → T04  ; inner: Expr
 
 [type_names]
-N0: S07 → T4  ; Expr
-N1: S08 → T5  ; Test
+N0: S07 → T04  ; Expr
+N1: S08 → T05  ; Test
 
 [entrypoints]
-Expr = 01 :: T4
-Test = 04 :: T5
+Expr = 01 :: T04
+Test = 04 :: T05
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Expr:
-  01  𝜀                                     02
-  02  𝜀                                     19, 27
+  01   ε                                    02
+  02   ε                                    19, 27
 
 Test:
-  04  𝜀                                     05
+  04   ε                                    05
   05       (program)                        06
-  06  ↓* ▶ (Expr)                           07
-  07  𝜀    [Set(M5)]                        09
-  09 *↑¹                                    10
+  06   ▽   (Expr)                           07 ⯇
+  07   ε   [Set(M5)]                        09
+  09   △                                    10
   10                                        ▶
-  11  𝜀    [Set(M2)]                        13
-  13 *↑¹                                    21
+  11   ε   [Set(M2)]                        13
+  13   △                                    21
   14                                        ▶
-  15  𝜀    [EndEnum]                        14
+  15   ε   [EndEnum]                        14
   17       (number) [Text Set(M0)]          15
-  19  𝜀    [Enum(M3)]                       17
-  21  𝜀    [EndEnum]                        14
-  23  *  ▶ arguments: (Expr)                11
-  24  ↓*   function: (identifier) [Node Set(M1)]  23
+  19   ε   [Enum(M3)]                       17
+  21   ε   [EndEnum]                        14
+  23   ▷   arguments: (Expr)                11 ⯇
+  24   ▽   function: (identifier) [Node Set(M1)]  23
   26       (call_expression)                24
-  27  𝜀    [Enum(M4)]                       26
+  27   ε   [Enum(M4)]                       26

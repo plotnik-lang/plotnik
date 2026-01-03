@@ -28,13 +28,13 @@ N0: S2 → T1  ; Test
 Test = 01 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (program)                        03
-  03  𝜀                                     06, 08
+  03   ε                                    06, 08
   05                                        ▶
-  06  ↓*   (identifier) [Node Set(M0)]      10
-  08  ↓*   (number) [Node Set(M0)]          10
-  10 *↑¹                                    05
+  06   ▽   (identifier) [Node Set(M0)]      10
+  08   ▽   (number) [Node Set(M0)]          10
+  10   △                                    05

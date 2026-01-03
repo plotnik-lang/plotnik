@@ -29,9 +29,6 @@ impl Graph {
             successors.entry(label).or_default();
 
             for succ in instr.successors() {
-                if succ.is_accept() {
-                    continue;
-                }
                 successors.entry(label).or_default().push(succ);
                 predecessors.entry(succ).or_default().push(label);
             }
@@ -62,7 +59,7 @@ impl CacheAligned {
     pub fn layout(instructions: &[Instruction], entries: &[Label]) -> LayoutResult {
         if instructions.is_empty() {
             return LayoutResult {
-                label_to_step: BTreeMap::from([(Label::ACCEPT, StepId::ACCEPT)]),
+                label_to_step: BTreeMap::new(),
                 total_steps: 1,
             };
         }
@@ -146,9 +143,8 @@ fn assign_step_ids(
     label_to_instr: &BTreeMap<Label, &Instruction>,
 ) -> LayoutResult {
     let mut mapping = BTreeMap::new();
-    mapping.insert(Label::ACCEPT, StepId::ACCEPT);
 
-    let mut current_step = 1u16; // 0 is ACCEPT
+    let mut current_step = 1u16; // Step 0 is reserved (never used)
     let mut current_offset = 0usize; // Byte offset for cache alignment
 
     for chain in chains {
@@ -170,7 +166,7 @@ fn assign_step_ids(
                 }
             }
 
-            mapping.insert(label, StepId(current_step));
+            mapping.insert(label, StepId::new(current_step));
             let step_count = (size / STEP_SIZE) as u16;
             current_step += step_count;
             current_offset += size;

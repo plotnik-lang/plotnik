@@ -18,21 +18,10 @@ use crate::analyze::type_check::TypeId;
 pub struct Label(pub u32);
 
 impl Label {
-    /// Sentinel for terminal (accept) state.
-    pub const ACCEPT: Label = Label(u32::MAX);
-
-    #[inline]
-    pub fn is_accept(self) -> bool {
-        self.0 == u32::MAX
-    }
-
     /// Resolve this label to a StepId using the layout mapping.
     #[inline]
     pub fn resolve(self, map: &BTreeMap<Label, StepId>) -> StepId {
-        if self.is_accept() {
-            return StepId::ACCEPT;
-        }
-        *map.get(&self).unwrap_or(&StepId::ACCEPT)
+        *map.get(&self).expect("label not in layout")
     }
 }
 
@@ -299,13 +288,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn label_accept_sentinel() {
-        assert!(Label::ACCEPT.is_accept());
-        assert!(!Label(0).is_accept());
-        assert!(!Label(100).is_accept());
-    }
-
-    #[test]
     fn match_ir_size_match8() {
         let m = MatchIR {
             label: Label(0),
@@ -371,7 +353,8 @@ mod tests {
     }
 
     #[test]
-    fn resolve_match_with_accept() {
+    fn resolve_match_terminal() {
+        // Terminal match: empty successors → next = 0 in bytecode
         let m = MatchIR {
             label: Label(0),
             nav: Nav::Stay,
@@ -380,18 +363,18 @@ mod tests {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![Label::ACCEPT],
+            successors: vec![],
         };
 
         let mut map = BTreeMap::new();
-        map.insert(Label(0), StepId(1));
+        map.insert(Label(0), StepId::new(1));
 
         let bytes = m.resolve(&map, |_| None);
         assert_eq!(bytes.len(), 8);
 
         // Verify opcode is Match8 (0x0)
         assert_eq!(bytes[0] & 0xF, 0);
-        // Verify next is ACCEPT (0)
+        // Verify next is terminal (0)
         assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 0);
     }
 

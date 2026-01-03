@@ -28,13 +28,13 @@ N0: S2 → T1  ; Test
 Test = 01 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (function_declaration)           03
-  03  𝜀                                     05, 09
-  05  ↓*   (decorator) [Node Set(M0)]       07
-  07 *↑¹                                    08
+  03   ε                                    05, 09
+  05   ▽   (decorator) [Node Set(M0)]       07
+  07   △                                    08
   08                                        ▶
-  09  𝜀    [Null Set(M0)]                   08
+  09   ε   [Null Set(M0)]                   08

@@ -18,11 +18,15 @@ S6 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { id, n }
-T2 = Optional(T0)  ; <Node>?
+T2 = Struct  M2:1  ; { id }
+T3 = Struct  M3:1  ; { n }
+T4 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T2  ; id: T2
+M0: S1 → T4  ; id: T4
 M1: S2 → T0  ; n: <Node>
+M2: S1 → T4  ; id: T4
+M3: S2 → T0  ; n: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test
@@ -31,15 +35,15 @@ N0: S3 → T1  ; Test
 Test = 01 :: T1
 
 [transitions]
-  00  𝜀                                     ◼
+  00   ε                                    ◼
 
 Test:
-  01  𝜀                                     02
+  01   ε                                    02
   02       (program)                        03
-  03  𝜀                                     12, 10
+  03   ε                                    12, 10
   05                                        ▶
-  06  ↓*   (number) [Node Set(M1)]          14
-  08  *    (number) [Node Set(M1)]          14
-  10  𝜀    [Null Set(M0)]                   06
-  12  ↓*   (identifier) [Node Set(M0)]      08
-  14 *↑¹                                    05
+  06   ▽   (number) [Node Set(M1)]          14
+  08   ▷   (number) [Node Set(M1)]          14
+  10   ε   [Null Set(M0)]                   06
+  12   ▽   (identifier) [Node Set(M0)]      08
+  14   △                                    05

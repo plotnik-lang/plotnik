@@ -12,7 +12,7 @@ use super::ids::{QTypeId, StepId, StringId};
 use super::instructions::{Call, Match, MatchView, Opcode, Return};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
 use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
-use super::{Entrypoint, SECTION_ALIGN, VERSION};
+use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
 
 /// Read a little-endian u16 from bytes at the given offset.
 #[inline]
@@ -190,21 +190,22 @@ impl Module {
         &self.storage
     }
 
-    /// Decode an instruction at the given step ID.
+    /// Decode an instruction at the given step index (raw u16).
     ///
     /// This allocates for Match instructions. For zero-allocation decoding,
-    /// use [`decode_step_view`](Self::decode_step_view) instead.
-    pub fn decode_step(&self, step_id: StepId) -> Instruction {
-        let offset = self.header.transitions_offset as usize + step_id.byte_offset();
+    /// use [`decode_step`](Self::decode_step) instead.
+    pub fn decode_step_alloc(&self, step: u16) -> Instruction {
+        let offset = self.header.transitions_offset as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
 
-    /// Decode an instruction view at the given step ID without allocating.
+    /// Decode an instruction view at the given step index (raw u16) without allocating.
     ///
     /// This is the VM's main access point for fetching instructions efficiently.
+    /// Step 0 is valid at runtime (though bytecode never jumps to it).
     #[inline]
-    pub fn decode_step_view(&self, step_id: StepId) -> InstructionView<'_> {
-        let offset = self.header.transitions_offset as usize + step_id.byte_offset();
+    pub fn decode_step(&self, step: u16) -> InstructionView<'_> {
+        let offset = self.header.transitions_offset as usize + (step as usize) * STEP_SIZE;
         InstructionView::from_bytes(&self.storage[offset..])
     }
 
@@ -307,12 +308,16 @@ pub struct StringsView<'a> {
 }
 
 impl<'a> StringsView<'a> {
-    /// Get a string by its ID.
+    /// Get a string by its ID (type-safe access for bytecode references).
+    pub fn get(&self, id: StringId) -> &'a str {
+        self.get_by_index(id.get() as usize)
+    }
+
+    /// Get a string by raw index (for iteration/dumps, including easter egg at 0).
     ///
     /// The string table contains sequential u32 offsets. To get string i:
     /// `start = table[i]`, `end = table[i+1]`, `length = end - start`.
-    pub fn get(&self, id: StringId) -> &'a str {
-        let idx = id.0 as usize;
+    pub fn get_by_index(&self, idx: usize) -> &'a str {
         let start = read_u32_le(self.table, idx * 4) as usize;
         let end = read_u32_le(self.table, (idx + 1) * 4) as usize;
         std::str::from_utf8(&self.blob[start..end]).expect("invalid UTF-8 in string table")
@@ -333,7 +338,7 @@ impl<'a> SymbolsView<'a, NodeSymbol> {
         let offset = idx * 4;
         NodeSymbol {
             id: read_u16_le(self.bytes, offset),
-            name: StringId(read_u16_le(self.bytes, offset + 2)),
+            name: StringId::new(read_u16_le(self.bytes, offset + 2)),
         }
     }
 
@@ -355,7 +360,7 @@ impl<'a> SymbolsView<'a, FieldSymbol> {
         let offset = idx * 4;
         FieldSymbol {
             id: read_u16_le(self.bytes, offset),
-            name: StringId(read_u16_le(self.bytes, offset + 2)),
+            name: StringId::new(read_u16_le(self.bytes, offset + 2)),
         }
     }
 
@@ -443,7 +448,7 @@ impl<'a> TypesView<'a> {
         assert!(idx < self.members_count, "type member index out of bounds");
         let offset = idx * 4;
         TypeMember {
-            name: StringId(read_u16_le(self.members_bytes, offset)),
+            name: StringId::new(read_u16_le(self.members_bytes, offset)),
             type_id: QTypeId(read_u16_le(self.members_bytes, offset + 2)),
         }
     }
@@ -453,7 +458,7 @@ impl<'a> TypesView<'a> {
         assert!(idx < self.names_count, "type name index out of bounds");
         let offset = idx * 4;
         TypeName {
-            name: StringId(read_u16_le(self.names_bytes, offset)),
+            name: StringId::new(read_u16_le(self.names_bytes, offset)),
             type_id: QTypeId(read_u16_le(self.names_bytes, offset + 2)),
         }
     }
@@ -505,10 +510,10 @@ impl<'a> EntrypointsView<'a> {
         assert!(idx < self.count, "entrypoint index out of bounds");
         let offset = idx * 8;
         Entrypoint {
-            name: StringId(read_u16_le(self.bytes, offset)),
-            target: StepId(read_u16_le(self.bytes, offset + 2)),
+            name: StringId::new(read_u16_le(self.bytes, offset)),
+            target: StepId::new(read_u16_le(self.bytes, offset + 2)),
             result_type: QTypeId(read_u16_le(self.bytes, offset + 4)),
-            ..Default::default()
+            _pad: 0,
         }
     }
 
