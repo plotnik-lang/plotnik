@@ -145,19 +145,20 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (check, dump, infer, tree, langs)
+    src/commands/      # Subcommands (check, dump, exec, infer, trace, tree, langs)
   plotnik-core/        # Common code (Interner, Symbol)
   plotnik-lib/         # Plotnik as library
     src/
       analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)
       bytecode/        # Binary format definitions
-      typegen/         # Type declaration extraction (bytecode → .d.ts)
       compile/         # Thompson NFA construction (AST → IR)
       diagnostics/     # User-friendly error reporting
       emit/            # Bytecode emission (IR → binary)
+      engine/          # Runtime VM (execution, backtracking, effects)
       parser/          # Syntactic parsing (lexer, grammar, AST)
       query/           # Query facade (Query, QueryBuilder, SourceMap)
       type_system/     # Shared type primitives
+      typegen/         # Type declaration extraction (bytecode → .d.ts)
   plotnik-langs/       # Tree-sitter language bindings
   plotnik-macros/      # Proc macros
 docs/
@@ -169,14 +170,15 @@ docs/
 
 Run: `cargo run -p plotnik-cli -- <command>`
 
-| Command | Purpose                    | Status  |
-| ------- | -------------------------- | ------- |
-| `tree`  | Explore tree-sitter AST    | Working |
-| `check` | Validate query             | Working |
-| `dump`  | Show compiled bytecode     | Working |
-| `infer` | Generate TypeScript types  | Working |
-| `langs` | List supported languages   | Working |
-| `exec`  | Execute query, output JSON | Not yet |
+| Command | Purpose                       |
+| ------- | ----------------------------- |
+| `tree`  | Explore tree-sitter AST       |
+| `check` | Validate query                |
+| `dump`  | Show compiled bytecode        |
+| `infer` | Generate TypeScript types     |
+| `exec`  | Execute query, output JSON    |
+| `trace` | Trace execution for debugging |
+| `langs` | List supported languages      |
 
 ## tree
 
@@ -219,6 +221,30 @@ cargo run -p plotnik-cli -- infer -q '(identifier) @id' -l typescript
 ```
 
 Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
+
+## exec
+
+Execute a query against source code and output JSON.
+
+```sh
+cargo run -p plotnik-cli -- exec query.ptk app.ts
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' app.ts       # -q shifts positional to source
+cargo run -p plotnik-cli -- exec -q '(identifier) @id' -s 'let x' -l javascript
+```
+
+Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
+
+## trace
+
+Trace query execution for debugging.
+
+```sh
+cargo run -p plotnik-cli -- trace query.ptk app.ts
+cargo run -p plotnik-cli -- trace -q '(identifier) @id' app.ts      # -q shifts positional to source
+cargo run -p plotnik-cli -- trace query.ptk app.ts --no-result -vv
+```
+
+Options: `-v` (verbose), `-vv` (very verbose), `--no-result`, `--fuel <N>`
 
 ## langs
 
