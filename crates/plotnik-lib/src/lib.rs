@@ -18,6 +18,7 @@
 
 pub mod analyze;
 pub mod bytecode;
+pub mod colors;
 pub mod compile;
 pub mod diagnostics;
 pub mod emit;
@@ -32,6 +33,7 @@ pub mod typegen;
 /// Fatal errors (like fuel exhaustion) use the outer `Result`.
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
 
+pub use colors::Colors;
 pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity, Span};
 pub use query::{Query, QueryBuilder};
 pub use query::{SourceId, SourceMap};
