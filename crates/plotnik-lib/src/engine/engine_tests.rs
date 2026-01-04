@@ -60,10 +60,7 @@ fn build_trivia_types(module: &Module) -> Vec<u16> {
 }
 
 /// Resolve entrypoint by name or use the default.
-fn resolve_entrypoint(
-    module: &Module,
-    name: Option<&str>,
-) -> crate::bytecode::Entrypoint {
+fn resolve_entrypoint(module: &Module, name: Option<&str>) -> crate::bytecode::Entrypoint {
     let entrypoints = module.entrypoints();
     let strings = module.strings();
 
@@ -208,6 +205,23 @@ fn alternation_tagged_ident() {
             Q = (program (lexical_declaration (variable_declarator value: (Value) @value)))
         "#},
         "let x = y",
+        entry: "Q"
+    );
+}
+
+/// Regression: tagged alternation with named definition reference.
+/// When a definition is parsed before the alternation, Symbol interning order
+/// differs from AST branch order. The variant index must use BTreeMap order
+/// (by Symbol), not AST iteration order.
+#[test]
+fn alternation_tagged_definition_ref_backtrack() {
+    snap!(
+        indoc! {r#"
+            Block = (call_expression function: (identifier) @name)
+            Statement = [Assign: (assignment_expression) @a  Block: (Block) @b]
+            Q = (program (expression_statement (Statement) @stmt))
+        "#},
+        "foo()",
         entry: "Q"
     );
 }

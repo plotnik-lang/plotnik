@@ -4,10 +4,14 @@
 //! - Sequences: `{a b c}` - siblings matched in order
 //! - Alternations: `[a b c]` - first matching branch wins
 
+use std::collections::BTreeMap;
+
+use plotnik_core::Symbol;
+
+use crate::analyze::type_check::{TypeId, TypeShape};
 use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
-use crate::analyze::type_check::TypeShape;
 
 use super::capture::CaptureEffects;
 use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};
@@ -190,11 +194,15 @@ impl Compiler<'_> {
         let alt_type_shape = alt_type_id.and_then(|id| self.type_ctx.get_type(id));
         let is_enum = alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
 
-        // For tagged alternations: get variant types for scope pushing
-        // For untagged alternations: get merged struct fields for Null injection
-        let variant_types: Vec<_> = match alt_type_shape {
-            Some(TypeShape::Enum(variants)) => variants.values().copied().collect(),
-            _ => vec![],
+        // For tagged alternations: build map from label Symbol to (member index, payload TypeId)
+        // This ensures we use the correct BTreeMap order indices, not AST iteration order
+        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = match alt_type_shape {
+            Some(TypeShape::Enum(variants)) => variants
+                .iter()
+                .enumerate()
+                .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
+                .collect(),
+            _ => BTreeMap::new(),
         };
         let merged_fields = alt_type_id.and_then(|id| self.type_ctx.get_struct_fields(id));
 
@@ -206,12 +214,21 @@ impl Compiler<'_> {
 
         // Compile each branch, collecting entry labels
         let mut successors = Vec::new();
-        for (variant_idx, branch) in branches.iter().enumerate() {
+        for branch in branches.iter() {
             let Some(body) = branch.body() else {
                 continue;
             };
 
             if is_enum {
+                // Look up variant info by branch label (using BTreeMap order, not AST order)
+                let label = branch.label().expect("tagged branch must have label");
+                let label_text = label.text();
+                let (variant_idx, payload_type_id) = variant_info
+                    .iter()
+                    .find(|(sym, _)| self.interner.resolve(**sym) == label_text)
+                    .map(|(_, info)| *info)
+                    .expect("variant must exist for labeled branch");
+
                 // Tagged branch: E(variant_ref) → body → EndE → exit
                 // Outer capture effects go on EndEnum, not on the branch body
                 let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndEnum, 0)];
@@ -230,19 +247,15 @@ impl Compiler<'_> {
                 }));
 
                 // Compile body with variant's scope (no outer capture - it's on EndEnum)
-                let body_entry = if let Some(&payload_type_id) = variant_types.get(variant_idx) {
-                    self.with_scope(payload_type_id, |this| {
-                        this.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
-                    })
-                } else {
-                    self.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
-                };
+                let body_entry = self.with_scope(payload_type_id, |this| {
+                    this.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
+                });
 
                 // Create deferred member reference for the enum variant
                 let e_effect = if let Some(type_id) = alt_type_id {
-                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::deferred(type_id, variant_idx as u16))
+                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::deferred(type_id, variant_idx))
                 } else {
-                    EffectIR::simple(EffectOpcode::Enum, variant_idx)
+                    EffectIR::simple(EffectOpcode::Enum, variant_idx as usize)
                 };
 
                 let e_step = self.fresh_label();

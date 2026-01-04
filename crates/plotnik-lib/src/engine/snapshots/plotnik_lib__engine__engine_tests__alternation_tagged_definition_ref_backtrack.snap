@@ -1,0 +1,26 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Block = (call_expression function: (identifier) @name)
+Statement = [Assign: (assignment_expression) @a  Block: (Block) @b]
+Q = (program (expression_statement (Statement) @stmt))
+---
+foo()
+---
+{
+  "stmt": {
+    "$tag": "Block",
+    "$data": {
+      "b": {
+        "name": {
+          "kind": "identifier",
+          "text": "foo",
+          "span": [
+            0,
+            3
+          ]
+        }
+      }
+    }
+  }
+}
