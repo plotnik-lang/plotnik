@@ -4,6 +4,8 @@
 //! a checkpoint for each alternative. On failure, it restores the
 //! most recent checkpoint and continues.
 
+use super::cursor::SkipPolicy;
+
 /// Checkpoint for backtracking.
 #[derive(Clone, Copy, Debug)]
 pub struct Checkpoint {
@@ -17,6 +19,10 @@ pub struct Checkpoint {
     pub recursion_depth: u32,
     /// Resume point (raw step index).
     pub ip: u16,
+    /// If set, advance cursor before retrying (for Call instruction retry).
+    /// When a Call navigates and the callee fails, we need to try the next
+    /// sibling. This policy determines how to advance.
+    pub skip_policy: Option<SkipPolicy>,
 }
 
 /// Stack of checkpoints with O(1) max_frame_ref tracking.

@@ -60,10 +60,7 @@ fn build_trivia_types(module: &Module) -> Vec<u16> {
 }
 
 /// Resolve entrypoint by name or use the default.
-fn resolve_entrypoint(
-    module: &Module,
-    name: Option<&str>,
-) -> crate::bytecode::Entrypoint {
+fn resolve_entrypoint(module: &Module, name: Option<&str>) -> crate::bytecode::Entrypoint {
     let entrypoints = module.entrypoints();
     let strings = module.strings();
 
@@ -364,6 +361,23 @@ fn regression_call_searches_for_field_constraint() {
             Q = (program (expression_statement (Expr) @expr))
         "#},
         "1 + 2",
+        entry: "Q"
+    );
+}
+
+/// BUG #5: Named definitions didn't search among siblings like inline patterns.
+/// When using a named definition like `(GString)` inside a parent pattern, it
+/// should search among siblings the same way an inline pattern like `(string)`
+/// would. This is the "safe refactoring" promise: extracting a pattern to a
+/// named definition should not change matching behavior.
+#[test]
+fn regression_call_searches_among_siblings() {
+    snap!(
+        indoc! {r#"
+            Num = (number) @n
+            Q = (program (expression_statement (array (Num) @num)))
+        "#},
+        "[1, 2, 3]",
         entry: "Q"
     );
 }

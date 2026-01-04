@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Num = (number) @n
+Q = (program (expression_statement (array (Num) @num)))
+---
+[1, 2, 3]
+---
+{
+  "num": {
+    "n": {
+      "kind": "number",
+      "text": "1",
+      "span": [
+        1,
+        2
+      ]
+    }
+  }
+}
