@@ -2,18 +2,13 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::bytecode::Module;
-use plotnik_lib::emit::emit_linked;
-use plotnik_lib::Colors;
-use plotnik_lib::QueryBuilder;
-
 use plotnik_lib::engine::{
     debug_verify_type, FuelLimits, Materializer, PrintTracer, RuntimeError, ValueMaterializer,
     Verbosity, VM,
 };
+use plotnik_lib::Colors;
 
-use super::query_loader::load_query_source;
-use super::run_common;
+use super::run_common::{self, PreparedQuery, QueryInput};
 
 pub struct TraceArgs {
     pub query_path: Option<PathBuf>,
@@ -29,61 +24,21 @@ pub struct TraceArgs {
 }
 
 pub fn run(args: TraceArgs) {
-    if let Err(msg) = run_common::validate(
-        args.query_text.is_some() || args.query_path.is_some(),
-        args.source_text.is_some() || args.source_path.is_some(),
-        args.source_text.is_some(),
-        args.lang.is_some(),
-    ) {
-        eprintln!("error: {}", msg);
-        std::process::exit(1);
-    }
-
-    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
-    {
-        Ok(map) => map,
-        Err(msg) => {
-            eprintln!("error: {}", msg);
-            std::process::exit(1);
-        }
-    };
-
-    if source_map.is_empty() {
-        eprintln!("error: query cannot be empty");
-        std::process::exit(1);
-    }
-
-    let source_code = run_common::load_source(
-        args.source_text.as_deref(),
-        args.source_path.as_deref(),
-        args.query_path.as_deref(),
-    );
-    let lang = run_common::resolve_lang(args.lang.as_deref(), args.source_path.as_deref());
-
-    let query = match QueryBuilder::new(source_map).parse() {
-        Ok(parsed) => parsed.analyze().link(&lang),
-        Err(e) => {
-            eprintln!("error: {}", e);
-            std::process::exit(1);
-        }
-    };
-
-    if !query.is_valid() {
-        eprint!(
-            "{}",
-            query
-                .diagnostics()
-                .render_colored(query.source_map(), args.color)
-        );
-        std::process::exit(1);
-    }
-
-    let bytecode = emit_linked(&query).expect("emit failed");
-    let module = Module::from_bytes(bytecode).expect("module load failed");
-
-    let entrypoint = run_common::resolve_entrypoint(&module, args.entry.as_deref());
-    let tree = lang.parse(&source_code);
-    let trivia_types = run_common::build_trivia_types(&module);
+    let PreparedQuery {
+        module,
+        entrypoint,
+        tree,
+        trivia_types,
+        source_code,
+    } = run_common::prepare_query(QueryInput {
+        query_path: args.query_path.as_deref(),
+        query_text: args.query_text.as_deref(),
+        source_path: args.source_path.as_deref(),
+        source_text: args.source_text.as_deref(),
+        lang: args.lang.as_deref(),
+        entry: args.entry.as_deref(),
+        color: args.color,
+    });
 
     let limits = FuelLimits {
         exec_fuel: args.fuel,
