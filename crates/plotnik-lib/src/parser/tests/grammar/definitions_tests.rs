@@ -109,16 +109,14 @@ fn named_def_with_captures() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-            At "@"
-            Id "left"
+            CaptureToken "@left"
           Capture
             Field
               Id "operator"
               Colon ":"
               Wildcard
                 Underscore "_"
-            At "@"
-            Id "op"
+            CaptureToken "@op"
           Capture
             Field
               Id "right"
@@ -127,8 +125,7 @@ fn named_def_with_captures() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-            At "@"
-            Id "right"
+            CaptureToken "@right"
           ParenClose ")"
     "#);
 }
@@ -277,16 +274,14 @@ fn named_def_complex_recursive() {
                     ParenOpen "("
                     Id "identifier"
                     ParenClose ")"
-                  At "@"
-                  Id "name"
+                  CaptureToken "@name"
               Branch
                 Capture
                   Ref
                     ParenOpen "("
                     Id "NestedCall"
                     ParenClose ")"
-                  At "@"
-                  Id "inner"
+                  CaptureToken "@inner"
               BracketClose "]"
           Field
             Id "arguments"
@@ -325,8 +320,7 @@ fn named_def_with_type_annotation() {
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-            At "@"
-            Id "name"
+            CaptureToken "@name"
             Type
               DoubleColon "::"
               Id "string"
@@ -338,8 +332,7 @@ fn named_def_with_type_annotation() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-            At "@"
-            Id "body"
+            CaptureToken "@body"
           ParenClose ")"
     "#);
 }
@@ -373,8 +366,7 @@ fn unnamed_def_allowed_as_last() {
               ParenOpen "("
               Id "Expr"
               ParenClose ")"
-            At "@"
-            Id "value"
+            CaptureToken "@value"
           ParenClose ")"
     "#);
 }

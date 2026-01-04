@@ -74,8 +74,7 @@ fn anchor_adjacency() {
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
-            At "@"
-            Id "a"
+            CaptureToken "@a"
           Anchor
             Dot "."
           Capture
@@ -83,8 +82,7 @@ fn anchor_adjacency() {
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
-            At "@"
-            Id "b"
+            CaptureToken "@b"
           ParenClose ")"
     "#);
 }

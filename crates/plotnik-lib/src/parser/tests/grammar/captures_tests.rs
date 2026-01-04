@@ -19,8 +19,7 @@ fn capture() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-          At "@"
-          Id "name"
+          CaptureToken "@name"
     "#);
 }
 
@@ -48,8 +47,7 @@ fn capture_nested() {
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-            At "@"
-            Id "func"
+            CaptureToken "@func"
           ParenClose ")"
     "#);
 }
@@ -81,8 +79,7 @@ fn multiple_captures() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-              At "@"
-              Id "left"
+              CaptureToken "@left"
             Capture
               Field
                 Id "right"
@@ -91,11 +88,9 @@ fn multiple_captures() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-              At "@"
-              Id "right"
+              CaptureToken "@right"
             ParenClose ")"
-          At "@"
-          Id "expr"
+          CaptureToken "@expr"
     "#);
 }
 
@@ -117,8 +112,7 @@ fn capture_with_type_annotation() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-          At "@"
-          Id "name"
+          CaptureToken "@name"
           Type
             DoubleColon "::"
             Id "string"
@@ -143,8 +137,7 @@ fn capture_with_custom_type() {
             ParenOpen "("
             Id "function_declaration"
             ParenClose ")"
-          At "@"
-          Id "fn"
+          CaptureToken "@fn"
           Type
             DoubleColon "::"
             Id "FunctionDecl"
@@ -169,8 +162,7 @@ fn capture_without_type_annotation() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-          At "@"
-          Id "name"
+          CaptureToken "@name"
     "#);
 }
 
@@ -201,8 +193,7 @@ fn multiple_captures_with_types() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-              At "@"
-              Id "left"
+              CaptureToken "@left"
               Type
                 DoubleColon "::"
                 Id "Node"
@@ -214,14 +205,12 @@ fn multiple_captures_with_types() {
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"
-              At "@"
-              Id "right"
+              CaptureToken "@right"
               Type
                 DoubleColon "::"
                 Id "string"
             ParenClose ")"
-          At "@"
-          Id "expr"
+          CaptureToken "@expr"
           Type
             DoubleColon "::"
             Id "BinaryExpr"
@@ -253,8 +242,7 @@ fn sequence_capture_with_type() {
               Id "b"
               ParenClose ")"
             BraceClose "}"
-          At "@"
-          Id "seq"
+          CaptureToken "@seq"
           Type
             DoubleColon "::"
             Id "MySequence"
@@ -288,8 +276,7 @@ fn alternation_capture_with_type() {
                 Id "number"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          Id "value"
+          CaptureToken "@value"
           Type
             DoubleColon "::"
             Id "Value"
@@ -316,8 +303,7 @@ fn quantified_capture_with_type() {
               Id "statement"
               ParenClose ")"
             Plus "+"
-          At "@"
-          Id "stmts"
+          CaptureToken "@stmts"
           Type
             DoubleColon "::"
             Id "Statement"
@@ -352,8 +338,7 @@ fn nested_captures_with_types() {
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
-              At "@"
-              Id "name"
+              CaptureToken "@name"
               Type
                 DoubleColon "::"
                 Id "string"
@@ -370,15 +355,13 @@ fn nested_captures_with_types() {
                       Id "statement"
                       ParenClose ")"
                     Star "*"
-                  At "@"
-                  Id "body_stmts"
+                  CaptureToken "@body_stmts"
                   Type
                     DoubleColon "::"
                     Id "Statement"
                 ParenClose ")"
             ParenClose ")"
-          At "@"
-          Id "func"
+          CaptureToken "@func"
           Type
             DoubleColon "::"
             Id "Function"
@@ -403,8 +386,7 @@ fn capture_with_type_no_spaces() {
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
-          At "@"
-          Id "name"
+          CaptureToken "@name"
           Type
             DoubleColon "::"
             Id "string"
@@ -429,8 +411,7 @@ fn capture_literal() {
             DoubleQuote "\""
             StrVal "foo"
             DoubleQuote "\""
-          At "@"
-          Id "keyword"
+          CaptureToken "@keyword"
     "#);
 }
 
@@ -452,8 +433,7 @@ fn capture_literal_with_type() {
             DoubleQuote "\""
             StrVal "return"
             DoubleQuote "\""
-          At "@"
-          Id "kw"
+          CaptureToken "@kw"
           Type
             DoubleColon "::"
             Id "string"
@@ -481,8 +461,7 @@ fn capture_literal_in_tree() {
               DoubleQuote "\""
               StrVal "+"
               DoubleQuote "\""
-            At "@"
-            Id "op"
+            CaptureToken "@op"
           ParenClose ")"
     "#);
 }
@@ -507,7 +486,6 @@ fn capture_literal_with_quantifier() {
               StrVal ","
               DoubleQuote "\""
             Star "*"
-          At "@"
-          Id "commas"
+          CaptureToken "@commas"
     "#);
 }

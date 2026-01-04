@@ -23,6 +23,8 @@ pub struct Checkpoint {
     /// When a Call navigates and the callee fails, we need to try the next
     /// sibling. This policy determines how to advance.
     pub skip_policy: Option<SkipPolicy>,
+    /// Suppression depth at checkpoint.
+    pub suppress_depth: u16,
 }
 
 /// Stack of checkpoints with O(1) max_frame_ref tracking.

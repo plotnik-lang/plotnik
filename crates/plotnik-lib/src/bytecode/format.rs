@@ -148,6 +148,8 @@ pub mod trace {
 
     /// Effect: data capture or structure.
     pub const EFFECT: Symbol = Symbol::new("  ", "⬥", "  ");
+    /// Effect: suppressed (inside @_ capture).
+    pub const EFFECT_SUPPRESSED: Symbol = Symbol::new("  ", "⬦", "  ");
 
     /// Call: entering definition.
     pub const CALL: Symbol = Symbol::new("  ", "▶", "  ");
@@ -275,7 +277,9 @@ impl LineBuilder {
     ///
     /// Ensures at least 2 spaces between content and successors.
     pub fn pad_successors(&self, base: String, successors: &str) -> String {
-        let padding = cols::TOTAL_WIDTH.saturating_sub(base.chars().count()).max(2);
+        let padding = cols::TOTAL_WIDTH
+            .saturating_sub(base.chars().count())
+            .max(2);
         format!("{base}{:padding$}{successors}", "")
     }
 }
@@ -299,6 +303,8 @@ pub fn format_effect(effect: &EffectOp) -> String {
         EffectOpcode::Text => "Text".to_string(),
         EffectOpcode::Clear => "Clear".to_string(),
         EffectOpcode::Null => "Null".to_string(),
+        EffectOpcode::SuppressBegin => "SuppressBegin".to_string(),
+        EffectOpcode::SuppressEnd => "SuppressEnd".to_string(),
     }
 }
 

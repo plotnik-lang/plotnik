@@ -66,7 +66,7 @@ impl Compiler<'_> {
         // Always look up in the current scope - bubble captures don't create new scopes,
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
-            let capture_name = name_token.text();
+            let capture_name = &name_token.text()[1..]; // Strip @ prefix
             let member_ref = self.lookup_member_in_scope(capture_name);
             if let Some(member_ref) = member_ref {
                 effects.push(EffectIR::with_member(EffectOpcode::Set, member_ref));
@@ -132,7 +132,7 @@ impl Compiler<'_> {
             if let Expr::CapturedExpr(cap) = expr
                 && let Some(name) = cap.name()
             {
-                names.insert(name.text().to_string());
+                names.insert(name.text()[1..].to_string()); // Strip @ prefix
             }
             for child in expr.children() {
                 collect(&child, names);

@@ -265,7 +265,8 @@ impl NamedNode {
             if let Some(token) = child.into_token() {
                 if token.kind() == SyntaxKind::KwMissing {
                     found_missing = true;
-                } else if found_missing && matches!(token.kind(), SyntaxKind::Id | SyntaxKind::StrVal)
+                } else if found_missing
+                    && matches!(token.kind(), SyntaxKind::Id | SyntaxKind::StrVal)
                 {
                     return Some(token);
                 }
@@ -362,11 +363,27 @@ impl SeqExpr {
 }
 
 impl CapturedExpr {
+    /// Returns the capture token (@name or @_name).
+    /// The token text includes the @ prefix.
     pub fn name(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+            .find(|t| {
+                matches!(
+                    t.kind(),
+                    SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
+                )
+            })
+    }
+
+    /// Returns true if this is a suppressive capture (@_ or @_name).
+    /// Suppressive captures match structurally but don't contribute to output.
+    pub fn is_suppressive(&self) -> bool {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .any(|t| t.kind() == SyntaxKind::SuppressiveCapture)
     }
 
     pub fn inner(&self) -> Option<Expr> {

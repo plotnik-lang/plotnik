@@ -100,10 +100,19 @@ fn garbage_inside_node() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected capture name
+    error: unexpected token
       |
     1 | (a (b) @@@ (c)) (d)
-      |         ^
+      |        ^
+      |
+    help: try `(child)` or close with `)`
+
+    error: unexpected token
+      |
+    1 | (a (b) @@@ (c)) (d)
+      |          ^
+      |
+    help: try `(child)` or close with `)`
     ");
 }
 
@@ -167,7 +176,7 @@ fn predicate_unsupported() {
     error: unexpected token
       |
     1 | (a (#eq? @x "foo") b)
-      |          ^
+      |          ^^
       |
     help: try `(child)` or close with `)`
 
@@ -197,17 +206,6 @@ fn predicate_match() {
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
-
-    error: bare identifier is not valid
-      |
-    1 | (identifier) #match? @name "test"
-      |                       ^^^^
-      |
-    help: wrap in parentheses
-      |
-    1 - (identifier) #match? @name "test"
-    1 + (identifier) #match? @(name) "test"
-      |
     "#);
 }
 
@@ -226,7 +224,7 @@ fn predicate_in_tree() {
     error: unexpected token
       |
     1 | (function #eq? @name "test")
-      |                ^
+      |                ^^^^^
       |
     help: try `(child)` or close with `)`
     "#);
@@ -363,7 +361,7 @@ fn alternation_recovery_to_capture() {
     error: unexpected token
       |
     1 | [^^^ @name]
-      |      ^
+      |      ^^^^^
       |
     help: try `(node)` or close with `]`
     ");

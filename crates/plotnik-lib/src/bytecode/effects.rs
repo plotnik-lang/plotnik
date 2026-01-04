@@ -15,6 +15,8 @@ pub enum EffectOpcode {
     Text = 9,
     Clear = 10,
     Null = 11,
+    SuppressBegin = 12,
+    SuppressEnd = 13,
 }
 
 impl EffectOpcode {
@@ -32,6 +34,8 @@ impl EffectOpcode {
             9 => Self::Text,
             10 => Self::Clear,
             11 => Self::Null,
+            12 => Self::SuppressBegin,
+            13 => Self::SuppressEnd,
             _ => panic!("invalid effect opcode: {v}"),
         }
     }

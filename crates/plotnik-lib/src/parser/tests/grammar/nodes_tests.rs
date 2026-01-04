@@ -249,8 +249,7 @@ fn supertype_with_capture() {
             Slash "/"
             Id "binary_expression"
             ParenClose ")"
-          At "@"
-          Id "expr"
+          CaptureToken "@expr"
     "#);
 }
 
@@ -282,8 +281,7 @@ fn supertype_with_children() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-            At "@"
-            Id "left"
+            CaptureToken "@left"
           Capture
             Field
               Id "right"
@@ -292,8 +290,7 @@ fn supertype_with_children() {
                 ParenOpen "("
                 Underscore "_"
                 ParenClose ")"
-            At "@"
-            Id "right"
+            CaptureToken "@right"
           ParenClose ")"
     "#);
 }

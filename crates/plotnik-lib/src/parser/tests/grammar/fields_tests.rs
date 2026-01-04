@@ -266,8 +266,7 @@ fn fields_with_quantifiers_and_captures() {
                   Id "bar"
                   ParenClose ")"
               Star "*"
-            At "@"
-            Id "baz"
+            CaptureToken "@baz"
           ParenClose ")"
     "#);
 }

@@ -86,8 +86,7 @@ fn alternation_with_capture() {
                 Id "string"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          Id "value"
+          CaptureToken "@value"
     "#);
 }
 
@@ -122,8 +121,7 @@ fn alternation_with_quantifier() {
                   Id "string"
                   ParenClose ")"
                 Star "*"
-              At "@"
-              Id "strings"
+              CaptureToken "@strings"
           BracketClose "]"
     "#);
 }
@@ -344,8 +342,7 @@ fn tagged_alternation_with_captures() {
                       ParenOpen "("
                       Id "identifier"
                       ParenClose ")"
-                  At "@"
-                  Id "left"
+                  CaptureToken "@left"
                 ParenClose ")"
             Branch
               Id "Call"
@@ -361,12 +358,10 @@ fn tagged_alternation_with_captures() {
                       ParenOpen "("
                       Id "identifier"
                       ParenClose ")"
-                  At "@"
-                  Id "func"
+                  CaptureToken "@func"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          Id "stmt"
+          CaptureToken "@stmt"
     "#);
 }
 
@@ -397,8 +392,7 @@ fn tagged_alternation_with_type_annotation() {
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
-                At "@"
-                Id "name"
+                CaptureToken "@name"
             Branch
               Id "Access"
               Colon ":"
@@ -413,12 +407,10 @@ fn tagged_alternation_with_type_annotation() {
                       ParenOpen "("
                       Underscore "_"
                       ParenClose ")"
-                  At "@"
-                  Id "obj"
+                  CaptureToken "@obj"
                 ParenClose ")"
             BracketClose "]"
-          At "@"
-          Id "chain"
+          CaptureToken "@chain"
           Type
             DoubleColon "::"
             Id "MemberChain"
@@ -666,8 +658,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
-              At "@"
-              Id "name"
+              CaptureToken "@name"
               Type
                 DoubleColon "::"
                 Id "string"
@@ -679,8 +670,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 Id "number"
                 ParenClose ")"
-              At "@"
-              Id "value"
+              CaptureToken "@value"
               Type
                 DoubleColon "::"
                 Id "string"
@@ -692,8 +682,7 @@ fn tagged_alternation_full_example() {
                 ParenOpen "("
                 Id "string"
                 ParenClose ")"
-              At "@"
-              Id "value"
+              CaptureToken "@value"
               Type
                 DoubleColon "::"
                 Id "string"
@@ -711,8 +700,7 @@ fn tagged_alternation_full_example() {
                     ParenOpen "("
                     Id "Expression"
                     ParenClose ")"
-                At "@"
-                Id "left"
+                CaptureToken "@left"
               Capture
                 Field
                   Id "right"
@@ -721,8 +709,7 @@ fn tagged_alternation_full_example() {
                     ParenOpen "("
                     Id "Expression"
                     ParenClose ")"
-                At "@"
-                Id "right"
+                CaptureToken "@right"
               ParenClose ")"
           BracketClose "]"
     "#);

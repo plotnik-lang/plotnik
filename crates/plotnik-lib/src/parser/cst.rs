@@ -111,6 +111,15 @@ pub enum SyntaxKind {
     #[token(".")]
     Dot,
 
+    /// Regular capture: @name (matches before `At`)
+    #[regex(r"@[a-zA-Z][a-zA-Z0-9_]*")]
+    CaptureToken,
+
+    /// Suppressive capture: @_ or @_name (matches before `At`)
+    #[regex(r"@_[a-zA-Z0-9_]*")]
+    SuppressiveCapture,
+
+    /// Bare @ (for error recovery: "capture without target")
     #[token("@")]
     At,
 
@@ -311,8 +320,14 @@ pub mod token_sets {
 
     pub const ALT_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenClose]);
 
-    pub const FIELD_RECOVERY_TOKENS: TokenSet =
-        TokenSet::new(&[ParenClose, BracketClose, BraceClose, At, Colon]);
+    pub const FIELD_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[
+        ParenClose,
+        BracketClose,
+        BraceClose,
+        CaptureToken,
+        SuppressiveCapture,
+        Colon,
+    ]);
 
     pub const ROOT_RECOVERY_TOKENS: TokenSet =
         TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);

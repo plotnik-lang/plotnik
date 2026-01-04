@@ -446,12 +446,12 @@ fn capture_name_pascal_case_error() {
     error: capture names must be lowercase: captures become struct fields
       |
     1 | (a) @Name
-      |      ^^^^
+      |     ^^^^^
       |
     help: use `@name`
       |
     1 - (a) @Name
-    1 + (a) @name
+    1 + (a) name
       |
     ");
 }
@@ -465,15 +465,26 @@ fn capture_name_pascal_case_with_hyphens_error() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `-`: captures become struct fields
+    error: capture names must be lowercase: captures become struct fields
       |
     1 | (a) @My-Name
-      |      ^^^^^^^
+      |     ^^^
       |
-    help: use `@my_name`
+    help: use `@my`
       |
     1 - (a) @My-Name
-    1 + (a) @my_name
+    1 + (a) my-Name
+      |
+
+    error: field names must be lowercase: field names become struct fields
+      |
+    1 | (a) @My-Name
+      |         ^^^^
+      |
+    help: use `name:`
+      |
+    1 - (a) @My-Name
+    1 + (a) @My-name:
       |
     ");
 }
@@ -487,16 +498,12 @@ fn capture_name_with_hyphens_error() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `-`: captures become struct fields
+    error: definition must be named
       |
     1 | (a) @my-name
-      |      ^^^^^^^
+      | ^^^^^^^
       |
-    help: use `@my_name`
-      |
-    1 - (a) @my-name
-    1 + (a) @my_name
-      |
+    help: give it a name like `Name = (a) @my`
     ");
 }
 
@@ -509,15 +516,15 @@ fn capture_dotted_error() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `.`: captures become struct fields
+    error: bare identifier is not valid
       |
     1 | (identifier) @foo.bar
-      |               ^^^^^^^
+      |                   ^^^
       |
-    help: use `@foo_bar`
+    help: wrap in parentheses
       |
     1 - (identifier) @foo.bar
-    1 + (identifier) @foo_bar
+    1 + (identifier) @foo.(bar)
       |
     ");
 }
@@ -531,15 +538,15 @@ fn capture_dotted_multiple_parts() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `.`: captures become struct fields
+    error: bare identifier is not valid
       |
     1 | (identifier) @foo.bar.baz
-      |               ^^^^^^^^^^^
+      |                   ^^^^^^^
       |
-    help: use `@foo_bar_baz`
+    help: wrap in parentheses
       |
     1 - (identifier) @foo.bar.baz
-    1 + (identifier) @foo_bar_baz
+    1 + (identifier) @foo.(bar.baz)
       |
     ");
 }
@@ -553,15 +560,15 @@ fn capture_dotted_followed_by_field() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `.`: captures become struct fields
+    error: bare identifier is not valid
       |
     1 | (node) @foo.bar name: (other)
-      |         ^^^^^^^
+      |             ^^^
       |
-    help: use `@foo_bar`
+    help: wrap in parentheses
       |
     1 - (node) @foo.bar name: (other)
-    1 + (node) @foo_bar name: (other)
+    1 + (node) @foo.(bar) name: (other)
       |
     ");
 }
@@ -575,17 +582,6 @@ fn capture_space_after_dot_breaks_chain() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `.`: captures become struct fields
-      |
-    1 | (identifier) @foo. bar
-      |               ^^^^
-      |
-    help: use `@foo_`
-      |
-    1 - (identifier) @foo. bar
-    1 + (identifier) @foo_ bar
-      |
-
     error: bare identifier is not valid
       |
     1 | (identifier) @foo. bar
@@ -608,16 +604,12 @@ fn capture_hyphenated_error() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `-`: captures become struct fields
+    error: definition must be named
       |
     1 | (identifier) @foo-bar
-      |               ^^^^^^^
+      | ^^^^^^^^^^^^^^^^^
       |
-    help: use `@foo_bar`
-      |
-    1 - (identifier) @foo-bar
-    1 + (identifier) @foo_bar
-      |
+    help: give it a name like `Name = (identifier) @foo`
     ");
 }
 
@@ -630,15 +622,15 @@ fn capture_hyphenated_multiple() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `-`: captures become struct fields
+    error: field names cannot contain `-`: field names become struct fields
       |
     1 | (identifier) @foo-bar-baz
-      |               ^^^^^^^^^^^
+      |                   ^^^^^^^
       |
-    help: use `@foo_bar_baz`
+    help: use `bar_baz:`
       |
     1 - (identifier) @foo-bar-baz
-    1 + (identifier) @foo_bar_baz
+    1 + (identifier) @foo-bar_baz:
       |
     ");
 }
@@ -652,15 +644,15 @@ fn capture_mixed_dots_and_hyphens() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: capture names cannot contain `.`: captures become struct fields
+    error: bare identifier is not valid
       |
     1 | (identifier) @foo.bar-baz
-      |               ^^^^^^^^^^^
+      |                   ^^^^^^^
       |
-    help: use `@foo_bar_baz`
+    help: wrap in parentheses
       |
     1 - (identifier) @foo.bar-baz
-    1 + (identifier) @foo_bar_baz
+    1 + (identifier) @foo.(bar-baz)
       |
     ");
 }
@@ -1339,11 +1331,13 @@ fn single_colon_primitive_type() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @r#"
+    error: unexpected token
       |
     1 | @val : string
-      | ^
+      | ^^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
 
     error: bare identifier is not valid
       |
@@ -1355,7 +1349,7 @@ fn single_colon_primitive_type() {
     1 - @val : string
     1 + @val : (string)
       |
-    ");
+    "#);
 }
 
 #[test]
