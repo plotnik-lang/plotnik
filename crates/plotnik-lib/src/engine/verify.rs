@@ -14,18 +14,12 @@ use super::Value;
 ///
 /// Panics with a pretty diagnostic if the value doesn't match the expected type.
 /// This is a no-op in release builds.
+///
+/// `expected_type` should be the `result_type` from the entrypoint that was executed.
 #[cfg(debug_assertions)]
-pub fn debug_verify_type(value: &Value, module: &Module, colors: Colors) {
+pub fn debug_verify_type(value: &Value, expected_type: QTypeId, module: &Module, colors: Colors) {
     let types = module.types();
     let strings = module.strings();
-    let entrypoints = module.entrypoints();
-
-    // Get the first entrypoint's result type for verification
-    if entrypoints.is_empty() {
-        return;
-    }
-    let entrypoint = entrypoints.get(0);
-    let expected_type = entrypoint.result_type;
 
     let mut errors = Vec::new();
     verify_type(
@@ -37,14 +31,20 @@ pub fn debug_verify_type(value: &Value, module: &Module, colors: Colors) {
         &mut errors,
     );
     if !errors.is_empty() {
-        panic_with_mismatch(value, &errors, module, colors);
+        panic_with_mismatch(value, expected_type, &errors, module, colors);
     }
 }
 
 /// No-op in release builds.
 #[cfg(not(debug_assertions))]
 #[inline(always)]
-pub fn debug_verify_type(_value: &Value, _module: &Module, _colors: Colors) {}
+pub fn debug_verify_type(
+    _value: &Value,
+    _expected_type: QTypeId,
+    _module: &Module,
+    _colors: Colors,
+) {
+}
 
 /// Recursive type verification. Collects mismatch paths into `errors`.
 #[cfg(debug_assertions)]
@@ -316,17 +316,30 @@ fn centered_header(label: &str, width: usize) -> String {
 
 /// Panic with a pretty diagnostic showing the type mismatch.
 #[cfg(debug_assertions)]
-fn panic_with_mismatch(value: &Value, errors: &[String], module: &Module, colors: Colors) -> ! {
+fn panic_with_mismatch(
+    value: &Value,
+    expected_type: QTypeId,
+    errors: &[String],
+    module: &Module,
+    colors: Colors,
+) -> ! {
     const WIDTH: usize = 80;
     let separator = "=".repeat(WIDTH);
 
     let entrypoints = module.entrypoints();
     let strings = module.strings();
-    let type_name = if !entrypoints.is_empty() {
-        strings.get(entrypoints.get(0).name)
-    } else {
-        "unknown"
-    };
+
+    // Find the entrypoint name by matching result_type
+    let type_name = (0..entrypoints.len())
+        .find_map(|i| {
+            let e = entrypoints.get(i);
+            if e.result_type == expected_type {
+                Some(strings.get(e.name))
+            } else {
+                None
+            }
+        })
+        .unwrap_or("unknown");
 
     let config = Config {
         export: true,

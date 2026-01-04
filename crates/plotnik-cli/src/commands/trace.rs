@@ -118,7 +118,7 @@ pub fn run(args: TraceArgs) {
     let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);
 
     // Debug-only: verify output matches declared type
-    debug_verify_type(&value, &module, colors);
+    debug_verify_type(&value, entrypoint.result_type, &module, colors);
 
     let output = value.format(true, colors);
     println!("{}", output);
