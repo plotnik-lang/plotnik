@@ -170,15 +170,15 @@ plotnik exec query.ptk app.js --entry FunctionDef
 
 **Flags:**
 
-| Flag              | Purpose                               |
-| ----------------- | ------------------------------------- |
-| `-q, --query`     | Inline query text                     |
-| `-s, --source`    | Inline source text                    |
-| `-l, --lang`      | Language (inferred from file ext)     |
-| `--compact`       | Output compact JSON                   |
-| `--verbose-nodes` | Include line/column in nodes          |
-| `--check`         | Validate output against inferred types|
-| `--entry NAME`    | Start from specific definition        |
+| Flag              | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `-q, --query`     | Inline query text                      |
+| `-s, --source`    | Inline source text                     |
+| `-l, --lang`      | Language (inferred from file ext)      |
+| `--compact`       | Output compact JSON                    |
+| `--verbose-nodes` | Include line/column in nodes           |
+| `--check`         | Validate output against inferred types |
+| `--entry NAME`    | Start from specific definition         |
 
 ---
 
@@ -221,6 +221,7 @@ plotnik trace query.ptk app.js -vv  # very verbose
 ### Query-Only Commands (tree, check, dump, infer)
 
 These commands take a single input. Use either:
+
 - **Positional**: `plotnik tree app.ts` or `plotnik dump query.ptk`
 - **Flag**: `plotnik tree -s 'let x' -l js` or `plotnik dump -q 'Q = ...'`
 
@@ -228,21 +229,21 @@ These commands take a single input. Use either:
 
 These commands take two inputs. Use any combination:
 
-| Pattern                         | Query from    | Source from    |
-| ------------------------------- | ------------- | -------------- |
-| `exec QUERY SOURCE`             | 1st positional| 2nd positional |
-| `exec -q '...' SOURCE`          | `-q` flag     | positional     |
-| `exec -s '...' QUERY -l lang`   | positional    | `-s` flag      |
-| `exec -q '...' -s '...' -l lang`| `-q` flag     | `-s` flag      |
+| Pattern                          | Query from     | Source from    |
+| -------------------------------- | -------------- | -------------- |
+| `exec QUERY SOURCE`              | 1st positional | 2nd positional |
+| `exec -q '...' SOURCE`           | `-q` flag      | positional     |
+| `exec -s '...' QUERY -l lang`    | positional     | `-s` flag      |
+| `exec -q '...' -s '...' -l lang` | `-q` flag      | `-s` flag      |
 
 **Key rule**: When `-q` is provided with one positional, it becomes SOURCE.
 
 ### Language Detection
 
-| Input type   | Language             |
-| ------------ | -------------------- |
-| File         | Inferred from `.ext` |
-| Inline (`-s`)| Requires `-l`        |
+| Input type    | Language             |
+| ------------- | -------------------- |
+| File          | Inferred from `.ext` |
+| Inline (`-s`) | Requires `-l`        |
 
 ---
 

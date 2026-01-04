@@ -1,6 +1,6 @@
 # Ethos
 
-- `AGENTS.md` is our constitution. Propose useful amendments.
+- `AGENTS.md` is our constitution. When you notice systematic gaps (repeated retries, patterns discovered through trial-and-error), propose amendments at the end of the session.
 - Resilient parser with user-friendly error messages called "diagnostics" (see `diagnostics/`)
 - Stability via invariants: `panic!`/`assert!`/`.expect()` for simple cases, `invariants.rs` otherwise
 
@@ -227,6 +227,7 @@ Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
 Execute a query against source code and output JSON.
 
 **Usage variants:**
+
 ```
 exec <QUERY> <SOURCE>           # two positional files
 exec -q <TEXT> <SOURCE>         # inline query + source file
@@ -246,6 +247,7 @@ Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
 Trace query execution for debugging.
 
 **Usage variants:**
+
 ```
 trace <QUERY> <SOURCE>           # two positional files
 trace -q <TEXT> <SOURCE>         # inline query + source file
@@ -276,13 +278,13 @@ cargo run -p plotnik-cli -- langs
 
 ## Lifetime Conventions
 
-| Lifetime | Meaning                                          |
-| -------- | ------------------------------------------------ |
-| `'q`     | Query source string (`.ptk` file content)        |
-| `'d`     | Diagnostics reference                            |
-| `'s`     | Source code string (tree-sitter input)           |
-| `'t`     | Parsed tree-sitter tree                          |
-| `'a`     | Any other (generic borrows, bytecode views)      |
+| Lifetime | Meaning                                     |
+| -------- | ------------------------------------------- |
+| `'q`     | Query source string (`.ptk` file content)   |
+| `'d`     | Diagnostics reference                       |
+| `'s`     | Source code string (tree-sitter input)      |
+| `'t`     | Parsed tree-sitter tree                     |
+| `'a`     | Any other (generic borrows, bytecode views) |
 
 # Testing Rules
 
@@ -318,3 +320,22 @@ fn valid_query() {
 Coverage: `make coverage-lines | grep recursion`
 
 `invariants.rs`: `ensure_*()` functions for unreachable code exclusion from coverage.
+
+# PR Body Format
+
+```
+## Summary
+<1-3 bullets: what this PR does>
+
+## Why
+<1-2 sentences: motivation, problem solved, or link to relevant docs>
+
+## Notes (optional)
+<Tradeoffs, alternatives considered, gotchas for future reference>
+```
+
+- **Summary**: Quick scan; becomes squash-merge commit body
+- **Why**: Captures context that code/diff doesn't convey
+- **Notes**: Escape hatch for edge cases
+
+**Omit**: How (diff shows this), Testing (CI covers it).
