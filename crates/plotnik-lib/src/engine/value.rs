@@ -23,10 +23,7 @@ pub struct NodeHandle {
 impl NodeHandle {
     /// Create from a tree-sitter node and source text.
     pub fn from_node(node: Node<'_>, source: &str) -> Self {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("")
-            .to_owned();
+        let text = node.utf8_text(source.as_bytes()).unwrap_or("").to_owned();
         Self {
             kind: node.kind().to_owned(),
             text,
@@ -60,8 +57,11 @@ pub enum Value {
     Array(Vec<Value>),
     /// Object with ordered fields.
     Object(Vec<(String, Value)>),
-    /// Tagged union.
-    Tagged { tag: String, data: Box<Value> },
+    /// Tagged union. `data` is None for Void payloads.
+    Tagged {
+        tag: String,
+        data: Option<Box<Value>>,
+    },
 }
 
 impl Serialize for Value {
@@ -88,9 +88,12 @@ impl Serialize for Value {
                 map.end()
             }
             Value::Tagged { tag, data } => {
-                let mut map = serializer.serialize_map(Some(2))?;
+                let len = if data.is_some() { 2 } else { 1 };
+                let mut map = serializer.serialize_map(Some(len))?;
                 map.serialize_entry("$tag", tag)?;
-                map.serialize_entry("$data", data)?;
+                if let Some(d) = data {
+                    map.serialize_entry("$data", d)?;
+                }
                 map.end()
             }
         }
@@ -333,7 +336,7 @@ fn format_object(
 fn format_tagged(
     out: &mut String,
     tag: &str,
-    data: &Value,
+    data: &Option<Box<Value>>,
     c: &Colors,
     pretty: bool,
     indent: usize,
@@ -369,29 +372,32 @@ fn format_tagged(
     out.push('"');
     out.push_str(c.reset);
 
-    out.push_str(c.dim);
-    out.push(',');
-    out.push_str(c.reset);
+    // Only emit $data if present (Void payloads omit it)
+    if let Some(d) = data {
+        out.push_str(c.dim);
+        out.push(',');
+        out.push_str(c.reset);
 
-    if pretty {
-        out.push('\n');
-        out.push_str(&" ".repeat(field_indent));
+        if pretty {
+            out.push('\n');
+            out.push_str(&" ".repeat(field_indent));
+        }
+
+        // $data key in blue
+        out.push_str(c.blue);
+        out.push_str("\"$data\"");
+        out.push_str(c.reset);
+
+        out.push_str(c.dim);
+        out.push(':');
+        out.push_str(c.reset);
+
+        if pretty {
+            out.push(' ');
+        }
+
+        format_value(out, d, c, pretty, field_indent);
     }
-
-    // $data key in blue
-    out.push_str(c.blue);
-    out.push_str("\"$data\"");
-    out.push_str(c.reset);
-
-    out.push_str(c.dim);
-    out.push(':');
-    out.push_str(c.reset);
-
-    if pretty {
-        out.push(' ');
-    }
-
-    format_value(out, data, c, pretty, field_indent);
 
     if pretty {
         out.push('\n');

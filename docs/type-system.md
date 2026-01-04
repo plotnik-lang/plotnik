@@ -163,19 +163,24 @@ Created by `[ ... ]`:
 
 ### Enum Variants
 
-| Captures | Payload             |
-| -------- | ------------------- |
-| 0        | `Struct {}` (Empty) |
-| 1+       | Struct              |
+| Captures | Payload |
+| -------- | ------- |
+| 0        | Void    |
+| 1+       | Struct  |
+
+Void payloads omit the `$data` field entirely:
 
 ```
-Result = [
-    Ok: (value) @val
-    Err: (error (code) @code (message) @msg)
+Expr = [
+    Num: (number) @val
+    Empty: (string)
 ]
 ```
 
-Single-capture variants stay wrapped (`result.$data.val`), making field additions non-breaking.
+- `Num` variant: `{ "$tag": "Num", "$data": { val: Node } }`
+- `Empty` variant: `{ "$tag": "Empty" }` (no `$data`)
+
+Single-capture variants stay wrapped (`result.$data.val`).
 
 ## 4. Cardinality
 
