@@ -51,7 +51,35 @@ impl QuantifierKind {
     pub fn is_greedy(self) -> bool {
         matches!(self, Self::Optional | Self::Star | Self::Plus)
     }
+}
 
+/// Result of parsing a quantified expression.
+enum QuantifierParse {
+    /// No inner expression found.
+    Empty,
+    /// Inner expression exists but no valid quantifier operator.
+    Plain(Expr),
+    /// Valid quantified expression with inner and kind.
+    Quantified { inner: Expr, kind: QuantifierKind },
+}
+
+/// Parse a quantified expression into its components.
+///
+/// Returns `Empty` if no inner, `Plain` if inner but no quantifier,
+/// `Quantified` if both inner and valid quantifier operator.
+fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
+    let Some(inner) = quant.inner() else {
+        return QuantifierParse::Empty;
+    };
+
+    let Some(op) = quant.operator() else {
+        return QuantifierParse::Plain(inner);
+    };
+
+    match QuantifierKind::from_syntax(op.kind()) {
+        Some(kind) => QuantifierParse::Quantified { inner, kind },
+        None => QuantifierParse::Plain(inner),
+    }
 }
 
 /// Configuration for unified quantifier compilation.
@@ -83,16 +111,12 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         capture: CaptureEffects,
     ) -> Label {
-        let Some(inner) = quant.inner() else {
-            return exit;
-        };
-
-        let Some(op) = quant.operator() else {
-            return self.compile_expr_inner(&inner, exit, nav_override, capture);
-        };
-
-        let Some(kind) = QuantifierKind::from_syntax(op.kind()) else {
-            return self.compile_expr_inner(&inner, exit, nav_override, capture);
+        let (inner, kind) = match parse_quantifier(quant) {
+            QuantifierParse::Empty => return exit,
+            QuantifierParse::Plain(inner) => {
+                return self.compile_expr_inner(&inner, exit, nav_override, capture);
+            }
+            QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
         let config = QuantifierConfig {
@@ -119,16 +143,12 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         element_capture: CaptureEffects,
     ) -> Label {
-        let Some(inner) = quant.inner() else {
-            return exit;
-        };
-
-        let Some(op) = quant.operator() else {
-            return self.compile_expr_inner(&inner, exit, nav_override, element_capture);
-        };
-
-        let Some(kind) = QuantifierKind::from_syntax(op.kind()) else {
-            return self.compile_expr_inner(&inner, exit, nav_override, element_capture);
+        let (inner, kind) = match parse_quantifier(quant) {
+            QuantifierParse::Empty => return exit,
+            QuantifierParse::Plain(inner) => {
+                return self.compile_expr_inner(&inner, exit, nav_override, element_capture);
+            }
+            QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
         let config = QuantifierConfig {
@@ -180,16 +200,12 @@ impl Compiler<'_> {
             return self.compile_expr_inner(expr, match_exit, nav_override, capture);
         };
 
-        let Some(inner) = quant.inner() else {
-            return match_exit;
-        };
-
-        let Some(op) = quant.operator() else {
-            return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
-        };
-
-        let Some(kind) = QuantifierKind::from_syntax(op.kind()) else {
-            return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+        let (inner, kind) = match parse_quantifier(quant) {
+            QuantifierParse::Empty => return match_exit,
+            QuantifierParse::Plain(inner) => {
+                return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+            }
+            QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
         // Handle null injection for both passed captures and internal captures
@@ -261,16 +277,12 @@ impl Compiler<'_> {
             return self.compile_expr_inner(expr, match_exit, nav_override, capture);
         };
 
-        let Some(inner) = quant.inner() else {
-            return match_exit;
-        };
-
-        let Some(op) = quant.operator() else {
-            return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
-        };
-
-        let Some(kind) = QuantifierKind::from_syntax(op.kind()) else {
-            return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+        let (inner, kind) = match parse_quantifier(quant) {
+            QuantifierParse::Empty => return match_exit,
+            QuantifierParse::Plain(inner) => {
+                return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+            }
+            QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
         let config = QuantifierConfig {
