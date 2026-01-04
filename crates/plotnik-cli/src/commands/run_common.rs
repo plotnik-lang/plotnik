@@ -4,10 +4,14 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
+use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::emit::emit_linked;
+use plotnik_lib::QueryBuilder;
 
 use super::lang_resolver::{resolve_lang_required, suggest_language};
+use super::query_loader::load_query_source;
 
 /// Load source code from file, stdin, or inline text.
 pub fn load_source(
@@ -120,4 +124,87 @@ pub fn build_trivia_types(module: &Module) -> Vec<u16> {
     (0..trivia_view.len())
         .map(|i| trivia_view.get(i).node_type)
         .collect()
+}
+
+/// Common input parameters for exec/trace commands.
+pub struct QueryInput<'a> {
+    pub query_path: Option<&'a Path>,
+    pub query_text: Option<&'a str>,
+    pub source_path: Option<&'a Path>,
+    pub source_text: Option<&'a str>,
+    pub lang: Option<&'a str>,
+    pub entry: Option<&'a str>,
+    pub color: bool,
+}
+
+/// Prepared query ready for execution.
+pub struct PreparedQuery {
+    pub module: Module,
+    pub entrypoint: Entrypoint,
+    pub tree: tree_sitter::Tree,
+    pub trivia_types: Vec<u16>,
+    pub source_code: String,
+}
+
+/// Load, parse, analyze, link, and emit a query.
+/// Exits on any error.
+pub fn prepare_query(input: QueryInput) -> PreparedQuery {
+    if let Err(msg) = validate(
+        input.query_text.is_some() || input.query_path.is_some(),
+        input.source_text.is_some() || input.source_path.is_some(),
+        input.source_text.is_some(),
+        input.lang.is_some(),
+    ) {
+        eprintln!("error: {}", msg);
+        std::process::exit(1);
+    }
+
+    let source_map = match load_query_source(input.query_path, input.query_text) {
+        Ok(map) => map,
+        Err(msg) => {
+            eprintln!("error: {}", msg);
+            std::process::exit(1);
+        }
+    };
+
+    if source_map.is_empty() {
+        eprintln!("error: query cannot be empty");
+        std::process::exit(1);
+    }
+
+    let source_code = load_source(input.source_text, input.source_path, input.query_path);
+    let lang = resolve_lang(input.lang, input.source_path);
+
+    let query = match QueryBuilder::new(source_map).parse() {
+        Ok(parsed) => parsed.analyze().link(&lang),
+        Err(e) => {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if !query.is_valid() {
+        eprint!(
+            "{}",
+            query
+                .diagnostics()
+                .render_colored(query.source_map(), input.color)
+        );
+        std::process::exit(1);
+    }
+
+    let bytecode = emit_linked(&query).expect("emit failed");
+    let module = Module::from_bytes(bytecode).expect("module load failed");
+
+    let entrypoint = resolve_entrypoint(&module, input.entry);
+    let tree = lang.parse(&source_code);
+    let trivia_types = build_trivia_types(&module);
+
+    PreparedQuery {
+        module,
+        entrypoint,
+        tree,
+        trivia_types,
+        source_code,
+    }
 }
