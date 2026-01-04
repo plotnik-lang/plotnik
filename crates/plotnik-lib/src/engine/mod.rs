@@ -11,6 +11,7 @@ mod frame;
 mod materializer;
 mod trace;
 mod value;
+mod verify;
 mod vm;
 
 #[cfg(test)]
@@ -21,4 +22,5 @@ pub use error::RuntimeError;
 pub use materializer::{Materializer, ValueMaterializer};
 pub use trace::{PrintTracer, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
+pub use verify::debug_verify_type;
 pub use vm::{FuelLimits, VM};
