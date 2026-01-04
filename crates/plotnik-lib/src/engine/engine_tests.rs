@@ -381,3 +381,20 @@ fn regression_call_searches_for_field_constraint() {
         entry: "Q"
     );
 }
+
+/// BUG #5: Named definitions didn't search among siblings like inline patterns.
+/// When using a named definition like `(GString)` inside a parent pattern, it
+/// should search among siblings the same way an inline pattern like `(string)`
+/// would. This is the "safe refactoring" promise: extracting a pattern to a
+/// named definition should not change matching behavior.
+#[test]
+fn regression_call_searches_among_siblings() {
+    snap!(
+        indoc! {r#"
+            Num = (number) @n
+            Q = (program (expression_statement (array (Num) @num)))
+        "#},
+        "[1, 2, 3]",
+        entry: "Q"
+    );
+}

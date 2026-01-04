@@ -19,6 +19,18 @@ fn continuation_nav(nav: Nav) -> Nav {
 
 use super::checkpoint::{Checkpoint, CheckpointStack};
 use super::cursor::{CursorWrapper, SkipPolicy};
+
+/// Derive skip policy from navigation mode without navigating.
+/// Used when retrying a Call to determine the policy for the next checkpoint.
+fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
+    match nav {
+        Nav::Down | Nav::Next => Some(SkipPolicy::Any),
+        Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
+        Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
+        // Stay doesn't navigate, Up doesn't retry among siblings
+        _ => None,
+    }
+}
 use super::effect::{EffectLog, RuntimeEffect};
 use super::error::RuntimeError;
 use super::frame::FrameArena;
@@ -56,6 +68,12 @@ pub struct VM<'t> {
     exec_fuel: u32,
     recursion_depth: u32,
     limits: FuelLimits,
+
+    /// When true, the next Call instruction should skip navigation (use Stay).
+    /// This is set when backtracking to a Call retry checkpoint after advancing
+    /// the cursor to a new sibling. The Call's navigation was already done, and
+    /// we're now at the correct position for the callee to match.
+    skip_call_nav: bool,
 }
 
 impl<'t> VM<'t> {
@@ -71,6 +89,7 @@ impl<'t> VM<'t> {
             exec_fuel: limits.exec_fuel,
             recursion_depth: 0,
             limits,
+            skip_call_nav: false,
         }
     }
 
@@ -216,6 +235,7 @@ impl<'t> VM<'t> {
                 frame_index: self.frames.current(),
                 recursion_depth: self.recursion_depth,
                 ip: m.successor(i).get(),
+                skip_policy: None,
             });
             tracer.trace_checkpoint_created(self.ip);
         }
@@ -229,13 +249,34 @@ impl<'t> VM<'t> {
             return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth));
         }
 
-        self.navigate_to_field(c.nav, c.node_field, tracer)?;
+        // Get skip policy: from navigation (normal) or from nav mode (retry)
+        let skip_policy = if self.skip_call_nav {
+            // Retry: skip navigation, just check field, derive policy from nav mode
+            self.skip_call_nav = false;
+            self.check_field(c.node_field, tracer)?;
+            skip_policy_for_nav(c.nav)
+        } else {
+            // Normal: navigate and capture skip policy
+            self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?
+        };
+
+        // Push checkpoint for retry (both normal and retry paths need this)
+        if let Some(policy) = skip_policy
+            && policy != SkipPolicy::Exact
+        {
+            self.checkpoints.push(Checkpoint {
+                descendant_index: self.cursor.descendant_index(),
+                effect_watermark: self.effects.len(),
+                frame_index: self.frames.current(),
+                recursion_depth: self.recursion_depth,
+                ip: self.ip,
+                skip_policy: Some(policy),
+            });
+            tracer.trace_checkpoint_created(self.ip);
+        }
 
         // Save tree depth AFTER navigation. On Return, we go up to this depth.
-        // This allows continue_search advances at the same level to be preserved,
-        // while still restoring level when the callee descended into children.
         let saved_depth = self.cursor.depth();
-
         tracer.trace_call(c.target.get());
         self.frames.push(c.next.get(), saved_depth);
         self.recursion_depth += 1;
@@ -243,30 +284,34 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn navigate_to_field<T: Tracer>(
+    /// Navigate to a field and return the skip policy for retry support.
+    ///
+    /// Returns `Some(policy)` if navigation was performed, `None` if Stay nav was used.
+    fn navigate_to_field_with_policy<T: Tracer>(
         &mut self,
         nav: Nav,
         field: Option<std::num::NonZeroU16>,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
-        if nav == Nav::Stay {
-            return self.check_field(field, tracer);
+    ) -> Result<Option<SkipPolicy>, RuntimeError> {
+        if nav == Nav::Stay || nav == Nav::StayExact {
+            self.check_field(field, tracer)?;
+            return Ok(None);
         }
 
         let Some(policy) = self.cursor.navigate(nav) else {
-            return self.backtrack(tracer);
+            return Err(self.backtrack(tracer).unwrap_err());
         };
         tracer.trace_nav(nav, self.cursor.node());
 
         let Some(field_id) = field else {
-            return Ok(());
+            return Ok(Some(policy));
         };
 
         let cont_nav = continuation_nav(nav);
         loop {
             if self.cursor.field_id() == Some(field_id) {
                 tracer.trace_field_success(field_id);
-                return Ok(());
+                return Ok(Some(policy));
             }
             tracer.trace_field_failure(self.cursor.node());
             self.advance_or_backtrack(policy, cont_nav, tracer)?;
@@ -327,6 +372,16 @@ impl<'t> VM<'t> {
         self.effects.truncate(cp.effect_watermark);
         self.frames.restore(cp.frame_index);
         self.recursion_depth = cp.recursion_depth;
+
+        // Call retry: advance cursor to next sibling before re-executing
+        if let Some(policy) = cp.skip_policy {
+            if !self.cursor.continue_search(policy) {
+                return self.backtrack(tracer);
+            }
+            tracer.trace_nav(continuation_nav(Nav::Down), self.cursor.node());
+            self.skip_call_nav = true;
+        }
+
         self.ip = cp.ip;
         Err(RuntimeError::Backtracked)
     }
