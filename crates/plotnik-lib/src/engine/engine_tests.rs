@@ -398,3 +398,21 @@ fn regression_call_searches_among_siblings() {
         entry: "Q"
     );
 }
+
+/// BUG #6: Tagged alternation used wrong $tag when branches reference named definitions.
+/// The issue was that enum members are emitted in BTreeMap (Symbol interning) order,
+/// but the compiler used AST branch order for member indices. When a definition name
+/// (e.g., "Second") is interned before a branch label (e.g., "First"), the indices mismatch.
+#[test]
+fn regression_enum_tag_with_definition_refs() {
+    // "Second" is interned as a definition name before "First" is seen as a branch label.
+    // This caused the First branch to incorrectly get tagged as "Second".
+    snap!(
+        indoc! {r#"
+            Second = (binary_expression left: (number) @left right: (number) @right)
+            Q = (program (expression_statement [First: (number) @num  Second: (Second) @bin]))
+        "#},
+        "42",
+        entry: "Q"
+    );
+}
