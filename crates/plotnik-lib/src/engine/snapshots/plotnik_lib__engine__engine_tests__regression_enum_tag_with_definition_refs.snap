@@ -1,0 +1,21 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Second = (binary_expression left: (number) @left right: (number) @right)
+Q = (program (expression_statement [First: (number) @num  Second: (Second) @bin]))
+---
+42
+---
+{
+  "$tag": "First",
+  "$data": {
+    "num": {
+      "kind": "number",
+      "text": "42",
+      "span": [
+        0,
+        2
+      ]
+    }
+  }
+}
