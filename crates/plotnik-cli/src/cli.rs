@@ -15,7 +15,13 @@ impl ColorChoice {
         match self {
             ColorChoice::Always => true,
             ColorChoice::Never => false,
-            ColorChoice::Auto => std::io::IsTerminal::is_terminal(&std::io::stderr()),
+            // Check both streams: if either is piped, disable colors.
+            // This handles `exec query.ptk app.js | jq` where stdout is piped
+            // but stderr (diagnostics) is still a TTY.
+            ColorChoice::Auto => {
+                std::io::IsTerminal::is_terminal(&std::io::stdout())
+                    && std::io::IsTerminal::is_terminal(&std::io::stderr())
+            }
         }
     }
 }
