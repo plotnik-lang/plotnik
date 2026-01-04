@@ -100,7 +100,7 @@ pub fn run(args: ExecArgs) {
     let colors = Colors::new(args.color);
 
     // Debug-only: verify output matches declared type
-    debug_verify_type(&value, &module, colors);
+    debug_verify_type(&value, entrypoint.result_type, &module, colors);
 
     let output = value.format(args.pretty, colors);
     println!("{}", output);
