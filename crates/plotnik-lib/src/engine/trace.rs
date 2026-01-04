@@ -24,7 +24,7 @@ use std::num::NonZeroU16;
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
-    format_effect, nav_symbol, trace, truncate_text, width_for_count, EffectOpcode,
+    cols, format_effect, nav_symbol, trace, truncate_text, width_for_count, EffectOpcode,
     InstructionView, LineBuilder, MatchView, Module, Nav, Symbol,
 };
 use crate::Colors;
@@ -252,6 +252,25 @@ impl<'s> PrintTracer<'s> {
         self.entrypoint_by_ip.get(&ip).map_or("?", |s| s.as_str())
     }
 
+    /// Format kind with source text, dynamically truncated to fit content width.
+    /// Text is displayed dimmed and green, no quotes.
+    fn format_kind_with_text(&self, kind: &str, text: &str) -> String {
+        let c = &self.colors;
+
+        // Available content width = TOTAL_WIDTH - prefix_width + step_width
+        // prefix_width = INDENT + step_width + GAP + SYMBOL + GAP = 9 + step_width
+        // +step_width because ellipsis can extend into the successors column
+        // (sub-lines have no successors, so we use that space)
+        // This simplifies to: TOTAL_WIDTH - 9 = 35
+        let available = cols::TOTAL_WIDTH - 9;
+
+        // Text budget = available - kind.len() - 1 (space), minimum 12
+        let text_budget = available.saturating_sub(kind.len() + 1).max(12);
+
+        let truncated = truncate_text(text, text_budget);
+        format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
+    }
+
     /// Format a runtime effect for display.
     fn format_effect(&self, effect: &RuntimeEffect<'_>) -> String {
         use RuntimeEffect::*;
@@ -398,7 +417,6 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let c = &self.colors;
         let kind = node.kind();
         let symbol = match nav {
             Nav::Down | Nav::DownSkip | Nav::DownExact => trace::NAV_DOWN,
@@ -407,45 +425,37 @@ impl Tracer for PrintTracer<'_> {
             Nav::Stay | Nav::StayExact => Symbol::EMPTY,
         };
 
-        // Text only in VeryVerbose (text is dim)
+        // Text only in VeryVerbose
         if self.verbosity == Verbosity::VeryVerbose {
-            let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(
-                symbol,
-                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
-            );
+            let text = node.utf8_text(self.source).unwrap_or("?");
+            let content = self.format_kind_with_text(kind, text);
+            self.add_subline(symbol, &content);
         } else {
             self.add_subline(symbol, kind);
         }
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {
-        let c = &self.colors;
         let kind = node.kind();
 
-        // Text on match/failure in Verbose+ (text is dim)
+        // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
-            let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(
-                trace::MATCH_SUCCESS,
-                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
-            );
+            let text = node.utf8_text(self.source).unwrap_or("?");
+            let content = self.format_kind_with_text(kind, text);
+            self.add_subline(trace::MATCH_SUCCESS, &content);
         } else {
             self.add_subline(trace::MATCH_SUCCESS, kind);
         }
     }
 
     fn trace_match_failure(&mut self, node: Node<'_>) {
-        let c = &self.colors;
         let kind = node.kind();
 
-        // Text on match/failure in Verbose+ (text is dim)
+        // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
-            let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(
-                trace::MATCH_FAILURE,
-                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
-            );
+            let text = node.utf8_text(self.source).unwrap_or("?");
+            let content = self.format_kind_with_text(kind, text);
+            self.add_subline(trace::MATCH_FAILURE, &content);
         } else {
             self.add_subline(trace::MATCH_FAILURE, kind);
         }

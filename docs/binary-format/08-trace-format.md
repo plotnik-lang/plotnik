@@ -20,7 +20,7 @@ plotnik trace query.ptk source.js --fuel 10000
 | `-v`      | all                           | on match/failure   | Developer      |
 | `-vv`     | all                           | on all (incl. nav) | Deep debugging |
 
-**Text budget**: Node text is truncated to 20 characters with `…` when displayed.
+**Text budget**: Node text fills the line up to the successors column (minimum 12 characters). Truncated text ends with `…`.
 
 ---
 
@@ -156,11 +156,11 @@ Assignment:
 Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
-       ●   assignment_expression "x = y"
+       ●   assignment_expression x = y
   10   ▽   left: (identifier) [Node Set(M6)]      12
        ▽   identifier
        ●   left:
-       ●   identifier "x"
+       ●   identifier x
        ⬥   Node
        ⬥   Set "target"
   12   ▷   right: (Expression)                    13 ⯇
@@ -174,12 +174,12 @@ Expression:
   22   ε   [Enum(M3)]                             20
        ⬥   Enum "Literal"
   20       (number) [Node Set(M1)]                18
-       ○   identifier "y"
+       ○   identifier y
   06  ❮❮❮
   28   ε   [Enum(M4)]                             26
        ⬥   Enum "Variable"
   26       (identifier) [Node Set(M2)]            24
-       ●   identifier "y"
+       ●   identifier y
        ⬥   Node
        ⬥   Set "name"
   24   ε   [EndEnum]                              17
@@ -231,11 +231,11 @@ Assignment:
 Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
-       ●   assignment_expression "x = 1"
+       ●   assignment_expression x = 1
   10   ▽   left: (identifier) [Node Set(M6)]      12
        ▽   identifier
        ●   left:
-       ●   identifier "x"
+       ●   identifier x
        ⬥   Node
        ⬥   Set "target"
   12   ▷   right: (Expression)                    13 ⯇
@@ -249,7 +249,7 @@ Expression:
   22   ε   [Enum(M3)]                             20
        ⬥   Enum "Literal"
   20       (number) [Node Set(M1)]                18
-       ●   number "1"
+       ●   number 1
        ⬥   Node
        ⬥   Set "value"
   18   ε   [EndEnum]                              17
@@ -288,12 +288,12 @@ Expression:
   22   ε   [Enum(M3)]                             20
        ⬥   Enum "Literal"
   20       (number) [Node Set(M1)]                18
-       ○   string "hello"
+       ○   string hello
   06  ❮❮❮
   28   ε   [Enum(M4)]                             26
        ⬥   Enum "Variable"
   26       (identifier) [Node Set(M2)]            24
-       ○   string "hello"
+       ○   string hello
 ```
 
 Both branches fail. No more checkpoints—query does not match. The CLI exits with code 1.
@@ -315,7 +315,7 @@ Both branches fail. No more checkpoints—query does not match. The CLI exits wi
 Ident:
   01   ε                                          02
   02       (identifier) [Text Set(M0)]            04
-       ●   identifier "foo"
+       ●   identifier foo
        ⬥   Text
        ⬥   Set "name"
   04                                              ▶
@@ -359,12 +359,12 @@ ReturnVal:
 ReturnVal:
   01   ε                                          02
   02       (statement_block)                      03
-       ●   statement_block "{ x; return 1; }"
+       ●   statement_block { x; return 1; }
   03   ▽   (return_statement) [Node Set(M0)]      04
        ▽   expression_statement
-       ○   expression_statement "x;"
+       ○   expression_statement x;
        ▷   return_statement
-       ●   return_statement "return 1;"
+       ●   return_statement return 1;
        ⬥   Node
        ⬥   Set "ret"
   04   △                                          05
@@ -391,7 +391,7 @@ The `▽` lands on `(expression_statement)`, type mismatch, skip `▷` to next s
 Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
-       ○   number "42"
+       ○   number 42
 ```
 
 Type check fails at root—no navigation occurs. The CLI exits with code 1.
@@ -429,11 +429,11 @@ Pair:
   02   ε   [Obj]                                  04
        ⬥   Obj
   04       (pair)                                 05
-       ●   pair "\"x\": 1"
+       ●   pair "x": 1
   05   ▽   key: (string) [SuppressBegin]          06
        ▽   string
        ●   key:
-       ●   string "\"x\""
+       ●   string "x"
        ⬥   SuppressBegin
   06   ε   [SuppressEnd]                          08
        ⬦   Node
@@ -442,7 +442,7 @@ Pair:
   08   ▷   value: (number) [Node Set(M0)]         10
        ▷   number
        ●   value:
-       ●   number "1"
+       ●   number 1
        ⬥   Node
        ⬥   Set "value"
   10   △                                          12
@@ -511,11 +511,11 @@ Hidden:
 | ------- | ------------------- | ---------------------------- |
 | (blank) | `     kind`         | `     identifier`            |
 | `  ▽  ` | `▽   kind`          | `▽   identifier`             |
-| `  ▽  ` | `▽   kind "text"`   | `▽   identifier "foo"`       |
+| `  ▽  ` | `▽   kind text`     | `▽   identifier foo`         |
 | `  ▷  ` | `▷   kind`          | `▷   return_statement`       |
 | `  △  ` | `△   kind`          | `△   assignment_expression`  |
 | `  ●  ` | `●   kind`          | `●   identifier`             |
-| `  ●  ` | `●   kind "text"`   | `●   identifier "foo"`       |
+| `  ●  ` | `●   kind text`     | `●   identifier foo`         |
 | `  ●  ` | `●   field:`        | `●   left:`                  |
 | `  ○  ` | `○   kind`          | `○   string`                 |
 | `  ⬥  ` | `⬥   Effect`        | `⬥   Node`                   |
