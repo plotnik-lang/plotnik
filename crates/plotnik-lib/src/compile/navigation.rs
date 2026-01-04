@@ -101,49 +101,41 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
     matches!(nav, Some(Nav::Down | Nav::DownSkip | Nav::DownExact))
 }
 
-/// Check if expression is optional (?) or star (*) - patterns that can match zero times.
+/// Extract the operator kind from an expression if it's a quantifier.
 /// Unwraps CapturedExpr if present.
-pub fn is_skippable_quantifier(expr: &Expr) -> bool {
-    use crate::parser::cst::SyntaxKind;
-
-    // Unwrap CapturedExpr to check the inner quantifier
+fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::cst::SyntaxKind> {
     let expr = match expr {
-        Expr::CapturedExpr(cap) => match cap.inner() {
-            Some(inner) => inner,
-            None => return false,
-        },
+        Expr::CapturedExpr(cap) => cap.inner()?,
         e => e.clone(),
     };
 
-    let Expr::QuantifiedExpr(q) = &expr else {
-        return false;
-    };
-    let Some(op) = q.operator() else {
-        return false;
-    };
-    matches!(
-        op.kind(),
-        SyntaxKind::Question
-            | SyntaxKind::QuestionQuestion
-            | SyntaxKind::Star
-            | SyntaxKind::StarQuestion
-    )
+    let Expr::QuantifiedExpr(q) = &expr else { return None };
+    Some(q.operator()?.kind())
+}
+
+/// Check if expression is optional (?) or star (*) - patterns that can match zero times.
+pub fn is_skippable_quantifier(expr: &Expr) -> bool {
+    use crate::parser::cst::SyntaxKind;
+    quantifier_operator_kind(expr).is_some_and(|k| {
+        matches!(
+            k,
+            SyntaxKind::Question
+                | SyntaxKind::QuestionQuestion
+                | SyntaxKind::Star
+                | SyntaxKind::StarQuestion
+        )
+    })
 }
 
 /// Syntactic check for star/plus quantifier (fallback when type info unavailable).
 pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
     use crate::parser::cst::SyntaxKind;
-
-    let Some(Expr::QuantifiedExpr(q)) = expr else {
-        return false;
-    };
-    let Some(op) = q.operator() else {
-        return false;
-    };
-    matches!(
-        op.kind(),
-        SyntaxKind::Star | SyntaxKind::StarQuestion | SyntaxKind::Plus | SyntaxKind::PlusQuestion
-    )
+    expr.and_then(quantifier_operator_kind).is_some_and(|k| {
+        matches!(
+            k,
+            SyntaxKind::Star | SyntaxKind::StarQuestion | SyntaxKind::Plus | SyntaxKind::PlusQuestion
+        )
+    })
 }
 
 /// Determines if an expression creates a scope boundary when captured.
