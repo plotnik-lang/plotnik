@@ -1,0 +1,8 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (lexical_declaration (variable_declarator name: (identifier) @_)))
+---
+let x = 1
+---
+null

@@ -1,0 +1,18 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Expr = (binary_expression left: (number) @left right: (number) @right)
+Q = (program (expression_statement {(Expr) @_} @expr))
+---
+1 + 2
+---
+{
+  "expr": {
+    "kind": "binary_expression",
+    "text": "1 + 2",
+    "span": [
+      0,
+      5
+    ]
+  }
+}

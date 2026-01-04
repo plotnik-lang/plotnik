@@ -1,36 +1,12 @@
 use rowan::Checkpoint;
 
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::Parser;
-use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use crate::parser::cst::SyntaxKind;
 use crate::parser::lexer::token_text;
+use crate::parser::Parser;
 
 impl Parser<'_, '_> {
-    /// `@name` | `@name :: Type`
-    pub(crate) fn parse_capture_suffix(&mut self) {
-        self.bump(); // consume At
-
-        if !self.currently_is(SyntaxKind::Id) {
-            self.error(DiagnosticKind::ExpectedCaptureName);
-            return;
-        }
-
-        let span = self.current_span();
-        let name = token_text(self.source, &self.tokens[self.pos]);
-        self.bump(); // consume Id
-
-        self.validate_capture_name(name, span);
-
-        if self.currently_is(SyntaxKind::Colon) {
-            self.parse_type_annotation_single_colon();
-            return;
-        }
-        if self.currently_is(SyntaxKind::DoubleColon) {
-            self.parse_type_annotation();
-        }
-    }
-
     /// Type annotation: `::Type` (PascalCase) or `::string` (primitive)
     pub(crate) fn parse_type_annotation(&mut self) {
         self.start_node(SyntaxKind::Type);
@@ -189,13 +165,35 @@ impl Parser<'_, '_> {
         }
     }
 
-    /// If current token is a capture (`@name`), wrap preceding expression with Capture using checkpoint.
+    /// If current token is a capture (`@name` or `@_`), wrap preceding expression with Capture using checkpoint.
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        if self.currently_is(SyntaxKind::At) {
-            self.start_node_at(checkpoint, SyntaxKind::Capture);
-            self.drain_trivia();
-            self.parse_capture_suffix();
-            self.finish_node();
+        let is_capture = self.currently_is(SyntaxKind::CaptureToken);
+        let is_suppressive = self.currently_is(SyntaxKind::SuppressiveCapture);
+
+        if !is_capture && !is_suppressive {
+            return;
         }
+
+        self.start_node_at(checkpoint, SyntaxKind::Capture);
+        self.drain_trivia();
+
+        // Validate capture name (strip @ prefix first)
+        let span = self.current_span();
+        let text = token_text(self.source, &self.tokens[self.pos]);
+        let name = &text[1..]; // Strip @ prefix
+        self.validate_capture_name(name, span);
+
+        self.bump(); // consume CaptureToken or SuppressiveCapture
+
+        // Type annotation only on regular captures
+        if is_capture {
+            if self.currently_is(SyntaxKind::DoubleColon) {
+                self.parse_type_annotation();
+            } else if self.currently_is(SyntaxKind::Colon) {
+                self.parse_type_annotation_single_colon();
+            }
+        }
+
+        self.finish_node();
     }
 }

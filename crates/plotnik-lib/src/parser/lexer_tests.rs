@@ -155,29 +155,20 @@ fn strings_empty() {
 
 #[test]
 fn capture_simple() {
-    insta::assert_snapshot!(snapshot("@name"), @r#"
-    At "@"
-    Id "name"
-    "#);
+    insta::assert_snapshot!(snapshot("@name"), @r#"CaptureToken "@name""#);
 }
 
 #[test]
 fn capture_with_underscores() {
-    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"
-    At "@"
-    Id "my_capture_name"
-    "#);
+    insta::assert_snapshot!(snapshot("@my_capture_name"), @r#"CaptureToken "@my_capture_name""#);
 }
 
 #[test]
 fn capture_multiple() {
     insta::assert_snapshot!(snapshot("@name @value @other"), @r#"
-    At "@"
-    Id "name"
-    At "@"
-    Id "value"
-    At "@"
-    Id "other"
+    CaptureToken "@name"
+    CaptureToken "@value"
+    CaptureToken "@other"
     "#);
 }
 
@@ -191,11 +182,8 @@ fn capture_bare_at() {
 
 #[test]
 fn capture_uppercase() {
-    // Uppercase after @ is now just At + Id (parser validates)
-    insta::assert_snapshot!(snapshot("@Name"), @r#"
-    At "@"
-    Id "Name"
-    "#);
+    // Uppercase after @ is CaptureToken (parser validates name convention)
+    insta::assert_snapshot!(snapshot("@Name"), @r#"CaptureToken "@Name""#);
 }
 
 #[test]
@@ -335,8 +323,7 @@ fn complex_expression() {
     ParenOpen "("
     Id "identifier"
     ParenClose ")"
-    At "@"
-    Id "name"
+    CaptureToken "@name"
     ParenClose ")"
     "#);
 }
@@ -366,8 +353,7 @@ fn empty_input() {
 #[test]
 fn double_colon() {
     insta::assert_snapshot!(snapshot("@name :: Type"), @r#"
-    At "@"
-    Id "name"
+    CaptureToken "@name"
     DoubleColon "::"
     Id "Type"
     "#);
@@ -376,8 +362,7 @@ fn double_colon() {
 #[test]
 fn double_colon_no_spaces() {
     insta::assert_snapshot!(snapshot("@name::Type"), @r#"
-    At "@"
-    Id "name"
+    CaptureToken "@name"
     DoubleColon "::"
     Id "Type"
     "#);
@@ -396,8 +381,7 @@ fn double_colon_vs_single_colon() {
 #[test]
 fn double_colon_string_type() {
     insta::assert_snapshot!(snapshot("@name :: string"), @r#"
-    At "@"
-    Id "name"
+    CaptureToken "@name"
     DoubleColon "::"
     Id "string"
     "#);
@@ -493,8 +477,7 @@ fn type_annotation_full() {
     ParenOpen "("
     Id "identifier"
     ParenClose ")"
-    At "@"
-    Id "name"
+    CaptureToken "@name"
     DoubleColon "::"
     Id "string"
     "#);
@@ -559,8 +542,7 @@ fn special_node_missing_with_arg() {
 #[test]
 fn type_annotation_upper() {
     insta::assert_snapshot!(snapshot("@val :: Type"), @r#"
-    At "@"
-    Id "val"
+    CaptureToken "@val"
     DoubleColon "::"
     Id "Type"
     "#);
@@ -657,5 +639,45 @@ fn pipe_in_expression_context() {
     Pipe "|"
     Id "b"
     BracketClose "]"
+    "#);
+}
+
+#[test]
+fn suppressive_capture_anonymous() {
+    insta::assert_snapshot!(snapshot("@_"), @r#"SuppressiveCapture "@_""#);
+}
+
+#[test]
+fn suppressive_capture_named() {
+    insta::assert_snapshot!(snapshot("@_foo"), @r#"SuppressiveCapture "@_foo""#);
+}
+
+#[test]
+fn suppressive_capture_named_with_underscores() {
+    insta::assert_snapshot!(snapshot("@_foo_bar"), @r#"SuppressiveCapture "@_foo_bar""#);
+}
+
+#[test]
+fn suppressive_capture_named_alphanumeric() {
+    insta::assert_snapshot!(snapshot("@_name123"), @r#"SuppressiveCapture "@_name123""#);
+}
+
+#[test]
+fn suppressive_capture_in_expression() {
+    insta::assert_snapshot!(snapshot("(identifier) @_"), @r#"
+    ParenOpen "("
+    Id "identifier"
+    ParenClose ")"
+    SuppressiveCapture "@_"
+    "#);
+}
+
+#[test]
+fn suppressive_vs_regular_capture() {
+    // @_ and @_name are SuppressiveCapture, @name is CaptureToken
+    insta::assert_snapshot!(snapshot("@_ @_name @name"), @r#"
+    SuppressiveCapture "@_"
+    SuppressiveCapture "@_name"
+    CaptureToken "@name"
     "#);
 }

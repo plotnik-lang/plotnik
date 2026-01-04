@@ -39,8 +39,7 @@ fn error_node_with_capture() {
             ParenOpen "("
             KwError "ERROR"
             ParenClose ")"
-          At "@"
-          Id "err"
+          CaptureToken "@err"
     "#);
 }
 
@@ -129,8 +128,7 @@ fn missing_node_with_capture() {
             StrVal ";"
             DoubleQuote "\""
             ParenClose ")"
-          At "@"
-          Id "missing_semi"
+          CaptureToken "@missing_semi"
     "#);
 }
 

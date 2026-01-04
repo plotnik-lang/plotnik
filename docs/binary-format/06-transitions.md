@@ -85,23 +85,25 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-- **Opcode**: 6 bits (0-63), currently 12 defined.
+- **Opcode**: 6 bits (0-63), currently 14 defined.
 - **Payload**: 10 bits (0-1023), member/variant index.
 
-| Opcode | Name      | Payload                |
-| :----- | :-------- | :--------------------- |
-| 0      | `Node`    | -                      |
-| 1      | `Arr`     | -                      |
-| 2      | `Push`    | -                      |
-| 3      | `EndArr`  | -                      |
-| 4      | `Obj`     | -                      |
-| 5      | `EndObj`  | -                      |
-| 6      | `Set`     | Member index (0-1023)  |
-| 7      | `Enum`    | Variant index (0-1023) |
-| 8      | `EndEnum` | -                      |
-| 9      | `Text`    | -                      |
-| 10     | `Clear`   | -                      |
-| 11     | `Null`    | -                      |
+| Opcode | Name            | Payload                |
+| :----- | :-------------- | :--------------------- |
+| 0      | `Node`          | -                      |
+| 1      | `Arr`           | -                      |
+| 2      | `Push`          | -                      |
+| 3      | `EndArr`        | -                      |
+| 4      | `Obj`           | -                      |
+| 5      | `EndObj`        | -                      |
+| 6      | `Set`           | Member index (0-1023)  |
+| 7      | `Enum`          | Variant index (0-1023) |
+| 8      | `EndEnum`       | -                      |
+| 9      | `Text`          | -                      |
+| 10     | `Clear`         | -                      |
+| 11     | `Null`          | -                      |
+| 12     | `SuppressBegin` | -                      |
+| 13     | `SuppressEnd`   | -                      |
 
 **Opcode Ranges** (future extensibility):
 
@@ -110,7 +112,9 @@ EffectOp (u16)
 | 0-31  | Single word | 10-bit payload in same word    |
 | 32-63 | Extended    | Next u16 word is full argument |
 
-Current opcodes (0-11) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
+Current opcodes (0-13) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
+
+**Suppression Opcodes**: `SuppressBegin` (12) and `SuppressEnd` (13) implement suppressive captures (`@_`). When `SuppressBegin` is executed, the VM enters suppression mode and all subsequent effects are skipped until `SuppressEnd` is executed. Suppression nesting is supported via a depth counter.
 
 ## 4. Instructions
 

@@ -22,8 +22,7 @@ fn whitespace_preserved() {
             Id "identifier"
             ParenClose ")"
           Whitespace "  "
-          At "@"
-          Id "name"
+          CaptureToken "@name"
       Newline "\n"
     "#);
 }

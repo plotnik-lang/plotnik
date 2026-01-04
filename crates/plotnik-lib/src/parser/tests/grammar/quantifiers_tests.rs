@@ -87,8 +87,7 @@ fn quantifier_with_capture() {
               Id "statement"
               ParenClose ")"
             Star "*"
-          At "@"
-          Id "statements"
+          CaptureToken "@statements"
     "#);
 }
 

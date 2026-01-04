@@ -10,10 +10,10 @@ fn missing_capture_name() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected capture name
+    error: capture has no target
       |
     1 | (identifier) @
-      |               ^
+      |              ^
     ");
 }
 
@@ -192,10 +192,10 @@ fn capture_with_invalid_char() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
-    error: expected capture name
+    error: capture has no target
       |
     1 | (identifier) @123
-      |               ^^^
+      |              ^
     ");
 }
 
@@ -221,12 +221,14 @@ fn bare_capture_at_root() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @r#"
+    error: unexpected token
       |
     1 | @name
-      | ^
-    ");
+      | ^^^^^
+      |
+    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+    "#);
 }
 
 #[test]
@@ -241,7 +243,7 @@ fn capture_at_start_of_alternation() {
     error: unexpected token
       |
     1 | [@x (a)]
-      |  ^
+      |  ^^
       |
     help: try `(node)` or close with `]`
     ");
@@ -260,17 +262,6 @@ fn mixed_valid_invalid_captures() {
       |
     1 | (a) @ok @ @name
       |         ^
-
-    error: bare identifier is not valid
-      |
-    1 | (a) @ok @ @name
-      |            ^^^^
-      |
-    help: wrap in parentheses
-      |
-    1 - (a) @ok @ @name
-    1 + (a) @ok @ @(name)
-      |
     ");
 }
 

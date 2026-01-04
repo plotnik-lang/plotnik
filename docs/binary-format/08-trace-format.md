@@ -60,6 +60,7 @@ Below each instruction, sub-lines show what happened during execution. Each sub-
 | `  ●  ` | Match: success                    |
 | `  ○  ` | Match: failure                    |
 | `  ⬥  ` | Effect: data capture or structure |
+| `  ⬦  ` | Effect: suppressed (inside @_)    |
 | `  ▶  ` | Call: entering definition         |
 | `  ◀  ` | Return: back from definition      |
 
@@ -394,7 +395,64 @@ Type check fails at root—no navigation occurs. The CLI exits with code 1.
 
 ---
 
-## Trace 7: Default Verbosity (Compact)
+## Trace 7: Suppressive Capture (`-v`)
+
+Suppressive captures (`@_`) match structurally but don't emit effects. The trace shows:
+- `⬥ SuppressBegin` / `⬥ SuppressEnd` when entering/exiting suppression
+- `⬦` for data effects that are suppressed
+- `⬦ SuppressBegin` / `⬦ SuppressEnd` for nested suppression (already inside another `@_`)
+
+**Query:**
+
+```
+Pair = (pair key: (string) @_ value: (number) @value)
+```
+
+**Entrypoint:** `Pair`
+**Source:** `"x": 1`
+
+```
+(pair
+  key: (string)                    ; "x"
+  value: (number))                 ; 1
+```
+
+### Execution Trace
+
+```
+Pair:
+  01   ε                                          02
+  02   ε   [Obj]                                  04
+       ⬥   Obj
+  04       (pair)                                 05
+       ●   pair "\"x\": 1"
+  05   ▽   key: (string) [SuppressBegin]          06
+       ▽   string
+       ●   key:
+       ●   string "\"x\""
+       ⬥   SuppressBegin
+  06   ε   [SuppressEnd]                          08
+       ⬦   Node
+       ⬦   Set "key"
+       ⬥   SuppressEnd
+  08   ▷   value: (number) [Node Set(M0)]         10
+       ▷   number
+       ●   value:
+       ●   number "1"
+       ⬥   Node
+       ⬥   Set "value"
+  10   △                                          12
+       △   pair
+  12   ε   [EndObj]                               14
+       ⬥   EndObj
+  14                                              ◼
+```
+
+The `@_` capture on `key:` wraps its inner effects with `SuppressBegin`/`SuppressEnd`. Effects between them (`Node`, `Set "key"`) appear as `⬦` (suppressed). The `@value` capture emits normally with `⬥`.
+
+---
+
+## Trace 8: Default Verbosity (Compact)
 
 Same as Trace 1 but with default verbosity (no `-v` flag). Navigation and effect sub-lines are hidden:
 
@@ -439,7 +497,7 @@ Default shows:
 Hidden:
 
 - Navigation sub-lines (`▽`, `▷`, `△`)
-- Effect sub-lines (`⬥`)
+- Effect sub-lines (`⬥`, `⬦`)
 
 ---
 
@@ -458,6 +516,10 @@ Hidden:
 | `  ⬥  ` | `⬥   Effect`      | `⬥   Node`                  |
 | `  ⬥  ` | `⬥   Set "field"` | `⬥   Set "target"`          |
 | `  ⬥  ` | `⬥   Enum "var"`  | `⬥   Enum "Literal"`        |
+| `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`       |
+| `  ⬥  ` | `⬥   SuppressEnd` | `⬥   SuppressEnd`           |
+| `  ⬦  ` | `⬦   Effect`      | `⬦   Node` (suppressed)     |
+| `  ⬦  ` | `⬦   SuppressBegin` | `⬦   SuppressBegin` (nested) |
 | `  ▶  ` | `▶   Name`        | `▶   Expression`            |
 | `  ◀  ` | `◀   Name`        | `◀   Expression`            |
 
@@ -488,20 +550,22 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 
 ## Effects
 
-| Effect         | Description                 |
-| -------------- | --------------------------- |
-| Node           | Capture matched node        |
-| Text           | Extract node text as string |
-| Set "field"    | Assign to struct field      |
-| Enum "variant" | Start tagged union variant  |
-| EndEnum        | End tagged union variant    |
-| Arr            | Start array                 |
-| Push           | Push to array               |
-| EndArr         | End array                   |
-| Obj            | Start object                |
-| EndObj         | End object                  |
-| Null           | Null value                  |
-| Clear          | Clear pending value         |
+| Effect         | Description                      |
+| -------------- | -------------------------------- |
+| Node           | Capture matched node             |
+| Text           | Extract node text as string      |
+| Set "field"    | Assign to struct field           |
+| Enum "variant" | Start tagged union variant       |
+| EndEnum        | End tagged union variant         |
+| Arr            | Start array                      |
+| Push           | Push to array                    |
+| EndArr         | End array                        |
+| Obj            | Start object                     |
+| EndObj         | End object                       |
+| Null           | Null value                       |
+| Clear          | Clear pending value              |
+| SuppressBegin  | Enter suppression scope (`@_`)   |
+| SuppressEnd    | Exit suppression scope           |
 
 ## Command Options
 

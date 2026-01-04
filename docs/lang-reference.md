@@ -273,6 +273,34 @@ The `@func` capture on the group creates a nested scope. All captures inside (`@
 
 Only `:: string` changes data; other `:: T` affect only generated type names.
 
+### Suppressive Captures
+
+Suppress captures from contributing to output with `@_` or `@_name`:
+
+```
+Expr = (binary_expression left: (number) @left right: (number) @right)
+
+; Without suppression: @left, @right bubble up
+Query = (statement (Expr) @expr)
+; Output: { expr: Node, left: Node, right: Node }
+
+; With suppression: inner captures are suppressed
+Query = (statement { (Expr) @_ } @expr)
+; Output: { expr: Node }
+```
+
+Use cases:
+
+- **Match structurally, don't extract**: Use a definition's pattern but discard its captures
+- **Wrap and isolate**: `{ inner @_ } @outer` captures the outer node while suppressing inner captures
+
+Rules:
+
+- `@_` and `@_name` match like regular captures but produce no output
+- Named suppressive captures (`@_foo`) are equivalent to `@_`—the name is documentation only
+- Type annotations are not allowed on suppressive captures
+- Nesting works: `@_outer` containing `@_inner` correctly suppresses both
+
 Example:
 
 ```
@@ -902,6 +930,7 @@ type Root = {
 | Feature              | Tree-sitter      | Plotnik                   |
 | -------------------- | ---------------- | ------------------------- |
 | Capture              | `@name`          | `@name` (snake_case only) |
+| Suppressive capture  |                  | `@_` or `@_name`          |
 | Type annotation      |                  | `@x :: T`                 |
 | Text extraction      |                  | `@x :: string`            |
 | Named node           | `(type)`         | `(type)`                  |

@@ -267,6 +267,16 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// - Other expressions (named nodes, refs) don't create scopes.
     ///   Inner fields bubble up alongside the capture field.
     fn infer_captured_expr(&mut self, cap: &CapturedExpr) -> TermInfo {
+        // Suppressive captures don't contribute to output type
+        if cap.is_suppressive() {
+            // Still infer inner for structural validation, but don't create fields
+            return cap
+                .inner()
+                .map(|i| self.infer_expr(&i))
+                .map(|info| TermInfo::new(info.arity, TypeFlow::Void))
+                .unwrap_or_else(TermInfo::void);
+        }
+
         let Some(name_tok) = cap.name() else {
             // Recover gracefully
             return cap
@@ -274,7 +284,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 .map(|i| self.infer_expr(&i))
                 .unwrap_or_else(TermInfo::void);
         };
-        let capture_name = self.interner.intern(name_tok.text());
+        let capture_name = self.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
         let annotation_type = self.resolve_annotation(cap);
         let Some(inner) = cap.inner() else {

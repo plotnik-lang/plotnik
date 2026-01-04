@@ -92,15 +92,13 @@ fn sequence_with_captures() {
                 Id "comment"
                 ParenClose ")"
               Star "*"
-            At "@"
-            Id "comments"
+            CaptureToken "@comments"
           Capture
             Tree
               ParenOpen "("
               Id "function"
               ParenClose ")"
-            At "@"
-            Id "fn"
+            CaptureToken "@fn"
           BraceClose "}"
     "#);
 }

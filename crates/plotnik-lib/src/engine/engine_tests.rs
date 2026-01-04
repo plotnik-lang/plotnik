@@ -416,3 +416,60 @@ fn regression_enum_tag_with_definition_refs() {
         entry: "Q"
     );
 }
+
+// ============================================================================
+// 10. SUPPRESSIVE CAPTURES
+// ============================================================================
+
+/// Suppressive capture (@_) matches structurally but doesn't produce output.
+#[test]
+fn suppressive_capture_anonymous() {
+    snap!(
+        "Q = (program (lexical_declaration (variable_declarator name: (identifier) @_)))",
+        "let x = 1"
+    );
+}
+
+/// Named suppressive capture (@_name) also suppresses output.
+#[test]
+fn suppressive_capture_named() {
+    snap!(
+        "Q = (program (lexical_declaration (variable_declarator name: (identifier) @_name value: (number) @value)))",
+        "let x = 42"
+    );
+}
+
+/// Suppressive capture with sibling regular capture - only regular capture appears.
+#[test]
+fn suppressive_capture_with_regular_sibling() {
+    snap!(
+        "Q = (program (lexical_declaration (variable_declarator name: (identifier) @_ value: (number) @value)))",
+        "let x = 42"
+    );
+}
+
+/// Suppressive capture suppresses inner captures from definitions.
+#[test]
+fn suppressive_capture_suppresses_inner() {
+    snap!(
+        indoc! {r#"
+            Expr = (binary_expression left: (number) @left right: (number) @right)
+            Q = (program (expression_statement (Expr) @_))
+        "#},
+        "1 + 2",
+        entry: "Q"
+    );
+}
+
+/// Suppressive capture with wrap pattern: { inner } @_ wraps and suppresses.
+#[test]
+fn suppressive_capture_with_wrap() {
+    snap!(
+        indoc! {r#"
+            Expr = (binary_expression left: (number) @left right: (number) @right)
+            Q = (program (expression_statement {(Expr) @_} @expr))
+        "#},
+        "1 + 2",
+        entry: "Q"
+    );
+}

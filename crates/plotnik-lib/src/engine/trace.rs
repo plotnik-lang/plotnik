@@ -24,8 +24,8 @@ use std::num::NonZeroU16;
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
-    format_effect, nav_symbol, trace, truncate_text, width_for_count, InstructionView,
-    LineBuilder, MatchView, Module, Nav, Symbol,
+    format_effect, nav_symbol, trace, truncate_text, width_for_count, EffectOpcode,
+    InstructionView, LineBuilder, MatchView, Module, Nav, Symbol,
 };
 use crate::Colors;
 
@@ -83,6 +83,13 @@ pub trait Tracer {
     /// Called after emitting an effect.
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>);
 
+    /// Called when an effect is suppressed (inside @_ capture).
+    fn trace_effect_suppressed(&mut self, opcode: EffectOpcode, payload: usize);
+
+    /// Called for SuppressBegin/SuppressEnd control effects.
+    /// `suppressed` is true if already inside another suppress scope.
+    fn trace_suppress_control(&mut self, opcode: EffectOpcode, suppressed: bool);
+
     /// Called when entering a definition via Call.
     fn trace_call(&mut self, target_ip: u16);
 
@@ -123,6 +130,12 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {}
+
+    #[inline(always)]
+    fn trace_effect_suppressed(&mut self, _opcode: EffectOpcode, _payload: usize) {}
+
+    #[inline(always)]
+    fn trace_suppress_control(&mut self, _opcode: EffectOpcode, _suppressed: bool) {}
 
     #[inline(always)]
     fn trace_call(&mut self, _target_ip: u16) {}
@@ -258,6 +271,26 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
+    /// Format a suppressed effect from opcode and payload.
+    fn format_effect_from_opcode(&self, opcode: EffectOpcode, payload: usize) -> String {
+        use EffectOpcode::*;
+        match opcode {
+            Node => "Node".to_string(),
+            Text => "Text".to_string(),
+            Arr => "Arr".to_string(),
+            Push => "Push".to_string(),
+            EndArr => "EndArr".to_string(),
+            Obj => "Obj".to_string(),
+            EndObj => "EndObj".to_string(),
+            Set => format!("Set \"{}\"", self.member_name(payload as u16)),
+            Enum => format!("Enum \"{}\"", self.member_name(payload as u16)),
+            EndEnum => "EndEnum".to_string(),
+            Clear => "Clear".to_string(),
+            Null => "Null".to_string(),
+            SuppressBegin | SuppressEnd => unreachable!(),
+        }
+    }
+
     /// Format match content for instruction line (matches dump format exactly).
     ///
     /// Order: [pre-effects] !neg_fields field: (type) [post-effects]
@@ -321,7 +354,9 @@ impl<'s> PrintTracer<'s> {
     /// Add an instruction line.
     fn add_instruction(&mut self, ip: u16, symbol: Symbol, content: &str, successors: &str) {
         let prefix = format!("  {:0sw$} {} ", ip, symbol.format(), sw = self.step_width);
-        let line = self.builder.pad_successors(format!("{prefix}{content}"), successors);
+        let line = self
+            .builder
+            .pad_successors(format!("{prefix}{content}"), successors);
         self.lines.push(line);
     }
 
@@ -375,7 +410,10 @@ impl Tracer for PrintTracer<'_> {
         // Text only in VeryVerbose (text is dim)
         if self.verbosity == Verbosity::VeryVerbose {
             let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(symbol, &format!("{} {}\"{}\"{}",  kind, c.dim, text, c.reset));
+            self.add_subline(
+                symbol,
+                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
+            );
         } else {
             self.add_subline(symbol, kind);
         }
@@ -388,7 +426,10 @@ impl Tracer for PrintTracer<'_> {
         // Text on match/failure in Verbose+ (text is dim)
         if self.verbosity != Verbosity::Default {
             let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(trace::MATCH_SUCCESS, &format!("{} {}\"{}\"{}",  kind, c.dim, text, c.reset));
+            self.add_subline(
+                trace::MATCH_SUCCESS,
+                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
+            );
         } else {
             self.add_subline(trace::MATCH_SUCCESS, kind);
         }
@@ -401,7 +442,10 @@ impl Tracer for PrintTracer<'_> {
         // Text on match/failure in Verbose+ (text is dim)
         if self.verbosity != Verbosity::Default {
             let text = truncate_text(node.utf8_text(self.source).unwrap_or("?"), 20);
-            self.add_subline(trace::MATCH_FAILURE, &format!("{} {}\"{}\"{}",  kind, c.dim, text, c.reset));
+            self.add_subline(
+                trace::MATCH_FAILURE,
+                &format!("{} {}\"{}\"{}", kind, c.dim, text, c.reset),
+            );
         } else {
             self.add_subline(trace::MATCH_FAILURE, kind);
         }
@@ -431,6 +475,35 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(trace::EFFECT, &effect_str);
     }
 
+    fn trace_effect_suppressed(&mut self, opcode: EffectOpcode, payload: usize) {
+        // Effect sub-lines hidden in default verbosity
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        let effect_str = self.format_effect_from_opcode(opcode, payload);
+        self.add_subline(trace::EFFECT_SUPPRESSED, &effect_str);
+    }
+
+    fn trace_suppress_control(&mut self, opcode: EffectOpcode, suppressed: bool) {
+        // Effect sub-lines hidden in default verbosity
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        let name = match opcode {
+            EffectOpcode::SuppressBegin => "SuppressBegin",
+            EffectOpcode::SuppressEnd => "SuppressEnd",
+            _ => unreachable!(),
+        };
+        let symbol = if suppressed {
+            trace::EFFECT_SUPPRESSED
+        } else {
+            trace::EFFECT
+        };
+        self.add_subline(symbol, name);
+    }
+
     fn trace_call(&mut self, target_ip: u16) {
         let c = &self.colors;
         let name = self.entrypoint_name(target_ip).to_string();
@@ -451,7 +524,10 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_backtrack(&mut self) {
-        let created_at = self.checkpoint_ips.pop().expect("backtrack without checkpoint");
+        let created_at = self
+            .checkpoint_ips
+            .pop()
+            .expect("backtrack without checkpoint");
         let line = format!(
             "  {:0sw$} {}",
             created_at,
@@ -478,7 +554,6 @@ fn format_match_symbol(m: &MatchView<'_>) -> Symbol {
         nav_symbol(m.nav)
     }
 }
-
 
 /// Format match successors for instruction line.
 fn format_match_successors(m: &MatchView<'_>) -> String {

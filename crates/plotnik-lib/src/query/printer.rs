@@ -7,8 +7,8 @@ use rowan::NodeOrToken;
 
 use crate::parser::{self as ast, SyntaxNode};
 
-use super::Query;
 use super::source_map::SourceKind;
+use super::Query;
 use crate::analyze::type_check::Arity;
 
 /// Returns indentation string for the given level.
@@ -286,7 +286,10 @@ impl<'q> QueryPrinter<'q> {
                 self.format_tree_children(s.as_cst(), depth + 1, w)?;
             }
             ast::Expr::CapturedExpr(c) => {
-                let name = c.name().map(|t| t.text().to_string()).unwrap_or_default();
+                let name = c
+                    .name()
+                    .map(|t| t.text()[1..].to_string()) // Strip @ prefix
+                    .unwrap_or_default();
                 let type_ann = c
                     .type_annotation()
                     .and_then(|t| t.name())
@@ -412,4 +415,3 @@ impl Query {
         QueryPrinter::new(self)
     }
 }
-

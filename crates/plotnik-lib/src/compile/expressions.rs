@@ -9,8 +9,8 @@
 
 use std::num::NonZeroU16;
 
-use crate::bytecode::ir::{CallIR, Instruction, Label, MatchIR};
-use crate::bytecode::Nav;
+use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR};
+use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 
 use super::capture::CaptureEffects;
@@ -164,18 +164,7 @@ impl Compiler<'_> {
         let return_addr = if capture.post.is_empty() {
             exit
         } else {
-            let effects_label = self.fresh_label();
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: effects_label,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: None,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: capture.post,
-                successors: vec![exit],
-            }));
-            effects_label
+            self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default())
         };
 
         // Emit Call instruction with caller-provided navigation and field constraint.
@@ -281,6 +270,7 @@ impl Compiler<'_> {
     /// - Struct: Obj epsilon → inner_pattern[Node/Text, Set] → EndObj epsilon → exit
     /// - Array:  Arr epsilon → quantifier (with Push on body) → EndArr+Set epsilon → exit
     /// - Ref:    Call → Set epsilon → exit (structured result needs epsilon)
+    /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured_inner(
         &mut self,
         cap: &ast::CapturedExpr,
@@ -288,6 +278,11 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
     ) -> Label {
+        // Handle suppressive captures: wrap inner with SuppressBegin/End
+        if cap.is_suppressive() {
+            return self.compile_suppressive_capture(cap, exit, nav_override, outer_capture);
+        }
+
         let inner = cap.inner();
         let inner_info = inner.as_ref().and_then(|i| self.type_ctx.get_term_info(i));
         let inner_is_bubble = inner_info.as_ref().is_some_and(|info| info.flow.is_bubble());
@@ -335,6 +330,38 @@ impl Compiler<'_> {
         let mut combined = capture_effects;
         combined.extend(outer_capture.post);
         self.compile_expr_inner(&inner, exit, nav_override, CaptureEffects { post: combined })
+    }
+
+    /// Compile a suppressive capture (@_ or @_name).
+    ///
+    /// Suppressive captures match structurally but don't emit effects.
+    /// Flow: SuppressBegin → inner → SuppressEnd → outer_effects → exit
+    fn compile_suppressive_capture(
+        &mut self,
+        cap: &ast::CapturedExpr,
+        exit: Label,
+        nav_override: Option<Nav>,
+        outer_capture: CaptureEffects,
+    ) -> Label {
+        let Some(inner) = cap.inner() else {
+            // Bare @_ with no inner - just pass through outer effects
+            if outer_capture.post.is_empty() {
+                return exit;
+            }
+            return self.emit_effects_epsilon(exit, vec![], outer_capture);
+        };
+
+        // SuppressEnd + outer capture effects → exit
+        let suppress_end = vec![EffectIR::simple(EffectOpcode::SuppressEnd, 0)];
+        let end_label = self.emit_effects_epsilon(exit, suppress_end, outer_capture);
+
+        // Compile inner → end_label (inner gets NO capture effects)
+        let inner_entry =
+            self.compile_expr_inner(&inner, end_label, nav_override, CaptureEffects::default());
+
+        // SuppressBegin → inner_entry
+        let suppress_begin = vec![EffectIR::simple(EffectOpcode::SuppressBegin, 0)];
+        self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default())
     }
 
     /// Resolve an anonymous node's literal text to its node type ID.

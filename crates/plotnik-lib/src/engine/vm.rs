@@ -74,6 +74,10 @@ pub struct VM<'t> {
     /// the cursor to a new sibling. The Call's navigation was already done, and
     /// we're now at the correct position for the callee to match.
     skip_call_nav: bool,
+
+    /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
+    /// Incremented by SuppressBegin, decremented by SuppressEnd.
+    suppress_depth: u16,
 }
 
 impl<'t> VM<'t> {
@@ -90,6 +94,7 @@ impl<'t> VM<'t> {
             recursion_depth: 0,
             limits,
             skip_call_nav: false,
+            suppress_depth: 0,
         }
     }
 
@@ -236,6 +241,7 @@ impl<'t> VM<'t> {
                 recursion_depth: self.recursion_depth,
                 ip: m.successor(i).get(),
                 skip_policy: None,
+                suppress_depth: self.suppress_depth,
             });
             tracer.trace_checkpoint_created(self.ip);
         }
@@ -271,6 +277,7 @@ impl<'t> VM<'t> {
                 recursion_depth: self.recursion_depth,
                 ip: self.ip,
                 skip_policy: Some(policy),
+                suppress_depth: self.suppress_depth,
             });
             tracer.trace_checkpoint_created(self.ip);
         }
@@ -372,6 +379,7 @@ impl<'t> VM<'t> {
         self.effects.truncate(cp.effect_watermark);
         self.frames.restore(cp.frame_index);
         self.recursion_depth = cp.recursion_depth;
+        self.suppress_depth = cp.suppress_depth;
 
         // Call retry: advance cursor to next sibling before re-executing
         if let Some(policy) = cp.skip_policy {
@@ -402,7 +410,27 @@ impl<'t> VM<'t> {
 
     fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) {
         use EffectOpcode::*;
+
         let effect = match op.opcode {
+            // Suppress control: trace then update depth
+            SuppressBegin => {
+                tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
+                self.suppress_depth += 1;
+                return;
+            }
+            SuppressEnd => {
+                self.suppress_depth = self.suppress_depth.saturating_sub(1);
+                tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
+                return;
+            }
+
+            // Skip data effects when suppressing, but trace them
+            _ if self.suppress_depth > 0 => {
+                tracer.trace_effect_suppressed(op.opcode, op.payload);
+                return;
+            }
+
+            // Data effects
             Node => RuntimeEffect::Node(
                 self.matched_node
                     .expect("Node effect without matched_node"),
@@ -422,6 +450,7 @@ impl<'t> VM<'t> {
             Clear => RuntimeEffect::Clear,
             Null => RuntimeEffect::Null,
         };
+
         tracer.trace_effect(&effect);
         self.effects.push(effect);
     }
