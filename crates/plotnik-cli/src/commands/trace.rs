@@ -8,7 +8,8 @@ use plotnik_lib::Colors;
 use plotnik_lib::QueryBuilder;
 
 use plotnik_lib::engine::{
-    FuelLimits, Materializer, PrintTracer, RuntimeError, ValueMaterializer, Verbosity, VM,
+    debug_verify_type, FuelLimits, Materializer, PrintTracer, RuntimeError, ValueMaterializer,
+    Verbosity, VM,
 };
 
 use super::query_loader::load_query_source;
@@ -38,14 +39,14 @@ pub fn run(args: TraceArgs) {
         std::process::exit(1);
     }
 
-    let source_map =
-        match load_query_source(args.query_path.as_deref(), args.query_text.as_deref()) {
-            Ok(map) => map,
-            Err(msg) => {
-                eprintln!("error: {}", msg);
-                std::process::exit(1);
-            }
-        };
+    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
+    {
+        Ok(map) => map,
+        Err(msg) => {
+            eprintln!("error: {}", msg);
+            std::process::exit(1);
+        }
+    };
 
     if source_map.is_empty() {
         eprintln!("error: query cannot be empty");
@@ -115,6 +116,9 @@ pub fn run(args: TraceArgs) {
     println!("{}---{}", colors.dim, colors.reset);
     let materializer = ValueMaterializer::new(&source_code, module.types(), module.strings());
     let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);
+
+    // Debug-only: verify output matches declared type
+    debug_verify_type(&value, &module, colors);
 
     let output = value.format(true, colors);
     println!("{}", output);
