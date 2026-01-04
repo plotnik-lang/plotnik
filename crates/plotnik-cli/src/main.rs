@@ -1,168 +1,43 @@
 mod cli;
 mod commands;
 
-use std::path::PathBuf;
-
-use cli::{Cli, Command};
-use commands::check::CheckArgs;
-use commands::dump::DumpArgs;
-use commands::exec::ExecArgs;
-use commands::infer::InferArgs;
-use commands::trace::TraceArgs;
-use commands::tree::TreeArgs;
-
-/// When -q is used with a single positional arg, shift it from query to source.
-/// This enables: `plotnik exec -q 'query' source.js`
-fn shift_positional_to_source(
-    has_query_text: bool,
-    query_path: Option<PathBuf>,
-    source_path: Option<PathBuf>,
-) -> (Option<PathBuf>, Option<PathBuf>) {
-    if has_query_text && query_path.is_some() && source_path.is_none() {
-        (None, query_path)
-    } else {
-        (query_path, source_path)
-    }
-}
+use cli::{
+    CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams, TreeParams,
+    build_cli,
+};
 
 fn main() {
-    let cli = <Cli as clap::Parser>::parse();
+    let matches = build_cli().get_matches();
 
-    match cli.command {
-        Command::Tree {
-            source_path,
-            source_text,
-            lang,
-            raw,
-            spans,
-        } => {
-            commands::tree::run(TreeArgs {
-                source_path,
-                source_text,
-                lang,
-                raw,
-                spans,
-            });
+    match matches.subcommand() {
+        Some(("tree", m)) => {
+            let params = TreeParams::from_matches(m);
+            commands::tree::run(params.into());
         }
-        Command::Check {
-            query_path,
-            query_text,
-            lang,
-            strict,
-            output,
-        } => {
-            commands::check::run(CheckArgs {
-                query_path,
-                query_text,
-                lang,
-                strict,
-                color: output.color.should_colorize(),
-            });
+        Some(("check", m)) => {
+            let params = CheckParams::from_matches(m);
+            commands::check::run(params.into());
         }
-        Command::Dump {
-            query_path,
-            query_text,
-            lang,
-            output,
-        } => {
-            commands::dump::run(DumpArgs {
-                query_path,
-                query_text,
-                lang,
-                color: output.color.should_colorize(),
-            });
+        Some(("dump", m)) => {
+            let params = DumpParams::from_matches(m);
+            commands::dump::run(params.into());
         }
-        Command::Infer {
-            query_path,
-            query_text,
-            lang,
-            infer_output,
-            output,
-        } => {
-            commands::infer::run(InferArgs {
-                query_path,
-                query_text,
-                lang,
-                format: infer_output.format,
-                verbose_nodes: infer_output.verbose_nodes,
-                no_node_type: infer_output.no_node_type,
-                export: !infer_output.no_export,
-                output: infer_output.output,
-                color: output.color.should_colorize(),
-                void_type: infer_output.void_type,
-            });
+        Some(("infer", m)) => {
+            let params = InferParams::from_matches(m);
+            commands::infer::run(params.into());
         }
-        Command::Exec {
-            query_path,
-            source_path,
-            query_text,
-            source_text,
-            lang,
-            exec_output,
-            output,
-        } => {
-            // When -q is used with a single positional, shift it to source
-            let (query_path, source_path) = shift_positional_to_source(
-                query_text.is_some(),
-                query_path,
-                source_path,
-            );
-
-            // Pretty by default when stdout is a TTY, unless --compact is passed
-            let pretty =
-                !exec_output.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
-            commands::exec::run(ExecArgs {
-                query_path,
-                query_text,
-                source_path,
-                source_text,
-                lang,
-                pretty,
-                entry: exec_output.entry,
-                color: output.color.should_colorize(),
-            });
+        Some(("exec", m)) => {
+            let params = ExecParams::from_matches(m);
+            commands::exec::run(params.into());
         }
-        Command::Trace {
-            query_path,
-            source_path,
-            query_text,
-            source_text,
-            lang,
-            entry,
-            verbose,
-            no_result,
-            fuel,
-            output,
-        } => {
-            // When -q is used with a single positional, shift it to source
-            let (query_path, source_path) = shift_positional_to_source(
-                query_text.is_some(),
-                query_path,
-                source_path,
-            );
-
-            use plotnik_lib::engine::Verbosity;
-
-            let verbosity = match verbose {
-                0 => Verbosity::Default,
-                1 => Verbosity::Verbose,
-                _ => Verbosity::VeryVerbose,
-            };
-            commands::trace::run(TraceArgs {
-                query_path,
-                query_text,
-                source_path,
-                source_text,
-                lang,
-                entry,
-                verbosity,
-                no_result,
-                fuel,
-                color: output.color.should_colorize(),
-            });
+        Some(("trace", m)) => {
+            let params = TraceParams::from_matches(m);
+            commands::trace::run(params.into());
         }
-        Command::Langs => {
+        Some(("langs", m)) => {
+            let _params = LangsParams::from_matches(m);
             commands::langs::run();
         }
+        _ => unreachable!("clap should have caught this"),
     }
 }
