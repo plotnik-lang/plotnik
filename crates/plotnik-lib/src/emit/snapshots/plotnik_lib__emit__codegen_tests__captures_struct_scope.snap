@@ -40,7 +40,7 @@ Test:
   01   ε                                    02
   02   ε   [Obj]                            04
   04   ε   [Obj]                            06
-  06  ‼·   (a) [Node Set(M0)]               08
+  06  !!!  (a) [Node Set(M0)]               08
   08   ▷   (b) [Node Set(M1)]               10
   10   ε   [EndObj Set(M2)]                 12
   12   ε   [EndObj]                         14

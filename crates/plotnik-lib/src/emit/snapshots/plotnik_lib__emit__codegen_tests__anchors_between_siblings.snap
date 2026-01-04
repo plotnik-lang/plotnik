@@ -29,7 +29,7 @@ Test = 1 :: T0
 
 Test:
   1   ε                                     2
-  2  ‼·   (parent)                          3
+  2  !!!  (parent)                          3
   3   ▽   (a)                               4
   4  !▷   (b)                               5
   5   △                                     6

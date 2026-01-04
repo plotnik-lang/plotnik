@@ -20,7 +20,7 @@ plotnik trace query.ptk source.js --fuel 10000
 | `-v`      | all                           | on match/failure   | Developer      |
 | `-vv`     | all                           | on all (incl. nav) | Deep debugging |
 
-**Text budget**: Node text is truncated to ~30 characters with `…` when displayed.
+**Text budget**: Node text is truncated to 20 characters with `…` when displayed.
 
 ---
 
@@ -54,15 +54,18 @@ Below each instruction, sub-lines show what happened during execution. Each sub-
 
 | Symbol  | Meaning                           |
 | ------- | --------------------------------- |
+| (blank) | Navigation: stayed at position    |
 | `  ▽  ` | Navigation: descended to child    |
 | `  ▷  ` | Navigation: moved to sibling      |
 | `  △  ` | Navigation: ascended to parent    |
 | `  ●  ` | Match: success                    |
 | `  ○  ` | Match: failure                    |
 | `  ⬥  ` | Effect: data capture or structure |
-| `  ⬦  ` | Effect: suppressed (inside @_)    |
+| `  ⬦  ` | Effect: suppressed (inside @\_)   |
 | `  ▶  ` | Call: entering definition         |
 | `  ◀  ` | Return: back from definition      |
+
+Navigation sub-lines show the node kind we arrived at. Match sub-lines follow, showing success (`●`) or failure (`○`) for type/field checks.
 
 ### Backtrack Line
 
@@ -398,6 +401,7 @@ Type check fails at root—no navigation occurs. The CLI exits with code 1.
 ## Trace 7: Suppressive Capture (`-v`)
 
 Suppressive captures (`@_`) match structurally but don't emit effects. The trace shows:
+
 - `⬥ SuppressBegin` / `⬥ SuppressEnd` when entering/exiting suppression
 - `⬦` for data effects that are suppressed
 - `⬦ SuppressBegin` / `⬦ SuppressEnd` for nested suppression (already inside another `@_`)
@@ -503,25 +507,26 @@ Hidden:
 
 ## Sub-Line Reference
 
-| Symbol  | Format            | Example                     |
-| ------- | ----------------- | --------------------------- |
-| `  ▽  ` | `▽   kind`        | `▽   identifier`            |
-| `  ▽  ` | `▽   kind "text"` | `▽   identifier "foo"`      |
-| `  ▷  ` | `▷   kind`        | `▷   return_statement`      |
-| `  △  ` | `△   kind`        | `△   assignment_expression` |
-| `  ●  ` | `●   kind`        | `●   identifier`            |
-| `  ●  ` | `●   kind "text"` | `●   identifier "foo"`      |
-| `  ●  ` | `●   field:`      | `●   left:`                 |
-| `  ○  ` | `○   kind`        | `○   string`                |
-| `  ⬥  ` | `⬥   Effect`      | `⬥   Node`                  |
-| `  ⬥  ` | `⬥   Set "field"` | `⬥   Set "target"`          |
-| `  ⬥  ` | `⬥   Enum "var"`  | `⬥   Enum "Literal"`        |
-| `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`       |
-| `  ⬥  ` | `⬥   SuppressEnd` | `⬥   SuppressEnd`           |
-| `  ⬦  ` | `⬦   Effect`      | `⬦   Node` (suppressed)     |
+| Symbol  | Format              | Example                      |
+| ------- | ------------------- | ---------------------------- |
+| (blank) | `     kind`         | `     identifier`            |
+| `  ▽  ` | `▽   kind`          | `▽   identifier`             |
+| `  ▽  ` | `▽   kind "text"`   | `▽   identifier "foo"`       |
+| `  ▷  ` | `▷   kind`          | `▷   return_statement`       |
+| `  △  ` | `△   kind`          | `△   assignment_expression`  |
+| `  ●  ` | `●   kind`          | `●   identifier`             |
+| `  ●  ` | `●   kind "text"`   | `●   identifier "foo"`       |
+| `  ●  ` | `●   field:`        | `●   left:`                  |
+| `  ○  ` | `○   kind`          | `○   string`                 |
+| `  ⬥  ` | `⬥   Effect`        | `⬥   Node`                   |
+| `  ⬥  ` | `⬥   Set "field"`   | `⬥   Set "target"`           |
+| `  ⬥  ` | `⬥   Enum "var"`    | `⬥   Enum "Literal"`         |
+| `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`          |
+| `  ⬥  ` | `⬥   SuppressEnd`   | `⬥   SuppressEnd`            |
+| `  ⬦  ` | `⬦   Effect`        | `⬦   Node` (suppressed)      |
 | `  ⬦  ` | `⬦   SuppressBegin` | `⬦   SuppressBegin` (nested) |
-| `  ▶  ` | `▶   Name`        | `▶   Expression`            |
-| `  ◀  ` | `◀   Name`        | `◀   Expression`            |
+| `  ▶  ` | `▶   Name`          | `▶   Expression`             |
+| `  ◀  ` | `◀   Name`          | `◀   Expression`             |
 
 ### Backtrack (Instruction-Level)
 
@@ -537,35 +542,36 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 | --------------- | ------- | ------------------------------- |
 | Stay            | (space) | No movement                     |
 | Stay (epsilon)  | ε       | No movement, no constraints     |
+| StayExact       | !!!     | Stay at position, exact only    |
 | Down            | ▽       | First child, skip any           |
 | DownSkip        | !▽      | First child, skip trivia        |
-| DownExact       | ‼▽      | First child, exact              |
+| DownExact       | !!▽     | First child, exact              |
 | Next            | ▷       | Next sibling, skip any          |
 | NextSkip        | !▷      | Next sibling, skip trivia       |
-| NextExact       | ‼▷      | Next sibling, exact             |
+| NextExact       | !!▷     | Next sibling, exact             |
 | Up(1)           | △       | Ascend 1 level (no superscript) |
 | Up(n≥2)         | △ⁿ      | Ascend n levels                 |
 | UpSkipTrivia(n) | !△ⁿ     | Ascend n, last non-trivia       |
-| UpExact(n)      | ‼△ⁿ     | Ascend n, last child            |
+| UpExact(n)      | !!△ⁿ    | Ascend n, last child            |
 
 ## Effects
 
-| Effect         | Description                      |
-| -------------- | -------------------------------- |
-| Node           | Capture matched node             |
-| Text           | Extract node text as string      |
-| Set "field"    | Assign to struct field           |
-| Enum "variant" | Start tagged union variant       |
-| EndEnum        | End tagged union variant         |
-| Arr            | Start array                      |
-| Push           | Push to array                    |
-| EndArr         | End array                        |
-| Obj            | Start object                     |
-| EndObj         | End object                       |
-| Null           | Null value                       |
-| Clear          | Clear pending value              |
-| SuppressBegin  | Enter suppression scope (`@_`)   |
-| SuppressEnd    | Exit suppression scope           |
+| Effect         | Description                    |
+| -------------- | ------------------------------ |
+| Node           | Capture matched node           |
+| Text           | Extract node text as string    |
+| Set "field"    | Assign to struct field         |
+| Enum "variant" | Start tagged union variant     |
+| EndEnum        | End tagged union variant       |
+| Arr            | Start array                    |
+| Push           | Push to array                  |
+| EndArr         | End array                      |
+| Obj            | Start object                   |
+| EndObj         | End object                     |
+| Null           | Null value                     |
+| Clear          | Clear pending value            |
+| SuppressBegin  | Enter suppression scope (`@_`) |
+| SuppressEnd    | Exit suppression scope         |
 
 ## Command Options
 
@@ -579,4 +585,4 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 ## Files
 
 - `crates/plotnik-cli/src/commands/trace.rs` — Command implementation
-- `crates/plotnik-cli/src/engine/trace.rs` — Tracer trait and PrintTracer
+- `crates/plotnik-lib/src/engine/trace.rs` — Tracer trait and PrintTracer

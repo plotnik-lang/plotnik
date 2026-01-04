@@ -47,7 +47,7 @@ The `Node` API's `next_sibling()` is O(siblings)—unacceptable for repeated bac
 | Nav               | Dump Symbol | Movement                      |
 | ----------------- | ----------- | ----------------------------- |
 | `Stay`            | (space)     | No movement                   |
-| `StayExact`       | `‼·`        | No movement, exact match only |
+| `StayExact`       | `!!!`       | No movement, exact match only |
 | `Down`            | `↓*`        | First child, skip any         |
 | `DownSkip`        | `↓~`        | First child, skip trivia only |
 | `DownExact`       | `↓.`        | First child, exact            |

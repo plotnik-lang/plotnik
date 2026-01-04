@@ -43,7 +43,7 @@ Test = 01 :: T3
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  ‼·   (array)                          05
+  04  !!!  (array)                          05
   05   ε   [Arr]                            07
   07   ε                                    32, 19
   09   ε   [EndArr Set(M2)]                 11
@@ -54,7 +54,7 @@ Test:
   17   ε   [EndObj]                         16
   19   ε   [EndArr Set(M2)]                 17
   21   ▷   (number) [Node Set(M1)]          12
-  23  ‼·   (identifier) [Node Set(M0)]      21
+  23  !!!  (identifier) [Node Set(M0)]      21
   25   ε   [Obj]                            23
   27   ▷                                    30
   28   ε                                    27, 19

@@ -47,10 +47,10 @@ Test:
   09   ε   [EndObj]                         08
   11   ε   [EndObj Set(M2)]                 09
   13   ε   [EndObj Set(M1)]                 11
-  15  ‼·   (identifier) [Node Set(M0)]      13
+  15  !!!  (identifier) [Node Set(M0)]      13
   17   ε   [Obj]                            15
   19   ε   [Null Set(M1)]                   11
   21   ▷                                    24
   22   ε                                    21, 19
   24   ε                                    17, 22
-  26  ‼·                                    24
+  26  !!!                                   24
