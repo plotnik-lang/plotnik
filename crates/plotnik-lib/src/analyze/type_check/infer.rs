@@ -12,7 +12,8 @@ use rowan::TextRange;
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TermInfo, TypeFlow, TypeId, TypeShape,
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,
+    TypeId, TypeShape,
 };
 use super::unify::{UnifyError, unify_flows};
 
@@ -213,9 +214,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let label_sym = self.interner.intern(label.text());
 
             let Some(body) = branch.body() else {
-                // Empty variant -> empty struct
-                let empty_struct = self.ctx.intern_struct(BTreeMap::new());
-                variants.insert(label_sym, empty_struct);
+                // Empty variant -> Void (no payload)
+                variants.insert(label_sym, TYPE_VOID);
                 continue;
             };
 
@@ -623,7 +623,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
-            TypeFlow::Void => self.ctx.intern_struct(BTreeMap::new()),
+            TypeFlow::Void => TYPE_VOID,
             TypeFlow::Scalar(t) | TypeFlow::Bubble(t) => *t,
         }
     }

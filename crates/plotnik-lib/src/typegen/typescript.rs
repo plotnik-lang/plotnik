@@ -589,7 +589,7 @@ impl<'a> Emitter<'a> {
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());
 
-            let data_str = self.inline_data_type(member.type_id);
+            let is_void = self.is_void_type(member.type_id);
 
             // Header: export interface NameVariant {
             if self.config.export {
@@ -605,11 +605,14 @@ impl<'a> Emitter<'a> {
                 "{}  $tag{}:{} {}\"{}\"{}{};{}\n",
                 c.reset, c.dim, c.reset, c.green, variant_name, c.reset, c.dim, c.reset
             ));
-            // $data field
-            self.output.push_str(&format!(
-                "  $data{}:{} {}{};\n",
-                c.dim, c.reset, data_str, c.dim
-            ));
+            // $data field (omit for Void payloads)
+            if !is_void {
+                let data_str = self.inline_data_type(member.type_id);
+                self.output.push_str(&format!(
+                    "  $data{}:{} {}{};\n",
+                    c.dim, c.reset, data_str, c.dim
+                ));
+            }
             self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
         }
 
@@ -772,11 +775,19 @@ impl<'a> Emitter<'a> {
             .members_of(type_def)
             .map(|member| {
                 let name = self.strings.get(member.name);
-                let data_type = self.type_to_ts(member.type_id);
-                format!(
-                    "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
-                    c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data_type, c.dim, c.reset
-                )
+                if self.is_void_type(member.type_id) {
+                    // Void payload: omit $data
+                    format!(
+                        "{}{{{} $tag{}:{} {}\"{}\"{}{}}}{}",
+                        c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.reset
+                    )
+                } else {
+                    let data_type = self.type_to_ts(member.type_id);
+                    format!(
+                        "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
+                        c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data_type, c.dim, c.reset
+                    )
+                }
             })
             .collect();
 
@@ -802,6 +813,13 @@ impl<'a> Emitter<'a> {
         } else {
             self.type_to_ts(type_id)
         }
+    }
+
+    fn is_void_type(&self, type_id: QTypeId) -> bool {
+        self.types
+            .get(type_id)
+            .and_then(|def| def.type_kind())
+            .is_some_and(|k| k == TypeKind::Void)
     }
 
     fn needs_generated_name(&self, type_def: &TypeDef) -> bool {

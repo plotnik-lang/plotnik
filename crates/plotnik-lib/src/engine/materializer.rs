@@ -33,6 +33,17 @@ impl<'ctx> ValueMaterializer<'ctx> {
         self.strings.get(member.name).to_owned()
     }
 
+    fn resolve_member_type(&self, idx: u16) -> QTypeId {
+        self.types.get_member(idx as usize).type_id
+    }
+
+    fn is_void_type(&self, type_id: QTypeId) -> bool {
+        self.types
+            .get(type_id)
+            .and_then(|def| def.type_kind())
+            .is_some_and(|k| k == TypeKind::Void)
+    }
+
     /// Create initial builder based on result type.
     fn builder_for_type(&self, type_id: QTypeId) -> Builder {
         let def = match self.types.get(type_id) {
@@ -54,7 +65,11 @@ enum Builder {
     Scalar(Option<Value>),
     Array(Vec<Value>),
     Object(Vec<(String, Value)>),
-    Tagged { tag: String, fields: Vec<(String, Value)> },
+    Tagged {
+        tag: String,
+        payload_type: QTypeId,
+        fields: Vec<(String, Value)>,
+    },
 }
 
 impl Builder {
@@ -63,9 +78,9 @@ impl Builder {
             Builder::Scalar(v) => v.unwrap_or(Value::Null),
             Builder::Array(arr) => Value::Array(arr),
             Builder::Object(fields) => Value::Object(fields),
-            Builder::Tagged { tag, fields } => Value::Tagged {
+            Builder::Tagged { tag, fields, .. } => Value::Tagged {
                 tag,
-                data: Box::new(Value::Object(fields)),
+                data: Some(Box::new(Value::Object(fields))),
             },
         }
     }
@@ -135,17 +150,29 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                 }
                 RuntimeEffect::Enum(idx) => {
                     let tag = self.resolve_member_name(*idx);
-                    stack.push(Builder::Tagged { tag, fields: vec![] });
+                    let payload_type = self.resolve_member_type(*idx);
+                    stack.push(Builder::Tagged {
+                        tag,
+                        payload_type,
+                        fields: vec![],
+                    });
                 }
                 RuntimeEffect::EndEnum => {
-                    if let Some(Builder::Tagged { tag, fields }) = stack.pop() {
-                        // If inner returned a structured value (via Obj/EndObj), use it as data
-                        // Otherwise use fields collected from direct Set effects
-                        let data = pending.take().unwrap_or(Value::Object(fields));
-                        pending = Some(Value::Tagged {
-                            tag,
-                            data: Box::new(data),
-                        });
+                    if let Some(Builder::Tagged {
+                        tag,
+                        payload_type,
+                        fields,
+                    }) = stack.pop()
+                    {
+                        // Void payloads produce no $data field
+                        let data = if self.is_void_type(payload_type) {
+                            None
+                        } else {
+                            // If inner returned a structured value (via Obj/EndObj), use it as data
+                            // Otherwise use fields collected from direct Set effects
+                            Some(Box::new(pending.take().unwrap_or(Value::Object(fields))))
+                        };
+                        pending = Some(Value::Tagged { tag, data });
                     }
                 }
                 RuntimeEffect::Clear => {
