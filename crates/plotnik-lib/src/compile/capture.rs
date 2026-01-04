@@ -117,15 +117,13 @@ impl Compiler<'_> {
     /// (Enum/Struct/Array), Return leaves that result pending for Set to consume.
     /// In this case, we skip emitting Node/Text effects in captures.
     fn ref_returns_structured(&self, r: &ast::Ref) -> bool {
-        if let Some(name) = r.name()
-            && let Some(def_id) = self.type_ctx.get_def_id(self.interner, name.text())
-            && let Some(def_type) = self.type_ctx.get_def_type(def_id)
-            && let Some(shape) = self.type_ctx.get_type(def_type)
-        {
-            matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
-        } else {
-            false
-        }
+        r.name()
+            .and_then(|name| self.type_ctx.get_def_id(self.interner, name.text()))
+            .and_then(|def_id| self.type_ctx.get_def_type(def_id))
+            .and_then(|def_type| self.type_ctx.get_type(def_type))
+            .is_some_and(|shape| {
+                matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
+            })
     }
 
     /// Collect all capture names from an expression recursively.
