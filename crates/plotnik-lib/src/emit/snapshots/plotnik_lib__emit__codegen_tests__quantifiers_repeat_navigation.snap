@@ -33,12 +33,12 @@ Test = 01 :: T2
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  ‼·   (function_declaration)           05
+  04  !!!  (function_declaration)           05
   05   ε   [Arr]                            07
   07   ε                                    26, 19
   09   ε   [EndArr Set(M0)]                 11
   11   △                                    17
-  12  ‼·   (decorator) [Node Push]          14
+  12  !!!  (decorator) [Node Push]          14
   14   ε                                    32, 09
   16                                        ▶
   17   ε   [EndObj]                         16

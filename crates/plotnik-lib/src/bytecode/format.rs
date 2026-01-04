@@ -38,7 +38,7 @@ pub mod cols {
 #[derive(Clone, Copy, Debug)]
 pub struct Symbol {
     /// Left modifier (2 chars): mode indicator or spaces.
-    /// Examples: "  ", " !", " ‼"
+    /// Examples: "  ", " !", "!!"
     pub left: &'static str,
     /// Center symbol (1 char): direction or status.
     /// Examples: "ε", "▽", "▷", "△", "●", "○", "⬥", "▶", "◀"
@@ -86,29 +86,29 @@ impl Symbol {
 /// | --------------- | ------- | ----------------------------------- |
 /// | Stay            | (blank) | No movement, 5 spaces               |
 /// | Stay (epsilon)  | ε       | Only when no type/field constraints |
-/// | StayExact       | ‼·      | Stay at position, exact match only  |
+/// | StayExact       | !!!     | Stay at position, exact match only  |
 /// | Down            | ▽       | First child, skip any               |
 /// | DownSkip        | !▽      | First child, skip trivia            |
-/// | DownExact       | ‼▽      | First child, exact                  |
+/// | DownExact       | !!▽     | First child, exact                  |
 /// | Next            | ▷       | Next sibling, skip any              |
 /// | NextSkip        | !▷      | Next sibling, skip trivia           |
-/// | NextExact       | ‼▷      | Next sibling, exact                 |
+/// | NextExact       | !!▷     | Next sibling, exact                 |
 /// | Up(n)           | △ⁿ      | Ascend n levels, skip any           |
 /// | UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
-/// | UpExact(n)      | ‼△ⁿ     | Ascend n, must be last child        |
+/// | UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Stay => Symbol::EMPTY,
-        Nav::StayExact => Symbol::new(" ‼", "·", "  "),
+        Nav::StayExact => Symbol::new(" ", "!!!", " "),
         Nav::Down => Symbol::new("  ", "▽", "  "),
         Nav::DownSkip => Symbol::new(" !", "▽", "  "),
-        Nav::DownExact => Symbol::new(" ‼", "▽", "  "),
+        Nav::DownExact => Symbol::new("!!", "▽", "  "),
         Nav::Next => Symbol::new("  ", "▷", "  "),
         Nav::NextSkip => Symbol::new(" !", "▷", "  "),
-        Nav::NextExact => Symbol::new(" ‼", "▷", "  "),
+        Nav::NextExact => Symbol::new("!!", "▷", "  "),
         Nav::Up(n) => Symbol::new("  ", "△", superscript_suffix(n)),
         Nav::UpSkipTrivia(n) => Symbol::new(" !", "△", superscript_suffix(n)),
-        Nav::UpExact(n) => Symbol::new(" ‼", "△", superscript_suffix(n)),
+        Nav::UpExact(n) => Symbol::new("!!", "△", superscript_suffix(n)),
     }
 }
 
@@ -316,14 +316,17 @@ mod tests {
     fn test_symbol_format() {
         assert_eq!(Symbol::EMPTY.format(), "     ");
         assert_eq!(Symbol::EPSILON.format(), "  ε  ");
+        assert_eq!(nav_symbol(Nav::StayExact).format(), " !!! ");
         assert_eq!(nav_symbol(Nav::Down).format(), "  ▽  ");
         assert_eq!(nav_symbol(Nav::DownSkip).format(), " !▽  ");
-        assert_eq!(nav_symbol(Nav::DownExact).format(), " ‼▽  ");
+        assert_eq!(nav_symbol(Nav::DownExact).format(), "!!▽  ");
         assert_eq!(nav_symbol(Nav::Next).format(), "  ▷  ");
+        assert_eq!(nav_symbol(Nav::NextSkip).format(), " !▷  ");
+        assert_eq!(nav_symbol(Nav::NextExact).format(), "!!▷  ");
         assert_eq!(nav_symbol(Nav::Up(1)).format(), "  △  ");
         assert_eq!(nav_symbol(Nav::Up(2)).format(), "  △² ");
         assert_eq!(nav_symbol(Nav::UpSkipTrivia(1)).format(), " !△  ");
-        assert_eq!(nav_symbol(Nav::UpExact(1)).format(), " ‼△  ");
+        assert_eq!(nav_symbol(Nav::UpExact(1)).format(), "!!△  ");
     }
 
     #[test]

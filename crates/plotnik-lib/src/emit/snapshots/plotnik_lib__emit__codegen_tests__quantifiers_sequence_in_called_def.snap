@@ -48,7 +48,7 @@ Test    = 16 :: T4
 Item:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  ‼·   (identifier) [Node Set(M0)]      06
+  04  !!!  (identifier) [Node Set(M0)]      06
   06   ε   [EndObj]                         08
   08                                        ▶
 
@@ -61,7 +61,7 @@ Collect:
 Test:
   16   ε                                    17
   17   ε   [Obj]                            19
-  19  ‼·   (parent)                         20
+  19  !!!  (parent)                         20
   20   ▽   (Collect)                        21 ⯇
   21   △                                    22
   22   ε   [EndObj]                         24
@@ -72,12 +72,12 @@ Test:
   30   ε   [EndObj]                         29
   32   ε   [EndArr Set(M3)]                 30
   34   ε   [Set(M2)]                        25
-  36  ‼·   (Item)                           34 ⯇
+  36  !!!  (Item)                           34 ⯇
   37   ε   [Obj]                            36
   39   ▷                                    42
   40   ε                                    39, 32
   42   ε                                    37, 40
-  44  ‼·                                    42
+  44  !!!                                   42
   45   ▷                                    48
   46   ε                                    45, 32
   48   ε                                    37, 46

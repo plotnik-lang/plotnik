@@ -158,7 +158,7 @@ Each line follows a fixed column layout:
 ```
 
 - **Center**: Direction (ε, ▽, ▷, △)
-- **Left**: Mode modifier (`!` skip trivia, `‼` exact)
+- **Left**: Mode modifier (`!` skip trivia, `!!` exact)
 - **Right**: Level suffix (¹, ², ³... for Up)
 
 Examples:
@@ -168,7 +168,7 @@ Examples:
 - `  ▷  ` — next, skip any
 - `  △  ` — up 1 level (no superscript)
 - `!▽ ` — down, skip trivia
-- `‼▷ ` — next, exact
+- `!!▷ ` — next, exact
 
 | Instruction      | Format                                        |
 | ---------------- | --------------------------------------------- |
@@ -189,17 +189,17 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | --------------- | ------- | ----------------------------------- |
 | Stay            | (blank) | No movement, 5 spaces               |
 | Stay (epsilon)  | ε       | Only when no type/field constraints |
-| StayExact       | ‼·      | No movement, exact match only       |
+| StayExact       | !!!     | No movement, exact match only       |
 | Down            | ▽       | First child, skip any               |
 | DownSkip        | !▽      | First child, skip trivia            |
-| DownExact       | ‼▽      | First child, exact                  |
+| DownExact       | !!▽     | First child, exact                  |
 | Next            | ▷       | Next sibling, skip any              |
 | NextSkip        | !▷      | Next sibling, skip trivia           |
-| NextExact       | ‼▷      | Next sibling, exact                 |
+| NextExact       | !!▷     | Next sibling, exact                 |
 | Up(1)           | △       | Ascend 1 level (no superscript)     |
 | Up(n≥2)         | △ⁿ      | Ascend n levels, skip any           |
 | UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
-| UpExact(n)      | ‼△ⁿ     | Ascend n, must be last child        |
+| UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
 
 **Note**: `ε` only appears when all three conditions are met: Stay nav, no type constraint, no field constraint. A step matching `(identifier)` at current position shows spaces, not `ε`.
 

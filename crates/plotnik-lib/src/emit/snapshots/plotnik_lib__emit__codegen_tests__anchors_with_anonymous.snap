@@ -29,8 +29,8 @@ Test = 1 :: T0
 
 Test:
   1   ε                                     2
-  2  ‼·   (parent)                          3
+  2  !!!  (parent)                          3
   3   ▽   (+)                               4
-  4  ‼▷   (next)                            5
+  4 !!▷   (next)                            5
   5   △                                     6
   6                                         ▶

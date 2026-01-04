@@ -47,8 +47,8 @@ Test:
   06                                        ▶
   07   ε   [EndObj]                         06
   09   ε   [EndEnum Set(M4)]                07
-  11  ‼·   (identifier) [Node Set(M0)]      09
+  11  !!!  (identifier) [Node Set(M0)]      09
   13   ε   [Enum(M2)]                       11
   15   ε   [EndEnum Set(M4)]                07
-  17  ‼·   (number) [Node Set(M1)]          15
+  17  !!!  (number) [Node Set(M1)]          15
   19   ε   [Enum(M3)]                       17
