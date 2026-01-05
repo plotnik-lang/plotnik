@@ -27,6 +27,19 @@ use crate::parser::ast::{
 use crate::parser::cst::SyntaxKind;
 use crate::query::source_map::SourceId;
 
+/// Type annotation kind from `@capture :: Type` syntax.
+///
+/// The caller decides how to use the annotation based on context:
+/// - `String`: always converts the capture to string type
+/// - `TypeName`: either names a struct (for scope-creating captures) or creates a Node alias
+#[derive(Clone, Copy, Debug)]
+enum AnnotationKind {
+    /// `:: string` - extract text as string
+    String,
+    /// `:: TypeName` - custom type name
+    TypeName(Symbol),
+}
+
 /// Inference context for a single pass over the AST.
 pub struct InferenceVisitor<'a, 'd> {
     pub ctx: &'a mut TypeContext,
@@ -286,10 +299,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         };
         let capture_name = self.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
-        let annotation_type = self.resolve_annotation(cap);
+        let annotation = self.resolve_annotation(cap);
         let Some(inner) = cap.inner() else {
-            // Capture without inner -> creates a Node field
-            let type_id = annotation_type.unwrap_or(TYPE_NODE);
+            // Capture without inner -> creates a Node field with optional annotation
+            let type_id = self.annotation_to_alias(annotation, TYPE_NODE);
             let field = FieldInfo::required(type_id);
             return TermInfo::new(
                 Arity::One,
@@ -309,7 +322,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         if should_merge_fields {
             // Named node/ref/etc with bubbling fields: capture adds a field,
             // inner fields bubble up alongside.
-            let captured_type = self.determine_non_scope_captured_type(&inner, annotation_type);
+            let captured_type = self.determine_non_scope_captured_type(&inner, annotation);
             let field_info = if is_optional {
                 FieldInfo::optional(captured_type)
             } else {
@@ -334,7 +347,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         } else {
             // All other cases: scope-creating captures, scalar flows, void flows.
             // Inner becomes the captured type (if applicable).
-            let captured_type = self.determine_captured_type(&inner, &inner_info, annotation_type);
+            let captured_type = self.determine_captured_type(&inner, &inner_info, annotation);
             let field_info = if is_optional {
                 FieldInfo::optional(captured_type)
             } else {
@@ -369,31 +382,44 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Determines captured type for non-scope-creating expressions.
+    ///
+    /// For non-scope captures, fields bubble up alongside the capture field.
+    /// The annotation applies to the capture's type (usually Node or a recursive ref).
     fn determine_non_scope_captured_type(
         &mut self,
         inner: &Expr,
-        annotation: Option<TypeId>,
+        annotation: Option<AnnotationKind>,
     ) -> TypeId {
-        if let Some(ref_type) = self.get_recursive_ref_type(inner) {
-            annotation.unwrap_or(ref_type)
-        } else {
-            annotation.unwrap_or(TYPE_NODE)
-        }
+        let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+        self.annotation_to_alias(annotation, base_type)
     }
 
-    /// Resolves explicit type annotation like `@foo: string`.
-    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<TypeId> {
+    /// Resolves explicit type annotation like `@foo :: string` or `@foo :: TypeName`.
+    ///
+    /// Returns the annotation kind without creating types - the caller decides
+    /// how to use the annotation based on the capture's flow.
+    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<AnnotationKind> {
         cap.type_annotation().and_then(|t| {
             t.name().map(|n| {
                 let text = n.text();
                 if text == "string" {
-                    TYPE_STRING
+                    AnnotationKind::String
                 } else {
-                    let sym = self.interner.intern(text);
-                    self.ctx.intern_type(TypeShape::Custom(sym))
+                    AnnotationKind::TypeName(self.interner.intern(text))
                 }
             })
         })
+    }
+
+    /// Converts annotation to a type, creating a Node alias for custom type names.
+    ///
+    /// Used for non-struct contexts where TypeName should create an alias to Node.
+    fn annotation_to_alias(&mut self, annotation: Option<AnnotationKind>, base: TypeId) -> TypeId {
+        match annotation {
+            Some(AnnotationKind::String) => TYPE_STRING,
+            Some(AnnotationKind::TypeName(name)) => self.ctx.intern_type(TypeShape::Custom(name)),
+            None => base,
+        }
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
@@ -415,34 +441,59 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Transforms the inner flow into a specific TypeId for the field.
+    ///
+    /// Handles type annotation semantics based on the flow:
+    /// - Void/Scalar + TypeName: creates a Node alias (current Custom behavior)
+    /// - Bubble + TypeName: names the struct type instead of replacing it
     fn determine_captured_type(
         &mut self,
         inner: &Expr,
         inner_info: &TermInfo,
-        annotation: Option<TypeId>,
+        annotation: Option<AnnotationKind>,
     ) -> TypeId {
         match &inner_info.flow {
             TypeFlow::Void => {
-                if let Some(ref_type) = self.get_recursive_ref_type(inner) {
-                    annotation.unwrap_or(ref_type)
-                } else {
-                    annotation.unwrap_or(TYPE_NODE)
-                }
+                let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+                self.annotation_to_alias(annotation, base_type)
             }
             TypeFlow::Scalar(type_id) => {
                 // For array types with annotation, replace the element type
                 // e.g., `(identifier)* @names :: string` → string[] not string
-                if let Some(ann) = annotation
+                if let Some(AnnotationKind::String) = annotation
                     && let Some(TypeShape::Array { non_empty, .. }) = self.ctx.get_type(*type_id)
                 {
                     return self.ctx.intern_type(TypeShape::Array {
-                        element: ann,
+                        element: TYPE_STRING,
                         non_empty: *non_empty,
                     });
                 }
-                annotation.unwrap_or(*type_id)
+                match annotation {
+                    Some(AnnotationKind::String) => TYPE_STRING,
+                    Some(AnnotationKind::TypeName(name)) => {
+                        // For enum types, name the enum instead of creating an alias
+                        if matches!(self.ctx.get_type(*type_id), Some(TypeShape::Enum(_))) {
+                            self.ctx.set_type_name(*type_id, name);
+                            *type_id
+                        } else {
+                            self.ctx.intern_type(TypeShape::Custom(name))
+                        }
+                    }
+                    None => *type_id,
+                }
             }
-            TypeFlow::Bubble(type_id) => annotation.unwrap_or(*type_id),
+            TypeFlow::Bubble(type_id) => {
+                // Bubble flow means inner has struct fields (scope-creating capture).
+                // TypeName annotation should NAME the struct, not replace it with an alias.
+                match annotation {
+                    Some(AnnotationKind::String) => TYPE_STRING,
+                    Some(AnnotationKind::TypeName(name)) => {
+                        // Register the name for this struct type
+                        self.ctx.set_type_name(*type_id, name);
+                        *type_id
+                    }
+                    None => *type_id,
+                }
+            }
         }
     }
 

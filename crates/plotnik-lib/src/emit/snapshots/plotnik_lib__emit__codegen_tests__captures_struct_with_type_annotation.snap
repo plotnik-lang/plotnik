@@ -1,0 +1,45 @@
+---
+source: crates/plotnik-lib/src/emit/codegen_tests.rs
+---
+Test = {(identifier) @fn} @outer :: FunctionInfo
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "outer"
+S3 "Test"
+S4 "FunctionInfo"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { fn }
+T2 = Struct  M1:1  ; { outer }
+
+[type_members]
+M0: S1 → T0  ; fn: <Node>
+M1: S2 → T1  ; outer: FunctionInfo
+
+[type_names]
+N0: S3 → T2  ; Test
+N1: S4 → T1  ; FunctionInfo
+
+[entrypoints]
+Test = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   ε   [Obj]                            09
+  09   !   (identifier) [Node Set(M0)]      11
+  11   ε   [EndObj Set(M1)]                 13
+  13                                        ▶

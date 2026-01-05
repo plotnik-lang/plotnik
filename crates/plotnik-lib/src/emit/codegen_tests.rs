@@ -131,6 +131,22 @@ fn captures_optional_wrapper_struct() {
     "#});
 }
 
+#[test]
+fn captures_struct_with_type_annotation() {
+    // Type annotation on struct capture should name the struct, not create an alias
+    snap!(indoc! {r#"
+        Test = {(identifier) @fn} @outer :: FunctionInfo
+    "#});
+}
+
+#[test]
+fn captures_enum_with_type_annotation() {
+    // Type annotation on tagged alternation should name the enum
+    snap!(indoc! {r#"
+        Test = [A: (identifier) @id B: (number) @num] @expr :: Expression
+    "#});
+}
+
 // ============================================================================
 // 3. FIELDS
 // ============================================================================

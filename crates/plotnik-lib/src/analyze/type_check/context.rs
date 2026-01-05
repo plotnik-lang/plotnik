@@ -27,6 +27,10 @@ pub struct TypeContext {
     recursive_defs: HashSet<DefId>,
 
     term_info: HashMap<Expr, TermInfo>,
+
+    /// Explicit type names from annotations like `{...} @x :: TypeName`.
+    /// Maps a struct/enum TypeId to the name it should have in generated code.
+    type_names: HashMap<TypeId, Symbol>,
 }
 
 impl Default for TypeContext {
@@ -45,6 +49,7 @@ impl TypeContext {
             def_types: HashMap::new(),
             recursive_defs: HashSet::new(),
             term_info: HashMap::new(),
+            type_names: HashMap::new(),
         };
 
         // Pre-register builtin types at their expected IDs
@@ -225,6 +230,21 @@ impl TypeContext {
     /// Number of registered definitions.
     pub fn def_count(&self) -> usize {
         self.def_names.len()
+    }
+
+    /// Associate an explicit name with a type (from `@x :: TypeName` on struct captures).
+    pub fn set_type_name(&mut self, type_id: TypeId, name: Symbol) {
+        self.type_names.insert(type_id, name);
+    }
+
+    /// Get the explicit name for a type, if any.
+    pub fn get_type_name(&self, type_id: TypeId) -> Option<Symbol> {
+        self.type_names.get(&type_id).copied()
+    }
+
+    /// Iterate over all explicit type names as (TypeId, Symbol).
+    pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
+        self.type_names.iter().map(|(&id, &sym)| (id, sym))
     }
 }
 
