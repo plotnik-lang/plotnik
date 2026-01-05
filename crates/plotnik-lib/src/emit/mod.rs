@@ -317,6 +317,18 @@ impl TypeTableBuilder {
             });
         }
 
+        // Collect TypeName entries for explicit type annotations on struct captures
+        // e.g., `{(fn) @fn} @outer :: FunctionInfo` names the struct "FunctionInfo"
+        for (type_id, name_sym) in type_ctx.iter_type_names() {
+            if let Some(&bc_type_id) = self.mapping.get(&type_id) {
+                let name = strings.get_or_intern(name_sym, interner)?;
+                self.type_names.push(TypeName {
+                    name,
+                    type_id: bc_type_id,
+                });
+            }
+        }
+
         Ok(())
     }
 
