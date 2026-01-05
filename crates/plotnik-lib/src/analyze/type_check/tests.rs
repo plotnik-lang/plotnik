@@ -733,3 +733,176 @@ fn recursive_type_in_quantified_context() {
     }
     ");
 }
+
+#[test]
+fn scalar_propagates_through_named_node() {
+    let input = indoc! {r#"
+    A = [X: (identifier) @x Y: (number) @y]
+    Q = (program (A))
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    // Q should inherit the enum type from A
+    insta::assert_snapshot!(res, @r#"
+    export interface Node {
+      kind: string;
+      text: string;
+      span: [number, number];
+    }
+
+    export interface AX {
+      $tag: "X";
+      $data: { x: Node };
+    }
+
+    export interface AY {
+      $tag: "Y";
+      $data: { y: Node };
+    }
+
+    export type A = AX | AY;
+
+    export type Q = A;
+    "#);
+}
+
+#[test]
+fn scalar_array_propagates_through_named_node() {
+    let input = indoc! {r#"
+    A = [X: (identifier) @x Y: (number) @y]
+    Q = (program (A)+)
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    // Q should be A[] (non-empty array of the enum)
+    insta::assert_snapshot!(res, @r#"
+    export interface Node {
+      kind: string;
+      text: string;
+      span: [number, number];
+    }
+
+    export interface AX {
+      $tag: "X";
+      $data: { x: Node };
+    }
+
+    export interface AY {
+      $tag: "Y";
+      $data: { y: Node };
+    }
+
+    export type A = AX | AY;
+
+    export type Q = [A, ...A[]];
+    "#);
+}
+
+#[test]
+fn scalar_propagates_through_sequence() {
+    let input = indoc! {r#"
+    A = [X: (identifier) @x Y: (number) @y]
+    Q = {(A)}
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    // Q should inherit the enum type from A
+    insta::assert_snapshot!(res, @r#"
+    export interface Node {
+      kind: string;
+      text: string;
+      span: [number, number];
+    }
+
+    export interface AX {
+      $tag: "X";
+      $data: { x: Node };
+    }
+
+    export interface AY {
+      $tag: "Y";
+      $data: { y: Node };
+    }
+
+    export type A = AX | AY;
+
+    export type Q = A;
+    "#);
+}
+
+#[test]
+fn error_multiple_uncaptured_outputs() {
+    let input = indoc! {r#"
+    A = [X: (x)]
+    B = [Y: (y)]
+    Q = (program (A) (B))
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: multiple expressions produce output without capture: 2 expressions produce output without capture
+      |
+    3 | Q = (program (A) (B))
+      |     ^^^^^^^^^^^^^^^^^
+      |
+    help: capture each expression explicitly: `(X) @x (Y) @y`
+    ");
+}
+
+#[test]
+fn error_uncaptured_output_with_captures() {
+    let input = indoc! {r#"
+    A = [X: (x)]
+    Q = (program (A) (identifier) @name)
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: output-producing expression requires capture when siblings have captures
+      |
+    2 | Q = (program (A) (identifier) @name)
+      |              ^^^
+      |
+    help: add `@name` to capture the output
+    ");
+}
+
+#[test]
+fn output_captured_with_bubbles_ok() {
+    let input = indoc! {r#"
+    A = [X: (x) Y: (y)]
+    Q = (program (A) @a (identifier) @name)
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    // Q should be { a: A, name: Node }
+    // Note: enum variants without captures have no $data field (void payload)
+    insta::assert_snapshot!(res, @r#"
+    export interface Node {
+      kind: string;
+      text: string;
+      span: [number, number];
+    }
+
+    export interface AX {
+      $tag: "X";
+    }
+
+    export interface AY {
+      $tag: "Y";
+    }
+
+    export type A = AX | AY;
+
+    export interface Q {
+      a: A;
+      name: Node;
+    }
+    "#);
+}
