@@ -567,8 +567,8 @@ impl<'a> Emitter<'a> {
             let ts_type = self.type_to_ts(field_type);
             let opt_marker = if optional { "?" } else { "" };
             self.output.push_str(&format!(
-                "{}  {}{}{}{}: {};\n",
-                c.reset, field_name, c.dim, opt_marker, c.dim, ts_type
+                "{}  {}{}{}{}: {}{}{};\n",
+                c.reset, field_name, c.dim, opt_marker, c.dim, c.reset, ts_type, c.dim
             ));
         }
 
