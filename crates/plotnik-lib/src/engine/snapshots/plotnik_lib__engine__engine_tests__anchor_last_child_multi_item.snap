@@ -1,0 +1,25 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program {(function_declaration) @a (function_declaration) @b .})
+---
+function a() {} function b() {} function c() {}
+---
+{
+  "a": {
+    "kind": "function_declaration",
+    "text": "function b() {}",
+    "span": [
+      16,
+      31
+    ]
+  },
+  "b": {
+    "kind": "function_declaration",
+    "text": "function c() {}",
+    "span": [
+      32,
+      47
+    ]
+  }
+}

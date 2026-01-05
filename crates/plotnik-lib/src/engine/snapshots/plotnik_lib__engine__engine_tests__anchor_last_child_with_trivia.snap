@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (function_declaration) @last .)
+---
+function first() {} function second() {} /* trailing comment */
+---
+{
+  "last": {
+    "kind": "function_declaration",
+    "text": "function second() {} /* trailing comment */",
+    "span": [
+      20,
+      63
+    ]
+  }
+}
