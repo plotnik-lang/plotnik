@@ -542,7 +542,13 @@ fn format_call(
         .unwrap_or_else(|| format!("@{:0w$}", call.target.0, w = step_width));
     // Definition name in call is blue
     let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
-    let successors = format!("{} ⯇", format_step(call.next, ctx, step_width));
+    // Format as "target : return" with numeric IDs
+    let successors = format!(
+        "{:0w$} : {:0w$}",
+        call.target.get(),
+        call.next.get(),
+        w = step_width
+    );
 
     let base = format!("{prefix}{content}");
     builder.pad_successors(base, &successors)

@@ -24,8 +24,8 @@ use std::num::NonZeroU16;
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
-    cols, format_effect, nav_symbol, trace, truncate_text, width_for_count, EffectOpcode,
-    InstructionView, LineBuilder, MatchView, Module, Nav, Symbol,
+    cols, format_effect, trace, truncate_text, width_for_count, EffectOpcode, InstructionView,
+    LineBuilder, MatchView, Module, Nav, Symbol,
 };
 use crate::Colors;
 
@@ -177,6 +177,8 @@ pub struct PrintTracer<'s> {
     checkpoint_ips: Vec<u16>,
     /// Stack of definition names (for return display).
     definition_stack: Vec<String>,
+    /// Pending return instruction IP (for consolidated return line).
+    pending_return_ip: Option<u16>,
     /// Step width for formatting.
     step_width: usize,
     /// Color palette.
@@ -229,6 +231,7 @@ impl<'s> PrintTracer<'s> {
             entrypoint_by_ip,
             checkpoint_ips: Vec::new(),
             definition_stack: Vec::new(),
+            pending_return_ip: None,
             step_width,
             colors,
         }
@@ -385,28 +388,42 @@ impl<'s> PrintTracer<'s> {
         let prefix = format!("{:step_area$}{} ", "", symbol.format());
         self.lines.push(format!("{prefix}{content}"));
     }
+
+    /// Format definition name in parentheses (blue).
+    fn format_def_name(&self, name: &str) -> String {
+        let c = self.colors;
+        format!("({}{}{})", c.blue, name, c.reset)
+    }
+
+    /// Format definition label with colon (blue).
+    fn format_def_label(&self, name: &str) -> String {
+        let c = self.colors;
+        format!("{}{}{}:", c.blue, name, c.reset)
+    }
 }
 
 impl Tracer for PrintTracer<'_> {
     fn trace_instruction(&mut self, ip: u16, instr: &InstructionView<'_>) {
-        let colors = &self.colors;
         match instr {
             InstructionView::Match(m) => {
-                let symbol = format_match_symbol(m);
+                // Show ε for epsilon transitions, empty otherwise (nav shown in sublines)
+                let symbol = if m.is_epsilon() {
+                    Symbol::EPSILON
+                } else {
+                    Symbol::EMPTY
+                };
                 let content = self.format_match_content(m);
                 let successors = format_match_successors(m);
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             InstructionView::Call(c) => {
                 let name = self.entrypoint_name(c.target.get());
-                let symbol = nav_symbol(c.nav);
-                // Definition name in blue
-                let content = format!("({}{}{})", colors.blue, name, colors.reset);
-                let successors = format!("{:02} ⯇", c.next.get());
-                self.add_instruction(ip, symbol, &content, &successors);
+                let content = self.format_def_name(name);
+                let successors = format!("{:02} : {:02}", c.target.get(), c.next.get());
+                self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             InstructionView::Return(_) => {
-                self.add_instruction(ip, Symbol::EMPTY, "", "▶");
+                self.pending_return_ip = Some(ip);
             }
         }
     }
@@ -515,18 +532,27 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_call(&mut self, target_ip: u16) {
-        let c = &self.colors;
         let name = self.entrypoint_name(target_ip).to_string();
-        // Definition name is blue
-        self.add_subline(trace::CALL, &format!("{}{}{}", c.blue, name, c.reset));
+        self.add_subline(trace::CALL, &self.format_def_name(&name));
+        self.lines.push(self.format_def_label(&name));
         self.definition_stack.push(name);
     }
 
     fn trace_return(&mut self) {
-        let c = &self.colors;
+        let ip = self
+            .pending_return_ip
+            .take()
+            .expect("trace_return without trace_instruction");
         let name = self.definition_stack.pop().unwrap_or_default();
-        // Definition name is blue
-        self.add_subline(trace::RETURN, &format!("{}{}{}", c.blue, name, c.reset));
+        let content = self.format_def_name(&name);
+        // Show ◼ when returning from top-level (stack now empty)
+        let is_top_level = self.definition_stack.is_empty();
+        let successor = if is_top_level { "◼" } else { "" };
+        self.add_instruction(ip, trace::RETURN, &content, successor);
+        // Print caller's label after return (if not top-level)
+        if let Some(caller) = self.definition_stack.last() {
+            self.lines.push(self.format_def_label(caller));
+        }
     }
 
     fn trace_checkpoint_created(&mut self, ip: u16) {
@@ -548,20 +574,9 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_enter_entrypoint(&mut self, target_ip: u16) {
-        let c = &self.colors;
         let name = self.entrypoint_name(target_ip).to_string();
-        // Definition name in blue
-        self.lines.push(format!("{}{}{}:", c.blue, name, c.reset));
+        self.lines.push(self.format_def_label(&name));
         self.definition_stack.push(name);
-    }
-}
-
-/// Format match symbol for instruction line.
-fn format_match_symbol(m: &MatchView<'_>) -> Symbol {
-    if m.is_epsilon() {
-        Symbol::EPSILON
-    } else {
-        nav_symbol(m.nav)
     }
 }
 

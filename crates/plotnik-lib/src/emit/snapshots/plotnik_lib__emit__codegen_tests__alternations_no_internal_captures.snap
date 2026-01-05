@@ -33,7 +33,7 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  !!!  (program)                        05
+  04   !   (program)                        05
   05   ε                                    10, 12
   07                                        ▶
   08   ε   [EndObj]                         07

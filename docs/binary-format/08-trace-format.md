@@ -42,11 +42,15 @@ Same as dump format:
 
 ### Instruction Line
 
-Each instruction appears exactly as in the `dump` output:
+Each instruction shows a simplified view compared to `dump`:
 
 ```
-  10   ▽   left: (identifier) [Node Set(M6)]      12
+  12       (program)                        13
+  13       (B)                              01 : 14
+  08   ◀   (B)
 ```
+
+**Match instructions** show empty symbol column (nav appears in sublines). **Call instructions** show `(Name)` with `target : return` successors. **Return instructions** show `◀` with `(Name)`.
 
 ### Sub-Lines
 
@@ -63,9 +67,39 @@ Below each instruction, sub-lines show what happened during execution. Each sub-
 | `  ⬥  ` | Effect: data capture or structure |
 | `  ⬦  ` | Effect: suppressed (inside @\_)   |
 | `  ▶  ` | Call: entering definition         |
-| `  ◀  ` | Return: back from definition      |
 
-Navigation sub-lines show the node kind we arrived at. Match sub-lines follow, showing success (`●`) or failure (`○`) for type/field checks.
+Navigation symbols (`▽`, `▷`, `△`) appear only in sub-lines, not on instruction lines. Match sub-lines show success (`●`) or failure (`○`) for type/field checks.
+
+### Return Line
+
+Return is an instruction-level line showing the definition being returned from:
+
+```
+  08   ◀   (B)
+  17   ◀   (A)                              ◼
+```
+
+The `◀` symbol appears in the symbol column with the definition name in parentheses. Top-level returns (empty call stack) show `◼` as successor; mid-stack returns have no successor.
+
+### Definition Labels
+
+Definition labels (`Name:`) appear at:
+- Entry to a definition (initial or via call)
+- After returning from a call (showing the caller's name)
+
+```
+A:
+  09   ε                                    10
+  ...
+  13       (B)                              01 : 14
+       ▶   (B)
+B:
+  01   ε                                    02
+  ...
+  08   ◀   (B)
+A:
+  14                                        15
+```
 
 ### Backtrack Line
 
@@ -121,7 +155,7 @@ Assignment:
   13   ε   [Obj]                            15
   15       (assignment_expression)          16
   16   ▽   left: (identifier) [Node Set(M6)]  18
-  18   ▷   right: (Expression)              19 ⯇
+  18   ▷   right: (Expression)           09 : 19
   19   ε   [Set(M5)]                        21
   21   △                                    22
   22   ε   [EndObj]                         24
@@ -157,17 +191,16 @@ Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
        ●   assignment_expression x = y
-  10   ▽   left: (identifier) [Node Set(M6)]      12
+  10       left: (identifier) [Node Set(M6)]      12
        ▽   identifier
        ●   left:
        ●   identifier x
        ⬥   Node
        ⬥   Set "target"
-  12   ▷   right: (Expression)                    13 ⯇
+  12       (Expression)                        05 : 13
        ▷   identifier
        ●   right:
-       ▶   Expression
-
+       ▶   (Expression)
 Expression:
   05   ε                                          06
   06   ε                                          22, 28
@@ -184,16 +217,13 @@ Expression:
        ⬥   Set "name"
   24   ε   [EndEnum]                              17
        ⬥   EndEnum
-  17                                              ▶
-       ◀   Expression
-
+  17   ◀   (Expression)
 Assignment:
   13   ε   [Set(M5)]                              15
        ⬥   Set "value"
-  15   △                                          16
+  15                                              16
        △   assignment_expression
-  16                                              ▶
-       ◀   Assignment
+  16   ◀   (Assignment)                           ◼
 ```
 
 ### Execution Summary
@@ -232,17 +262,16 @@ Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
        ●   assignment_expression x = 1
-  10   ▽   left: (identifier) [Node Set(M6)]      12
+  10       left: (identifier) [Node Set(M6)]      12
        ▽   identifier
        ●   left:
        ●   identifier x
        ⬥   Node
        ⬥   Set "target"
-  12   ▷   right: (Expression)                    13 ⯇
+  12       (Expression)                        05 : 13
        ▷   number
        ●   right:
-       ▶   Expression
-
+       ▶   (Expression)
 Expression:
   05   ε                                          06
   06   ε                                          22, 28
@@ -254,16 +283,13 @@ Expression:
        ⬥   Set "value"
   18   ε   [EndEnum]                              17
        ⬥   EndEnum
-  17                                              ▶
-       ◀   Expression
-
+  17   ◀   (Expression)
 Assignment:
   13   ε   [Set(M5)]                              15
        ⬥   Set "value"
-  15   △                                          16
+  15                                              16
        △   assignment_expression
-  16                                              ▶
-       ◀   Assignment
+  16   ◀   (Assignment)                           ◼
 ```
 
 First branch (Literal) matches immediately—checkpoint at 28 is never used.
@@ -318,7 +344,7 @@ Ident:
        ●   identifier foo
        ⬥   Text
        ⬥   Set "name"
-  04                                              ▶
+  04   ◀   (Ident)                                ◼
 ```
 
 The `Text` effect extracts the node's source text as a string (from `@name :: string`).
@@ -360,19 +386,19 @@ ReturnVal:
   01   ε                                          02
   02       (statement_block)                      03
        ●   statement_block { x; return 1; }
-  03   ▽   (return_statement) [Node Set(M0)]      04
+  03       (return_statement) [Node Set(M0)]      04
        ▽   expression_statement
        ○   expression_statement x;
        ▷   return_statement
        ●   return_statement return 1;
        ⬥   Node
        ⬥   Set "ret"
-  04   △                                          05
+  04                                              05
        △   statement_block
-  05                                              ◼
+  05   ◀   (ReturnVal)                            ◼
 ```
 
-The `▽` lands on `(expression_statement)`, type mismatch, skip `▷` to next sibling, find `(return_statement)`.
+The navigation lands on `(expression_statement)`, type mismatch, skip `▷` to next sibling, find `(return_statement)`.
 
 ---
 
@@ -430,7 +456,7 @@ Pair:
        ⬥   Obj
   04       (pair)                                 05
        ●   pair "x": 1
-  05   ▽   key: (string) [SuppressBegin]          06
+  05       key: (string) [SuppressBegin]          06
        ▽   string
        ●   key:
        ●   string "x"
@@ -439,17 +465,17 @@ Pair:
        ⬦   Node
        ⬦   Set "key"
        ⬥   SuppressEnd
-  08   ▷   value: (number) [Node Set(M0)]         10
+  08       value: (number) [Node Set(M0)]         10
        ▷   number
        ●   value:
        ●   number 1
        ⬥   Node
        ⬥   Set "value"
-  10   △                                          12
+  10                                              12
        △   pair
   12   ε   [EndObj]                               14
        ⬥   EndObj
-  14                                              ◼
+  14   ◀   (Pair)                                 ◼
 ```
 
 The `@_` capture on `key:` wraps its inner effects with `SuppressBegin`/`SuppressEnd`. Effects between them (`Node`, `Set "key"`) appear as `⬦` (suppressed). The `@value` capture emits normally with `⬥`.
@@ -465,11 +491,10 @@ Assignment:
   08   ε                                          09
   09       (assignment_expression)                10
        ●   assignment_expression
-  10   ▽   left: (identifier) [Node Set(M6)]      12
+  10       left: (identifier) [Node Set(M6)]      12
        ●   identifier
-  12   ▷   right: (Expression)                    13 ⯇
-       ▶   Expression
-
+  12       (Expression)                        05 : 13
+       ▶   (Expression)
 Expression:
   05   ε                                          06
   06   ε                                          22, 28
@@ -481,22 +506,19 @@ Expression:
   26       (identifier) [Node Set(M2)]            24
        ●   identifier
   24   ε   [EndEnum]                              17
-  17                                              ▶
-       ◀   Expression
-
+  17   ◀   (Expression)
 Assignment:
   13   ε   [Set(M5)]                              15
-  15   △                                          16
+  15                                              16
        ●   assignment_expression
-  16                                              ▶
-       ◀   Assignment
+  16   ◀   (Assignment)                           ◼
 ```
 
 Default shows:
 
 - Match results (`●`, `○`) with kind only, no text
 - Backtrack (`❮❮❮`)
-- Call/return (`▶`, `◀`)
+- Call (`▶`) and return (`◀`)
 
 Hidden:
 
@@ -525,8 +547,7 @@ Hidden:
 | `  ⬥  ` | `⬥   SuppressEnd`   | `⬥   SuppressEnd`            |
 | `  ⬦  ` | `⬦   Effect`        | `⬦   Node` (suppressed)      |
 | `  ⬦  ` | `⬦   SuppressBegin` | `⬦   SuppressBegin` (nested) |
-| `  ▶  ` | `▶   Name`          | `▶   Expression`             |
-| `  ◀  ` | `◀   Name`          | `◀   Expression`             |
+| `  ▶  ` | `▶   (Name)`        | `▶   (Expression)`           |
 
 ### Backtrack (Instruction-Level)
 
@@ -542,7 +563,7 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 | --------------- | ------- | ------------------------------- |
 | Stay            | (space) | No movement                     |
 | Stay (epsilon)  | ε       | No movement, no constraints     |
-| StayExact       | !!!     | Stay at position, exact only    |
+| StayExact       | !       | Stay at position, exact only    |
 | Down            | ▽       | First child, skip any           |
 | DownSkip        | !▽      | First child, skip trivia        |
 | DownExact       | !!▽     | First child, exact              |

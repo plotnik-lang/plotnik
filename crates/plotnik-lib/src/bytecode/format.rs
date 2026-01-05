@@ -86,7 +86,7 @@ impl Symbol {
 /// | --------------- | ------- | ----------------------------------- |
 /// | Stay            | (blank) | No movement, 5 spaces               |
 /// | Stay (epsilon)  | ε       | Only when no type/field constraints |
-/// | StayExact       | !!!     | Stay at position, exact match only  |
+/// | StayExact       | !       | Stay at position, exact match only  |
 /// | Down            | ▽       | First child, skip any               |
 /// | DownSkip        | !▽      | First child, skip trivia            |
 /// | DownExact       | !!▽     | First child, exact                  |
@@ -99,7 +99,7 @@ impl Symbol {
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Stay => Symbol::EMPTY,
-        Nav::StayExact => Symbol::new(" ", "!!!", " "),
+        Nav::StayExact => Symbol::new("  ", "!", "  "),
         Nav::Down => Symbol::new("  ", "▽", "  "),
         Nav::DownSkip => Symbol::new(" !", "▽", "  "),
         Nav::DownExact => Symbol::new("!!", "▽", "  "),
@@ -278,10 +278,32 @@ impl LineBuilder {
     /// Ensures at least 2 spaces between content and successors.
     pub fn pad_successors(&self, base: String, successors: &str) -> String {
         let padding = cols::TOTAL_WIDTH
-            .saturating_sub(base.chars().count())
+            .saturating_sub(display_width(&base))
             .max(2);
         format!("{base}{:padding$}{successors}", "")
     }
+}
+
+/// Calculate display width of a string, ignoring ANSI escape sequences.
+///
+/// ANSI sequences have the form `\x1b[...m` and render as zero-width.
+fn display_width(s: &str) -> usize {
+    let mut width = 0;
+    let mut in_escape = false;
+
+    for c in s.chars() {
+        if in_escape {
+            if c == 'm' {
+                in_escape = false;
+            }
+        } else if c == '\x1b' {
+            in_escape = true;
+        } else {
+            width += 1;
+        }
+    }
+
+    width
 }
 
 // =============================================================================
@@ -316,7 +338,7 @@ mod tests {
     fn test_symbol_format() {
         assert_eq!(Symbol::EMPTY.format(), "     ");
         assert_eq!(Symbol::EPSILON.format(), "  ε  ");
-        assert_eq!(nav_symbol(Nav::StayExact).format(), " !!! ");
+        assert_eq!(nav_symbol(Nav::StayExact).format(), "  !  ");
         assert_eq!(nav_symbol(Nav::Down).format(), "  ▽  ");
         assert_eq!(nav_symbol(Nav::DownSkip).format(), " !▽  ");
         assert_eq!(nav_symbol(Nav::DownExact).format(), "!!▽  ");

@@ -66,8 +66,8 @@ Expr:
 Test:
   04   ε                                    05
   05   ε   [Obj]                            07
-  07  !!!  (program)                        08
-  08   ▽   (Expr)                           09 ⯇
+  07   !   (program)                        08
+  08   ▽   (Expr)                           01 : 09
   09   ε   [Set(M5)]                        11
   11   △                                    12
   12   ε   [EndObj]                         14
@@ -76,10 +76,10 @@ Test:
   17   △                                    25
   18                                        ▶
   19   ε   [EndEnum]                        18
-  21  !!!  (number) [Text Set(M0)]          19
+  21   !   (number) [Text Set(M0)]          19
   23   ε   [Enum(M3)]                       21
   25   ε   [EndEnum]                        18
-  27   ▷   arguments: (Expr)                15 ⯇
+  27   ▷   arguments: (Expr)                01 : 15
   28   ▽   function: (identifier) [Node Set(M1)]  27
-  30  !!!  (call_expression)                28
+  30   !   (call_expression)                28
   31   ε   [Enum(M4)]                       30
