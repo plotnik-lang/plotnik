@@ -31,10 +31,8 @@ pub fn run(args: InferArgs) {
         std::process::exit(1);
     }
 
-    let source_map = match load_query_source(
-        args.query_path.as_deref(),
-        args.query_text.as_deref(),
-    ) {
+    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
+    {
         Ok(map) => map,
         Err(msg) => {
             eprintln!("error: {}", msg);
@@ -80,7 +78,9 @@ pub fn run(args: InferArgs) {
         if !linked.is_valid() {
             eprint!(
                 "{}",
-                linked.diagnostics().render_colored(linked.source_map(), args.color)
+                linked
+                    .diagnostics()
+                    .render_colored(linked.source_map(), args.color)
             );
             std::process::exit(1);
         }
@@ -89,7 +89,9 @@ pub fn run(args: InferArgs) {
         if !query.is_valid() {
             eprint!(
                 "{}",
-                query.diagnostics().render_colored(query.source_map(), args.color)
+                query
+                    .diagnostics()
+                    .render_colored(query.source_map(), args.color)
             );
             std::process::exit(1);
         }

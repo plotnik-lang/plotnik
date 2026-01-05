@@ -30,22 +30,22 @@ N0: S3 → T1  ; Foo
 N1: S4 → T2  ; Bar
 
 [entrypoints]
-Bar = 09 :: T2
-Foo = 01 :: T1
+Bar = 10 :: T2
+Foo = 06 :: T1
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Foo:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (identifier) [Node Set(M0)]      06
-  06   ε   [EndObj]                         08
-  08                                        ▶
+  06   ε                                    07
+  07   !   (identifier) [Node Set(M0)]      09
+  09                                        ▶
 
 Bar:
-  09   ε                                    10
-  10   ε   [Obj]                            12
-  12   !   (string) [Node Set(M1)]          14
-  14   ε   [EndObj]                         16
-  16                                        ▶
+  10   ε                                    11
+  11   !   (string) [Node Set(M1)]          13
+  13                                        ▶

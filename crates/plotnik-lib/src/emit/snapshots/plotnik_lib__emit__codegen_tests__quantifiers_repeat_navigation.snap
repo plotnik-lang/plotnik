@@ -25,29 +25,31 @@ M0: S1 → T1  ; decs: T1
 N0: S2 → T2  ; Test
 
 [entrypoints]
-Test = 01 :: T2
+Test = 06 :: T2
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (function_declaration)           05
-  05   ε   [Arr]                            07
-  07   ε                                    26, 19
-  09   ε   [EndArr Set(M0)]                 11
-  11   △                                    17
-  12   !   (decorator) [Node Push]          14
-  14   ε                                    32, 09
-  16                                        ▶
-  17   ε   [EndObj]                         16
-  19   ε   [EndArr Set(M0)]                 17
-  21   ▷                                    24
-  22   ε                                    21, 19
-  24   ε                                    12, 22
-  26   ▽                                    24
-  27   ▷                                    30
-  28   ε                                    27, 09
-  30   ε                                    12, 28
-  32   ▷                                    30
+  06   ε                                    07
+  07   !   (function_declaration)           08
+  08   ε   [Arr]                            10
+  10   ε                                    27, 20
+  12   ε   [EndArr Set(M0)]                 14
+  14   △                                    19
+  15   !   (decorator) [Node Push]          17
+  17   ε                                    33, 12
+  19                                        ▶
+  20   ε   [EndArr Set(M0)]                 19
+  22   ▷                                    25
+  23   ε                                    22, 20
+  25   ε                                    15, 23
+  27   ▽                                    25
+  28   ▷                                    31
+  29   ε                                    28, 12
+  31   ε                                    15, 29
+  33   ▷                                    31

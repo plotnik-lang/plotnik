@@ -9,7 +9,7 @@ use std::path::Path;
 
 use super::header::Header;
 use super::ids::{QTypeId, StepId, StringId};
-use super::instructions::{Call, Match, MatchView, Opcode, Return};
+use super::instructions::{Call, Match, MatchView, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
 use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
@@ -62,6 +62,7 @@ pub enum Instruction {
     Match(Match),
     Call(Call),
     Return(Return),
+    Trampoline(Trampoline),
 }
 
 impl Instruction {
@@ -81,6 +82,10 @@ impl Instruction {
                 let arr: [u8; 8] = bytes[..8].try_into().unwrap();
                 Self::Return(Return::from_bytes(arr))
             }
+            Opcode::Trampoline => {
+                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
+                Self::Trampoline(Trampoline::from_bytes(arr))
+            }
             _ => Self::Match(Match::from_bytes(bytes)),
         }
     }
@@ -94,6 +99,7 @@ pub enum InstructionView<'a> {
     Match(MatchView<'a>),
     Call(Call),
     Return(Return),
+    Trampoline(Trampoline),
 }
 
 impl<'a> InstructionView<'a> {
@@ -113,6 +119,10 @@ impl<'a> InstructionView<'a> {
             Opcode::Return => {
                 let arr: [u8; 8] = bytes[..8].try_into().unwrap();
                 Self::Return(Return::from_bytes(arr))
+            }
+            Opcode::Trampoline => {
+                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
+                Self::Trampoline(Trampoline::from_bytes(arr))
             }
             _ => Self::Match(MatchView::from_bytes(bytes)),
         }

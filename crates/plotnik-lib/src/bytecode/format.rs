@@ -6,9 +6,9 @@
 //! |   | pad  |   | (sym) |   |                      |   |      |
 //! ```
 
+use super::EffectOp;
 use super::effects::EffectOpcode;
 use super::nav::Nav;
-use super::EffectOp;
 
 // =============================================================================
 // Column Layout

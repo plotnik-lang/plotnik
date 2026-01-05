@@ -53,33 +53,35 @@ N0: S07 → T04  ; Expr
 N1: S08 → T05  ; Test
 
 [entrypoints]
-Expr = 01 :: T04
-Test = 04 :: T05
+Expr = 06 :: T04
+Test = 09 :: T05
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Expr:
-  01   ε                                    02
-  02   ε                                    23, 31
+  06   ε                                    07
+  07   ε                                    24, 32
 
 Test:
-  04   ε                                    05
-  05   ε   [Obj]                            07
-  07   !   (program)                        08
-  08   ▽   (Expr)                           01 : 09
-  09   ε   [Set(M5)]                        11
-  11   △                                    12
-  12   ε   [EndObj]                         14
-  14                                        ▶
-  15   ε   [Set(M2)]                        17
-  17   △                                    25
-  18                                        ▶
-  19   ε   [EndEnum]                        18
-  21   !   (number) [Text Set(M0)]          19
-  23   ε   [Enum(M3)]                       21
-  25   ε   [EndEnum]                        18
-  27   ▷   arguments: (Expr)                01 : 15
-  28   ▽   function: (identifier) [Node Set(M1)]  27
-  30   !   (call_expression)                28
-  31   ε   [Enum(M4)]                       30
+  09   ε                                    10
+  10   !   (program)                        11
+  11   ▽   (Expr)                           06 : 12
+  12   ε   [Set(M5)]                        14
+  14   △                                    15
+  15                                        ▶
+  16   ε   [Set(M2)]                        18
+  18   △                                    26
+  19                                        ▶
+  20   ε   [EndEnum]                        19
+  22   !   (number) [Text Set(M0)]          20
+  24   ε   [Enum(M3)]                       22
+  26   ε   [EndEnum]                        19
+  28   ▷   arguments: (Expr)                06 : 16
+  29   ▽   function: (identifier) [Node Set(M1)]  28
+  31   !   (call_expression)                29
+  32   ε   [Enum(M4)]                       31

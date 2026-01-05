@@ -40,37 +40,39 @@ M5: S06 → T5  ; items: T5
 N0: S07 → T6  ; Test
 
 [entrypoints]
-Test = 01 :: T6
+Test = 06 :: T6
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (object)                         05
-  05   ε   [Arr]                            07
-  07   ε                                    42, 19
-  09   ε   [EndArr Set(M5)]                 11
-  11   △                                    17
-  12   ε   [EndObj Push]                    14
-  14   ε                                    48, 09
-  16                                        ▶
-  17   ε   [EndObj]                         16
-  19   ε   [EndArr Set(M5)]                 17
-  21   ε   [EndEnum Set(M4)]                12
-  23   !   (pair) [Node Set(M0)]            21
-  25   ε   [Enum(M2)]                       23
-  27   ε   [EndEnum Set(M4)]                12
-  29   !   (shorthand_property_identifier) [Node Set(M1)]  27
-  31   ε   [Enum(M3)]                       29
-  33   ε                                    25, 31
-  35   ε   [Obj]                            33
-  37   ▷                                    40
-  38   ε                                    37, 19
-  40   ε                                    35, 38
-  42   ▽                                    40
-  43   ▷                                    46
-  44   ε                                    43, 09
-  46   ε                                    35, 44
-  48   ▷                                    46
+  06   ε                                    07
+  07   !   (object)                         08
+  08   ε   [Arr]                            10
+  10   ε                                    43, 20
+  12   ε   [EndArr Set(M5)]                 14
+  14   △                                    19
+  15   ε   [EndObj Push]                    17
+  17   ε                                    49, 12
+  19                                        ▶
+  20   ε   [EndArr Set(M5)]                 19
+  22   ε   [EndEnum Set(M4)]                15
+  24   !   (pair) [Node Set(M0)]            22
+  26   ε   [Enum(M2)]                       24
+  28   ε   [EndEnum Set(M4)]                15
+  30   !   (shorthand_property_identifier) [Node Set(M1)]  28
+  32   ε   [Enum(M3)]                       30
+  34   ε                                    26, 32
+  36   ε   [Obj]                            34
+  38   ▷                                    41
+  39   ε                                    38, 20
+  41   ε                                    36, 39
+  43   ▽                                    41
+  44   ▷                                    47
+  45   ε                                    44, 12
+  47   ε                                    36, 45
+  49   ▷                                    47

@@ -37,45 +37,47 @@ N1: S5 → T4  ; Collect
 N2: S6 → T4  ; Test
 
 [entrypoints]
-Collect = 09 :: T4
-Item    = 01 :: T1
-Test    = 16 :: T4
+Collect = 10 :: T4
+Item    = 06 :: T1
+Test    = 15 :: T4
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Item:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (identifier) [Node Set(M0)]      06
-  06   ε   [EndObj]                         08
-  08                                        ▶
+  06   ε                                    07
+  07   !   (identifier) [Node Set(M0)]      09
+  09                                        ▶
 
 Collect:
-  09   ε                                    10
-  10   ε   [Obj]                            12
-  12   ε   [Arr]                            14
-  14   ε                                    40, 28
+  10   ε                                    11
+  11   ε   [Arr]                            13
+  13   ε                                    41, 25
 
 Test:
-  16   ε                                    17
-  17   !   (parent)                         18
-  18   ▽   (Collect)                        09 : 19
-  19   △                                    20
-  20                                        ▶
-  21   ε   [EndObj Push]                    23
-  23   ε                                    46, 28
-  25                                        ▶
-  26   ε   [EndObj]                         25
-  28   ε   [EndArr Set(M2)]                 26
-  30   ε   [Set(M1)]                        21
-  32   !   (Item)                           01 : 30
-  33   ε   [Obj]                            32
-  35   ▷                                    38
-  36   ε                                    35, 28
-  38   ε                                    33, 36
-  40   !                                    38
-  41   ▷                                    44
-  42   ε                                    41, 28
-  44   ε                                    33, 42
-  46   ▷                                    44
+  15   ε                                    16
+  16   !   (parent)                         17
+  17   ▽   (Collect)                        10 : 18
+  18   △                                    19
+  19                                        ▶
+  20   ε   [EndObj Push]                    22
+  22   ε                                    47, 25
+  24                                        ▶
+  25   ε   [EndArr Set(M2)]                 24
+  27   ε   [Set(M1)]                        20
+  29   ε   [EndObj]                         27
+  31   !   (Item)                           06 : 29
+  32   ε   [Obj]                            31
+  34   ε   [Obj]                            32
+  36   ▷                                    39
+  37   ε                                    36, 25
+  39   ε                                    34, 37
+  41   !                                    39
+  42   ▷                                    45
+  43   ε                                    42, 25
+  45   ε                                    34, 43
+  47   ▷                                    45

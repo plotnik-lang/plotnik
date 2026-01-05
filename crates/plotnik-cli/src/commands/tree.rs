@@ -27,7 +27,11 @@ pub fn run(args: TreeArgs) {
         }
     };
 
-    let lang = resolve_lang(&args.lang, args.source_path.as_deref(), args.source_text.is_some());
+    let lang = resolve_lang(
+        &args.lang,
+        args.source_path.as_deref(),
+        args.source_text.is_some(),
+    );
     let tree = lang.parse(&source);
     print!("{}", dump_tree(&tree, &source, args.raw, args.spans));
 }
@@ -107,7 +111,10 @@ fn format_node_with_field(
     let span_suffix = if show_spans {
         let start = node.start_position();
         let end = node.end_position();
-        format!(" [{}:{}-{}:{}]", start.row, start.column, end.row, end.column)
+        format!(
+            " [{}:{}-{}:{}]",
+            start.row, start.column, end.row, end.column
+        )
     } else {
         String::new()
     };

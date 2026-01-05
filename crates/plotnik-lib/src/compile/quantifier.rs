@@ -6,15 +6,15 @@
 //! - Whether it's skippable (first-child with Down navigation)
 //! - Whether skip/match need separate exits
 
+use crate::analyze::type_check::TypeId;
 use crate::bytecode::ir::{EffectIR, Label};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 use crate::parser::cst::SyntaxKind;
-use crate::analyze::type_check::TypeId;
 
-use super::capture::{check_needs_struct_wrapper, get_row_type_id, CaptureEffects};
-use super::navigation::is_star_or_plus_quantifier;
 use super::Compiler;
+use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};
+use super::navigation::is_star_or_plus_quantifier;
 
 /// Quantifier operator classification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,17 +181,28 @@ impl Compiler<'_> {
             // Array capture: need special handling with Arr/EndArr
             if is_star_or_plus_quantifier(Some(&inner)) {
                 return self.compile_array_capture_with_exits(
-                    cap, &inner, match_exit, skip_exit, nav_override, capture,
+                    cap,
+                    &inner,
+                    match_exit,
+                    skip_exit,
+                    nav_override,
+                    capture,
                 );
             }
 
             // Non-array capture: build capture effects and recurse
             let capture_effects = self.build_capture_effects(cap, Some(&inner));
-            let mut combined = CaptureEffects { post: capture_effects };
+            let mut combined = CaptureEffects {
+                post: capture_effects,
+            };
             combined.post.extend(capture.post);
 
             return self.compile_skippable_with_exits(
-                &inner, match_exit, skip_exit, nav_override, combined,
+                &inner,
+                match_exit,
+                skip_exit,
+                nav_override,
+                combined,
             );
         }
 
@@ -257,8 +268,13 @@ impl Compiler<'_> {
                 vec![EffectIR::simple(EffectOpcode::Push, 0)]
             },
         };
-        let inner_entry =
-            self.compile_star_for_array_with_exits(inner, match_endarr, skip_endarr, nav_override, push_effects);
+        let inner_entry = self.compile_star_for_array_with_exits(
+            inner,
+            match_endarr,
+            skip_endarr,
+            nav_override,
+            push_effects,
+        );
 
         // Emit Arr step at entry
         self.emit_arr_step(inner_entry)
@@ -319,7 +335,8 @@ impl Compiler<'_> {
         } = config;
 
         // Determine if struct wrapper is needed (once, here)
-        let needs_struct_wrapper = in_array_context && check_needs_struct_wrapper(inner, self.type_ctx);
+        let needs_struct_wrapper =
+            in_array_context && check_needs_struct_wrapper(inner, self.type_ctx);
         let row_type_id = if in_array_context {
             get_row_type_id(inner, self.type_ctx)
         } else {
@@ -354,13 +371,14 @@ impl Compiler<'_> {
                 // First iteration: skip-retry but NO exit (must match at least one)
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
                 let first_iterate = self.compile_skip_retry_iteration_no_exit(
-                    first_nav_mode, body_entry, is_greedy
+                    first_nav_mode,
+                    body_entry,
+                    is_greedy,
                 );
 
                 // Repeat iteration: skip-retry with exit option
-                let repeat_iterate = self.compile_skip_retry_iteration(
-                    Nav::Next, body_entry, match_exit, is_greedy
-                );
+                let repeat_iterate =
+                    self.compile_skip_retry_iteration(Nav::Next, body_entry, match_exit, is_greedy);
 
                 // loop_entry → [repeat_iterate, exit]
                 self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
@@ -373,8 +391,14 @@ impl Compiler<'_> {
                     // Star with split exits: uses skip-retry with separate exit paths
                     let skip = skip_exit.expect("split exits requires skip_exit");
                     self.compile_star_with_skip_retry_split_exits(
-                        inner, match_exit, skip, first_nav, element_capture, is_greedy,
-                        needs_struct_wrapper, row_type_id,
+                        inner,
+                        match_exit,
+                        skip,
+                        first_nav,
+                        element_capture,
+                        is_greedy,
+                        needs_struct_wrapper,
+                        row_type_id,
                     )
                 } else {
                     // Regular star with skip-retry:
@@ -388,12 +412,18 @@ impl Compiler<'_> {
                     // First iteration: Down navigation with skip-retry
                     let first_nav_mode = first_nav.unwrap_or(Nav::Down);
                     let first_iterate = self.compile_skip_retry_iteration(
-                        first_nav_mode, body_entry, match_exit, is_greedy
+                        first_nav_mode,
+                        body_entry,
+                        match_exit,
+                        is_greedy,
                     );
 
                     // Repeat iteration: Next navigation with skip-retry
                     let repeat_iterate = self.compile_skip_retry_iteration(
-                        Nav::Next, body_entry, match_exit, is_greedy
+                        Nav::Next,
+                        body_entry,
+                        match_exit,
+                        is_greedy,
                     );
 
                     // loop_entry → [repeat_iterate, exit]
@@ -420,7 +450,10 @@ impl Compiler<'_> {
                 // Skip-retry iteration leading to null exit
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
                 let iterate = self.compile_skip_retry_iteration(
-                    first_nav_mode, body_entry, skip_with_null, is_greedy
+                    first_nav_mode,
+                    body_entry,
+                    skip_with_null,
+                    is_greedy,
                 );
 
                 // entry → [iterate, skip_with_null]
@@ -525,14 +558,12 @@ impl Compiler<'_> {
 
         // First iteration: skip-retry with skip_exit as fallback
         let first_nav_mode = nav_override.unwrap_or(Nav::Down);
-        let first_iterate = self.compile_skip_retry_iteration(
-            first_nav_mode, body_entry, skip_exit, is_greedy
-        );
+        let first_iterate =
+            self.compile_skip_retry_iteration(first_nav_mode, body_entry, skip_exit, is_greedy);
 
         // Repeat iteration: skip-retry with match_exit as fallback
-        let repeat_iterate = self.compile_skip_retry_iteration(
-            Nav::Next, body_entry, match_exit, is_greedy
-        );
+        let repeat_iterate =
+            self.compile_skip_retry_iteration(Nav::Next, body_entry, match_exit, is_greedy);
 
         // loop_entry → [repeat_iterate, match_exit]
         self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);

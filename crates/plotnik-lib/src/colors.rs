@@ -43,11 +43,7 @@ impl Colors {
 
     /// Create colors based on enabled flag.
     pub fn new(enabled: bool) -> Self {
-        if enabled {
-            Self::ON
-        } else {
-            Self::OFF
-        }
+        if enabled { Self::ON } else { Self::OFF }
     }
 
     /// Check if colors are enabled.

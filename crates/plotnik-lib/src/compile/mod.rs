@@ -24,13 +24,13 @@ mod sequences;
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
-use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, ReturnIR};
-use crate::bytecode::{EffectOpcode, Nav};
+use crate::bytecode::Nav;
+use crate::bytecode::ir::{Instruction, Label, ReturnIR, TrampolineIR};
 use crate::parser::ast::Expr;
 
-use crate::emit::StringTableBuilder;
 use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::type_check::{DefId, TypeContext, TypeShape};
+use crate::analyze::type_check::{DefId, TypeContext};
+use crate::emit::StringTableBuilder;
 
 pub use capture::CaptureEffects;
 use scope::StructScope;
@@ -62,6 +62,9 @@ pub struct CompileResult {
     pub instructions: Vec<Instruction>,
     /// Entry labels for each definition (in definition order).
     pub def_entries: IndexMap<DefId, Label>,
+    /// Entry label for the universal preamble.
+    /// The preamble wraps any entrypoint: Obj → Trampoline → EndObj → Return
+    pub preamble_entry: Label,
 }
 
 /// Compiler state for Thompson construction.
@@ -113,7 +116,18 @@ impl<'a> Compiler<'a> {
         node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
         node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
     ) -> Result<CompileResult, CompileError> {
-        let mut compiler = Self::new(interner, type_ctx, symbol_table, strings, node_type_ids, node_field_ids);
+        let mut compiler = Self::new(
+            interner,
+            type_ctx,
+            symbol_table,
+            strings,
+            node_type_ids,
+            node_field_ids,
+        );
+
+        // Emit universal preamble first: Obj → Trampoline → EndObj → Return
+        // This wraps any entrypoint to create the top-level scope.
+        let preamble_entry = compiler.emit_preamble();
 
         // Pre-allocate entry labels for all definitions
         for (def_id, _) in type_ctx.iter_def_types() {
@@ -129,7 +143,32 @@ impl<'a> Compiler<'a> {
         Ok(CompileResult {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
+            preamble_entry,
         })
+    }
+
+    /// Emit the universal preamble: Obj → Trampoline → EndObj → Return
+    ///
+    /// The preamble creates a scope for the entrypoint's captures.
+    /// The Trampoline instruction jumps to the actual entrypoint (set via VM context).
+    fn emit_preamble(&mut self) -> Label {
+        // Return (stack is empty after preamble, so this means Accept)
+        let return_label = self.fresh_label();
+        self.instructions.push(Instruction::Return(ReturnIR {
+            label: return_label,
+        }));
+
+        // Chain: Obj → Trampoline → EndObj → Return
+        let endobj_label = self.emit_endobj_step(return_label);
+
+        let trampoline_label = self.fresh_label();
+        self.instructions
+            .push(Instruction::Trampoline(TrampolineIR {
+                label: trampoline_label,
+                next: endobj_label,
+            }));
+
+        self.emit_obj_step(trampoline_label)
     }
 
     /// Generate a fresh label.
@@ -154,24 +193,9 @@ impl<'a> Compiler<'a> {
         // When stack is empty, Return means Accept (top-level match completed).
         // When stack is non-empty, Return pops frame and jumps to return address.
         let return_label = self.fresh_label();
-        self.instructions
-            .push(Instruction::Return(ReturnIR { label: return_label }));
-
-        // Check if definition needs Obj/EndObj wrapper.
-        // A definition needs its own scope when:
-        // 1. It returns a struct type, AND
-        // 2. It has direct captures (CapturedExpr not inside a Ref)
-        //
-        // When captures come only from Refs (called definitions), those definitions
-        // already handle their own Obj/EndObj scopes. Adding another wrapper would
-        // create nested scopes where the inner result gets lost.
-        let def_returns_struct = self
-            .type_ctx
-            .get_def_type(def_id)
-            .and_then(|tid| self.type_ctx.get_type(tid))
-            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
-        let has_direct_captures = !Self::collect_captures(body).is_empty();
-        let needs_obj_wrapper = def_returns_struct && has_direct_captures;
+        self.instructions.push(Instruction::Return(ReturnIR {
+            label: return_label,
+        }));
 
         // Definition bodies use StayExact navigation: match at current position only.
         // The caller (alternation, sequence, quantifier, or VM top-level) owns the search.
@@ -179,43 +203,13 @@ impl<'a> Compiler<'a> {
         // alternation branches should try.
         let body_nav = Some(Nav::StayExact);
 
-        let body_entry = if needs_obj_wrapper {
-            let type_id = self.type_ctx.get_def_type(def_id).expect("checked above");
-
-            // Emit EndObj → Return
-            let endobj_label = self.fresh_label();
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: endobj_label,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: None,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![EffectIR::simple(EffectOpcode::EndObj, 0)],
-                successors: vec![return_label],
-            }));
-
-            // Compile body with scope, targeting EndObj
-            let inner_entry = self.with_scope(type_id, |this| {
-                this.compile_expr_with_nav(body, endobj_label, body_nav)
-            });
-
-            // Emit Obj → inner_entry
-            let obj_label = self.fresh_label();
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: obj_label,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: None,
-                pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors: vec![inner_entry],
-            }));
-
-            obj_label
-        } else if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
-            self.with_scope(type_id, |this| this.compile_expr_with_nav(body, return_label, body_nav))
+        // Definitions are compiled in normalized form: body → Return
+        // No Obj/EndObj wrapper - that's the caller's responsibility (call-site scoping).
+        // We still use with_scope for member index lookup during compilation.
+        let body_entry = if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
+            self.with_scope(type_id, |this| {
+                this.compile_expr_with_nav(body, return_label, body_nav)
+            })
         } else {
             self.compile_expr_with_nav(body, return_label, body_nav)
         };
@@ -229,7 +223,12 @@ impl<'a> Compiler<'a> {
     }
 
     /// Compile an expression with an optional navigation override.
-    pub(super) fn compile_expr_with_nav(&mut self, expr: &Expr, exit: Label, nav_override: Option<Nav>) -> Label {
+    pub(super) fn compile_expr_with_nav(
+        &mut self,
+        expr: &Expr,
+        exit: Label,
+        nav_override: Option<Nav>,
+    ) -> Label {
         self.compile_expr_inner(expr, exit, nav_override, CaptureEffects::default())
     }
 
@@ -250,14 +249,18 @@ impl<'a> Compiler<'a> {
         match expr {
             // Leaf nodes: attach capture effects directly
             Expr::NamedNode(n) => self.compile_named_node_inner(n, exit, nav_override, capture),
-            Expr::AnonymousNode(n) => self.compile_anonymous_node_inner(n, exit, nav_override, capture),
+            Expr::AnonymousNode(n) => {
+                self.compile_anonymous_node_inner(n, exit, nav_override, capture)
+            }
             // Sequences: pass capture to last item
             Expr::SeqExpr(s) => self.compile_seq_inner(s, exit, nav_override, capture),
             // Alternations: pass capture to each branch
             Expr::AltExpr(a) => self.compile_alt_inner(a, exit, nav_override, capture),
             // Wrappers: propagate capture through
             Expr::CapturedExpr(c) => self.compile_captured_inner(c, exit, nav_override, capture),
-            Expr::QuantifiedExpr(q) => self.compile_quantified_inner(q, exit, nav_override, capture),
+            Expr::QuantifiedExpr(q) => {
+                self.compile_quantified_inner(q, exit, nav_override, capture)
+            }
             Expr::FieldExpr(f) => self.compile_field_inner(f, exit, nav_override, capture),
             // Refs: special handling for Call
             Expr::Ref(r) => self.compile_ref_inner(r, exit, nav_override, None, capture),

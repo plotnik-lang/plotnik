@@ -7,11 +7,11 @@ use std::fmt::Write as _;
 
 use crate::colors::Colors;
 
-use super::format::{format_effect, nav_symbol_epsilon, width_for_count, LineBuilder, Symbol};
+use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, width_for_count};
 use super::ids::{QTypeId, StepId};
 use super::module::{Instruction, Module};
 use super::type_meta::TypeKind;
-use super::{Call, Match, Return};
+use super::{Call, Match, Return, Trampoline};
 
 /// Generate a human-readable dump of the bytecode module.
 pub fn dump(module: &Module, colors: Colors) -> String {
@@ -36,7 +36,6 @@ fn dump_header(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "linked = {}", header.is_linked()).unwrap();
     out.push('\n');
 }
-
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
@@ -74,6 +73,8 @@ impl DumpContext {
         let node_fields = module.node_fields();
 
         let mut step_labels = BTreeMap::new();
+        // Preamble always starts at step 0
+        step_labels.insert(0, "_ObjWrap".to_string());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name).to_string();
@@ -249,10 +250,7 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
-            member.name.0,
-            member.type_id.0,
-            c.dim,
-            c.reset
+            member.name.0, member.type_id.0, c.dim, c.reset
         )
         .unwrap();
     }
@@ -274,11 +272,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
-            entry.name.0,
-            entry.type_id.0,
-            c.dim,
-            c.blue,
-            c.reset
+            entry.name.0, entry.type_id.0, c.dim, c.blue, c.reset
         )
         .unwrap();
     }
@@ -356,10 +350,16 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "{}[transitions]{}", c.blue, c.reset).unwrap();
 
     let mut step = 0u16;
+    let mut first_label = true;
     while (step as usize) < transitions_count {
         // Check if this step has a label (using raw u16)
         if let Some(label) = ctx.step_labels.get(&step) {
-            writeln!(out, "\n{}{label}{}:", c.blue, c.reset).unwrap();
+            if first_label {
+                writeln!(out, "{}{label}{}:", c.blue, c.reset).unwrap();
+                first_label = false;
+            } else {
+                writeln!(out, "\n{}{label}{}:", c.blue, c.reset).unwrap();
+            }
         }
 
         let instr = module.decode_step_alloc(step);
@@ -372,7 +372,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         step += size;
     }
 }
-
 
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
@@ -400,10 +399,9 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
                 8 // Match64
             }
         }
-        Instruction::Call(_) | Instruction::Return(_) => 1,
+        Instruction::Call(_) | Instruction::Return(_) | Instruction::Trampoline(_) => 1,
     }
 }
-
 
 fn format_instruction(
     step: u16,
@@ -416,9 +414,9 @@ fn format_instruction(
         Instruction::Match(m) => format_match(step, m, module, ctx, step_width),
         Instruction::Call(c) => format_call(step, c, module, ctx, step_width),
         Instruction::Return(r) => format_return(step, r, module, ctx, step_width),
+        Instruction::Trampoline(t) => format_trampoline(step, t, ctx, step_width),
     }
 }
-
 
 fn format_match(
     step: u16,
@@ -571,6 +569,20 @@ fn format_return(
     builder.pad_successors(prefix, "▶")
 }
 
+fn format_trampoline(step: u16, t: &Trampoline, _ctx: &DumpContext, step_width: usize) -> String {
+    let builder = LineBuilder::new(step_width);
+    let prefix = format!(
+        "  {:0sw$} {} ",
+        step,
+        Symbol::EMPTY.format(),
+        sw = step_width
+    );
+    let content = "Trampoline";
+    let successors = format!("{:0w$}", t.next.get(), w = step_width);
+    let base = format!("{prefix}{content}");
+    builder.pad_successors(base, &successors)
+}
+
 /// Format a step ID, showing entrypoint label or numeric ID.
 fn format_step(step: StepId, ctx: &DumpContext, step_width: usize) -> String {
     let c = &ctx.colors;
@@ -580,4 +592,3 @@ fn format_step(step: StepId, ctx: &DumpContext, step_width: usize) -> String {
         format!("{:0w$}", step.get(), w = step_width)
     }
 }
-

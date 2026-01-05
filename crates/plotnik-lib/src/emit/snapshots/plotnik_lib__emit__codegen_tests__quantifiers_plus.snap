@@ -24,24 +24,26 @@ M0: S1 → T1  ; items: T1
 N0: S2 → T2  ; Test
 
 [entrypoints]
-Test = 01 :: T2
+Test = 06 :: T2
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   ε   [Arr]                            06
-  06   !                                    17
-  07   !   (identifier) [Node Push]         09
-  09   ε                                    24, 14
-  11                                        ▶
-  12   ε   [EndObj]                         11
-  14   ε   [EndArr Set(M0)]                 12
-  16   ▷                                    17
-  17   ε                                    07, 16
-  19   ▷                                    22
-  20   ε                                    19, 14
-  22   ε                                    07, 20
-  24   ▷                                    22
+  06   ε                                    07
+  07   ε   [Arr]                            09
+  09   !                                    18
+  10   !   (identifier) [Node Push]         12
+  12   ε                                    25, 15
+  14                                        ▶
+  15   ε   [EndArr Set(M0)]                 14
+  17   ▷                                    18
+  18   ε                                    10, 17
+  20   ▷                                    23
+  21   ε                                    20, 15
+  23   ε                                    10, 21
+  25   ▷                                    23

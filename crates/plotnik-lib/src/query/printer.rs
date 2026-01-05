@@ -7,8 +7,8 @@ use rowan::NodeOrToken;
 
 use crate::parser::{self as ast, SyntaxNode};
 
-use super::source_map::SourceKind;
 use super::Query;
+use super::source_map::SourceKind;
 use crate::analyze::type_check::Arity;
 
 /// Returns indentation string for the given level.

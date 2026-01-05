@@ -1,10 +1,10 @@
 //! Tests for debug type verification.
 
+use crate::Colors;
+use crate::QueryBuilder;
 use crate::bytecode::{Module, QTypeId};
 use crate::emit::emit_linked;
 use crate::engine::value::{NodeHandle, Value};
-use crate::Colors;
-use crate::QueryBuilder;
 
 use super::debug_verify_type;
 

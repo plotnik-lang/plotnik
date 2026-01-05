@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::engine::{
-    debug_verify_type, FuelLimits, Materializer, PrintTracer, RuntimeError, ValueMaterializer,
-    Verbosity, VM,
-};
 use plotnik_lib::Colors;
+use plotnik_lib::engine::{
+    FuelLimits, Materializer, PrintTracer, RuntimeError, VM, ValueMaterializer, Verbosity,
+    debug_verify_type,
+};
 
 use super::run_common::{self, PreparedQuery, QueryInput};
 

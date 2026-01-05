@@ -9,13 +9,16 @@
 
 use std::num::NonZeroU16;
 
-use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR};
+use crate::analyze::type_check::TypeShape;
+use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 
-use super::capture::CaptureEffects;
-use super::navigation::{check_trailing_anchor, inner_creates_scope, is_skippable_quantifier, is_star_or_plus_quantifier};
 use super::Compiler;
+use super::capture::CaptureEffects;
+use super::navigation::{
+    check_trailing_anchor, inner_creates_scope, is_skippable_quantifier, is_star_or_plus_quantifier,
+};
 
 impl Compiler<'_> {
     /// Compile a named node with capture effects.
@@ -75,8 +78,14 @@ impl Compiler<'_> {
         // If first item is skippable: skip path → exit (bypass Up), match path → Up → exit
         let up_label = self.fresh_label();
         let skip_exit = first_is_skippable.then_some(exit);
-        let items_entry =
-            self.compile_seq_items_inner(&items, up_label, true, None, CaptureEffects::default(), skip_exit);
+        let items_entry = self.compile_seq_items_inner(
+            &items,
+            up_label,
+            true,
+            None,
+            CaptureEffects::default(),
+            skip_exit,
+        );
 
         self.instructions.push(Instruction::Match(MatchIR {
             label: up_label,
@@ -137,8 +146,12 @@ impl Compiler<'_> {
 
     /// Compile a reference with capture effects.
     ///
-    /// For Call instructions, capture effects are placed in an epsilon after the call,
-    /// since the call returns a structured value that the effects operate on.
+    /// Call-site scoping: the caller decides whether to wrap with Obj/EndObj based on
+    /// whether the ref is captured and the called definition returns a struct.
+    ///
+    /// - Captured ref returning struct: `Obj → Call → EndObj → Set → exit`
+    /// - Captured ref returning scalar: `Call → Set → exit`
+    /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
     pub(super) fn compile_ref_inner(
         &mut self,
         r: &ast::Ref,
@@ -160,25 +173,34 @@ impl Compiler<'_> {
             return exit;
         };
 
-        // Determine return address: if capture effects present, emit epsilon for them
-        let return_addr = if capture.post.is_empty() {
-            exit
+        // Check if the called definition returns a struct (needs scope isolation when captured)
+        let def_type_id = self.type_ctx.get_def_type(def_id);
+        let ref_returns_struct = def_type_id
+            .and_then(|tid| self.type_ctx.get_type(tid))
+            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
+
+        // Determine if this is a captured ref that needs scope isolation
+        let is_captured = !capture.post.is_empty();
+        let needs_scope = is_captured && ref_returns_struct;
+
+        let nav = nav_override.unwrap_or(Nav::Stay);
+
+        if needs_scope {
+            // Captured ref returning struct: Obj → Call → EndObj → Set → exit
+            // The Obj creates an isolated scope for the definition's internal captures.
+            let set_step = self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+            let endobj_step = self.emit_endobj_step(set_step);
+            let call_label = self.emit_call(nav, field_override, endobj_step, target);
+            self.emit_obj_step(call_label)
+        } else if is_captured {
+            // Captured ref returning scalar: Call → Set → exit
+            let return_addr =
+                self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+            self.emit_call(nav, field_override, return_addr, target)
         } else {
-            self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default())
-        };
-
-        // Emit Call instruction with caller-provided navigation and field constraint.
-        // Return is emitted at definition exit, not here.
-        let call_label = self.fresh_label();
-        self.instructions.push(Instruction::Call(CallIR {
-            label: call_label,
-            nav: nav_override.unwrap_or(Nav::Stay),
-            node_field: field_override,
-            next: return_addr,
-            target,
-        }));
-
-        call_label
+            // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
+            self.emit_call(nav, field_override, exit, target)
+        }
     }
 
     /// Compile a field constraint with capture effects (passed to inner pattern).
@@ -236,7 +258,10 @@ impl Compiler<'_> {
         // If we have a field constraint, try to merge it into the value's instruction
         if let Some(field_id) = node_field {
             // Try to find and merge with the instruction we just created
-            if let Some(instr) = self.instructions.iter_mut().find(|i| i.label() == value_entry)
+            if let Some(instr) = self
+                .instructions
+                .iter_mut()
+                .find(|i| i.label() == value_entry)
                 && let Instruction::Match(m) = instr
                 && m.node_field.is_none()
             {
@@ -285,7 +310,9 @@ impl Compiler<'_> {
 
         let inner = cap.inner();
         let inner_info = inner.as_ref().and_then(|i| self.type_ctx.get_term_info(i));
-        let inner_is_bubble = inner_info.as_ref().is_some_and(|info| info.flow.is_bubble());
+        let inner_is_bubble = inner_info
+            .as_ref()
+            .is_some_and(|info| info.flow.is_bubble());
         let inner_creates_scope = inner.as_ref().is_some_and(inner_creates_scope);
 
         // Scope type for inner compilation:
@@ -311,10 +338,24 @@ impl Compiler<'_> {
         if inner_is_bubble {
             return if inner_creates_scope {
                 // Sequence/alternation: capture effects after EndObj (value is the struct)
-                self.compile_struct_scope(&inner, exit, nav_override, scope_type_id, capture_effects, outer_capture)
+                self.compile_struct_scope(
+                    &inner,
+                    exit,
+                    nav_override,
+                    scope_type_id,
+                    capture_effects,
+                    outer_capture,
+                )
             } else {
                 // Node with bubbles: scope wrapper for inner captures, but capture on inner match
-                self.compile_bubble_with_node_capture(&inner, exit, nav_override, scope_type_id, capture_effects, outer_capture)
+                self.compile_bubble_with_node_capture(
+                    &inner,
+                    exit,
+                    nav_override,
+                    scope_type_id,
+                    capture_effects,
+                    outer_capture,
+                )
             };
         }
 
@@ -323,13 +364,24 @@ impl Compiler<'_> {
         let inner_is_array = is_star_or_plus_quantifier(Some(&inner));
 
         if inner_is_array {
-            return self.compile_array_scope(&inner, exit, nav_override, capture_effects, outer_capture);
+            return self.compile_array_scope(
+                &inner,
+                exit,
+                nav_override,
+                capture_effects,
+                outer_capture,
+            );
         }
 
         // Scalar: capture effects go directly on the match instruction
         let mut combined = capture_effects;
         combined.extend(outer_capture.post);
-        self.compile_expr_inner(&inner, exit, nav_override, CaptureEffects { post: combined })
+        self.compile_expr_inner(
+            &inner,
+            exit,
+            nav_override,
+            CaptureEffects { post: combined },
+        )
     }
 
     /// Compile a suppressive capture (@_ or @_name).

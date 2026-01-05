@@ -1,17 +1,16 @@
 use std::num::NonZeroU16;
 
-use crate::bytecode::StepId;
-use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
+use super::layout::CacheAligned;
 use crate::bytecode::EffectOpcode;
 use crate::bytecode::Nav;
-use super::layout::CacheAligned;
+use crate::bytecode::StepId;
+use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
 
 #[test]
 fn layout_empty() {
     let result = CacheAligned::layout(&[], &[]);
 
-    // With no instructions, we start at step 1 (step 0 is reserved as unrepresentable)
-    assert_eq!(result.total_steps, 1);
+    assert_eq!(result.total_steps, 0);
     assert!(result.label_to_step.is_empty());
 }
 
@@ -30,8 +29,8 @@ fn layout_single_instruction() {
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
-    assert_eq!(result.total_steps, 2); // 1 instruction + 1 step
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(0)));
+    assert_eq!(result.total_steps, 1);
 }
 
 #[test]
@@ -72,10 +71,10 @@ fn layout_linear_chain() {
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
-    // Should be contiguous: 1, 2, 3
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
-    assert_eq!(result.label_to_step.get(&Label(1)), Some(&StepId::new(2)));
-    assert_eq!(result.label_to_step.get(&Label(2)), Some(&StepId::new(3)));
+    // Should be contiguous: 0, 1, 2
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(0)));
+    assert_eq!(result.label_to_step.get(&Label(1)), Some(&StepId::new(1)));
+    assert_eq!(result.label_to_step.get(&Label(2)), Some(&StepId::new(2)));
 }
 
 #[test]
@@ -119,9 +118,7 @@ fn layout_call_return() {
             post_effects: vec![],
             successors: vec![], // Terminal
         }),
-        Instruction::Return(ReturnIR {
-            label: Label(4),
-        }),
+        Instruction::Return(ReturnIR { label: Label(4) }),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
@@ -235,10 +232,10 @@ fn layout_large_instruction_cache_alignment() {
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
-    // Label 0 at step 1 (offset 8)
-    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(1)));
+    // Label 0 at step 0 (offset 0)
+    assert_eq!(result.label_to_step.get(&Label(0)), Some(&StepId::new(0)));
 
-    // Label 1 should be aligned - either at step 2 or padded to cache line
+    // Label 1 should be aligned - either at step 1 or padded to cache line
     let step1 = result.label_to_step.get(&Label(1)).unwrap();
-    assert!(step1.get() >= 2);
+    assert!(step1.get() >= 1);
 }

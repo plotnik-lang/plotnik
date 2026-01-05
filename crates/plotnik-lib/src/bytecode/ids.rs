@@ -6,29 +6,28 @@ use super::constants::STEP_SIZE;
 
 /// Index into the Transitions section (8-byte steps).
 ///
-/// Uses NonZeroU16 to make StepId(0) unrepresentable - terminal state
-/// is expressed through absence (empty successors, None) rather than
-/// a magic value.
+/// Step 0 is a valid address (preamble starts there).
+/// In successor fields, raw value 0 means "terminal" — this sentinel
+/// is handled by decoding logic, not by the type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct StepId(pub NonZeroU16);
+pub struct StepId(pub u16);
 
 impl StepId {
-    /// Create a new StepId. Panics if n == 0.
     #[inline]
     pub fn new(n: u16) -> Self {
-        Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
+        Self(n)
     }
 
     /// Get the raw u16 value.
     #[inline]
     pub fn get(self) -> u16 {
-        self.0.get()
+        self.0
     }
 
     #[inline]
     pub fn byte_offset(self) -> usize {
-        self.0.get() as usize * STEP_SIZE
+        self.0 as usize * STEP_SIZE
     }
 }
 
@@ -66,6 +65,7 @@ mod tests {
 
     #[test]
     fn step_id_byte_offset() {
+        assert_eq!(StepId::new(0).byte_offset(), 0);
         assert_eq!(StepId::new(1).byte_offset(), 8);
         assert_eq!(StepId::new(10).byte_offset(), 80);
     }

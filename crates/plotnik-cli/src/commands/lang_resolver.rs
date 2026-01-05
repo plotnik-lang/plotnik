@@ -25,8 +25,7 @@ pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option
 
 /// Resolve language, returning an error message if unknown.
 pub fn resolve_lang_required(lang_name: &str) -> Result<Lang, String> {
-    plotnik_langs::from_name(lang_name)
-        .ok_or_else(|| format!("unknown language: '{}'", lang_name))
+    plotnik_langs::from_name(lang_name).ok_or_else(|| format!("unknown language: '{}'", lang_name))
 }
 
 /// Suggest similar language names for typos.
@@ -59,9 +58,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
         curr[0] = i;
         for j in 1..=n {
             let cost = usize::from(a_chars[i - 1] != b_chars[j - 1]);
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }

@@ -22,15 +22,19 @@ T0 = <Void>
 N0: S1 → T0  ; Test
 
 [entrypoints]
-Test = 1 :: T0
+Test = 06 :: T0
 
 [transitions]
-  0   ε                                     ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  1   ε                                     2
-  2   !   (parent)                          3
-  3   ▽   (+)                               4
-  4 !!▷   (next)                            5
-  5   △                                     6
-  6                                         ▶
+  06   ε                                    07
+  07   !   (parent)                         08
+  08   ▽   (+)                              09
+  09 !!▷   (next)                           10
+  10   △                                    11
+  11                                        ▶

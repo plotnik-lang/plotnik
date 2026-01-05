@@ -35,6 +35,7 @@ pub enum Opcode {
     Match64 = 0x5,
     Call = 0x6,
     Return = 0x7,
+    Trampoline = 0x8,
 }
 
 impl Opcode {
@@ -48,6 +49,7 @@ impl Opcode {
             0x5 => Self::Match64,
             0x6 => Self::Call,
             0x7 => Self::Return,
+            0x8 => Self::Trampoline,
             _ => panic!("invalid opcode: {v}"),
         }
     }
@@ -63,6 +65,7 @@ impl Opcode {
             Self::Match64 => 64,
             Self::Call => 8,
             Self::Return => 8,
+            Self::Trampoline => 8,
         }
     }
 
@@ -172,9 +175,11 @@ impl Match {
         if opcode == Opcode::Match8 {
             // Match8: single successor in bytes 6-7 (0 = terminal)
             let next_raw = u16::from_le_bytes([bytes[6], bytes[7]]);
-            let successors = NonZeroU16::new(next_raw)
-                .map(|n| vec![StepId(n)])
-                .unwrap_or_default();
+            let successors = if next_raw == 0 {
+                vec![] // terminal
+            } else {
+                vec![StepId(next_raw)]
+            };
 
             Self {
                 segment,
@@ -411,8 +416,8 @@ impl<'a> MatchView<'a> {
         );
         if self.is_match8 {
             debug_assert!(idx == 0);
-            // Safe: we only call this when succ_count > 0, meaning match8_next != 0
-            StepId(NonZeroU16::new(self.match8_next).unwrap())
+            debug_assert!(self.match8_next != 0, "terminal has no successors");
+            StepId(self.match8_next)
         } else {
             let offset = self.succ_offset() + idx * 2;
             StepId::new(u16::from_le_bytes([
@@ -540,6 +545,48 @@ impl Return {
         let mut bytes = [0u8; 8];
         bytes[0] = (self.segment << 4) | (Opcode::Return as u8);
         // bytes[1..8] are reserved/padding
+        bytes
+    }
+}
+
+/// Trampoline instruction for universal entry.
+///
+/// Like Call, but the target comes from VM context (external parameter)
+/// rather than being encoded in the instruction. Used at address 0 for
+/// the entry preamble: `Obj → Trampoline → EndObj → Accept`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Trampoline {
+    /// Segment index (0-15).
+    pub segment: u8,
+    /// Return address (where to continue after entrypoint returns).
+    pub next: StepId,
+}
+
+impl Trampoline {
+    /// Decode from 8-byte bytecode.
+    pub fn from_bytes(bytes: [u8; 8]) -> Self {
+        let type_id_byte = bytes[0];
+        let segment = type_id_byte >> 4;
+        assert!(
+            segment == 0,
+            "non-zero segment not yet supported: {segment}"
+        );
+        let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        assert_eq!(opcode, Opcode::Trampoline, "expected Trampoline opcode");
+
+        Self {
+            segment,
+            next: StepId::new(u16::from_le_bytes([bytes[2], bytes[3]])),
+        }
+    }
+
+    /// Encode to 8-byte bytecode.
+    pub fn to_bytes(&self) -> [u8; 8] {
+        let mut bytes = [0u8; 8];
+        bytes[0] = (self.segment << 4) | (Opcode::Trampoline as u8);
+        // bytes[1] is padding
+        bytes[2..4].copy_from_slice(&self.next.get().to_le_bytes());
+        // bytes[4..8] are reserved/padding
         bytes
     }
 }

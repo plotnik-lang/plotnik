@@ -13,9 +13,9 @@ use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
 
+use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};
-use super::Compiler;
 
 impl Compiler<'_> {
     /// Compile a sequence with capture effects (passed to last item).
@@ -102,10 +102,13 @@ impl Compiler<'_> {
         let mut current_exit = exit;
         let mut is_last = true;
         for (expr_idx, nav_override) in nav_modes.into_iter().rev() {
-            let expr = items[expr_idx].as_expr().expect("nav_modes only contains expr indices");
+            let expr = items[expr_idx]
+                .as_expr()
+                .expect("nav_modes only contains expr indices");
             if is_last {
                 // Last expression gets capture effects
-                current_exit = self.compile_expr_inner(expr, current_exit, nav_override, capture.clone());
+                current_exit =
+                    self.compile_expr_inner(expr, current_exit, nav_override, capture.clone());
                 is_last = false;
             } else {
                 current_exit = self.compile_expr_with_nav(expr, current_exit, nav_override);
@@ -226,7 +229,7 @@ impl Compiler<'_> {
                 let (variant_idx, payload_type_id) = variant_info
                     .iter()
                     .find(|(sym, _)| self.interner.resolve(**sym) == label_text)
-                    .map(|(_, info)| *info)
+                    .map(|(_, &(idx, type_id))| (idx, type_id))
                     .expect("variant must exist for labeled branch");
 
                 // Tagged branch: E(variant_ref) → body → EndE → exit
@@ -252,10 +255,15 @@ impl Compiler<'_> {
                 });
 
                 // Create deferred member reference for the enum variant
+                // Uses parent enum type + relative index (enum variants don't bubble)
                 let e_effect = if let Some(type_id) = alt_type_id {
-                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::deferred(type_id, variant_idx))
+                    EffectIR::with_member(
+                        EffectOpcode::Enum,
+                        MemberRef::deferred_by_index(type_id, variant_idx),
+                    )
                 } else {
-                    EffectIR::simple(EffectOpcode::Enum, variant_idx as usize)
+                    // Fallback: use absolute index (should not happen for well-formed queries)
+                    EffectIR::simple(EffectOpcode::Enum, 0)
                 };
 
                 let e_step = self.fresh_label();
@@ -273,13 +281,14 @@ impl Compiler<'_> {
                 successors.push(e_step);
             } else {
                 // Untagged branch: compile body, then inject Null for missing captures
-                let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, capture.clone());
+                let branch_entry =
+                    self.compile_expr_inner(&body, exit, branch_nav, capture.clone());
 
                 let Some(fields) = merged_fields else {
                     successors.push(branch_entry);
                     continue;
                 };
-                let Some(type_id) = alt_type_id else {
+                let Some(alt_type) = alt_type_id else {
                     successors.push(branch_entry);
                     continue;
                 };
@@ -289,11 +298,14 @@ impl Compiler<'_> {
                 let null_effects: Vec<_> = fields
                     .iter()
                     .enumerate()
-                    .filter(|&(_, (&sym, _))| !branch_captures.contains(self.interner.resolve(sym)))
+                    .filter(|(_, (sym, _))| !branch_captures.contains(self.interner.resolve(**sym)))
                     .flat_map(|(idx, _)| {
                         [
                             EffectIR::simple(EffectOpcode::Null, 0),
-                            EffectIR::with_member(EffectOpcode::Set, MemberRef::deferred(type_id, idx as u16)),
+                            EffectIR::with_member(
+                                EffectOpcode::Set,
+                                MemberRef::deferred_by_index(alt_type, idx as u16),
+                            ),
                         ]
                     })
                     .collect();

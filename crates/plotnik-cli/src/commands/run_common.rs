@@ -6,9 +6,9 @@ use std::path::Path;
 
 use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
+use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::emit::emit_linked;
-use plotnik_lib::QueryBuilder;
 
 use super::lang_resolver::{resolve_lang_required, suggest_language};
 use super::query_loader::load_query_source;
