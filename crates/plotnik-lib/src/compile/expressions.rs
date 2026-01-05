@@ -66,6 +66,15 @@ impl Compiler<'_> {
             Nav::Up(1)
         };
 
+        // Trailing anchor requires skip-retry pattern for backtracking.
+        // When the anchor check fails (matched node is not last), we need to
+        // retry with the next sibling until we find one that IS last.
+        if has_trailing_anchor {
+            return self.compile_named_node_with_trailing_anchor(
+                entry, exit, nav, node_type, neg_fields, &items, up_nav, capture,
+            );
+        }
+
         // Check if first item is skippable - its skip path should bypass the Up.
         // When a zero-match quantifier (? or *) is the first child with Down navigation,
         // the skip path never descends, so executing Up would ascend too far.
@@ -108,6 +117,90 @@ impl Compiler<'_> {
             neg_fields,
             post_effects: capture.post,
             successors: vec![items_entry],
+        }));
+
+        entry
+    }
+
+    /// Compile a named node with trailing anchor using skip-retry pattern.
+    ///
+    /// Structure:
+    /// ```text
+    /// entry: Match(nav, node_type) → down_wildcard
+    /// down_wildcard: Match(Down, wildcard) → try
+    /// try: epsilon → [body, retry_nav]
+    /// body: items (StayExact) → up_check
+    /// up_check: Match(up_nav, None) → exit
+    /// retry_nav: Match(Next, wildcard) → try
+    /// ```
+    ///
+    /// When items match but the trailing anchor check fails, we backtrack to `try`,
+    /// which falls through to `retry_nav`, advances to next sibling, and retries.
+    /// Only when siblings are exhausted does backtracking propagate to the caller.
+    #[allow(clippy::too_many_arguments)]
+    fn compile_named_node_with_trailing_anchor(
+        &mut self,
+        entry: Label,
+        exit: Label,
+        nav: Nav,
+        node_type: Option<NonZeroU16>,
+        neg_fields: Vec<u16>,
+        items: &[ast::SeqItem],
+        up_nav: Nav,
+        capture: CaptureEffects,
+    ) -> Label {
+        // up_check: Match(up_nav) → exit
+        let up_check = self.fresh_label();
+        self.instructions.push(Instruction::Match(MatchIR {
+            label: up_check,
+            nav: up_nav,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields: vec![],
+            post_effects: vec![],
+            successors: vec![exit],
+        }));
+
+        // body: items with StayExact navigation → up_check
+        // Items are compiled with StayExact because the skip-retry loop handles
+        // advancement; the body should match at the current position only.
+        let body = self.compile_seq_items_inner(
+            items,
+            up_check,
+            true,
+            Some(Nav::StayExact), // First item uses StayExact (we're already at position)
+            CaptureEffects::default(),
+            None,
+        );
+
+        // Build skip-retry structure:
+        // try: epsilon → [body, retry_nav]
+        // retry_nav: Match(Next, wildcard) → try
+        let try_label = self.fresh_label();
+        let retry_nav = self.fresh_label();
+
+        // retry_nav: advance to next sibling and loop back
+        self.emit_wildcard_nav(retry_nav, Nav::Next, try_label);
+
+        // try: branch to body (prefer) or retry (fallback)
+        // Greedy: try body first, then retry on failure
+        self.emit_branch_epsilon_at(try_label, body, retry_nav, true);
+
+        // down_wildcard: navigate to first child → try
+        let down_wildcard = self.fresh_label();
+        self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
+
+        // entry: match parent node → down_wildcard
+        self.instructions.push(Instruction::Match(MatchIR {
+            label: entry,
+            nav,
+            node_type,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields,
+            post_effects: capture.post,
+            successors: vec![down_wildcard],
         }));
 
         entry

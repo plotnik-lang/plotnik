@@ -312,6 +312,44 @@ fn anchor_adjacency() {
     );
 }
 
+/// Trailing anchor requires backtracking when first match isn't last.
+/// The skip-retry pattern retries with next sibling until finding the last one.
+#[test]
+fn anchor_last_child() {
+    snap!(
+        "Q = (program (function_declaration) @last .)",
+        "function first() {} function second() {}"
+    );
+}
+
+/// Trailing anchor with only one sibling - trivial case.
+#[test]
+fn anchor_last_child_single() {
+    snap!(
+        "Q = (program (function_declaration) @only .)",
+        "function only() {}"
+    );
+}
+
+/// Trailing anchor skips trivia (comments) when checking last position.
+#[test]
+fn anchor_last_child_with_trivia() {
+    snap!(
+        "Q = (program (function_declaration) @last .)",
+        "function first() {} function second() {} /* trailing comment */"
+    );
+}
+
+/// Multi-item sequence with trailing anchor.
+/// Should find (b, c) not (a, b) because c must be last.
+#[test]
+fn anchor_last_child_multi_item() {
+    snap!(
+        "Q = (program {(function_declaration) @a (function_declaration) @b .})",
+        "function a() {} function b() {} function c() {}"
+    );
+}
+
 // ============================================================================
 // 6. FIELDS
 // ============================================================================

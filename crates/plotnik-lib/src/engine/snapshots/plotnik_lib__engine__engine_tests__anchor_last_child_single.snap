@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (function_declaration) @only .)
+---
+function only() {}
+---
+{
+  "only": {
+    "kind": "function_declaration",
+    "text": "function only() {}",
+    "span": [
+      0,
+      18
+    ]
+  }
+}
