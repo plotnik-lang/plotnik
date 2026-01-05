@@ -55,11 +55,12 @@ Inner:
 
 Test:
   10   ε                                    11
-  11   ε                                    17, 23
+  11   ε                                    19, 25
   13                                        ▶
-  14   ε   [EndEnum Set(M4)]                13
-  16   !   (Inner)                          06 : 14
-  17   ε   [Enum(M2)]                       16
-  19   ε   [EndEnum Set(M4)]                13
-  21   !   (number) [Node Set(M1)]          19
-  23   ε   [Enum(M3)]                       21
+  14   ε   [Set(M4)]                        13
+  16   ε   [EndEnum]                        14
+  18   !   (Inner)                          06 : 16
+  19   ε   [Enum(M2)]                       18
+  21   ε   [EndEnum]                        14
+  23   !   (number) [Node Set(M1)]          21
+  25   ε   [Enum(M3)]                       23

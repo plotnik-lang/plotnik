@@ -453,6 +453,26 @@ impl Compiler<'_> {
             };
         }
 
+        // Handle scope-creating scalar expressions (tagged enums)
+        // Enum produces its own value via EndEnum - capture effects go AFTER, not inside
+        let inner_is_scope_creating_scalar = !inner_is_bubble
+            && inner_creates_scope
+            && inner_info
+                .as_ref()
+                .and_then(|info| info.flow.type_id())
+                .and_then(|id| self.type_ctx.get_type(id))
+                .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+
+        if inner_is_scope_creating_scalar {
+            let set_step = self.emit_effects_epsilon(exit, capture_effects, outer_capture);
+            return self.compile_expr_inner(
+                &inner,
+                set_step,
+                nav_override,
+                CaptureEffects::default(),
+            );
+        }
+
         // Array: Arr → quantifier (with Push) → EndArr+capture → exit
         // Check if inner is a * or + quantifier - these produce arrays regardless of arity
         let inner_is_array = is_star_or_plus_quantifier(Some(&inner));
