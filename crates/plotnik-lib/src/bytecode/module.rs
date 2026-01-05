@@ -8,7 +8,7 @@ use std::ops::Deref;
 use std::path::Path;
 
 use super::header::Header;
-use super::ids::{QTypeId, StepId, StringId};
+use super::ids::{QTypeId, StringId};
 use super::instructions::{Call, Match, MatchView, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
 use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
@@ -521,7 +521,7 @@ impl<'a> EntrypointsView<'a> {
         let offset = idx * 8;
         Entrypoint {
             name: StringId::new(read_u16_le(self.bytes, offset)),
-            target: StepId::new(read_u16_le(self.bytes, offset + 2)),
+            target: read_u16_le(self.bytes, offset + 2),
             result_type: QTypeId(read_u16_le(self.bytes, offset + 4)),
             _pad: 0,
         }

@@ -7,8 +7,36 @@ use std::num::NonZeroU16;
 
 use super::constants::{SECTION_ALIGN, STEP_SIZE};
 use super::effects::EffectOp;
-use super::ids::StepId;
 use super::nav::Nav;
+
+/// Step address in bytecode (raw u16).
+///
+/// Used for layout addresses, entrypoint targets, bootstrap parameter, etc.
+/// For decoded instruction successors (where 0 = terminal), use [`StepId`] instead.
+pub type StepAddr = u16;
+
+/// Successor step address in decoded instructions.
+///
+/// Uses NonZeroU16 because raw 0 means "terminal" (no successor).
+/// This type is only for decoded instruction successors - use raw `u16`
+/// for addresses in layout, entrypoints, and VM internals.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(transparent)]
+pub struct StepId(pub NonZeroU16);
+
+impl StepId {
+    /// Create a new StepId. Panics if n == 0.
+    #[inline]
+    pub fn new(n: u16) -> Self {
+        Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
+    }
+
+    /// Get the raw u16 value.
+    #[inline]
+    pub fn get(self) -> u16 {
+        self.0.get()
+    }
+}
 
 /// Read `count` little-endian u16 values from bytes starting at `offset`.
 /// Advances `offset` by `count * 2`.
@@ -178,7 +206,7 @@ impl Match {
             let successors = if next_raw == 0 {
                 vec![] // terminal
             } else {
-                vec![StepId(next_raw)]
+                vec![StepId::new(next_raw)]
             };
 
             Self {
@@ -417,7 +445,7 @@ impl<'a> MatchView<'a> {
         if self.is_match8 {
             debug_assert!(idx == 0);
             debug_assert!(self.match8_next != 0, "terminal has no successors");
-            StepId(self.match8_next)
+            StepId::new(self.match8_next)
         } else {
             let offset = self.succ_offset() + idx * 2;
             StepId::new(u16::from_le_bytes([

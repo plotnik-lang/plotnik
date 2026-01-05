@@ -3,9 +3,8 @@
 use std::num::NonZeroU16;
 
 use super::effects::{EffectOp, EffectOpcode};
-use super::ids::StepId;
 use super::instructions::{
-    Call, Match, MatchView, Opcode, Return, align_to_section, select_match_opcode,
+    Call, Match, MatchView, Opcode, Return, StepId, align_to_section, select_match_opcode,
 };
 use super::nav::Nav;
 

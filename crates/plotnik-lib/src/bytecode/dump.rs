@@ -8,7 +8,8 @@ use std::fmt::Write as _;
 use crate::colors::Colors;
 
 use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, width_for_count};
-use super::ids::{QTypeId, StepId};
+use super::ids::QTypeId;
+use super::instructions::StepId;
 use super::module::{Instruction, Module};
 use super::type_meta::TypeKind;
 use super::{Call, Match, Return, Trampoline};
@@ -73,12 +74,12 @@ impl DumpContext {
         let node_fields = module.node_fields();
 
         let mut step_labels = BTreeMap::new();
-        // Preamble always starts at step 0
+        // Preamble always at step 0 (first in layout)
         step_labels.insert(0, "_ObjWrap".to_string());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name).to_string();
-            step_labels.insert(ep.target.get(), name);
+            step_labels.insert(ep.target, name);
         }
 
         let mut node_type_names = BTreeMap::new();
@@ -319,7 +320,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
         .map(|i| {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name);
-            (name, ep.target.0, ep.result_type.0)
+            (name, ep.target, ep.result_type.0)
         })
         .collect();
     entries.sort_by_key(|(name, _, _)| *name);

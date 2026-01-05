@@ -1,26 +1,25 @@
 //! Instruction IR with symbolic labels.
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
-//! After layout, labels are resolved to `StepId` for serialization.
+//! After layout, labels are resolved to step addresses (u16) for serialization.
 //! Member indices use deferred resolution via `MemberRef`.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
 use super::effects::{EffectOp, EffectOpcode};
-use super::ids::StepId;
-use super::instructions::{Call, Match, Return, Trampoline, select_match_opcode};
+use super::instructions::{Call, Match, Return, StepAddr, StepId, Trampoline, select_match_opcode};
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
 
-/// Symbolic reference, resolved to StepId at layout time.
+/// Symbolic reference, resolved to step address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Label(pub u32);
 
 impl Label {
-    /// Resolve this label to a StepId using the layout mapping.
+    /// Resolve this label to a step address using the layout mapping.
     #[inline]
-    pub fn resolve(self, map: &BTreeMap<Label, StepId>) -> StepId {
+    pub fn resolve(self, map: &BTreeMap<Label, StepAddr>) -> StepAddr {
         *map.get(&self).expect("label not in layout")
     }
 }
@@ -197,7 +196,7 @@ impl Instruction {
     /// - `get_member_base`: maps parent TypeId to member base index
     pub fn resolve<F, G>(
         &self,
-        map: &BTreeMap<Label, StepId>,
+        map: &BTreeMap<Label, StepAddr>,
         lookup_member: F,
         get_member_base: G,
     ) -> Vec<u8>
@@ -263,7 +262,7 @@ impl MatchIR {
     /// - `get_member_base`: maps parent TypeId to member base index
     pub fn resolve<F, G>(
         &self,
-        map: &BTreeMap<Label, StepId>,
+        map: &BTreeMap<Label, StepAddr>,
         lookup_member: F,
         get_member_base: G,
     ) -> Vec<u8>
@@ -271,7 +270,11 @@ impl MatchIR {
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
     {
-        let successors: Vec<StepId> = self.successors.iter().map(|&l| l.resolve(map)).collect();
+        let successors: Vec<StepId> = self
+            .successors
+            .iter()
+            .map(|&l| StepId::new(l.resolve(map)))
+            .collect();
 
         // Resolve effect member references to absolute indices
         let pre_effects: Vec<EffectOp> = self
@@ -323,13 +326,13 @@ pub struct CallIR {
 
 impl CallIR {
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> [u8; 8] {
+    pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         let c = Call {
             segment: 0,
             nav: self.nav,
             node_field: self.node_field,
-            next: self.next.resolve(map),
-            target: self.target.resolve(map),
+            next: StepId::new(self.next.resolve(map)),
+            target: StepId::new(self.target.resolve(map)),
         };
         c.to_bytes()
     }
@@ -364,20 +367,20 @@ pub struct TrampolineIR {
 
 impl TrampolineIR {
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> [u8; 8] {
+    pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         let t = Trampoline {
             segment: 0,
-            next: self.next.resolve(map),
+            next: StepId::new(self.next.resolve(map)),
         };
         t.to_bytes()
     }
 }
 
-/// Result of layout: maps labels to step IDs.
+/// Result of layout: maps labels to step addresses.
 #[derive(Clone, Debug)]
 pub struct LayoutResult {
-    /// Mapping from symbolic labels to concrete step IDs.
-    pub label_to_step: BTreeMap<Label, StepId>,
+    /// Mapping from symbolic labels to concrete step addresses (raw u16).
+    pub label_to_step: BTreeMap<Label, StepAddr>,
     /// Total number of steps (for header).
     pub total_steps: u16,
 }
@@ -464,7 +467,7 @@ mod tests {
         };
 
         let mut map = BTreeMap::new();
-        map.insert(Label(0), StepId::new(1));
+        map.insert(Label(0), 1u16);
 
         let bytes = m.resolve(&map, |_, _| None, |_| None);
         assert_eq!(bytes.len(), 8);
