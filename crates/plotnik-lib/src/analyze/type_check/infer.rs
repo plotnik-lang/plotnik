@@ -348,9 +348,16 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Determines if an expression creates a scope boundary when captured.
+    ///
+    /// When captured, these expressions produce structured values (not nodes):
+    /// - Sequences/alternations: produce structs/enums from their internal captures
+    /// - Refs: produce whatever the called definition returns (struct if it has captures)
+    ///
+    /// This only affects captured expressions. Uncaptured refs remain transparent
+    /// (their captures bubble up) because this check only runs in `infer_captured_expr`.
     fn inner_creates_scope(inner: &Expr) -> bool {
         match inner {
-            Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
+            Expr::SeqExpr(_) | Expr::AltExpr(_) | Expr::Ref(_) => true,
             Expr::QuantifiedExpr(q) => {
                 // Look through quantifier to the actual expression
                 q.inner()
