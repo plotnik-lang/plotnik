@@ -130,20 +130,13 @@ impl<'a> Emitter<'a> {
             }
         }
 
-        // Emit entrypoints with primitive result types (like VOID)
-        // These are not in to_emit because collect_reachable_types skips primitives
+        // Emit remaining entrypoints (primitives, arrays, optionals)
+        // These are not in to_emit because collect_reachable_types skips them
         for (&type_id, name) in &primary_names {
             if self.emitted.contains(&type_id) {
                 continue;
             }
-            let Some(type_def) = self.types.get(type_id) else {
-                continue;
-            };
-            if let Some(kind) = type_def.type_kind()
-                && kind.is_primitive()
-            {
-                self.emit_type_definition(name, type_id);
-            }
+            self.emit_type_definition(name, type_id);
         }
 
         // Emit aliases

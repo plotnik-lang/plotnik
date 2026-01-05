@@ -72,6 +72,8 @@ pub enum DiagnosticKind {
     MultiCaptureQuantifierNoName,
     UnusedBranchLabels,
     StrictDimensionalityViolation,
+    UncapturedOutputWithCaptures,
+    AmbiguousUncapturedOutputs,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
@@ -155,6 +157,10 @@ impl DiagnosticKind {
             }
             Self::AnchorWithoutContext => Some("wrap in a named node: `(parent . (child))`"),
             Self::AnchorInAlternation => Some("use `[{(a) . (b)} (c)]` to anchor within a branch"),
+            Self::UncapturedOutputWithCaptures => Some("add `@name` to capture the output"),
+            Self::AmbiguousUncapturedOutputs => {
+                Some("capture each expression explicitly: `(X) @x (Y) @y`")
+            }
             _ => None,
         }
     }
@@ -221,6 +227,12 @@ impl DiagnosticKind {
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
             Self::StrictDimensionalityViolation => {
                 "quantifier with captures requires a struct capture"
+            }
+            Self::UncapturedOutputWithCaptures => {
+                "output-producing expression requires capture when siblings have captures"
+            }
+            Self::AmbiguousUncapturedOutputs => {
+                "multiple expressions produce output without capture"
             }
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",

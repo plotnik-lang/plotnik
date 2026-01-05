@@ -93,29 +93,32 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Named node: matches one position, bubbles up child captures.
+    /// Named node: matches one position, bubbles up child captures or propagates output.
     fn infer_named_node(&mut self, node: &NamedNode) -> TermInfo {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
+        let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
         for child in node.children() {
             let child_info = self.infer_expr(&child);
 
-            if let TypeFlow::Bubble(type_id) = child_info.flow
-                && let Some(fields) = self.ctx.get_struct_fields(type_id)
-            {
-                for (name, info) in fields {
-                    // Named nodes merge fields silently (union behavior)
-                    merged_fields.entry(*name).or_insert(*info);
+            match &child_info.flow {
+                TypeFlow::Bubble(type_id) => {
+                    if let Some(fields) = self.ctx.get_struct_fields(*type_id) {
+                        for (name, info) in fields {
+                            merged_fields.entry(*name).or_insert(*info);
+                        }
+                    }
                 }
+                TypeFlow::Scalar(type_id) => {
+                    if self.produces_output(*type_id) {
+                        output_children.push((child.text_range(), *type_id));
+                    }
+                }
+                TypeFlow::Void => {}
             }
         }
 
-        let flow = if merged_fields.is_empty() {
-            TypeFlow::Void
-        } else {
-            TypeFlow::Bubble(self.ctx.intern_struct(merged_fields))
-        };
-
+        let flow = self.compute_merged_flow(merged_fields, output_children, node.text_range());
         TermInfo::new(Arity::One, flow)
     }
 
@@ -148,7 +151,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         self.infer_expr(body)
     }
 
-    /// Sequence: Arity aggregation and strict field merging (no duplicates).
+    /// Sequence: Arity aggregation, strict field merging, and output propagation.
     fn infer_seq_expr(&mut self, seq: &SeqExpr) -> TermInfo {
         let children: Vec<_> = seq.children().collect();
 
@@ -161,25 +164,27 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         };
 
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
+        let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
         for child in &children {
             let child_info = self.infer_expr(child);
 
-            if let TypeFlow::Bubble(type_id) = child_info.flow {
-                // Clone fields to release immutable borrow on self.ctx,
-                // allowing mutable borrow of self for merge_seq_fields.
-                if let Some(fields) = self.ctx.get_struct_fields(type_id).cloned() {
-                    self.merge_seq_fields(&mut merged_fields, &fields, child.text_range());
+            match &child_info.flow {
+                TypeFlow::Bubble(type_id) => {
+                    if let Some(fields) = self.ctx.get_struct_fields(*type_id).cloned() {
+                        self.merge_seq_fields(&mut merged_fields, &fields, child.text_range());
+                    }
                 }
+                TypeFlow::Scalar(type_id) => {
+                    if self.produces_output(*type_id) {
+                        output_children.push((child.text_range(), *type_id));
+                    }
+                }
+                TypeFlow::Void => {}
             }
         }
 
-        let flow = if merged_fields.is_empty() {
-            TypeFlow::Void
-        } else {
-            TypeFlow::Bubble(self.ctx.intern_struct(merged_fields))
-        };
-
+        let flow = self.compute_merged_flow(merged_fields, output_children, seq.text_range());
         TermInfo::new(arity, flow)
     }
 
@@ -697,6 +702,85 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         match flow {
             TypeFlow::Void => TYPE_VOID,
             TypeFlow::Scalar(t) | TypeFlow::Bubble(t) => *t,
+        }
+    }
+
+    /// Check if a type produces meaningful output for propagation.
+    ///
+    /// Meaningful outputs are structured types (enums, structs, refs) or arrays/optionals
+    /// of such types. Simple `Node[]` from quantified named nodes is NOT meaningful.
+    fn produces_output(&self, type_id: TypeId) -> bool {
+        let Some(shape) = self.ctx.get_type(type_id) else {
+            return false;
+        };
+        match shape {
+            TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_) => true,
+            TypeShape::Array { element, .. } => {
+                *element != TYPE_NODE && self.produces_output(*element)
+            }
+            TypeShape::Optional(inner) => *inner != TYPE_NODE && self.produces_output(*inner),
+            TypeShape::Node | TypeShape::String | TypeShape::Void | TypeShape::Custom(_) => false,
+        }
+    }
+
+    /// Compute flow from merged bubble fields and output-producing children.
+    ///
+    /// Rules:
+    /// - No bubbles, 0 outputs → Void
+    /// - No bubbles, 1 output → Forward output (propagate)
+    /// - No bubbles, 2+ outputs → Error (ambiguous)
+    /// - Bubbles, 0 outputs → Bubble(struct)
+    /// - Bubbles, 1+ outputs → Error (require capture)
+    fn compute_merged_flow(
+        &mut self,
+        merged_fields: BTreeMap<Symbol, FieldInfo>,
+        output_children: Vec<(TextRange, TypeId)>,
+        parent_range: TextRange,
+    ) -> TypeFlow {
+        let has_bubbles = !merged_fields.is_empty();
+
+        match (has_bubbles, output_children.len()) {
+            (false, 0) => TypeFlow::Void,
+            (false, 1) => TypeFlow::Scalar(output_children[0].1),
+            (false, _) => {
+                self.report_ambiguous_outputs(parent_range, &output_children);
+                TypeFlow::Void
+            }
+            (true, 0) => TypeFlow::Bubble(self.ctx.intern_struct(merged_fields)),
+            (true, _) => {
+                self.report_uncaptured_output_with_captures(&output_children);
+                TypeFlow::Bubble(self.ctx.intern_struct(merged_fields))
+            }
+        }
+    }
+
+    fn report_ambiguous_outputs(
+        &mut self,
+        parent_range: TextRange,
+        outputs: &[(TextRange, TypeId)],
+    ) {
+        self.diag
+            .report(
+                self.source_id,
+                DiagnosticKind::AmbiguousUncapturedOutputs,
+                parent_range,
+            )
+            .message(format!(
+                "{} expressions produce output without capture",
+                outputs.len()
+            ))
+            .emit();
+    }
+
+    fn report_uncaptured_output_with_captures(&mut self, outputs: &[(TextRange, TypeId)]) {
+        for (range, _) in outputs {
+            self.diag
+                .report(
+                    self.source_id,
+                    DiagnosticKind::UncapturedOutputWithCaptures,
+                    *range,
+                )
+                .emit();
         }
     }
 
