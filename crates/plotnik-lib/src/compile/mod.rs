@@ -157,13 +157,21 @@ impl<'a> Compiler<'a> {
         self.instructions
             .push(Instruction::Return(ReturnIR { label: return_label }));
 
-        // Check if definition returns a struct type - if so, wrap in Obj/EndObj
-        // This ensures recursive calls properly scope their captures
+        // Check if definition needs Obj/EndObj wrapper.
+        // A definition needs its own scope when:
+        // 1. It returns a struct type, AND
+        // 2. It has direct captures (CapturedExpr not inside a Ref)
+        //
+        // When captures come only from Refs (called definitions), those definitions
+        // already handle their own Obj/EndObj scopes. Adding another wrapper would
+        // create nested scopes where the inner result gets lost.
         let def_returns_struct = self
             .type_ctx
             .get_def_type(def_id)
             .and_then(|tid| self.type_ctx.get_type(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
+        let has_direct_captures = !Self::collect_captures(body).is_empty();
+        let needs_obj_wrapper = def_returns_struct && has_direct_captures;
 
         // Definition bodies use StayExact navigation: match at current position only.
         // The caller (alternation, sequence, quantifier, or VM top-level) owns the search.
@@ -171,7 +179,7 @@ impl<'a> Compiler<'a> {
         // alternation branches should try.
         let body_nav = Some(Nav::StayExact);
 
-        let body_entry = if def_returns_struct {
+        let body_entry = if needs_obj_wrapper {
             let type_id = self.type_ctx.get_def_type(def_id).expect("checked above");
 
             // Emit EndObj → Return
