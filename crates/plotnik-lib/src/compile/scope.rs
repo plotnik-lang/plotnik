@@ -191,6 +191,9 @@ impl Compiler<'_> {
     }
 
     /// Compile array scope: Arr → quantifier (with Push) → EndArr+capture → exit
+    ///
+    /// `use_text_for_elements` indicates whether to use `Text` effect for array elements
+    /// (true when the capture has `:: string` annotation).
     pub(super) fn compile_array_scope(
         &mut self,
         inner: &Expr,
@@ -198,6 +201,7 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
+        use_text_for_elements: bool,
     ) -> Label {
         let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndArr, 0)];
         end_effects.extend(capture_effects);
@@ -217,8 +221,14 @@ impl Compiler<'_> {
 
         let push_effects = CaptureEffects {
             post: if self.quantifier_needs_node_for_push(inner) {
+                // Use Text if the capture has `:: string` annotation, else Node
+                let opcode = if use_text_for_elements {
+                    EffectOpcode::Text
+                } else {
+                    EffectOpcode::Node
+                };
                 vec![
-                    EffectIR::simple(EffectOpcode::Node, 0),
+                    EffectIR::simple(opcode, 0),
                     EffectIR::simple(EffectOpcode::Push, 0),
                 ]
             } else {

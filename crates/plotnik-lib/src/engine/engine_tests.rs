@@ -36,7 +36,9 @@ fn execute_with_entry(query: &str, source: &str, entry: Option<&str>) -> String 
     let vm = VM::new(&tree, trivia, FuelLimits::default());
 
     let entrypoint = resolve_entrypoint(&module, entry);
-    let effects = vm.execute(&module, &entrypoint).expect("execution failed");
+    let effects = vm
+        .execute(&module, 0, &entrypoint)
+        .expect("execution failed");
 
     let materializer = ValueMaterializer::new(source, module.types(), module.strings());
     let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);
@@ -178,6 +180,26 @@ fn quantifier_struct_array() {
     snap!(
         "Q = (program (lexical_declaration {(variable_declarator name: (identifier) @name) @decl}* @decls))",
         "let a, b, c"
+    );
+}
+
+/// Regression: string annotation on array capture should extract text.
+/// `(identifier)* @names :: string` should produce string[], not Node[].
+#[test]
+fn quantifier_star_with_string_annotation() {
+    snap!(
+        "Q = (program (expression_statement (array (identifier)* @names :: string)))",
+        "[a, b, c]"
+    );
+}
+
+/// Regression: string annotation on non-empty array capture.
+/// `(identifier)+ @names :: string` should produce [string, ...string[]].
+#[test]
+fn quantifier_plus_with_string_annotation() {
+    snap!(
+        "Q = (program (expression_statement (array (identifier)+ @names :: string)))",
+        "[a, b, c]"
     );
 }
 

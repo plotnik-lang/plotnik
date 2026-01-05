@@ -393,6 +393,12 @@ impl CapturedExpr {
     pub fn type_annotation(&self) -> Option<Type> {
         self.0.children().find_map(Type::cast)
     }
+
+    /// Returns true if this capture has a `:: string` type annotation.
+    pub fn has_string_annotation(&self) -> bool {
+        self.type_annotation()
+            .is_some_and(|t| t.name().is_some_and(|n| n.text() == "string"))
+    }
 }
 
 impl Type {

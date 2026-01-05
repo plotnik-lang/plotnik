@@ -260,8 +260,13 @@ impl Compiler<'_> {
 
         let push_effects = CaptureEffects {
             post: if self.quantifier_needs_node_for_push(inner) {
+                let opcode = if cap.has_string_annotation() {
+                    EffectOpcode::Text
+                } else {
+                    EffectOpcode::Node
+                };
                 vec![
-                    EffectIR::simple(EffectOpcode::Node, 0),
+                    EffectIR::simple(opcode, 0),
                     EffectIR::simple(EffectOpcode::Push, 0),
                 ]
             } else {

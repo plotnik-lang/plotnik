@@ -370,6 +370,7 @@ impl Compiler<'_> {
                 nav_override,
                 capture_effects,
                 outer_capture,
+                cap.has_string_annotation(),
             );
         }
 
