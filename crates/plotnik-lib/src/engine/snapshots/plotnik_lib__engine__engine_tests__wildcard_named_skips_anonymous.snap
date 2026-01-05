@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (return_statement (_) @x))
+---
+return 42
+---
+{
+  "x": {
+    "kind": "number",
+    "text": "42",
+    "span": [
+      7,
+      9
+    ]
+  }
+}

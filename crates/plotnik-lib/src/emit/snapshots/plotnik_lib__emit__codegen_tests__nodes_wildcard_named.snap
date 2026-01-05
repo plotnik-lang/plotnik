@@ -35,6 +35,6 @@ _ObjWrap:
 Test:
   06   ε                                    07
   07   !   (pair)                           08
-  08   ▽   key: _ [Node Set(M0)]            10
+  08   ▽   key: (_) [Node Set(M0)]          10
   10   △                                    11
   11                                        ▶

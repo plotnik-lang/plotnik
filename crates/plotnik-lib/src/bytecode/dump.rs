@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 
 use crate::colors::Colors;
 
+use super::NAMED_WILDCARD;
 use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, width_for_count};
 use super::ids::QTypeId;
 use super::instructions::StepId;
@@ -471,7 +472,7 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
     parts.join(" ")
 }
 
-/// Format node pattern: `field: (type)` or `(type)` or `field: _`
+/// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)`
 fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
     let mut result = String::new();
 
@@ -485,13 +486,18 @@ fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
     }
 
     if let Some(type_id) = m.node_type {
-        let name = ctx
-            .node_type_name(type_id.get())
-            .map(String::from)
-            .unwrap_or_else(|| format!("node#{}", type_id.get()));
-        result.push('(');
-        result.push_str(&name);
-        result.push(')');
+        if type_id.get() == NAMED_WILDCARD {
+            // Named wildcard: any named node
+            result.push_str("(_)");
+        } else {
+            let name = ctx
+                .node_type_name(type_id.get())
+                .map(String::from)
+                .unwrap_or_else(|| format!("node#{}", type_id.get()));
+            result.push('(');
+            result.push_str(&name);
+            result.push(')');
+        }
     } else if m.node_field.is_some() {
         result.push('_');
     }
