@@ -31,7 +31,7 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  !!!  (pair)                           05
+  04   !   (pair)                           05
   05   ▽   key: _ [Node Set(M0)]            07
   07   △                                    08
   08   ε   [EndObj]                         10

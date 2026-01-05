@@ -100,7 +100,7 @@ Assignment:
   13   ε   [Obj]                            15
   15       (assignment_expression)          16
   16   ▽   left: (identifier) [Node Set(M6)]  18
-  18   ▷   right: (Expression)              19 ⯇
+  18   ▷   right: (Expression)             09 : 19
   19   ε   [Set(M5)]                        21
   21   △                                    22
   22   ε   [EndObj]                         24
@@ -170,14 +170,14 @@ Examples:
 - `!▽ ` — down, skip trivia
 - `!!▷ ` — next, exact
 
-| Instruction      | Format                                        |
-| ---------------- | --------------------------------------------- |
-| Match (terminal) | `step nav    [pre] (type) [post]      ◼`      |
-| Match            | `step nav    [pre] field: (type) [post] succ` |
-| Match (branch)   | `step nav    [pre] (type) [post]      s1, s2` |
-| Epsilon          | `step  ε     [effects]                succ`   |
-| Call             | `step nav    field: (Name)         return ⯇`  |
-| Return           | `step                                 ▶`      |
+| Instruction      | Format                                           |
+| ---------------- | ------------------------------------------------ |
+| Match (terminal) | `step nav    [pre] (type) [post]      ◼`         |
+| Match            | `step nav    [pre] field: (type) [post] succ`    |
+| Match (branch)   | `step nav    [pre] (type) [post]      s1, s2`    |
+| Epsilon          | `step  ε     [effects]                succ`      |
+| Call             | `step nav    field: (Name)        target : ret`  |
+| Return           | `step                                 ▶`         |
 
 Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`, `field:`.
 
@@ -189,7 +189,7 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | --------------- | ------- | ----------------------------------- |
 | Stay            | (blank) | No movement, 5 spaces               |
 | Stay (epsilon)  | ε       | Only when no type/field constraints |
-| StayExact       | !!!     | No movement, exact match only       |
+| StayExact       | !       | No movement, exact match only       |
 | Down            | ▽       | First child, skip any               |
 | DownSkip        | !▽      | First child, skip trivia            |
 | DownExact       | !!▽     | First child, exact                  |

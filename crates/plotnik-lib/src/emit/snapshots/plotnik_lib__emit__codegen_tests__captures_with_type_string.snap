@@ -31,6 +31,6 @@ Test = 1 :: T1
 Test:
   1   ε                                     2
   2   ε   [Obj]                             4
-  4  !!!  (identifier) [Text Set(M0)]       6
+  4   !   (identifier) [Text Set(M0)]       6
   6   ε   [EndObj]                          8
   8                                         ▶

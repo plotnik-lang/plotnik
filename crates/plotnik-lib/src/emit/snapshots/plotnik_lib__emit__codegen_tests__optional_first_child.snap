@@ -40,14 +40,14 @@ Test = 01 :: T1
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  !!!  (program)                        05
+  04   !   (program)                        05
   05   ε                                    23, 14
   07                                        ▶
   08   ε   [EndObj]                         07
   10   ▽   (number) [Node Set(M1)]          24
   12   ▷   (number) [Node Set(M1)]          24
   14   ε   [Null Set(M0)]                   10
-  16  !!!  (identifier) [Node Set(M0)]      12
+  16   !   (identifier) [Node Set(M0)]      12
   18   ▷                                    21
   19   ε                                    18, 14
   21   ε                                    16, 19

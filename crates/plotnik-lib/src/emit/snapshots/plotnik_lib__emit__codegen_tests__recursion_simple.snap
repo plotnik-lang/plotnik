@@ -57,10 +57,10 @@ Expr:
   06   △                                    14
   07                                        ▶
   08   ε   [EndEnum]                        07
-  10  !!!  (number) [Text Set(M0)]          08
+  10   !   (number) [Text Set(M0)]          08
   12   ε   [Enum(M3)]                       10
   14   ε   [EndEnum]                        07
-  16   ▷   arguments: (Expr)                04 ⯇
+  16   ▷   arguments: (Expr)                01 : 04
   17   ▽   function: (identifier) [Node Set(M1)]  16
-  19  !!!  (call_expression)                17
+  19   !   (call_expression)                17
   20   ε   [Enum(M4)]                       19

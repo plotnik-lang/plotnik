@@ -49,14 +49,14 @@ Expression:
 Root:
   06   ε                                    07
   07   ε   [Obj]                            09
-  09  !!!  (function_declaration)           10
+  09   !   (function_declaration)           10
   10   ▽   name: (identifier) [Node Set(M2)]  12
   12   △                                    13
   13   ε   [EndObj]                         15
   15                                        ▶
   16                                        ▶
   17   ε   [EndObj]                         16
-  19  !!!  (identifier) [Node Set(M0)]      17
+  19   !   (identifier) [Node Set(M0)]      17
   21   ε   [Null Set(M1)]                   19
-  23  !!!  (number) [Node Set(M1)]          17
+  23   !   (number) [Node Set(M1)]          17
   25   ε   [Null Set(M0)]                   23

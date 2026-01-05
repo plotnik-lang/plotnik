@@ -40,10 +40,10 @@ Test = 01 :: T2
 Test:
   01   ε                                    02
   02   ε   [Obj]                            04
-  04  !!!  (array)                          05
+  04   !   (array)                          05
   05   ε   [Arr]                            07
   07   ε                                    29, 22
-  09  !!!  (identifier) [Node Push]         11
+  09   !   (identifier) [Node Push]         11
   11   ε                                    35, 20
   13                                        ▶
   14   ε   [EndObj]                         13
