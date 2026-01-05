@@ -24,16 +24,18 @@ M0: S1 → T0  ; op: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T1
+Test = 06 :: T1
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (binary_expression)              05
-  05   ▽   (+) [Node Set(M0)]               07
-  07   △                                    08
-  08   ε   [EndObj]                         10
-  10                                        ▶
+  06   ε                                    07
+  07   !   (binary_expression)              08
+  08   ▽   (+) [Node Set(M0)]               10
+  10   △                                    11
+  11                                        ▶

@@ -5,13 +5,13 @@
 
 use std::collections::HashSet;
 
-use crate::bytecode::ir::EffectIR;
-use crate::bytecode::EffectOpcode;
-use crate::parser::ast::{self, Expr};
 use crate::analyze::type_check::{TypeContext, TypeId, TypeShape};
+use crate::bytecode::EffectOpcode;
+use crate::bytecode::ir::EffectIR;
+use crate::parser::ast::{self, Expr};
 
-use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier};
 use super::Compiler;
+use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier};
 
 /// Capture effects to attach to the innermost match instruction.
 ///
@@ -55,10 +55,14 @@ impl Compiler<'_> {
         });
 
         if !is_structured_ref && !creates_structured_scope && !is_array {
-            let is_text = cap.type_annotation().is_some_and(|t| {
-                t.name().is_some_and(|n| n.text() == "string")
-            });
-            let opcode = if is_text { EffectOpcode::Text } else { EffectOpcode::Node };
+            let is_text = cap
+                .type_annotation()
+                .is_some_and(|t| t.name().is_some_and(|n| n.text() == "string"));
+            let opcode = if is_text {
+                EffectOpcode::Text
+            } else {
+                EffectOpcode::Node
+            };
             effects.push(EffectIR::simple(opcode, 0));
         }
 
@@ -122,7 +126,10 @@ impl Compiler<'_> {
             .and_then(|def_id| self.type_ctx.get_def_type(def_id))
             .and_then(|def_type| self.type_ctx.get_type(def_type))
             .is_some_and(|shape| {
-                matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
+                matches!(
+                    shape,
+                    TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. }
+                )
             })
     }
 
@@ -148,10 +155,7 @@ impl Compiler<'_> {
 ///
 /// Returns true when inner is a scope-creating expression (sequence/alternation)
 /// that produces an untagged struct (not an enum). Enums use Enum/EndEnum instead.
-pub fn check_needs_struct_wrapper(
-    inner: &Expr,
-    type_ctx: &TypeContext,
-) -> bool {
+pub fn check_needs_struct_wrapper(inner: &Expr, type_ctx: &TypeContext) -> bool {
     let inner_info = type_ctx.get_term_info(inner);
     let inner_creates_scope = inner_creates_scope(inner);
     let inner_is_untagged_bubble = inner_info.as_ref().is_some_and(|info| {
@@ -171,5 +175,7 @@ pub fn check_needs_struct_wrapper(
 
 /// Get row type ID for array element scoping.
 pub fn get_row_type_id(inner: &Expr, type_ctx: &TypeContext) -> Option<TypeId> {
-    type_ctx.get_term_info(inner).and_then(|info| info.flow.type_id())
+    type_ctx
+        .get_term_info(inner)
+        .and_then(|info| info.flow.type_id())
 }

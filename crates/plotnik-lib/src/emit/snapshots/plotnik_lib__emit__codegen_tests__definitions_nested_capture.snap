@@ -35,42 +35,44 @@ N0: S4 → T1  ; Inner
 N1: S5 → T4  ; Outer
 
 [entrypoints]
-Inner = 01 :: T1
-Outer = 11 :: T4
+Inner = 06 :: T1
+Outer = 12 :: T4
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Inner:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   !   (call)                           05
-  05   ▽   (identifier) [Node Set(M0)]      07
-  07   △                                    08
-  08   ε   [EndObj]                         10
-  10                                        ▶
+  06   ε                                    07
+  07   !   (call)                           08
+  08   ▽   (identifier) [Node Set(M0)]      10
+  10   △                                    11
+  11                                        ▶
 
 Outer:
-  11   ε                                    12
-  12   ε   [Obj]                            14
-  14   !   (parent)                         15
-  15   ε   [Arr]                            17
-  17   ε                                    41, 29
-  19   ε   [EndArr Set(M2)]                 21
-  21   △                                    27
-  22   ε   [EndObj Push]                    24
-  24   ε                                    47, 19
-  26                                        ▶
-  27   ε   [EndObj]                         26
-  29   ε   [EndArr Set(M2)]                 27
-  31   ε   [Set(M1)]                        22
-  33   !   (Inner)                          01 : 31
-  34   ε   [Obj]                            33
-  36   ▷                                    39
-  37   ε                                    36, 29
-  39   ε                                    34, 37
-  41   ▽                                    39
-  42   ▷                                    45
-  43   ε                                    42, 19
-  45   ε                                    34, 43
-  47   ▷                                    45
+  12   ε                                    13
+  13   !   (parent)                         14
+  14   ε   [Arr]                            16
+  16   ε                                    42, 26
+  18   ε   [EndArr Set(M2)]                 20
+  20   △                                    25
+  21   ε   [EndObj Push]                    23
+  23   ε                                    48, 18
+  25                                        ▶
+  26   ε   [EndArr Set(M2)]                 25
+  28   ε   [Set(M1)]                        21
+  30   ε   [EndObj]                         28
+  32   !   (Inner)                          06 : 30
+  33   ε   [Obj]                            32
+  35   ε   [Obj]                            33
+  37   ▷                                    40
+  38   ε                                    37, 26
+  40   ε                                    35, 38
+  42   ▽                                    40
+  43   ▷                                    46
+  44   ε                                    43, 18
+  46   ε                                    35, 44
+  48   ▷                                    46

@@ -26,14 +26,16 @@ N0: S1 → T1  ; Identifier
 N1: S3 → T2  ; Test
 
 [entrypoints]
-Test = 1 :: T2
+Test = 6 :: T2
 
 [transitions]
-  0   ε                                     ◼
+_ObjWrap:
+  0   ε   [Obj]                             2
+  2       Trampoline                        3
+  3   ε   [EndObj]                          5
+  5                                         ▶
 
 Test:
-  1   ε                                     2
-  2   ε   [Obj]                             4
-  4   !   (identifier) [Node Set(M0)]       6
-  6   ε   [EndObj]                          8
-  8                                         ▶
+  6   ε                                     7
+  7   !   (identifier) [Node Set(M0)]       9
+  9                                         ▶

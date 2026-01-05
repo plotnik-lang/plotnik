@@ -153,12 +153,8 @@ impl DiagnosticKind {
             Self::DirectRecursion => {
                 Some("recursive references must consume input before recursing")
             }
-            Self::AnchorWithoutContext => {
-                Some("wrap in a named node: `(parent . (child))`")
-            }
-            Self::AnchorInAlternation => {
-                Some("use `[{(a) . (b)} (c)]` to anchor within a branch")
-            }
+            Self::AnchorWithoutContext => Some("wrap in a named node: `(parent . (child))`"),
+            Self::AnchorInAlternation => Some("use `[{(a) . (b)} (c)]` to anchor within a branch"),
             _ => None,
         }
     }

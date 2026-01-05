@@ -17,7 +17,11 @@ pub fn check_trailing_anchor(items: &[SeqItem]) -> (bool, bool) {
     // Direct trailing anchor
     if matches!(items.last(), Some(SeqItem::Anchor(_))) {
         let prev_expr = items.iter().rev().skip(1).find_map(|item| {
-            if let SeqItem::Expr(e) = item { Some(e) } else { None }
+            if let SeqItem::Expr(e) = item {
+                Some(e)
+            } else {
+                None
+            }
         });
         return (true, expr_is_anonymous(prev_expr));
     }
@@ -53,10 +57,18 @@ pub fn compute_nav_modes(items: &[SeqItem], is_inside_node: bool) -> Vec<(usize,
                     let is_exact = prev_is_anonymous || current_is_anonymous;
                     if is_first_expr && is_inside_node {
                         // First child with leading anchor
-                        Some(if is_exact { Nav::DownExact } else { Nav::DownSkip })
+                        Some(if is_exact {
+                            Nav::DownExact
+                        } else {
+                            Nav::DownSkip
+                        })
                     } else if !is_first_expr {
                         // Sibling with anchor
-                        Some(if is_exact { Nav::NextExact } else { Nav::NextSkip })
+                        Some(if is_exact {
+                            Nav::NextExact
+                        } else {
+                            Nav::NextSkip
+                        })
                     } else {
                         // First in sequence (not inside node)
                         None
@@ -109,7 +121,9 @@ fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::cst::SyntaxKin
         e => e.clone(),
     };
 
-    let Expr::QuantifiedExpr(q) = &expr else { return None };
+    let Expr::QuantifiedExpr(q) = &expr else {
+        return None;
+    };
     Some(q.operator()?.kind())
 }
 
@@ -133,7 +147,10 @@ pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
     expr.and_then(quantifier_operator_kind).is_some_and(|k| {
         matches!(
             k,
-            SyntaxKind::Star | SyntaxKind::StarQuestion | SyntaxKind::Plus | SyntaxKind::PlusQuestion
+            SyntaxKind::Star
+                | SyntaxKind::StarQuestion
+                | SyntaxKind::Plus
+                | SyntaxKind::PlusQuestion
         )
     })
 }
@@ -143,9 +160,7 @@ pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
 pub fn inner_creates_scope(inner: &Expr) -> bool {
     match inner {
         Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
-        Expr::QuantifiedExpr(q) => {
-            q.inner().is_some_and(|i| inner_creates_scope(&i))
-        }
+        Expr::QuantifiedExpr(q) => q.inner().is_some_and(|i| inner_creates_scope(&i)),
         _ => false,
     }
 }

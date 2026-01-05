@@ -45,22 +45,26 @@ M6: S03 → T4  ; inner: Expr
 N0: S06 → T4  ; Expr
 
 [entrypoints]
-Expr = 01 :: T4
+Expr = 06 :: T4
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Expr:
-  01   ε                                    02
-  02   ε                                    12, 20
-  04   ε   [Set(M2)]                        06
-  06   △                                    14
-  07                                        ▶
-  08   ε   [EndEnum]                        07
-  10   !   (number) [Text Set(M0)]          08
-  12   ε   [Enum(M3)]                       10
-  14   ε   [EndEnum]                        07
-  16   ▷   arguments: (Expr)                01 : 04
-  17   ▽   function: (identifier) [Node Set(M1)]  16
-  19   !   (call_expression)                17
-  20   ε   [Enum(M4)]                       19
+  06   ε                                    07
+  07   ε                                    17, 25
+  09   ε   [Set(M2)]                        11
+  11   △                                    19
+  12                                        ▶
+  13   ε   [EndEnum]                        12
+  15   !   (number) [Text Set(M0)]          13
+  17   ε   [Enum(M3)]                       15
+  19   ε   [EndEnum]                        12
+  21   ▷   arguments: (Expr)                06 : 09
+  22   ▽   function: (identifier) [Node Set(M1)]  21
+  24   !   (call_expression)                22
+  25   ε   [Enum(M4)]                       24

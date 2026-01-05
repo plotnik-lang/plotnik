@@ -512,7 +512,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             TypeFlow::Void => {
                 // Scalar list: void inner -> array of Node (or Ref)
                 let element = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
-                let array_type = self.ctx.intern_type(TypeShape::Array { element, non_empty });
+                let array_type = self
+                    .ctx
+                    .intern_type(TypeShape::Array { element, non_empty });
                 TypeFlow::Scalar(array_type)
             }
             TypeFlow::Scalar(t) => {

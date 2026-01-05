@@ -1,10 +1,10 @@
 use rowan::Checkpoint;
 
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
-use crate::parser::cst::SyntaxKind;
-use crate::parser::lexer::token_text;
 use crate::parser::Parser;
+use crate::parser::cst::SyntaxKind;
+use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use crate::parser::lexer::token_text;
 
 impl Parser<'_, '_> {
     /// Type annotation: `::Type` (PascalCase) or `::string` (primitive)

@@ -41,7 +41,10 @@ impl Graph {
     }
 
     fn successors(&self, label: Label) -> &[Label] {
-        self.successors.get(&label).map(|v| v.as_slice()).unwrap_or(&[])
+        self.successors
+            .get(&label)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     fn predecessor_count(&self, label: Label) -> usize {
@@ -60,7 +63,7 @@ impl CacheAligned {
         if instructions.is_empty() {
             return LayoutResult {
                 label_to_step: BTreeMap::new(),
-                total_steps: 1,
+                total_steps: 0,
             };
         }
 
@@ -76,7 +79,11 @@ impl CacheAligned {
 }
 
 /// Extract linear chains from the control flow graph.
-fn extract_chains(graph: &Graph, instructions: &[Instruction], entries: &[Label]) -> Vec<Vec<Label>> {
+fn extract_chains(
+    graph: &Graph,
+    instructions: &[Instruction],
+    entries: &[Label],
+) -> Vec<Vec<Label>> {
     let mut visited = HashSet::new();
     let mut chains = Vec::new();
 
@@ -125,9 +132,13 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
     let entry_set: HashSet<Label> = entries.iter().copied().collect();
 
     // Partition into entry chains and non-entry chains
-    let (mut entry_chains, mut other_chains): (Vec<_>, Vec<_>) = chains
-        .drain(..)
-        .partition(|chain| chain.first().map(|l| entry_set.contains(l)).unwrap_or(false));
+    let (mut entry_chains, mut other_chains): (Vec<_>, Vec<_>) =
+        chains.drain(..).partition(|chain| {
+            chain
+                .first()
+                .map(|l| entry_set.contains(l))
+                .unwrap_or(false)
+        });
 
     // Sort other chains by size (descending) for better locality
     other_chains.sort_by_key(|chain| std::cmp::Reverse(chain.len()));
@@ -144,7 +155,7 @@ fn assign_step_ids(
 ) -> LayoutResult {
     let mut mapping = BTreeMap::new();
 
-    let mut current_step = 1u16; // Step 0 is reserved (never used)
+    let mut current_step = 0u16;
     let mut current_offset = 0usize; // Byte offset for cache alignment
 
     for chain in chains {

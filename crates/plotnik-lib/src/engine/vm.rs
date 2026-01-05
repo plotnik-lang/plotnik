@@ -3,7 +3,7 @@
 use arborium_tree_sitter::{Node, Tree};
 
 use crate::bytecode::{
-    Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav,
+    Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav, Trampoline,
 };
 
 /// Get the nav for continue_search (always a sibling move).
@@ -78,6 +78,10 @@ pub struct VM<'t> {
     /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
     /// Incremented by SuppressBegin, decremented by SuppressEnd.
     suppress_depth: u16,
+
+    /// Target address for Trampoline instruction.
+    /// Set from entrypoint before execution; Trampoline jumps to this address.
+    entrypoint_target: u16,
 }
 
 impl<'t> VM<'t> {
@@ -95,6 +99,7 @@ impl<'t> VM<'t> {
             limits,
             skip_call_nav: false,
             suppress_depth: 0,
+            entrypoint_target: 0,
         }
     }
 
@@ -120,8 +125,13 @@ impl<'t> VM<'t> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.ip = entrypoint.target.get();
-        tracer.trace_enter_entrypoint(self.ip);
+        // Bootstrap address: where VM starts execution.
+        // Currently hardcoded to 0 (preamble is first in layout).
+        // Future: parameterize for different preamble types (e.g., recursive deep-match).
+        const BOOTSTRAP: u16 = 0;
+        self.ip = BOOTSTRAP;
+        self.entrypoint_target = entrypoint.target.get();
+        tracer.trace_enter_preamble();
 
         loop {
             // Fuel check
@@ -138,6 +148,7 @@ impl<'t> VM<'t> {
                 InstructionView::Match(m) => self.exec_match(m, tracer),
                 InstructionView::Call(c) => self.exec_call(c, tracer),
                 InstructionView::Return(_) => self.exec_return(tracer),
+                InstructionView::Trampoline(t) => self.exec_trampoline(t, tracer),
             };
 
             match result {
@@ -291,6 +302,28 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
+    /// Execute a Trampoline instruction.
+    ///
+    /// Trampoline is like Call, but the target comes from VM context (entrypoint_target)
+    /// rather than being encoded in the instruction. Used for universal entry preamble.
+    fn exec_trampoline<T: Tracer>(
+        &mut self,
+        t: Trampoline,
+        tracer: &mut T,
+    ) -> Result<(), RuntimeError> {
+        if self.recursion_depth >= self.limits.recursion_limit {
+            return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth));
+        }
+
+        // Trampoline doesn't navigate - it's always at root, cursor stays at root
+        let saved_depth = self.cursor.depth();
+        tracer.trace_call(self.entrypoint_target);
+        self.frames.push(t.next.get(), saved_depth);
+        self.recursion_depth += 1;
+        self.ip = self.entrypoint_target;
+        Ok(())
+    }
+
     /// Navigate to a field and return the skip policy for retry support.
     ///
     /// Returns `Some(policy)` if navigation was performed, `None` if Stay nav was used.
@@ -431,14 +464,12 @@ impl<'t> VM<'t> {
             }
 
             // Data effects
-            Node => RuntimeEffect::Node(
-                self.matched_node
-                    .expect("Node effect without matched_node"),
-            ),
-            Text => RuntimeEffect::Text(
-                self.matched_node
-                    .expect("Text effect without matched_node"),
-            ),
+            Node => {
+                RuntimeEffect::Node(self.matched_node.expect("Node effect without matched_node"))
+            }
+            Text => {
+                RuntimeEffect::Text(self.matched_node.expect("Text effect without matched_node"))
+            }
             Arr => RuntimeEffect::Arr,
             Push => RuntimeEffect::Push,
             EndArr => RuntimeEffect::EndArr,

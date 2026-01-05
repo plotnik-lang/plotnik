@@ -9,7 +9,7 @@ use std::num::NonZeroU16;
 
 use super::effects::{EffectOp, EffectOpcode};
 use super::ids::StepId;
-use super::instructions::{Call, Match, Return, select_match_opcode};
+use super::instructions::{Call, Match, Return, Trampoline, select_match_opcode};
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
 
@@ -27,12 +27,33 @@ impl Label {
 
 /// Symbolic reference to a struct field or enum variant.
 /// Resolved to absolute member index during bytecode emission.
+///
+/// Struct field indices are deduplicated globally: same (name, type) pair → same index.
+/// This enables call-site scoping where uncaptured refs share the caller's scope.
+///
+/// Enum variant indices use the traditional (parent_type, relative_index) approach
+/// since enum variants don't bubble between scopes.
 #[derive(Clone, Copy, Debug)]
 pub enum MemberRef {
     /// Already resolved to absolute index (for cases where it's known).
     Absolute(u16),
-    /// Deferred resolution: (struct/enum type, relative field/variant index).
-    Deferred { type_id: TypeId, relative_index: u16 },
+    /// Deferred resolution by field identity (for struct fields).
+    /// The same (field_name, field_type) pair resolves to the same member index
+    /// regardless of which struct type contains it.
+    Deferred {
+        /// The Symbol of the field name (from query interner).
+        field_name: plotnik_core::Symbol,
+        /// The TypeId of the field's value type (from query TypeContext).
+        field_type: TypeId,
+    },
+    /// Deferred resolution by parent type + relative index (for enum variants).
+    /// Uses the parent enum's member_base + relative_index.
+    DeferredByIndex {
+        /// The TypeId of the parent enum type.
+        parent_type: TypeId,
+        /// Relative index within the parent type's members.
+        relative_index: u16,
+    },
 }
 
 impl MemberRef {
@@ -41,21 +62,41 @@ impl MemberRef {
         Self::Absolute(index)
     }
 
-    /// Create a deferred reference.
-    pub fn deferred(type_id: TypeId, relative_index: u16) -> Self {
-        Self::Deferred { type_id, relative_index }
+    /// Create a deferred reference by field identity (for struct fields).
+    pub fn deferred(field_name: plotnik_core::Symbol, field_type: TypeId) -> Self {
+        Self::Deferred {
+            field_name,
+            field_type,
+        }
     }
 
-    /// Resolve this reference using a member base lookup function.
-    pub fn resolve<F>(self, get_member_base: F) -> u16
+    /// Create a deferred reference by parent type + index (for enum variants).
+    pub fn deferred_by_index(parent_type: TypeId, relative_index: u16) -> Self {
+        Self::DeferredByIndex {
+            parent_type,
+            relative_index,
+        }
+    }
+
+    /// Resolve this reference using lookup functions.
+    ///
+    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
+    /// - `get_member_base`: maps parent TypeId to member base index
+    pub fn resolve<F, G>(self, lookup_member: F, get_member_base: G) -> u16
     where
-        F: Fn(TypeId) -> Option<u16>,
+        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+        G: Fn(TypeId) -> Option<u16>,
     {
         match self {
             Self::Absolute(n) => n,
-            Self::Deferred { type_id, relative_index } => {
-                get_member_base(type_id).unwrap_or(0) + relative_index
-            }
+            Self::Deferred {
+                field_name,
+                field_type,
+            } => lookup_member(field_name, field_type).unwrap_or(0),
+            Self::DeferredByIndex {
+                parent_type,
+                relative_index,
+            } => get_member_base(parent_type).unwrap_or(0) + relative_index,
         }
     }
 }
@@ -74,25 +115,40 @@ pub struct EffectIR {
 impl EffectIR {
     /// Create a simple effect without member reference.
     pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
-        Self { opcode, payload, member_ref: None }
+        Self {
+            opcode,
+            payload,
+            member_ref: None,
+        }
     }
 
     /// Create an effect with a member reference.
     pub fn with_member(opcode: EffectOpcode, member_ref: MemberRef) -> Self {
-        Self { opcode, payload: 0, member_ref: Some(member_ref) }
+        Self {
+            opcode,
+            payload: 0,
+            member_ref: Some(member_ref),
+        }
     }
 
     /// Resolve this IR effect to a concrete EffectOp.
-    pub fn resolve<F>(&self, get_member_base: F) -> EffectOp
+    ///
+    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
+    /// - `get_member_base`: maps parent TypeId to member base index
+    pub fn resolve<F, G>(&self, lookup_member: F, get_member_base: G) -> EffectOp
     where
-        F: Fn(TypeId) -> Option<u16>,
+        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+        G: Fn(TypeId) -> Option<u16>,
     {
         let payload = if let Some(member_ref) = self.member_ref {
-            member_ref.resolve(&get_member_base) as usize
+            member_ref.resolve(&lookup_member, &get_member_base) as usize
         } else {
             self.payload
         };
-        EffectOp { opcode: self.opcode, payload }
+        EffectOp {
+            opcode: self.opcode,
+            payload,
+        }
     }
 }
 
@@ -102,6 +158,7 @@ pub enum Instruction {
     Match(MatchIR),
     Call(CallIR),
     Return(ReturnIR),
+    Trampoline(TrampolineIR),
 }
 
 impl Instruction {
@@ -112,6 +169,7 @@ impl Instruction {
             Self::Match(m) => m.label,
             Self::Call(c) => c.label,
             Self::Return(r) => r.label,
+            Self::Trampoline(t) => t.label,
         }
     }
 
@@ -119,7 +177,7 @@ impl Instruction {
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
-            Self::Call(_) | Self::Return(_) => 8,
+            Self::Call(_) | Self::Return(_) | Self::Trampoline(_) => 8,
         }
     }
 
@@ -129,18 +187,29 @@ impl Instruction {
             Self::Match(m) => m.successors.clone(),
             Self::Call(c) => vec![c.next],
             Self::Return(_) => vec![],
+            Self::Trampoline(t) => vec![t.next],
         }
     }
 
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve<F>(&self, map: &BTreeMap<Label, StepId>, get_member_base: F) -> Vec<u8>
+    ///
+    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
+    /// - `get_member_base`: maps parent TypeId to member base index
+    pub fn resolve<F, G>(
+        &self,
+        map: &BTreeMap<Label, StepId>,
+        lookup_member: F,
+        get_member_base: G,
+    ) -> Vec<u8>
     where
-        F: Fn(TypeId) -> Option<u16>,
+        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+        G: Fn(TypeId) -> Option<u16>,
     {
         match self {
-            Self::Match(m) => m.resolve(map, get_member_base),
+            Self::Match(m) => m.resolve(map, lookup_member, get_member_base),
             Self::Call(c) => c.resolve(map).to_vec(),
             Self::Return(r) => r.resolve().to_vec(),
+            Self::Trampoline(t) => t.resolve(map).to_vec(),
         }
     }
 }
@@ -185,15 +254,22 @@ impl MatchIR {
             + self.post_effects.len()
             + self.successors.len();
 
-        select_match_opcode(slots)
-            .map(|op| op.size())
-            .unwrap_or(64)
+        select_match_opcode(slots).map(|op| op.size()).unwrap_or(64)
     }
 
     /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve<F>(&self, map: &BTreeMap<Label, StepId>, get_member_base: F) -> Vec<u8>
+    ///
+    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
+    /// - `get_member_base`: maps parent TypeId to member base index
+    pub fn resolve<F, G>(
+        &self,
+        map: &BTreeMap<Label, StepId>,
+        lookup_member: F,
+        get_member_base: G,
+    ) -> Vec<u8>
     where
-        F: Fn(TypeId) -> Option<u16>,
+        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+        G: Fn(TypeId) -> Option<u16>,
     {
         let successors: Vec<StepId> = self.successors.iter().map(|&l| l.resolve(map)).collect();
 
@@ -201,12 +277,12 @@ impl MatchIR {
         let pre_effects: Vec<EffectOp> = self
             .pre_effects
             .iter()
-            .map(|e| e.resolve(&get_member_base))
+            .map(|e| e.resolve(&lookup_member, &get_member_base))
             .collect();
         let post_effects: Vec<EffectOp> = self
             .post_effects
             .iter()
-            .map(|e| e.resolve(&get_member_base))
+            .map(|e| e.resolve(&lookup_member, &get_member_base))
             .collect();
 
         let m = Match {
@@ -271,6 +347,29 @@ impl ReturnIR {
     pub fn resolve(&self) -> [u8; 8] {
         let r = Return { segment: 0 };
         r.to_bytes()
+    }
+}
+
+/// Trampoline instruction IR with symbolic return address.
+///
+/// Trampoline is like Call, but the target comes from VM context (external parameter)
+/// rather than being encoded in the instruction. Used for universal entry preamble.
+#[derive(Clone, Debug)]
+pub struct TrampolineIR {
+    /// Where this instruction lives.
+    pub label: Label,
+    /// Return address (where to continue after entrypoint returns).
+    pub next: Label,
+}
+
+impl TrampolineIR {
+    /// Resolve labels and serialize to bytecode bytes.
+    pub fn resolve(&self, map: &BTreeMap<Label, StepId>) -> [u8; 8] {
+        let t = Trampoline {
+            segment: 0,
+            next: self.next.resolve(map),
+        };
+        t.to_bytes()
     }
 }
 
@@ -345,9 +444,7 @@ mod tests {
 
         assert_eq!(c.successors(), vec![Label(4)]);
 
-        let r = Instruction::Return(ReturnIR {
-            label: Label(6),
-        });
+        let r = Instruction::Return(ReturnIR { label: Label(6) });
 
         assert!(r.successors().is_empty());
     }
@@ -369,7 +466,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert(Label(0), StepId::new(1));
 
-        let bytes = m.resolve(&map, |_| None);
+        let bytes = m.resolve(&map, |_, _| None, |_| None);
         assert_eq!(bytes.len(), 8);
 
         // Verify opcode is Match8 (0x0)
@@ -380,33 +477,76 @@ mod tests {
 
     #[test]
     fn member_ref_resolution() {
+        use plotnik_core::Symbol;
+
+        // Create test symbols (these are just integer handles)
+        let field_name = Symbol::from_raw(100);
+        let field_type = TypeId(10);
+        let parent_type = TypeId(20);
+
         // Test absolute reference
         let abs = MemberRef::absolute(42);
-        assert_eq!(abs.resolve(|_| None), 42);
+        assert_eq!(abs.resolve(|_, _| None, |_| None), 42);
 
-        // Test deferred reference with base lookup
-        let deferred = MemberRef::deferred(TypeId(10), 2);
-        assert_eq!(deferred.resolve(|id| if id.0 == 10 { Some(100) } else { None }), 102);
+        // Test deferred reference with lookup (struct field)
+        let deferred = MemberRef::deferred(field_name, field_type);
+        assert_eq!(
+            deferred.resolve(
+                |name, ty| {
+                    if name == field_name && ty == field_type {
+                        Some(77)
+                    } else {
+                        None
+                    }
+                },
+                |_| None
+            ),
+            77
+        );
 
-        // Test deferred reference with no base (defaults to 0)
-        assert_eq!(deferred.resolve(|_| None), 2);
+        // Test deferred reference with no match (defaults to 0)
+        assert_eq!(deferred.resolve(|_, _| None, |_| None), 0);
+
+        // Test deferred by index reference (enum variant)
+        let by_index = MemberRef::deferred_by_index(parent_type, 3);
+        assert_eq!(
+            by_index.resolve(
+                |_, _| None,
+                |ty| if ty == parent_type { Some(50) } else { None }
+            ),
+            53 // base 50 + relative 3
+        );
     }
 
     #[test]
     fn effect_ir_resolution() {
+        use plotnik_core::Symbol;
+
+        let field_name = Symbol::from_raw(200);
+        let field_type = TypeId(10);
+
         // Simple effect without member ref
         let simple = EffectIR::simple(EffectOpcode::Node, 5);
-        let resolved = simple.resolve(|_| None);
+        let resolved = simple.resolve(|_, _| None, |_| None);
         assert_eq!(resolved.opcode, EffectOpcode::Node);
         assert_eq!(resolved.payload, 5);
 
         // Effect with deferred member ref
         let set_effect = EffectIR::with_member(
             EffectOpcode::Set,
-            MemberRef::deferred(TypeId(10), 1),
+            MemberRef::deferred(field_name, field_type),
         );
-        let resolved = set_effect.resolve(|id| if id.0 == 10 { Some(50) } else { None });
+        let resolved = set_effect.resolve(
+            |name, ty| {
+                if name == field_name && ty == field_type {
+                    Some(51)
+                } else {
+                    None
+                }
+            },
+            |_| None,
+        );
         assert_eq!(resolved.opcode, EffectOpcode::Set);
-        assert_eq!(resolved.payload, 51); // base 50 + relative 1
+        assert_eq!(resolved.payload, 51);
     }
 }

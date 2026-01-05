@@ -24,16 +24,18 @@ M0: S1 → T0  ; value: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 01 :: T1
+Test = 06 :: T1
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   ε                                    09, 11
-  06                                        ▶
-  07   ε   [EndObj]                         06
-  09   !   (identifier) [Node Set(M0)]      07
-  11   !   (number) [Node Set(M0)]          07
+  06   ε                                    07
+  07   ε                                    10, 12
+  09                                        ▶
+  10   !   (identifier) [Node Set(M0)]      09
+  12   !   (number) [Node Set(M0)]          09

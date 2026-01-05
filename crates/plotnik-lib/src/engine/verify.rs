@@ -3,10 +3,10 @@
 //! Verifies that materialized `Value` matches the declared `result_type` from bytecode.
 //! Zero-cost in release builds.
 
+use crate::Colors;
 use crate::bytecode::{Module, QTypeId, StringsView, TypesView};
 use crate::type_system::TypeKind;
 use crate::typegen::typescript::{self, Config, VoidType};
-use crate::Colors;
 
 use super::Value;
 

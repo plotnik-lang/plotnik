@@ -35,28 +35,28 @@ N0: S3 → T1  ; Expression
 N1: S4 → T2  ; Root
 
 [entrypoints]
-Expression = 01 :: T1
-Root       = 06 :: T2
+Expression = 06 :: T1
+Root       = 09 :: T2
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Expression:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04   ε                                    21, 25
+  06   ε                                    07
+  07   ε                                    18, 22
 
 Root:
-  06   ε                                    07
-  07   ε   [Obj]                            09
-  09   !   (function_declaration)           10
-  10   ▽   name: (identifier) [Node Set(M2)]  12
-  12   △                                    13
-  13   ε   [EndObj]                         15
+  09   ε                                    10
+  10   !   (function_declaration)           11
+  11   ▽   name: (identifier) [Node Set(M2)]  13
+  13   △                                    14
+  14                                        ▶
   15                                        ▶
-  16                                        ▶
-  17   ε   [EndObj]                         16
-  19   !   (identifier) [Node Set(M0)]      17
-  21   ε   [Null Set(M1)]                   19
-  23   !   (number) [Node Set(M1)]          17
-  25   ε   [Null Set(M0)]                   23
+  16   !   (identifier) [Node Set(M0)]      15
+  18   ε   [Null Set(M1)]                   16
+  20   !   (number) [Node Set(M1)]          15
+  22   ε   [Null Set(M0)]                   20

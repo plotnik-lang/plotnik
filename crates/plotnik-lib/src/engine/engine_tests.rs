@@ -5,11 +5,11 @@
 
 use indoc::indoc;
 
+use crate::QueryBuilder;
 use crate::bytecode::Module;
 use crate::emit::emit_linked;
-use crate::QueryBuilder;
 
-use super::{FuelLimits, Materializer, ValueMaterializer, VM};
+use super::{FuelLimits, Materializer, VM, ValueMaterializer};
 
 /// Execute a query against source code and return the JSON output.
 fn execute(query: &str, source: &str) -> String {

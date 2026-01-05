@@ -20,7 +20,7 @@ pub use constants::{MAGIC, SECTION_ALIGN, STEP_SIZE, VERSION};
 
 pub use ids::{QTypeId, StepId, StringId};
 
-pub use header::{flags, Header};
+pub use header::{Header, flags};
 
 pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
 
@@ -33,7 +33,7 @@ pub use nav::Nav;
 pub use effects::{EffectOp, EffectOpcode};
 
 pub use instructions::{
-    Call, Match, MatchView, Opcode, Return, align_to_section, select_match_opcode,
+    Call, Match, MatchView, Opcode, Return, Trampoline, align_to_section, select_match_opcode,
 };
 
 pub use module::{
@@ -44,8 +44,8 @@ pub use module::{
 pub use dump::dump;
 
 pub use format::{
-    cols, format_effect, nav_symbol, nav_symbol_epsilon, superscript, trace, truncate_text,
-    width_for_count, LineBuilder, Symbol,
+    LineBuilder, Symbol, cols, format_effect, nav_symbol, nav_symbol_epsilon, superscript, trace,
+    truncate_text, width_for_count,
 };
 
 #[cfg(test)]

@@ -8,10 +8,10 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use plotnik_core::utils::to_pascal_case;
 
+use crate::Colors;
 use crate::bytecode::{
     EntrypointsView, Module, QTypeId, StringsView, TypeDef, TypeKind, TypesView,
 };
-use crate::Colors;
 
 /// How to represent the void type in TypeScript.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -139,7 +139,9 @@ impl<'a> Emitter<'a> {
             let Some(type_def) = self.types.get(type_id) else {
                 continue;
             };
-            if let Some(kind) = type_def.type_kind() && kind.is_primitive() {
+            if let Some(kind) = type_def.type_kind()
+                && kind.is_primitive()
+            {
                 self.emit_type_definition(name, type_id);
             }
         }
@@ -648,10 +650,14 @@ impl<'a> Emitter<'a> {
         ));
 
         // kind, text, span fields
-        self.output
-            .push_str(&format!("{}  kind{}:{} string{};\n", c.reset, c.dim, c.reset, c.dim));
-        self.output
-            .push_str(&format!("{}  text{}:{} string{};\n", c.reset, c.dim, c.reset, c.dim));
+        self.output.push_str(&format!(
+            "{}  kind{}:{} string{};\n",
+            c.reset, c.dim, c.reset, c.dim
+        ));
+        self.output.push_str(&format!(
+            "{}  text{}:{} string{};\n",
+            c.reset, c.dim, c.reset, c.dim
+        ));
         self.output.push_str(&format!(
             "{}  span{}:{} {}[{}number{}, {}number{}]{};\n",
             c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.dim
@@ -764,7 +770,12 @@ impl<'a> Emitter<'a> {
             .collect();
 
         format!(
-            "{}{{{} {} {}}}{}", c.dim, c.reset, field_strs.join(&format!("{}; ", c.dim)), c.dim, c.reset
+            "{}{{{} {} {}}}{}",
+            c.dim,
+            c.reset,
+            field_strs.join(&format!("{}; ", c.dim)),
+            c.dim,
+            c.reset
         )
     }
 
@@ -785,7 +796,19 @@ impl<'a> Emitter<'a> {
                     let data_type = self.type_to_ts(member.type_id);
                     format!(
                         "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
-                        c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data_type, c.dim, c.reset
+                        c.dim,
+                        c.reset,
+                        c.dim,
+                        c.reset,
+                        c.green,
+                        name,
+                        c.reset,
+                        c.dim,
+                        c.dim,
+                        c.reset,
+                        data_type,
+                        c.dim,
+                        c.reset
                     )
                 }
             })

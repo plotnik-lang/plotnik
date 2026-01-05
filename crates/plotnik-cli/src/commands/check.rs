@@ -14,10 +14,8 @@ pub struct CheckArgs {
 }
 
 pub fn run(args: CheckArgs) {
-    let source_map = match load_query_source(
-        args.query_path.as_deref(),
-        args.query_text.as_deref(),
-    ) {
+    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
+    {
         Ok(map) => map,
         Err(msg) => {
             eprintln!("error: {}", msg);

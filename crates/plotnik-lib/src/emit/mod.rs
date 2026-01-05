@@ -29,12 +29,12 @@ use crate::bytecode::{
 };
 use crate::type_system::TypeKind;
 
-use crate::compile::Compiler;
-use crate::query::query::LinkedQuery;
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
+use crate::compile::Compiler;
+use crate::query::query::LinkedQuery;
 use layout::CacheAligned;
 
 /// Error during bytecode emission.
@@ -162,6 +162,11 @@ impl StringTableBuilder {
         Ok(())
     }
 
+    /// Get the StringId for a Symbol, if it was interned.
+    pub fn get(&self, sym: Symbol) -> Option<StringId> {
+        self.mapping.get(&sym).copied()
+    }
+
     /// Emit the string blob and offset table.
     ///
     /// Returns (blob_bytes, table_bytes).
@@ -201,6 +206,10 @@ pub struct TypeTableBuilder {
     type_names: Vec<TypeName>,
     /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
     optional_wrappers: HashMap<QTypeId, QTypeId>,
+    /// Cache for deduplicated members: (StringId, QTypeId) -> member_index.
+    /// Same (name, type) pair → same member index globally.
+    /// This enables call-site scoping where uncaptured refs share the caller's scope.
+    member_cache: HashMap<(StringId, QTypeId), u16>,
 }
 
 impl TypeTableBuilder {
@@ -211,6 +220,7 @@ impl TypeTableBuilder {
             type_members: Vec::new(),
             type_names: Vec::new(),
             optional_wrappers: HashMap::new(),
+            member_cache: HashMap::new(),
         }
     }
 
@@ -257,7 +267,11 @@ impl TypeTableBuilder {
         }
 
         // Phase 1: Emit used builtins first (in order: Void, Node, String)
-        let builtin_types = [(TYPE_VOID, TypeKind::Void), (TYPE_NODE, TypeKind::Node), (TYPE_STRING, TypeKind::String)];
+        let builtin_types = [
+            (TYPE_VOID, TypeKind::Void),
+            (TYPE_NODE, TypeKind::Node),
+            (TYPE_STRING, TypeKind::String),
+        ];
         for (i, &(builtin_id, kind)) in builtin_types.iter().enumerate() {
             if used_builtins[i] {
                 let bc_id = QTypeId(self.type_defs.len() as u16);
@@ -379,7 +393,7 @@ impl TypeTableBuilder {
                     resolved_fields.push((field_name, field_type));
                 }
 
-                // Now emit the members and update the placeholder
+                // Emit members contiguously for this struct
                 let member_start = self.type_members.len() as u16;
                 for (field_name, field_type) in resolved_fields {
                     self.type_members.push(TypeMember {
@@ -517,6 +531,22 @@ impl TypeTableBuilder {
         } else {
             None
         }
+    }
+
+    /// Look up member index by field identity (name Symbol, value TypeId).
+    ///
+    /// Members are deduplicated globally: same (name, type) pair → same index.
+    /// This enables call-site scoping where uncaptured refs share the caller's scope.
+    pub fn lookup_member(
+        &self,
+        field_name: Symbol,
+        field_type: TypeId,
+        strings: &StringTableBuilder,
+    ) -> Option<u16> {
+        // Convert query-level identifiers to bytecode-level identifiers
+        let string_id = strings.get(field_name)?;
+        let type_id = self.mapping.get(&field_type)?;
+        self.member_cache.get(&(string_id, *type_id)).copied()
     }
 
     /// Emit type definitions, members, and names as bytes.
@@ -712,11 +742,20 @@ fn emit_inner(
     types.build(type_ctx, interner, &mut strings)?;
 
     // Compile transitions (strings are interned here for unlinked mode)
-    let compile_result = Compiler::compile(interner, type_ctx, symbol_table, &mut strings, node_type_ids, node_field_ids)
-        .map_err(EmitError::Compile)?;
+    let compile_result = Compiler::compile(
+        interner,
+        type_ctx,
+        symbol_table,
+        &mut strings,
+        node_type_ids,
+        node_field_ids,
+    )
+    .map_err(EmitError::Compile)?;
 
     // Layout with cache alignment
-    let entry_labels: Vec<Label> = compile_result.def_entries.values().copied().collect();
+    // Preamble entry FIRST ensures it gets the lowest address (step 1)
+    let mut entry_labels: Vec<Label> = vec![compile_result.preamble_entry];
+    entry_labels.extend(compile_result.def_entries.values().copied());
     let layout = CacheAligned::layout(&compile_result.instructions, &entry_labels);
 
     // Validate transition count
@@ -782,7 +821,8 @@ fn emit_inner(
     let trivia_entries: Vec<TriviaEntry> = Vec::new();
 
     // Resolve and serialize transitions
-    let transitions_bytes = emit_transitions(&compile_result.instructions, &layout, &types);
+    let transitions_bytes =
+        emit_transitions(&compile_result.instructions, &layout, &types, &strings);
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -854,11 +894,17 @@ fn emit_transitions(
     instructions: &[crate::bytecode::ir::Instruction],
     layout: &crate::bytecode::ir::LayoutResult,
     types: &TypeTableBuilder,
+    strings: &StringTableBuilder,
 ) -> Vec<u8> {
     // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps as usize * 8];
 
-    // Create a resolver closure for member indices
+    // Create resolver closures for member indices.
+    // lookup_member: for struct fields (deduplicated by field identity)
+    // get_member_base: for enum variants (parent_type + relative_index)
+    let lookup_member = |field_name: Symbol, field_type: TypeId| {
+        types.lookup_member(field_name, field_type, strings)
+    };
     let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
 
     for instr in instructions {
@@ -868,7 +914,7 @@ fn emit_transitions(
         };
 
         let offset = step_id.byte_offset();
-        let resolved = instr.resolve(&layout.label_to_step, get_member_base);
+        let resolved = instr.resolve(&layout.label_to_step, lookup_member, get_member_base);
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();

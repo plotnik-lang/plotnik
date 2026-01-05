@@ -35,18 +35,22 @@ M3: S4 → T2  ; B: T2
 N0: S5 → T3  ; Test
 
 [entrypoints]
-Test = 01 :: T3
+Test = 06 :: T3
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  01   ε                                    02
-  02   ε                                    09, 15
-  04                                        ▶
-  05   ε   [EndEnum]                        04
-  07   !   (identifier) [Node Set(M0)]      05
-  09   ε   [Enum(M2)]                       07
-  11   ε   [EndEnum]                        04
-  13   !   (number) [Node Set(M1)]          11
-  15   ε   [Enum(M3)]                       13
+  06   ε                                    07
+  07   ε                                    14, 20
+  09                                        ▶
+  10   ε   [EndEnum]                        09
+  12   !   (identifier) [Node Set(M0)]      10
+  14   ε   [Enum(M2)]                       12
+  16   ε   [EndEnum]                        09
+  18   !   (number) [Node Set(M1)]          16
+  20   ε   [Enum(M3)]                       18

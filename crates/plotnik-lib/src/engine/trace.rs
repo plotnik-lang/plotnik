@@ -23,11 +23,11 @@ use std::num::NonZeroU16;
 
 use arborium_tree_sitter::Node;
 
-use crate::bytecode::{
-    cols, format_effect, trace, truncate_text, width_for_count, EffectOpcode, InstructionView,
-    LineBuilder, MatchView, Module, Nav, Symbol,
-};
 use crate::Colors;
+use crate::bytecode::{
+    EffectOpcode, InstructionView, LineBuilder, MatchView, Module, Nav, Symbol, cols,
+    format_effect, trace, truncate_text, width_for_count,
+};
 
 use super::effect::RuntimeEffect;
 
@@ -104,6 +104,9 @@ pub trait Tracer {
 
     /// Called when entering an entrypoint (for section labels).
     fn trace_enter_entrypoint(&mut self, target_ip: u16);
+
+    /// Called when entering the preamble (bootstrap wrapper).
+    fn trace_enter_preamble(&mut self);
 }
 
 /// No-op tracer that gets optimized away completely.
@@ -151,6 +154,9 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_enter_entrypoint(&mut self, _target_ip: u16) {}
+
+    #[inline(always)]
+    fn trace_enter_preamble(&mut self) {}
 }
 
 use std::collections::BTreeMap;
@@ -389,16 +395,30 @@ impl<'s> PrintTracer<'s> {
         self.lines.push(format!("{prefix}{content}"));
     }
 
-    /// Format definition name in parentheses (blue).
+    /// Format definition name (blue). User definitions get parentheses, preamble doesn't.
     fn format_def_name(&self, name: &str) -> String {
         let c = self.colors;
-        format!("({}{}{})", c.blue, name, c.reset)
+        if name.starts_with('_') {
+            // Preamble/internal names: no parentheses
+            format!("{}{}{}", c.blue, name, c.reset)
+        } else {
+            // User definitions: wrap in parentheses
+            format!("({}{}{})", c.blue, name, c.reset)
+        }
     }
 
     /// Format definition label with colon (blue).
     fn format_def_label(&self, name: &str) -> String {
         let c = self.colors;
         format!("{}{}{}:", c.blue, name, c.reset)
+    }
+
+    /// Push a definition label, with empty line separator (except for first label).
+    fn push_def_label(&mut self, name: &str) {
+        if !self.lines.is_empty() {
+            self.lines.push(String::new());
+        }
+        self.lines.push(self.format_def_label(name));
     }
 }
 
@@ -424,6 +444,12 @@ impl Tracer for PrintTracer<'_> {
             }
             InstructionView::Return(_) => {
                 self.pending_return_ip = Some(ip);
+            }
+            InstructionView::Trampoline(t) => {
+                // Trampoline shows as a call to the entrypoint target
+                let content = "Trampoline";
+                let successors = format!("{:02}", t.next.get());
+                self.add_instruction(ip, Symbol::EMPTY, content, &successors);
             }
         }
     }
@@ -534,7 +560,7 @@ impl Tracer for PrintTracer<'_> {
     fn trace_call(&mut self, target_ip: u16) {
         let name = self.entrypoint_name(target_ip).to_string();
         self.add_subline(trace::CALL, &self.format_def_name(&name));
-        self.lines.push(self.format_def_label(&name));
+        self.push_def_label(&name);
         self.definition_stack.push(name);
     }
 
@@ -550,8 +576,8 @@ impl Tracer for PrintTracer<'_> {
         let successor = if is_top_level { "◼" } else { "" };
         self.add_instruction(ip, trace::RETURN, &content, successor);
         // Print caller's label after return (if not top-level)
-        if let Some(caller) = self.definition_stack.last() {
-            self.lines.push(self.format_def_label(caller));
+        if let Some(caller) = self.definition_stack.last().cloned() {
+            self.push_def_label(&caller);
         }
     }
 
@@ -575,8 +601,14 @@ impl Tracer for PrintTracer<'_> {
 
     fn trace_enter_entrypoint(&mut self, target_ip: u16) {
         let name = self.entrypoint_name(target_ip).to_string();
-        self.lines.push(self.format_def_label(&name));
+        self.push_def_label(&name);
         self.definition_stack.push(name);
+    }
+
+    fn trace_enter_preamble(&mut self) {
+        const PREAMBLE_NAME: &str = "_ObjWrap";
+        self.push_def_label(PREAMBLE_NAME);
+        self.definition_stack.push(PREAMBLE_NAME.to_string());
     }
 }
 

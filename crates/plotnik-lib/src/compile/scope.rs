@@ -2,13 +2,15 @@
 //!
 //! Handles Obj/EndObj and Arr/EndArr wrapper emission for struct and array captures.
 
-use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
+use std::num::NonZeroU16;
+
+use crate::analyze::type_check::TypeId;
+use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::Expr;
-use crate::analyze::type_check::TypeId;
 
-use super::capture::CaptureEffects;
 use super::Compiler;
+use super::capture::CaptureEffects;
 
 /// Struct scope for tracking captures in nested contexts.
 /// Each scope represents a struct type whose fields can receive captures.
@@ -38,11 +40,14 @@ impl Compiler<'_> {
     }
 
     /// Look up a capture name in a type, returning a deferred member reference.
+    ///
+    /// Uses (struct_type, relative_index) for deferred resolution.
+    /// Member deduplication for call-site scoping will be added later.
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
         let fields = self.type_ctx.get_struct_fields(type_id)?;
-        for (relative_index, (&sym, _)) in fields.iter().enumerate() {
-            if self.interner.resolve(sym) == capture_name {
-                return Some(MemberRef::deferred(type_id, relative_index as u16));
+        for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
+            if self.interner.resolve(field_sym) == capture_name {
+                return Some(MemberRef::deferred_by_index(type_id, relative_index as u16));
             }
         }
         None
@@ -139,7 +144,9 @@ impl Compiler<'_> {
             };
 
             // Compile inner with capture_effects on the match instruction
-            let inner_capture = CaptureEffects { post: capture_effects };
+            let inner_capture = CaptureEffects {
+                post: capture_effects,
+            };
             return self.compile_expr_inner(inner, actual_exit, nav_override, inner_capture);
         }
 
@@ -161,7 +168,9 @@ impl Compiler<'_> {
         }));
 
         // Compile inner WITH capture_effects on the match instruction
-        let inner_capture = CaptureEffects { post: capture_effects };
+        let inner_capture = CaptureEffects {
+            post: capture_effects,
+        };
         let inner_entry = self.with_scope(scope_type_id.unwrap(), |this| {
             this.compile_expr_inner(inner, endobj_step, nav_override, inner_capture)
         });
@@ -310,6 +319,38 @@ impl Compiler<'_> {
         label
     }
 
+    /// Emit an Obj epsilon step.
+    pub(super) fn emit_obj_step(&mut self, successor: Label) -> Label {
+        let label = self.fresh_label();
+        self.instructions.push(Instruction::Match(MatchIR {
+            label,
+            nav: Nav::Stay,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
+            neg_fields: vec![],
+            post_effects: vec![],
+            successors: vec![successor],
+        }));
+        label
+    }
+
+    /// Emit an EndObj epsilon step.
+    pub(super) fn emit_endobj_step(&mut self, successor: Label) -> Label {
+        let label = self.fresh_label();
+        self.instructions.push(Instruction::Match(MatchIR {
+            label,
+            nav: Nav::Stay,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields: vec![],
+            post_effects: vec![EffectIR::simple(EffectOpcode::EndObj, 0)],
+            successors: vec![successor],
+        }));
+        label
+    }
+
     /// Emit an Arr epsilon step.
     pub(super) fn emit_arr_step(&mut self, successor: Label) -> Label {
         let label = self.fresh_label();
@@ -322,6 +363,25 @@ impl Compiler<'_> {
             neg_fields: vec![],
             post_effects: vec![],
             successors: vec![successor],
+        }));
+        label
+    }
+
+    /// Emit a Call instruction.
+    pub(super) fn emit_call(
+        &mut self,
+        nav: Nav,
+        node_field: Option<NonZeroU16>,
+        next: Label,
+        target: Label,
+    ) -> Label {
+        let label = self.fresh_label();
+        self.instructions.push(Instruction::Call(CallIR {
+            label,
+            nav,
+            node_field,
+            next,
+            target,
         }));
         label
     }
@@ -356,18 +416,17 @@ impl Compiler<'_> {
     ///
     /// Returns the new exit label (with null effects) or the original exit if
     /// no null effects are needed.
-    pub(super) fn emit_null_for_skip_path(&mut self, exit: Label, capture: &CaptureEffects) -> Label {
+    pub(super) fn emit_null_for_skip_path(
+        &mut self,
+        exit: Label,
+        capture: &CaptureEffects,
+    ) -> Label {
         // Collect Set effects - these are the fields that need nulling
         let null_effects: Vec<_> = capture
             .post
             .iter()
             .filter(|eff| eff.opcode == EffectOpcode::Set)
-            .flat_map(|set_eff| {
-                [
-                    EffectIR::simple(EffectOpcode::Null, 0),
-                    set_eff.clone(),
-                ]
-            })
+            .flat_map(|set_eff| [EffectIR::simple(EffectOpcode::Null, 0), set_eff.clone()])
             .collect();
 
         if null_effects.is_empty() {
@@ -447,7 +506,12 @@ impl Compiler<'_> {
     }
 
     /// Emit an epsilon branch preferring `prefer` when greedy, `other` when non-greedy.
-    pub(super) fn emit_branch_epsilon(&mut self, prefer: Label, other: Label, is_greedy: bool) -> Label {
+    pub(super) fn emit_branch_epsilon(
+        &mut self,
+        prefer: Label,
+        other: Label,
+        is_greedy: bool,
+    ) -> Label {
         let entry = self.fresh_label();
         self.emit_branch_epsilon_at(entry, prefer, other, is_greedy);
         entry
