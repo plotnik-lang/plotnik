@@ -10,6 +10,7 @@
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
+use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
@@ -535,10 +536,11 @@ impl Compiler<'_> {
     ///
     /// In linked mode, returns the grammar NodeTypeId.
     /// In unlinked mode, returns the StringId of the type name.
+    /// For the wildcard `(_)`, returns `NAMED_WILDCARD` sentinel.
     pub(super) fn resolve_node_type(&mut self, node: &ast::NamedNode) -> Option<NonZeroU16> {
-        // For wildcard (_), no constraint
+        // For wildcard (_), return sentinel for "any named node"
         if node.is_any() {
-            return None;
+            return NonZeroU16::new(NAMED_WILDCARD);
         }
 
         let type_token = node.node_type()?;

@@ -2,6 +2,7 @@
 
 use arborium_tree_sitter::{Node, Tree};
 
+use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::{
     Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav, StepAddr,
     Trampoline,
@@ -222,11 +223,17 @@ impl<'t> VM<'t> {
 
     /// Check if current node matches type and field constraints.
     fn node_matches<T: Tracer>(&self, m: MatchView<'_>, tracer: &mut T) -> bool {
-        if let Some(expected) = m.node_type
-            && self.cursor.node().kind_id() != expected.get()
-        {
-            tracer.trace_match_failure(self.cursor.node());
-            return false;
+        if let Some(expected) = m.node_type {
+            if expected.get() == NAMED_WILDCARD {
+                // Special case: `(_)` wildcard matches any named node
+                if !self.cursor.node().is_named() {
+                    tracer.trace_match_failure(self.cursor.node());
+                    return false;
+                }
+            } else if self.cursor.node().kind_id() != expected.get() {
+                tracer.trace_match_failure(self.cursor.node());
+                return false;
+            }
         }
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)

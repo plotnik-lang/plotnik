@@ -533,3 +533,17 @@ fn suppressive_capture_with_wrap() {
         entry: "Q"
     );
 }
+
+/// Named wildcard `(_)` matches only named nodes, skipping anonymous nodes.
+/// In `return 42`, `(_)` should match `number`, not the `return` keyword.
+#[test]
+fn wildcard_named_skips_anonymous() {
+    snap!("Q = (program (return_statement (_) @x))", "return 42");
+}
+
+/// Bare wildcard `_` matches any node including anonymous ones.
+/// In `return 42`, `_` should match the first child which is `return` keyword.
+#[test]
+fn wildcard_bare_matches_anonymous() {
+    snap!("Q = (program (return_statement _ @x))", "return 42");
+}
