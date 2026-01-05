@@ -10,7 +10,7 @@
 <br/>
 
 <p align="center">
-  A type-safe query language for source code.<br/>
+  A type-safe query language for <a href="https://tree-sitter.github.io">Tree-sitter</a>.<br/>
   Query in, typed data out.
 </p>
   
