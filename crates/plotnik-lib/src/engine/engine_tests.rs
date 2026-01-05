@@ -183,6 +183,26 @@ fn quantifier_struct_array() {
     );
 }
 
+/// Regression: string annotation on array capture should extract text.
+/// `(identifier)* @names :: string` should produce string[], not Node[].
+#[test]
+fn quantifier_star_with_string_annotation() {
+    snap!(
+        "Q = (program (expression_statement (array (identifier)* @names :: string)))",
+        "[a, b, c]"
+    );
+}
+
+/// Regression: string annotation on non-empty array capture.
+/// `(identifier)+ @names :: string` should produce [string, ...string[]].
+#[test]
+fn quantifier_plus_with_string_annotation() {
+    snap!(
+        "Q = (program (expression_statement (array (identifier)+ @names :: string)))",
+        "[a, b, c]"
+    );
+}
+
 // ============================================================================
 // 3. ALTERNATIONS
 // ============================================================================

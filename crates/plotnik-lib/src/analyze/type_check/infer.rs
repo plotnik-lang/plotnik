@@ -429,7 +429,19 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                     annotation.unwrap_or(TYPE_NODE)
                 }
             }
-            TypeFlow::Scalar(type_id) => annotation.unwrap_or(*type_id),
+            TypeFlow::Scalar(type_id) => {
+                // For array types with annotation, replace the element type
+                // e.g., `(identifier)* @names :: string` → string[] not string
+                if let Some(ann) = annotation
+                    && let Some(TypeShape::Array { non_empty, .. }) = self.ctx.get_type(*type_id)
+                {
+                    return self.ctx.intern_type(TypeShape::Array {
+                        element: ann,
+                        non_empty: *non_empty,
+                    });
+                }
+                annotation.unwrap_or(*type_id)
+            }
             TypeFlow::Bubble(type_id) => annotation.unwrap_or(*type_id),
         }
     }

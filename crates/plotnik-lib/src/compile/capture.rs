@@ -55,10 +55,7 @@ impl Compiler<'_> {
         });
 
         if !is_structured_ref && !creates_structured_scope && !is_array {
-            let is_text = cap
-                .type_annotation()
-                .is_some_and(|t| t.name().is_some_and(|n| n.text() == "string"));
-            let opcode = if is_text {
+            let opcode = if cap.has_string_annotation() {
                 EffectOpcode::Text
             } else {
                 EffectOpcode::Node

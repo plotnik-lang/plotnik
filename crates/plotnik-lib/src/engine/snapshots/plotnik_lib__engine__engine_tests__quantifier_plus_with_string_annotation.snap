@@ -1,0 +1,14 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement (array (identifier)+ @names :: string)))
+---
+[a, b, c]
+---
+{
+  "names": [
+    "a",
+    "b",
+    "c"
+  ]
+}

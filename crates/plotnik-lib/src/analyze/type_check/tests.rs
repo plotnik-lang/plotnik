@@ -251,6 +251,32 @@ fn scalar_list_one_or_more() {
 }
 
 #[test]
+fn scalar_list_with_string_annotation_zero_or_more() {
+    let input = "Q = (identifier)* @names :: string";
+
+    let res = Query::expect_valid_types(input);
+
+    insta::assert_snapshot!(res, @r"
+    export interface Q {
+      names: string[];
+    }
+    ");
+}
+
+#[test]
+fn scalar_list_with_string_annotation_one_or_more() {
+    let input = "Q = (identifier)+ @names :: string";
+
+    let res = Query::expect_valid_types(input);
+
+    insta::assert_snapshot!(res, @r"
+    export interface Q {
+      names: [string, ...string[]];
+    }
+    ");
+}
+
+#[test]
 fn row_list_basic() {
     let input = indoc! {r#"
     Q = {(key) @k (value) @v}* @rows
