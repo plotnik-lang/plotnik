@@ -6,6 +6,9 @@
 use crate::bytecode::Nav;
 use crate::parser::ast::{Expr, SeqItem};
 
+// Re-export from parser for compile module consumers
+pub use crate::parser::is_truly_empty_scope;
+
 /// Check if an expression is anonymous (string literal or wildcard).
 pub fn expr_is_anonymous(expr: Option<&Expr>) -> bool {
     matches!(expr, Some(Expr::AnonymousNode(_)))

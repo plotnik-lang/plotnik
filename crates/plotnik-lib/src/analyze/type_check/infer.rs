@@ -22,7 +22,7 @@ use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node,
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{
     AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
-    Ref, Root, SeqExpr,
+    Ref, Root, SeqExpr, is_truly_empty_scope,
 };
 use crate::parser::cst::SyntaxKind;
 use crate::query::source_map::SourceId;
@@ -458,8 +458,24 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     ) -> TypeId {
         match &inner_info.flow {
             TypeFlow::Void => {
-                let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
-                self.annotation_to_alias(annotation, base_type)
+                // Truly empty sequences/alternations produce empty struct.
+                // E.g., `{ } @x` has type `{ x: {} }`.
+                // Non-empty sequences with void flow (e.g., suppressed captures)
+                // still produce Node for the capture.
+                if is_truly_empty_scope(inner) {
+                    let empty_struct = self.ctx.intern_struct(BTreeMap::new());
+                    match annotation {
+                        Some(AnnotationKind::String) => TYPE_STRING,
+                        Some(AnnotationKind::TypeName(name)) => {
+                            self.ctx.set_type_name(empty_struct, name);
+                            empty_struct
+                        }
+                        None => empty_struct,
+                    }
+                } else {
+                    let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+                    self.annotation_to_alias(annotation, base_type)
+                }
             }
             TypeFlow::Scalar(type_id) => {
                 // For array types with annotation, replace the element type

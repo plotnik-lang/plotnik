@@ -11,7 +11,7 @@ use crate::bytecode::ir::EffectIR;
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;
-use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier};
+use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope};
 
 /// Capture effects to attach to the innermost match instruction.
 ///
@@ -42,21 +42,29 @@ impl Compiler<'_> {
         let is_array = is_star_or_plus_quantifier(inner);
 
         // Check if inner is a scope-creating expression (SeqExpr/AltExpr) that produces
-        // a structured type (Struct/Enum). Named nodes with bubble captures don't count -
-        // they still need Node because we're capturing the matched node, not the struct.
+        // a structured type (Struct/Enum) or truly empty struct. Named nodes with bubble
+        // captures don't count - they still need Node because we're capturing the matched
+        // node, not the struct.
         //
         // For FieldExpr, look through to the value. The parser treats `field: expr @cap` as
         // `(field: expr) @cap` so that quantifiers work on fields (e.g., `decorator: (x)*`
         // for repeating fields). This means captures wrap the FieldExpr, but the value
         // determines whether it produces a structured type. See `parse_expr_no_suffix`.
         let creates_structured_scope = inner.and_then(unwrap_field_value).is_some_and(|ei| {
-            inner_creates_scope(&ei)
-                && self
-                    .type_ctx
-                    .get_term_info(&ei)
-                    .and_then(|info| info.flow.type_id())
-                    .and_then(|id| self.type_ctx.get_type(id))
-                    .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
+            // Truly empty scopes (like `{ }`) produce empty struct
+            if is_truly_empty_scope(&ei) {
+                return true;
+            }
+            if !inner_creates_scope(&ei) {
+                return false;
+            }
+            let Some(info) = self.type_ctx.get_term_info(&ei) else {
+                return false;
+            };
+            info.flow
+                .type_id()
+                .and_then(|id| self.type_ctx.get_type(id))
+                .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
         });
 
         if !is_structured_ref && !creates_structured_scope && !is_array {
