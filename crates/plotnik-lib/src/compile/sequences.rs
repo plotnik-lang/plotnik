@@ -195,7 +195,14 @@ impl Compiler<'_> {
             .get_term_info(&alt_expr)
             .and_then(|info| info.flow.type_id());
         let alt_type_shape = alt_type_id.and_then(|id| self.type_ctx.get_type(id));
-        let is_enum = alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+
+        // Check if THIS alternation is syntactically tagged (all branches have labels).
+        // This is distinct from whether the type is an Enum - a nested untagged alternation
+        // like `[[A: (x)]]` can inherit an enum type from its inner branch while the outer
+        // branches have no labels.
+        let is_tagged_alt = branches.iter().all(|b| b.label().is_some());
+        let is_enum = is_tagged_alt
+            && alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
 
         // For tagged alternations: build map from label Symbol to (member index, payload TypeId)
         // This ensures we use the correct BTreeMap order indices, not AST iteration order
