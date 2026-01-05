@@ -44,11 +44,16 @@ impl Compiler<'_> {
         // Check if inner is a scope-creating expression (SeqExpr/AltExpr) that produces
         // a structured type (Struct/Enum). Named nodes with bubble captures don't count -
         // they still need Node because we're capturing the matched node, not the struct.
-        let creates_structured_scope = inner.is_some_and(|i| {
-            inner_creates_scope(i)
+        //
+        // For FieldExpr, look through to the value. The parser treats `field: expr @cap` as
+        // `(field: expr) @cap` so that quantifiers work on fields (e.g., `decorator: (x)*`
+        // for repeating fields). This means captures wrap the FieldExpr, but the value
+        // determines whether it produces a structured type. See `parse_expr_no_suffix`.
+        let creates_structured_scope = inner.and_then(unwrap_field_value).is_some_and(|ei| {
+            inner_creates_scope(&ei)
                 && self
                     .type_ctx
-                    .get_term_info(i)
+                    .get_term_info(&ei)
                     .and_then(|info| info.flow.type_id())
                     .and_then(|id| self.type_ctx.get_type(id))
                     .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
@@ -145,6 +150,17 @@ impl Compiler<'_> {
         let mut names = HashSet::new();
         collect(expr, &mut names);
         names
+    }
+}
+
+/// Unwrap FieldExpr to get its value, pass through other expressions.
+///
+/// Used when checking properties of a captured expression - captures on fields
+/// like `field: [A: B:] @cap` wrap the FieldExpr, but we need to inspect the value.
+fn unwrap_field_value(expr: &Expr) -> Option<Expr> {
+    match expr {
+        Expr::FieldExpr(f) => f.value(),
+        other => Some(other.clone()),
     }
 }
 

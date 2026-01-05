@@ -481,6 +481,17 @@ Output type:
 { target: string, value: Node }
 ```
 
+### Quantifiers and Captures on Fields
+
+Quantifiers and captures after a field value apply to the entire field constraint, not just the value:
+
+```
+decorator: (decorator)* @decorators   ; repeats the whole field
+value: [A: (x) B: (y)] @kind          ; captures the field (containing the alternation)
+```
+
+This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type—for alternations, you get the tagged union, not a raw node.
+
 ### Negated Fields
 
 Assert a field is absent with `-`:

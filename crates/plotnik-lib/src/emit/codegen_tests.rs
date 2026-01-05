@@ -358,6 +358,16 @@ fn alternations_no_internal_captures() {
     "#});
 }
 
+#[test]
+fn alternations_tagged_in_field_constraint() {
+    // Regression test: captured tagged alternation as field value should not emit Node effect.
+    // The capture `@kind` applies to the field expression, but the value determines
+    // whether it's a structured scope (enum in this case).
+    snap!(indoc! {r#"
+        Test = (foo field: [A: (x) @a B: (y)] @kind)
+    "#});
+}
+
 // ============================================================================
 // 7. ANCHORS
 // ============================================================================

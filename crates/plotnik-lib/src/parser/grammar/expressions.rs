@@ -35,7 +35,14 @@ impl Parser<'_, '_> {
     }
 
     /// Parse expression without applying quantifier/capture suffix.
-    /// Used for field values so that `field: (x)*` parses as `(field: (x))*`.
+    ///
+    /// Used for field values so that suffixes apply to the whole field constraint:
+    /// - `field: (x)*` parses as `(field: (x))*` — repeat the field (e.g., decorators)
+    /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field expression
+    ///
+    /// For captures on structured values (enums/structs), the compilation handles this
+    /// by looking through FieldExpr to determine the actual value type. See
+    /// `build_capture_effects` in compile/capture.rs.
     pub(crate) fn parse_expr_no_suffix(&mut self) {
         self.parse_expr_inner(false)
     }
