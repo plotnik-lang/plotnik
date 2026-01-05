@@ -3,7 +3,8 @@
 use arborium_tree_sitter::{Node, Tree};
 
 use crate::bytecode::{
-    Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav, Trampoline,
+    Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav, StepAddr,
+    Trampoline,
 };
 
 /// Get the nav for continue_search (always a sibling move).
@@ -110,27 +111,29 @@ impl<'t> VM<'t> {
     pub fn execute(
         self,
         module: &Module,
+        bootstrap: StepAddr,
         entrypoint: &Entrypoint,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.execute_with(module, entrypoint, &mut NoopTracer)
+        self.execute_with(module, bootstrap, entrypoint, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
     ///
     /// The tracer is generic, so `NoopTracer` calls are optimized away
     /// while `PrintTracer` calls collect execution trace.
+    ///
+    /// `bootstrap` is the preamble entry point - caller decides which preamble to use.
     pub fn execute_with<T: Tracer>(
         mut self,
         module: &Module,
+        bootstrap: StepAddr,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        // Bootstrap address: where VM starts execution.
-        // Currently hardcoded to 0 (preamble is first in layout).
-        // Future: parameterize for different preamble types (e.g., recursive deep-match).
-        const BOOTSTRAP: u16 = 0;
-        self.ip = BOOTSTRAP;
-        self.entrypoint_target = entrypoint.target.get();
+        // Bootstrap address: where VM starts execution (preamble entry point).
+        // Caller provides this, enabling different preamble types (root-match, recursive, etc.).
+        self.ip = bootstrap;
+        self.entrypoint_target = entrypoint.target;
         tracer.trace_enter_preamble();
 
         loop {

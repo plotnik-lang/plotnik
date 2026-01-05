@@ -36,7 +36,9 @@ fn execute_with_entry(query: &str, source: &str, entry: Option<&str>) -> String 
     let vm = VM::new(&tree, trivia, FuelLimits::default());
 
     let entrypoint = resolve_entrypoint(&module, entry);
-    let effects = vm.execute(&module, &entrypoint).expect("execution failed");
+    let effects = vm
+        .execute(&module, 0, &entrypoint)
+        .expect("execution failed");
 
     let materializer = ValueMaterializer::new(source, module.types(), module.strings());
     let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);

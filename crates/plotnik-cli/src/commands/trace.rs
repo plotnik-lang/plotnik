@@ -48,7 +48,7 @@ pub fn run(args: TraceArgs) {
     let colors = Colors::new(args.color);
     let mut tracer = PrintTracer::new(&source_code, &module, args.verbosity, colors);
 
-    let effects = match vm.execute_with(&module, &entrypoint, &mut tracer) {
+    let effects = match vm.execute_with(&module, 0, &entrypoint, &mut tracer) {
         Ok(effects) => {
             tracer.print();
             effects

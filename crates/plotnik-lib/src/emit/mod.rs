@@ -753,7 +753,7 @@ fn emit_inner(
     .map_err(EmitError::Compile)?;
 
     // Layout with cache alignment
-    // Preamble entry FIRST ensures it gets the lowest address (step 1)
+    // Preamble entry FIRST ensures it gets the lowest address (step 0)
     let mut entry_labels: Vec<Label> = vec![compile_result.preamble_entry];
     entry_labels.extend(compile_result.def_entries.values().copied());
     let layout = CacheAligned::layout(&compile_result.instructions, &entry_labels);
@@ -913,7 +913,7 @@ fn emit_transitions(
             continue;
         };
 
-        let offset = step_id.byte_offset();
+        let offset = step_id as usize * 8; // STEP_SIZE
         let resolved = instr.resolve(&layout.label_to_step, lookup_member, get_member_base);
 
         // Copy instruction bytes to the correct position
@@ -963,7 +963,7 @@ fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * 8);
     for ep in entrypoints {
         bytes.extend_from_slice(&ep.name.get().to_le_bytes());
-        bytes.extend_from_slice(&ep.target.get().to_le_bytes());
+        bytes.extend_from_slice(&ep.target.to_le_bytes());
         bytes.extend_from_slice(&ep.result_type.0.to_le_bytes());
         bytes.extend_from_slice(&ep._pad.to_le_bytes());
     }

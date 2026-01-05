@@ -5,7 +5,6 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::StepId;
 use crate::bytecode::ir::{Instruction, Label, LayoutResult};
 
 const CACHE_LINE: usize = 64;
@@ -177,7 +176,7 @@ fn assign_step_ids(
                 }
             }
 
-            mapping.insert(label, StepId::new(current_step));
+            mapping.insert(label, current_step);
             let step_count = (size / STEP_SIZE) as u16;
             current_step += step_count;
             current_offset += size;

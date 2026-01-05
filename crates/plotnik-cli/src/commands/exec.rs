@@ -38,7 +38,7 @@ pub fn run(args: ExecArgs) {
     });
 
     let vm = VM::new(&tree, trivia_types, FuelLimits::default());
-    let effects = match vm.execute(&module, &entrypoint) {
+    let effects = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
             std::process::exit(1);

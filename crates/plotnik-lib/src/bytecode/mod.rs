@@ -18,7 +18,7 @@ mod type_meta;
 
 pub use constants::{MAGIC, SECTION_ALIGN, STEP_SIZE, VERSION};
 
-pub use ids::{QTypeId, StepId, StringId};
+pub use ids::{QTypeId, StringId};
 
 pub use header::{Header, flags};
 
@@ -33,7 +33,8 @@ pub use nav::Nav;
 pub use effects::{EffectOp, EffectOpcode};
 
 pub use instructions::{
-    Call, Match, MatchView, Opcode, Return, Trampoline, align_to_section, select_match_opcode,
+    Call, Match, MatchView, Opcode, Return, StepAddr, StepId, Trampoline, align_to_section,
+    select_match_opcode,
 };
 
 pub use module::{
