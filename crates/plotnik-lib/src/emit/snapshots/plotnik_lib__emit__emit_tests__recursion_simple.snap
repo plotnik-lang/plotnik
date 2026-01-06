@@ -1,0 +1,67 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Expr = [
+    Lit: (number) @value :: string
+    Rec: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+]
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "fn"
+S03 "inner"
+S04 "Lit"
+S05 "Rec"
+S06 "Expr"
+S07 "number"
+S08 "call_expression"
+S09 "arguments"
+S10 "function"
+S11 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = <String>
+T2 = Struct  M0:1  ; { value }
+T3 = Struct  M1:2  ; { fn, inner }
+T4 = Enum    M3:2  ; Lit | Rec
+T5 = Struct  M5:1  ; { fn }
+T6 = Struct  M6:1  ; { inner }
+
+[type_members]
+M0: S01 → T1  ; value: <String>
+M1: S02 → T0  ; fn: <Node>
+M2: S03 → T4  ; inner: Expr
+M3: S04 → T2  ; Lit: T2
+M4: S05 → T3  ; Rec: T3
+M5: S02 → T0  ; fn: <Node>
+M6: S03 → T4  ; inner: Expr
+
+[type_names]
+N0: S06 → T4  ; Expr
+
+[entrypoints]
+Expr = 06 :: T4
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Expr:
+  06   ε                                    07
+  07   ε                                    13, 21
+  09   ε   [Set(M2)]                        11
+  11   △                                    16
+  12                                        ▶
+  13   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  12
+  16   ε   [EndEnum]                        12
+  18   ▷   arguments: (Expr)                06 : 09
+  19   ▽   function: (identifier) [Node Set(M1)]  18
+  21   !   [Enum(M4)] (call_expression)     19

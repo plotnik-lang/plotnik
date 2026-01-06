@@ -84,6 +84,7 @@ The `◀` symbol appears in the symbol column with the definition name in parent
 ### Definition Labels
 
 Definition labels (`Name:`) appear at:
+
 - Entry to a definition (initial or via call)
 - After returning from a call (showing the caller's name)
 

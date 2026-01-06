@@ -1,0 +1,75 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = (object { [A: (pair) @a  B: (shorthand_property_identifier) @b] @item }* @items)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "A"
+S04 "B"
+S05 "item"
+S06 "items"
+S07 "Test"
+S08 "object"
+S09 "pair"
+S10 "shorthand_property_identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Struct  M1:1  ; { b }
+T3 = Enum    M2:2  ; A | B
+T4 = Struct  M4:1  ; { item }
+T5 = ArrayStar(T4)  ; T4*
+T6 = Struct  M5:1  ; { items }
+
+[type_members]
+M0: S01 → T0  ; a: <Node>
+M1: S02 → T0  ; b: <Node>
+M2: S03 → T1  ; A: T1
+M3: S04 → T2  ; B: T2
+M4: S05 → T3  ; item: T3
+M5: S06 → T5  ; items: T5
+
+[type_names]
+N0: S07 → T6  ; Test
+
+[entrypoints]
+Test = 06 :: T6
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   !   (object)                         08
+  08   ε   [Arr]                            10
+  10   ε                                    39, 20
+  12   ε   [EndArr Set(M5)]                 14
+  14   △                                    19
+  15   ε   [EndObj Push]                    17
+  17   ε                                    45, 12
+  19                                        ▶
+  20   ε   [EndArr Set(M5)]                 19
+  22   ε   [Set(M4)]                        15
+  24   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum]  22
+  27   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum]  22
+  30   ε                                    24, 27
+  32   ε   [Obj]                            30
+  34   ▷                                    37
+  35   ε                                    34, 20
+  37   ε                                    32, 35
+  39   ▽                                    37
+  40   ▷                                    43
+  41   ε                                    40, 12
+  43   ε                                    32, 41
+  45   ▷                                    43

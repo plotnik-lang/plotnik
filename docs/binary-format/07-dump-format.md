@@ -170,14 +170,14 @@ Examples:
 - `!▽ ` — down, skip trivia
 - `!!▷ ` — next, exact
 
-| Instruction      | Format                                           |
-| ---------------- | ------------------------------------------------ |
-| Match (terminal) | `step nav    [pre] (type) [post]      ◼`         |
-| Match            | `step nav    [pre] field: (type) [post] succ`    |
-| Match (branch)   | `step nav    [pre] (type) [post]      s1, s2`    |
-| Epsilon          | `step  ε     [effects]                succ`      |
-| Call             | `step nav    field: (Name)        target : ret`  |
-| Return           | `step                                 ▶`         |
+| Instruction      | Format                                          |
+| ---------------- | ----------------------------------------------- |
+| Match (terminal) | `step nav    [pre] (type) [post]      ◼`        |
+| Match            | `step nav    [pre] field: (type) [post] succ`   |
+| Match (branch)   | `step nav    [pre] (type) [post]      s1, s2`   |
+| Epsilon          | `step  ε     [effects]                succ`     |
+| Call             | `step nav    field: (Name)        target : ret` |
+| Return           | `step                                 ▶`        |
 
 Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`, `field:`.
 

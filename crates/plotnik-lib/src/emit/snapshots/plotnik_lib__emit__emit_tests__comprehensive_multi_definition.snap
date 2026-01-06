@@ -1,0 +1,90 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Ident = (identifier) @name :: string
+Expression = [
+    Literal: (number) @value
+    Variable: (identifier) @name
+]
+Assignment = (assignment_expression
+    left: (identifier) @target
+    right: (Expression) @value)
+---
+[flags]
+linked = false
+
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "value"
+S03 "Literal"
+S04 "Variable"
+S05 "target"
+S06 "Ident"
+S07 "Expression"
+S08 "Assignment"
+S09 "identifier"
+S10 "number"
+S11 "assignment_expression"
+S12 "right"
+S13 "left"
+
+[type_defs]
+T00 = <Node>
+T01 = <String>
+T02 = Struct  M0:1  ; { name }
+T03 = Struct  M1:1  ; { value }
+T04 = Struct  M2:1  ; { name }
+T05 = Enum    M3:2  ; Literal | Variable
+T06 = Struct  M5:2  ; { value, target }
+T07 = Struct  M7:1  ; { target }
+T08 = Struct  M8:1  ; { value }
+
+[type_members]
+M0: S01 → T01  ; name: <String>
+M1: S02 → T00  ; value: <Node>
+M2: S01 → T00  ; name: <Node>
+M3: S03 → T03  ; Literal: T03
+M4: S04 → T04  ; Variable: T04
+M5: S02 → T05  ; value: Expression
+M6: S05 → T00  ; target: <Node>
+M7: S05 → T00  ; target: <Node>
+M8: S02 → T05  ; value: Expression
+
+[type_names]
+N0: S06 → T02  ; Ident
+N1: S07 → T05  ; Expression
+N2: S08 → T06  ; Assignment
+
+[entrypoints]
+Assignment = 13 :: T06
+Expression = 10 :: T05
+Ident      = 06 :: T02
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Ident:
+  06   ε                                    07
+  07   !   (identifier) [Text Set(M0)]      09
+  09                                        ▶
+
+Expression:
+  10   ε                                    11
+  11   ε                                    23, 26
+
+Assignment:
+  13   ε                                    14
+  14   !   (assignment_expression)          15
+  15   ▽   left: (identifier) [Node Set(M6)]  17
+  17   ▷   right: (Expression)              10 : 18
+  18   ε   [Set(M5)]                        20
+  20   △                                    21
+  21                                        ▶
+  22                                        ▶
+  23   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  22
+  26   !   [Enum(M4)] (identifier) [Node Set(M2) EndEnum]  22
