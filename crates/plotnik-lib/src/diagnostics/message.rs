@@ -30,6 +30,7 @@ pub enum DiagnosticKind {
 
     // User wrote something that doesn't belong
     EmptyTree,
+    EmptyAnonymousNode,
     BareIdentifier,
     InvalidSeparator,
     AnchorInAlternation,
@@ -144,6 +145,7 @@ impl DiagnosticKind {
             Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
             Self::ExpectedFieldName => Some("e.g., `-value`"),
             Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
+            Self::EmptyAnonymousNode => Some("use a valid anonymous node or remove it"),
             Self::TreeSitterSequenceSyntax => Some("use `{...}` for sequences"),
             Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
             Self::MixedAltBranches => {
@@ -182,6 +184,7 @@ impl DiagnosticKind {
 
             // Invalid syntax
             Self::EmptyTree => "empty `()` is not allowed",
+            Self::EmptyAnonymousNode => "empty anonymous node",
             Self::BareIdentifier => "bare identifier is not valid",
             Self::InvalidSeparator => "unexpected separator",
             Self::AnchorInAlternation => "anchors cannot appear directly in alternations",

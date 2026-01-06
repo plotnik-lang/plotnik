@@ -200,7 +200,8 @@ fn empty_double_quote_string() {
     Q = (a "")
     "#};
 
-    let res = Query::expect_valid_cst(input);
+    // Empty anonymous nodes are now invalid, but CST structure is still correct
+    let res = Query::expect(input).dump_cst();
 
     insta::assert_snapshot!(res, @r#"
     Root
@@ -223,7 +224,8 @@ fn empty_single_quote_string() {
     Q = (a '')
     "#};
 
-    let res = Query::expect_valid_cst(input);
+    // Empty anonymous nodes are now invalid, but CST structure is still correct
+    let res = Query::expect(input).dump_cst();
 
     insta::assert_snapshot!(res, @r#"
     Root

@@ -1,3 +1,6 @@
+use rowan::TextRange;
+
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 
@@ -10,9 +13,38 @@ impl Parser<'_, '_> {
 
     /// `"if"` | `'+'`
     pub(crate) fn parse_str(&mut self) {
+        let start = self.current_span().start();
         self.start_node(SyntaxKind::Str);
-        self.bump_string_tokens();
+
+        let open_quote = self.current();
+        self.bump(); // opening quote
+
+        let has_content = self.currently_is(SyntaxKind::StrVal);
+        if has_content {
+            self.bump();
+        }
+
+        let closing = self.current();
+        assert_eq!(
+            closing, open_quote,
+            "parse_str: expected closing {:?} but found {:?} \
+             (lexer should only produce quote tokens from complete strings)",
+            open_quote, closing
+        );
+        let end = self.current_span().end();
+        self.bump(); // closing quote
+
         self.finish_node();
+
+        if !has_content {
+            self.diagnostics
+                .report(
+                    self.source_id,
+                    DiagnosticKind::EmptyAnonymousNode,
+                    TextRange::new(start, end),
+                )
+                .emit();
+        }
     }
 
     /// Consume string tokens (quote + optional content + quote) without creating a node.
