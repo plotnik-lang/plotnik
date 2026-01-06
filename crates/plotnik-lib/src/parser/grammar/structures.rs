@@ -47,10 +47,10 @@ impl Parser<'_, '_> {
                 return;
             }
             _ => {
-                self.start_node_at(checkpoint, SyntaxKind::Tree);
-                // Warn about tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
-                // Only warn when it looks like an expression (not predicates or other invalid tokens)
+                // Tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
+                // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
+                    self.start_node_at(checkpoint, SyntaxKind::Seq);
                     self.diagnostics
                         .report(
                             self.source_id,
@@ -58,6 +58,8 @@ impl Parser<'_, '_> {
                             open_paren_span,
                         )
                         .emit();
+                } else {
+                    self.start_node_at(checkpoint, SyntaxKind::Tree);
                 }
             }
         }

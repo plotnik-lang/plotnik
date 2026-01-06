@@ -177,6 +177,21 @@ impl QueryAnalyzed {
 
         query.dump_diagnostics()
     }
+
+    #[track_caller]
+    pub fn expect_cst_with_warnings(src: &str) -> String {
+        let source_map = SourceMap::one_liner(src);
+        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+
+        if !query.is_valid() {
+            panic!(
+                "Expected valid query (warnings ok), got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+
+        query.dump_cst()
+    }
 }
 
 #[test]
