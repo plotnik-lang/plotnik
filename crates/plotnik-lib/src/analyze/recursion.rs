@@ -92,12 +92,12 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
     /// Finds a cycle within the given set of nodes (SCC).
     /// `get_edge_location` returns the location of a reference from `expr` to `target`.
-    fn find_cycle<'s>(
+    fn find_cycle<'b>(
         &self,
-        nodes: &'s [String],
-        domain: &IndexSet<&'s str>,
+        nodes: &'b [String],
+        domain: &IndexSet<&'b str>,
         get_edge_location: impl Fn(&Self, SourceId, &Expr, &str) -> Option<TextRange>,
-    ) -> Option<Vec<(SourceId, TextRange, &'s str)>> {
+    ) -> Option<Vec<(SourceId, TextRange, &'b str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
             if let Some((source_id, body)) = self.symbol_table.get_full(name) {

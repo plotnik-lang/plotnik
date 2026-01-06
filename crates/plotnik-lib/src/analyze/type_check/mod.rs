@@ -14,7 +14,7 @@ mod context_tests;
 #[cfg(test)]
 mod symbol_tests;
 #[cfg(test)]
-mod tests;
+mod type_check_tests;
 #[cfg(test)]
 mod unify_tests;
 
