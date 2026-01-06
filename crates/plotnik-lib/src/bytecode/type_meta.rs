@@ -1,6 +1,6 @@
 //! Type metadata definitions for bytecode format.
 
-use super::{QTypeId, StringId};
+use super::{StringId, TypeId};
 
 // Re-export the shared TypeKind
 pub use crate::type_system::TypeKind;
@@ -77,10 +77,10 @@ const _: () = assert!(std::mem::size_of::<TypeDef>() == 4);
 impl TypeDef {
     /// For wrapper types, get the inner type.
     #[inline]
-    pub fn inner_type(&self) -> Option<QTypeId> {
+    pub fn inner_type(&self) -> Option<TypeId> {
         TypeKind::from_u8(self.kind)
             .filter(|k| k.is_wrapper())
-            .map(|_| QTypeId(self.data))
+            .map(|_| TypeId(self.data))
     }
 
     /// Get the TypeKind for this definition.
@@ -103,10 +103,10 @@ impl TypeDef {
 
     /// For alias types, get the target type.
     #[inline]
-    pub fn alias_target(&self) -> Option<QTypeId> {
+    pub fn alias_target(&self) -> Option<TypeId> {
         TypeKind::from_u8(self.kind)
             .filter(|k| k.is_alias())
-            .map(|_| QTypeId(self.data))
+            .map(|_| TypeId(self.data))
     }
 
     /// For Struct/Enum types, get the member index.
@@ -136,7 +136,7 @@ pub struct TypeName {
     /// StringId of the type name.
     pub name: StringId,
     /// TypeId this name refers to.
-    pub type_id: QTypeId,
+    pub type_id: TypeId,
 }
 
 const _: () = assert!(std::mem::size_of::<TypeName>() == 4);
@@ -148,7 +148,7 @@ pub struct TypeMember {
     /// Field/variant name.
     pub name: StringId,
     /// Type of this field/variant.
-    pub type_id: QTypeId,
+    pub type_id: TypeId,
 }
 
 const _: () = assert!(std::mem::size_of::<TypeMember>() == 4);

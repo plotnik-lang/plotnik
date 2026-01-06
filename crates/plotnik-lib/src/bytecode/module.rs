@@ -8,7 +8,7 @@ use std::ops::Deref;
 use std::path::Path;
 
 use super::header::Header;
-use super::ids::{QTypeId, StringId};
+use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, MatchView, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
 use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
@@ -443,8 +443,8 @@ impl<'a> TypesView<'a> {
         }
     }
 
-    /// Get a type definition by QTypeId.
-    pub fn get(&self, id: QTypeId) -> Option<TypeDef> {
+    /// Get a type definition by TypeId.
+    pub fn get(&self, id: TypeId) -> Option<TypeDef> {
         let idx = id.0 as usize;
         if idx < self.defs_count {
             Some(self.get_def(idx))
@@ -459,7 +459,7 @@ impl<'a> TypesView<'a> {
         let offset = idx * 4;
         TypeMember {
             name: StringId::new(read_u16_le(self.members_bytes, offset)),
-            type_id: QTypeId(read_u16_le(self.members_bytes, offset + 2)),
+            type_id: TypeId(read_u16_le(self.members_bytes, offset + 2)),
         }
     }
 
@@ -469,7 +469,7 @@ impl<'a> TypesView<'a> {
         let offset = idx * 4;
         TypeName {
             name: StringId::new(read_u16_le(self.names_bytes, offset)),
-            type_id: QTypeId(read_u16_le(self.names_bytes, offset + 2)),
+            type_id: TypeId(read_u16_le(self.names_bytes, offset + 2)),
         }
     }
 
@@ -497,14 +497,14 @@ impl<'a> TypesView<'a> {
 
     /// Unwrap Optional wrapper and return (inner_type, is_optional).
     /// If not Optional, returns (type_id, false).
-    pub fn unwrap_optional(&self, type_id: QTypeId) -> (QTypeId, bool) {
+    pub fn unwrap_optional(&self, type_id: TypeId) -> (TypeId, bool) {
         let Some(type_def) = self.get(type_id) else {
             return (type_id, false);
         };
         if !type_def.is_optional() {
             return (type_id, false);
         }
-        (QTypeId(type_def.data), true)
+        (TypeId(type_def.data), true)
     }
 }
 
@@ -522,7 +522,7 @@ impl<'a> EntrypointsView<'a> {
         Entrypoint {
             name: StringId::new(read_u16_le(self.bytes, offset)),
             target: read_u16_le(self.bytes, offset + 2),
-            result_type: QTypeId(read_u16_le(self.bytes, offset + 4)),
+            result_type: TypeId(read_u16_le(self.bytes, offset + 4)),
             _pad: 0,
         }
     }

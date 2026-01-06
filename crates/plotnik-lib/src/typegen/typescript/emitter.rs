@@ -4,7 +4,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::Colors;
-use crate::bytecode::{EntrypointsView, Module, QTypeId, StringsView, TypesView};
+use crate::bytecode::{EntrypointsView, Module, StringsView, TypeId, TypesView};
 
 use super::Config;
 
@@ -16,15 +16,15 @@ pub struct Emitter<'a> {
     pub(super) config: Config,
 
     /// TypeId -> assigned name mapping
-    pub(super) type_names: HashMap<QTypeId, String>,
+    pub(super) type_names: HashMap<TypeId, String>,
     /// Names already used (for collision avoidance)
     pub(super) used_names: BTreeSet<String>,
     /// Track which builtin types are referenced
     pub(super) node_referenced: bool,
     /// Track which types have been emitted
-    pub(super) emitted: HashSet<QTypeId>,
+    pub(super) emitted: HashSet<TypeId>,
     /// Types visited during builtin reference collection (cycle detection)
-    pub(super) refs_visited: HashSet<QTypeId>,
+    pub(super) refs_visited: HashSet<TypeId>,
     /// Output buffer
     pub(super) output: String,
 }
@@ -54,8 +54,8 @@ impl<'a> Emitter<'a> {
         self.prepare_emission();
 
         // Collect all entrypoints and their result types
-        let mut primary_names: HashMap<QTypeId, String> = HashMap::new();
-        let mut aliases: Vec<(String, QTypeId)> = Vec::new();
+        let mut primary_names: HashMap<TypeId, String> = HashMap::new();
+        let mut aliases: Vec<(String, TypeId)> = Vec::new();
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);

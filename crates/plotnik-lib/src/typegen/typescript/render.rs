@@ -2,7 +2,7 @@
 
 use plotnik_core::utils::to_pascal_case;
 
-use crate::bytecode::{QTypeId, TypeDef, TypeKind};
+use crate::bytecode::{TypeDef, TypeId, TypeKind};
 
 use super::Emitter;
 
@@ -35,7 +35,7 @@ impl Emitter<'_> {
         }
     }
 
-    pub(super) fn emit_generated_or_custom(&mut self, type_id: QTypeId) {
+    pub(super) fn emit_generated_or_custom(&mut self, type_id: TypeId) {
         if self.emitted.contains(&type_id) {
             return;
         }
@@ -67,7 +67,7 @@ impl Emitter<'_> {
         }
     }
 
-    fn emit_generated_type_def(&mut self, type_id: QTypeId, name: &str) {
+    fn emit_generated_type_def(&mut self, type_id: TypeId, name: &str) {
         self.emitted.insert(type_id);
 
         let Some(type_def) = self.types.get(type_id) else {
@@ -85,7 +85,7 @@ impl Emitter<'_> {
         }
     }
 
-    pub(super) fn emit_type_definition(&mut self, name: &str, type_id: QTypeId) {
+    pub(super) fn emit_type_definition(&mut self, name: &str, type_id: TypeId) {
         self.emitted.insert(type_id);
         let type_name = to_pascal_case(name);
 
@@ -138,7 +138,7 @@ impl Emitter<'_> {
         ));
 
         // Collect fields and sort by name
-        let mut fields: Vec<(String, QTypeId, bool)> = self
+        let mut fields: Vec<(String, TypeId, bool)> = self
             .types
             .members_of(type_def)
             .map(|member| {

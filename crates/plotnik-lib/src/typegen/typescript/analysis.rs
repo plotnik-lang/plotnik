@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::bytecode::{QTypeId, TypeKind};
+use crate::bytecode::{TypeId, TypeKind};
 
 use super::Emitter;
 
@@ -14,7 +14,7 @@ impl Emitter<'_> {
         }
     }
 
-    fn collect_refs_recursive(&mut self, type_id: QTypeId) {
+    fn collect_refs_recursive(&mut self, type_id: TypeId) {
         // Cycle detection
         if !self.refs_visited.insert(type_id) {
             return;
@@ -46,7 +46,7 @@ impl Emitter<'_> {
                 }
             }
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.collect_refs_recursive(QTypeId(type_def.data));
+                self.collect_refs_recursive(TypeId(type_def.data));
             }
             TypeKind::Alias => {
                 // Alias to Node
@@ -55,9 +55,9 @@ impl Emitter<'_> {
         }
     }
 
-    pub(super) fn sort_topologically(&self, types: HashSet<QTypeId>) -> Vec<QTypeId> {
-        let mut deps: HashMap<QTypeId, HashSet<QTypeId>> = HashMap::new();
-        let mut rdeps: HashMap<QTypeId, HashSet<QTypeId>> = HashMap::new();
+    pub(super) fn sort_topologically(&self, types: HashSet<TypeId>) -> Vec<TypeId> {
+        let mut deps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
+        let mut rdeps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
 
         for &tid in &types {
             deps.entry(tid).or_default();
@@ -76,7 +76,7 @@ impl Emitter<'_> {
 
         // Kahn's algorithm
         let mut result = Vec::with_capacity(types.len());
-        let mut queue: Vec<QTypeId> = deps
+        let mut queue: Vec<TypeId> = deps
             .iter()
             .filter(|(_, d)| d.is_empty())
             .map(|(&tid, _)| tid)
@@ -102,7 +102,7 @@ impl Emitter<'_> {
         result
     }
 
-    pub(super) fn collect_reachable_types(&self, type_id: QTypeId, out: &mut HashSet<QTypeId>) {
+    pub(super) fn collect_reachable_types(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
         if out.contains(&type_id) {
             return;
         }
@@ -133,14 +133,14 @@ impl Emitter<'_> {
                 out.insert(type_id);
             }
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.collect_reachable_types(QTypeId(type_def.data), out);
+                self.collect_reachable_types(TypeId(type_def.data), out);
             }
         }
     }
 
     /// Collect reachable types from enum variant payloads.
     /// Recurses into struct fields but doesn't add the payload struct itself.
-    fn collect_enum_variant_refs(&self, type_id: QTypeId, out: &mut HashSet<QTypeId>) {
+    fn collect_enum_variant_refs(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
         let Some(type_def) = self.types.get(type_id) else {
             return;
         };
@@ -157,7 +157,7 @@ impl Emitter<'_> {
         }
     }
 
-    pub(super) fn get_direct_deps(&self, type_id: QTypeId) -> Vec<QTypeId> {
+    pub(super) fn get_direct_deps(&self, type_id: TypeId) -> Vec<TypeId> {
         let Some(type_def) = self.types.get(type_id) else {
             return vec![];
         };
@@ -174,12 +174,12 @@ impl Emitter<'_> {
                 .flat_map(|member| self.unwrap_for_deps(member.type_id))
                 .collect(),
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.unwrap_for_deps(QTypeId(type_def.data))
+                self.unwrap_for_deps(TypeId(type_def.data))
             }
         }
     }
 
-    fn unwrap_for_deps(&self, type_id: QTypeId) -> Vec<QTypeId> {
+    fn unwrap_for_deps(&self, type_id: TypeId) -> Vec<TypeId> {
         let Some(type_def) = self.types.get(type_id) else {
             return vec![];
         };
@@ -191,7 +191,7 @@ impl Emitter<'_> {
         match kind {
             TypeKind::Void | TypeKind::Node | TypeKind::String => vec![],
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.unwrap_for_deps(QTypeId(type_def.data))
+                self.unwrap_for_deps(TypeId(type_def.data))
             }
             TypeKind::Struct | TypeKind::Enum | TypeKind::Alias => vec![type_id],
         }

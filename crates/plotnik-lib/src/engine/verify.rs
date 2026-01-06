@@ -4,7 +4,7 @@
 //! Zero-cost in release builds.
 
 use crate::Colors;
-use crate::bytecode::{Module, QTypeId, StringsView, TypesView};
+use crate::bytecode::{Module, StringsView, TypeId, TypesView};
 use crate::type_system::TypeKind;
 use crate::typegen::typescript::{self, Config, VoidType};
 
@@ -17,7 +17,7 @@ use super::Value;
 ///
 /// `expected_type` should be the `result_type` from the entrypoint that was executed.
 #[cfg(debug_assertions)]
-pub fn debug_verify_type(value: &Value, expected_type: QTypeId, module: &Module, colors: Colors) {
+pub fn debug_verify_type(value: &Value, expected_type: TypeId, module: &Module, colors: Colors) {
     let types = module.types();
     let strings = module.strings();
 
@@ -40,7 +40,7 @@ pub fn debug_verify_type(value: &Value, expected_type: QTypeId, module: &Module,
 #[inline(always)]
 pub fn debug_verify_type(
     _value: &Value,
-    _expected_type: QTypeId,
+    _expected_type: TypeId,
     _module: &Module,
     _colors: Colors,
 ) {
@@ -50,7 +50,7 @@ pub fn debug_verify_type(
 #[cfg(debug_assertions)]
 fn verify_type(
     value: &Value,
-    expected: QTypeId,
+    expected: TypeId,
     types: &TypesView<'_>,
     strings: &StringsView<'_>,
     path: &mut String,
@@ -107,14 +107,14 @@ fn verify_type(
         }
 
         TypeKind::Optional => {
-            let inner_type = QTypeId(type_def.data);
+            let inner_type = TypeId(type_def.data);
             if !matches!(value, Value::Null) {
                 verify_type(value, inner_type, types, strings, path, errors);
             }
         }
 
         TypeKind::ArrayZeroOrMore => {
-            let inner_type = QTypeId(type_def.data);
+            let inner_type = TypeId(type_def.data);
             match value {
                 Value::Array(items) => {
                     for (i, item) in items.iter().enumerate() {
@@ -134,7 +134,7 @@ fn verify_type(
         }
 
         TypeKind::ArrayOneOrMore => {
-            let inner_type = QTypeId(type_def.data);
+            let inner_type = TypeId(type_def.data);
             match value {
                 Value::Array(items) => {
                     if items.is_empty() {
@@ -318,7 +318,7 @@ fn centered_header(label: &str, width: usize) -> String {
 #[cfg(debug_assertions)]
 fn panic_with_mismatch(
     value: &Value,
-    expected_type: QTypeId,
+    expected_type: TypeId,
     errors: &[String],
     module: &Module,
     colors: Colors,

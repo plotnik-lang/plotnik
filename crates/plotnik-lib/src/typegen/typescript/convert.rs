@@ -1,12 +1,12 @@
 //! Type to TypeScript string conversion.
 
-use crate::bytecode::{QTypeId, TypeDef, TypeKind};
+use crate::bytecode::{TypeDef, TypeId, TypeKind};
 
 use super::Emitter;
 use super::config::VoidType;
 
 impl Emitter<'_> {
-    pub(super) fn type_to_ts(&self, type_id: QTypeId) -> String {
+    pub(super) fn type_to_ts(&self, type_id: TypeId) -> String {
         let c = self.c();
         let Some(type_def) = self.types.get(type_id) else {
             return "unknown".to_string();
@@ -38,24 +38,24 @@ impl Emitter<'_> {
                 }
             }
             TypeKind::ArrayZeroOrMore => {
-                let elem_type = self.type_to_ts(QTypeId(type_def.data));
+                let elem_type = self.type_to_ts(TypeId(type_def.data));
                 format!("{}{}[]{}", elem_type, c.dim, c.reset)
             }
             TypeKind::ArrayOneOrMore => {
-                let elem_type = self.type_to_ts(QTypeId(type_def.data));
+                let elem_type = self.type_to_ts(TypeId(type_def.data));
                 format!(
                     "{}[{}{}{}, ...{}{}{}[]]{}",
                     c.dim, c.reset, elem_type, c.dim, c.reset, elem_type, c.dim, c.reset
                 )
             }
             TypeKind::Optional => {
-                let inner_type = self.type_to_ts(QTypeId(type_def.data));
+                let inner_type = self.type_to_ts(TypeId(type_def.data));
                 format!("{} {}|{} null", inner_type, c.dim, c.reset)
             }
         }
     }
 
-    fn inline_composite(&self, _type_id: QTypeId, type_def: &TypeDef, kind: &TypeKind) -> String {
+    fn inline_composite(&self, _type_id: TypeId, type_def: &TypeDef, kind: &TypeKind) -> String {
         match kind {
             TypeKind::Struct => self.inline_struct(type_def),
             TypeKind::Enum => self.inline_enum(type_def),
@@ -69,7 +69,7 @@ impl Emitter<'_> {
             return format!("{}{{}}{}", c.dim, c.reset);
         }
 
-        let mut fields: Vec<(String, QTypeId, bool)> = self
+        let mut fields: Vec<(String, TypeId, bool)> = self
             .types
             .members_of(type_def)
             .map(|member| {
@@ -141,7 +141,7 @@ impl Emitter<'_> {
         variant_strs.join(&format!(" {}|{} ", c.dim, c.reset))
     }
 
-    pub(super) fn inline_data_type(&self, type_id: QTypeId) -> String {
+    pub(super) fn inline_data_type(&self, type_id: TypeId) -> String {
         let c = self.c();
         let Some(type_def) = self.types.get(type_id) else {
             return self.type_to_ts(type_id);
@@ -162,7 +162,7 @@ impl Emitter<'_> {
         }
     }
 
-    pub(super) fn is_void_type(&self, type_id: QTypeId) -> bool {
+    pub(super) fn is_void_type(&self, type_id: TypeId) -> bool {
         self.types
             .get(type_id)
             .and_then(|def| def.type_kind())

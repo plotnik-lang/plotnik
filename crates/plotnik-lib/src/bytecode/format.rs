@@ -10,10 +10,6 @@ use super::EffectOp;
 use super::effects::EffectOpcode;
 use super::nav::Nav;
 
-// =============================================================================
-// Column Layout
-// =============================================================================
-
 /// Column widths for instruction line formatting.
 pub mod cols {
     /// Leading indentation (2 spaces).
@@ -25,10 +21,6 @@ pub mod cols {
     /// Total width before successors are right-aligned.
     pub const TOTAL_WIDTH: usize = 44;
 }
-
-// =============================================================================
-// Symbol Types
-// =============================================================================
 
 /// Symbols for the 5-character symbol column.
 ///
@@ -76,10 +68,6 @@ impl Symbol {
     }
 }
 
-// =============================================================================
-// Navigation Symbols
-// =============================================================================
-
 /// Format navigation command as a Symbol using the doc-specified triangles.
 ///
 /// | Nav             | Symbol  | Notes                               |
@@ -126,10 +114,6 @@ pub fn nav_symbol_epsilon(nav: Nav, is_epsilon: bool) -> Symbol {
     }
 }
 
-// =============================================================================
-// Trace-Specific Symbols
-// =============================================================================
-
 /// Trace sub-line symbols.
 pub mod trace {
     use super::Symbol;
@@ -159,10 +143,6 @@ pub mod trace {
     /// Backtrack symbol (centered in 5 chars).
     pub const BACKTRACK: Symbol = Symbol::new(" ", "❮❮❮", " ");
 }
-
-// =============================================================================
-// Superscript Formatting
-// =============================================================================
 
 const SUPERSCRIPT_DIGITS: &[char] = &['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
@@ -196,10 +176,6 @@ fn superscript_suffix(n: u8) -> &'static str {
     }
 }
 
-// =============================================================================
-// Width Calculation
-// =============================================================================
-
 /// Calculate minimum width needed to display numbers up to `count - 1`.
 pub fn width_for_count(count: usize) -> usize {
     if count <= 1 {
@@ -208,10 +184,6 @@ pub fn width_for_count(count: usize) -> usize {
         ((count - 1) as f64).log10().floor() as usize + 1
     }
 }
-
-// =============================================================================
-// Text Truncation
-// =============================================================================
 
 /// Truncate text to max length with ellipsis.
 ///
@@ -224,10 +196,6 @@ pub fn truncate_text(s: &str, max_len: usize) -> String {
         format!("{}…", truncated)
     }
 }
-
-// =============================================================================
-// Line Building
-// =============================================================================
 
 /// Builder for formatted output lines.
 ///
@@ -305,10 +273,6 @@ fn display_width(s: &str) -> usize {
 
     width
 }
-
-// =============================================================================
-// Effect Formatting
-// =============================================================================
 
 /// Format an effect operation for display.
 pub fn format_effect(effect: &EffectOp) -> String {

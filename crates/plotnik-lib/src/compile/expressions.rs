@@ -12,7 +12,7 @@ use std::num::NonZeroU16;
 use crate::analyze::type_check::TypeShape;
 use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::Nav;
-use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;
@@ -355,7 +355,7 @@ impl Compiler<'_> {
                 .instructions
                 .iter_mut()
                 .find(|i| i.label() == value_entry)
-                && let Instruction::Match(m) = instr
+                && let InstructionIR::Match(m) = instr
                 && m.node_field.is_none()
             {
                 m.node_field = Some(field_id);

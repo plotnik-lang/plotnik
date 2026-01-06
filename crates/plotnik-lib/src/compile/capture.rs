@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use crate::analyze::type_check::{TypeContext, TypeId, TypeShape};
+use crate::bytecode::EffectIR;
 use crate::bytecode::EffectOpcode;
-use crate::bytecode::ir::EffectIR;
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;

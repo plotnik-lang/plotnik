@@ -2,14 +2,14 @@
 
 use crate::Colors;
 use crate::QueryBuilder;
-use crate::bytecode::{Module, QTypeId};
+use crate::bytecode::{Module, TypeId};
 use crate::emit::emit_linked;
 use crate::engine::value::{NodeHandle, Value};
 
 use super::debug_verify_type;
 
 /// Build a module from a query string and return with its first entrypoint's result type.
-fn build_module(query: &str) -> (Module, QTypeId) {
+fn build_module(query: &str) -> (Module, TypeId) {
     let lang = plotnik_langs::javascript();
     let query_obj = QueryBuilder::one_liner(query)
         .parse()

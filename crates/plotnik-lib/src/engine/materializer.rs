@@ -1,6 +1,6 @@
 //! Materializer transforms effect logs into output values.
 
-use crate::bytecode::{QTypeId, StringsView, TypeKind, TypesView};
+use crate::bytecode::{StringsView, TypeId, TypeKind, TypesView};
 
 use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
@@ -9,7 +9,7 @@ use super::value::{NodeHandle, Value};
 pub trait Materializer<'t> {
     type Output;
 
-    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: QTypeId) -> Self::Output;
+    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Self::Output;
 }
 
 /// Materializer that produces Value with resolved strings.
@@ -33,11 +33,11 @@ impl<'ctx> ValueMaterializer<'ctx> {
         self.strings.get(member.name).to_owned()
     }
 
-    fn resolve_member_type(&self, idx: u16) -> QTypeId {
+    fn resolve_member_type(&self, idx: u16) -> TypeId {
         self.types.get_member(idx as usize).type_id
     }
 
-    fn is_void_type(&self, type_id: QTypeId) -> bool {
+    fn is_void_type(&self, type_id: TypeId) -> bool {
         self.types
             .get(type_id)
             .and_then(|def| def.type_kind())
@@ -45,7 +45,7 @@ impl<'ctx> ValueMaterializer<'ctx> {
     }
 
     /// Create initial builder based on result type.
-    fn builder_for_type(&self, type_id: QTypeId) -> Builder {
+    fn builder_for_type(&self, type_id: TypeId) -> Builder {
         let def = match self.types.get(type_id) {
             Some(d) => d,
             None => return Builder::Scalar(None),
@@ -67,7 +67,7 @@ enum Builder {
     Object(Vec<(String, Value)>),
     Tagged {
         tag: String,
-        payload_type: QTypeId,
+        payload_type: TypeId,
         fields: Vec<(String, Value)>,
     },
 }
@@ -89,7 +89,7 @@ impl Builder {
 impl<'t> Materializer<'t> for ValueMaterializer<'_> {
     type Output = Value;
 
-    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: QTypeId) -> Value {
+    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
         // Stack of containers being built
         let mut stack: Vec<Builder> = vec![];
 

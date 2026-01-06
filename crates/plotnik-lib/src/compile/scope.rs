@@ -5,7 +5,7 @@
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeId;
-use crate::bytecode::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
+use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::Expr;
 
