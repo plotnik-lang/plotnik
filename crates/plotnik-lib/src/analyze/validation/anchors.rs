@@ -9,7 +9,7 @@
 use crate::SourceId;
 use crate::analyze::visitor::{Visitor, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::ast::{NamedNode, Root, SeqExpr, SeqItem};
+use crate::parser::{NamedNode, Root, SeqExpr, SeqItem};
 
 pub fn validate_anchors(source_id: SourceId, ast: &Root, diag: &mut Diagnostics) {
     let mut visitor = AnchorValidator {

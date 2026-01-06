@@ -4,7 +4,7 @@
 //! for quantifier repeat iterations.
 
 use crate::bytecode::Nav;
-use crate::parser::ast::{Expr, SeqItem};
+use crate::parser::{Expr, SeqItem};
 
 // Re-export from parser for compile module consumers
 pub use crate::parser::is_truly_empty_scope;
@@ -118,7 +118,7 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
 
 /// Extract the operator kind from an expression if it's a quantifier.
 /// Unwraps CapturedExpr if present.
-fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::cst::SyntaxKind> {
+fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::SyntaxKind> {
     let expr = match expr {
         Expr::CapturedExpr(cap) => cap.inner()?,
         e => e.clone(),
@@ -132,7 +132,7 @@ fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::cst::SyntaxKin
 
 /// Check if expression is optional (?) or star (*) - patterns that can match zero times.
 pub fn is_skippable_quantifier(expr: &Expr) -> bool {
-    use crate::parser::cst::SyntaxKind;
+    use crate::parser::SyntaxKind;
     quantifier_operator_kind(expr).is_some_and(|k| {
         matches!(
             k,
@@ -146,7 +146,7 @@ pub fn is_skippable_quantifier(expr: &Expr) -> bool {
 
 /// Syntactic check for star/plus quantifier (fallback when type info unavailable).
 pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
-    use crate::parser::cst::SyntaxKind;
+    use crate::parser::SyntaxKind;
     expr.and_then(quantifier_operator_kind).is_some_and(|k| {
         matches!(
             k,

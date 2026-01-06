@@ -2,9 +2,8 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::parser::SyntaxKind;
-
 use super::core::Parser;
+use super::cst::SyntaxKind;
 
 impl Parser<'_, '_> {
     #[inline]

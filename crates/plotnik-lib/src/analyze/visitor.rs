@@ -15,7 +15,7 @@
 //! }
 //! ```
 
-use crate::parser::ast::{
+use crate::parser::{
     AltExpr, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr, Ref,
     Root, SeqExpr,
 };

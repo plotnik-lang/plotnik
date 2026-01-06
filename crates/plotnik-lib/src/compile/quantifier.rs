@@ -9,8 +9,8 @@
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::Nav;
 use crate::bytecode::{EffectIR, Label};
+use crate::parser::SyntaxKind;
 use crate::parser::ast::{self, Expr};
-use crate::parser::cst::SyntaxKind;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};

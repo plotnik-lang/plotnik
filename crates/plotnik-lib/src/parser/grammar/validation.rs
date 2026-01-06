@@ -1,8 +1,9 @@
 use rowan::TextRange;
 
-use super::utils::{to_pascal_case, to_snake_case};
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
+
+use super::utils::{to_pascal_case, to_snake_case};
 
 impl Parser<'_, '_> {
     /// Validate capture name follows plotnik convention (snake_case).
