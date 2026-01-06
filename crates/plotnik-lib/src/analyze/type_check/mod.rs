@@ -10,7 +10,13 @@ pub(crate) mod types;
 mod unify;
 
 #[cfg(test)]
+mod context_tests;
+#[cfg(test)]
+mod symbol_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod unify_tests;
 
 pub use context::TypeContext;
 pub use symbol::{DefId, Interner, Symbol};

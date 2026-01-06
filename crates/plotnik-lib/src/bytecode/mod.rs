@@ -57,8 +57,22 @@ pub use ir::{
 };
 
 #[cfg(test)]
+mod effects_tests;
+#[cfg(test)]
+mod entrypoint_tests;
+#[cfg(test)]
+mod format_tests;
+#[cfg(test)]
+mod header_tests;
+#[cfg(test)]
 mod instructions_tests;
 #[cfg(test)]
 mod ir_tests;
 #[cfg(test)]
 mod module_tests;
+#[cfg(test)]
+mod nav_tests;
+#[cfg(test)]
+mod sections_tests;
+#[cfg(test)]
+mod type_meta_tests;

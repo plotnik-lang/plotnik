@@ -10,6 +10,15 @@ mod kind;
 mod primitives;
 mod quantifier;
 
+#[cfg(test)]
+mod arity_tests;
+#[cfg(test)]
+mod kind_tests;
+#[cfg(test)]
+mod primitives_tests;
+#[cfg(test)]
+mod quantifier_tests;
+
 pub use arity::Arity;
 pub use kind::TypeKind;
 pub use primitives::{PrimitiveType, TYPE_CUSTOM_START, TYPE_NODE, TYPE_STRING, TYPE_VOID};
