@@ -1,6 +1,79 @@
 use crate::Query;
 use indoc::indoc;
 
+// Tree-sitter compatibility: ((a) (b)) parses as Seq, not as wildcard Tree with children
+
+#[test]
+fn treesitter_sequence_parses_as_seq() {
+    // Tree-sitter style ((a) (b)) should produce Seq, same structure as {(a) (b)}
+    let input = "Q = ((a) (b))";
+
+    let res = Query::expect_cst_with_warnings(input);
+
+    insta::assert_snapshot!(res, @r#"
+    Root
+      Def
+        Id "Q"
+        Equals "="
+        Seq
+          ParenOpen "("
+          Tree
+            ParenOpen "("
+            Id "a"
+            ParenClose ")"
+          Tree
+            ParenOpen "("
+            Id "b"
+            ParenClose ")"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn treesitter_single_item_sequence_parses_as_seq() {
+    // Regression test: ((x)) should be Seq containing x, not wildcard Tree with child x
+    let input = "Q = ((expression_statement))";
+
+    let res = Query::expect_cst_with_warnings(input);
+
+    insta::assert_snapshot!(res, @r#"
+    Root
+      Def
+        Id "Q"
+        Equals "="
+        Seq
+          ParenOpen "("
+          Tree
+            ParenOpen "("
+            Id "expression_statement"
+            ParenClose ")"
+          ParenClose ")"
+    "#);
+}
+
+#[test]
+fn named_node_with_child_remains_tree() {
+    // (foo (bar)) is a named node with child, NOT a sequence
+    let input = "Q = (foo (bar))";
+
+    let res = Query::expect_valid_cst(input);
+
+    insta::assert_snapshot!(res, @r#"
+    Root
+      Def
+        Id "Q"
+        Equals "="
+        Tree
+          ParenOpen "("
+          Id "foo"
+          Tree
+            ParenOpen "("
+            Id "bar"
+            ParenClose ")"
+          ParenClose ")"
+    "#);
+}
+
 #[test]
 fn simple_sequence() {
     let input = indoc! {r#"
