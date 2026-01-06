@@ -7,8 +7,8 @@
 //! - Whether skip/match need separate exits
 
 use crate::analyze::type_check::TypeId;
+use crate::bytecode::Nav;
 use crate::bytecode::ir::{EffectIR, Label};
-use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 use crate::parser::cst::SyntaxKind;
 
@@ -262,17 +262,14 @@ impl Compiler<'_> {
         let push_effects = CaptureEffects {
             pre: vec![],
             post: if self.quantifier_needs_node_for_push(inner) {
-                let opcode = if cap.has_string_annotation() {
-                    EffectOpcode::Text
+                let node_eff = if cap.has_string_annotation() {
+                    EffectIR::text()
                 } else {
-                    EffectOpcode::Node
+                    EffectIR::node()
                 };
-                vec![
-                    EffectIR::simple(opcode, 0),
-                    EffectIR::simple(EffectOpcode::Push, 0),
-                ]
+                vec![node_eff, EffectIR::push()]
             } else {
-                vec![EffectIR::simple(EffectOpcode::Push, 0)]
+                vec![EffectIR::push()]
             },
         };
         let inner_entry = self.compile_star_for_array_with_exits(

@@ -1,9 +1,8 @@
 use std::num::NonZeroU16;
 
 use super::layout::CacheAligned;
-use crate::bytecode::EffectOpcode;
 use crate::bytecode::Nav;
-use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, ReturnIR};
+use crate::bytecode::ir::{CallIR, EffectIR, Label, MatchIR, ReturnIR};
 
 #[test]
 fn layout_empty() {
@@ -15,16 +14,12 @@ fn layout_empty() {
 
 #[test]
 fn layout_single_instruction() {
-    let instructions = vec![Instruction::Match(MatchIR {
-        label: Label(0),
-        nav: Nav::Down,
-        node_type: NonZeroU16::new(10),
-        node_field: None,
-        pre_effects: vec![],
-        neg_fields: vec![],
-        post_effects: vec![],
-        successors: vec![], // Terminal - empty successors
-    })];
+    let instructions = vec![
+        MatchIR::terminal(Label(0))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .into(),
+    ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
 
@@ -36,36 +31,17 @@ fn layout_single_instruction() {
 fn layout_linear_chain() {
     // A -> B -> C -> ACCEPT
     let instructions = vec![
-        Instruction::Match(MatchIR {
-            label: Label(0),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(10),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1)],
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(1),
-            nav: Nav::Next,
-            node_type: NonZeroU16::new(20),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(2)],
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(2),
-            nav: Nav::Up(1),
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![], // Terminal
-        }),
+        MatchIR::at(Label(0))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .next(Label(1))
+            .into(),
+        MatchIR::at(Label(1))
+            .nav(Nav::Next)
+            .node_type(NonZeroU16::new(20))
+            .next(Label(2))
+            .into(),
+        MatchIR::terminal(Label(2)).nav(Nav::Up(1)).into(),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
@@ -80,44 +56,21 @@ fn layout_linear_chain() {
 fn layout_call_return() {
     // Entry -> Call(target=2) -> Return
     let instructions = vec![
-        Instruction::Match(MatchIR {
-            label: Label(0),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(10),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1)],
-        }),
-        Instruction::Call(CallIR {
-            label: Label(1),
-            nav: Nav::Down,
-            node_field: None,
-            next: Label(3),
-            target: Label(2),
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(2),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(20),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(4)],
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(3),
-            nav: Nav::Up(1),
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![], // Terminal
-        }),
-        Instruction::Return(ReturnIR { label: Label(4) }),
+        MatchIR::at(Label(0))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .next(Label(1))
+            .into(),
+        CallIR::new(Label(1), Label(2), Label(3))
+            .nav(Nav::Down)
+            .into(),
+        MatchIR::at(Label(2))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(20))
+            .next(Label(4))
+            .into(),
+        MatchIR::terminal(Label(3)).nav(Nav::Up(1)).into(),
+        ReturnIR::new(Label(4)).into(),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
@@ -134,36 +87,17 @@ fn layout_call_return() {
 fn layout_branch() {
     // Entry -> [A, B] -> ACCEPT
     let instructions = vec![
-        Instruction::Match(MatchIR {
-            label: Label(0),
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1), Label(2)],
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(1),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(10),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![], // Terminal
-        }),
-        Instruction::Match(MatchIR {
-            label: Label(2),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(20),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![], // Terminal
-        }),
+        MatchIR::at(Label(0))
+            .next_many(vec![Label(1), Label(2)])
+            .into(),
+        MatchIR::terminal(Label(1))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .into(),
+        MatchIR::terminal(Label(2))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(20))
+            .into(),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);
@@ -182,24 +116,17 @@ fn layout_branch() {
 fn layout_large_instruction_cache_alignment() {
     // Large instruction (Match48 = 48 bytes = 6 steps) near cache line boundary
     // Start at step 5 (offset 40), would straddle - should pad
-    let large_match = MatchIR {
-        label: Label(1),
-        nav: Nav::Down,
-        node_type: NonZeroU16::new(10),
-        node_field: None,
-        pre_effects: vec![
-            EffectIR::simple(EffectOpcode::Obj, 0),
-            EffectIR::simple(EffectOpcode::Obj, 0),
-            EffectIR::simple(EffectOpcode::Obj, 0),
-        ],
-        neg_fields: vec![],
-        post_effects: vec![
-            EffectIR::simple(EffectOpcode::Node, 0),
-            EffectIR::simple(EffectOpcode::EndObj, 0),
-            EffectIR::simple(EffectOpcode::EndObj, 0),
-            EffectIR::simple(EffectOpcode::EndObj, 0),
-        ],
-        successors: vec![
+    let large_match = MatchIR::at(Label(1))
+        .nav(Nav::Down)
+        .node_type(NonZeroU16::new(10))
+        .pre_effect(EffectIR::start_obj())
+        .pre_effect(EffectIR::start_obj())
+        .pre_effect(EffectIR::start_obj())
+        .post_effect(EffectIR::node())
+        .post_effect(EffectIR::end_obj())
+        .post_effect(EffectIR::end_obj())
+        .post_effect(EffectIR::end_obj())
+        .next_many(vec![
             Label(100),
             Label(101),
             Label(102),
@@ -208,25 +135,15 @@ fn layout_large_instruction_cache_alignment() {
             Label(105),
             Label(106),
             Label(107),
-        ],
-    };
+        ]);
 
     // Verify it's large enough to trigger alignment
     assert!(large_match.size() >= 48);
 
     let instructions = vec![
         // Small instruction first
-        Instruction::Match(MatchIR {
-            label: Label(0),
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1)],
-        }),
-        Instruction::Match(large_match),
+        MatchIR::epsilon(Label(0), Label(1)).into(),
+        large_match.into(),
     ];
 
     let result = CacheAligned::layout(&instructions, &[Label(0)]);

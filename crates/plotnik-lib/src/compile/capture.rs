@@ -79,12 +79,12 @@ impl Compiler<'_> {
         });
 
         if !is_structured_ref && !creates_structured_scope && !is_array {
-            let opcode = if cap.has_string_annotation() {
-                EffectOpcode::Text
+            let effect = if cap.has_string_annotation() {
+                EffectIR::text()
             } else {
-                EffectOpcode::Node
+                EffectIR::node()
             };
-            effects.push(EffectIR::simple(opcode, 0));
+            effects.push(effect);
         }
 
         // Add Set effect if we have a capture name.

@@ -256,11 +256,11 @@ impl Compiler<'_> {
                         MemberRef::deferred_by_index(type_id, variant_idx),
                     )
                 } else {
-                    EffectIR::simple(EffectOpcode::Enum, 0)
+                    EffectIR::start_enum()
                 };
 
                 // Build capture effects: Enum as pre, EndEnum + outer as post
-                let mut post_effects = vec![EffectIR::simple(EffectOpcode::EndEnum, 0)];
+                let mut post_effects = vec![EffectIR::end_enum()];
                 post_effects.extend(capture.post.iter().cloned());
 
                 let branch_capture = CaptureEffects {
@@ -287,7 +287,7 @@ impl Compiler<'_> {
                             })
                             .flat_map(|(idx, _)| {
                                 [
-                                    EffectIR::simple(EffectOpcode::Null, 0),
+                                    EffectIR::null(),
                                     EffectIR::with_member(
                                         EffectOpcode::Set,
                                         MemberRef::deferred_by_index(alt_type, idx as u16),

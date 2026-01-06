@@ -5,7 +5,7 @@
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeId;
-use crate::bytecode::ir::{CallIR, EffectIR, Instruction, Label, MatchIR, MemberRef};
+use crate::bytecode::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::Expr;
 
@@ -69,37 +69,25 @@ impl Compiler<'_> {
         capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
     ) -> Label {
-        let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndObj, 0)];
-        end_effects.extend(capture_effects);
-        end_effects.extend(outer_capture.post);
-
         let endobj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: endobj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: end_effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(endobj_step, exit)
+                .post_effect(EffectIR::end_obj())
+                .post_effects(capture_effects)
+                .post_effects(outer_capture.post)
+                .into(),
+        );
 
         let inner_entry = self.compile_with_optional_scope(scope_type_id, |this| {
             this.compile_expr_with_nav(inner, endobj_step, nav_override)
         });
 
         let obj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: obj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![inner_entry],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(obj_step, inner_entry)
+                .pre_effect(EffectIR::start_obj())
+                .into(),
+        );
 
         obj_step
     }
@@ -130,16 +118,11 @@ impl Compiler<'_> {
                 exit
             } else {
                 let outer_step = self.fresh_label();
-                self.instructions.push(Instruction::Match(MatchIR {
-                    label: outer_step,
-                    nav: Nav::Stay,
-                    node_type: None,
-                    node_field: None,
-                    pre_effects: vec![],
-                    neg_fields: vec![],
-                    post_effects: outer_capture.post,
-                    successors: vec![exit],
-                }));
+                self.instructions.push(
+                    MatchIR::epsilon(outer_step, exit)
+                        .post_effects(outer_capture.post)
+                        .into(),
+                );
                 outer_step
             };
 
@@ -153,20 +136,13 @@ impl Compiler<'_> {
 
         // When scope_type_id is Some, we need Obj/EndObj to create the scope
         // EndObj step with ONLY outer_capture effects (like Push), NOT capture_effects
-        let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndObj, 0)];
-        end_effects.extend(outer_capture.post);
-
         let endobj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: endobj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: end_effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(endobj_step, exit)
+                .post_effect(EffectIR::end_obj())
+                .post_effects(outer_capture.post)
+                .into(),
+        );
 
         // Compile inner WITH capture_effects on the match instruction
         // Note: pre effects don't propagate through Obj/EndObj scope wrapper
@@ -179,16 +155,11 @@ impl Compiler<'_> {
         });
 
         let obj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: obj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![inner_entry],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(obj_step, inner_entry)
+                .pre_effect(EffectIR::start_obj())
+                .into(),
+        );
 
         obj_step
     }
@@ -206,37 +177,27 @@ impl Compiler<'_> {
         outer_capture: CaptureEffects,
         use_text_for_elements: bool,
     ) -> Label {
-        let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndArr, 0)];
-        end_effects.extend(capture_effects);
-        end_effects.extend(outer_capture.post);
-
         let endarr_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: endarr_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: end_effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(endarr_step, exit)
+                .post_effect(EffectIR::end_arr())
+                .post_effects(capture_effects)
+                .post_effects(outer_capture.post)
+                .into(),
+        );
 
         let push_effects = CaptureEffects {
             pre: vec![],
             post: if self.quantifier_needs_node_for_push(inner) {
                 // Use Text if the capture has `:: string` annotation, else Node
-                let opcode = if use_text_for_elements {
-                    EffectOpcode::Text
+                let node_eff = if use_text_for_elements {
+                    EffectIR::text()
                 } else {
-                    EffectOpcode::Node
+                    EffectIR::node()
                 };
-                vec![
-                    EffectIR::simple(opcode, 0),
-                    EffectIR::simple(EffectOpcode::Push, 0),
-                ]
+                vec![node_eff, EffectIR::push()]
             } else {
-                vec![EffectIR::simple(EffectOpcode::Push, 0)]
+                vec![EffectIR::push()]
             },
         };
         let inner_entry = if let Expr::QuantifiedExpr(quant) = inner {
@@ -246,16 +207,11 @@ impl Compiler<'_> {
         };
 
         let arr_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: arr_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Arr, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![inner_entry],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(arr_step, inner_entry)
+                .pre_effect(EffectIR::start_arr())
+                .into(),
+        );
 
         arr_step
     }
@@ -273,19 +229,12 @@ impl Compiler<'_> {
     ) -> Label {
         // EndObj Push → exit
         let endobj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: endobj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![
-                EffectIR::simple(EffectOpcode::EndObj, 0),
-                EffectIR::simple(EffectOpcode::Push, 0),
-            ],
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(endobj_step, exit)
+                .post_effect(EffectIR::end_obj())
+                .post_effect(EffectIR::push())
+                .into(),
+        );
 
         // Compile inner with row scope (for Set effects to work)
         let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
@@ -294,16 +243,11 @@ impl Compiler<'_> {
 
         // Obj → inner_entry
         let obj_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: obj_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![inner_entry],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(obj_step, inner_entry)
+                .pre_effect(EffectIR::start_obj())
+                .into(),
+        );
 
         obj_step
     }
@@ -315,69 +259,47 @@ impl Compiler<'_> {
         outer_effects: &[EffectIR],
         exit: Label,
     ) -> Label {
-        let mut effects = vec![EffectIR::simple(EffectOpcode::EndArr, 0)];
-        effects.extend(capture_effects.iter().cloned());
-        effects.extend(outer_effects.iter().cloned());
-
         let label = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(label, exit)
+                .post_effect(EffectIR::end_arr())
+                .post_effects(capture_effects.iter().cloned())
+                .post_effects(outer_effects.iter().cloned())
+                .into(),
+        );
         label
     }
 
     /// Emit an Obj epsilon step.
     pub(super) fn emit_obj_step(&mut self, successor: Label) -> Label {
         let label = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![successor],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(label, successor)
+                .pre_effect(EffectIR::start_obj())
+                .into(),
+        );
         label
     }
 
     /// Emit an EndObj epsilon step.
     pub(super) fn emit_endobj_step(&mut self, successor: Label) -> Label {
         let label = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![EffectIR::simple(EffectOpcode::EndObj, 0)],
-            successors: vec![successor],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(label, successor)
+                .post_effect(EffectIR::end_obj())
+                .into(),
+        );
         label
     }
 
     /// Emit an Arr epsilon step.
     pub(super) fn emit_arr_step(&mut self, successor: Label) -> Label {
         let label = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Arr, 0)],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![successor],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(label, successor)
+                .pre_effect(EffectIR::start_arr())
+                .into(),
+        );
         label
     }
 
@@ -390,13 +312,12 @@ impl Compiler<'_> {
         target: Label,
     ) -> Label {
         let label = self.fresh_label();
-        self.instructions.push(Instruction::Call(CallIR {
-            label,
-            nav,
-            node_field,
-            next,
-            target,
-        }));
+        self.instructions.push(
+            CallIR::new(label, target, next)
+                .nav(nav)
+                .node_field(node_field)
+                .into(),
+        );
         label
     }
 
@@ -404,21 +325,16 @@ impl Compiler<'_> {
     pub(super) fn emit_effects_epsilon(
         &mut self,
         exit: Label,
-        mut effects: Vec<EffectIR>,
+        effects: Vec<EffectIR>,
         outer: CaptureEffects,
     ) -> Label {
-        effects.extend(outer.post);
         let entry = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: entry,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(entry, exit)
+                .post_effects(effects)
+                .post_effects(outer.post)
+                .into(),
+        );
         entry
     }
 
@@ -440,7 +356,7 @@ impl Compiler<'_> {
             .post
             .iter()
             .filter(|eff| eff.opcode == EffectOpcode::Set)
-            .flat_map(|set_eff| [EffectIR::simple(EffectOpcode::Null, 0), set_eff.clone()])
+            .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
             .collect();
 
         if null_effects.is_empty() {
@@ -448,16 +364,11 @@ impl Compiler<'_> {
         }
 
         let null_step = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: null_step,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: null_effects,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(null_step, exit)
+                .post_effects(null_effects)
+                .into(),
+        );
         null_step
     }
 
@@ -475,7 +386,7 @@ impl Compiler<'_> {
         let mut null_effects = Vec::new();
         for name in captures {
             if let Some(member_ref) = self.lookup_member_in_scope(&name) {
-                null_effects.push(EffectIR::simple(EffectOpcode::Null, 0));
+                null_effects.push(EffectIR::null());
                 null_effects.push(EffectIR::with_member(EffectOpcode::Set, member_ref));
             }
         }
@@ -513,16 +424,8 @@ impl Compiler<'_> {
     }
 
     fn push_epsilon(&mut self, label: Label, successors: Vec<Label>) {
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors,
-        }));
+        self.instructions
+            .push(MatchIR::at(label).next_many(successors).into());
     }
 
     /// Emit a wildcard navigation step that accepts any node.
@@ -531,16 +434,8 @@ impl Compiler<'_> {
     /// and matches any node there. If navigation fails (no more siblings/children),
     /// the VM backtracks automatically.
     pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {
-        self.instructions.push(Instruction::Match(MatchIR {
-            label,
-            nav,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![successor],
-        }));
+        self.instructions
+            .push(MatchIR::epsilon(label, successor).nav(nav).into());
     }
 
     /// Emit an epsilon branch preferring `prefer` when greedy, `other` when non-greedy.
