@@ -11,7 +11,7 @@ use crate::diagnostics::DiagnosticKind;
 use crate::parser::{Root, ast, token_src};
 
 use super::visitor::Visitor;
-use crate::query::source_map::{SourceId, SourceMap};
+use crate::query::{SourceId, SourceMap};
 
 /// Sentinel name for unnamed definitions (bare expressions at root level).
 /// Code generators can emit whatever name they want for this.

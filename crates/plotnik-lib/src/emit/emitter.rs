@@ -12,7 +12,7 @@ use crate::bytecode::{
     Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry, TypeMetaHeader,
 };
 use crate::compile::Compiler;
-use crate::query::query::LinkedQuery;
+use crate::query::LinkedQuery;
 
 use super::EmitError;
 use super::layout::CacheAligned;

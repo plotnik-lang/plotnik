@@ -13,7 +13,7 @@ use super::visitor::{Visitor, walk_expr, walk_named_node};
 use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
-use crate::query::source_map::SourceId;
+use crate::query::SourceId;
 
 /// Validate recursion using the pre-computed dependency analysis.
 pub fn validate_recursion(

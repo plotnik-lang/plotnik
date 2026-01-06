@@ -26,7 +26,7 @@ use crate::parser::{
     AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
     Ref, Root, SeqExpr, SyntaxKind, is_truly_empty_scope,
 };
-use crate::query::source_map::SourceId;
+use crate::query::SourceId;
 
 /// Type annotation kind from `@capture :: Type` syntax.
 ///

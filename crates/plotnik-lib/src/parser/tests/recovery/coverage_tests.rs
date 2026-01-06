@@ -1,5 +1,4 @@
-use crate::Query;
-use crate::query::query::QueryBuilder;
+use crate::{Query, query::QueryBuilder};
 use indoc::indoc;
 
 #[test]

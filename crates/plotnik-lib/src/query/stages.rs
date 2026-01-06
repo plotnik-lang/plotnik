@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 
+use super::{SourceId, SourceMap};
 use crate::Diagnostics;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
@@ -12,7 +13,6 @@ use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{validate_alt_kinds, validate_anchors};
 use crate::analyze::{dependencies, validate_recursion};
 use crate::parser::{Parser, Root, SyntaxNode, lex};
-use crate::query::source_map::{SourceId, SourceMap};
 
 const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
 const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;

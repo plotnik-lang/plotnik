@@ -32,7 +32,7 @@ use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::{SymbolTable, UNNAMED_DEF};
 use crate::diagnostics::Diagnostics;
 use crate::parser::Root;
-use crate::query::source_map::SourceId;
+use crate::query::SourceId;
 
 /// Run type inference on all definitions.
 ///

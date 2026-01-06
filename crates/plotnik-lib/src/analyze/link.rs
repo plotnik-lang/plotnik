@@ -26,8 +26,7 @@ use super::visitor::{Visitor, walk};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::{SyntaxKind, SyntaxToken, token_src};
-use crate::query::query::AstMap;
-use crate::query::source_map::{SourceId, SourceMap};
+use crate::query::{AstMap, SourceId, SourceMap};
 
 /// Link query against a language grammar.
 ///
