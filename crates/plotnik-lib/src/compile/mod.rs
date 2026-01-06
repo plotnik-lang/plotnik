@@ -154,19 +154,14 @@ impl<'a> Compiler<'a> {
     fn emit_preamble(&mut self) -> Label {
         // Return (stack is empty after preamble, so this means Accept)
         let return_label = self.fresh_label();
-        self.instructions.push(Instruction::Return(ReturnIR {
-            label: return_label,
-        }));
+        self.instructions.push(ReturnIR::new(return_label).into());
 
         // Chain: Obj → Trampoline → EndObj → Return
         let endobj_label = self.emit_endobj_step(return_label);
 
         let trampoline_label = self.fresh_label();
         self.instructions
-            .push(Instruction::Trampoline(TrampolineIR {
-                label: trampoline_label,
-                next: endobj_label,
-            }));
+            .push(TrampolineIR::new(trampoline_label, endobj_label).into());
 
         self.emit_obj_step(trampoline_label)
     }
@@ -193,9 +188,7 @@ impl<'a> Compiler<'a> {
         // When stack is empty, Return means Accept (top-level match completed).
         // When stack is non-empty, Return pops frame and jumps to return address.
         let return_label = self.fresh_label();
-        self.instructions.push(Instruction::Return(ReturnIR {
-            label: return_label,
-        }));
+        self.instructions.push(ReturnIR::new(return_label).into());
 
         // Definition bodies use StayExact navigation: match at current position only.
         // The caller (alternation, sequence, quantifier, or VM top-level) owns the search.
