@@ -1,10 +1,8 @@
 use plotnik_langs::{Lang, from_name};
 
-use crate::{
-    SourceMap,
-    bytecode::Module,
-    query::query::{LinkedQuery, QueryAnalyzed, QueryBuilder},
-};
+use crate::{SourceMap, bytecode::Module};
+
+use super::{LinkedQuery, QueryAnalyzed, QueryBuilder};
 
 fn javascript() -> Lang {
     from_name("javascript").expect("javascript lang")

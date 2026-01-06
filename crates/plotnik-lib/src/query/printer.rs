@@ -1,5 +1,6 @@
 //! AST/CST pretty-printer for debugging and test snapshots.
 
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use indexmap::IndexSet;
@@ -8,7 +9,7 @@ use rowan::NodeOrToken;
 use crate::parser::{self as ast, SyntaxNode};
 
 use super::Query;
-use super::source_map::SourceKind;
+use super::SourceKind;
 use crate::analyze::type_check::Arity;
 
 /// Returns indentation string for the given level.
@@ -111,8 +112,6 @@ impl<'q> QueryPrinter<'q> {
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
-        use std::collections::HashMap;
-
         let symbols = &self.query.symbol_table;
         if symbols.is_empty() {
             return Ok(());

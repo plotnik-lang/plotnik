@@ -1,4 +1,4 @@
-use super::source_map::{SourceId, SourceKind, SourceMap};
+use super::{SourceId, SourceKind, SourceMap};
 
 #[test]
 fn single_one_liner() {
