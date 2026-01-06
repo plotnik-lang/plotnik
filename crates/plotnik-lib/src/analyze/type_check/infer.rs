@@ -22,11 +22,10 @@ use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::ast::{
+use crate::parser::{
     AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
-    Ref, Root, SeqExpr, is_truly_empty_scope,
+    Ref, Root, SeqExpr, SyntaxKind, is_truly_empty_scope,
 };
-use crate::parser::cst::SyntaxKind;
 use crate::query::source_map::SourceId;
 
 /// Type annotation kind from `@capture :: Type` syntax.

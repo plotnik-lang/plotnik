@@ -25,8 +25,7 @@ use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::ast::{self, Expr, NamedNode};
-use crate::parser::cst::{SyntaxKind, SyntaxToken};
-use crate::parser::token_src;
+use crate::parser::{SyntaxKind, SyntaxToken, token_src};
 use crate::query::query::AstMap;
 use crate::query::source_map::{SourceId, SourceMap};
 

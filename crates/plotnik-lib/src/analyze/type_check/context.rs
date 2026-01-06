@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::parser::ast::Expr;
+use crate::parser::Expr;
 
 use super::symbol::{DefId, Interner, Symbol};
 use super::types::{

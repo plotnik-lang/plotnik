@@ -1,6 +1,5 @@
 use rowan::{Checkpoint, TextRange};
 
-use super::utils::capitalize_first;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::token_sets::{
@@ -8,6 +7,8 @@ use crate::parser::cst::token_sets::{
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
 use crate::parser::lexer::token_text;
+
+use super::utils::capitalize_first;
 
 impl Parser<'_, '_> {
     /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)` | `(expr/subtype)`

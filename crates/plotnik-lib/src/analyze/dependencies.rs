@@ -12,8 +12,7 @@ use plotnik_core::{Interner, Symbol};
 
 use super::symbol_table::SymbolTable;
 use super::type_check::DefId;
-use crate::parser::Ref;
-use crate::parser::ast::Expr;
+use crate::parser::{Expr, Ref};
 
 /// Result of dependency analysis.
 #[derive(Clone, Debug, Default)]

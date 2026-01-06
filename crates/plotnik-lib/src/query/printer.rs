@@ -336,7 +336,7 @@ impl<'q> QueryPrinter<'q> {
         depth: usize,
         w: &mut impl Write,
     ) -> std::fmt::Result {
-        use crate::parser::cst::SyntaxKind;
+        use crate::parser::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
                 self.mark_anchor(depth, w)?;

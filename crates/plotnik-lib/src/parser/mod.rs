@@ -22,8 +22,8 @@
 //! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an actual error immediately.
 
 pub mod ast;
-pub mod cst;
-pub mod lexer;
+mod cst;
+mod lexer;
 
 mod core;
 mod grammar;
@@ -47,3 +47,5 @@ pub use ast::{
 };
 
 pub use core::{ParseResult, Parser};
+
+pub use lexer::{Token, lex, token_text};

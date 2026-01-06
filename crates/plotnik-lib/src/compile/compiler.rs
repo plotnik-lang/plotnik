@@ -8,7 +8,7 @@ use crate::analyze::type_check::{DefId, TypeContext};
 use crate::bytecode::Nav;
 use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::emit::StringTableBuilder;
-use crate::parser::ast::Expr;
+use crate::parser::Expr;
 
 use super::capture::CaptureEffects;
 use super::error::{CompileError, CompileResult};
