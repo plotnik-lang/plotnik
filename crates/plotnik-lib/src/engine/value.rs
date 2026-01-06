@@ -23,7 +23,10 @@ pub struct NodeHandle {
 impl NodeHandle {
     /// Create from a tree-sitter node and source text.
     pub fn from_node(node: Node<'_>, source: &str) -> Self {
-        let text = node.utf8_text(source.as_bytes()).unwrap_or("").to_owned();
+        let text = node
+            .utf8_text(source.as_bytes())
+            .expect("node text extraction failed")
+            .to_owned();
         Self {
             kind: node.kind().to_owned(),
             text,
