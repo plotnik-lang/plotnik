@@ -145,18 +145,21 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                 }
                 RuntimeEffect::EndObj => {
                     if let Some(Builder::Object(fields)) = stack.pop() {
-                        // Preserve pending if this object is empty and pending has a value.
-                        // This allows the preamble's Obj/EndObj to work correctly for
-                        // entrypoints that return non-struct values (enums, scalars).
-                        // For void-returning queries (no pending, empty object), return null.
                         if !fields.is_empty() {
+                            // Non-empty object: always produce the object value
                             pending = Some(Value::Object(fields));
                         } else if pending.is_none() {
-                            // Empty object with no pending = void result → null
-                            // (This is the preamble's empty wrapper for void-returning queries)
-                            pending = None;
+                            // Empty object with no pending value:
+                            // - If nested (stack.len() > 1): produce empty object {}
+                            //   This handles captured empty sequences like `{ } @x`
+                            //   Note: stack always has at least the result_builder, so we check > 1
+                            // - If at root (stack.len() <= 1): void result → null
+                            if stack.len() > 1 {
+                                pending = Some(Value::Object(vec![]));
+                            }
+                            // else: pending stays None (void result)
                         }
-                        // else: non-empty pending, keep it (passthrough for enums, etc.)
+                        // else: pending has a value, keep it (passthrough for enums, suppressive, etc.)
                     }
                 }
                 RuntimeEffect::Enum(idx) => {

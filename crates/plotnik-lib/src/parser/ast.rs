@@ -469,3 +469,14 @@ impl NegatedField {
             .find(|t| t.kind() == SyntaxKind::Id)
     }
 }
+
+/// Checks if expression is a truly empty scope (sequence/alternation with no children).
+/// Used to distinguish `{ } @x` (empty struct) from `{(expr) @_} @x` (Node capture).
+pub fn is_truly_empty_scope(inner: &Expr) -> bool {
+    match inner {
+        Expr::SeqExpr(seq) => seq.children().next().is_none(),
+        Expr::AltExpr(alt) => alt.branches().next().is_none(),
+        Expr::QuantifiedExpr(q) => q.inner().is_some_and(|i| is_truly_empty_scope(&i)),
+        _ => false,
+    }
+}

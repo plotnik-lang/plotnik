@@ -1,0 +1,18 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement (identifier) @id { } @empty))
+---
+x
+---
+{
+  "id": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [
+      0,
+      1
+    ]
+  },
+  "empty": {}
+}

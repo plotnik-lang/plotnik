@@ -18,7 +18,8 @@ use crate::parser::ast::{self, Expr};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{
-    check_trailing_anchor, inner_creates_scope, is_skippable_quantifier, is_star_or_plus_quantifier,
+    check_trailing_anchor, inner_creates_scope, is_skippable_quantifier,
+    is_star_or_plus_quantifier, is_truly_empty_scope,
 };
 
 impl Compiler<'_> {
@@ -429,7 +430,11 @@ impl Compiler<'_> {
         };
 
         // Struct scope: Obj → inner → EndObj+capture → exit
-        if inner_is_bubble {
+        // Also handle truly empty scopes (e.g., `{ } @x` produces empty struct)
+        let inner_is_truly_empty_scope = is_truly_empty_scope(&inner);
+        let needs_struct_scope = inner_is_bubble || inner_is_truly_empty_scope;
+
+        if needs_struct_scope {
             return if inner_creates_scope {
                 // Sequence/alternation: capture effects after EndObj (value is the struct)
                 self.compile_struct_scope(
