@@ -16,3 +16,5 @@ pub use crate::analyze::SymbolTable;
 mod printer_tests;
 #[cfg(test)]
 mod query_tests;
+#[cfg(test)]
+mod source_map_tests;

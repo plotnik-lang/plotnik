@@ -23,6 +23,8 @@ mod dependencies_tests;
 #[cfg(all(test, feature = "plotnik-langs"))]
 mod link_tests;
 #[cfg(test)]
+mod refs_tests;
+#[cfg(test)]
 mod symbol_table_tests;
 
 pub use dependencies::DependencyAnalysis;
