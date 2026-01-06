@@ -2,7 +2,7 @@ mod cli;
 mod commands;
 
 use cli::{
-    CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams, TreeParams,
+    AstParams, CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams,
     build_cli,
 };
 
@@ -10,9 +10,9 @@ fn main() {
     let matches = build_cli().get_matches();
 
     match matches.subcommand() {
-        Some(("tree", m)) => {
-            let params = TreeParams::from_matches(m);
-            commands::tree::run(params.into());
+        Some(("ast", m)) => {
+            let params = AstParams::from_matches(m);
+            commands::ast::run(params.into());
         }
         Some(("check", m)) => {
             let params = CheckParams::from_matches(m);

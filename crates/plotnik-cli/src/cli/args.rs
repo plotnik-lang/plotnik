@@ -69,14 +69,6 @@ pub fn raw_arg() -> Arg {
         .help("Include anonymous nodes (literals, punctuation)")
 }
 
-/// Show source positions (--spans).
-pub fn spans_arg() -> Arg {
-    Arg::new("spans")
-        .long("spans")
-        .action(ArgAction::SetTrue)
-        .help("Show source positions")
-}
-
 /// Treat warnings as errors (--strict).
 pub fn strict_arg() -> Arg {
     Arg::new("strict")

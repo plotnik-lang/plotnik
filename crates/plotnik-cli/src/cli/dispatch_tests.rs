@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::cli::commands::{
-    check_command, dump_command, exec_command, infer_command, trace_command,
+    ast_command, check_command, dump_command, exec_command, infer_command, trace_command,
 };
 
 #[test]
@@ -517,4 +517,198 @@ fn dump_params_extracts_only_relevant_fields() {
     assert_eq!(params.lang, Some("rust".to_string()));
     assert!(matches!(params.color, ColorChoice::Auto));
     // No source_path, fuel, compact fields in DumpParams
+}
+
+// AST command tests
+
+#[test]
+fn ast_accepts_exec_flags() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from([
+        "ast",
+        "query.ptk",
+        "app.js",
+        "--compact",
+        "--check",
+        "--verbose-nodes",
+        "--entry",
+        "Foo",
+    ]);
+    assert!(
+        result.is_ok(),
+        "ast should accept exec flags: {:?}",
+        result.err()
+    );
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_accepts_trace_flags() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from([
+        "ast",
+        "query.ptk",
+        "app.js",
+        "--fuel",
+        "500",
+        "-vv",
+        "--no-result",
+    ]);
+    assert!(
+        result.is_ok(),
+        "ast should accept trace flags: {:?}",
+        result.err()
+    );
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_shifts_positional_with_inline_query() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "-q", "(identifier) @id", "app.js"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // With -q, the single positional should become source_path, not query_path
+    assert_eq!(params.query_path, None);
+    assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_no_shift_with_both_positionals() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "query.ptk", "app.js"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // Without -q, both positionals are used as-is
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_help_shows_raw_flag() {
+    let mut cmd = ast_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(help.contains("--raw"), "ast help should show --raw");
+}
+
+#[test]
+fn ast_help_hides_unified_flags() {
+    let mut cmd = ast_command();
+    let help = cmd.render_help().to_string();
+
+    // Exec flags should be hidden
+    assert!(
+        !help.contains("--compact"),
+        "ast help should not show --compact"
+    );
+    assert!(
+        !help.contains("--verbose-nodes"),
+        "ast help should not show --verbose-nodes"
+    );
+    assert!(
+        !help.contains("--check"),
+        "ast help should not show --check"
+    );
+    assert!(
+        !help.contains("--entry"),
+        "ast help should not show --entry"
+    );
+
+    // Trace flags should be hidden
+    assert!(!help.contains("--fuel"), "ast help should not show --fuel");
+    assert!(
+        !help.contains("--no-result"),
+        "ast help should not show --no-result"
+    );
+    assert!(
+        !help.contains("Verbosity level"),
+        "ast help should not show -v description"
+    );
+}
+
+#[test]
+fn ast_params_extracts_all_fields() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from([
+        "ast",
+        "query.ptk",
+        "app.js",
+        "-l",
+        "typescript",
+        "--raw",
+        "--color",
+        "always",
+    ]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+    assert_eq!(params.lang, Some("typescript".to_string()));
+    assert!(params.raw);
+    assert!(matches!(params.color, ColorChoice::Always));
+}
+
+// Test that other commands accept --raw (unified flag)
+
+#[test]
+fn dump_accepts_raw_flag() {
+    let cmd = dump_command();
+    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--raw"]);
+    assert!(
+        result.is_ok(),
+        "dump should accept --raw flag: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn exec_accepts_raw_flag() {
+    let cmd = exec_command();
+    let result = cmd.try_get_matches_from(["exec", "query.ptk", "app.js", "--raw"]);
+    assert!(
+        result.is_ok(),
+        "exec should accept --raw flag: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn trace_accepts_raw_flag() {
+    let cmd = trace_command();
+    let result = cmd.try_get_matches_from(["trace", "query.ptk", "app.js", "--raw"]);
+    assert!(
+        result.is_ok(),
+        "trace should accept --raw flag: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn check_accepts_raw_flag() {
+    let cmd = check_command();
+    let result = cmd.try_get_matches_from(["check", "query.ptk", "--raw"]);
+    assert!(
+        result.is_ok(),
+        "check should accept --raw flag: {:?}",
+        result.err()
+    );
 }
