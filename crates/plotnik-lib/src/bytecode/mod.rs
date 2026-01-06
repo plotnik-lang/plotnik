@@ -16,7 +16,9 @@ mod nav;
 mod sections;
 mod type_meta;
 
-pub use constants::{MAGIC, NAMED_WILDCARD, SECTION_ALIGN, STEP_SIZE, VERSION};
+pub use constants::{
+    MAGIC, MAX_MATCH_PAYLOAD_SLOTS, NAMED_WILDCARD, SECTION_ALIGN, STEP_SIZE, VERSION,
+};
 
 pub use ids::{QTypeId, StringId};
 
