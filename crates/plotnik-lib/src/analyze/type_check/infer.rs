@@ -135,20 +135,38 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let name = name_tok.text();
         let name_sym = self.interner.intern(name);
 
-        // Recursive refs are opaque boundaries - they match but don't bubble captures.
-        // The Ref type is created when a recursive ref is captured (in infer_captured_expr).
-        if let Some(def_id) = self.ctx.get_def_id_sym(name_sym)
-            && self.ctx.is_recursive(def_id)
-        {
-            return TermInfo::new(Arity::One, TypeFlow::Void);
-        }
-
         let Some(body) = self.symbol_table.get(name) else {
             return TermInfo::void();
         };
 
+        // Recursive refs are opaque boundaries - they don't bubble captures.
+        // For tagged alternations, return Scalar(Ref) since they always produce Enum output.
+        // For other definitions, return Void to avoid type errors in untagged alternation contexts.
+        if let Some(def_id) = self.ctx.get_def_id_sym(name_sym)
+            && self.ctx.is_recursive(def_id)
+        {
+            if self.body_produces_enum(body) {
+                let ref_type = self.ctx.intern_type(TypeShape::Ref(def_id));
+                return TermInfo::new(Arity::One, TypeFlow::Scalar(ref_type));
+            }
+            return TermInfo::new(Arity::One, TypeFlow::Void);
+        }
+
         // Non-recursive refs are transparent
         self.infer_expr(body)
+    }
+
+    /// Check if an expression body will produce an Enum type (Scalar flow).
+    ///
+    /// This is a syntactic check for tagged alternations at the root of a definition.
+    /// Tagged alternations always produce Enum types, making them safe to reference
+    /// as Scalar(Ref) in uncaptured contexts.
+    fn body_produces_enum(&self, body: &Expr) -> bool {
+        if let Expr::AltExpr(alt) = body {
+            matches!(alt.kind(), AltKind::Tagged | AltKind::Mixed)
+        } else {
+            false
+        }
     }
 
     /// Sequence: Arity aggregation, strict field merging, and output propagation.

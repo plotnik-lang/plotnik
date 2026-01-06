@@ -8,16 +8,16 @@ let a, b, c
 {
   "decls": [
     {
-      "decl": {
-        "kind": "variable_declarator",
+      "name": {
+        "kind": "identifier",
         "text": "a",
         "span": [
           4,
           5
         ]
       },
-      "name": {
-        "kind": "identifier",
+      "decl": {
+        "kind": "variable_declarator",
         "text": "a",
         "span": [
           4,
@@ -26,16 +26,16 @@ let a, b, c
       }
     },
     {
-      "decl": {
-        "kind": "variable_declarator",
+      "name": {
+        "kind": "identifier",
         "text": "b",
         "span": [
           7,
           8
         ]
       },
-      "name": {
-        "kind": "identifier",
+      "decl": {
+        "kind": "variable_declarator",
         "text": "b",
         "span": [
           7,
@@ -44,16 +44,16 @@ let a, b, c
       }
     },
     {
-      "decl": {
-        "kind": "variable_declarator",
+      "name": {
+        "kind": "identifier",
         "text": "c",
         "span": [
           10,
           11
         ]
       },
-      "name": {
-        "kind": "identifier",
+      "decl": {
+        "kind": "variable_declarator",
         "text": "c",
         "span": [
           10,

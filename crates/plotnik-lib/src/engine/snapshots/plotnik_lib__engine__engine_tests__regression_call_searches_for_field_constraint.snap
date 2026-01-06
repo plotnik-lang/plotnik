@@ -7,31 +7,35 @@ Q = (program (expression_statement (Expr) @expr))
 1 + 2
 ---
 {
-  "left": {
-    "$tag": "Lit",
+  "expr": {
+    "$tag": "Binary",
     "$data": {
-      "val": {
-        "kind": "number",
-        "text": "1",
-        "span": [
-          0,
-          1
-        ]
+      "left": {
+        "$tag": "Lit",
+        "$data": {
+          "val": {
+            "kind": "number",
+            "text": "1",
+            "span": [
+              0,
+              1
+            ]
+          }
+        }
+      },
+      "right": {
+        "$tag": "Lit",
+        "$data": {
+          "val": {
+            "kind": "number",
+            "text": "2",
+            "span": [
+              4,
+              5
+            ]
+          }
+        }
       }
     }
-  },
-  "right": {
-    "$tag": "Lit",
-    "$data": {
-      "val": {
-        "kind": "number",
-        "text": "2",
-        "span": [
-          4,
-          5
-        ]
-      }
-    }
-  },
-  "expr": null
+  }
 }
