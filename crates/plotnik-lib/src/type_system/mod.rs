@@ -12,5 +12,5 @@ mod quantifier;
 
 pub use arity::Arity;
 pub use kind::TypeKind;
-pub use primitives::{PrimitiveType, TYPE_CUSTOM_START, TYPE_NODE, TYPE_STRING, TYPE_VOID};
+pub use primitives::{PrimitiveType, TYPE_STRING};
 pub use quantifier::QuantifierKind;

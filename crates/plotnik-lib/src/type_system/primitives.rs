@@ -12,9 +12,6 @@ pub const TYPE_NODE: u16 = 1;
 /// Index for the String type (extracted source text).
 pub const TYPE_STRING: u16 = 2;
 
-/// First index available for user-defined/composite types.
-pub const TYPE_CUSTOM_START: u16 = 3;
-
 /// Primitive type enumeration.
 ///
 /// These are the builtin scalar types that don't require
