@@ -1407,3 +1407,35 @@ fn negation_syntax_deprecated_warning() {
     help: use `-field` instead of `!field`
     ");
 }
+
+#[test]
+fn empty_anonymous_node_double_quotes() {
+    let input = r#"(node "")"#;
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: empty anonymous node
+      |
+    1 | (node "")
+      |       ^^
+      |
+    help: use a valid anonymous node or remove it
+    "#);
+}
+
+#[test]
+fn empty_anonymous_node_single_quotes() {
+    let input = "(node '')";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: empty anonymous node
+      |
+    1 | (node '')
+      |       ^^
+      |
+    help: use a valid anonymous node or remove it
+    ");
+}
