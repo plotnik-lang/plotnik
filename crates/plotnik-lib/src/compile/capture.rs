@@ -13,15 +13,26 @@ use crate::parser::ast::{self, Expr};
 use super::Compiler;
 use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope};
 
-/// Capture effects to attach to the innermost match instruction.
+/// Capture effects to attach to match instructions.
 ///
-/// Instead of emitting a separate epsilon transition for capture effects,
+/// Instead of emitting separate epsilon transitions for wrapper effects,
 /// these effects are propagated through the compilation chain and attached
-/// directly to the match instruction that captures the node.
+/// directly to match instructions.
+///
+/// For sequences `{a b c}`:
+/// - `pre` effects go on the first item (entry)
+/// - `post` effects go on the last item (exit)
+///
+/// For tagged alternations `[A: body]`:
+/// - `pre` contains `Enum(variant)` for branch entry
+/// - `post` contains `EndEnum` for branch exit
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
-    /// Effects to place as post_effects on the matching instruction.
-    /// Typically: [Node/Text, Set(member)] or [Node/Text, Push]
+    /// Effects to place as pre_effects on the entry instruction.
+    /// Used for: Enum(variant) in tagged alternations.
+    pub pre: Vec<EffectIR>,
+    /// Effects to place as post_effects on the exit instruction.
+    /// Typically: [Node/Text, Set(member)], [Push], or [EndEnum].
     pub post: Vec<EffectIR>,
 }
 

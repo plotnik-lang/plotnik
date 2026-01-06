@@ -46,10 +46,8 @@ Test:
   06   ε                                    07
   07   !   (call_expression)                08
   08   ▽   function: _                      09
-  09   ε                                    14, 18
+  09   ε                                    12, 15
   11                                        ▶
-  12   !   (identifier) [Node Set(M0)]      20
-  14   ε   [Null Set(M1)]                   12
-  16   !   (number) [Node Set(M1)]          20
-  18   ε   [Null Set(M0)]                   16
-  20   △                                    11
+  12   !   [Null Set(M1)] (identifier) [Node Set(M0)]  18
+  15   !   [Null Set(M0)] (number) [Node Set(M1)]  18
+  18   △                                    11

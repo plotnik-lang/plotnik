@@ -7,43 +7,35 @@ Q = (program (expression_statement (Chain) @chain))
 a.b.c
 ---
 {
-  "chain": {
-    "$tag": "Access",
+  "base": {
+    "$tag": "Base",
     "$data": {
-      "base": {
-        "$tag": "Access",
-        "$data": {
-          "base": {
-            "$tag": "Base",
-            "$data": {
-              "name": {
-                "kind": "identifier",
-                "text": "a",
-                "span": [
-                  0,
-                  1
-                ]
-              }
-            }
-          },
-          "prop": {
-            "kind": "property_identifier",
-            "text": "b",
-            "span": [
-              2,
-              3
-            ]
-          }
-        }
-      },
-      "prop": {
-        "kind": "property_identifier",
-        "text": "c",
+      "name": {
+        "kind": "identifier",
+        "text": "a",
         "span": [
-          4,
-          5
+          0,
+          1
         ]
       }
     }
-  }
+  },
+  "prop": {
+    "kind": "property_identifier",
+    "text": "b",
+    "span": [
+      2,
+      3
+    ]
+  },
+  "base": null,
+  "prop": {
+    "kind": "property_identifier",
+    "text": "c",
+    "span": [
+      4,
+      5
+    ]
+  },
+  "chain": null
 }
