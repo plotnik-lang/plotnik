@@ -401,4 +401,33 @@ mod tests {
 
         assert!(!result.instructions.is_empty());
     }
+
+    #[test]
+    fn compile_large_tagged_alternation() {
+        // Regression test: alternations with 30+ branches should compile
+        // by splitting epsilon transitions into a cascade.
+        let branches: String = (0..30)
+            .map(|i| format!("A{i}: (identifier) @x{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let query_str = format!("Q = [{branches}]");
+
+        let query = QueryBuilder::one_liner(&query_str)
+            .parse()
+            .unwrap()
+            .analyze();
+
+        let mut strings = StringTableBuilder::new();
+        let result = Compiler::compile(
+            query.interner(),
+            query.type_context(),
+            &query.symbol_table,
+            &mut strings,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(!result.instructions.is_empty());
+    }
 }
