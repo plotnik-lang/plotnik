@@ -2,7 +2,7 @@ mod message;
 mod printer;
 
 #[cfg(test)]
-mod tests;
+mod diagnostics_tests;
 
 use rowan::TextRange;
 
