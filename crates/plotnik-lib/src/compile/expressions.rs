@@ -11,8 +11,8 @@ use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
 use crate::bytecode::NAMED_WILDCARD;
+use crate::bytecode::Nav;
 use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR};
-use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;
@@ -41,16 +41,15 @@ impl Compiler<'_> {
 
         // If no items, just match and exit (capture effects go here)
         if items.is_empty() {
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: entry,
-                nav,
-                node_type,
-                node_field: None,
-                pre_effects: capture.pre,
-                neg_fields,
-                post_effects: capture.post,
-                successors: vec![exit],
-            }));
+            self.instructions.push(
+                MatchIR::epsilon(entry, exit)
+                    .nav(nav)
+                    .node_type(node_type)
+                    .neg_fields(neg_fields)
+                    .pre_effects(capture.pre)
+                    .post_effects(capture.post)
+                    .into(),
+            );
             return entry;
         }
 
@@ -85,8 +84,10 @@ impl Compiler<'_> {
             .and_then(|i| i.as_expr())
             .is_some_and(is_skippable_quantifier);
 
-        // With items: nav → items → Up → exit
+        // With items: nav → items → Up → [post_effects] → exit
         // If first item is skippable: skip path → exit (bypass Up), match path → Up → exit
+        let final_exit = self.emit_post_effects_exit(exit, capture.post);
+
         let up_label = self.fresh_label();
         let skip_exit = first_is_skippable.then_some(exit);
         let items_entry = self.compile_seq_items_inner(
@@ -98,28 +99,18 @@ impl Compiler<'_> {
             skip_exit,
         );
 
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: up_label,
-            nav: up_nav,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![exit],
-        }));
+        self.instructions
+            .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
 
-        // Emit entry instruction into the node (capture effects go here at match time)
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: entry,
-            nav,
-            node_type,
-            node_field: None,
-            pre_effects: capture.pre,
-            neg_fields,
-            post_effects: capture.post,
-            successors: vec![items_entry],
-        }));
+        // Emit entry instruction into the node (only pre_effects here)
+        self.instructions.push(
+            MatchIR::epsilon(entry, items_entry)
+                .nav(nav)
+                .node_type(node_type)
+                .neg_fields(neg_fields)
+                .pre_effects(capture.pre)
+                .into(),
+        );
 
         entry
     }
@@ -151,18 +142,12 @@ impl Compiler<'_> {
         up_nav: Nav,
         capture: CaptureEffects,
     ) -> Label {
-        // up_check: Match(up_nav) → exit
+        let final_exit = self.emit_post_effects_exit(exit, capture.post);
+
+        // up_check: Match(up_nav) → final_exit
         let up_check = self.fresh_label();
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: up_check,
-            nav: up_nav,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![exit],
-        }));
+        self.instructions
+            .push(MatchIR::epsilon(up_check, final_exit).nav(up_nav).into());
 
         // body: items with StayExact navigation → up_check
         // Items are compiled with StayExact because the skip-retry loop handles
@@ -193,19 +178,30 @@ impl Compiler<'_> {
         let down_wildcard = self.fresh_label();
         self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
 
-        // entry: match parent node → down_wildcard
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: entry,
-            nav,
-            node_type,
-            node_field: None,
-            pre_effects: capture.pre,
-            neg_fields,
-            post_effects: capture.post,
-            successors: vec![down_wildcard],
-        }));
+        // entry: match parent node → down_wildcard (only pre_effects here)
+        self.instructions.push(
+            MatchIR::epsilon(entry, down_wildcard)
+                .nav(nav)
+                .node_type(node_type)
+                .neg_fields(neg_fields)
+                .pre_effects(capture.pre)
+                .into(),
+        );
 
         entry
+    }
+
+    /// Emit post-effects on an epsilon step after the exit label.
+    ///
+    /// Post-effects (like EndEnum) must execute AFTER children complete, not after
+    /// matching the parent node. This helper creates an epsilon step for the effects
+    /// when needed, or returns the original exit if no effects.
+    fn emit_post_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
+        if post.is_empty() {
+            exit
+        } else {
+            self.emit_effects_epsilon(exit, post, CaptureEffects::default())
+        }
     }
 
     /// Compile an anonymous node with capture effects.
@@ -225,16 +221,14 @@ impl Compiler<'_> {
             self.resolve_anonymous_node_type(text)
         });
 
-        self.instructions.push(Instruction::Match(MatchIR {
-            label: entry,
-            nav,
-            node_type,
-            node_field: None,
-            pre_effects: capture.pre,
-            neg_fields: vec![],
-            post_effects: capture.post,
-            successors: vec![exit],
-        }));
+        self.instructions.push(
+            MatchIR::epsilon(entry, exit)
+                .nav(nav)
+                .node_type(node_type)
+                .pre_effects(capture.pre)
+                .post_effects(capture.post)
+                .into(),
+        );
 
         entry
     }
@@ -342,16 +336,12 @@ impl Compiler<'_> {
             let value_entry = self.compile_expr_inner(&value, exit, None, capture);
 
             let entry = self.fresh_label();
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: entry,
-                nav: nav_override.unwrap_or(Nav::Stay),
-                node_type: None,
-                node_field,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors: vec![value_entry],
-            }));
+            self.instructions.push(
+                MatchIR::epsilon(entry, value_entry)
+                    .nav(nav_override.unwrap_or(Nav::Stay))
+                    .node_field(node_field)
+                    .into(),
+            );
             return entry;
         }
 
@@ -375,16 +365,11 @@ impl Compiler<'_> {
             // Fallback: wrap with field-checking Match for patterns that couldn't merge.
             // Use Stay since value was already compiled with navigation.
             let entry = self.fresh_label();
-            self.instructions.push(Instruction::Match(MatchIR {
-                label: entry,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: Some(field_id),
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors: vec![value_entry],
-            }));
+            self.instructions.push(
+                MatchIR::epsilon(entry, value_entry)
+                    .node_field(field_id)
+                    .into(),
+            );
             return entry;
         }
 
@@ -535,7 +520,7 @@ impl Compiler<'_> {
         };
 
         // SuppressEnd + outer capture effects → exit
-        let suppress_end = vec![EffectIR::simple(EffectOpcode::SuppressEnd, 0)];
+        let suppress_end = vec![EffectIR::suppress_end()];
         let end_label = self.emit_effects_epsilon(exit, suppress_end, outer_capture);
 
         // Compile inner → end_label (inner gets NO capture effects)
@@ -543,7 +528,7 @@ impl Compiler<'_> {
             self.compile_expr_inner(&inner, end_label, nav_override, CaptureEffects::default());
 
         // SuppressBegin → inner_entry
-        let suppress_begin = vec![EffectIR::simple(EffectOpcode::SuppressBegin, 0)];
+        let suppress_begin = vec![EffectIR::suppress_begin()];
         self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default())
     }
 

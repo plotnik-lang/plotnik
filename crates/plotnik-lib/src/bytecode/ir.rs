@@ -130,6 +130,66 @@ impl EffectIR {
         }
     }
 
+    /// Capture current node value.
+    pub fn node() -> Self {
+        Self::simple(EffectOpcode::Node, 0)
+    }
+
+    /// Capture current node text.
+    pub fn text() -> Self {
+        Self::simple(EffectOpcode::Text, 0)
+    }
+
+    /// Push null value.
+    pub fn null() -> Self {
+        Self::simple(EffectOpcode::Null, 0)
+    }
+
+    /// Push accumulated value to array.
+    pub fn push() -> Self {
+        Self::simple(EffectOpcode::Push, 0)
+    }
+
+    /// Begin array scope.
+    pub fn start_arr() -> Self {
+        Self::simple(EffectOpcode::Arr, 0)
+    }
+
+    /// End array scope.
+    pub fn end_arr() -> Self {
+        Self::simple(EffectOpcode::EndArr, 0)
+    }
+
+    /// Begin object scope.
+    pub fn start_obj() -> Self {
+        Self::simple(EffectOpcode::Obj, 0)
+    }
+
+    /// End object scope.
+    pub fn end_obj() -> Self {
+        Self::simple(EffectOpcode::EndObj, 0)
+    }
+
+    /// Begin enum scope.
+    pub fn start_enum() -> Self {
+        Self::simple(EffectOpcode::Enum, 0)
+    }
+
+    /// End enum scope.
+    pub fn end_enum() -> Self {
+        Self::simple(EffectOpcode::EndEnum, 0)
+    }
+
+    /// Begin suppression (suppress effects within).
+    pub fn suppress_begin() -> Self {
+        Self::simple(EffectOpcode::SuppressBegin, 0)
+    }
+
+    /// End suppression.
+    pub fn suppress_end() -> Self {
+        Self::simple(EffectOpcode::SuppressEnd, 0)
+    }
+
     /// Resolve this IR effect to a concrete EffectOp.
     ///
     /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
@@ -235,6 +295,96 @@ pub struct MatchIR {
 }
 
 impl MatchIR {
+    /// Create a terminal/accept state (empty successors).
+    pub fn terminal(label: Label) -> Self {
+        Self {
+            label,
+            nav: Nav::Stay,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields: vec![],
+            post_effects: vec![],
+            successors: vec![],
+        }
+    }
+
+    /// Start building a match instruction at the given label.
+    pub fn at(label: Label) -> Self {
+        Self::terminal(label)
+    }
+
+    /// Create an epsilon transition (no node interaction) to a single successor.
+    pub fn epsilon(label: Label, next: Label) -> Self {
+        Self::at(label).next(next)
+    }
+
+    /// Set the navigation command.
+    pub fn nav(mut self, nav: Nav) -> Self {
+        self.nav = nav;
+        self
+    }
+
+    /// Set the node type constraint.
+    pub fn node_type(mut self, t: impl Into<Option<NonZeroU16>>) -> Self {
+        self.node_type = t.into();
+        self
+    }
+
+    /// Set the field constraint.
+    pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
+        self.node_field = f.into();
+        self
+    }
+
+    /// Add a negated field constraint.
+    pub fn neg_field(mut self, f: u16) -> Self {
+        self.neg_fields.push(f);
+        self
+    }
+
+    /// Add a pre-match effect.
+    pub fn pre_effect(mut self, e: EffectIR) -> Self {
+        self.pre_effects.push(e);
+        self
+    }
+
+    /// Add a post-match effect.
+    pub fn post_effect(mut self, e: EffectIR) -> Self {
+        self.post_effects.push(e);
+        self
+    }
+
+    /// Add multiple negated field constraints.
+    pub fn neg_fields(mut self, fields: impl IntoIterator<Item = u16>) -> Self {
+        self.neg_fields.extend(fields);
+        self
+    }
+
+    /// Add multiple pre-match effects.
+    pub fn pre_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        self.pre_effects.extend(effects);
+        self
+    }
+
+    /// Add multiple post-match effects.
+    pub fn post_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        self.post_effects.extend(effects);
+        self
+    }
+
+    /// Set a single successor.
+    pub fn next(mut self, s: Label) -> Self {
+        self.successors = vec![s];
+        self
+    }
+
+    /// Set multiple successors (for branches).
+    pub fn next_many(mut self, s: Vec<Label>) -> Self {
+        self.successors = s;
+        self
+    }
+
     /// Compute instruction size in bytes.
     pub fn size(&self) -> usize {
         // Match8 can be used if: no effects, no neg_fields, and at most 1 successor
@@ -309,6 +459,12 @@ impl MatchIR {
     }
 }
 
+impl From<MatchIR> for Instruction {
+    fn from(m: MatchIR) -> Self {
+        Self::Match(m)
+    }
+}
+
 /// Call instruction IR with symbolic target.
 #[derive(Clone, Debug)]
 pub struct CallIR {
@@ -325,6 +481,29 @@ pub struct CallIR {
 }
 
 impl CallIR {
+    /// Create a call instruction with default nav (Stay) and no field constraint.
+    pub fn new(label: Label, target: Label, next: Label) -> Self {
+        Self {
+            label,
+            nav: Nav::Stay,
+            node_field: None,
+            next,
+            target,
+        }
+    }
+
+    /// Set the navigation command.
+    pub fn nav(mut self, nav: Nav) -> Self {
+        self.nav = nav;
+        self
+    }
+
+    /// Set the field constraint.
+    pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
+        self.node_field = f.into();
+        self
+    }
+
     /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         let c = Call {
@@ -338,6 +517,12 @@ impl CallIR {
     }
 }
 
+impl From<CallIR> for Instruction {
+    fn from(c: CallIR) -> Self {
+        Self::Call(c)
+    }
+}
+
 /// Return instruction IR.
 #[derive(Clone, Debug)]
 pub struct ReturnIR {
@@ -346,10 +531,21 @@ pub struct ReturnIR {
 }
 
 impl ReturnIR {
+    /// Create a return instruction at the given label.
+    pub fn new(label: Label) -> Self {
+        Self { label }
+    }
+
     /// Serialize to bytecode bytes (no labels to resolve).
     pub fn resolve(&self) -> [u8; 8] {
         let r = Return { segment: 0 };
         r.to_bytes()
+    }
+}
+
+impl From<ReturnIR> for Instruction {
+    fn from(r: ReturnIR) -> Self {
+        Self::Return(r)
     }
 }
 
@@ -366,6 +562,11 @@ pub struct TrampolineIR {
 }
 
 impl TrampolineIR {
+    /// Create a trampoline instruction.
+    pub fn new(label: Label, next: Label) -> Self {
+        Self { label, next }
+    }
+
     /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         let t = Trampoline {
@@ -373,6 +574,12 @@ impl TrampolineIR {
             next: StepId::new(self.next.resolve(map)),
         };
         t.to_bytes()
+    }
+}
+
+impl From<TrampolineIR> for Instruction {
+    fn from(t: TrampolineIR) -> Self {
+        Self::Trampoline(t)
     }
 }
 
@@ -391,32 +598,22 @@ mod tests {
 
     #[test]
     fn match_ir_size_match8() {
-        let m = MatchIR {
-            label: Label(0),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(10),
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1)],
-        };
+        let m = MatchIR::at(Label(0))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .next(Label(1));
 
         assert_eq!(m.size(), 8);
     }
 
     #[test]
     fn match_ir_size_extended() {
-        let m = MatchIR {
-            label: Label(0),
-            nav: Nav::Down,
-            node_type: NonZeroU16::new(10),
-            node_field: None,
-            pre_effects: vec![EffectIR::simple(EffectOpcode::Obj, 0)],
-            neg_fields: vec![],
-            post_effects: vec![EffectIR::simple(EffectOpcode::Node, 0)],
-            successors: vec![Label(1)],
-        };
+        let m = MatchIR::at(Label(0))
+            .nav(Nav::Down)
+            .node_type(NonZeroU16::new(10))
+            .pre_effect(EffectIR::start_obj())
+            .post_effect(EffectIR::node())
+            .next(Label(1));
 
         // 3 slots needed (1 pre + 1 post + 1 succ), fits in Match16 (4 slots)
         assert_eq!(m.size(), 16);
@@ -424,30 +621,19 @@ mod tests {
 
     #[test]
     fn instruction_successors() {
-        let m = Instruction::Match(MatchIR {
-            label: Label(0),
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![Label(1), Label(2)],
-        });
+        let m: Instruction = MatchIR::at(Label(0))
+            .next_many(vec![Label(1), Label(2)])
+            .into();
 
         assert_eq!(m.successors(), vec![Label(1), Label(2)]);
 
-        let c = Instruction::Call(CallIR {
-            label: Label(3),
-            nav: Nav::Down,
-            node_field: None,
-            next: Label(4),
-            target: Label(5),
-        });
+        let c: Instruction = CallIR::new(Label(3), Label(5), Label(4))
+            .nav(Nav::Down)
+            .into();
 
         assert_eq!(c.successors(), vec![Label(4)]);
 
-        let r = Instruction::Return(ReturnIR { label: Label(6) });
+        let r: Instruction = ReturnIR::new(Label(6)).into();
 
         assert!(r.successors().is_empty());
     }
@@ -455,16 +641,7 @@ mod tests {
     #[test]
     fn resolve_match_terminal() {
         // Terminal match: empty successors → next = 0 in bytecode
-        let m = MatchIR {
-            label: Label(0),
-            nav: Nav::Stay,
-            node_type: None,
-            node_field: None,
-            pre_effects: vec![],
-            neg_fields: vec![],
-            post_effects: vec![],
-            successors: vec![],
-        };
+        let m = MatchIR::terminal(Label(0));
 
         let mut map = BTreeMap::new();
         map.insert(Label(0), 1u16);
