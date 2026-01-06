@@ -10,6 +10,7 @@
 pub mod dependencies;
 mod invariants;
 pub mod link;
+mod recursion;
 pub mod refs;
 pub mod symbol_table;
 pub mod type_check;
@@ -26,6 +27,7 @@ mod symbol_table_tests;
 
 pub use dependencies::DependencyAnalysis;
 pub use link::LinkOutput;
+pub use recursion::validate_recursion;
 pub use symbol_table::{SymbolTable, UNNAMED_DEF};
 pub use type_check::{TypeContext, infer_types, primary_def_name};
 pub use validation::{validate_alt_kinds, validate_anchors};

@@ -10,7 +10,7 @@ pub fn ref_nodes(expr: &Expr) -> impl Iterator<Item = ast::Ref> + '_ {
 }
 
 /// Collect all reference names as owned strings.
-pub fn collect_ref_names(expr: &Expr) -> IndexSet<String> {
+pub fn ref_names(expr: &Expr) -> IndexSet<String> {
     ref_nodes(expr)
         .filter_map(|r| r.name())
         .map(|tok| tok.text().to_string())
@@ -33,7 +33,7 @@ mod tests {
     fn collect_refs_from_simple_ref() {
         let q = Query::expect("Q = (Foo)");
         let expr = q.symbol_table.get("Q").unwrap();
-        let refs = collect_ref_names(expr);
+        let refs = ref_names(expr);
         assert_eq!(refs.len(), 1);
         assert!(refs.contains("Foo"));
     }
@@ -42,7 +42,7 @@ mod tests {
     fn collect_refs_from_nested() {
         let q = Query::expect("Q = (x (Foo) (Bar))");
         let expr = q.symbol_table.get("Q").unwrap();
-        let refs = collect_ref_names(expr);
+        let refs = ref_names(expr);
         assert_eq!(refs.len(), 2);
         assert!(refs.contains("Foo"));
         assert!(refs.contains("Bar"));
@@ -52,7 +52,7 @@ mod tests {
     fn collect_refs_deduplicates() {
         let q = Query::expect("Q = {(Foo) (Foo)}");
         let expr = q.symbol_table.get("Q").unwrap();
-        let refs = collect_ref_names(expr);
+        let refs = ref_names(expr);
         assert_eq!(refs.len(), 1);
     }
 
