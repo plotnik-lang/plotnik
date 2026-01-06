@@ -193,6 +193,7 @@ impl Compiler<'_> {
             // Non-array capture: build capture effects and recurse
             let capture_effects = self.build_capture_effects(cap, Some(&inner));
             let mut combined = CaptureEffects {
+                pre: capture.pre.clone(),
                 post: capture_effects,
             };
             combined.post.extend(capture.post);
@@ -259,6 +260,7 @@ impl Compiler<'_> {
         let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
 
         let push_effects = CaptureEffects {
+            pre: vec![],
             post: if self.quantifier_needs_node_for_push(inner) {
                 let opcode = if cap.has_string_annotation() {
                     EffectOpcode::Text

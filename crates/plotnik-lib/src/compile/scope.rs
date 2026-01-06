@@ -145,6 +145,7 @@ impl Compiler<'_> {
 
             // Compile inner with capture_effects on the match instruction
             let inner_capture = CaptureEffects {
+                pre: outer_capture.pre,
                 post: capture_effects,
             };
             return self.compile_expr_inner(inner, actual_exit, nav_override, inner_capture);
@@ -168,7 +169,9 @@ impl Compiler<'_> {
         }));
 
         // Compile inner WITH capture_effects on the match instruction
+        // Note: pre effects don't propagate through Obj/EndObj scope wrapper
         let inner_capture = CaptureEffects {
+            pre: vec![],
             post: capture_effects,
         };
         let inner_entry = self.with_scope(scope_type_id.unwrap(), |this| {
@@ -220,6 +223,7 @@ impl Compiler<'_> {
         }));
 
         let push_effects = CaptureEffects {
+            pre: vec![],
             post: if self.quantifier_needs_node_for_push(inner) {
                 // Use Text if the capture has `:: string` annotation, else Node
                 let opcode = if use_text_for_elements {
@@ -491,39 +495,34 @@ impl Compiler<'_> {
         use crate::bytecode::MAX_MATCH_PAYLOAD_SLOTS;
 
         if successors.len() <= MAX_MATCH_PAYLOAD_SLOTS {
-            self.instructions.push(Instruction::Match(MatchIR {
-                label,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: None,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors,
-            }));
-        } else {
-            // Split: first (MAX-1) successors + intermediate for rest.
-            // This preserves priority order: VM tries s0, s1, ..., then intermediate.
-            let split_at = MAX_MATCH_PAYLOAD_SLOTS - 1;
-            let (first_batch, rest) = successors.split_at(split_at);
-
-            let intermediate = self.fresh_label();
-            self.emit_epsilon(intermediate, rest.to_vec());
-
-            let mut batch = first_batch.to_vec();
-            batch.push(intermediate);
-
-            self.instructions.push(Instruction::Match(MatchIR {
-                label,
-                nav: Nav::Stay,
-                node_type: None,
-                node_field: None,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors: batch,
-            }));
+            self.push_epsilon(label, successors);
+            return;
         }
+
+        // Split: first (MAX-1) successors + intermediate for rest.
+        // This preserves priority order: VM tries s0, s1, ..., then intermediate.
+        let split_at = MAX_MATCH_PAYLOAD_SLOTS - 1;
+        let (first_batch, rest) = successors.split_at(split_at);
+
+        let intermediate = self.fresh_label();
+        self.emit_epsilon(intermediate, rest.to_vec());
+
+        let mut batch = first_batch.to_vec();
+        batch.push(intermediate);
+        self.push_epsilon(label, batch);
+    }
+
+    fn push_epsilon(&mut self, label: Label, successors: Vec<Label>) {
+        self.instructions.push(Instruction::Match(MatchIR {
+            label,
+            nav: Nav::Stay,
+            node_type: None,
+            node_field: None,
+            pre_effects: vec![],
+            neg_fields: vec![],
+            post_effects: vec![],
+            successors,
+        }));
     }
 
     /// Emit a wildcard navigation step that accepts any node.

@@ -47,7 +47,7 @@ _ObjWrap:
 
 Expression:
   06   ε                                    07
-  07   ε                                    18, 22
+  07   ε                                    16, 19
 
 Root:
   09   ε                                    10
@@ -56,7 +56,5 @@ Root:
   13   △                                    14
   14                                        ▶
   15                                        ▶
-  16   !   (identifier) [Node Set(M0)]      15
-  18   ε   [Null Set(M1)]                   16
-  20   !   (number) [Node Set(M1)]          15
-  22   ε   [Null Set(M0)]                   20
+  16   !   [Null Set(M1)] (identifier) [Node Set(M0)]  15
+  19   !   [Null Set(M0)] (number) [Node Set(M1)]  15

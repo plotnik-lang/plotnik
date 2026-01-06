@@ -46,7 +46,7 @@ impl Compiler<'_> {
                 nav,
                 node_type,
                 node_field: None,
-                pre_effects: vec![],
+                pre_effects: capture.pre,
                 neg_fields,
                 post_effects: capture.post,
                 successors: vec![exit],
@@ -115,7 +115,7 @@ impl Compiler<'_> {
             nav,
             node_type,
             node_field: None,
-            pre_effects: vec![],
+            pre_effects: capture.pre,
             neg_fields,
             post_effects: capture.post,
             successors: vec![items_entry],
@@ -199,7 +199,7 @@ impl Compiler<'_> {
             nav,
             node_type,
             node_field: None,
-            pre_effects: vec![],
+            pre_effects: capture.pre,
             neg_fields,
             post_effects: capture.post,
             successors: vec![down_wildcard],
@@ -230,7 +230,7 @@ impl Compiler<'_> {
             nav,
             node_type,
             node_field: None,
-            pre_effects: vec![],
+            pre_effects: capture.pre,
             neg_fields: vec![],
             post_effects: capture.post,
             successors: vec![exit],
@@ -280,7 +280,8 @@ impl Compiler<'_> {
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
-        if needs_scope {
+        // Call instructions don't have pre_effects, so emit epsilon if needed
+        let call_entry = if needs_scope {
             // Captured ref returning struct: Obj → Call → EndObj → Set → exit
             // The Obj creates an isolated scope for the definition's internal captures.
             let set_step = self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
@@ -295,7 +296,14 @@ impl Compiler<'_> {
         } else {
             // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
             self.emit_call(nav, field_override, exit, target)
+        };
+
+        if capture.pre.is_empty() {
+            return call_entry;
         }
+
+        // Wrap with pre-effects epsilon (e.g., Enum for tagged alternations)
+        self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
     /// Compile a field constraint with capture effects (passed to inner pattern).
@@ -500,7 +508,10 @@ impl Compiler<'_> {
             &inner,
             exit,
             nav_override,
-            CaptureEffects { post: combined },
+            CaptureEffects {
+                pre: outer_capture.pre,
+                post: combined,
+            },
         )
     }
 

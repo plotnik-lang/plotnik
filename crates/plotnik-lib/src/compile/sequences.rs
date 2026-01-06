@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use plotnik_core::Symbol;
 
 use crate::analyze::type_check::{TypeId, TypeShape};
-use crate::bytecode::ir::{EffectIR, Instruction, Label, MatchIR, MemberRef};
+use crate::bytecode::ir::{EffectIR, Label, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
 
@@ -98,21 +98,31 @@ impl Compiler<'_> {
         }
 
         // Build chain in reverse: last expression exits to `exit`, each prior exits to next
-        // Capture effects go to the FIRST iteration (which is the last expression)
+        // Split capture effects: pre goes to FIRST item, post goes to LAST item
         let mut current_exit = exit;
-        let mut is_last = true;
-        for (expr_idx, nav_override) in nav_modes.into_iter().rev() {
+        let count = nav_modes.len();
+        for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
             let expr = items[expr_idx]
                 .as_expr()
                 .expect("nav_modes only contains expr indices");
-            if is_last {
-                // Last expression gets capture effects
-                current_exit =
-                    self.compile_expr_inner(expr, current_exit, nav_override, capture.clone());
-                is_last = false;
-            } else {
-                current_exit = self.compile_expr_with_nav(expr, current_exit, nav_override);
-            }
+
+            let is_last_expr = i == 0; // First in reversed loop = last in sequence
+            let is_first_expr = i == count - 1; // Last in reversed loop = first in sequence
+
+            let item_capture = CaptureEffects {
+                pre: if is_first_expr {
+                    capture.pre.clone()
+                } else {
+                    vec![]
+                },
+                post: if is_last_expr {
+                    capture.post.clone()
+                } else {
+                    vec![]
+                },
+            };
+
+            current_exit = self.compile_expr_inner(expr, current_exit, nav_override, item_capture);
         }
         current_exit
     }
@@ -239,101 +249,67 @@ impl Compiler<'_> {
                     .map(|(_, &(idx, type_id))| (idx, type_id))
                     .expect("variant must exist for labeled branch");
 
-                // Tagged branch: E(variant_ref) → body → EndE → exit
-                // Outer capture effects go on EndEnum, not on the branch body
-                let mut end_effects = vec![EffectIR::simple(EffectOpcode::EndEnum, 0)];
-                end_effects.extend(capture.post.iter().cloned());
-
-                let ende_step = self.fresh_label();
-                self.instructions.push(Instruction::Match(MatchIR {
-                    label: ende_step,
-                    nav: Nav::Stay,
-                    node_type: None,
-                    node_field: None,
-                    pre_effects: vec![],
-                    neg_fields: vec![],
-                    post_effects: end_effects,
-                    successors: vec![exit],
-                }));
-
-                // Compile body with variant's scope (no outer capture - it's on EndEnum)
-                let body_entry = self.with_scope(payload_type_id, |this| {
-                    this.compile_expr_inner(&body, ende_step, branch_nav, CaptureEffects::default())
-                });
-
-                // Create deferred member reference for the enum variant
-                // Uses parent enum type + relative index (enum variants don't bubble)
+                // Create Enum effect for branch entry
                 let e_effect = if let Some(type_id) = alt_type_id {
                     EffectIR::with_member(
                         EffectOpcode::Enum,
                         MemberRef::deferred_by_index(type_id, variant_idx),
                     )
                 } else {
-                    // Fallback: use absolute index (should not happen for well-formed queries)
                     EffectIR::simple(EffectOpcode::Enum, 0)
                 };
 
-                let e_step = self.fresh_label();
-                self.instructions.push(Instruction::Match(MatchIR {
-                    label: e_step,
-                    nav: Nav::Stay,
-                    node_type: None,
-                    node_field: None,
-                    pre_effects: vec![e_effect],
-                    neg_fields: vec![],
-                    post_effects: vec![],
-                    successors: vec![body_entry],
-                }));
+                // Build capture effects: Enum as pre, EndEnum + outer as post
+                let mut post_effects = vec![EffectIR::simple(EffectOpcode::EndEnum, 0)];
+                post_effects.extend(capture.post.iter().cloned());
 
-                successors.push(e_step);
+                let branch_capture = CaptureEffects {
+                    pre: vec![e_effect],
+                    post: post_effects,
+                };
+
+                // Compile body with merged effects - no separate epsilon wrappers needed
+                let body_entry = self.with_scope(payload_type_id, |this| {
+                    this.compile_expr_inner(&body, exit, branch_nav, branch_capture)
+                });
+
+                successors.push(body_entry);
             } else {
-                // Untagged branch: compile body, then inject Null for missing captures
-                let branch_entry =
-                    self.compile_expr_inner(&body, exit, branch_nav, capture.clone());
+                // Untagged branch: compile body with null injection for missing captures
+                let null_effects: Vec<_> =
+                    if let (Some(fields), Some(alt_type)) = (merged_fields, alt_type_id) {
+                        let branch_captures = Self::collect_captures(&body);
+                        fields
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, (sym, _))| {
+                                !branch_captures.contains(self.interner.resolve(**sym))
+                            })
+                            .flat_map(|(idx, _)| {
+                                [
+                                    EffectIR::simple(EffectOpcode::Null, 0),
+                                    EffectIR::with_member(
+                                        EffectOpcode::Set,
+                                        MemberRef::deferred_by_index(alt_type, idx as u16),
+                                    ),
+                                ]
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
 
-                let Some(fields) = merged_fields else {
-                    successors.push(branch_entry);
-                    continue;
+                // Merge null injection with outer capture effects
+                let mut pre = null_effects;
+                pre.extend(capture.pre.iter().cloned());
+
+                let branch_capture = CaptureEffects {
+                    pre,
+                    post: capture.post.clone(),
                 };
-                let Some(alt_type) = alt_type_id else {
-                    successors.push(branch_entry);
-                    continue;
-                };
 
-                // Build Null effects for fields not captured by this branch
-                let branch_captures = Self::collect_captures(&body);
-                let null_effects: Vec<_> = fields
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, (sym, _))| !branch_captures.contains(self.interner.resolve(**sym)))
-                    .flat_map(|(idx, _)| {
-                        [
-                            EffectIR::simple(EffectOpcode::Null, 0),
-                            EffectIR::with_member(
-                                EffectOpcode::Set,
-                                MemberRef::deferred_by_index(alt_type, idx as u16),
-                            ),
-                        ]
-                    })
-                    .collect();
-
-                if null_effects.is_empty() {
-                    successors.push(branch_entry);
-                    continue;
-                }
-
-                let null_step = self.fresh_label();
-                self.instructions.push(Instruction::Match(MatchIR {
-                    label: null_step,
-                    nav: Nav::Stay,
-                    node_type: None,
-                    node_field: None,
-                    pre_effects: null_effects,
-                    neg_fields: vec![],
-                    post_effects: vec![],
-                    successors: vec![branch_entry],
-                }));
-                successors.push(null_step);
+                let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, branch_capture);
+                successors.push(branch_entry);
             }
         }
 

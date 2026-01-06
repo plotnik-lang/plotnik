@@ -46,11 +46,7 @@ _ObjWrap:
 
 Test:
   06   ε                                    07
-  07   ε                                    14, 20
+  07   ε                                    10, 13
   09                                        ▶
-  10   ε   [EndEnum]                        09
-  12   !   (identifier) [Node Set(M0)]      10
-  14   ε   [Enum(M2)]                       12
-  16   ε   [EndEnum]                        09
-  18   !   (number) [Node Set(M1)]          16
-  20   ε   [Enum(M3)]                       18
+  10   !   [Enum(M2)] (identifier) [Node Set(M0) EndEnum]  09
+  13   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  09
