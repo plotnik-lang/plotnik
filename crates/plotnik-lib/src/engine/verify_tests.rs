@@ -19,8 +19,8 @@ fn build_module(query: &str) -> (Module, TypeId) {
     assert!(query_obj.is_valid(), "query should be valid");
     let bytecode = emit_linked(&query_obj).expect("emit failed");
     let module = Module::from_bytes(bytecode).expect("decode failed");
-    let expected_type = module.entrypoints().get(0).result_type;
-    (module, expected_type)
+    let declared_type = module.entrypoints().get(0).result_type;
+    (module, declared_type)
 }
 
 fn make_node() -> Value {
@@ -33,51 +33,51 @@ fn make_node() -> Value {
 
 #[test]
 fn verify_valid_node() {
-    let (module, expected_type) = build_module("Q = (identifier) @id");
+    let (module, declared_type) = build_module("Q = (identifier) @id");
     let value = Value::Object(vec![("id".to_string(), make_node())]);
 
     // Should not panic
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_optional_present() {
-    let (module, expected_type) = build_module("Q = (identifier)? @id");
+    let (module, declared_type) = build_module("Q = (identifier)? @id");
     let value = Value::Object(vec![("id".to_string(), make_node())]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_optional_null() {
-    let (module, expected_type) = build_module("Q = (identifier)? @id");
+    let (module, declared_type) = build_module("Q = (identifier)? @id");
     let value = Value::Object(vec![("id".to_string(), Value::Null)]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_array() {
-    let (module, expected_type) = build_module("Q = (identifier)* @ids");
+    let (module, declared_type) = build_module("Q = (identifier)* @ids");
     let value = Value::Object(vec![(
         "ids".to_string(),
         Value::Array(vec![make_node(), make_node()]),
     )]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_empty_array() {
-    let (module, expected_type) = build_module("Q = (identifier)* @ids");
+    let (module, declared_type) = build_module("Q = (identifier)* @ids");
     let value = Value::Object(vec![("ids".to_string(), Value::Array(vec![]))]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_enum() {
-    let (module, expected_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
+    let (module, declared_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
     let value = Value::Tagged {
         tag: "A".to_string(),
         data: Some(Box::new(Value::Object(vec![(
@@ -86,54 +86,54 @@ fn verify_valid_enum() {
         )]))),
     };
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_enum_void_variant() {
-    let (module, expected_type) = build_module("Q = [A: (identifier) @x  B: (number)]");
+    let (module, declared_type) = build_module("Q = [A: (identifier) @x  B: (number)]");
     let value = Value::Tagged {
         tag: "B".to_string(),
         data: None,
     };
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
 fn verify_valid_string() {
-    let (module, expected_type) = build_module("Q = (identifier) @id :: string");
+    let (module, declared_type) = build_module("Q = (identifier) @id :: string");
     let value = Value::Object(vec![("id".to_string(), Value::String("foo".to_string()))]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_node_is_string() {
-    let (module, expected_type) = build_module("Q = (identifier) @id");
+    let (module, declared_type) = build_module("Q = (identifier) @id");
 
     // id should be Node, but we provide string
     let value = Value::Object(vec![("id".to_string(), Value::String("wrong".to_string()))]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_missing_required_field() {
-    let (module, expected_type) = build_module("Q = {(identifier) @a (number) @b}");
+    let (module, declared_type) = build_module("Q = {(identifier) @a (number) @b}");
 
     // Missing field 'b'
     let value = Value::Object(vec![("a".to_string(), make_node())]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_array_element_wrong_type() {
-    let (module, expected_type) = build_module("Q = (identifier)* @ids");
+    let (module, declared_type) = build_module("Q = (identifier)* @ids");
 
     // Array element is string instead of Node
     let value = Value::Object(vec![(
@@ -141,37 +141,37 @@ fn verify_invalid_array_element_wrong_type() {
         Value::Array(vec![make_node(), Value::String("oops".to_string())]),
     )]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_non_empty_array_is_empty() {
-    let (module, expected_type) = build_module("Q = (identifier)+ @ids");
+    let (module, declared_type) = build_module("Q = (identifier)+ @ids");
 
     // Non-empty array but we provide empty
     let value = Value::Object(vec![("ids".to_string(), Value::Array(vec![]))]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_enum_unknown_variant() {
-    let (module, expected_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
+    let (module, declared_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
 
     let value = Value::Tagged {
         tag: "C".to_string(), // Unknown variant
         data: None,
     };
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_enum_void_with_data() {
-    let (module, expected_type) = build_module("Q = [A: (identifier) @x  B: (number)]");
+    let (module, declared_type) = build_module("Q = [A: (identifier) @x  B: (number)]");
 
     // Void variant B has data when it shouldn't
     let value = Value::Tagged {
@@ -179,13 +179,13 @@ fn verify_invalid_enum_void_with_data() {
         data: Some(Box::new(Value::Object(vec![]))),
     };
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
+#[should_panic(expected = "BUG:")]
 fn verify_invalid_enum_non_void_missing_data() {
-    let (module, expected_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
+    let (module, declared_type) = build_module("Q = [A: (identifier) @x  B: (number) @y]");
 
     // Non-void variant A missing data
     let value = Value::Tagged {
@@ -193,16 +193,16 @@ fn verify_invalid_enum_non_void_missing_data() {
         data: None,
     };
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }
 
 #[test]
-#[should_panic(expected = "TYPE MISMATCH")]
-fn verify_invalid_expected_object_got_array() {
-    let (module, expected_type) = build_module("Q = (identifier) @id");
+#[should_panic(expected = "BUG:")]
+fn verify_invalid_object_vs_array() {
+    let (module, declared_type) = build_module("Q = (identifier) @id");
 
-    // Expected object, got array
+    // Type says object, value is array
     let value = Value::Array(vec![make_node()]);
 
-    debug_verify_type(&value, expected_type, &module, Colors::OFF);
+    debug_verify_type(&value, declared_type, &module, Colors::OFF);
 }

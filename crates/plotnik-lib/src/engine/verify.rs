@@ -12,26 +12,26 @@ use super::Value;
 
 /// Debug-only type verification.
 ///
-/// Panics with a pretty diagnostic if the value doesn't match the expected type.
+/// Panics with a pretty diagnostic if the value doesn't match the declared type.
 /// This is a no-op in release builds.
 ///
-/// `expected_type` should be the `result_type` from the entrypoint that was executed.
+/// `declared_type` should be the `result_type` from the entrypoint that was executed.
 #[cfg(debug_assertions)]
-pub fn debug_verify_type(value: &Value, expected_type: TypeId, module: &Module, colors: Colors) {
+pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, colors: Colors) {
     let types = module.types();
     let strings = module.strings();
 
     let mut errors = Vec::new();
     verify_type(
         value,
-        expected_type,
+        declared_type,
         &types,
         &strings,
         &mut String::new(),
         &mut errors,
     );
     if !errors.is_empty() {
-        panic_with_mismatch(value, expected_type, &errors, module, colors);
+        panic_with_mismatch(value, declared_type, &errors, module, colors);
     }
 }
 
@@ -40,7 +40,7 @@ pub fn debug_verify_type(value: &Value, expected_type: TypeId, module: &Module, 
 #[inline(always)]
 pub fn debug_verify_type(
     _value: &Value,
-    _expected_type: TypeId,
+    _declared_type: TypeId,
     _module: &Module,
     _colors: Colors,
 ) {
@@ -50,16 +50,16 @@ pub fn debug_verify_type(
 #[cfg(debug_assertions)]
 fn verify_type(
     value: &Value,
-    expected: TypeId,
+    declared: TypeId,
     types: &TypesView<'_>,
     strings: &StringsView<'_>,
     path: &mut String,
     errors: &mut Vec<String>,
 ) {
-    let Some(type_def) = types.get(expected) else {
+    let Some(type_def) = types.get(declared) else {
         errors.push(format_error(
             path,
-            &format!("unknown type id {}", expected.0),
+            &format!("unknown type id {}", declared.0),
         ));
         return;
     };
@@ -74,7 +74,7 @@ fn verify_type(
             if !matches!(value, Value::Null) {
                 errors.push(format_error(
                     path,
-                    &format!("expected void (null), found {}", value_kind_name(value)),
+                    &format!("type: void, value: {}", value_kind_name(value)),
                 ));
             }
         }
@@ -83,7 +83,7 @@ fn verify_type(
             if !matches!(value, Value::Node(_)) {
                 errors.push(format_error(
                     path,
-                    &format!("expected Node, found {}", value_kind_name(value)),
+                    &format!("type: Node, value: {}", value_kind_name(value)),
                 ));
             }
         }
@@ -92,7 +92,7 @@ fn verify_type(
             if !matches!(value, Value::String(_)) {
                 errors.push(format_error(
                     path,
-                    &format!("expected string, found {}", value_kind_name(value)),
+                    &format!("type: string, value: {}", value_kind_name(value)),
                 ));
             }
         }
@@ -101,7 +101,7 @@ fn verify_type(
             if !matches!(value, Value::Node(_)) {
                 errors.push(format_error(
                     path,
-                    &format!("expected Node (alias), found {}", value_kind_name(value)),
+                    &format!("type: Node (alias), value: {}", value_kind_name(value)),
                 ));
             }
         }
@@ -127,7 +127,7 @@ fn verify_type(
                 _ => {
                     errors.push(format_error(
                         path,
-                        &format!("expected array, found {}", value_kind_name(value)),
+                        &format!("type: array, value: {}", value_kind_name(value)),
                     ));
                 }
             }
@@ -140,7 +140,7 @@ fn verify_type(
                     if items.is_empty() {
                         errors.push(format_error(
                             path,
-                            "expected non-empty array, found empty array",
+                            "type: non-empty array, value: empty array",
                         ));
                     }
                     for (i, item) in items.iter().enumerate() {
@@ -153,7 +153,7 @@ fn verify_type(
                 _ => {
                     errors.push(format_error(
                         path,
-                        &format!("expected array, found {}", value_kind_name(value)),
+                        &format!("type: array, value: {}", value_kind_name(value)),
                     ));
                 }
             }
@@ -191,7 +191,7 @@ fn verify_type(
             _ => {
                 errors.push(format_error(
                     path,
-                    &format!("expected object, found {}", value_kind_name(value)),
+                    &format!("type: object, value: {}", value_kind_name(value)),
                 ));
             }
         },
@@ -247,7 +247,7 @@ fn verify_type(
             _ => {
                 errors.push(format_error(
                     path,
-                    &format!("expected tagged union, found {}", value_kind_name(value)),
+                    &format!("type: tagged union, value: {}", value_kind_name(value)),
                 ));
             }
         },
@@ -318,7 +318,7 @@ fn centered_header(label: &str, width: usize) -> String {
 #[cfg(debug_assertions)]
 fn panic_with_mismatch(
     value: &Value,
-    expected_type: TypeId,
+    declared_type: TypeId,
     errors: &[String],
     module: &Module,
     colors: Colors,
@@ -333,7 +333,7 @@ fn panic_with_mismatch(
     let type_name = (0..entrypoints.len())
         .find_map(|i| {
             let e = entrypoints.get(i);
-            if e.result_type == expected_type {
+            if e.result_type == declared_type {
                 Some(strings.get(e.name))
             } else {
                 None
@@ -357,7 +357,7 @@ fn panic_with_mismatch(
 
     panic!(
         "\n{separator}\n\
-         TYPE MISMATCH: Query output does not match declared type\n\
+         BUG: Type and value do not match\n\
          {separator}\n\n\
          {type_str}\n\
          {output_header}\n\n\
