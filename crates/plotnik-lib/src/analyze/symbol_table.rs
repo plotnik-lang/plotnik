@@ -135,11 +135,11 @@ pub fn resolve_names(
     symbol_table
 }
 
-struct ReferenceResolver<'q, 'd, 't> {
+struct ReferenceResolver<'q, 'd, 'a> {
     src: &'q str,
     source_id: SourceId,
     diag: &'d mut Diagnostics,
-    symbol_table: &'t mut SymbolTable,
+    symbol_table: &'a mut SymbolTable,
 }
 
 impl Visitor for ReferenceResolver<'_, '_, '_> {
@@ -172,10 +172,10 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
     }
 }
 
-struct ReferenceValidator<'d, 't> {
+struct ReferenceValidator<'d, 'a> {
     source_id: SourceId,
     diag: &'d mut Diagnostics,
-    symbol_table: &'t SymbolTable,
+    symbol_table: &'a SymbolTable,
 }
 
 impl Visitor for ReferenceValidator<'_, '_> {

@@ -6,7 +6,7 @@
 
 # Documentation
 
-[docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Binary Format](docs/binary-format/01-overview.md)
+[docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Tree Navigation](docs/tree-navigation.md) | [Binary Format](docs/binary-format/01-overview.md)
 
 # Query Syntax Quick Reference
 
@@ -22,7 +22,7 @@
 | `@x :: T`           | Type annotation                |
 | `@x :: string`      | Extract node text              |
 | `field: pattern`    | Field constraint               |
-| `!field`            | Negated field (assert absent)  |
+| `-field`            | Negated field (assert absent)  |
 | `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)      |
 | `??` `*?` `+?`      | Non-greedy variants            |
 | `.`                 | Anchor (adjacency, see below)  |
@@ -146,7 +146,7 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 crates/
   plotnik-cli/         # CLI tool
     src/commands/      # Subcommands (ast, check, dump, exec, infer, trace, langs)
-  plotnik-core/        # Common code (Interner, Symbol)
+  plotnik-core/        # Node type database (NodeTypes, StaticNodeTypes) and string interning (Interner, Symbol)
   plotnik-lib/         # Plotnik as library
     src/
       analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)

@@ -13,14 +13,14 @@ pub trait Materializer<'t> {
 }
 
 /// Materializer that produces Value with resolved strings.
-pub struct ValueMaterializer<'ctx> {
-    source: &'ctx str,
-    types: TypesView<'ctx>,
-    strings: StringsView<'ctx>,
+pub struct ValueMaterializer<'a> {
+    source: &'a str,
+    types: TypesView<'a>,
+    strings: StringsView<'a>,
 }
 
-impl<'ctx> ValueMaterializer<'ctx> {
-    pub fn new(source: &'ctx str, types: TypesView<'ctx>, strings: StringsView<'ctx>) -> Self {
+impl<'a> ValueMaterializer<'a> {
+    pub fn new(source: &'a str, types: TypesView<'a>, strings: StringsView<'a>) -> Self {
         Self {
             source,
             types,
