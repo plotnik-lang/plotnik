@@ -42,7 +42,7 @@ Test:
   10   ε                                    28, 20
   12   ε   [EndArr Set(M0)]                 14
   14   △                                    19
-  15   ▷   (b) [Push]                       17
+  15   ▷   (b) [Node Push]                  17
   17   ε                                    34, 12
   19                                        ▶
   20   ε   [EndArr Set(M0)]                 19
