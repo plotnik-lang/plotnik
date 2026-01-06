@@ -85,8 +85,10 @@ impl Compiler<'_> {
             .and_then(|i| i.as_expr())
             .is_some_and(is_skippable_quantifier);
 
-        // With items: nav → items → Up → exit
+        // With items: nav → items → Up → [post_effects] → exit
         // If first item is skippable: skip path → exit (bypass Up), match path → Up → exit
+        let final_exit = self.emit_post_effects_exit(exit, capture.post);
+
         let up_label = self.fresh_label();
         let skip_exit = first_is_skippable.then_some(exit);
         let items_entry = self.compile_seq_items_inner(
@@ -106,10 +108,10 @@ impl Compiler<'_> {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![exit],
+            successors: vec![final_exit],
         }));
 
-        // Emit entry instruction into the node (capture effects go here at match time)
+        // Emit entry instruction into the node (only pre_effects here)
         self.instructions.push(Instruction::Match(MatchIR {
             label: entry,
             nav,
@@ -117,7 +119,7 @@ impl Compiler<'_> {
             node_field: None,
             pre_effects: capture.pre,
             neg_fields,
-            post_effects: capture.post,
+            post_effects: vec![],
             successors: vec![items_entry],
         }));
 
@@ -151,7 +153,9 @@ impl Compiler<'_> {
         up_nav: Nav,
         capture: CaptureEffects,
     ) -> Label {
-        // up_check: Match(up_nav) → exit
+        let final_exit = self.emit_post_effects_exit(exit, capture.post);
+
+        // up_check: Match(up_nav) → final_exit
         let up_check = self.fresh_label();
         self.instructions.push(Instruction::Match(MatchIR {
             label: up_check,
@@ -161,7 +165,7 @@ impl Compiler<'_> {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
-            successors: vec![exit],
+            successors: vec![final_exit],
         }));
 
         // body: items with StayExact navigation → up_check
@@ -193,7 +197,7 @@ impl Compiler<'_> {
         let down_wildcard = self.fresh_label();
         self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
 
-        // entry: match parent node → down_wildcard
+        // entry: match parent node → down_wildcard (only pre_effects here)
         self.instructions.push(Instruction::Match(MatchIR {
             label: entry,
             nav,
@@ -201,11 +205,24 @@ impl Compiler<'_> {
             node_field: None,
             pre_effects: capture.pre,
             neg_fields,
-            post_effects: capture.post,
+            post_effects: vec![],
             successors: vec![down_wildcard],
         }));
 
         entry
+    }
+
+    /// Emit post-effects on an epsilon step after the exit label.
+    ///
+    /// Post-effects (like EndEnum) must execute AFTER children complete, not after
+    /// matching the parent node. This helper creates an epsilon step for the effects
+    /// when needed, or returns the original exit if no effects.
+    fn emit_post_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
+        if post.is_empty() {
+            exit
+        } else {
+            self.emit_effects_epsilon(exit, post, CaptureEffects::default())
+        }
     }
 
     /// Compile an anonymous node with capture effects.

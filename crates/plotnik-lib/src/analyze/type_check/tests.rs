@@ -735,6 +735,42 @@ fn recursive_type_in_quantified_context() {
 }
 
 #[test]
+fn recursive_type_uncaptured_propagates() {
+    // Regression test: Q = (Rec) should inherit Rec's enum type, not infer as void.
+    // The recursive definition Rec is a tagged alternation, so its type propagates
+    // through the uncaptured reference.
+    let input = indoc! {r#"
+    Rec = [A: (program (expression_statement (Rec) @inner)) B: (identifier) @id]
+    Q = (Rec)
+    "#};
+
+    let res = Query::expect_valid_types(input);
+
+    // Q should have type Rec (aliased to the enum)
+    insta::assert_snapshot!(res, @r#"
+    export interface Node {
+      kind: string;
+      text: string;
+      span: [number, number];
+    }
+
+    export interface RecA {
+      $tag: "A";
+      $data: { inner: Rec };
+    }
+
+    export interface RecB {
+      $tag: "B";
+      $data: { id: Node };
+    }
+
+    export type Rec = RecA | RecB;
+
+    export type Q = Rec;
+    "#);
+}
+
+#[test]
 fn scalar_propagates_through_named_node() {
     let input = indoc! {r#"
     A = [X: (identifier) @x Y: (number) @y]

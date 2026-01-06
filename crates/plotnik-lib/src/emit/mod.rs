@@ -458,7 +458,13 @@ impl TypeTableBuilder {
     }
 
     /// Resolve a query TypeId to bytecode QTypeId.
-    fn resolve_type(&self, type_id: TypeId, type_ctx: &TypeContext) -> Result<QTypeId, EmitError> {
+    ///
+    /// Handles Ref types by following the reference chain to the actual type.
+    pub fn resolve_type(
+        &self,
+        type_id: TypeId,
+        type_ctx: &TypeContext,
+    ) -> Result<QTypeId, EmitError> {
         // Check if already mapped
         if let Some(&bc_id) = self.mapping.get(&type_id) {
             return Ok(bc_id);
@@ -804,7 +810,7 @@ fn emit_inner(
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
         let name = strings.get_or_intern(name_sym, interner)?;
-        let result_type = types.get(type_id).expect("all def types should be mapped");
+        let result_type = types.resolve_type(type_id, type_ctx)?;
 
         // Get actual target from compiled result
         let target = compile_result

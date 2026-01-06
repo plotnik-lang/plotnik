@@ -56,11 +56,12 @@ _ObjWrap:
 
 Expr:
   06   ε                                    07
-  07   ε                                    13, 19
+  07   ε                                    13, 21
   09   ε   [Set(M2)]                        11
-  11   △                                    12
+  11   △                                    16
   12                                        ▶
   13   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  12
-  16   ▷   arguments: (Expr)                06 : 09
-  17   ▽   function: (identifier) [Node Set(M1)]  16
-  19   !   [Enum(M4)] (call_expression) [EndEnum]  17
+  16   ε   [EndEnum]                        12
+  18   ▷   arguments: (Expr)                06 : 09
+  19   ▽   function: (identifier) [Node Set(M1)]  18
+  21   !   [Enum(M4)] (call_expression)     19
