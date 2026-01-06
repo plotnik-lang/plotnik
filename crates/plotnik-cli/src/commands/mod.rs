@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod check;
 pub mod dump;
 pub mod exec;
@@ -7,7 +8,6 @@ pub mod langs;
 pub mod query_loader;
 pub mod run_common;
 pub mod trace;
-pub mod tree;
 
 #[cfg(test)]
 mod langs_tests;

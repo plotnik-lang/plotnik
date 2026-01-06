@@ -36,13 +36,18 @@ fn with_hidden_trace_args(cmd: Command) -> Command {
         .arg(fuel_arg().hide(true))
 }
 
+/// Add hidden AST args (for commands that don't show AST).
+fn with_hidden_ast_args(cmd: Command) -> Command {
+    cmd.arg(raw_arg().hide(true))
+}
+
 /// Build the complete CLI with all subcommands.
 pub fn build_cli() -> Command {
     Command::new("plotnik")
         .about("Query language for tree-sitter AST with type inference")
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(tree_command())
+        .subcommand(ast_command())
         .subcommand(check_command())
         .subcommand(dump_command())
         .subcommand(infer_command())
@@ -51,26 +56,39 @@ pub fn build_cli() -> Command {
         .subcommand(langs_command())
 }
 
-/// Explore a source file's tree-sitter AST.
-pub fn tree_command() -> Command {
-    Command::new("tree")
-        .about("Explore a source file's tree-sitter AST")
+/// Show AST of query and/or source file.
+///
+/// Accepts all runtime flags for unified CLI experience.
+/// Shows query AST when query is provided, source AST when source is provided.
+pub fn ast_command() -> Command {
+    let cmd = Command::new("ast")
+        .about("Show AST of query and/or source file")
         .override_usage(
             "\
-  plotnik tree <SOURCE>
-  plotnik tree -s <TEXT> -l <LANG>",
+  plotnik ast <QUERY> [SOURCE]
+  plotnik ast -q <TEXT> [SOURCE]
+  plotnik ast <SOURCE>
+  plotnik ast -s <TEXT> -l <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik tree app.ts                 # source file
-  plotnik tree app.ts --raw           # include anonymous nodes
-  plotnik tree -s 'let x = 1' -l js   # inline source"#,
+  plotnik ast query.ptk               # query AST
+  plotnik ast app.ts                  # source AST (tree-sitter)
+  plotnik ast query.ptk app.ts        # both ASTs
+  plotnik ast query.ptk app.ts --raw  # CST / include anonymous nodes
+  plotnik ast -q '(id) @x'            # inline query AST
+  plotnik ast -s 'let x = 1' -l js    # inline source AST"#,
         )
+        .arg(query_path_arg())
         .arg(source_path_arg())
+        .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
         .arg(raw_arg())
-        .arg(spans_arg())
+        .arg(color_arg());
+
+    // Hidden unified flags
+    with_hidden_trace_args(with_hidden_exec_args(cmd))
 }
 
 /// Validate a query.
@@ -100,7 +118,9 @@ pub fn check_command() -> Command {
         .arg(color_arg());
 
     // Hidden unified flags
-    with_hidden_trace_args(with_hidden_exec_args(with_hidden_source_args(cmd)))
+    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args(
+        with_hidden_source_args(cmd),
+    )))
 }
 
 /// Show compiled bytecode.
@@ -128,7 +148,9 @@ pub fn dump_command() -> Command {
         .arg(color_arg());
 
     // Hidden unified flags
-    with_hidden_trace_args(with_hidden_exec_args(with_hidden_source_args(cmd)))
+    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args(
+        with_hidden_source_args(cmd),
+    )))
 }
 
 /// Generate type definitions from a query.
@@ -163,7 +185,9 @@ NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#,
         .arg(color_arg());
 
     // Hidden unified flags (use partial exec args since --verbose-nodes is visible)
-    with_hidden_trace_args(with_hidden_exec_args_partial(with_hidden_source_args(cmd)))
+    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args_partial(
+        with_hidden_source_args(cmd),
+    )))
 }
 
 /// Execute a query against source code and output JSON.
@@ -196,7 +220,7 @@ pub fn exec_command() -> Command {
         .arg(entry_arg());
 
     // Hidden unified flags
-    with_hidden_trace_args(cmd)
+    with_hidden_ast_args(with_hidden_trace_args(cmd))
 }
 
 /// Trace query execution for debugging.
@@ -229,9 +253,11 @@ pub fn trace_command() -> Command {
         .arg(fuel_arg());
 
     // Hidden unified flags (exec output flags only - entry is visible for trace)
-    cmd.arg(compact_arg().hide(true))
-        .arg(verbose_nodes_arg().hide(true))
-        .arg(check_arg().hide(true))
+    with_hidden_ast_args(
+        cmd.arg(compact_arg().hide(true))
+            .arg(verbose_nodes_arg().hide(true))
+            .arg(check_arg().hide(true)),
+    )
 }
 
 /// List supported languages.

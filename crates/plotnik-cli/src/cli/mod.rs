@@ -7,7 +7,7 @@ mod dispatch_tests;
 
 pub use commands::build_cli;
 pub use dispatch::{
-    CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams, TreeParams,
+    AstParams, CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams,
 };
 
 /// Color output mode for CLI commands.

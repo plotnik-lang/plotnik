@@ -145,7 +145,7 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 ```
 crates/
   plotnik-cli/         # CLI tool
-    src/commands/      # Subcommands (check, dump, exec, infer, trace, tree, langs)
+    src/commands/      # Subcommands (ast, check, dump, exec, infer, trace, langs)
   plotnik-core/        # Common code (Interner, Symbol)
   plotnik-lib/         # Plotnik as library
     src/
@@ -172,7 +172,7 @@ Run: `cargo run -p plotnik-cli -- <command>`
 
 | Command | Purpose                       |
 | ------- | ----------------------------- |
-| `tree`  | Explore tree-sitter AST       |
+| `ast`   | Show AST of query and/or source |
 | `check` | Validate query                |
 | `dump`  | Show compiled bytecode        |
 | `infer` | Generate TypeScript types     |
@@ -180,14 +180,15 @@ Run: `cargo run -p plotnik-cli -- <command>`
 | `trace` | Trace execution for debugging |
 | `langs` | List supported languages      |
 
-## tree
+## ast
 
-Explore a source file's tree-sitter AST.
+Show AST of query and/or source file.
 
 ```sh
-cargo run -p plotnik-cli -- tree app.ts
-cargo run -p plotnik-cli -- tree app.ts --raw
-cargo run -p plotnik-cli -- tree app.ts --spans
+cargo run -p plotnik-cli -- ast query.ptk               # query AST
+cargo run -p plotnik-cli -- ast app.ts                  # source AST (tree-sitter)
+cargo run -p plotnik-cli -- ast query.ptk app.ts        # both ASTs
+cargo run -p plotnik-cli -- ast query.ptk app.ts --raw  # CST / include anonymous nodes
 ```
 
 ## check
@@ -275,6 +276,7 @@ cargo run -p plotnik-cli -- langs
 - Early exit (`return`, `continue`, `break`) over deep nesting
 - Comments for seniors, not juniors
 - Rust 2024 `let` chains: `if let Some(x) = a && let Some(y) = b { ... }`
+- Never claim "all tests pass" — CI verifies this
 
 ## Lifetime Conventions
 
