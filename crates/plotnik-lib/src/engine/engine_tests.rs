@@ -529,23 +529,3 @@ fn wildcard_named_skips_anonymous() {
 fn wildcard_bare_matches_anonymous() {
     snap!("Q = (program (return_statement _ @x))", "return 42");
 }
-
-/// Empty captured sequence should produce empty struct, not null or panic.
-/// Regression test for: type inference treating `{ }` as Node instead of empty struct.
-#[test]
-fn regression_empty_captured_sequence() {
-    snap!(
-        "Q = (program (expression_statement (identifier) @id { } @empty))",
-        "x"
-    );
-}
-
-/// Optional empty captured sequence should produce empty struct when matched.
-/// Regression test for: `{ }? @maybe` producing null instead of `{}`.
-#[test]
-fn regression_optional_empty_captured_sequence() {
-    snap!(
-        "Q = (program (expression_statement (identifier) @id { }? @maybe))",
-        "x"
-    );
-}

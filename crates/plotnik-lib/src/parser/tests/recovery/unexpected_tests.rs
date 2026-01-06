@@ -351,6 +351,13 @@ fn alternation_recovery_to_capture() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r"
+    error: empty `[]` is not allowed
+      |
+    1 | [^^^ @name]
+      | ^^^^^^^^^^^
+      |
+    help: alternations must contain at least one branch
+
     error: unexpected token
       |
     1 | [^^^ @name]

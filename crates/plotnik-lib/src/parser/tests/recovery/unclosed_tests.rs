@@ -121,7 +121,7 @@ fn empty_parens() {
     error: empty `()` is not allowed
       |
     1 | ()
-      | ^
+      | ^^
       |
     help: use `(_)` to match any named node, or `_` for any node
     ");
