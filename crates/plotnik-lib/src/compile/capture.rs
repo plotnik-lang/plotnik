@@ -92,17 +92,35 @@ impl Compiler<'_> {
 
     /// Check if a quantifier body needs Node effect before Push.
     ///
-    /// For scalar array elements (simple named nodes, not structs/enums/refs),
-    /// we need [Node, Push] to capture the matched node value.
-    /// For structured elements, EndObj/EndEnum/Call already provides the value.
+    /// For scalar array elements (Node/String types), we need [Node/Text, Push]
+    /// to capture the matched node value.
+    /// For structured elements (Struct/Enum), EndObj/EndEnum provides the value.
+    /// For refs returning structured types, Call provides the value.
     pub(super) fn quantifier_needs_node_for_push(&self, expr: &Expr) -> bool {
-        if let Expr::QuantifiedExpr(quant) = expr
-            && let Some(body) = quant.inner()
-        {
-            !inner_creates_scope(&body) && !self.is_ref_returning_structured(&body)
-        } else {
-            true
+        let Expr::QuantifiedExpr(quant) = expr else {
+            return true;
+        };
+        let Some(inner) = quant.inner() else {
+            return true;
+        };
+
+        // Refs returning structured types don't need Node
+        if self.is_ref_returning_structured(&inner) {
+            return false;
         }
+
+        // Check the actual inferred type, not syntax
+        let Some(info) = self.type_ctx.get_term_info(&inner) else {
+            return true;
+        };
+
+        // If type is Struct or Enum, EndObj/EndEnum produces the value
+        // Otherwise (Node, String, Void, etc.), we need Node effect
+        !info
+            .flow
+            .type_id()
+            .and_then(|id| self.type_ctx.get_type(id))
+            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
     }
 
     /// Check if expr is (or wraps) a ref returning a structured type.
@@ -174,24 +192,27 @@ fn unwrap_field_value(expr: &Expr) -> Option<Expr> {
 
 /// Check if inner needs struct wrapper for array iterations.
 ///
-/// Returns true when inner is a scope-creating expression (sequence/alternation)
-/// that produces an untagged struct (not an enum). Enums use Enum/EndEnum instead.
+/// Returns true when the inner expression produces a Struct type (bubbling fields).
+/// This includes:
+/// - Sequences/alternations with captures: `{(a) @x (b) @y}*`
+/// - Named nodes with bubble captures: `(node (child) @x)*`
+///
+/// Enums use Enum/EndEnum instead (handled separately).
 pub fn check_needs_struct_wrapper(inner: &Expr, type_ctx: &TypeContext) -> bool {
-    let inner_info = type_ctx.get_term_info(inner);
-    let inner_creates_scope = inner_creates_scope(inner);
-    let inner_is_untagged_bubble = inner_info.as_ref().is_some_and(|info| {
-        if !info.flow.is_bubble() {
-            return false;
-        }
-        let Some(type_id) = info.flow.type_id() else {
-            return false;
-        };
-        let Some(shape) = type_ctx.get_type(type_id) else {
-            return false;
-        };
-        matches!(shape, TypeShape::Struct(_))
-    });
-    inner_is_untagged_bubble && inner_creates_scope
+    let Some(info) = type_ctx.get_term_info(inner) else {
+        return false;
+    };
+
+    // Must be a bubble (fields flow to parent scope)
+    if !info.flow.is_bubble() {
+        return false;
+    }
+
+    // Check the actual type - if it's a Struct, we need Obj/EndObj wrapper
+    info.flow
+        .type_id()
+        .and_then(|id| type_ctx.get_type(id))
+        .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)))
 }
 
 /// Get row type ID for array element scoping.
