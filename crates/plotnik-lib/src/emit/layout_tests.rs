@@ -2,7 +2,7 @@ use std::num::NonZeroU16;
 
 use super::layout::CacheAligned;
 use crate::bytecode::Nav;
-use crate::bytecode::ir::{CallIR, EffectIR, Label, MatchIR, ReturnIR};
+use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, ReturnIR};
 
 #[test]
 fn layout_empty() {

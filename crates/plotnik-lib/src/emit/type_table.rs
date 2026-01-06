@@ -1,6 +1,6 @@
 //! Type table builder for bytecode emission.
 //!
-//! Converts query-level types (TypeContext) into bytecode-level types (QTypeId).
+//! Converts query-level types (TypeContext) into bytecode-level types (BytecodeTypeId).
 
 use std::collections::{HashMap, HashSet};
 
@@ -9,16 +9,16 @@ use plotnik_core::{Interner, Symbol};
 use crate::analyze::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
-use crate::bytecode::{QTypeId, StringId, TypeDef, TypeMember, TypeName};
+use crate::bytecode::{StringId, TypeDef, TypeId as BytecodeTypeId, TypeMember, TypeName};
 use crate::type_system::TypeKind;
 
 use super::{EmitError, StringTableBuilder};
 
-/// Builds the type metadata, remapping query TypeIds to bytecode QTypeIds.
+/// Builds the type metadata, remapping query TypeIds to bytecode BytecodeTypeIds.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Map from query TypeId to bytecode QTypeId.
-    mapping: HashMap<TypeId, QTypeId>,
+    /// Map from query TypeId to bytecode BytecodeTypeId.
+    mapping: HashMap<TypeId, BytecodeTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
     /// Type members for structs/enums (4 bytes each).
@@ -26,11 +26,11 @@ pub struct TypeTableBuilder {
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeName>,
     /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
-    optional_wrappers: HashMap<QTypeId, QTypeId>,
-    /// Cache for deduplicated members: (StringId, QTypeId) -> member_index.
+    optional_wrappers: HashMap<BytecodeTypeId, BytecodeTypeId>,
+    /// Cache for deduplicated members: (StringId, BytecodeTypeId) -> member_index.
     /// Same (name, type) pair → same member index globally.
     /// This enables call-site scoping where uncaptured refs share the caller's scope.
-    member_cache: HashMap<(StringId, QTypeId), u16>,
+    member_cache: HashMap<(StringId, BytecodeTypeId), u16>,
 }
 
 impl TypeTableBuilder {
@@ -95,7 +95,7 @@ impl TypeTableBuilder {
         ];
         for (i, &(builtin_id, kind)) in builtin_types.iter().enumerate() {
             if used_builtins[i] {
-                let bc_id = QTypeId(self.type_defs.len() as u16);
+                let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
                 self.mapping.insert(builtin_id, bc_id);
                 self.type_defs.push(TypeDef {
                     data: 0,
@@ -105,9 +105,9 @@ impl TypeTableBuilder {
             }
         }
 
-        // Phase 2: Pre-assign QTypeIds for custom types and reserve slots
+        // Phase 2: Pre-assign BytecodeTypeIds for custom types and reserve slots
         for &type_id in &ordered_types {
-            let bc_id = QTypeId(self.type_defs.len() as u16);
+            let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
             self.mapping.insert(type_id, bc_id);
             self.type_defs.push(TypeDef {
                 data: 0,
@@ -131,7 +131,11 @@ impl TypeTableBuilder {
         for (def_id, type_id) in type_ctx.iter_def_types() {
             let name_sym = type_ctx.def_name_sym(def_id);
             let name = strings.get_or_intern(name_sym, interner)?;
-            let bc_type_id = self.mapping.get(&type_id).copied().unwrap_or(QTypeId(0));
+            let bc_type_id = self
+                .mapping
+                .get(&type_id)
+                .copied()
+                .unwrap_or(BytecodeTypeId(0));
             self.type_names.push(TypeName {
                 name,
                 type_id: bc_type_id,
@@ -171,7 +175,7 @@ impl TypeTableBuilder {
 
             TypeShape::Custom(sym) => {
                 // Custom type annotation: @x :: Identifier → type Identifier = Node
-                let bc_type_id = QTypeId(slot_index as u16);
+                let bc_type_id = BytecodeTypeId(slot_index as u16);
 
                 // Add TypeName entry for the custom type
                 let name = strings.get_or_intern(*sym, interner)?;
@@ -181,7 +185,11 @@ impl TypeTableBuilder {
                 });
 
                 // Custom types alias Node - look up Node's actual bytecode ID
-                let node_bc_id = self.mapping.get(&TYPE_NODE).copied().unwrap_or(QTypeId(0));
+                let node_bc_id = self
+                    .mapping
+                    .get(&TYPE_NODE)
+                    .copied()
+                    .unwrap_or(BytecodeTypeId(0));
                 self.type_defs[slot_index] = TypeDef {
                     data: node_bc_id.0,
                     count: 0,
@@ -278,14 +286,14 @@ impl TypeTableBuilder {
         }
     }
 
-    /// Resolve a query TypeId to bytecode QTypeId.
+    /// Resolve a query TypeId to bytecode BytecodeTypeId.
     ///
     /// Handles Ref types by following the reference chain to the actual type.
     pub fn resolve_type(
         &self,
         type_id: TypeId,
         type_ctx: &TypeContext,
-    ) -> Result<QTypeId, EmitError> {
+    ) -> Result<BytecodeTypeId, EmitError> {
         // Check if already mapped
         if let Some(&bc_id) = self.mapping.get(&type_id) {
             return Ok(bc_id);
@@ -300,7 +308,7 @@ impl TypeTableBuilder {
         }
 
         // If not found, default to first type (should not happen for well-formed types)
-        Ok(QTypeId(0))
+        Ok(BytecodeTypeId(0))
     }
 
     /// Resolve a field's type, handling optionality.
@@ -308,7 +316,7 @@ impl TypeTableBuilder {
         &mut self,
         field_info: &FieldInfo,
         type_ctx: &TypeContext,
-    ) -> Result<QTypeId, EmitError> {
+    ) -> Result<BytecodeTypeId, EmitError> {
         let base_type = self.resolve_type(field_info.type_id, type_ctx)?;
 
         // If the field is optional, wrap it in Optional
@@ -320,14 +328,17 @@ impl TypeTableBuilder {
     }
 
     /// Get or create an Optional wrapper for a base type.
-    fn get_or_create_optional(&mut self, base_type: QTypeId) -> Result<QTypeId, EmitError> {
+    fn get_or_create_optional(
+        &mut self,
+        base_type: BytecodeTypeId,
+    ) -> Result<BytecodeTypeId, EmitError> {
         // Check cache first
         if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
             return Ok(optional_id);
         }
 
         // Create new Optional wrapper at the next available index
-        let optional_id = QTypeId(self.type_defs.len() as u16);
+        let optional_id = BytecodeTypeId(self.type_defs.len() as u16);
 
         self.type_defs.push(TypeDef {
             data: base_type.0,
@@ -350,8 +361,8 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Get the bytecode QTypeId for a query TypeId.
-    pub fn get(&self, type_id: TypeId) -> Option<QTypeId> {
+    /// Get the bytecode BytecodeTypeId for a query TypeId.
+    pub fn get(&self, type_id: TypeId) -> Option<BytecodeTypeId> {
         self.mapping.get(&type_id).copied()
     }
 

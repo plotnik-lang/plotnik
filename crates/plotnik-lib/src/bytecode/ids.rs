@@ -28,4 +28,4 @@ impl StringId {
 /// All types (including builtins) are stored sequentially in TypeDefs.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 #[repr(transparent)]
-pub struct QTypeId(pub u16);
+pub struct TypeId(pub u16);

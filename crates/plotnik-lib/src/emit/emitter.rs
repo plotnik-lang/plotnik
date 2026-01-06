@@ -7,7 +7,7 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{TypeContext, TypeId};
-use crate::bytecode::ir::Label;
+use crate::bytecode::Label;
 use crate::bytecode::{
     Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry, TypeMetaHeader,
 };
@@ -211,8 +211,8 @@ fn pad_to_section(buf: &mut Vec<u8>) {
 
 /// Emit transitions section from instructions and layout.
 fn emit_transitions(
-    instructions: &[crate::bytecode::ir::Instruction],
-    layout: &crate::bytecode::ir::LayoutResult,
+    instructions: &[crate::bytecode::InstructionIR],
+    layout: &crate::bytecode::LayoutResult,
     types: &TypeTableBuilder,
     strings: &StringTableBuilder,
 ) -> Vec<u8> {

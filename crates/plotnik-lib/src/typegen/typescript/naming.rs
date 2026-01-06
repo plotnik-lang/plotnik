@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use plotnik_core::utils::to_pascal_case;
 
-use crate::bytecode::{QTypeId, TypeKind};
+use crate::bytecode::{TypeId, TypeKind};
 
 use super::Emitter;
 
@@ -17,7 +17,7 @@ pub(super) struct NamingContext {
 impl Emitter<'_> {
     pub(super) fn assign_generated_names(&mut self) {
         // Collect naming contexts from entrypoints → fields
-        let mut contexts: HashMap<QTypeId, NamingContext> = HashMap::new();
+        let mut contexts: HashMap<TypeId, NamingContext> = HashMap::new();
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
@@ -34,7 +34,7 @@ impl Emitter<'_> {
 
         // Assign names to types that need them
         for i in 0..self.types.defs_count() {
-            let type_id = QTypeId(i as u16);
+            let type_id = TypeId(i as u16);
             if self.type_names.contains_key(&type_id) {
                 continue;
             }
@@ -55,9 +55,9 @@ impl Emitter<'_> {
 
     fn collect_naming_contexts(
         &self,
-        type_id: QTypeId,
+        type_id: TypeId,
         ctx: &NamingContext,
-        contexts: &mut HashMap<QTypeId, NamingContext>,
+        contexts: &mut HashMap<TypeId, NamingContext>,
     ) {
         if contexts.contains_key(&type_id) {
             return;
@@ -89,7 +89,7 @@ impl Emitter<'_> {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
             }
             TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.collect_naming_contexts(QTypeId(type_def.data), ctx, contexts);
+                self.collect_naming_contexts(TypeId(type_def.data), ctx, contexts);
             }
         }
     }

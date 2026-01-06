@@ -9,7 +9,7 @@ use crate::colors::Colors;
 
 use super::NAMED_WILDCARD;
 use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, width_for_count};
-use super::ids::QTypeId;
+use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
 use super::type_meta::TypeKind;
@@ -217,15 +217,15 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
             }
             TypeKind::Optional => {
-                let inner_name = format_type_name(QTypeId(def.data), module, ctx);
+                let inner_name = format_type_name(TypeId(def.data), module, ctx);
                 format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
             }
             TypeKind::ArrayZeroOrMore => {
-                let inner_name = format_type_name(QTypeId(def.data), module, ctx);
+                let inner_name = format_type_name(TypeId(def.data), module, ctx);
                 format!("{}  ; {}*{}", c.dim, inner_name, c.reset)
             }
             TypeKind::ArrayOneOrMore => {
-                let inner_name = format_type_name(QTypeId(def.data), module, ctx);
+                let inner_name = format_type_name(TypeId(def.data), module, ctx);
                 format!("{}  ; {}+{}", c.dim, inner_name, c.reset)
             }
             TypeKind::Alias => String::new(),
@@ -282,7 +282,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
 }
 
 /// Format a type ID as a human-readable name.
-fn format_type_name(type_id: QTypeId, module: &Module, ctx: &DumpContext) -> String {
+fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> String {
     let types = module.types();
     let strings = module.strings();
 

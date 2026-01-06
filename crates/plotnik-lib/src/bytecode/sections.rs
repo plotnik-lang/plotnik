@@ -5,7 +5,7 @@ use super::ids::StringId;
 /// Range into an array: [ptr..ptr+len).
 ///
 /// Dual-use depending on context:
-/// - For `TypeDef` wrappers (Optional, Array*): `ptr` is inner `QTypeId`, `len` is 0.
+/// - For `TypeDef` wrappers (Optional, Array*): `ptr` is inner `TypeId`, `len` is 0.
 /// - For `TypeDef` composites (Struct, Enum): `ptr` is index into TypeMember array, `len` is count.
 #[derive(Clone, Copy, Debug, Default)]
 #[repr(C)]

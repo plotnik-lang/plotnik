@@ -1,7 +1,7 @@
 //! Entrypoint section types.
 
 use super::instructions::StepAddr;
-use super::{QTypeId, StringId};
+use super::{StringId, TypeId};
 
 /// Named query definition entry point (8 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,7 +12,7 @@ pub struct Entrypoint {
     /// Starting instruction address.
     pub target: StepAddr,
     /// Result type.
-    pub result_type: QTypeId,
+    pub result_type: TypeId,
     pub(crate) _pad: u16,
 }
 

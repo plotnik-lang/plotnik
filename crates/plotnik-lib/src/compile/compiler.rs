@@ -6,7 +6,7 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
 use crate::bytecode::Nav;
-use crate::bytecode::ir::{Instruction, Label, ReturnIR, TrampolineIR};
+use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::emit::StringTableBuilder;
 use crate::parser::ast::Expr;
 
@@ -22,7 +22,7 @@ pub struct Compiler<'a> {
     pub(super) strings: &'a mut StringTableBuilder,
     pub(super) node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
     pub(super) node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
-    pub(super) instructions: Vec<Instruction>,
+    pub(super) instructions: Vec<InstructionIR>,
     next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.

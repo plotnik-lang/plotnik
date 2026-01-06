@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use plotnik_core::Symbol;
 
 use crate::analyze::type_check::{TypeId, TypeShape};
-use crate::bytecode::ir::{EffectIR, Label, MemberRef};
+use crate::bytecode::{EffectIR, Label, MemberRef};
 use crate::bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
 

@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::ir::{Instruction, Label, LayoutResult};
+use crate::bytecode::{InstructionIR, Label, LayoutResult};
 
 const CACHE_LINE: usize = 64;
 const STEP_SIZE: usize = 8;
@@ -19,7 +19,7 @@ struct Graph {
 }
 
 impl Graph {
-    fn build(instructions: &[Instruction]) -> Self {
+    fn build(instructions: &[InstructionIR]) -> Self {
         let mut successors: BTreeMap<Label, Vec<Label>> = BTreeMap::new();
         let mut predecessors: BTreeMap<Label, Vec<Label>> = BTreeMap::new();
 
@@ -58,7 +58,7 @@ impl CacheAligned {
     /// Compute layout for instructions with given entry points.
     ///
     /// Returns mapping from labels to step IDs and total step count.
-    pub fn layout(instructions: &[Instruction], entries: &[Label]) -> LayoutResult {
+    pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutResult {
         if instructions.is_empty() {
             return LayoutResult {
                 label_to_step: BTreeMap::new(),
@@ -67,7 +67,7 @@ impl CacheAligned {
         }
 
         let graph = Graph::build(instructions);
-        let label_to_instr: BTreeMap<Label, &Instruction> =
+        let label_to_instr: BTreeMap<Label, &InstructionIR> =
             instructions.iter().map(|i| (i.label(), i)).collect();
 
         let chains = extract_chains(&graph, instructions, entries);
@@ -80,7 +80,7 @@ impl CacheAligned {
 /// Extract linear chains from the control flow graph.
 fn extract_chains(
     graph: &Graph,
-    instructions: &[Instruction],
+    instructions: &[InstructionIR],
     entries: &[Label],
 ) -> Vec<Vec<Label>> {
     let mut visited = HashSet::new();
@@ -150,7 +150,7 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
 /// Assign step IDs with cache line awareness.
 fn assign_step_ids(
     chains: Vec<Vec<Label>>,
-    label_to_instr: &BTreeMap<Label, &Instruction>,
+    label_to_instr: &BTreeMap<Label, &InstructionIR>,
 ) -> LayoutResult {
     let mut mapping = BTreeMap::new();
 

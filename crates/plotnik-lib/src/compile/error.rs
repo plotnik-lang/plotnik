@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 
 use crate::analyze::type_check::DefId;
-use crate::bytecode::ir::{Instruction, Label};
+use crate::bytecode::{InstructionIR, Label};
 
 /// Error during compilation.
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ impl std::error::Error for CompileError {}
 #[derive(Clone, Debug)]
 pub struct CompileResult {
     /// All generated instructions.
-    pub instructions: Vec<Instruction>,
+    pub instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub def_entries: IndexMap<DefId, Label>,
     /// Entry label for the universal preamble.

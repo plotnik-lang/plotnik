@@ -10,7 +10,7 @@ mod format;
 mod header;
 mod ids;
 mod instructions;
-pub mod ir;
+mod ir;
 mod module;
 mod nav;
 mod sections;
@@ -20,7 +20,7 @@ pub use constants::{
     MAGIC, MAX_MATCH_PAYLOAD_SLOTS, NAMED_WILDCARD, SECTION_ALIGN, STEP_SIZE, VERSION,
 };
 
-pub use ids::{QTypeId, StringId};
+pub use ids::{StringId, TypeId};
 
 pub use header::{Header, flags};
 
@@ -51,7 +51,14 @@ pub use format::{
     truncate_text, width_for_count,
 };
 
+pub use ir::{
+    CallIR, EffectIR, InstructionIR, Label, LayoutResult, MatchIR, MemberRef, ReturnIR,
+    TrampolineIR,
+};
+
 #[cfg(test)]
 mod instructions_tests;
+#[cfg(test)]
+mod ir_tests;
 #[cfg(test)]
 mod module_tests;

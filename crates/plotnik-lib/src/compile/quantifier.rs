@@ -8,7 +8,7 @@
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::Nav;
-use crate::bytecode::ir::{EffectIR, Label};
+use crate::bytecode::{EffectIR, Label};
 use crate::parser::ast::{self, Expr};
 use crate::parser::cst::SyntaxKind;
 
