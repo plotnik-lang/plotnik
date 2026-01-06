@@ -9,13 +9,15 @@ use crate::bytecode::{
 };
 
 /// Get the nav for continue_search (always a sibling move).
+/// Up/Stay variants return Next as a default since they don't do sibling search.
 fn continuation_nav(nav: Nav) -> Nav {
     match nav {
         Nav::Down | Nav::Next => Nav::Next,
         Nav::DownSkip | Nav::NextSkip => Nav::NextSkip,
         Nav::DownExact | Nav::NextExact => Nav::NextExact,
-        // Up/Stay don't have search loops
-        _ => Nav::Next,
+        Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) | Nav::Stay | Nav::StayExact => {
+            Nav::Next
+        }
     }
 }
 
@@ -24,13 +26,13 @@ use super::cursor::{CursorWrapper, SkipPolicy};
 
 /// Derive skip policy from navigation mode without navigating.
 /// Used when retrying a Call to determine the policy for the next checkpoint.
+/// Stay/Up variants return None since they don't retry among siblings.
 fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
     match nav {
         Nav::Down | Nav::Next => Some(SkipPolicy::Any),
         Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
         Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
-        // Stay doesn't navigate, Up doesn't retry among siblings
-        _ => None,
+        Nav::Stay | Nav::StayExact | Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => None,
     }
 }
 use super::effect::{EffectLog, RuntimeEffect};
@@ -462,7 +464,10 @@ impl<'t> VM<'t> {
                 return;
             }
             SuppressEnd => {
-                self.suppress_depth = self.suppress_depth.saturating_sub(1);
+                self.suppress_depth = self
+                    .suppress_depth
+                    .checked_sub(1)
+                    .expect("SuppressEnd without matching SuppressBegin");
                 tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
                 return;
             }
