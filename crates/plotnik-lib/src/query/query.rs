@@ -6,11 +6,11 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use plotnik_langs::Lang;
 
 use crate::Diagnostics;
-use crate::analyze::dependencies;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{validate_alt_kinds, validate_anchors};
+use crate::analyze::{dependencies, validate_recursion};
 use crate::parser::{Parser, Root, SyntaxNode, lexer::lex};
 use crate::query::source_map::{SourceId, SourceMap};
 
@@ -110,7 +110,7 @@ impl QueryParsed {
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
-        dependencies::validate_recursion(
+        validate_recursion(
             &dependency_analysis,
             &self.ast_map,
             &symbol_table,

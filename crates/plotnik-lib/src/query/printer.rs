@@ -167,7 +167,7 @@ impl<'q> QueryPrinter<'q> {
         visited.insert(name.to_string());
 
         if let Some(body) = self.query.symbol_table.get(name) {
-            let refs_set = crate::analyze::refs::collect_ref_names(body);
+            let refs_set = crate::analyze::refs::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
