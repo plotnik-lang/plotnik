@@ -1,0 +1,49 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = (identifier)+? @items
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "items"
+S2 "Test"
+S3 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayPlus(T0)  ; <Node>+
+T2 = Struct  M0:1  ; { items }
+
+[type_members]
+M0: S1 → T1  ; items: T1
+
+[type_names]
+N0: S2 → T2  ; Test
+
+[entrypoints]
+Test = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   ε   [Arr]                            09
+  09   !                                    18
+  10   !   (identifier) [Node Push]         12
+  12   ε                                    15, 25
+  14                                        ▶
+  15   ε   [EndArr Set(M0)]                 14
+  17   ▷                                    18
+  18   ε                                    17, 10
+  20   ▷                                    23
+  21   ε                                    15, 20
+  23   ε                                    21, 10
+  25   ▷                                    23

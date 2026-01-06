@@ -1,0 +1,38 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = (MISSING) @m
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "m"
+S2 "Test"
+S3 "MISSING"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { m }
+
+[type_members]
+M0: S1 → T0  ; m: <Node>
+
+[type_names]
+N0: S2 → T1  ; Test
+
+[entrypoints]
+Test = 6 :: T1
+
+[transitions]
+_ObjWrap:
+  0   ε   [Obj]                             2
+  2       Trampoline                        3
+  3   ε   [EndObj]                          5
+  5                                         ▶
+
+Test:
+  6   ε                                     7
+  7   !   (MISSING) [Node Set(M0)]          9
+  9                                         ▶

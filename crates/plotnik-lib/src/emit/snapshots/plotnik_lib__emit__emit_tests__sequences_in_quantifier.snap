@@ -1,0 +1,57 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = (parent {(a) (b)}* @items)
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "items"
+S2 "Test"
+S3 "parent"
+S4 "b"
+S5 "a"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { items }
+
+[type_members]
+M0: S1 → T1  ; items: T1
+
+[type_names]
+N0: S2 → T2  ; Test
+
+[entrypoints]
+Test = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   !   (parent)                         08
+  08   ε   [Arr]                            10
+  10   ε                                    28, 20
+  12   ε   [EndArr Set(M0)]                 14
+  14   △                                    19
+  15   ▷   (b) [Node Push]                  17
+  17   ε                                    34, 12
+  19                                        ▶
+  20   ε   [EndArr Set(M0)]                 19
+  22   !   (a)                              15
+  23   ▷                                    26
+  24   ε                                    23, 20
+  26   ε                                    22, 24
+  28   ▽                                    26
+  29   ▷                                    32
+  30   ε                                    29, 12
+  32   ε                                    22, 30
+  34   ▷                                    32

@@ -1,0 +1,58 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = {{(identifier) @id} @inner}? @outer
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "inner"
+S3 "outer"
+S4 "Test"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+T2 = Struct  M1:1  ; { inner }
+T3 = Struct  M2:1  ; { outer }
+T4 = Struct  M3:1  ; { inner }
+T5 = Optional(T1)  ; T1?
+T6 = Optional(T2)  ; T2?
+
+[type_members]
+M0: S1 → T0  ; id: <Node>
+M1: S2 → T5  ; inner: T5
+M2: S3 → T6  ; outer: T6
+M3: S2 → T1  ; inner: T1
+
+[type_names]
+N0: S4 → T3  ; Test
+
+[entrypoints]
+Test = 06 :: T3
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   ε   [Obj]                            09
+  09   ε                                    27, 20
+  11                                        ▶
+  12   ε   [EndObj Set(M2)]                 11
+  14   ε   [EndObj Set(M1)]                 12
+  16   !   (identifier) [Node Set(M0)]      14
+  18   ε   [Obj]                            16
+  20   ε   [Null Set(M1)]                   12
+  22   ▷                                    25
+  23   ε                                    22, 20
+  25   ε                                    18, 23
+  27   !                                    25

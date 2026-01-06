@@ -1,0 +1,41 @@
+---
+source: crates/plotnik-lib/src/emit/emit_tests.rs
+---
+Test = (binary_expression "+" @op)
+---
+[flags]
+linked = false
+
+[strings]
+S0 "Beauty will save the world"
+S1 "op"
+S2 "Test"
+S3 "binary_expression"
+S4 "+"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { op }
+
+[type_members]
+M0: S1 → T0  ; op: <Node>
+
+[type_names]
+N0: S2 → T1  ; Test
+
+[entrypoints]
+Test = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   !   (binary_expression)              08
+  08   ▽   (+) [Node Set(M0)]               10
+  10   △                                    11
+  11                                        ▶
