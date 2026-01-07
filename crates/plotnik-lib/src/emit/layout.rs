@@ -60,10 +60,7 @@ impl CacheAligned {
     /// Returns mapping from labels to step IDs and total step count.
     pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutResult {
         if instructions.is_empty() {
-            return LayoutResult {
-                label_to_step: BTreeMap::new(),
-                total_steps: 0,
-            };
+            return LayoutResult::empty();
         }
 
         let graph = Graph::build(instructions);
@@ -183,8 +180,5 @@ fn assign_step_ids(
         }
     }
 
-    LayoutResult {
-        label_to_step: mapping,
-        total_steps: current_step,
-    }
+    LayoutResult::new(mapping, current_step)
 }

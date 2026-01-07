@@ -7,12 +7,7 @@ fn type_meta_header_size() {
 
 #[test]
 fn type_meta_header_roundtrip() {
-    let header = TypeMetaHeader {
-        type_defs_count: 42,
-        type_members_count: 100,
-        type_names_count: 5,
-        ..Default::default()
-    };
+    let header = TypeMetaHeader::new(42, 100, 5);
     let bytes = header.to_bytes();
     let decoded = TypeMetaHeader::from_bytes(&bytes);
     assert_eq!(decoded, header);

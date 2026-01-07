@@ -206,10 +206,7 @@ impl EffectIR {
         } else {
             self.payload
         };
-        EffectOp {
-            opcode: self.opcode,
-            payload,
-        }
+        EffectOp::new(self.opcode, payload)
     }
 }
 
@@ -542,14 +539,13 @@ impl CallIR {
 
     /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-        let c = Call {
-            segment: 0,
-            nav: self.nav,
-            node_field: self.node_field,
-            next: StepId::new(self.next.resolve(map)),
-            target: StepId::new(self.target.resolve(map)),
-        };
-        c.to_bytes()
+        Call::new(
+            self.nav,
+            self.node_field,
+            StepId::new(self.next.resolve(map)),
+            StepId::new(self.target.resolve(map)),
+        )
+        .to_bytes()
     }
 }
 
@@ -574,8 +570,7 @@ impl ReturnIR {
 
     /// Serialize to bytecode bytes (no labels to resolve).
     pub fn resolve(&self) -> [u8; 8] {
-        let r = Return { segment: 0 };
-        r.to_bytes()
+        Return::new().to_bytes()
     }
 }
 
@@ -605,11 +600,7 @@ impl TrampolineIR {
 
     /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-        let t = Trampoline {
-            segment: 0,
-            next: StepId::new(self.next.resolve(map)),
-        };
-        t.to_bytes()
+        Trampoline::new(StepId::new(self.next.resolve(map))).to_bytes()
     }
 }
 
@@ -623,7 +614,32 @@ impl From<TrampolineIR> for InstructionIR {
 #[derive(Clone, Debug)]
 pub struct LayoutResult {
     /// Mapping from symbolic labels to concrete step addresses (raw u16).
-    pub label_to_step: BTreeMap<Label, StepAddr>,
+    pub(crate) label_to_step: BTreeMap<Label, StepAddr>,
     /// Total number of steps (for header).
-    pub total_steps: u16,
+    pub(crate) total_steps: u16,
+}
+
+impl LayoutResult {
+    /// Create a new layout result.
+    pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u16) -> Self {
+        Self {
+            label_to_step,
+            total_steps,
+        }
+    }
+
+    /// Create an empty layout result.
+    pub fn empty() -> Self {
+        Self {
+            label_to_step: BTreeMap::new(),
+            total_steps: 0,
+        }
+    }
+
+    pub fn label_to_step(&self) -> &BTreeMap<Label, StepAddr> {
+        &self.label_to_step
+    }
+    pub fn total_steps(&self) -> u16 {
+        self.total_steps
+    }
 }

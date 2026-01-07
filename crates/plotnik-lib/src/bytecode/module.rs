@@ -11,7 +11,7 @@ use super::header::Header;
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
-use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
+use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
 
 /// Read a little-endian u16 from bytes at the given offset.
@@ -295,10 +295,10 @@ impl<'a> SymbolsView<'a, NodeSymbol> {
     pub fn get(&self, idx: usize) -> NodeSymbol {
         assert!(idx < self.count, "node symbol index out of bounds");
         let offset = idx * 4;
-        NodeSymbol {
-            id: read_u16_le(self.bytes, offset),
-            name: StringId::new(read_u16_le(self.bytes, offset + 2)),
-        }
+        NodeSymbol::new(
+            read_u16_le(self.bytes, offset),
+            StringId::new(read_u16_le(self.bytes, offset + 2)),
+        )
     }
 
     /// Number of entries.
@@ -317,10 +317,10 @@ impl<'a> SymbolsView<'a, FieldSymbol> {
     pub fn get(&self, idx: usize) -> FieldSymbol {
         assert!(idx < self.count, "field symbol index out of bounds");
         let offset = idx * 4;
-        FieldSymbol {
-            id: read_u16_le(self.bytes, offset),
-            name: StringId::new(read_u16_le(self.bytes, offset + 2)),
-        }
+        FieldSymbol::new(
+            read_u16_le(self.bytes, offset),
+            StringId::new(read_u16_le(self.bytes, offset + 2)),
+        )
     }
 
     /// Number of entries.
@@ -344,9 +344,7 @@ impl<'a> TriviaView<'a> {
     /// Get a trivia entry by index.
     pub fn get(&self, idx: usize) -> TriviaEntry {
         assert!(idx < self.count, "trivia index out of bounds");
-        TriviaEntry {
-            node_type: read_u16_le(self.bytes, idx * 2),
-        }
+        TriviaEntry::new(read_u16_le(self.bytes, idx * 2))
     }
 
     /// Number of entries.
@@ -361,7 +359,7 @@ impl<'a> TriviaView<'a> {
 
     /// Check if a node type is trivia.
     pub fn contains(&self, node_type: u16) -> bool {
-        (0..self.count).any(|i| self.get(i).node_type == node_type)
+        (0..self.count).any(|i| self.get(i).node_type() == node_type)
     }
 }
 
@@ -385,11 +383,7 @@ impl<'a> TypesView<'a> {
     pub fn get_def(&self, idx: usize) -> TypeDef {
         assert!(idx < self.defs_count, "type def index out of bounds");
         let offset = idx * 4;
-        TypeDef {
-            data: read_u16_le(self.defs_bytes, offset),
-            count: self.defs_bytes[offset + 2],
-            kind: self.defs_bytes[offset + 3],
-        }
+        TypeDef::from_bytes(&self.defs_bytes[offset..])
     }
 
     /// Get a type definition by TypeId.
@@ -406,20 +400,20 @@ impl<'a> TypesView<'a> {
     pub fn get_member(&self, idx: usize) -> TypeMember {
         assert!(idx < self.members_count, "type member index out of bounds");
         let offset = idx * 4;
-        TypeMember {
-            name: StringId::new(read_u16_le(self.members_bytes, offset)),
-            type_id: TypeId(read_u16_le(self.members_bytes, offset + 2)),
-        }
+        TypeMember::new(
+            StringId::new(read_u16_le(self.members_bytes, offset)),
+            TypeId(read_u16_le(self.members_bytes, offset + 2)),
+        )
     }
 
     /// Get a type name entry by index.
     pub fn get_name(&self, idx: usize) -> TypeName {
         assert!(idx < self.names_count, "type name index out of bounds");
         let offset = idx * 4;
-        TypeName {
-            name: StringId::new(read_u16_le(self.names_bytes, offset)),
-            type_id: TypeId(read_u16_le(self.names_bytes, offset + 2)),
-        }
+        TypeName::new(
+            StringId::new(read_u16_le(self.names_bytes, offset)),
+            TypeId(read_u16_le(self.names_bytes, offset + 2)),
+        )
     }
 
     /// Number of type definitions.
@@ -439,8 +433,14 @@ impl<'a> TypesView<'a> {
 
     /// Iterate over members of a struct or enum type.
     pub fn members_of(&self, def: &TypeDef) -> impl Iterator<Item = TypeMember> + '_ {
-        let start = def.data as usize;
-        let count = def.count as usize;
+        let (start, count) = match def.classify() {
+            TypeData::Composite {
+                member_start,
+                member_count,
+                ..
+            } => (member_start as usize, member_count as usize),
+            _ => (0, 0),
+        };
         (0..count).map(move |i| self.get_member(start + i))
     }
 
@@ -450,10 +450,13 @@ impl<'a> TypesView<'a> {
         let Some(type_def) = self.get(type_id) else {
             return (type_id, false);
         };
-        if !type_def.is_optional() {
-            return (type_id, false);
+        match type_def.classify() {
+            TypeData::Wrapper {
+                kind: TypeKind::Optional,
+                inner,
+            } => (inner, true),
+            _ => (type_id, false),
         }
-        (TypeId(type_def.data), true)
     }
 }
 
@@ -468,12 +471,7 @@ impl<'a> EntrypointsView<'a> {
     pub fn get(&self, idx: usize) -> Entrypoint {
         assert!(idx < self.count, "entrypoint index out of bounds");
         let offset = idx * 8;
-        Entrypoint {
-            name: StringId::new(read_u16_le(self.bytes, offset)),
-            target: read_u16_le(self.bytes, offset + 2),
-            result_type: TypeId(read_u16_le(self.bytes, offset + 4)),
-            _pad: 0,
-        }
+        Entrypoint::from_bytes(&self.bytes[offset..])
     }
 
     /// Number of entrypoints.
@@ -490,6 +488,6 @@ impl<'a> EntrypointsView<'a> {
     pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<Entrypoint> {
         (0..self.count)
             .map(|i| self.get(i))
-            .find(|e| strings.get(e.name) == name)
+            .find(|e| strings.get(e.name()) == name)
     }
 }

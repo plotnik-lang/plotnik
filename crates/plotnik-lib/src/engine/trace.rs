@@ -164,41 +164,72 @@ use std::collections::BTreeMap;
 /// Tracer that collects execution trace for debugging.
 pub struct PrintTracer<'s> {
     /// Source code for extracting node text.
-    source: &'s [u8],
+    pub(crate) source: &'s [u8],
     /// Verbosity level for output filtering.
-    verbosity: Verbosity,
+    pub(crate) verbosity: Verbosity,
     /// Collected trace lines.
-    lines: Vec<String>,
+    pub(crate) lines: Vec<String>,
     /// Line builder for formatting.
-    builder: LineBuilder,
+    pub(crate) builder: LineBuilder,
     /// Maps node type ID to name.
-    node_type_names: BTreeMap<u16, String>,
+    pub(crate) node_type_names: BTreeMap<u16, String>,
     /// Maps node field ID to name.
-    node_field_names: BTreeMap<u16, String>,
+    pub(crate) node_field_names: BTreeMap<u16, String>,
     /// Maps member index to name (for Set/Enum effect display).
-    member_names: Vec<String>,
+    pub(crate) member_names: Vec<String>,
     /// Maps entrypoint target IP to name (for labels and call/return).
-    entrypoint_by_ip: BTreeMap<u16, String>,
+    pub(crate) entrypoint_by_ip: BTreeMap<u16, String>,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
-    checkpoint_ips: Vec<u16>,
+    pub(crate) checkpoint_ips: Vec<u16>,
     /// Stack of definition names (for return display).
-    definition_stack: Vec<String>,
+    pub(crate) definition_stack: Vec<String>,
     /// Pending return instruction IP (for consolidated return line).
-    pending_return_ip: Option<u16>,
+    pub(crate) pending_return_ip: Option<u16>,
     /// Step width for formatting.
-    step_width: usize,
+    pub(crate) step_width: usize,
     /// Color palette.
+    pub(crate) colors: Colors,
+}
+
+/// Builder for `PrintTracer`.
+pub struct PrintTracerBuilder<'s, 'm> {
+    source: &'s str,
+    module: &'m Module,
+    verbosity: Verbosity,
     colors: Colors,
 }
 
-impl<'s> PrintTracer<'s> {
-    pub fn new(source: &'s str, module: &Module, verbosity: Verbosity, colors: Colors) -> Self {
-        let header = module.header();
-        let strings = module.strings();
-        let types = module.types();
-        let node_types = module.node_types();
-        let node_fields = module.node_fields();
-        let entrypoints = module.entrypoints();
+impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
+    /// Create a new builder with required parameters.
+    pub fn new(source: &'s str, module: &'m Module) -> Self {
+        Self {
+            source,
+            module,
+            verbosity: Verbosity::Default,
+            colors: Colors::OFF,
+        }
+    }
+
+    /// Set the verbosity level.
+    pub fn verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
+        self
+    }
+
+    /// Set whether to use colored output.
+    pub fn colored(mut self, enabled: bool) -> Self {
+        self.colors = Colors::new(enabled);
+        self
+    }
+
+    /// Build the PrintTracer.
+    pub fn build(self) -> PrintTracer<'s> {
+        let header = self.module.header();
+        let strings = self.module.strings();
+        let types = self.module.types();
+        let node_types = self.module.node_types();
+        let node_fields = self.module.node_fields();
+        let entrypoints = self.module.entrypoints();
 
         let mut node_type_names = BTreeMap::new();
         for i in 0..node_types.len() {
@@ -212,12 +243,12 @@ impl<'s> PrintTracer<'s> {
             node_field_names.insert(f.id, strings.get(f.name).to_string());
         }
 
-        // Build member names lookup (index → name)
+        // Build member names lookup (index -> name)
         let member_names: Vec<String> = (0..types.members_count())
             .map(|i| strings.get(types.get_member(i).name).to_string())
             .collect();
 
-        // Build entrypoint IP → name lookup
+        // Build entrypoint IP -> name lookup
         let mut entrypoint_by_ip = BTreeMap::new();
         for i in 0..entrypoints.len() {
             let e = entrypoints.get(i);
@@ -226,9 +257,9 @@ impl<'s> PrintTracer<'s> {
 
         let step_width = width_for_count(header.transitions_count as usize);
 
-        Self {
-            source: source.as_bytes(),
-            verbosity,
+        PrintTracer {
+            source: self.source.as_bytes(),
+            verbosity: self.verbosity,
             lines: Vec::new(),
             builder: LineBuilder::new(step_width),
             node_type_names,
@@ -239,8 +270,15 @@ impl<'s> PrintTracer<'s> {
             definition_stack: Vec::new(),
             pending_return_ip: None,
             step_width,
-            colors,
+            colors: self.colors,
         }
+    }
+}
+
+impl<'s> PrintTracer<'s> {
+    /// Create a builder for PrintTracer.
+    pub fn builder<'m>(source: &'s str, module: &'m Module) -> PrintTracerBuilder<'s, 'm> {
+        PrintTracerBuilder::new(source, module)
     }
 
     fn node_type_name(&self, id: u16) -> &str {

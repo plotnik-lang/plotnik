@@ -43,9 +43,9 @@ use super::trace::{NoopTracer, Tracer};
 #[derive(Clone, Copy, Debug)]
 pub struct FuelLimits {
     /// Maximum total steps (default: 1,000,000).
-    pub exec_fuel: u32,
+    pub(crate) exec_fuel: u32,
     /// Maximum call depth (default: 1,024).
-    pub recursion_limit: u32,
+    pub(crate) recursion_limit: u32,
 }
 
 impl Default for FuelLimits {
@@ -57,53 +57,148 @@ impl Default for FuelLimits {
     }
 }
 
+impl FuelLimits {
+    /// Create new fuel limits with defaults.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the execution fuel limit.
+    pub fn exec_fuel(mut self, fuel: u32) -> Self {
+        self.exec_fuel = fuel;
+        self
+    }
+
+    /// Set the recursion limit.
+    pub fn recursion_limit(mut self, limit: u32) -> Self {
+        self.recursion_limit = limit;
+        self
+    }
+
+    pub fn get_exec_fuel(&self) -> u32 {
+        self.exec_fuel
+    }
+    pub fn get_recursion_limit(&self) -> u32 {
+        self.recursion_limit
+    }
+}
+
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
-    cursor: CursorWrapper<'t>,
+    pub(crate) cursor: CursorWrapper<'t>,
     /// Current instruction pointer (raw u16, 0 is valid at runtime).
-    ip: u16,
-    frames: FrameArena,
-    checkpoints: CheckpointStack,
-    effects: EffectLog<'t>,
-    matched_node: Option<Node<'t>>,
+    pub(crate) ip: u16,
+    pub(crate) frames: FrameArena,
+    pub(crate) checkpoints: CheckpointStack,
+    pub(crate) effects: EffectLog<'t>,
+    pub(crate) matched_node: Option<Node<'t>>,
 
     // Fuel tracking
-    exec_fuel: u32,
-    recursion_depth: u32,
-    limits: FuelLimits,
+    pub(crate) exec_fuel: u32,
+    pub(crate) recursion_depth: u32,
+    pub(crate) limits: FuelLimits,
 
     /// When true, the next Call instruction should skip navigation (use Stay).
     /// This is set when backtracking to a Call retry checkpoint after advancing
     /// the cursor to a new sibling. The Call's navigation was already done, and
     /// we're now at the correct position for the callee to match.
-    skip_call_nav: bool,
+    pub(crate) skip_call_nav: bool,
 
     /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
     /// Incremented by SuppressBegin, decremented by SuppressEnd.
-    suppress_depth: u16,
+    pub(crate) suppress_depth: u16,
 
     /// Target address for Trampoline instruction.
     /// Set from entrypoint before execution; Trampoline jumps to this address.
-    entrypoint_target: u16,
+    pub(crate) entrypoint_target: u16,
 }
 
-impl<'t> VM<'t> {
-    /// Create a new VM for execution.
-    pub fn new(tree: &'t Tree, trivia_types: Vec<u16>, limits: FuelLimits) -> Self {
+/// Builder for VM instances.
+pub struct VMBuilder<'t> {
+    tree: &'t Tree,
+    trivia_types: Vec<u16>,
+    limits: FuelLimits,
+}
+
+impl<'t> VMBuilder<'t> {
+    /// Create a new VM builder.
+    pub fn new(tree: &'t Tree) -> Self {
         Self {
-            cursor: CursorWrapper::new(tree.walk(), trivia_types),
+            tree,
+            trivia_types: Vec::new(),
+            limits: FuelLimits::default(),
+        }
+    }
+
+    /// Set the trivia types to skip during navigation.
+    pub fn trivia_types(mut self, types: Vec<u16>) -> Self {
+        self.trivia_types = types;
+        self
+    }
+
+    /// Set the fuel limits.
+    pub fn limits(mut self, limits: FuelLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Set the execution fuel limit.
+    pub fn exec_fuel(mut self, fuel: u32) -> Self {
+        self.limits = self.limits.exec_fuel(fuel);
+        self
+    }
+
+    /// Set the recursion limit.
+    pub fn recursion_limit(mut self, limit: u32) -> Self {
+        self.limits = self.limits.recursion_limit(limit);
+        self
+    }
+
+    /// Build the VM.
+    pub fn build(self) -> VM<'t> {
+        VM {
+            cursor: CursorWrapper::new(self.tree.walk(), self.trivia_types),
             ip: 0,
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
             matched_node: None,
-            exec_fuel: limits.exec_fuel,
+            exec_fuel: self.limits.get_exec_fuel(),
             recursion_depth: 0,
-            limits,
+            limits: self.limits,
             skip_call_nav: false,
             suppress_depth: 0,
             entrypoint_target: 0,
         }
+    }
+}
+
+impl<'t> VM<'t> {
+    /// Create a VM builder.
+    pub fn builder(tree: &'t Tree) -> VMBuilder<'t> {
+        VMBuilder::new(tree)
+    }
+
+    /// Create a new VM for execution.
+    #[deprecated(note = "Use VM::builder(tree).trivia_types(...).build() instead")]
+    pub fn new(tree: &'t Tree, trivia_types: Vec<u16>, limits: FuelLimits) -> Self {
+        Self::builder(tree)
+            .trivia_types(trivia_types)
+            .limits(limits)
+            .build()
+    }
+
+    /// Helper for internal checkpoint creation (eliminates duplication).
+    fn create_checkpoint(&self, ip: u16, skip_policy: Option<SkipPolicy>) -> Checkpoint {
+        Checkpoint::new(
+            self.cursor.descendant_index(),
+            self.effects.len(),
+            self.frames.current(),
+            self.recursion_depth,
+            ip,
+            skip_policy,
+            self.suppress_depth,
+        )
     }
 
     /// Execute query from entrypoint, returning effect log.
@@ -252,15 +347,8 @@ impl<'t> VM<'t> {
 
         // Push checkpoints for alternate branches (in reverse order)
         for i in (1..m.succ_count()).rev() {
-            self.checkpoints.push(Checkpoint {
-                descendant_index: self.cursor.descendant_index(),
-                effect_watermark: self.effects.len(),
-                frame_index: self.frames.current(),
-                recursion_depth: self.recursion_depth,
-                ip: m.successor(i).get(),
-                skip_policy: None,
-                suppress_depth: self.suppress_depth,
-            });
+            self.checkpoints
+                .push(self.create_checkpoint(m.successor(i).get(), None));
             tracer.trace_checkpoint_created(self.ip);
         }
 
@@ -288,15 +376,8 @@ impl<'t> VM<'t> {
         if let Some(policy) = skip_policy
             && policy != SkipPolicy::Exact
         {
-            self.checkpoints.push(Checkpoint {
-                descendant_index: self.cursor.descendant_index(),
-                effect_watermark: self.effects.len(),
-                frame_index: self.frames.current(),
-                recursion_depth: self.recursion_depth,
-                ip: self.ip,
-                skip_policy: Some(policy),
-                suppress_depth: self.suppress_depth,
-            });
+            self.checkpoints
+                .push(self.create_checkpoint(self.ip, Some(policy)));
             tracer.trace_checkpoint_created(self.ip);
         }
 

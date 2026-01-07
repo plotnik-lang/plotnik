@@ -9,7 +9,7 @@ use crate::QueryBuilder;
 use crate::bytecode::Module;
 use crate::emit::emit_linked;
 
-use super::{FuelLimits, Materializer, VM, ValueMaterializer};
+use super::{Materializer, VM, ValueMaterializer};
 
 /// Execute a query against source code and return the JSON output.
 fn execute(query: &str, source: &str) -> String {
@@ -33,7 +33,7 @@ fn execute_with_entry(query: &str, source: &str, entry: Option<&str>) -> String 
 
     let tree = lang.parse(source);
     let trivia = build_trivia_types(&module);
-    let vm = VM::new(&tree, trivia, FuelLimits::default());
+    let vm = VM::builder(&tree).trivia_types(trivia).build();
 
     let entrypoint = resolve_entrypoint(&module, entry);
     let effects = vm

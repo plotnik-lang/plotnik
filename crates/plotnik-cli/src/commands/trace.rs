@@ -4,8 +4,7 @@ use std::path::PathBuf;
 
 use plotnik_lib::Colors;
 use plotnik_lib::engine::{
-    FuelLimits, Materializer, PrintTracer, RuntimeError, VM, ValueMaterializer, Verbosity,
-    debug_verify_type,
+    Materializer, PrintTracer, RuntimeError, VM, ValueMaterializer, Verbosity, debug_verify_type,
 };
 
 use super::run_common::{self, PreparedQuery, QueryInput};
@@ -40,13 +39,15 @@ pub fn run(args: TraceArgs) {
         color: args.color,
     });
 
-    let limits = FuelLimits {
-        exec_fuel: args.fuel,
-        ..Default::default()
-    };
-    let vm = VM::new(&tree, trivia_types, limits);
+    let vm = VM::builder(&tree)
+        .trivia_types(trivia_types)
+        .exec_fuel(args.fuel)
+        .build();
     let colors = Colors::new(args.color);
-    let mut tracer = PrintTracer::new(&source_code, &module, args.verbosity, colors);
+    let mut tracer = PrintTracer::builder(&source_code, &module)
+        .verbosity(args.verbosity)
+        .colored(args.color)
+        .build();
 
     let effects = match vm.execute_with(&module, 0, &entrypoint, &mut tracer) {
         Ok(effects) => {
@@ -70,10 +71,10 @@ pub fn run(args: TraceArgs) {
 
     println!("{}---{}", colors.dim, colors.reset);
     let materializer = ValueMaterializer::new(&source_code, module.types(), module.strings());
-    let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);
+    let value = materializer.materialize(effects.as_slice(), entrypoint.result_type());
 
     // Debug-only: verify output matches declared type
-    debug_verify_type(&value, entrypoint.result_type, &module, colors);
+    debug_verify_type(&value, entrypoint.result_type(), &module, colors);
 
     let output = value.format(true, colors);
     println!("{}", output);

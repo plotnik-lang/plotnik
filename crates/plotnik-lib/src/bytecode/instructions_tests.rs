@@ -63,13 +63,12 @@ fn align_to_section_works() {
 
 #[test]
 fn call_roundtrip() {
-    let c = Call {
-        segment: 0,
-        nav: Nav::Down,
-        node_field: NonZeroU16::new(42),
-        next: StepId::new(100),
-        target: StepId::new(500),
-    };
+    let c = Call::new(
+        Nav::Down,
+        NonZeroU16::new(42),
+        StepId::new(100),
+        StepId::new(500),
+    );
 
     let bytes = c.to_bytes();
     let decoded = Call::from_bytes(bytes);
@@ -78,7 +77,7 @@ fn call_roundtrip() {
 
 #[test]
 fn return_roundtrip() {
-    let r = Return { segment: 0 };
+    let r = Return::new();
 
     let bytes = r.to_bytes();
     let decoded = Return::from_bytes(bytes);
