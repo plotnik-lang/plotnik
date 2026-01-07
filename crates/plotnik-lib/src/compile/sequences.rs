@@ -259,14 +259,8 @@ impl Compiler<'_> {
                     EffectIR::start_enum()
                 };
 
-                // Build capture effects: Enum as pre, EndEnum + outer as post
-                let mut post_effects = vec![EffectIR::end_enum()];
-                post_effects.extend(capture.post.iter().cloned());
-
-                let branch_capture = CaptureEffects {
-                    pre: vec![e_effect],
-                    post: post_effects,
-                };
+                // Build capture effects: nest Enum/EndEnum inside outer effects
+                let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
 
                 // Compile body with merged effects - no separate epsilon wrappers needed
                 let body_entry = self.with_scope(payload_type_id, |this| {
@@ -300,13 +294,7 @@ impl Compiler<'_> {
                     };
 
                 // Merge null injection with outer capture effects
-                let mut pre = null_effects;
-                pre.extend(capture.pre.iter().cloned());
-
-                let branch_capture = CaptureEffects {
-                    pre,
-                    post: capture.post.clone(),
-                };
+                let branch_capture = capture.clone().with_pre_values(null_effects);
 
                 let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, branch_capture);
                 successors.push(branch_entry);

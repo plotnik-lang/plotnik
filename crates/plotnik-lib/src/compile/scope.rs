@@ -127,10 +127,7 @@ impl Compiler<'_> {
             };
 
             // Compile inner with capture_effects on the match instruction
-            let inner_capture = CaptureEffects {
-                pre: outer_capture.pre,
-                post: capture_effects,
-            };
+            let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
             return self.compile_expr_inner(inner, actual_exit, nav_override, inner_capture);
         }
 
@@ -146,10 +143,7 @@ impl Compiler<'_> {
 
         // Compile inner WITH capture_effects on the match instruction
         // Note: pre effects don't propagate through Obj/EndObj scope wrapper
-        let inner_capture = CaptureEffects {
-            pre: vec![],
-            post: capture_effects,
-        };
+        let inner_capture = CaptureEffects::new_post(capture_effects);
         let inner_entry = self.with_scope(scope_type_id.unwrap(), |this| {
             this.compile_expr_inner(inner, endobj_step, nav_override, inner_capture)
         });
@@ -186,9 +180,8 @@ impl Compiler<'_> {
                 .into(),
         );
 
-        let push_effects = CaptureEffects {
-            pre: vec![],
-            post: if self.quantifier_needs_node_for_push(inner) {
+        let push_effects =
+            CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
                 // Use Text if the capture has `:: string` annotation, else Node
                 let node_eff = if use_text_for_elements {
                     EffectIR::text()
@@ -198,8 +191,7 @@ impl Compiler<'_> {
                 vec![node_eff, EffectIR::push()]
             } else {
                 vec![EffectIR::push()]
-            },
-        };
+            });
         let inner_entry = if let Expr::QuantifiedExpr(quant) = inner {
             self.compile_quantified_for_array(quant, endarr_step, nav_override, push_effects)
         } else {

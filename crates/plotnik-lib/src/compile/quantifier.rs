@@ -192,11 +192,7 @@ impl Compiler<'_> {
 
             // Non-array capture: build capture effects and recurse
             let capture_effects = self.build_capture_effects(cap, Some(&inner));
-            let mut combined = CaptureEffects {
-                pre: capture.pre.clone(),
-                post: capture_effects,
-            };
-            combined.post.extend(capture.post);
+            let combined = capture.clone().with_post_values(capture_effects);
 
             return self.compile_skippable_with_exits(
                 &inner,
@@ -259,9 +255,8 @@ impl Compiler<'_> {
         let match_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
         let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
 
-        let push_effects = CaptureEffects {
-            pre: vec![],
-            post: if self.quantifier_needs_node_for_push(inner) {
+        let push_effects =
+            CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
                 let node_eff = if cap.has_string_annotation() {
                     EffectIR::text()
                 } else {
@@ -270,8 +265,7 @@ impl Compiler<'_> {
                 vec![node_eff, EffectIR::push()]
             } else {
                 vec![EffectIR::push()]
-            },
-        };
+            });
         let inner_entry = self.compile_star_for_array_with_exits(
             inner,
             match_endarr,
