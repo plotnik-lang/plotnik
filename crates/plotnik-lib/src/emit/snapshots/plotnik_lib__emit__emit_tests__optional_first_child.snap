@@ -44,14 +44,15 @@ _ObjWrap:
 Test:
   06   ε                                    07
   07   !   (program)                        08
-  08   ε                                    24, 15
+  08   ε                                    26, 15
   10                                        ▶
-  11   ▽   (number) [Node Set(M1)]          25
-  13   ▷   (number) [Node Set(M1)]          25
+  11   ▽   (number) [Node Set(M1)]          27
+  13   ▷   (number) [Node Set(M1)]          27
   15   ε   [Null Set(M0)]                   11
   17   !   (identifier) [Node Set(M0)]      13
-  19   ▷   _                                22
-  20   ε                                    19, 15
-  22   ε                                    17, 20
-  24   ▽   _                                22
-  25   △   _                                10
+  19   ε   [Null Set(M0)]                   13
+  21   ▷   _                                24
+  22   ε                                    21, 19
+  24   ε                                    17, 22
+  26   ▽   _                                24
+  27   △   _                                10

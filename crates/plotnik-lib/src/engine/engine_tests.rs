@@ -634,3 +634,41 @@ fn regression_nested_quantifiers_struct_captures_mixed() {
         "class Empty { } class One { foo() {} } class Two { bar() {} baz() {} }"
     );
 }
+
+/// BUG #9: Childless nodes with inner quantifiers caused outer quantifier to miss matches.
+///
+/// For `(identifier (_)* @items)` inside a star quantifier, if `identifier` has zero
+/// children at runtime (tree-sitter identifiers are terminal nodes with no children),
+/// the Down navigation fails. The skip path should NOT execute Up since we never
+/// descended, but currently it does, causing the cursor to ascend one level too high.
+///
+/// This breaks the outer quantifier's iteration: after processing the first match,
+/// the cursor is at the grandparent level instead of sibling level, so Next fails.
+///
+/// Fix: When Down fails immediately (childless node), the skip path should bypass
+/// the Up instruction. Only execute Up when we actually descended into children.
+#[test]
+fn regression_childless_node_with_inner_star() {
+    snap!(
+        indoc! {r#"
+            Q = (program {(expression_statement
+                (identifier (_)* @items) @id
+            ) @stmt}* @stmts)
+        "#},
+        "foo; bar; baz"
+    );
+}
+
+/// Same bug with optional quantifier instead of star.
+/// `(identifier (_)? @item)` should also handle childless nodes correctly.
+#[test]
+fn regression_childless_node_with_inner_optional() {
+    snap!(
+        indoc! {r#"
+            Q = (program {(expression_statement
+                (identifier (_)? @item) @id
+            ) @stmt}* @stmts)
+        "#},
+        "foo; bar; baz"
+    );
+}

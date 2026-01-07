@@ -53,22 +53,23 @@ Test:
   06   ε                                    07
   07   !   (object)                         08
   08   ε   [Arr]                            10
-  10   ε                                    37, 12
+  10   ε                                    39, 20
   12   ε   [EndArr Set(M5)]                 14
   14   △   _                                19
   15   ε   [EndObj Push]                    17
-  17   ε                                    43, 12
+  17   ε                                    45, 12
   19                                        ▶
-  20   ε   [Set(M4)]                        15
-  22   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum]  20
-  25   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum]  20
-  28   ε                                    22, 25
-  30   ε   [Obj]                            28
-  32   ▷   _                                35
-  33   ε                                    32, 12
-  35   ε                                    30, 33
-  37   ▽   _                                35
-  38   ▷   _                                41
-  39   ε                                    38, 12
-  41   ε                                    30, 39
-  43   ▷   _                                41
+  20   ε   [EndArr Set(M5)]                 19
+  22   ε   [Set(M4)]                        15
+  24   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum]  22
+  27   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum]  22
+  30   ε                                    24, 27
+  32   ε   [Obj]                            30
+  34   ▷   _                                37
+  35   ε                                    34, 12
+  37   ε                                    32, 35
+  39   ▽   _                                37
+  40   ▷   _                                43
+  41   ε                                    40, 12
+  43   ε                                    32, 41
+  45   ▷   _                                43
