@@ -1,0 +1,129 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program {(class_declaration
+    name: (identifier) @name
+    body: (class_body {(method_definition
+        name: (property_identifier) @method_name
+    ) @method}* @methods)
+) @class}* @classes)
+---
+class Empty { } class One { foo() {} } class Two { bar() {} baz() {} }
+---
+{
+  "classes": [
+    {
+      "class": {
+        "kind": "class_declaration",
+        "text": "class Empty { }",
+        "span": [
+          0,
+          15
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "Empty",
+        "span": [
+          6,
+          11
+        ]
+      },
+      "methods": []
+    },
+    {
+      "class": {
+        "kind": "class_declaration",
+        "text": "class One { foo() {} }",
+        "span": [
+          16,
+          38
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "One",
+        "span": [
+          22,
+          25
+        ]
+      },
+      "methods": [
+        {
+          "method": {
+            "kind": "method_definition",
+            "text": "foo() {}",
+            "span": [
+              28,
+              36
+            ]
+          },
+          "method_name": {
+            "kind": "property_identifier",
+            "text": "foo",
+            "span": [
+              28,
+              31
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "class": {
+        "kind": "class_declaration",
+        "text": "class Two { bar() {} baz() {} }",
+        "span": [
+          39,
+          70
+        ]
+      },
+      "name": {
+        "kind": "identifier",
+        "text": "Two",
+        "span": [
+          45,
+          48
+        ]
+      },
+      "methods": [
+        {
+          "method": {
+            "kind": "method_definition",
+            "text": "bar() {}",
+            "span": [
+              51,
+              59
+            ]
+          },
+          "method_name": {
+            "kind": "property_identifier",
+            "text": "bar",
+            "span": [
+              51,
+              54
+            ]
+          }
+        },
+        {
+          "method": {
+            "kind": "method_definition",
+            "text": "baz() {}",
+            "span": [
+              60,
+              68
+            ]
+          },
+          "method_name": {
+            "kind": "property_identifier",
+            "text": "baz",
+            "span": [
+              60,
+              63
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

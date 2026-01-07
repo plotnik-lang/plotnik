@@ -1,0 +1,44 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program {(class_declaration
+    body: (class_body (method_definition)* @methods)
+) @class}* @classes)
+---
+class A { } class B { foo() {} }
+---
+{
+  "classes": [
+    {
+      "class": {
+        "kind": "class_declaration",
+        "text": "class A { }",
+        "span": [
+          0,
+          11
+        ]
+      },
+      "methods": []
+    },
+    {
+      "class": {
+        "kind": "class_declaration",
+        "text": "class B { foo() {} }",
+        "span": [
+          12,
+          32
+        ]
+      },
+      "methods": [
+        {
+          "kind": "method_definition",
+          "text": "foo() {}",
+          "span": [
+            22,
+            30
+          ]
+        }
+      ]
+    }
+  ]
+}

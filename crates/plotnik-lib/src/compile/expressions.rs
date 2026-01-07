@@ -17,8 +17,7 @@ use crate::parser::ast::{self, Expr};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{
-    check_trailing_anchor, inner_creates_scope, is_skippable_quantifier,
-    is_star_or_plus_quantifier, is_truly_empty_scope,
+    check_trailing_anchor, inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope,
 };
 
 impl Compiler<'_> {
@@ -73,39 +72,52 @@ impl Compiler<'_> {
             );
         }
 
-        // Check if first item is skippable - its skip path should bypass the Up.
-        // When a zero-match quantifier (? or *) is the first child with Down navigation,
-        // the skip path never descends, so executing Up would ascend too far.
-        let first_is_skippable = items
-            .first()
-            .and_then(|i| i.as_expr())
-            .is_some_and(is_skippable_quantifier);
+        // Split capture.post: Node/Text effects (and their Set) go on entry (need matched_node
+        // right after match), other effects go on final_exit (after children processing).
+        // Node/Text capture effects use matched_node which is only valid immediately after the match,
+        // before descending into children (which may clobber matched_node via backtracking).
+        use crate::bytecode::EffectOpcode;
 
-        // With items: nav → items → Up → [post_effects] → exit
-        // If first item is skippable: skip path → exit (bypass Up), match path → Up → exit
-        let final_exit = self.emit_post_effects_exit(exit, capture.post);
+        // Find Node/Text effects and their following Set effects (they come in pairs: Node Set)
+        let mut entry_effects = Vec::new();
+        let mut exit_effects = Vec::new();
+        let mut iter = capture.post.into_iter().peekable();
+        while let Some(eff) = iter.next() {
+            if matches!(eff.opcode, EffectOpcode::Node | EffectOpcode::Text) {
+                entry_effects.push(eff);
+                // Take the following Set if present (Node/Text are always followed by Set)
+                if iter.peek().is_some_and(|e| e.opcode == EffectOpcode::Set) {
+                    entry_effects.push(iter.next().unwrap());
+                }
+            } else {
+                exit_effects.push(eff);
+            }
+        }
+
+        // With items: nav[entry_effects] → items → Up → [exit_effects] → exit
+        let final_exit = self.emit_post_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
-        let skip_exit = first_is_skippable.then_some(exit);
         let items_entry = self.compile_seq_items_inner(
             &items,
             up_label,
             true,
             None,
             CaptureEffects::default(),
-            skip_exit,
+            None, // No skip_exit bypass - all paths need Up
         );
 
         self.instructions
             .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
 
-        // Emit entry instruction into the node (only pre_effects here)
+        // Emit entry instruction with node_effects on post (executes right after match)
         self.emit_match_with_cascade(
             MatchIR::epsilon(entry, items_entry)
                 .nav(nav)
                 .node_type(node_type)
                 .neg_fields(neg_fields)
-                .pre_effects(capture.pre),
+                .pre_effects(capture.pre)
+                .post_effects(entry_effects),
         );
 
         entry

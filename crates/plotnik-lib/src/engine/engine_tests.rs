@@ -573,3 +573,64 @@ fn regression_unlabeled_alternation_8_branches_captures() {
         "42"
     );
 }
+
+/// BUG #7: Node capture on named node with children captured wrong target.
+///
+/// For `(class_declaration body: (class_body ...)) @class`, the @class capture
+/// was capturing `class_body` instead of `class_declaration`. This happened because
+/// Node/Text capture effects were placed on the exit (after children processing),
+/// but matched_node gets clobbered by child matches and backtracking.
+///
+/// Fix: Split Node/Text effects to entry match's post_effects, where matched_node
+/// is still valid from the parent match.
+#[test]
+fn regression_node_capture_on_parent_with_children() {
+    snap!(
+        indoc! {r#"
+            Q = (program (class_declaration
+                body: (class_body (method_definition)* @methods)
+            ) @class)
+        "#},
+        "class A { foo() {} }"
+    );
+}
+
+/// BUG #8: Nested quantifiers with empty inner array found only first outer match.
+///
+/// For `{ (class_declaration ...) @class }* @classes` with multiple classes where
+/// some have empty method arrays, only the first class was captured. The skip path
+/// (zero matches on inner array) was bypassing an Up navigation, leaving the cursor
+/// at the wrong level for the outer loop.
+///
+/// Fix: Remove skip_exit bypass - all paths through children must go through Up,
+/// because even "skip" paths descend to check for matches before backtracking.
+#[test]
+fn regression_nested_quantifiers_empty_inner_array() {
+    snap!(
+        indoc! {r#"
+            Q = (program {(class_declaration
+                body: (class_body (method_definition)* @methods)
+            ) @class}* @classes)
+        "#},
+        "class A { } class B { foo() {} }"
+    );
+}
+
+/// Combined regression test: nested quantifiers with struct captures and mixed empty/non-empty.
+///
+/// This exercises both bugs together: Node capture must capture class_declaration (not class_body),
+/// and all classes must be found regardless of whether their method arrays are empty.
+#[test]
+fn regression_nested_quantifiers_struct_captures_mixed() {
+    snap!(
+        indoc! {r#"
+            Q = (program {(class_declaration
+                name: (identifier) @name
+                body: (class_body {(method_definition
+                    name: (property_identifier) @method_name
+                ) @method}* @methods)
+            ) @class}* @classes)
+        "#},
+        "class Empty { } class One { foo() {} } class Two { bar() {} baz() {} }"
+    );
+}
