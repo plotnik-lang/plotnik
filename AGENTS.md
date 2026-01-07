@@ -36,8 +36,8 @@
 - Captures are flat by default: nesting in pattern ≠ nesting in output
 - `{...} @x` or `[...] @x` creates a nested scope
 - Scalar list (no internal captures): `(x)* @a` → `a: T[]`
-- Row list (with internal captures): `{(x) @x}* @rows` → `rows: { x: T }[]`
-- **Strict dimensionality**: `*`/`+` with internal captures requires row capture
+- Row list (with internal captures): `(x @y)* @rows` → `rows: { y: T }[]`
+- **Strict dimensionality**: `*`/`+` with internal captures requires row capture on the quantifier
 
 ## Alternations
 
@@ -111,14 +111,16 @@ Rule: anchor is as strict as its strictest operand.
 
 ## Type System Rules
 
-**Strict dimensionality**: Quantifiers with internal captures require explicit row capture:
+**Strict dimensionality**: Quantifiers with internal captures require a row capture on the quantifier:
 
 ```
-{(a) @a (b) @b}*          ; ERROR: internal captures, no row capture
-{(a) @a (b) @b}* @rows    ; OK: rows: { a: Node, b: Node }[]
-(func (id) @name)*        ; ERROR: internal capture without row
-{(func (id) @name) @f}* @funcs  ; OK: funcs: { f: Node, name: Node }[]
+(func (id) @name)*              ; ERROR: no row capture
+(func (id) @name)* @funcs       ; OK: funcs: { name: Node }[]
+{(a) @a (b) @b}*                ; ERROR: no row capture
+{(a) @a (b) @b}* @rows          ; OK: rows: { a: Node, b: Node }[]
 ```
+
+Note: `{}` is for grouping siblings into a sequence, not for satisfying dimensionality.
 
 **Optional bubbling**: `?` does NOT require row capture (no dimensionality added):
 
@@ -170,15 +172,15 @@ docs/
 
 Run: `cargo run -p plotnik -- <command>`
 
-| Command | Purpose                       |
-| ------- | ----------------------------- |
+| Command | Purpose                         |
+| ------- | ------------------------------- |
 | `ast`   | Show AST of query and/or source |
-| `check` | Validate query                |
-| `dump`  | Show compiled bytecode        |
-| `infer` | Generate TypeScript types     |
-| `exec`  | Execute query, output JSON    |
-| `trace` | Trace execution for debugging |
-| `langs` | List supported languages      |
+| `check` | Validate query                  |
+| `dump`  | Show compiled bytecode          |
+| `infer` | Generate TypeScript types       |
+| `exec`  | Execute query, output JSON      |
+| `trace` | Trace execution for debugging   |
+| `langs` | List supported languages        |
 
 ## ast
 
