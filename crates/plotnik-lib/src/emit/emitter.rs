@@ -79,10 +79,7 @@ fn emit_inner(
     if let Some(ids) = node_type_ids {
         for (&sym, &node_id) in ids {
             let name = strings.get_or_intern(sym, interner)?;
-            node_symbols.push(NodeSymbol {
-                id: node_id.get(),
-                name,
-            });
+            node_symbols.push(NodeSymbol::new(node_id.get(), name));
         }
     }
 
@@ -91,10 +88,7 @@ fn emit_inner(
     if let Some(ids) = node_field_ids {
         for (&sym, &field_id) in ids {
             let name = strings.get_or_intern(sym, interner)?;
-            field_symbols.push(FieldSymbol {
-                id: field_id.get(),
-                name,
-            });
+            field_symbols.push(FieldSymbol::new(field_id.get(), name));
         }
     }
 
@@ -109,16 +103,11 @@ fn emit_inner(
         let target = compile_result
             .def_entries
             .get(&def_id)
-            .and_then(|label| layout.label_to_step.get(label))
+            .and_then(|label| layout.label_to_step().get(label))
             .copied()
             .expect("entrypoint must have compiled target");
 
-        entrypoints.push(Entrypoint {
-            name,
-            target,
-            result_type,
-            _pad: 0,
-        });
+        entrypoints.push(Entrypoint::new(name, target, result_type));
     }
 
     // Validate counts
@@ -156,12 +145,11 @@ fn emit_inner(
     // Type metadata section (header + 3 aligned sub-sections)
     let type_meta_offset = emit_section(
         &mut output,
-        &TypeMetaHeader {
-            type_defs_count: types.type_defs_count() as u16,
-            type_members_count: types.type_members_count() as u16,
-            type_names_count: types.type_names_count() as u16,
-            _pad: 0,
-        }
+        &TypeMetaHeader::new(
+            types.type_defs_count() as u16,
+            types.type_members_count() as u16,
+            types.type_names_count() as u16,
+        )
         .to_bytes(),
     );
     emit_section(&mut output, &type_defs_bytes);

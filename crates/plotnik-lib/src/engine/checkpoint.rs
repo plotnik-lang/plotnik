@@ -10,21 +10,67 @@ use super::cursor::SkipPolicy;
 #[derive(Clone, Copy, Debug)]
 pub struct Checkpoint {
     /// Cursor position (tree-sitter descendant_index).
-    pub descendant_index: u32,
+    pub(crate) descendant_index: u32,
     /// Effect stream length at checkpoint.
-    pub effect_watermark: usize,
+    pub(crate) effect_watermark: usize,
     /// Frame arena state at checkpoint.
-    pub frame_index: Option<u32>,
+    pub(crate) frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
-    pub recursion_depth: u32,
+    pub(crate) recursion_depth: u32,
     /// Resume point (raw step index).
-    pub ip: u16,
+    pub(crate) ip: u16,
     /// If set, advance cursor before retrying (for Call instruction retry).
     /// When a Call navigates and the callee fails, we need to try the next
     /// sibling. This policy determines how to advance.
-    pub skip_policy: Option<SkipPolicy>,
+    pub(crate) skip_policy: Option<SkipPolicy>,
     /// Suppression depth at checkpoint.
-    pub suppress_depth: u16,
+    pub(crate) suppress_depth: u16,
+}
+
+#[allow(dead_code)] // Getters useful for debugging/tracing
+impl Checkpoint {
+    /// Create a new checkpoint.
+    pub fn new(
+        descendant_index: u32,
+        effect_watermark: usize,
+        frame_index: Option<u32>,
+        recursion_depth: u32,
+        ip: u16,
+        skip_policy: Option<SkipPolicy>,
+        suppress_depth: u16,
+    ) -> Self {
+        Self {
+            descendant_index,
+            effect_watermark,
+            frame_index,
+            recursion_depth,
+            ip,
+            skip_policy,
+            suppress_depth,
+        }
+    }
+
+    pub fn descendant_index(&self) -> u32 {
+        self.descendant_index
+    }
+    pub fn effect_watermark(&self) -> usize {
+        self.effect_watermark
+    }
+    pub fn frame_index(&self) -> Option<u32> {
+        self.frame_index
+    }
+    pub fn recursion_depth(&self) -> u32 {
+        self.recursion_depth
+    }
+    pub fn ip(&self) -> u16 {
+        self.ip
+    }
+    pub fn skip_policy(&self) -> Option<SkipPolicy> {
+        self.skip_policy
+    }
+    pub fn suppress_depth(&self) -> u16 {
+        self.suppress_depth
+    }
 }
 
 /// Stack of checkpoints with O(1) max_frame_ref tracking.

@@ -43,11 +43,16 @@ impl EffectOpcode {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct EffectOp {
-    pub opcode: EffectOpcode,
-    pub payload: usize,
+    pub(crate) opcode: EffectOpcode,
+    pub(crate) payload: usize,
 }
 
 impl EffectOp {
+    /// Create a new effect operation.
+    pub fn new(opcode: EffectOpcode, payload: usize) -> Self {
+        Self { opcode, payload }
+    }
+
     pub fn from_bytes(bytes: [u8; 2]) -> Self {
         let raw = u16::from_le_bytes(bytes);
         let opcode = EffectOpcode::from_u8((raw >> 10) as u8);
@@ -63,5 +68,12 @@ impl EffectOp {
         );
         let raw = ((self.opcode as u16) << 10) | ((self.payload as u16) & 0x3FF);
         raw.to_le_bytes()
+    }
+
+    pub fn opcode(&self) -> EffectOpcode {
+        self.opcode
+    }
+    pub fn payload(&self) -> usize {
+        self.payload
     }
 }

@@ -16,15 +16,15 @@ pub enum VoidType {
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Whether to export types
-    pub export: bool,
+    pub(crate) export: bool,
     /// Whether to emit the Node type definition
-    pub emit_node_type: bool,
+    pub(crate) emit_node_type: bool,
     /// Use verbose node representation (with kind, text, etc.)
-    pub verbose_nodes: bool,
+    pub(crate) verbose_nodes: bool,
     /// How to represent the void type
-    pub void_type: VoidType,
+    pub(crate) void_type: VoidType,
     /// Color configuration for output
-    pub colors: Colors,
+    pub(crate) colors: Colors,
 }
 
 impl Default for Config {
@@ -36,5 +36,42 @@ impl Default for Config {
             void_type: VoidType::default(),
             colors: Colors::OFF,
         }
+    }
+}
+
+impl Config {
+    /// Create a new Config with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set whether to export types.
+    pub fn export(mut self, value: bool) -> Self {
+        self.export = value;
+        self
+    }
+
+    /// Set whether to emit the Node type definition.
+    pub fn emit_node_type(mut self, value: bool) -> Self {
+        self.emit_node_type = value;
+        self
+    }
+
+    /// Set whether to use verbose node representation.
+    pub fn verbose_nodes(mut self, value: bool) -> Self {
+        self.verbose_nodes = value;
+        self
+    }
+
+    /// Set the void type representation.
+    pub fn void_type(mut self, value: VoidType) -> Self {
+        self.void_type = value;
+        self
+    }
+
+    /// Set whether to use colored output.
+    pub fn colored(mut self, enabled: bool) -> Self {
+        self.colors = Colors::new(enabled);
+        self
     }
 }

@@ -3,9 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::engine::{
-    FuelLimits, Materializer, RuntimeError, VM, ValueMaterializer, debug_verify_type,
-};
+use plotnik_lib::engine::{Materializer, RuntimeError, VM, ValueMaterializer, debug_verify_type};
 
 use super::run_common::{self, PreparedQuery, QueryInput};
 
@@ -37,7 +35,7 @@ pub fn run(args: ExecArgs) {
         color: args.color,
     });
 
-    let vm = VM::new(&tree, trivia_types, FuelLimits::default());
+    let vm = VM::builder(&tree).trivia_types(trivia_types).build();
     let effects = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
@@ -50,12 +48,12 @@ pub fn run(args: ExecArgs) {
     };
 
     let materializer = ValueMaterializer::new(&source_code, module.types(), module.strings());
-    let value = materializer.materialize(effects.as_slice(), entrypoint.result_type);
+    let value = materializer.materialize(effects.as_slice(), entrypoint.result_type());
 
     let colors = Colors::new(args.color);
 
     // Debug-only: verify output matches declared type
-    debug_verify_type(&value, entrypoint.result_type, &module, colors);
+    debug_verify_type(&value, entrypoint.result_type(), &module, colors);
 
     let output = value.format(args.pretty, colors);
     println!("{}", output);

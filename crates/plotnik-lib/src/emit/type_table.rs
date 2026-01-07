@@ -9,7 +9,9 @@ use plotnik_core::{Interner, Symbol};
 use crate::analyze::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
-use crate::bytecode::{StringId, TypeDef, TypeId as BytecodeTypeId, TypeMember, TypeName};
+use crate::bytecode::{
+    StringId, TypeData, TypeDef, TypeId as BytecodeTypeId, TypeMember, TypeName,
+};
 use crate::type_system::TypeKind;
 
 use super::{EmitError, StringTableBuilder};
@@ -97,11 +99,7 @@ impl TypeTableBuilder {
             if used_builtins[i] {
                 let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
                 self.mapping.insert(builtin_id, bc_id);
-                self.type_defs.push(TypeDef {
-                    data: 0,
-                    count: 0,
-                    kind: kind as u8,
-                });
+                self.type_defs.push(TypeDef::builtin(kind));
             }
         }
 
@@ -109,11 +107,7 @@ impl TypeTableBuilder {
         for &type_id in &ordered_types {
             let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
             self.mapping.insert(type_id, bc_id);
-            self.type_defs.push(TypeDef {
-                data: 0,
-                count: 0,
-                kind: 0, // Placeholder
-            });
+            self.type_defs.push(TypeDef::placeholder());
         }
 
         // Phase 3: Fill in custom type definitions
@@ -136,10 +130,7 @@ impl TypeTableBuilder {
                 .get(&type_id)
                 .copied()
                 .unwrap_or(BytecodeTypeId(0));
-            self.type_names.push(TypeName {
-                name,
-                type_id: bc_type_id,
-            });
+            self.type_names.push(TypeName::new(name, bc_type_id));
         }
 
         // Collect TypeName entries for explicit type annotations on struct captures
@@ -147,10 +138,7 @@ impl TypeTableBuilder {
         for (type_id, name_sym) in type_ctx.iter_type_names() {
             if let Some(&bc_type_id) = self.mapping.get(&type_id) {
                 let name = strings.get_or_intern(name_sym, interner)?;
-                self.type_names.push(TypeName {
-                    name,
-                    type_id: bc_type_id,
-                });
+                self.type_names.push(TypeName::new(name, bc_type_id));
             }
         }
 
@@ -179,10 +167,7 @@ impl TypeTableBuilder {
 
                 // Add TypeName entry for the custom type
                 let name = strings.get_or_intern(*sym, interner)?;
-                self.type_names.push(TypeName {
-                    name,
-                    type_id: bc_type_id,
-                });
+                self.type_names.push(TypeName::new(name, bc_type_id));
 
                 // Custom types alias Node - look up Node's actual bytecode ID
                 let node_bc_id = self
@@ -190,37 +175,22 @@ impl TypeTableBuilder {
                     .get(&TYPE_NODE)
                     .copied()
                     .unwrap_or(BytecodeTypeId(0));
-                self.type_defs[slot_index] = TypeDef {
-                    data: node_bc_id.0,
-                    count: 0,
-                    kind: TypeKind::Alias as u8,
-                };
+                self.type_defs[slot_index] = TypeDef::alias(node_bc_id);
                 Ok(())
             }
 
             TypeShape::Optional(inner) => {
                 let inner_bc = self.resolve_type(*inner, type_ctx)?;
-
-                self.type_defs[slot_index] = TypeDef {
-                    data: inner_bc.0,
-                    count: 0,
-                    kind: TypeKind::Optional as u8,
-                };
+                self.type_defs[slot_index] = TypeDef::optional(inner_bc);
                 Ok(())
             }
 
             TypeShape::Array { element, non_empty } => {
                 let element_bc = self.resolve_type(*element, type_ctx)?;
-
-                let kind = if *non_empty {
-                    TypeKind::ArrayOneOrMore
+                self.type_defs[slot_index] = if *non_empty {
+                    TypeDef::array_plus(element_bc)
                 } else {
-                    TypeKind::ArrayZeroOrMore
-                };
-                self.type_defs[slot_index] = TypeDef {
-                    data: element_bc.0,
-                    count: 0,
-                    kind: kind as u8,
+                    TypeDef::array_star(element_bc)
                 };
                 Ok(())
             }
@@ -237,18 +207,12 @@ impl TypeTableBuilder {
                 // Emit members contiguously for this struct
                 let member_start = self.type_members.len() as u16;
                 for (field_name, field_type) in resolved_fields {
-                    self.type_members.push(TypeMember {
-                        name: field_name,
-                        type_id: field_type,
-                    });
+                    self.type_members
+                        .push(TypeMember::new(field_name, field_type));
                 }
 
                 let member_count = fields.len() as u8;
-                self.type_defs[slot_index] = TypeDef {
-                    data: member_start,
-                    count: member_count,
-                    kind: TypeKind::Struct as u8,
-                };
+                self.type_defs[slot_index] = TypeDef::struct_type(member_start, member_count);
                 Ok(())
             }
 
@@ -264,18 +228,12 @@ impl TypeTableBuilder {
                 // Now emit the members and update the placeholder
                 let member_start = self.type_members.len() as u16;
                 for (variant_name, variant_type) in resolved_variants {
-                    self.type_members.push(TypeMember {
-                        name: variant_name,
-                        type_id: variant_type,
-                    });
+                    self.type_members
+                        .push(TypeMember::new(variant_name, variant_type));
                 }
 
                 let member_count = variants.len() as u8;
-                self.type_defs[slot_index] = TypeDef {
-                    data: member_start,
-                    count: member_count,
-                    kind: TypeKind::Enum as u8,
-                };
+                self.type_defs[slot_index] = TypeDef::enum_type(member_start, member_count);
                 Ok(())
             }
 
@@ -339,13 +297,7 @@ impl TypeTableBuilder {
 
         // Create new Optional wrapper at the next available index
         let optional_id = BytecodeTypeId(self.type_defs.len() as u16);
-
-        self.type_defs.push(TypeDef {
-            data: base_type.0,
-            count: 0,
-            kind: TypeKind::Optional as u8,
-        });
-
+        self.type_defs.push(TypeDef::optional(base_type));
         self.optional_wrappers.insert(base_type, optional_id);
         Ok(optional_id)
     }
@@ -373,13 +325,9 @@ impl TypeTableBuilder {
     pub fn get_member_base(&self, type_id: TypeId) -> Option<u16> {
         let bc_type_id = self.mapping.get(&type_id)?;
         let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
-
-        // Only Struct and Enum have member bases
-        let kind = TypeKind::from_u8(type_def.kind)?;
-        if kind.is_composite() {
-            Some(type_def.data)
-        } else {
-            None
+        match type_def.classify() {
+            TypeData::Composite { member_start, .. } => Some(member_start),
+            _ => None,
         }
     }
 
@@ -405,21 +353,17 @@ impl TypeTableBuilder {
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut defs_bytes = Vec::with_capacity(self.type_defs.len() * 4);
         for def in &self.type_defs {
-            defs_bytes.extend_from_slice(&def.data.to_le_bytes());
-            defs_bytes.push(def.count);
-            defs_bytes.push(def.kind);
+            defs_bytes.extend_from_slice(&def.to_bytes());
         }
 
         let mut members_bytes = Vec::with_capacity(self.type_members.len() * 4);
         for member in &self.type_members {
-            members_bytes.extend_from_slice(&member.name.get().to_le_bytes());
-            members_bytes.extend_from_slice(&member.type_id.0.to_le_bytes());
+            members_bytes.extend_from_slice(&member.to_bytes());
         }
 
         let mut names_bytes = Vec::with_capacity(self.type_names.len() * 4);
         for type_name in &self.type_names {
-            names_bytes.extend_from_slice(&type_name.name.get().to_le_bytes());
-            names_bytes.extend_from_slice(&type_name.type_id.0.to_le_bytes());
+            names_bytes.extend_from_slice(&type_name.to_bytes());
         }
 
         (defs_bytes, members_bytes, names_bytes)

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use plotnik_core::utils::to_pascal_case;
 
-use crate::bytecode::{TypeId, TypeKind};
+use crate::bytecode::{TypeData, TypeId, TypeKind};
 
 use super::Emitter;
 
@@ -21,9 +21,9 @@ impl Emitter<'_> {
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let def_name = self.strings.get(ep.name);
+            let def_name = self.strings.get(ep.name());
             self.collect_naming_contexts(
-                ep.result_type,
+                ep.result_type(),
                 &NamingContext {
                     def_name: def_name.to_string(),
                     field_name: None,
@@ -67,17 +67,23 @@ impl Emitter<'_> {
             return;
         };
 
-        let Some(kind) = type_def.type_kind() else {
-            return;
-        };
-
-        match kind {
-            TypeKind::Void | TypeKind::Node | TypeKind::String | TypeKind::Alias => {}
-            TypeKind::Struct => {
+        match type_def.classify() {
+            TypeData::Primitive(_) => {}
+            TypeData::Wrapper {
+                kind: TypeKind::Alias,
+                ..
+            } => {}
+            TypeData::Wrapper { inner, .. } => {
+                self.collect_naming_contexts(inner, ctx, contexts);
+            }
+            TypeData::Composite {
+                kind: TypeKind::Struct,
+                ..
+            } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 for member in self.types.members_of(&type_def) {
-                    let field_name = self.strings.get(member.name);
-                    let (inner_type, _) = self.types.unwrap_optional(member.type_id);
+                    let field_name = self.strings.get(member.name());
+                    let (inner_type, _) = self.types.unwrap_optional(member.type_id());
                     let field_ctx = NamingContext {
                         def_name: ctx.def_name.clone(),
                         field_name: Some(field_name.to_string()),
@@ -85,19 +91,23 @@ impl Emitter<'_> {
                     self.collect_naming_contexts(inner_type, &field_ctx, contexts);
                 }
             }
-            TypeKind::Enum => {
+            TypeData::Composite {
+                kind: TypeKind::Enum,
+                ..
+            } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
             }
-            TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore | TypeKind::Optional => {
-                self.collect_naming_contexts(TypeId(type_def.data), ctx, contexts);
-            }
+            TypeData::Composite { .. } => {}
         }
     }
 
     pub(super) fn needs_generated_name(&self, type_def: &crate::bytecode::TypeDef) -> bool {
         matches!(
-            type_def.type_kind(),
-            Some(TypeKind::Struct) | Some(TypeKind::Enum)
+            type_def.classify(),
+            TypeData::Composite {
+                kind: TypeKind::Struct | TypeKind::Enum,
+                ..
+            }
         )
     }
 
@@ -111,9 +121,15 @@ impl Emitter<'_> {
     }
 
     pub(super) fn generate_fallback_name(&mut self, type_def: &crate::bytecode::TypeDef) -> String {
-        let base = match type_def.type_kind() {
-            Some(TypeKind::Struct) => "Struct",
-            Some(TypeKind::Enum) => "Enum",
+        let base = match type_def.classify() {
+            TypeData::Composite {
+                kind: TypeKind::Struct,
+                ..
+            } => "Struct",
+            TypeData::Composite {
+                kind: TypeKind::Enum,
+                ..
+            } => "Enum",
             _ => "Type",
         };
         self.unique_name(base)

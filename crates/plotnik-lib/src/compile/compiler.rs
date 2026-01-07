@@ -18,40 +18,83 @@ use super::scope::StructScope;
 pub struct Compiler<'a> {
     pub(super) interner: &'a Interner,
     pub(super) type_ctx: &'a TypeContext,
-    symbol_table: &'a SymbolTable,
+    pub(crate) symbol_table: &'a SymbolTable,
     pub(super) strings: &'a mut StringTableBuilder,
     pub(super) node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
     pub(super) node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
     pub(super) instructions: Vec<InstructionIR>,
-    next_label_id: u32,
+    pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<StructScope>,
 }
 
-impl<'a> Compiler<'a> {
-    /// Create a new compiler.
+/// Builder for `Compiler`.
+pub struct CompilerBuilder<'a> {
+    interner: &'a Interner,
+    type_ctx: &'a TypeContext,
+    symbol_table: &'a SymbolTable,
+    strings: &'a mut StringTableBuilder,
+    node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
+    node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
+}
+
+impl<'a> CompilerBuilder<'a> {
+    /// Create a new builder with required parameters.
     pub fn new(
         interner: &'a Interner,
         type_ctx: &'a TypeContext,
         symbol_table: &'a SymbolTable,
         strings: &'a mut StringTableBuilder,
-        node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
-        node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
     ) -> Self {
         Self {
             interner,
             type_ctx,
             symbol_table,
             strings,
-            node_type_ids,
-            node_field_ids,
+            node_type_ids: None,
+            node_field_ids: None,
+        }
+    }
+
+    /// Set node type and field IDs for linked compilation.
+    pub fn linked(
+        mut self,
+        node_type_ids: &'a IndexMap<Symbol, NodeTypeId>,
+        node_field_ids: &'a IndexMap<Symbol, NodeFieldId>,
+    ) -> Self {
+        self.node_type_ids = Some(node_type_ids);
+        self.node_field_ids = Some(node_field_ids);
+        self
+    }
+
+    /// Build the Compiler.
+    pub fn build(self) -> Compiler<'a> {
+        Compiler {
+            interner: self.interner,
+            type_ctx: self.type_ctx,
+            symbol_table: self.symbol_table,
+            strings: self.strings,
+            node_type_ids: self.node_type_ids,
+            node_field_ids: self.node_field_ids,
             instructions: Vec::new(),
             next_label_id: 0,
             def_entries: IndexMap::new(),
             scope_stack: Vec::new(),
         }
+    }
+}
+
+impl<'a> Compiler<'a> {
+    /// Create a builder for Compiler.
+    pub fn builder(
+        interner: &'a Interner,
+        type_ctx: &'a TypeContext,
+        symbol_table: &'a SymbolTable,
+        strings: &'a mut StringTableBuilder,
+    ) -> CompilerBuilder<'a> {
+        CompilerBuilder::new(interner, type_ctx, symbol_table, strings)
     }
 
     /// Compile all definitions in the query.
@@ -63,14 +106,14 @@ impl<'a> Compiler<'a> {
         node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
         node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
     ) -> Result<CompileResult, CompileError> {
-        let mut compiler = Self::new(
-            interner,
-            type_ctx,
-            symbol_table,
-            strings,
-            node_type_ids,
-            node_field_ids,
-        );
+        let mut compiler =
+            if let (Some(type_ids), Some(field_ids)) = (node_type_ids, node_field_ids) {
+                Compiler::builder(interner, type_ctx, symbol_table, strings)
+                    .linked(type_ids, field_ids)
+                    .build()
+            } else {
+                Compiler::builder(interner, type_ctx, symbol_table, strings).build()
+            };
 
         // Emit universal preamble first: Obj -> Trampoline -> EndObj -> Return
         // This wraps any entrypoint to create the top-level scope.

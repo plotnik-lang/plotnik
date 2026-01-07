@@ -27,9 +27,23 @@ impl Slice {
 #[repr(C)]
 pub struct NodeSymbol {
     /// Tree-sitter node type ID
-    pub id: u16,
+    pub(crate) id: u16,
     /// StringId for the node kind name
-    pub name: StringId,
+    pub(crate) name: StringId,
+}
+
+impl NodeSymbol {
+    /// Create a new node symbol.
+    pub fn new(id: u16, name: StringId) -> Self {
+        Self { id, name }
+    }
+
+    pub fn id(&self) -> u16 {
+        self.id
+    }
+    pub fn name(&self) -> StringId {
+        self.name
+    }
 }
 
 /// Maps tree-sitter NodeFieldId to its string name.
@@ -37,14 +51,39 @@ pub struct NodeSymbol {
 #[repr(C)]
 pub struct FieldSymbol {
     /// Tree-sitter field ID
-    pub id: u16,
+    pub(crate) id: u16,
     /// StringId for the field name
-    pub name: StringId,
+    pub(crate) name: StringId,
+}
+
+impl FieldSymbol {
+    /// Create a new field symbol.
+    pub fn new(id: u16, name: StringId) -> Self {
+        Self { id, name }
+    }
+
+    pub fn id(&self) -> u16 {
+        self.id
+    }
+    pub fn name(&self) -> StringId {
+        self.name
+    }
 }
 
 /// A node type ID that counts as trivia (whitespace, comments).
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TriviaEntry {
-    pub node_type: u16,
+    pub(crate) node_type: u16,
+}
+
+impl TriviaEntry {
+    /// Create a new trivia entry.
+    pub fn new(node_type: u16) -> Self {
+        Self { node_type }
+    }
+
+    pub fn node_type(&self) -> u16 {
+        self.node_type
+    }
 }

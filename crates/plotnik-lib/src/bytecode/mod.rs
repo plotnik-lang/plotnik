@@ -28,7 +28,7 @@ pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
 
 pub use entrypoint::Entrypoint;
 
-pub use type_meta::{TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
+pub use type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
 
 pub use nav::Nav;
 

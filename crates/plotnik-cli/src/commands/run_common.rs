@@ -122,7 +122,7 @@ pub fn validate(
 pub fn build_trivia_types(module: &Module) -> Vec<u16> {
     let trivia_view = module.trivia();
     (0..trivia_view.len())
-        .map(|i| trivia_view.get(i).node_type)
+        .map(|i| trivia_view.get(i).node_type())
         .collect()
 }
 

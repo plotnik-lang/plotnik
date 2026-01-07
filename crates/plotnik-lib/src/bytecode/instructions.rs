@@ -283,20 +283,31 @@ impl<'a> Match<'a> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Call {
     /// Segment index (0-15).
-    pub segment: u8,
+    pub(crate) segment: u8,
     /// Navigation to apply before jumping to target.
-    pub nav: Nav,
+    pub(crate) nav: Nav,
     /// Field constraint (None = no constraint).
-    pub node_field: Option<NonZeroU16>,
+    pub(crate) node_field: Option<NonZeroU16>,
     /// Return address (current segment).
-    pub next: StepId,
+    pub(crate) next: StepId,
     /// Callee entry point (target segment from type_id).
-    pub target: StepId,
+    pub(crate) target: StepId,
 }
 
 impl Call {
+    /// Create a new Call instruction.
+    pub fn new(nav: Nav, node_field: Option<NonZeroU16>, next: StepId, target: StepId) -> Self {
+        Self {
+            segment: 0,
+            nav,
+            node_field,
+            next,
+            target,
+        }
+    }
+
     /// Decode from 8-byte bytecode.
-    pub fn from_bytes(bytes: [u8; 8]) -> Self {
+    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = type_id_byte >> 4;
         assert!(
@@ -325,18 +336,36 @@ impl Call {
         bytes[6..8].copy_from_slice(&self.target.get().to_le_bytes());
         bytes
     }
+
+    pub fn nav(&self) -> Nav {
+        self.nav
+    }
+    pub fn node_field(&self) -> Option<NonZeroU16> {
+        self.node_field
+    }
+    pub fn next(&self) -> StepId {
+        self.next
+    }
+    pub fn target(&self) -> StepId {
+        self.target
+    }
 }
 
 /// Return instruction for returning from definitions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Return {
     /// Segment index (0-15).
-    pub segment: u8,
+    pub(crate) segment: u8,
 }
 
 impl Return {
+    /// Create a new Return instruction.
+    pub fn new() -> Self {
+        Self { segment: 0 }
+    }
+
     /// Decode from 8-byte bytecode.
-    pub fn from_bytes(bytes: [u8; 8]) -> Self {
+    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = type_id_byte >> 4;
         assert!(
@@ -358,6 +387,12 @@ impl Return {
     }
 }
 
+impl Default for Return {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Trampoline instruction for universal entry.
 ///
 /// Like Call, but the target comes from VM context (external parameter)
@@ -366,14 +401,19 @@ impl Return {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Trampoline {
     /// Segment index (0-15).
-    pub segment: u8,
+    pub(crate) segment: u8,
     /// Return address (where to continue after entrypoint returns).
-    pub next: StepId,
+    pub(crate) next: StepId,
 }
 
 impl Trampoline {
+    /// Create a new Trampoline instruction.
+    pub fn new(next: StepId) -> Self {
+        Self { segment: 0, next }
+    }
+
     /// Decode from 8-byte bytecode.
-    pub fn from_bytes(bytes: [u8; 8]) -> Self {
+    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = type_id_byte >> 4;
         assert!(
@@ -397,6 +437,10 @@ impl Trampoline {
         bytes[2..4].copy_from_slice(&self.next.get().to_le_bytes());
         // bytes[4..8] are reserved/padding
         bytes
+    }
+
+    pub fn next(&self) -> StepId {
+        self.next
     }
 }
 

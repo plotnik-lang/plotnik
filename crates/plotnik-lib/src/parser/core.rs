@@ -21,6 +21,11 @@ pub(super) struct OpenDelimiter {
     pub span: TextRange,
 }
 
+/// Default parsing fuel limit.
+const DEFAULT_FUEL: u32 = 1_000_000;
+/// Default maximum recursion depth.
+const DEFAULT_MAX_DEPTH: u32 = 4096;
+
 /// Trivia tokens are buffered and flushed when starting a new node.
 pub struct Parser<'q, 'd> {
     pub(super) source: &'q str,
@@ -34,13 +39,86 @@ pub struct Parser<'q, 'd> {
     pub(super) last_diagnostic_pos: Option<TextSize>,
     pub(super) delimiter_stack: Vec<OpenDelimiter>,
     pub(super) debug_fuel: std::cell::Cell<u32>,
-    fuel_initial: u32,
-    fuel_remaining: u32,
+    pub(crate) fuel_initial: u32,
+    pub(crate) fuel_remaining: u32,
+    pub(crate) max_depth: u32,
+    pub(crate) fatal_error: Option<Error>,
+}
+
+/// Builder for `Parser`.
+pub struct ParserBuilder<'q, 'd> {
+    source: &'q str,
+    source_id: SourceId,
+    tokens: Vec<Token>,
+    diagnostics: &'d mut Diagnostics,
+    fuel: u32,
     max_depth: u32,
-    fatal_error: Option<Error>,
+}
+
+impl<'q, 'd> ParserBuilder<'q, 'd> {
+    /// Create a new builder with required parameters.
+    pub fn new(
+        source: &'q str,
+        source_id: SourceId,
+        tokens: Vec<Token>,
+        diagnostics: &'d mut Diagnostics,
+    ) -> Self {
+        Self {
+            source,
+            source_id,
+            tokens,
+            diagnostics,
+            fuel: DEFAULT_FUEL,
+            max_depth: DEFAULT_MAX_DEPTH,
+        }
+    }
+
+    /// Set the fuel limit.
+    pub fn fuel(mut self, fuel: u32) -> Self {
+        self.fuel = fuel;
+        self
+    }
+
+    /// Set the maximum recursion depth.
+    pub fn max_depth(mut self, depth: u32) -> Self {
+        self.max_depth = depth;
+        self
+    }
+
+    /// Build the Parser.
+    pub fn build(self) -> Parser<'q, 'd> {
+        Parser {
+            source: self.source,
+            source_id: self.source_id,
+            tokens: self.tokens,
+            pos: 0,
+            trivia_buffer: Vec::with_capacity(4),
+            builder: GreenNodeBuilder::new(),
+            diagnostics: self.diagnostics,
+            depth: 0,
+            last_diagnostic_pos: None,
+            delimiter_stack: Vec::with_capacity(8),
+            debug_fuel: std::cell::Cell::new(256),
+            fuel_initial: self.fuel,
+            fuel_remaining: self.fuel,
+            max_depth: self.max_depth,
+            fatal_error: None,
+        }
+    }
 }
 
 impl<'q, 'd> Parser<'q, 'd> {
+    /// Create a builder for Parser.
+    pub fn builder(
+        source: &'q str,
+        source_id: SourceId,
+        tokens: Vec<Token>,
+        diagnostics: &'d mut Diagnostics,
+    ) -> ParserBuilder<'q, 'd> {
+        ParserBuilder::new(source, source_id, tokens, diagnostics)
+    }
+
+    /// Create a new parser with the specified parameters.
     pub fn new(
         source: &'q str,
         source_id: SourceId,
@@ -49,23 +127,10 @@ impl<'q, 'd> Parser<'q, 'd> {
         fuel: u32,
         max_depth: u32,
     ) -> Self {
-        Self {
-            source,
-            source_id,
-            tokens,
-            pos: 0,
-            trivia_buffer: Vec::with_capacity(4),
-            builder: GreenNodeBuilder::new(),
-            diagnostics,
-            depth: 0,
-            last_diagnostic_pos: None,
-            delimiter_stack: Vec::with_capacity(8),
-            debug_fuel: std::cell::Cell::new(256),
-            fuel_initial: fuel,
-            fuel_remaining: fuel,
-            max_depth,
-            fatal_error: None,
-        }
+        Parser::builder(source, source_id, tokens, diagnostics)
+            .fuel(fuel)
+            .max_depth(max_depth)
+            .build()
     }
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {

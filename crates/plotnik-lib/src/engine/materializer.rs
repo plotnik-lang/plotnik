@@ -1,6 +1,6 @@
 //! Materializer transforms effect logs into output values.
 
-use crate::bytecode::{StringsView, TypeId, TypeKind, TypesView};
+use crate::bytecode::{StringsView, TypeData, TypeId, TypeKind, TypesView};
 
 use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
@@ -30,18 +30,17 @@ impl<'a> ValueMaterializer<'a> {
 
     fn resolve_member_name(&self, idx: u16) -> String {
         let member = self.types.get_member(idx as usize);
-        self.strings.get(member.name).to_owned()
+        self.strings.get(member.name()).to_owned()
     }
 
     fn resolve_member_type(&self, idx: u16) -> TypeId {
-        self.types.get_member(idx as usize).type_id
+        self.types.get_member(idx as usize).type_id()
     }
 
     fn is_void_type(&self, type_id: TypeId) -> bool {
         self.types
             .get(type_id)
-            .and_then(|def| def.type_kind())
-            .is_some_and(|k| k == TypeKind::Void)
+            .is_some_and(|def| matches!(def.classify(), TypeData::Primitive(TypeKind::Void)))
     }
 
     /// Create initial builder based on result type.
@@ -51,10 +50,19 @@ impl<'a> ValueMaterializer<'a> {
             .get(type_id)
             .unwrap_or_else(|| panic!("unknown type_id {}", type_id.0));
 
-        match TypeKind::from_u8(def.kind) {
-            Some(TypeKind::Struct) => Builder::Object(vec![]),
-            Some(TypeKind::Enum) => Builder::Scalar(None), // Enum gets built when Enum effect comes
-            Some(TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore) => Builder::Array(vec![]),
+        match def.classify() {
+            TypeData::Composite {
+                kind: TypeKind::Struct,
+                ..
+            } => Builder::Object(vec![]),
+            TypeData::Composite {
+                kind: TypeKind::Enum,
+                ..
+            } => Builder::Scalar(None),
+            TypeData::Wrapper {
+                kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
+                ..
+            } => Builder::Array(vec![]),
             _ => Builder::Scalar(None),
         }
     }

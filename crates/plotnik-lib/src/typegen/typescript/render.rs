@@ -2,7 +2,7 @@
 
 use plotnik_core::utils::to_pascal_case;
 
-use crate::bytecode::{TypeDef, TypeId, TypeKind};
+use crate::bytecode::{TypeData, TypeDef, TypeId, TypeKind};
 
 use super::Emitter;
 
@@ -11,16 +11,16 @@ impl Emitter<'_> {
         // Reserve entrypoint names to avoid collisions
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let name = self.strings.get(ep.name);
+            let name = self.strings.get(ep.name());
             self.used_names.insert(to_pascal_case(name));
         }
 
         // Assign names to named types from TypeNames section
         for i in 0..self.types.names_count() {
             let type_name = self.types.get_name(i);
-            let name = self.strings.get(type_name.name);
+            let name = self.strings.get(type_name.name());
             self.type_names
-                .insert(type_name.type_id, to_pascal_case(name));
+                .insert(type_name.type_id(), to_pascal_case(name));
         }
 
         // Assign names to struct/enum types that need them but don't have names
@@ -44,26 +44,23 @@ impl Emitter<'_> {
             return;
         };
 
-        let Some(kind) = type_def.type_kind() else {
-            return;
-        };
-
-        if kind.is_primitive() {
-            return;
-        }
-
-        // Check if this is an alias type (custom type annotation)
-        if type_def.is_alias() {
-            if let Some(name) = self.type_names.get(&type_id).cloned() {
-                self.emit_custom_type_alias(&name);
-                self.emitted.insert(type_id);
+        match type_def.classify() {
+            TypeData::Primitive(_) => (),
+            TypeData::Wrapper {
+                kind: TypeKind::Alias,
+                ..
+            } => {
+                if let Some(name) = self.type_names.get(&type_id).cloned() {
+                    self.emit_custom_type_alias(&name);
+                    self.emitted.insert(type_id);
+                }
             }
-            return;
-        }
-
-        // Check if we have a generated name
-        if let Some(name) = self.type_names.get(&type_id).cloned() {
-            self.emit_generated_type_def(type_id, &name);
+            TypeData::Wrapper { .. } => (),
+            TypeData::Composite { .. } => {
+                if let Some(name) = self.type_names.get(&type_id).cloned() {
+                    self.emit_generated_type_def(type_id, &name);
+                }
+            }
         }
     }
 
@@ -74,13 +71,15 @@ impl Emitter<'_> {
             return;
         };
 
-        let Some(kind) = type_def.type_kind() else {
-            return;
-        };
-
-        match kind {
-            TypeKind::Struct => self.emit_interface(name, &type_def),
-            TypeKind::Enum => self.emit_tagged_union(name, &type_def),
+        match type_def.classify() {
+            TypeData::Composite {
+                kind: TypeKind::Struct,
+                ..
+            } => self.emit_interface(name, &type_def),
+            TypeData::Composite {
+                kind: TypeKind::Enum,
+                ..
+            } => self.emit_tagged_union(name, &type_def),
             _ => {}
         }
     }
@@ -96,13 +95,15 @@ impl Emitter<'_> {
             return;
         };
 
-        let Some(kind) = type_def.type_kind() else {
-            return;
-        };
-
-        match kind {
-            TypeKind::Struct => self.emit_interface(&type_name, &type_def),
-            TypeKind::Enum => self.emit_tagged_union(&type_name, &type_def),
+        match type_def.classify() {
+            TypeData::Composite {
+                kind: TypeKind::Struct,
+                ..
+            } => self.emit_interface(&type_name, &type_def),
+            TypeData::Composite {
+                kind: TypeKind::Enum,
+                ..
+            } => self.emit_tagged_union(&type_name, &type_def),
             _ => {
                 let ts_type = self.type_to_ts(type_id);
                 self.emit_type_decl(&type_name, &ts_type);
@@ -142,8 +143,8 @@ impl Emitter<'_> {
             .types
             .members_of(type_def)
             .map(|member| {
-                let field_name = self.strings.get(member.name).to_string();
-                let (inner_type, optional) = self.types.unwrap_optional(member.type_id);
+                let field_name = self.strings.get(member.name()).to_string();
+                let (inner_type, optional) = self.types.unwrap_optional(member.type_id());
                 (field_name, inner_type, optional)
             })
             .collect();
@@ -166,11 +167,11 @@ impl Emitter<'_> {
         let mut variant_types = Vec::new();
 
         for member in self.types.members_of(type_def) {
-            let variant_name = self.strings.get(member.name);
+            let variant_name = self.strings.get(member.name());
             let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
             variant_types.push(variant_type_name.clone());
 
-            let is_void = self.is_void_type(member.type_id);
+            let is_void = self.is_void_type(member.type_id());
 
             // Header: export interface NameVariant {
             if self.config.export {
@@ -188,7 +189,7 @@ impl Emitter<'_> {
             ));
             // $data field (omit for Void payloads)
             if !is_void {
-                let data_str = self.inline_data_type(member.type_id);
+                let data_str = self.inline_data_type(member.type_id());
                 self.output.push_str(&format!(
                     "  $data{}:{} {}{};\n",
                     c.dim, c.reset, data_str, c.dim

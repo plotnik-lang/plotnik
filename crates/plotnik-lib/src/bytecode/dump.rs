@@ -12,7 +12,7 @@ use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, widt
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
-use super::type_meta::TypeKind;
+use super::type_meta::{TypeData, TypeKind};
 use super::{Call, Match, Return, Trampoline};
 
 /// Generate a human-readable dump of the bytecode module.
@@ -79,20 +79,20 @@ impl DumpContext {
         step_labels.insert(0, "_ObjWrap".to_string());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
-            let name = strings.get(ep.name).to_string();
-            step_labels.insert(ep.target, name);
+            let name = strings.get(ep.name()).to_string();
+            step_labels.insert(ep.target(), name);
         }
 
         let mut node_type_names = BTreeMap::new();
         for i in 0..node_types.len() {
             let t = node_types.get(i);
-            node_type_names.insert(t.id, strings.get(t.name).to_string());
+            node_type_names.insert(t.id(), strings.get(t.name()).to_string());
         }
 
         let mut node_field_names = BTreeMap::new();
         for i in 0..node_fields.len() {
             let f = node_fields.get(i);
-            node_field_names.insert(f.id, strings.get(f.name).to_string());
+            node_field_names.insert(f.id(), strings.get(f.name()).to_string());
         }
 
         // Collect all strings for unlinked mode lookups
@@ -182,53 +182,74 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
     // All types are now in type_defs, including builtins
     for i in 0..types.defs_count() {
         let def = types.get_def(i);
-        let kind = def.type_kind().expect("valid type kind");
 
-        let formatted = match kind {
-            // Primitive types
-            TypeKind::Void => "<Void>".to_string(),
-            TypeKind::Node => "<Node>".to_string(),
-            TypeKind::String => "<String>".to_string(),
-            // Composite types
-            TypeKind::Struct => format!("Struct  M{:0mw$}:{}", def.data, def.count),
-            TypeKind::Enum => format!("Enum    M{:0mw$}:{}", def.data, def.count),
-            // Wrapper types
-            TypeKind::Optional => format!("Optional(T{:0tw$})", def.data),
-            TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", def.data),
-            TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", def.data),
-            TypeKind::Alias => format!("Alias(T{:0tw$})", def.data),
-        };
-
-        // Generate comment for non-primitives (comments are dim)
-        let comment = match kind {
-            TypeKind::Void | TypeKind::Node | TypeKind::String => String::new(),
-            TypeKind::Struct => {
-                let fields: Vec<_> = types
-                    .members_of(&def)
-                    .map(|m| strings.get(m.name).to_string())
-                    .collect();
-                format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset)
+        let (formatted, comment) = match def.classify() {
+            TypeData::Primitive(kind) => {
+                let name = match kind {
+                    TypeKind::Void => "<Void>",
+                    TypeKind::Node => "<Node>",
+                    TypeKind::String => "<String>",
+                    _ => unreachable!(),
+                };
+                (name.to_string(), String::new())
             }
-            TypeKind::Enum => {
-                let variants: Vec<_> = types
-                    .members_of(&def)
-                    .map(|m| strings.get(m.name).to_string())
-                    .collect();
-                format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
+            TypeData::Wrapper { kind, inner } => {
+                let formatted = match kind {
+                    TypeKind::Optional => format!("Optional(T{:0tw$})", inner.0),
+                    TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", inner.0),
+                    TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", inner.0),
+                    TypeKind::Alias => format!("Alias(T{:0tw$})", inner.0),
+                    _ => unreachable!(),
+                };
+                let comment = match kind {
+                    TypeKind::Optional => {
+                        let inner_name = format_type_name(inner, module, ctx);
+                        format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
+                    }
+                    TypeKind::ArrayZeroOrMore => {
+                        let inner_name = format_type_name(inner, module, ctx);
+                        format!("{}  ; {}*{}", c.dim, inner_name, c.reset)
+                    }
+                    TypeKind::ArrayOneOrMore => {
+                        let inner_name = format_type_name(inner, module, ctx);
+                        format!("{}  ; {}+{}", c.dim, inner_name, c.reset)
+                    }
+                    TypeKind::Alias => String::new(),
+                    _ => unreachable!(),
+                };
+                (formatted, comment)
             }
-            TypeKind::Optional => {
-                let inner_name = format_type_name(TypeId(def.data), module, ctx);
-                format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
+            TypeData::Composite {
+                kind,
+                member_start,
+                member_count,
+            } => {
+                let formatted = match kind {
+                    TypeKind::Struct => {
+                        format!("Struct  M{:0mw$}:{}", member_start, member_count)
+                    }
+                    TypeKind::Enum => format!("Enum    M{:0mw$}:{}", member_start, member_count),
+                    _ => unreachable!(),
+                };
+                let comment = match kind {
+                    TypeKind::Struct => {
+                        let fields: Vec<_> = types
+                            .members_of(&def)
+                            .map(|m| strings.get(m.name()).to_string())
+                            .collect();
+                        format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset)
+                    }
+                    TypeKind::Enum => {
+                        let variants: Vec<_> = types
+                            .members_of(&def)
+                            .map(|m| strings.get(m.name()).to_string())
+                            .collect();
+                        format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
+                    }
+                    _ => unreachable!(),
+                };
+                (formatted, comment)
             }
-            TypeKind::ArrayZeroOrMore => {
-                let inner_name = format_type_name(TypeId(def.data), module, ctx);
-                format!("{}  ; {}*{}", c.dim, inner_name, c.reset)
-            }
-            TypeKind::ArrayOneOrMore => {
-                let inner_name = format_type_name(TypeId(def.data), module, ctx);
-                format!("{}  ; {}+{}", c.dim, inner_name, c.reset)
-            }
-            TypeKind::Alias => String::new(),
         };
 
         writeln!(out, "T{i:0tw$} = {formatted}{comment}").unwrap();
@@ -288,7 +309,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
 
     // Check if it's a primitive type
     if let Some(def) = types.get(type_id)
-        && let Some(kind) = def.type_kind()
+        && let TypeData::Primitive(kind) = def.classify()
         && let Some(name) = kind.primitive_name()
     {
         return format!("<{}>", name);
@@ -297,8 +318,8 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     // Try to find a name in types.names
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
-        if entry.type_id == type_id {
-            return strings.get(entry.name).to_string();
+        if entry.type_id() == type_id {
+            return strings.get(entry.name()).to_string();
         }
     }
 
@@ -320,8 +341,8 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let mut entries: Vec<_> = (0..entrypoints.len())
         .map(|i| {
             let ep = entrypoints.get(i);
-            let name = strings.get(ep.name);
-            (name, ep.target, ep.result_type.0)
+            let name = strings.get(ep.name());
+            (name, ep.target(), ep.result_type().0)
         })
         .collect();
     entries.sort_by_key(|(name, _, _)| *name);
