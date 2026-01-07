@@ -9,7 +9,7 @@ use std::path::Path;
 
 use super::header::Header;
 use super::ids::{StringId, TypeId};
-use super::instructions::{Call, Match, MatchView, Opcode, Return, Trampoline};
+use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
 use super::type_meta::{TypeDef, TypeMember, TypeMetaHeader, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
@@ -57,55 +57,16 @@ impl ByteStorage {
 }
 
 /// Decoded instruction from bytecode.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Instruction {
-    Match(Match),
-    Call(Call),
-    Return(Return),
-    Trampoline(Trampoline),
-}
-
-impl Instruction {
-    /// Decode an instruction from bytecode bytes.
-    ///
-    /// The slice must start at the instruction and contain at least 8 bytes.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= 8, "instruction too short");
-
-        let opcode = Opcode::from_u8(bytes[0] & 0xF);
-        match opcode {
-            Opcode::Call => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
-                Self::Call(Call::from_bytes(arr))
-            }
-            Opcode::Return => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
-                Self::Return(Return::from_bytes(arr))
-            }
-            Opcode::Trampoline => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
-                Self::Trampoline(Trampoline::from_bytes(arr))
-            }
-            _ => Self::Match(Match::from_bytes(bytes)),
-        }
-    }
-}
-
-/// Zero-copy instruction view for efficient VM execution.
-///
-/// Unlike `Instruction`, this doesn't allocate for Match instructions.
 #[derive(Clone, Copy, Debug)]
-pub enum InstructionView<'a> {
-    Match(MatchView<'a>),
+pub enum Instruction<'a> {
+    Match(Match<'a>),
     Call(Call),
     Return(Return),
     Trampoline(Trampoline),
 }
 
-impl<'a> InstructionView<'a> {
-    /// Decode an instruction view from bytecode bytes without allocating.
-    ///
-    /// The slice must start at the instruction and contain at least 8 bytes.
+impl<'a> Instruction<'a> {
+    /// Decode an instruction from bytecode bytes.
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(bytes.len() >= 8, "instruction too short");
@@ -124,7 +85,7 @@ impl<'a> InstructionView<'a> {
                 let arr: [u8; 8] = bytes[..8].try_into().unwrap();
                 Self::Trampoline(Trampoline::from_bytes(arr))
             }
-            _ => Self::Match(MatchView::from_bytes(bytes)),
+            _ => Self::Match(Match::from_bytes(bytes)),
         }
     }
 }
@@ -200,23 +161,11 @@ impl Module {
         &self.storage
     }
 
-    /// Decode an instruction at the given step index (raw u16).
-    ///
-    /// This allocates for Match instructions. For zero-allocation decoding,
-    /// use [`decode_step`](Self::decode_step) instead.
-    pub fn decode_step_alloc(&self, step: u16) -> Instruction {
+    /// Decode an instruction at the given step index.
+    #[inline]
+    pub fn decode_step(&self, step: u16) -> Instruction<'_> {
         let offset = self.header.transitions_offset as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
-    }
-
-    /// Decode an instruction view at the given step index (raw u16) without allocating.
-    ///
-    /// This is the VM's main access point for fetching instructions efficiently.
-    /// Step 0 is valid at runtime (though bytecode never jumps to it).
-    #[inline]
-    pub fn decode_step(&self, step: u16) -> InstructionView<'_> {
-        let offset = self.header.transitions_offset as usize + (step as usize) * STEP_SIZE;
-        InstructionView::from_bytes(&self.storage[offset..])
     }
 
     /// Get a view into the string table.

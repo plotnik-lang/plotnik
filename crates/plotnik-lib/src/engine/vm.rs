@@ -4,8 +4,7 @@ use arborium_tree_sitter::{Node, Tree};
 
 use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::{
-    Call, EffectOp, EffectOpcode, Entrypoint, InstructionView, MatchView, Module, Nav, StepAddr,
-    Trampoline,
+    Call, EffectOp, EffectOpcode, Entrypoint, Instruction, Match, Module, Nav, StepAddr, Trampoline,
 };
 
 /// Get the nav for continue_search (always a sibling move).
@@ -151,10 +150,10 @@ impl<'t> VM<'t> {
             tracer.trace_instruction(self.ip, &instr);
 
             let result = match instr {
-                InstructionView::Match(m) => self.exec_match(m, tracer),
-                InstructionView::Call(c) => self.exec_call(c, tracer),
-                InstructionView::Return(_) => self.exec_return(tracer),
-                InstructionView::Trampoline(t) => self.exec_trampoline(t, tracer),
+                Instruction::Match(m) => self.exec_match(m, tracer),
+                Instruction::Call(c) => self.exec_call(c, tracer),
+                Instruction::Return(_) => self.exec_return(tracer),
+                Instruction::Trampoline(t) => self.exec_trampoline(t, tracer),
             };
 
             match result {
@@ -165,11 +164,7 @@ impl<'t> VM<'t> {
         }
     }
 
-    fn exec_match<T: Tracer>(
-        &mut self,
-        m: MatchView<'_>,
-        tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    fn exec_match<T: Tracer>(&mut self, m: Match<'_>, tracer: &mut T) -> Result<(), RuntimeError> {
         for effect_op in m.pre_effects() {
             self.emit_effect(effect_op, tracer);
         }
@@ -190,7 +185,7 @@ impl<'t> VM<'t> {
 
     fn navigate_and_match<T: Tracer>(
         &mut self,
-        m: MatchView<'_>,
+        m: Match<'_>,
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
@@ -224,7 +219,7 @@ impl<'t> VM<'t> {
     }
 
     /// Check if current node matches type and field constraints.
-    fn node_matches<T: Tracer>(&self, m: MatchView<'_>, tracer: &mut T) -> bool {
+    fn node_matches<T: Tracer>(&self, m: Match<'_>, tracer: &mut T) -> bool {
         if let Some(expected) = m.node_type {
             if expected.get() == NAMED_WILDCARD {
                 // Special case: `(_)` wildcard matches any named node
@@ -248,7 +243,7 @@ impl<'t> VM<'t> {
 
     fn branch_to_successors<T: Tracer>(
         &mut self,
-        m: MatchView<'_>,
+        m: Match<'_>,
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
         if m.succ_count() == 0 {

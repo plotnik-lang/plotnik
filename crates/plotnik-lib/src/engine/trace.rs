@@ -25,8 +25,8 @@ use arborium_tree_sitter::Node;
 
 use crate::Colors;
 use crate::bytecode::{
-    EffectOpcode, InstructionView, LineBuilder, MatchView, Module, Nav, Symbol, cols,
-    format_effect, trace, truncate_text, width_for_count,
+    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, Symbol, cols, format_effect, trace,
+    truncate_text, width_for_count,
 };
 
 use super::effect::RuntimeEffect;
@@ -63,7 +63,7 @@ pub enum Verbosity {
 /// - `trace_enter_entrypoint` - when entering an entrypoint (for labels)
 pub trait Tracer {
     /// Called before executing an instruction.
-    fn trace_instruction(&mut self, ip: u16, instr: &InstructionView<'_>);
+    fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>);
 
     /// Called after navigation succeeds.
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>);
@@ -114,7 +114,7 @@ pub struct NoopTracer;
 
 impl Tracer for NoopTracer {
     #[inline(always)]
-    fn trace_instruction(&mut self, _ip: u16, _instr: &InstructionView<'_>) {}
+    fn trace_instruction(&mut self, _ip: u16, _instr: &Instruction<'_>) {}
 
     #[inline(always)]
     fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {}
@@ -322,7 +322,7 @@ impl<'s> PrintTracer<'s> {
     /// Format match content for instruction line (matches dump format exactly).
     ///
     /// Order: [pre-effects] !neg_fields field: (type) [post-effects]
-    fn format_match_content(&self, m: &MatchView<'_>) -> String {
+    fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
         // Pre-effects: [Effect1 Effect2]
@@ -353,7 +353,7 @@ impl<'s> PrintTracer<'s> {
     }
 
     /// Format node pattern: `field: (type)` or `(type)` or `field: _` or empty.
-    fn format_node_pattern(&self, m: &MatchView<'_>) -> String {
+    fn format_node_pattern(&self, m: &Match<'_>) -> String {
         let mut result = String::new();
 
         if let Some(f) = m.node_field {
@@ -423,9 +423,9 @@ impl<'s> PrintTracer<'s> {
 }
 
 impl Tracer for PrintTracer<'_> {
-    fn trace_instruction(&mut self, ip: u16, instr: &InstructionView<'_>) {
+    fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>) {
         match instr {
-            InstructionView::Match(m) => {
+            Instruction::Match(m) => {
                 // Show ε for epsilon transitions, empty otherwise (nav shown in sublines)
                 let symbol = if m.is_epsilon() {
                     Symbol::EPSILON
@@ -436,16 +436,16 @@ impl Tracer for PrintTracer<'_> {
                 let successors = format_match_successors(m);
                 self.add_instruction(ip, symbol, &content, &successors);
             }
-            InstructionView::Call(c) => {
+            Instruction::Call(c) => {
                 let name = self.entrypoint_name(c.target.get());
                 let content = self.format_def_name(name);
                 let successors = format!("{:02} : {:02}", c.target.get(), c.next.get());
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
-            InstructionView::Return(_) => {
+            Instruction::Return(_) => {
                 self.pending_return_ip = Some(ip);
             }
-            InstructionView::Trampoline(t) => {
+            Instruction::Trampoline(t) => {
                 // Trampoline shows as a call to the entrypoint target
                 let content = "Trampoline";
                 let successors = format!("{:02}", t.next.get());
@@ -613,7 +613,7 @@ impl Tracer for PrintTracer<'_> {
 }
 
 /// Format match successors for instruction line.
-fn format_match_successors(m: &MatchView<'_>) -> String {
+fn format_match_successors(m: &Match<'_>) -> String {
     if m.is_terminal() {
         "◼".to_string()
     } else if m.succ_count() == 1 {

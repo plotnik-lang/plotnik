@@ -35,13 +35,13 @@ pub use nav::Nav;
 pub use effects::{EffectOp, EffectOpcode};
 
 pub use instructions::{
-    Call, Match, MatchView, Opcode, Return, StepAddr, StepId, Trampoline, align_to_section,
+    Call, Match, Opcode, Return, StepAddr, StepId, Trampoline, align_to_section,
     select_match_opcode,
 };
 
 pub use module::{
-    ByteStorage, EntrypointsView, Instruction, InstructionView, Module, ModuleError, StringsView,
-    SymbolsView, TriviaView, TypesView,
+    ByteStorage, EntrypointsView, Instruction, Module, ModuleError, StringsView, SymbolsView,
+    TriviaView, TypesView,
 };
 
 pub use dump::dump;

@@ -1,11 +1,13 @@
 //! Tests for bytecode instructions.
 
+use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use super::effects::{EffectOp, EffectOpcode};
+use super::effects::EffectOpcode;
 use super::instructions::{
-    Call, Match, MatchView, Opcode, Return, StepId, align_to_section, select_match_opcode,
+    Call, Match, Opcode, Return, StepId, align_to_section, select_match_opcode,
 };
+use super::ir::{EffectIR, Label, MatchIR};
 use super::nav::Nav;
 
 #[test]
@@ -60,81 +62,6 @@ fn align_to_section_works() {
 }
 
 #[test]
-fn match8_roundtrip() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Down,
-        node_type: NonZeroU16::new(42),
-        node_field: NonZeroU16::new(7),
-        pre_effects: vec![],
-        neg_fields: vec![],
-        post_effects: vec![],
-        successors: vec![StepId::new(10)],
-    };
-
-    let bytes = m.to_bytes().unwrap();
-    assert_eq!(bytes.len(), 8);
-
-    let decoded = Match::from_bytes(&bytes);
-    assert_eq!(decoded, m);
-}
-
-#[test]
-fn match8_terminal_roundtrip() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Stay,
-        node_type: None,
-        node_field: None,
-        pre_effects: vec![],
-        neg_fields: vec![],
-        post_effects: vec![],
-        successors: vec![],
-    };
-
-    let bytes = m.to_bytes().unwrap();
-    assert_eq!(bytes.len(), 8);
-
-    let decoded = Match::from_bytes(&bytes);
-    assert_eq!(decoded, m);
-    assert!(decoded.is_terminal());
-    assert!(decoded.is_epsilon());
-}
-
-#[test]
-fn match_extended_roundtrip() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Next,
-        node_type: NonZeroU16::new(100),
-        node_field: None,
-        pre_effects: vec![EffectOp {
-            opcode: EffectOpcode::Obj,
-            payload: 0,
-        }],
-        neg_fields: vec![5, 6],
-        post_effects: vec![
-            EffectOp {
-                opcode: EffectOpcode::Node,
-                payload: 0,
-            },
-            EffectOp {
-                opcode: EffectOpcode::Set,
-                payload: 42,
-            },
-        ],
-        successors: vec![StepId::new(20), StepId::new(30)],
-    };
-
-    let bytes = m.to_bytes().unwrap();
-    // 1 pre + 2 neg + 2 post + 2 succ = 7 slots → Match24 (8 slots capacity)
-    assert_eq!(bytes.len(), 24);
-
-    let decoded = Match::from_bytes(&bytes);
-    assert_eq!(decoded, m);
-}
-
-#[test]
 fn call_roundtrip() {
     let c = Call {
         segment: 0,
@@ -158,107 +85,92 @@ fn return_roundtrip() {
     assert_eq!(decoded, r);
 }
 
-#[test]
-fn match_view_match8() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Down,
-        node_type: NonZeroU16::new(42),
-        node_field: NonZeroU16::new(7),
-        pre_effects: vec![],
-        neg_fields: vec![],
-        post_effects: vec![],
-        successors: vec![StepId::new(10)],
-    };
-
-    let bytes = m.to_bytes().unwrap();
-    let view = MatchView::from_bytes(&bytes);
-
-    assert_eq!(view.nav, Nav::Down);
-    assert_eq!(view.node_type, NonZeroU16::new(42));
-    assert_eq!(view.node_field, NonZeroU16::new(7));
-    assert!(!view.is_terminal());
-    assert!(!view.is_epsilon());
-    assert_eq!(view.succ_count(), 1);
-    assert_eq!(view.successor(0), StepId::new(10));
-    assert_eq!(view.pre_effects().count(), 0);
-    assert_eq!(view.neg_fields().count(), 0);
-    assert_eq!(view.post_effects().count(), 0);
+fn label_map(pairs: &[(u32, u16)]) -> BTreeMap<Label, u16> {
+    pairs.iter().map(|&(l, s)| (Label(l), s)).collect()
 }
 
 #[test]
-fn match_view_terminal() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Stay,
-        node_type: None,
-        node_field: None,
-        pre_effects: vec![],
-        neg_fields: vec![],
-        post_effects: vec![],
-        successors: vec![],
-    };
+fn match_basic() {
+    let map = label_map(&[(0, 1), (1, 10)]);
 
-    let bytes = m.to_bytes().unwrap();
-    let view = MatchView::from_bytes(&bytes);
+    let bytes = MatchIR::at(Label(0))
+        .nav(Nav::Down)
+        .node_type(NonZeroU16::new(42))
+        .node_field(NonZeroU16::new(7))
+        .next(Label(1))
+        .resolve(&map, |_, _| None, |_| None);
 
-    assert!(view.is_terminal());
-    assert!(view.is_epsilon());
-    assert_eq!(view.succ_count(), 0);
+    assert_eq!(bytes.len(), 8);
+
+    let m = Match::from_bytes(&bytes);
+    assert_eq!(m.nav, Nav::Down);
+    assert_eq!(m.node_type, NonZeroU16::new(42));
+    assert_eq!(m.node_field, NonZeroU16::new(7));
+    assert!(!m.is_terminal());
+    assert!(!m.is_epsilon());
+    assert_eq!(m.succ_count(), 1);
+    assert_eq!(m.successor(0), StepId::new(10));
+    assert_eq!(m.pre_effects().count(), 0);
+    assert_eq!(m.neg_fields().count(), 0);
+    assert_eq!(m.post_effects().count(), 0);
 }
 
 #[test]
-fn match_view_extended() {
-    let m = Match {
-        segment: 0,
-        nav: Nav::Next,
-        node_type: NonZeroU16::new(100),
-        node_field: None,
-        pre_effects: vec![EffectOp {
-            opcode: EffectOpcode::Obj,
-            payload: 0,
-        }],
-        neg_fields: vec![5, 6],
-        post_effects: vec![
-            EffectOp {
-                opcode: EffectOpcode::Node,
-                payload: 0,
-            },
-            EffectOp {
-                opcode: EffectOpcode::Set,
-                payload: 42,
-            },
-        ],
-        successors: vec![StepId::new(20), StepId::new(30)],
-    };
+fn match_terminal() {
+    let map = label_map(&[(0, 1)]);
 
-    let bytes = m.to_bytes().unwrap();
-    let view = MatchView::from_bytes(&bytes);
+    let bytes = MatchIR::terminal(Label(0)).resolve(&map, |_, _| None, |_| None);
 
-    assert_eq!(view.nav, Nav::Next);
-    assert_eq!(view.node_type, NonZeroU16::new(100));
-    assert!(!view.is_terminal());
+    assert_eq!(bytes.len(), 8);
 
-    // Check pre_effects
-    let pre: Vec<_> = view.pre_effects().collect();
+    let m = Match::from_bytes(&bytes);
+    assert!(m.is_terminal());
+    assert!(m.is_epsilon());
+    assert_eq!(m.succ_count(), 0);
+}
+
+#[test]
+fn match_extended() {
+    let map = label_map(&[(0, 1), (1, 20), (2, 30)]);
+
+    let bytes = MatchIR::at(Label(0))
+        .nav(Nav::Next)
+        .node_type(NonZeroU16::new(100))
+        .pre_effect(EffectIR::start_obj())
+        .neg_field(5)
+        .neg_field(6)
+        .post_effect(EffectIR::node())
+        .post_effect(EffectIR::with_member(
+            EffectOpcode::Set,
+            super::ir::MemberRef::absolute(42),
+        ))
+        .next_many(vec![Label(1), Label(2)])
+        .resolve(&map, |_, _| None, |_| None);
+
+    // 1 pre + 2 neg + 2 post + 2 succ = 7 slots → Match24 (8 slots capacity)
+    assert_eq!(bytes.len(), 24);
+
+    let m = Match::from_bytes(&bytes);
+    assert_eq!(m.nav, Nav::Next);
+    assert_eq!(m.node_type, NonZeroU16::new(100));
+    assert!(!m.is_terminal());
+
+    let pre: Vec<_> = m.pre_effects().collect();
     assert_eq!(pre.len(), 1);
     assert_eq!(pre[0].opcode, EffectOpcode::Obj);
 
-    // Check neg_fields
-    let neg: Vec<_> = view.neg_fields().collect();
+    let neg: Vec<_> = m.neg_fields().collect();
     assert_eq!(neg, vec![5, 6]);
 
-    // Check post_effects
-    let post: Vec<_> = view.post_effects().collect();
+    let post: Vec<_> = m.post_effects().collect();
     assert_eq!(post.len(), 2);
     assert_eq!(post[0].opcode, EffectOpcode::Node);
     assert_eq!(post[1].opcode, EffectOpcode::Set);
     assert_eq!(post[1].payload, 42);
 
-    // Check successors
-    assert_eq!(view.succ_count(), 2);
-    assert_eq!(view.successor(0), StepId::new(20));
-    assert_eq!(view.successor(1), StepId::new(30));
-    let succs: Vec<_> = view.successors().collect();
+    assert_eq!(m.succ_count(), 2);
+    assert_eq!(m.successor(0), StepId::new(20));
+    assert_eq!(m.successor(1), StepId::new(30));
+    let succs: Vec<_> = m.successors().collect();
     assert_eq!(succs, vec![StepId::new(20), StepId::new(30)]);
 }
