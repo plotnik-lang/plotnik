@@ -1,0 +1,70 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program {(expression_statement
+    (identifier (_)? @item) @id
+) @stmt}* @stmts)
+---
+foo; bar; baz
+---
+{
+  "stmts": [
+    {
+      "stmt": {
+        "kind": "expression_statement",
+        "text": "foo;",
+        "span": [
+          0,
+          4
+        ]
+      },
+      "id": {
+        "kind": "identifier",
+        "text": "foo",
+        "span": [
+          0,
+          3
+        ]
+      },
+      "item": null
+    },
+    {
+      "stmt": {
+        "kind": "expression_statement",
+        "text": "bar;",
+        "span": [
+          5,
+          9
+        ]
+      },
+      "id": {
+        "kind": "identifier",
+        "text": "bar",
+        "span": [
+          5,
+          8
+        ]
+      },
+      "item": null
+    },
+    {
+      "stmt": {
+        "kind": "expression_statement",
+        "text": "baz",
+        "span": [
+          10,
+          13
+        ]
+      },
+      "id": {
+        "kind": "identifier",
+        "text": "baz",
+        "span": [
+          10,
+          13
+        ]
+      },
+      "item": null
+    }
+  ]
+}

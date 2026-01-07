@@ -104,7 +104,7 @@ impl Compiler<'_> {
             true,
             None,
             CaptureEffects::default(),
-            None, // No skip_exit bypass - all paths need Up
+            Some(final_exit), // Skip exit bypasses Up when Down fails (childless node)
         );
 
         self.instructions

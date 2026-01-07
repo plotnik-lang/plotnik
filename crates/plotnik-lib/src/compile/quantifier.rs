@@ -445,12 +445,23 @@ impl Compiler<'_> {
                     self.emit_null_for_internal_captures(null_exit, inner)
                 };
 
-                // Skip-retry iteration leading to null exit
+                // Skip-retry iteration:
+                // For Optional, both skip paths (entry-level and retry-exhaust) need null.
+                // - Entry-level (Down fails): skip_with_null (bypass Up, has null from caller)
+                // - Retry exhaust (Down succeeded but pattern fails): need Up, then null
+                // When needs_split_exits, create a retry exhaust path with null → match_exit.
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
+                let iterate_exit = if needs_split_exits {
+                    // Retry exhaust needs null injection then goes to match_exit (for Up)
+                    let null_exit = self.emit_null_for_skip_path(match_exit, &element_capture);
+                    self.emit_null_for_internal_captures(null_exit, inner)
+                } else {
+                    skip_with_null
+                };
                 let iterate = self.compile_skip_retry_iteration(
                     first_nav_mode,
                     body_entry,
-                    skip_with_null,
+                    iterate_exit,
                     is_greedy,
                 );
 
@@ -554,10 +565,12 @@ impl Compiler<'_> {
             self.compile_expr_inner(inner, loop_entry, Some(Nav::StayExact), capture)
         };
 
-        // First iteration: skip-retry with skip_exit as fallback
+        // First iteration: skip-retry with match_exit as internal fallback.
+        // When retry exhausts (Down succeeded but pattern fails), we need Up via match_exit.
+        // The entry-level epsilon (below) handles Down failure → skip_exit (bypass Up).
         let first_nav_mode = nav_override.unwrap_or(Nav::Down);
         let first_iterate =
-            self.compile_skip_retry_iteration(first_nav_mode, body_entry, skip_exit, is_greedy);
+            self.compile_skip_retry_iteration(first_nav_mode, body_entry, match_exit, is_greedy);
 
         // Repeat iteration: skip-retry with match_exit as fallback
         let repeat_iterate =
