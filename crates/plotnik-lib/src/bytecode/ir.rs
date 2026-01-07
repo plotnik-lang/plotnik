@@ -526,12 +526,24 @@ impl MatchIR {
                 .unwrap_or(0);
             bytes[6..8].copy_from_slice(&next.to_le_bytes());
         } else {
-            let pre_count = self.pre_effects.len() as u16;
-            let neg_count = self.neg_fields.len() as u16;
-            let post_count = self.post_effects.len() as u16;
-            let succ_count = self.successors.len() as u16;
-            let counts =
-                (pre_count << 13) | (neg_count << 10) | (post_count << 7) | (succ_count << 1);
+            let pre_count = self.pre_effects.len();
+            let neg_count = self.neg_fields.len();
+            let post_count = self.post_effects.len();
+            let succ_count = self.successors.len();
+
+            // Validate bit-packed field limits (3 bits for counts, 6 bits for successors)
+            assert!(
+                pre_count <= 7,
+                "pre_effects overflow: {pre_count} > 7 (use emit_match_with_cascade)"
+            );
+            assert!(neg_count <= 7, "neg_fields overflow: {neg_count} > 7");
+            assert!(post_count <= 7, "post_effects overflow: {post_count} > 7");
+            assert!(succ_count <= 63, "successors overflow: {succ_count} > 63");
+
+            let counts = ((pre_count as u16) << 13)
+                | ((neg_count as u16) << 10)
+                | ((post_count as u16) << 7)
+                | ((succ_count as u16) << 1);
             bytes[6..8].copy_from_slice(&counts.to_le_bytes());
 
             let mut offset = 8;

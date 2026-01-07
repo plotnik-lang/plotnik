@@ -529,3 +529,47 @@ fn wildcard_named_skips_anonymous() {
 fn wildcard_bare_matches_anonymous() {
     snap!("Q = (program (return_statement _ @x))", "return 42");
 }
+
+/// BUG: Unlabeled alternation with 5+ branches and unique captures per branch.
+///
+/// Each branch in an unlabeled alternation needs to inject null for captures
+/// it doesn't have. With 5 branches (@a, @b, @c, @d, @e), each branch needs
+/// 8 pre-effects (4 nulls + 4 sets). This exceeds the 3-bit limit (max 7)
+/// and caused bytecode encoding overflow, resulting in garbage addresses.
+///
+/// Fix: Cascade overflow pre-effects into leading epsilon transitions.
+#[test]
+fn regression_unlabeled_alternation_5_branches_captures() {
+    snap!(
+        indoc! {r#"
+            Q = (program (expression_statement [
+                (identifier) @a
+                (number) @b
+                (string) @c
+                (binary_expression) @d
+                (call_expression) @e
+            ]))
+        "#},
+        "foo"
+    );
+}
+
+/// Same bug with 8 branches - even more pre-effects requiring multiple cascade steps.
+#[test]
+fn regression_unlabeled_alternation_8_branches_captures() {
+    snap!(
+        indoc! {r#"
+            Q = (program (expression_statement [
+                (identifier) @a
+                (number) @b
+                (string) @c
+                (binary_expression) @d
+                (call_expression) @e
+                (member_expression) @f
+                (array) @g
+                (object) @h
+            ]))
+        "#},
+        "42"
+    );
+}

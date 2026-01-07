@@ -1,0 +1,33 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement [
+    (identifier) @a
+    (number) @b
+    (string) @c
+    (binary_expression) @d
+    (call_expression) @e
+    (member_expression) @f
+    (array) @g
+    (object) @h
+]))
+---
+42
+---
+{
+  "a": null,
+  "c": null,
+  "d": null,
+  "e": null,
+  "f": null,
+  "g": null,
+  "h": null,
+  "b": {
+    "kind": "number",
+    "text": "42",
+    "span": [
+      0,
+      2
+    ]
+  }
+}

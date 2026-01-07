@@ -40,16 +40,14 @@ impl Compiler<'_> {
 
         // If no items, just match and exit (capture effects go here)
         if items.is_empty() {
-            self.instructions.push(
+            return self.emit_match_with_cascade(
                 MatchIR::epsilon(entry, exit)
                     .nav(nav)
                     .node_type(node_type)
                     .neg_fields(neg_fields)
                     .pre_effects(capture.pre)
-                    .post_effects(capture.post)
-                    .into(),
+                    .post_effects(capture.post),
             );
-            return entry;
         }
 
         // Determine Up navigation based on trailing anchor
@@ -102,13 +100,12 @@ impl Compiler<'_> {
             .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
 
         // Emit entry instruction into the node (only pre_effects here)
-        self.instructions.push(
+        self.emit_match_with_cascade(
             MatchIR::epsilon(entry, items_entry)
                 .nav(nav)
                 .node_type(node_type)
                 .neg_fields(neg_fields)
-                .pre_effects(capture.pre)
-                .into(),
+                .pre_effects(capture.pre),
         );
 
         entry
@@ -178,13 +175,12 @@ impl Compiler<'_> {
         self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
 
         // entry: match parent node → down_wildcard (only pre_effects here)
-        self.instructions.push(
+        self.emit_match_with_cascade(
             MatchIR::epsilon(entry, down_wildcard)
                 .nav(nav)
                 .node_type(node_type)
                 .neg_fields(neg_fields)
-                .pre_effects(capture.pre)
-                .into(),
+                .pre_effects(capture.pre),
         );
 
         entry
@@ -220,13 +216,12 @@ impl Compiler<'_> {
             None => NodeTypeIR::Any, // `_` wildcard matches any node
         };
 
-        self.instructions.push(
+        self.emit_match_with_cascade(
             MatchIR::epsilon(entry, exit)
                 .nav(nav)
                 .node_type(node_type)
                 .pre_effects(capture.pre)
-                .post_effects(capture.post)
-                .into(),
+                .post_effects(capture.post),
         );
 
         entry

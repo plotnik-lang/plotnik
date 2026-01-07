@@ -16,7 +16,9 @@ mod nav;
 mod sections;
 mod type_meta;
 
-pub use constants::{MAGIC, MAX_MATCH_PAYLOAD_SLOTS, SECTION_ALIGN, STEP_SIZE, VERSION};
+pub use constants::{
+    MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE, VERSION,
+};
 
 pub use ids::{StringId, TypeId};
 

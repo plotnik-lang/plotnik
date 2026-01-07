@@ -1,0 +1,27 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+Q = (program (expression_statement [
+    (identifier) @a
+    (number) @b
+    (string) @c
+    (binary_expression) @d
+    (call_expression) @e
+]))
+---
+foo
+---
+{
+  "b": null,
+  "c": null,
+  "d": null,
+  "e": null,
+  "a": {
+    "kind": "identifier",
+    "text": "foo",
+    "span": [
+      0,
+      3
+    ]
+  }
+}
