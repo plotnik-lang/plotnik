@@ -45,6 +45,24 @@ Tree-sitter gives you the syntax tree. Extracting structured data from it still 
 - [ ] LSP server
 - [ ] Editor extensions
 
+## Installation
+
+```sh
+cargo install plotnik
+```
+
+By default, 15 common languages are included. To add specific languages:
+
+```sh
+cargo install plotnik --features lang-ruby,lang-elixir
+```
+
+Or with all 80+ languages:
+
+```sh
+cargo install plotnik --features all-languages
+```
+
 ## Example
 
 Extract function signatures from Rust. `Type` references itself to handle nested generics like `Option<Vec<String>>`.
@@ -81,7 +99,7 @@ fn set(key: String, val: i32) {}
 Plotnik infers TypeScript types from the query structure. `Type` is recursive: `args: Type[]`.
 
 ```sh
-❯ plotnik infer query.ptk -l rust
+❯ plotnik infer query.ptk --lang rust
 export type Type =
   | { $tag: "Simple"; $data: { name: string } }
   | { $tag: "Generic"; $data: { name: string; args: Type[] } };

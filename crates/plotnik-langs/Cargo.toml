@@ -1,6 +1,6 @@
 [package]
 name = "plotnik-langs"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Tree-sitter language bindings for Plotnik query language"
@@ -233,8 +233,8 @@ lang-zsh = ["dep:arborium-zsh", "plotnik-macros/lang-zsh"]
 
 [dependencies]
 paste = "1.0"
-plotnik-core = { version = "0.1.0", path = "../plotnik-core" }
-plotnik-macros = { version = "0.1.0", path = "../plotnik-macros" }
+plotnik-core = { version = "0.2", path = "../plotnik-core" }
+plotnik-macros = { version = "0.2", path = "../plotnik-macros" }
 arborium-tree-sitter = "2.5.0"
 arborium-ada = { version = "2.5.0", optional = true }
 arborium-agda = { version = "2.5.0", optional = true }

@@ -168,7 +168,7 @@ docs/
 
 # CLI Reference
 
-Run: `cargo run -p plotnik-cli -- <command>`
+Run: `cargo run -p plotnik -- <command>`
 
 | Command | Purpose                       |
 | ------- | ----------------------------- |
@@ -185,10 +185,10 @@ Run: `cargo run -p plotnik-cli -- <command>`
 Show AST of query and/or source file.
 
 ```sh
-cargo run -p plotnik-cli -- ast query.ptk               # query AST
-cargo run -p plotnik-cli -- ast app.ts                  # source AST (tree-sitter)
-cargo run -p plotnik-cli -- ast query.ptk app.ts        # both ASTs
-cargo run -p plotnik-cli -- ast query.ptk app.ts --raw  # CST / include anonymous nodes
+cargo run -p plotnik -- ast query.ptk               # query AST
+cargo run -p plotnik -- ast app.ts                  # source AST (tree-sitter)
+cargo run -p plotnik -- ast query.ptk app.ts        # both ASTs
+cargo run -p plotnik -- ast query.ptk app.ts --raw  # CST / include anonymous nodes
 ```
 
 ## check
@@ -196,9 +196,9 @@ cargo run -p plotnik-cli -- ast query.ptk app.ts --raw  # CST / include anonymou
 Validate a query (silent on success, like `cargo check`).
 
 ```sh
-cargo run -p plotnik-cli -- check query.ptk -l typescript
-cargo run -p plotnik-cli -- check queries.ts/              # workspace with lang inference
-cargo run -p plotnik-cli -- check -q '(identifier) @id' -l javascript
+cargo run -p plotnik -- check query.ptk -l typescript
+cargo run -p plotnik -- check queries.ts/              # workspace with lang inference
+cargo run -p plotnik -- check -q '(identifier) @id' -l javascript
 ```
 
 ## dump
@@ -206,9 +206,9 @@ cargo run -p plotnik-cli -- check -q '(identifier) @id' -l javascript
 Show compiled bytecode.
 
 ```sh
-cargo run -p plotnik-cli -- dump query.ptk                 # unlinked
-cargo run -p plotnik-cli -- dump query.ptk -l typescript   # linked
-cargo run -p plotnik-cli -- dump -q '(identifier) @id'
+cargo run -p plotnik -- dump query.ptk                 # unlinked
+cargo run -p plotnik -- dump query.ptk -l typescript   # linked
+cargo run -p plotnik -- dump -q '(identifier) @id'
 ```
 
 ## infer
@@ -216,9 +216,9 @@ cargo run -p plotnik-cli -- dump -q '(identifier) @id'
 Generate TypeScript type definitions from a query.
 
 ```sh
-cargo run -p plotnik-cli -- infer query.ptk -l javascript
-cargo run -p plotnik-cli -- infer queries.ts/ -o types.d.ts
-cargo run -p plotnik-cli -- infer -q '(identifier) @id' -l typescript
+cargo run -p plotnik -- infer query.ptk -l javascript
+cargo run -p plotnik -- infer queries.ts/ -o types.d.ts
+cargo run -p plotnik -- infer -q '(identifier) @id' -l typescript
 ```
 
 Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
@@ -236,9 +236,9 @@ exec -q <TEXT> -s <TEXT> -l <LANG>  # all inline
 ```
 
 ```sh
-cargo run -p plotnik-cli -- exec query.ptk app.ts
-cargo run -p plotnik-cli -- exec -q 'Q = (identifier) @id' app.ts
-cargo run -p plotnik-cli -- exec -q 'Q = (identifier) @id' -s 'let x' -l javascript
+cargo run -p plotnik -- exec query.ptk app.ts
+cargo run -p plotnik -- exec -q 'Q = (identifier) @id' app.ts
+cargo run -p plotnik -- exec -q 'Q = (identifier) @id' -s 'let x' -l javascript
 ```
 
 Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
@@ -256,9 +256,9 @@ trace -q <TEXT> -s <TEXT> -l <LANG>  # all inline
 ```
 
 ```sh
-cargo run -p plotnik-cli -- trace query.ptk app.ts
-cargo run -p plotnik-cli -- trace -q 'Q = (identifier) @id' app.ts
-cargo run -p plotnik-cli -- trace query.ptk app.ts --no-result -vv
+cargo run -p plotnik -- trace query.ptk app.ts
+cargo run -p plotnik -- trace -q 'Q = (identifier) @id' app.ts
+cargo run -p plotnik -- trace query.ptk app.ts --no-result -vv
 ```
 
 Options: `-v` (verbose), `-vv` (very verbose), `--no-result`, `--fuel <N>`
@@ -268,7 +268,7 @@ Options: `-v` (verbose), `-vv` (very verbose), `--no-result`, `--fuel <N>`
 List supported tree-sitter languages.
 
 ```sh
-cargo run -p plotnik-cli -- langs
+cargo run -p plotnik -- langs
 ```
 
 # Coding Rules
