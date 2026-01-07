@@ -2,7 +2,7 @@ use std::num::NonZeroU16;
 
 use super::layout::CacheAligned;
 use crate::bytecode::Nav;
-use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, ReturnIR};
+use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, NodeTypeIR, ReturnIR};
 
 #[test]
 fn layout_empty() {
@@ -17,7 +17,7 @@ fn layout_single_instruction() {
     let instructions = vec![
         MatchIR::terminal(Label(0))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(10))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
             .into(),
     ];
 
@@ -33,12 +33,12 @@ fn layout_linear_chain() {
     let instructions = vec![
         MatchIR::at(Label(0))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(10))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
             .next(Label(1))
             .into(),
         MatchIR::at(Label(1))
             .nav(Nav::Next)
-            .node_type(NonZeroU16::new(20))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(20)))
             .next(Label(2))
             .into(),
         MatchIR::terminal(Label(2)).nav(Nav::Up(1)).into(),
@@ -58,7 +58,7 @@ fn layout_call_return() {
     let instructions = vec![
         MatchIR::at(Label(0))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(10))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
             .next(Label(1))
             .into(),
         CallIR::new(Label(1), Label(2), Label(3))
@@ -66,7 +66,7 @@ fn layout_call_return() {
             .into(),
         MatchIR::at(Label(2))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(20))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(20)))
             .next(Label(4))
             .into(),
         MatchIR::terminal(Label(3)).nav(Nav::Up(1)).into(),
@@ -92,11 +92,11 @@ fn layout_branch() {
             .into(),
         MatchIR::terminal(Label(1))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(10))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
             .into(),
         MatchIR::terminal(Label(2))
             .nav(Nav::Down)
-            .node_type(NonZeroU16::new(20))
+            .node_type(NodeTypeIR::Named(NonZeroU16::new(20)))
             .into(),
     ];
 
@@ -118,7 +118,7 @@ fn layout_large_instruction_cache_alignment() {
     // Start at step 5 (offset 40), would straddle - should pad
     let large_match = MatchIR::at(Label(1))
         .nav(Nav::Down)
-        .node_type(NonZeroU16::new(10))
+        .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
         .pre_effect(EffectIR::start_obj())
         .pre_effect(EffectIR::start_obj())
         .pre_effect(EffectIR::start_obj())

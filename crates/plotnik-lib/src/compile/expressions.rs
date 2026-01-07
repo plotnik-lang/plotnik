@@ -10,9 +10,8 @@
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
-use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::Nav;
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR};
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;
@@ -136,7 +135,7 @@ impl Compiler<'_> {
         entry: Label,
         exit: Label,
         nav: Nav,
-        node_type: Option<NonZeroU16>,
+        node_type: NodeTypeIR,
         neg_fields: Vec<u16>,
         items: &[ast::SeqItem],
         up_nav: Nav,
@@ -215,11 +214,11 @@ impl Compiler<'_> {
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
 
-        // Extract literal value (None for wildcard `_`)
-        let node_type = node.value().and_then(|token| {
-            let text = token.text();
-            self.resolve_anonymous_node_type(text)
-        });
+        // Extract literal value (Any for wildcard `_`, Anonymous for literals)
+        let node_type = match node.value() {
+            Some(token) => self.resolve_anonymous_node_type(token.text()),
+            None => NodeTypeIR::Any, // `_` wildcard matches any node
+        };
 
         self.instructions.push(
             MatchIR::epsilon(entry, exit)
@@ -523,54 +522,56 @@ impl Compiler<'_> {
         self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default())
     }
 
-    /// Resolve an anonymous node's literal text to its node type ID.
+    /// Resolve an anonymous node's literal text to its node type constraint.
     ///
-    /// In linked mode, returns the grammar NodeTypeId for the literal.
-    /// In unlinked mode, returns the StringId of the literal text.
-    pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> Option<NonZeroU16> {
+    /// Returns `NodeTypeIR::Anonymous` with the type ID.
+    pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
         if let Some(ids) = self.node_type_ids {
             // Linked mode: resolve to NodeTypeId from grammar
             for (&sym, &id) in ids {
                 if self.interner.resolve(sym) == text {
-                    return NonZeroU16::new(id.get());
+                    return NodeTypeIR::Anonymous(NonZeroU16::new(id.get()));
                 }
             }
-            // If not found in grammar, treat as no constraint
-            None
+            // If not found in grammar, treat as anonymous wildcard
+            NodeTypeIR::Anonymous(None)
         } else {
             // Unlinked mode: store StringId referencing the literal text
             let string_id = self.strings.intern_str(text);
-            Some(string_id.0)
+            NodeTypeIR::Anonymous(Some(string_id.0))
         }
     }
 
-    /// Resolve a NamedNode to its node type ID.
+    /// Resolve a NamedNode to its node type constraint.
     ///
-    /// In linked mode, returns the grammar NodeTypeId.
-    /// In unlinked mode, returns the StringId of the type name.
-    /// For the wildcard `(_)`, returns `NAMED_WILDCARD` sentinel.
-    pub(super) fn resolve_node_type(&mut self, node: &ast::NamedNode) -> Option<NonZeroU16> {
-        // For wildcard (_), return sentinel for "any named node"
+    /// Returns `NodeTypeIR::Named` with:
+    /// - `None` for wildcard `(_)` (any named node)
+    /// - `Some(id)` for specific types like `(identifier)`
+    pub(super) fn resolve_node_type(&mut self, node: &ast::NamedNode) -> NodeTypeIR {
+        // For wildcard (_), return Named(None) for "any named node"
         if node.is_any() {
-            return NonZeroU16::new(NAMED_WILDCARD);
+            return NodeTypeIR::Named(None);
         }
 
-        let type_token = node.node_type()?;
+        let Some(type_token) = node.node_type() else {
+            // No type specified - treat as any named
+            return NodeTypeIR::Named(None);
+        };
         let type_name = type_token.text();
 
         if let Some(ids) = self.node_type_ids {
             // Linked mode: resolve to NodeTypeId from grammar
             for (&sym, &id) in ids {
                 if self.interner.resolve(sym) == type_name {
-                    return NonZeroU16::new(id.get());
+                    return NodeTypeIR::Named(NonZeroU16::new(id.get()));
                 }
             }
-            // If not found in grammar, treat as no constraint (linked mode)
-            None
+            // If not found in grammar, treat as any named (linked mode)
+            NodeTypeIR::Named(None)
         } else {
             // Unlinked mode: store StringId referencing the type name
             let string_id = self.strings.intern_str(type_name);
-            Some(string_id.0)
+            NodeTypeIR::Named(Some(string_id.0))
         }
     }
 

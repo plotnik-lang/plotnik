@@ -38,5 +38,5 @@ Test:
   06   ε                                    07
   07   !   -type_parameters (function_declaration)  09
   09   ▽   name: (identifier) [Node Set(M0)]  11
-  11   △                                    12
+  11   △   _                                12
   12                                        ▶

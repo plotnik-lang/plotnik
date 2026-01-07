@@ -14,6 +14,79 @@ use super::instructions::{
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
 
+/// Node type constraint for Match instructions.
+///
+/// Distinguishes between named nodes (`(identifier)`), anonymous nodes (`"text"`),
+/// and wildcards (`_`, `(_)`). Encoded in bytecode header byte bits 5-4.
+///
+/// | `node_kind` | Value | Meaning      | `node_type=0`       | `node_type>0`     |
+/// | ----------- | ----- | ------------ | ------------------- | ----------------- |
+/// | `00`        | Any   | `_` pattern  | No check            | (invalid)         |
+/// | `01`        | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `kind_id()` |
+/// | `10`        | Anon  | `"text"`     | Check `!is_named()` | Check `kind_id()` |
+/// | `11`        | -     | Reserved     | Error               | Error             |
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum NodeTypeIR {
+    /// Any node (`_` pattern) - no type check performed.
+    #[default]
+    Any,
+    /// Named node constraint (`(_)` or `(identifier)`).
+    /// - `None` = any named node (check `is_named()`)
+    /// - `Some(id)` = specific named type (check `kind_id()`)
+    Named(Option<NonZeroU16>),
+    /// Anonymous node constraint (`"text"` literals).
+    /// - `None` = any anonymous node (check `!is_named()`)
+    /// - `Some(id)` = specific anonymous type (check `kind_id()`)
+    Anonymous(Option<NonZeroU16>),
+}
+
+impl NodeTypeIR {
+    /// Encode to bytecode: returns (node_kind bits, node_type value).
+    ///
+    /// `node_kind` is 2 bits for header byte bits 5-4.
+    /// `node_type` is u16 for bytes 2-3.
+    pub fn to_bytes(self) -> (u8, u16) {
+        match self {
+            Self::Any => (0b00, 0),
+            Self::Named(opt) => (0b01, opt.map(|n| n.get()).unwrap_or(0)),
+            Self::Anonymous(opt) => (0b10, opt.map(|n| n.get()).unwrap_or(0)),
+        }
+    }
+
+    /// Decode from bytecode: node_kind bits (2 bits) and node_type value (u16).
+    pub fn from_bytes(node_kind: u8, node_type: u16) -> Self {
+        match node_kind {
+            0b00 => Self::Any,
+            0b01 => Self::Named(NonZeroU16::new(node_type)),
+            0b10 => Self::Anonymous(NonZeroU16::new(node_type)),
+            _ => panic!("invalid node_kind: {node_kind}"),
+        }
+    }
+
+    /// Check if this represents a specific type ID (not a wildcard).
+    pub fn type_id(&self) -> Option<NonZeroU16> {
+        match self {
+            Self::Any => None,
+            Self::Named(opt) | Self::Anonymous(opt) => *opt,
+        }
+    }
+
+    /// Check if this is the Any wildcard.
+    pub fn is_any(&self) -> bool {
+        matches!(self, Self::Any)
+    }
+
+    /// Check if this is a Named constraint (wildcard or specific).
+    pub fn is_named(&self) -> bool {
+        matches!(self, Self::Named(_))
+    }
+
+    /// Check if this is an Anonymous constraint (wildcard or specific).
+    pub fn is_anonymous(&self) -> bool {
+        matches!(self, Self::Anonymous(_))
+    }
+}
+
 /// Symbolic reference, resolved to step address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Label(pub u32);
@@ -277,10 +350,10 @@ impl InstructionIR {
 pub struct MatchIR {
     /// Where this instruction lives.
     pub label: Label,
-    /// Navigation command.
+    /// Navigation command. `Epsilon` means pure control flow (no node check).
     pub nav: Nav,
-    /// Node type constraint (None = wildcard).
-    pub node_type: Option<NonZeroU16>,
+    /// Node type constraint (Any = wildcard, Named/Anonymous for specific checks).
+    pub node_type: NodeTypeIR,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
     /// Effects to execute before match attempt.
@@ -298,8 +371,8 @@ impl MatchIR {
     pub fn terminal(label: Label) -> Self {
         Self {
             label,
-            nav: Nav::Stay,
-            node_type: None,
+            nav: Nav::Epsilon,
+            node_type: NodeTypeIR::Any,
             node_field: None,
             pre_effects: vec![],
             neg_fields: vec![],
@@ -325,8 +398,8 @@ impl MatchIR {
     }
 
     /// Set the node type constraint.
-    pub fn node_type(mut self, t: impl Into<Option<NonZeroU16>>) -> Self {
-        self.node_type = t.into();
+    pub fn node_type(mut self, t: NodeTypeIR) -> Self {
+        self.node_type = t;
         self
     }
 
@@ -437,9 +510,10 @@ impl MatchIR {
         let size = opcode.size();
         let mut bytes = vec![0u8; size];
 
-        bytes[0] = opcode as u8; // segment 0
+        // Header byte layout: segment(2) | node_kind(2) | opcode(4)
+        let (node_kind, node_type_val) = self.node_type.to_bytes();
+        bytes[0] = (node_kind << 4) | (opcode as u8); // segment 0
         bytes[1] = self.nav.to_byte();
-        let node_type_val = self.node_type.map(|n| n.get()).unwrap_or(0);
         bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
         let node_field_val = self.node_field.map(|n| n.get()).unwrap_or(0);
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
@@ -488,7 +562,7 @@ impl MatchIR {
     /// Check if this is an epsilon transition (no node interaction).
     #[inline]
     pub fn is_epsilon(&self) -> bool {
-        self.nav == Nav::Stay && self.node_type.is_none() && self.node_field.is_none()
+        self.nav == Nav::Epsilon
     }
 }
 

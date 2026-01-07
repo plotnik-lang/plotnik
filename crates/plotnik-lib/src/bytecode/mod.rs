@@ -16,9 +16,7 @@ mod nav;
 mod sections;
 mod type_meta;
 
-pub use constants::{
-    MAGIC, MAX_MATCH_PAYLOAD_SLOTS, NAMED_WILDCARD, SECTION_ALIGN, STEP_SIZE, VERSION,
-};
+pub use constants::{MAGIC, MAX_MATCH_PAYLOAD_SLOTS, SECTION_ALIGN, STEP_SIZE, VERSION};
 
 pub use ids::{StringId, TypeId};
 
@@ -47,12 +45,12 @@ pub use module::{
 pub use dump::dump;
 
 pub use format::{
-    LineBuilder, Symbol, cols, format_effect, nav_symbol, nav_symbol_epsilon, superscript, trace,
-    truncate_text, width_for_count,
+    LineBuilder, Symbol, cols, format_effect, nav_symbol, superscript, trace, truncate_text,
+    width_for_count,
 };
 
 pub use ir::{
-    CallIR, EffectIR, InstructionIR, Label, LayoutResult, MatchIR, MemberRef, ReturnIR,
+    CallIR, EffectIR, InstructionIR, Label, LayoutResult, MatchIR, MemberRef, NodeTypeIR, ReturnIR,
     TrampolineIR,
 };
 

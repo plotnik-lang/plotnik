@@ -2,21 +2,24 @@
 
 use arborium_tree_sitter::{Node, Tree};
 
-use crate::bytecode::NAMED_WILDCARD;
 use crate::bytecode::{
-    Call, EffectOp, EffectOpcode, Entrypoint, Instruction, Match, Module, Nav, StepAddr, Trampoline,
+    Call, EffectOp, EffectOpcode, Entrypoint, Instruction, Match, Module, Nav, NodeTypeIR,
+    StepAddr, Trampoline,
 };
 
 /// Get the nav for continue_search (always a sibling move).
-/// Up/Stay variants return Next as a default since they don't do sibling search.
+/// Up/Stay/Epsilon variants return Next as a default since they don't do sibling search.
 fn continuation_nav(nav: Nav) -> Nav {
     match nav {
         Nav::Down | Nav::Next => Nav::Next,
         Nav::DownSkip | Nav::NextSkip => Nav::NextSkip,
         Nav::DownExact | Nav::NextExact => Nav::NextExact,
-        Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) | Nav::Stay | Nav::StayExact => {
-            Nav::Next
-        }
+        Nav::Epsilon
+        | Nav::Up(_)
+        | Nav::UpSkipTrivia(_)
+        | Nav::UpExact(_)
+        | Nav::Stay
+        | Nav::StayExact => Nav::Next,
     }
 }
 
@@ -25,13 +28,18 @@ use super::cursor::{CursorWrapper, SkipPolicy};
 
 /// Derive skip policy from navigation mode without navigating.
 /// Used when retrying a Call to determine the policy for the next checkpoint.
-/// Stay/Up variants return None since they don't retry among siblings.
+/// Epsilon/Stay/Up variants return None since they don't retry among siblings.
 fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
     match nav {
         Nav::Down | Nav::Next => Some(SkipPolicy::Any),
         Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
         Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
-        Nav::Stay | Nav::StayExact | Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => None,
+        Nav::Epsilon
+        | Nav::Stay
+        | Nav::StayExact
+        | Nav::Up(_)
+        | Nav::UpSkipTrivia(_)
+        | Nav::UpExact(_) => None,
     }
 }
 use super::effect::{EffectLog, RuntimeEffect};
@@ -284,6 +292,7 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
+            tracer.trace_nav_failure(m.nav);
             return self.backtrack(tracer);
         };
         tracer.trace_nav(m.nav, self.cursor.node());
@@ -315,22 +324,48 @@ impl<'t> VM<'t> {
 
     /// Check if current node matches type and field constraints.
     fn node_matches<T: Tracer>(&self, m: Match<'_>, tracer: &mut T) -> bool {
-        if let Some(expected) = m.node_type {
-            if expected.get() == NAMED_WILDCARD {
-                // Special case: `(_)` wildcard matches any named node
-                if !self.cursor.node().is_named() {
-                    tracer.trace_match_failure(self.cursor.node());
+        let node = self.cursor.node();
+
+        // Check node type constraint
+        match m.node_type {
+            NodeTypeIR::Any => {
+                // Any node matches - no check needed
+            }
+            NodeTypeIR::Named(None) => {
+                // `(_)` wildcard: must be a named node
+                if !node.is_named() {
+                    tracer.trace_match_failure(node);
                     return false;
                 }
-            } else if self.cursor.node().kind_id() != expected.get() {
-                tracer.trace_match_failure(self.cursor.node());
-                return false;
+            }
+            NodeTypeIR::Named(Some(expected)) => {
+                // Specific named type: check kind_id
+                if node.kind_id() != expected.get() {
+                    tracer.trace_match_failure(node);
+                    return false;
+                }
+            }
+            NodeTypeIR::Anonymous(None) => {
+                // Any anonymous node: must NOT be named
+                if node.is_named() {
+                    tracer.trace_match_failure(node);
+                    return false;
+                }
+            }
+            NodeTypeIR::Anonymous(Some(expected)) => {
+                // Specific anonymous type: check kind_id
+                if node.kind_id() != expected.get() {
+                    tracer.trace_match_failure(node);
+                    return false;
+                }
             }
         }
+
+        // Check field constraint
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)
         {
-            tracer.trace_field_failure(self.cursor.node());
+            tracer.trace_field_failure(node);
             return false;
         }
         true
@@ -427,6 +462,7 @@ impl<'t> VM<'t> {
         }
 
         let Some(policy) = self.cursor.navigate(nav) else {
+            tracer.trace_nav_failure(nav);
             return Err(self.backtrack(tracer).unwrap_err());
         };
         tracer.trace_nav(nav, self.cursor.node());

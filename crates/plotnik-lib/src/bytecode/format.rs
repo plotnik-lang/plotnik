@@ -72,8 +72,8 @@ impl Symbol {
 ///
 /// | Nav             | Symbol  | Notes                               |
 /// | --------------- | ------- | ----------------------------------- |
+/// | Epsilon         | ε       | Pure control flow, no cursor check  |
 /// | Stay            | (blank) | No movement, 5 spaces               |
-/// | Stay (epsilon)  | ε       | Only when no type/field constraints |
 /// | StayExact       | !       | Stay at position, exact match only  |
 /// | Down            | ▽       | First child, skip any               |
 /// | DownSkip        | !▽      | First child, skip trivia            |
@@ -86,6 +86,7 @@ impl Symbol {
 /// | UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
+        Nav::Epsilon => Symbol::EPSILON,
         Nav::Stay => Symbol::EMPTY,
         Nav::StayExact => Symbol::new("  ", "!", "  "),
         Nav::Down => Symbol::new("  ", "▽", "  "),
@@ -97,20 +98,6 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
         Nav::Up(n) => Symbol::new("  ", "△", superscript_suffix(n)),
         Nav::UpSkipTrivia(n) => Symbol::new(" !", "△", superscript_suffix(n)),
         Nav::UpExact(n) => Symbol::new("!!", "△", superscript_suffix(n)),
-    }
-}
-
-/// Format navigation for epsilon transitions (when is_epsilon is true).
-///
-/// True epsilon transitions require all three conditions:
-/// - `nav == Stay` (no cursor movement)
-/// - `node_type == None` (no type constraint)
-/// - `node_field == None` (no field constraint)
-pub fn nav_symbol_epsilon(nav: Nav, is_epsilon: bool) -> Symbol {
-    if is_epsilon {
-        Symbol::EPSILON
-    } else {
-        nav_symbol(nav)
     }
 }
 

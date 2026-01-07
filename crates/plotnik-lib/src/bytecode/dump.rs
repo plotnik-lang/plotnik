@@ -7,10 +7,10 @@ use std::fmt::Write as _;
 
 use crate::colors::Colors;
 
-use super::NAMED_WILDCARD;
-use super::format::{LineBuilder, Symbol, format_effect, nav_symbol_epsilon, width_for_count};
+use super::format::{LineBuilder, Symbol, format_effect, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
+use super::ir::NodeTypeIR;
 use super::module::{Instruction, Module};
 use super::type_meta::{TypeData, TypeKind};
 use super::{Call, Match, Return, Trampoline};
@@ -446,7 +446,7 @@ fn format_match(
     step_width: usize,
 ) -> String {
     let builder = LineBuilder::new(step_width);
-    let symbol = nav_symbol_epsilon(m.nav, m.is_epsilon());
+    let symbol = nav_symbol(m.nav);
     let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
     let content = format_match_content(m, ctx);
@@ -464,17 +464,20 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
         parts.push(format!("[{}]", pre.join(" ")));
     }
 
-    for field_id in m.neg_fields() {
-        let name = ctx
-            .node_field_name(field_id)
-            .map(String::from)
-            .unwrap_or_else(|| format!("field#{field_id}"));
-        parts.push(format!("-{name}"));
-    }
+    // Skip neg_fields and node pattern for epsilon (no node interaction)
+    if !m.is_epsilon() {
+        for field_id in m.neg_fields() {
+            let name = ctx
+                .node_field_name(field_id)
+                .map(String::from)
+                .unwrap_or_else(|| format!("field#{field_id}"));
+            parts.push(format!("-{name}"));
+        }
 
-    let node_part = format_node_pattern(m, ctx);
-    if !node_part.is_empty() {
-        parts.push(node_part);
+        let node_part = format_node_pattern(m, ctx);
+        if !node_part.is_empty() {
+            parts.push(node_part);
+        }
     }
 
     let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
@@ -485,7 +488,7 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
     parts.join(" ")
 }
 
-/// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)`
+/// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)` or `"text"`
 fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
     let mut result = String::new();
 
@@ -498,11 +501,17 @@ fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
         result.push_str(": ");
     }
 
-    if let Some(type_id) = m.node_type {
-        if type_id.get() == NAMED_WILDCARD {
+    match m.node_type {
+        NodeTypeIR::Any => {
+            // Any node wildcard: `_`
+            result.push('_');
+        }
+        NodeTypeIR::Named(None) => {
             // Named wildcard: any named node
             result.push_str("(_)");
-        } else {
+        }
+        NodeTypeIR::Named(Some(type_id)) => {
+            // Specific named node type
             let name = ctx
                 .node_type_name(type_id.get())
                 .map(String::from)
@@ -511,8 +520,20 @@ fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
             result.push_str(&name);
             result.push(')');
         }
-    } else if m.node_field.is_some() {
-        result.push('_');
+        NodeTypeIR::Anonymous(None) => {
+            // Anonymous wildcard: any anonymous node (future syntax)
+            result.push_str("\"_\"");
+        }
+        NodeTypeIR::Anonymous(Some(type_id)) => {
+            // Specific anonymous node (literal token)
+            let name = ctx
+                .node_type_name(type_id.get())
+                .map(String::from)
+                .unwrap_or_else(|| format!("anon#{}", type_id.get()));
+            result.push('"');
+            result.push_str(&name);
+            result.push('"');
+        }
     }
 
     result
@@ -538,7 +559,7 @@ fn format_call(
 ) -> String {
     let c = &ctx.colors;
     let builder = LineBuilder::new(step_width);
-    let symbol = nav_symbol_epsilon(call.nav, false);
+    let symbol = nav_symbol(call.nav());
     let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
     // Format field constraint if present

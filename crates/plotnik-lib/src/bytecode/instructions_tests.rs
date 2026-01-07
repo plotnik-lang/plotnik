@@ -7,7 +7,7 @@ use super::effects::EffectOpcode;
 use super::instructions::{
     Call, Match, Opcode, Return, StepId, align_to_section, select_match_opcode,
 };
-use super::ir::{EffectIR, Label, MatchIR};
+use super::ir::{EffectIR, Label, MatchIR, NodeTypeIR};
 use super::nav::Nav;
 
 #[test]
@@ -94,7 +94,7 @@ fn match_basic() {
 
     let bytes = MatchIR::at(Label(0))
         .nav(Nav::Down)
-        .node_type(NonZeroU16::new(42))
+        .node_type(NodeTypeIR::Named(NonZeroU16::new(42)))
         .node_field(NonZeroU16::new(7))
         .next(Label(1))
         .resolve(&map, |_, _| None, |_| None);
@@ -103,7 +103,7 @@ fn match_basic() {
 
     let m = Match::from_bytes(&bytes);
     assert_eq!(m.nav, Nav::Down);
-    assert_eq!(m.node_type, NonZeroU16::new(42));
+    assert_eq!(m.node_type, NodeTypeIR::Named(NonZeroU16::new(42)));
     assert_eq!(m.node_field, NonZeroU16::new(7));
     assert!(!m.is_terminal());
     assert!(!m.is_epsilon());
@@ -134,7 +134,7 @@ fn match_extended() {
 
     let bytes = MatchIR::at(Label(0))
         .nav(Nav::Next)
-        .node_type(NonZeroU16::new(100))
+        .node_type(NodeTypeIR::Named(NonZeroU16::new(100)))
         .pre_effect(EffectIR::start_obj())
         .neg_field(5)
         .neg_field(6)
@@ -151,7 +151,7 @@ fn match_extended() {
 
     let m = Match::from_bytes(&bytes);
     assert_eq!(m.nav, Nav::Next);
-    assert_eq!(m.node_type, NonZeroU16::new(100));
+    assert_eq!(m.node_type, NodeTypeIR::Named(NonZeroU16::new(100)));
     assert!(!m.is_terminal());
 
     let pre: Vec<_> = m.pre_effects().collect();

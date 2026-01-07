@@ -13,23 +13,34 @@ Multi-step instructions (Match16–Match64) consume consecutive StepIds. A Match
 
 ### Future: Segment-Based Addressing
 
-The `type_id` byte reserves 4 bits for segment selection, enabling future expansion to 16 segments × 512 KB = 8 MB. Currently, only segment 0 is used. Compilers must emit `segment = 0`; runtimes should reject non-zero segments until implemented.
+The `type_id` byte reserves 2 bits for segment selection, enabling future expansion to 4 segments × 512 KB = 2 MB. Currently, only segment 0 is used. Compilers must emit `segment = 0`; runtimes should reject non-zero segments until implemented.
 
 When implemented: Address = `(segment * 512KB) + (StepId * 8)`. Each instruction's successors must reside in the same segment; cross-segment jumps require trampoline steps.
 
 ## 2. Step Types
 
-The first byte of every step encodes segment and opcode:
+The first byte of every step encodes segment, node kind, and opcode:
 
 ```text
 type_id (u8)
-┌────────────┬────────────┐
-│ segment(4) │ opcode(4)  │
-└────────────┴────────────┘
+┌───────────┬──────────────┬────────────┐
+│ segment(2)│ node_kind(2) │ opcode(4)  │
+└───────────┴──────────────┴────────────┘
+  bits 7-6     bits 5-4      bits 3-0
 ```
 
-- **Bits 4-7 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
-- **Bits 0-3 (Opcode)**: Step type and size.
+- **Bits 7-6 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
+- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Ignored for Call/Return/Trampoline.
+- **Bits 3-0 (Opcode)**: Step type and size.
+
+**NodeKind values** (for Match instructions):
+
+| Value | Name      | Meaning                                    |
+| :---- | :-------- | :----------------------------------------- |
+| `00`  | Any       | No type check (`_` pattern)                |
+| `01`  | Named     | Named node check (`(_)` or `(identifier)`) |
+| `10`  | Anonymous | Anonymous node check (`"text"` literals)   |
+| `11`  | Reserved  | Reserved for future use                    |
 
 | Opcode | Name    | Size     | Description                          |
 | :----- | :------ | :------- | :----------------------------------- |
@@ -64,14 +75,15 @@ Bit-packed navigation command.
 
 **Standard Modes**:
 
-- `0`: `Stay` (No movement)
-- `1`: `StayExact` (No movement, exact match only)
-- `2`: `Next` (Sibling, skip any)
-- `3`: `NextSkip` (Sibling, skip trivia)
-- `4`: `NextExact` (Sibling, exact)
-- `5`: `Down` (Child, skip any)
-- `6`: `DownSkip` (Child, skip trivia)
-- `7`: `DownExact` (Child, exact)
+- `0`: `Epsilon` (Pure control flow, no cursor movement or node check)
+- `1`: `Stay` (No movement)
+- `2`: `StayExact` (No movement, exact match only)
+- `3`: `Next` (Sibling, skip any)
+- `4`: `NextSkip` (Sibling, skip trivia)
+- `5`: `NextExact` (Sibling, exact)
+- `6`: `Down` (Child, skip any)
+- `7`: `DownSkip` (Child, skip trivia)
+- `8`: `DownExact` (Child, exact)
 
 ### 3.2. EffectOp (u16)
 
@@ -125,15 +137,21 @@ Optimized fast-path transition. Used when there are no side effects, no negated 
 ```rust
 #[repr(C)]
 struct Match8 {
-    type_id: u8,                     // segment(4) | 0x0
+    type_id: u8,                     // segment(2) | node_kind(2) | 0x0
     nav: u8,                         // Nav
-    node_type: Option<NonZeroU16>,   // None (0) means "any"
-    node_field: Option<NonZeroU16>,  // None (0) means "any"
+    node_type: u16,                  // Type ID (interpretation depends on node_kind)
+    node_field: Option<NonZeroU16>,  // None (0) means "any field"
     next: u16,                       // Next StepId. 0 = Accept.
 }
 ```
 
-**Note**: The value 0 indicates wildcard (no constraint).
+**NodeKind + node_type interpretation**:
+
+| `node_kind`  | `node_type=0`       | `node_type>0`              |
+| :----------- | :------------------ | :------------------------- |
+| `00` (Any)   | No check (any node) | Invalid                    |
+| `01` (Named) | Check `is_named()`  | Check `kind_id() == value` |
+| `10` (Anon)  | Check `!is_named()` | Check `kind_id() == value` |
 
 **Linked vs Unlinked Interpretation**:
 
@@ -156,10 +174,10 @@ Extended transitions with inline payload. Used for side effects, negated fields,
 ```rust
 #[repr(C)]
 struct MatchHeader {
-    type_id: u8,                     // segment(4) | opcode(1-5)
+    type_id: u8,                     // segment(2) | node_kind(2) | opcode(1-5)
     nav: u8,                         // Nav
-    node_type: Option<NodeTypeId>,   // None (0) means "any"
-    node_field: Option<NodeFieldId>, // None (0) means "any"
+    node_type: u16,                  // Type ID (interpretation depends on node_kind)
+    node_field: Option<NodeFieldId>, // None (0) means "any field"
     counts: u16,                     // Bit-packed element counts
 }
 ```
@@ -229,11 +247,18 @@ The compiler places effects based on semantic requirements: scope openers often 
 
 ### 4.3. Epsilon Transitions
 
-A Match8 or Match16–64 with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables:
+A Match instruction with `nav == Epsilon` is an **epsilon transition**—it succeeds unconditionally without cursor movement or node checking. The VM skips navigation and node matching entirely, only executing effects and proceeding to successors. This enables:
 
 - **Branching at EOF**: `(a)?` must succeed when no node exists to match.
 - **Pure control flow**: Decision points for quantifiers.
-- **Trailing navigation**: Queries ending with `Up(n)` to restore cursor position.
+- **Effect-only steps**: Scope openers/closers (`Obj`, `EndObj`) without node interaction.
+
+When `nav == Epsilon`:
+
+- No cursor movement occurs
+- No node type or field checks are performed
+- `node_kind`, `node_type`, and `node_field` are ignored
+- Only `pre_effects`, `post_effects`, and successors are meaningful
 
 ### 4.4. Call
 
@@ -242,7 +267,7 @@ Invokes another definition (recursion). Executes navigation (with optional field
 ```rust
 #[repr(C)]
 struct Call {
-    type_id: u8,                    // segment(4) | 0x6
+    type_id: u8,                    // segment(2) | 0 | 0x6
     nav: u8,                        // Nav
     node_field: Option<NonZeroU16>, // None (0) means "any"
     next: u16,                      // Return address (StepId, current segment)
@@ -251,7 +276,7 @@ struct Call {
 ```
 
 - **Nav + Field**: Call handles navigation and field constraint. The callee's first Match checks node type. This allows `field: (Ref)` patterns to check field and type on the same node.
-- **Target Segment**: Defined by `type_id >> 4`.
+- **Target Segment**: Defined by `(type_id >> 6) & 0x3`.
 - **Return Segment**: Implicitly the current segment.
 
 ### 4.5. Return
@@ -261,7 +286,7 @@ Returns from a definition. Pops the return address from the call stack.
 ```rust
 #[repr(C)]
 struct Return {
-    type_id: u8,        // segment(4) | 0x7
+    type_id: u8,        // segment(2) | 0 | 0x7
     _pad: [u8; 7],
 }
 ```
@@ -270,25 +295,33 @@ struct Return {
 
 ### 5.1. Match8 Execution
 
-1. Execute `nav` movement.
-2. Check `node_type` (if not wildcard).
-3. Check `node_field` (if not wildcard).
-4. On failure: backtrack.
-5. On success: if `next == 0` → accept; else `ip = next`.
+1. If `nav == Epsilon`: skip steps 2-4, go directly to step 5.
+2. Execute `nav` movement.
+3. Check `node_type` according to `node_kind`:
+   - `Any`: no check
+   - `Named(0)`: check `is_named()`
+   - `Named(id)`: check `kind_id() == id`
+   - `Anonymous(0)`: check `!is_named()`
+   - `Anonymous(id)`: check `kind_id() == id`
+4. Check `node_field` (if not 0).
+5. On failure: backtrack.
+6. On success: if `next == 0` → accept; else `ip = next`.
 
 ### 5.2. Match16–64 Execution
 
 1. Execute `pre_effects`.
-2. Clear `matched_node`.
-3. Execute `nav` movement (skip for epsilon transitions).
-4. Check `node_type` and `node_field` (skip for epsilon).
-5. On success: `matched_node = cursor.node()`.
-6. Verify all `negated_fields` are absent on current node.
-7. Execute `post_effects`.
-8. Continuation:
-   - `succ_count == 0` → accept.
-   - `succ_count == 1` → `ip = successors[0]`.
-   - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.
+2. If `nav == Epsilon`: skip steps 3-6, go to step 7.
+3. Clear `matched_node`.
+4. Execute `nav` movement.
+5. Check `node_type` according to `node_kind` (see Match8 Execution).
+6. Check `node_field` (if not 0).
+7. On success: `matched_node = cursor.node()`.
+8. Verify all `negated_fields` are absent on current node.
+9. Execute `post_effects`.
+10. Continuation:
+    - `succ_count == 0` → accept.
+    - `succ_count == 1` → `ip = successors[0]`.
+    - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.
 
 ### 5.3. Backtracking
 
