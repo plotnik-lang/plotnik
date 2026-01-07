@@ -38,19 +38,6 @@ impl StepId {
     }
 }
 
-/// Read `count` little-endian u16 values from bytes starting at `offset`.
-/// Advances `offset` by `count * 2`.
-#[inline]
-fn read_u16_vec(bytes: &[u8], offset: &mut usize, count: usize) -> Vec<u16> {
-    (0..count)
-        .map(|_| {
-            let v = u16::from_le_bytes([bytes[*offset], bytes[*offset + 1]]);
-            *offset += 2;
-            v
-        })
-        .collect()
-}
-
 /// Instruction opcodes (4-bit).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -136,215 +123,11 @@ impl Opcode {
     }
 }
 
-/// Match instruction for pattern matching in the VM.
+/// Match instruction decoded from bytecode.
 ///
-/// Unifies Match8 (fast-path) and Match16-64 (extended) wire formats into
-/// a single runtime-friendly struct.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Match {
-    /// Segment index (0-15, currently only 0 is used).
-    pub segment: u8,
-    /// Navigation command.
-    pub nav: Nav,
-    /// Node type constraint (None = wildcard).
-    pub node_type: Option<NonZeroU16>,
-    /// Field constraint (None = wildcard).
-    pub node_field: Option<NonZeroU16>,
-    /// Effects to execute before match attempt.
-    pub pre_effects: Vec<EffectOp>,
-    /// Fields that must NOT be present on the node.
-    pub neg_fields: Vec<u16>,
-    /// Effects to execute after successful match.
-    pub post_effects: Vec<EffectOp>,
-    /// Successor step IDs (empty = accept, 1 = linear, 2+ = branch).
-    pub successors: Vec<StepId>,
-}
-
-impl Match {
-    /// Check if this is a terminal (accept) state.
-    #[inline]
-    pub fn is_terminal(&self) -> bool {
-        self.successors.is_empty()
-    }
-
-    /// Check if this is an epsilon transition (no node interaction).
-    #[inline]
-    pub fn is_epsilon(&self) -> bool {
-        self.nav == Nav::Stay && self.node_type.is_none() && self.node_field.is_none()
-    }
-
-    /// Decode from bytecode bytes.
-    ///
-    /// The slice must start at the instruction and contain at least
-    /// the full instruction size (determined by opcode).
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= 8, "Match instruction too short");
-
-        let type_id_byte = bytes[0];
-        let segment = type_id_byte >> 4;
-        assert!(
-            segment == 0,
-            "non-zero segment not yet supported: {segment}"
-        );
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
-
-        assert!(opcode.is_match(), "expected Match opcode, got {opcode:?}");
-        assert!(
-            bytes.len() >= opcode.size(),
-            "Match instruction truncated: expected {} bytes, got {}",
-            opcode.size(),
-            bytes.len()
-        );
-
-        let nav = Nav::from_byte(bytes[1]);
-        let node_type = NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]));
-        let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
-
-        if opcode == Opcode::Match8 {
-            // Match8: single successor in bytes 6-7 (0 = terminal)
-            let next_raw = u16::from_le_bytes([bytes[6], bytes[7]]);
-            let successors = if next_raw == 0 {
-                vec![] // terminal
-            } else {
-                vec![StepId::new(next_raw)]
-            };
-
-            Self {
-                segment,
-                nav,
-                node_type,
-                node_field,
-                pre_effects: vec![],
-                neg_fields: vec![],
-                post_effects: vec![],
-                successors,
-            }
-        } else {
-            // Extended match: parse counts and payload
-            let counts = u16::from_le_bytes([bytes[6], bytes[7]]);
-            let pre_count = ((counts >> 13) & 0x7) as usize;
-            let neg_count = ((counts >> 10) & 0x7) as usize;
-            let post_count = ((counts >> 7) & 0x7) as usize;
-            let succ_count = ((counts >> 1) & 0x3F) as usize;
-
-            let payload = &bytes[8..];
-            let mut offset = 0;
-
-            let pre_effects = read_u16_vec(payload, &mut offset, pre_count)
-                .into_iter()
-                .map(|v| EffectOp::from_bytes(v.to_le_bytes()))
-                .collect();
-            let neg_fields = read_u16_vec(payload, &mut offset, neg_count);
-            let post_effects = read_u16_vec(payload, &mut offset, post_count)
-                .into_iter()
-                .map(|v| EffectOp::from_bytes(v.to_le_bytes()))
-                .collect();
-            let successors = read_u16_vec(payload, &mut offset, succ_count)
-                .into_iter()
-                .map(StepId::new)
-                .collect();
-
-            Self {
-                segment,
-                nav,
-                node_type,
-                node_field,
-                pre_effects,
-                neg_fields,
-                post_effects,
-                successors,
-            }
-        }
-    }
-
-    /// Encode to bytecode bytes.
-    ///
-    /// Automatically selects the smallest opcode that fits the payload.
-    /// Returns None if the payload is too large (> 28 u16 slots).
-    pub fn to_bytes(&self) -> Option<Vec<u8>> {
-        // Match8 can be used if: no effects, no neg_fields, and at most 1 successor
-        let can_use_match8 = self.pre_effects.is_empty()
-            && self.neg_fields.is_empty()
-            && self.post_effects.is_empty()
-            && self.successors.len() <= 1;
-
-        let opcode = if can_use_match8 {
-            Opcode::Match8
-        } else {
-            // Extended match: count all payload slots
-            let slots_needed = self.pre_effects.len()
-                + self.neg_fields.len()
-                + self.post_effects.len()
-                + self.successors.len();
-            select_match_opcode(slots_needed)?
-        };
-        let size = opcode.size();
-        let mut bytes = vec![0u8; size];
-
-        // Type ID byte
-        bytes[0] = (self.segment << 4) | (opcode as u8);
-        bytes[1] = self.nav.to_byte();
-
-        // Node type/field
-        let node_type_val = self.node_type.map(|n| n.get()).unwrap_or(0);
-        bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
-        let node_field_val = self.node_field.map(|n| n.get()).unwrap_or(0);
-        bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
-
-        if opcode == Opcode::Match8 {
-            // Match8: single successor or terminal (0)
-            let next = self.successors.first().map(|s| s.get()).unwrap_or(0);
-            bytes[6..8].copy_from_slice(&next.to_le_bytes());
-        } else {
-            // Extended match: pack counts and payload
-            let pre_count = self.pre_effects.len() as u16;
-            let neg_count = self.neg_fields.len() as u16;
-            let post_count = self.post_effects.len() as u16;
-            let succ_count = self.successors.len() as u16;
-
-            let counts =
-                (pre_count << 13) | (neg_count << 10) | (post_count << 7) | (succ_count << 1);
-            bytes[6..8].copy_from_slice(&counts.to_le_bytes());
-
-            let mut offset = 8;
-
-            // Write pre_effects
-            for effect in &self.pre_effects {
-                bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
-                offset += 2;
-            }
-
-            // Write neg_fields
-            for &field in &self.neg_fields {
-                bytes[offset..offset + 2].copy_from_slice(&field.to_le_bytes());
-                offset += 2;
-            }
-
-            // Write post_effects
-            for effect in &self.post_effects {
-                bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
-                offset += 2;
-            }
-
-            // Write successors
-            for succ in &self.successors {
-                bytes[offset..offset + 2].copy_from_slice(&succ.get().to_le_bytes());
-                offset += 2;
-            }
-
-            // Remaining bytes are already zero (padding)
-        }
-
-        Some(bytes)
-    }
-}
-
-/// Zero-copy view into a Match instruction for efficient VM execution.
-///
-/// Unlike `Match`, this doesn't allocate - it stores a reference to the
-/// bytecode and provides iterator methods for accessing effects and successors.
+/// Provides iterator-based access to effects and successors without allocating.
 #[derive(Clone, Copy, Debug)]
-pub struct MatchView<'a> {
+pub struct Match<'a> {
     bytes: &'a [u8],
     /// Segment index (0-15, currently only 0 is used).
     pub segment: u8,
@@ -365,7 +148,7 @@ pub struct MatchView<'a> {
     succ_count: u8,
 }
 
-impl<'a> MatchView<'a> {
+impl<'a> Match<'a> {
     /// Parse a Match instruction from bytecode without allocating.
     ///
     /// The slice must start at the instruction and contain at least
@@ -384,36 +167,34 @@ impl<'a> MatchView<'a> {
         let node_type = NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]));
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
-        if opcode == Opcode::Match8 {
-            let next = u16::from_le_bytes([bytes[6], bytes[7]]);
-            Self {
-                bytes,
-                segment,
-                nav,
-                node_type,
-                node_field,
-                is_match8: true,
-                match8_next: next,
-                pre_count: 0,
-                neg_count: 0,
-                post_count: 0,
-                succ_count: if next == 0 { 0 } else { 1 },
-            }
-        } else {
-            let counts = u16::from_le_bytes([bytes[6], bytes[7]]);
-            Self {
-                bytes,
-                segment,
-                nav,
-                node_type,
-                node_field,
-                is_match8: false,
-                match8_next: 0,
-                pre_count: ((counts >> 13) & 0x7) as u8,
-                neg_count: ((counts >> 10) & 0x7) as u8,
-                post_count: ((counts >> 7) & 0x7) as u8,
-                succ_count: ((counts >> 1) & 0x3F) as u8,
-            }
+        let (is_match8, match8_next, pre_count, neg_count, post_count, succ_count) =
+            if opcode == Opcode::Match8 {
+                let next = u16::from_le_bytes([bytes[6], bytes[7]]);
+                (true, next, 0, 0, 0, if next == 0 { 0 } else { 1 })
+            } else {
+                let counts = u16::from_le_bytes([bytes[6], bytes[7]]);
+                (
+                    false,
+                    0,
+                    ((counts >> 13) & 0x7) as u8,
+                    ((counts >> 10) & 0x7) as u8,
+                    ((counts >> 7) & 0x7) as u8,
+                    ((counts >> 1) & 0x3F) as u8,
+                )
+            };
+
+        Self {
+            bytes,
+            segment,
+            nav,
+            node_type,
+            node_field,
+            is_match8,
+            match8_next,
+            pre_count,
+            neg_count,
+            post_count,
+            succ_count,
         }
     }
 

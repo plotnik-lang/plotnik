@@ -161,8 +161,7 @@ fn module_decode_step() {
     let bytes = Query::expect_valid_linked_bytes(input);
     let module = Module::from_bytes(bytes).unwrap();
 
-    // Step 0 is the preamble entry (Obj instruction)
-    let instr = module.decode_step_alloc(0);
+    let instr = module.decode_step(0);
     assert!(matches!(instr, crate::bytecode::Instruction::Match(_)));
 }
 
@@ -184,8 +183,7 @@ fn module_from_path_mmap() {
 
     assert!(module.header().validate_magic());
 
-    // Verify we can decode instructions (step 0 is the preamble entry)
-    let instr = module.decode_step_alloc(0);
+    let instr = module.decode_step(0);
     assert!(matches!(instr, crate::bytecode::Instruction::Match(_)));
 
     // Verify string lookup works through mmap

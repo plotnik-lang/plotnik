@@ -364,7 +364,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
             }
         }
 
-        let instr = module.decode_step_alloc(step);
+        let instr = module.decode_step(step);
         let line = format_instruction(step, &instr, module, ctx, step_width);
         out.push_str(&line);
         out.push('\n');
@@ -378,16 +378,13 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
         Instruction::Match(m) => {
-            let slots = m.pre_effects.len()
-                + m.neg_fields.len()
-                + m.post_effects.len()
-                + m.successors.len();
+            let pre = m.pre_effects().count();
+            let neg = m.neg_fields().count();
+            let post = m.post_effects().count();
+            let succ = m.succ_count();
+            let slots = pre + neg + post + succ;
 
-            if m.pre_effects.is_empty()
-                && m.neg_fields.is_empty()
-                && m.post_effects.is_empty()
-                && m.successors.len() <= 1
-            {
+            if pre == 0 && neg == 0 && post == 0 && succ <= 1 {
                 1 // Match8
             } else if slots <= 4 {
                 2 // Match16
@@ -432,24 +429,21 @@ fn format_match(
     let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
     let content = format_match_content(m, ctx);
-    let successors = format_successors(&m.successors, ctx, step_width);
+    let successors = format_match_successors(m, ctx, step_width);
 
     let base = format!("{prefix}{content}");
     builder.pad_successors(base, &successors)
 }
 
-/// Format Match instruction content (effects, node pattern, etc.)
 fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
     let mut parts = Vec::new();
 
-    // Pre-effects
-    if !m.pre_effects.is_empty() {
-        let effects: Vec<_> = m.pre_effects.iter().map(format_effect).collect();
-        parts.push(format!("[{}]", effects.join(" ")));
+    let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
+    if !pre.is_empty() {
+        parts.push(format!("[{}]", pre.join(" ")));
     }
 
-    // Negated fields
-    for &field_id in &m.neg_fields {
+    for field_id in m.neg_fields() {
         let name = ctx
             .node_field_name(field_id)
             .map(String::from)
@@ -457,16 +451,14 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
         parts.push(format!("-{name}"));
     }
 
-    // Field constraint and node type
     let node_part = format_node_pattern(m, ctx);
     if !node_part.is_empty() {
         parts.push(node_part);
     }
 
-    // Post-effects
-    if !m.post_effects.is_empty() {
-        let effects: Vec<_> = m.post_effects.iter().map(format_effect).collect();
-        parts.push(format!("[{}]", effects.join(" ")));
+    let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
+    if !post.is_empty() {
+        parts.push(format!("[{}]", post.join(" ")));
     }
 
     parts.join(" ")
@@ -505,14 +497,12 @@ fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
     result
 }
 
-/// Format successors list or terminal symbol.
-fn format_successors(successors: &[StepId], ctx: &DumpContext, step_width: usize) -> String {
-    if successors.is_empty() {
+fn format_match_successors(m: &Match, ctx: &DumpContext, step_width: usize) -> String {
+    if m.is_terminal() {
         "◼".to_string()
     } else {
-        successors
-            .iter()
-            .map(|s| format_step(*s, ctx, step_width))
+        m.successors()
+            .map(|s| format_step(s, ctx, step_width))
             .collect::<Vec<_>>()
             .join(", ")
     }

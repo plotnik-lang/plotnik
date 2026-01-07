@@ -8,7 +8,9 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
 use super::effects::{EffectOp, EffectOpcode};
-use super::instructions::{Call, Match, Return, StepAddr, StepId, Trampoline, select_match_opcode};
+use super::instructions::{
+    Call, Opcode, Return, StepAddr, StepId, Trampoline, select_match_opcode,
+};
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
 
@@ -420,36 +422,70 @@ impl MatchIR {
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
     {
-        let successors: Vec<StepId> = self
-            .successors
-            .iter()
-            .map(|&l| StepId::new(l.resolve(map)))
-            .collect();
+        let can_use_match8 = self.pre_effects.is_empty()
+            && self.neg_fields.is_empty()
+            && self.post_effects.is_empty()
+            && self.successors.len() <= 1;
 
-        // Resolve effect member references to absolute indices
-        let pre_effects: Vec<EffectOp> = self
-            .pre_effects
-            .iter()
-            .map(|e| e.resolve(&lookup_member, &get_member_base))
-            .collect();
-        let post_effects: Vec<EffectOp> = self
-            .post_effects
-            .iter()
-            .map(|e| e.resolve(&lookup_member, &get_member_base))
-            .collect();
-
-        let m = Match {
-            segment: 0,
-            nav: self.nav,
-            node_type: self.node_type,
-            node_field: self.node_field,
-            pre_effects,
-            neg_fields: self.neg_fields.clone(),
-            post_effects,
-            successors,
+        let opcode = if can_use_match8 {
+            Opcode::Match8
+        } else {
+            let slots_needed = self.pre_effects.len()
+                + self.neg_fields.len()
+                + self.post_effects.len()
+                + self.successors.len();
+            select_match_opcode(slots_needed).expect("instruction too large")
         };
 
-        m.to_bytes().expect("instruction too large")
+        let size = opcode.size();
+        let mut bytes = vec![0u8; size];
+
+        bytes[0] = opcode as u8; // segment 0
+        bytes[1] = self.nav.to_byte();
+        let node_type_val = self.node_type.map(|n| n.get()).unwrap_or(0);
+        bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
+        let node_field_val = self.node_field.map(|n| n.get()).unwrap_or(0);
+        bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
+
+        if opcode == Opcode::Match8 {
+            let next = self
+                .successors
+                .first()
+                .map(|&l| l.resolve(map))
+                .unwrap_or(0);
+            bytes[6..8].copy_from_slice(&next.to_le_bytes());
+        } else {
+            let pre_count = self.pre_effects.len() as u16;
+            let neg_count = self.neg_fields.len() as u16;
+            let post_count = self.post_effects.len() as u16;
+            let succ_count = self.successors.len() as u16;
+            let counts =
+                (pre_count << 13) | (neg_count << 10) | (post_count << 7) | (succ_count << 1);
+            bytes[6..8].copy_from_slice(&counts.to_le_bytes());
+
+            let mut offset = 8;
+            for effect in &self.pre_effects {
+                let resolved = effect.resolve(&lookup_member, &get_member_base);
+                bytes[offset..offset + 2].copy_from_slice(&resolved.to_bytes());
+                offset += 2;
+            }
+            for &field in &self.neg_fields {
+                bytes[offset..offset + 2].copy_from_slice(&field.to_le_bytes());
+                offset += 2;
+            }
+            for effect in &self.post_effects {
+                let resolved = effect.resolve(&lookup_member, &get_member_base);
+                bytes[offset..offset + 2].copy_from_slice(&resolved.to_bytes());
+                offset += 2;
+            }
+            for &label in &self.successors {
+                let addr = label.resolve(map);
+                bytes[offset..offset + 2].copy_from_slice(&addr.to_le_bytes());
+                offset += 2;
+            }
+        }
+
+        bytes
     }
 
     /// Check if this is an epsilon transition (no node interaction).
