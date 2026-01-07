@@ -48,14 +48,11 @@ _ObjWrap:
 
 Test:
   06   ε                                    07
-  07   !   (a)                              08
-  08   ▽   (b)                              09
-  09   ▽   (c)                              10
-  10   ▽   (d) [Node Set(M3)]               12
-  12   △   _                                13
-  13   ε   [Node Set(M2)]                   15
+  07   !   (a) [Node Set(M0)]               09
+  09   ▽   (b) [Node Set(M1)]               11
+  11   ▽   (c) [Node Set(M2)]               13
+  13   ▽   (d) [Node Set(M3)]               15
   15   △   _                                16
-  16   ε   [Node Set(M1)]                   18
-  18   △   _                                19
-  19   ε   [Node Set(M0)]                   21
-  21                                        ▶
+  16   △   _                                17
+  17   △   _                                18
+  18                                        ▶
