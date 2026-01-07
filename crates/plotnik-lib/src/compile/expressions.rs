@@ -487,17 +487,8 @@ impl Compiler<'_> {
         }
 
         // Scalar: capture effects go directly on the match instruction
-        let mut combined = capture_effects;
-        combined.extend(outer_capture.post);
-        self.compile_expr_inner(
-            &inner,
-            exit,
-            nav_override,
-            CaptureEffects {
-                pre: outer_capture.pre,
-                post: combined,
-            },
-        )
+        let combined = outer_capture.with_post_values(capture_effects);
+        self.compile_expr_inner(&inner, exit, nav_override, combined)
     }
 
     /// Compile a suppressive capture (@_ or @_name).

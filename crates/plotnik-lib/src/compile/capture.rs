@@ -36,6 +36,80 @@ pub struct CaptureEffects {
     pub post: Vec<EffectIR>,
 }
 
+impl CaptureEffects {
+    /// Create with explicit pre and post effects.
+    pub fn new(pre: Vec<EffectIR>, post: Vec<EffectIR>) -> Self {
+        Self { pre, post }
+    }
+
+    /// Create with only pre effects.
+    pub fn new_pre(pre: Vec<EffectIR>) -> Self {
+        Self { pre, post: vec![] }
+    }
+
+    /// Create with only post effects.
+    pub fn new_post(post: Vec<EffectIR>) -> Self {
+        Self { pre: vec![], post }
+    }
+
+    /// Add an inner scope (opens after existing scopes, closes before them).
+    ///
+    /// Use for: Obj/EndObj, Enum/EndEnum, Arr/EndArr, SuppressBegin/SuppressEnd
+    ///
+    /// Given existing `pre=[A_Open]`, `post=[A_Close]`, adding inner scope B:
+    /// - Result: `pre=[A_Open, B_Open]`, `post=[B_Close, A_Close]`
+    /// - Execution: A opens -> B opens -> match -> B closes -> A closes
+    pub fn nest_scope(mut self, open: EffectIR, close: EffectIR) -> Self {
+        assert!(
+            matches!(
+                open.opcode,
+                EffectOpcode::Obj
+                    | EffectOpcode::Enum
+                    | EffectOpcode::Arr
+                    | EffectOpcode::SuppressBegin
+            ),
+            "nest_scope expects scope-opening effect, got {:?}",
+            open.opcode
+        );
+        assert!(
+            matches!(
+                close.opcode,
+                EffectOpcode::EndObj
+                    | EffectOpcode::EndEnum
+                    | EffectOpcode::EndArr
+                    | EffectOpcode::SuppressEnd
+            ),
+            "nest_scope expects scope-closing effect, got {:?}",
+            close.opcode
+        );
+        self.pre.push(open);
+        self.post.insert(0, close);
+        self
+    }
+
+    /// Add pre-match value effects (run after all scopes open).
+    ///
+    /// Use for: Null+Set injection in untagged alternations
+    ///
+    /// Given `pre=[Scope_Open]`, adding value effects:
+    /// - Result: `pre=[Scope_Open, Value1, Value2]`
+    pub fn with_pre_values(mut self, effects: Vec<EffectIR>) -> Self {
+        self.pre.extend(effects);
+        self
+    }
+
+    /// Add post-match value effects (run before any scope closes).
+    ///
+    /// Use for: Node/Text+Set capture effects, Push for arrays
+    ///
+    /// Given `post=[Scope_Close]`, adding value effects:
+    /// - Result: `post=[Value1, Value2, Scope_Close]`
+    pub fn with_post_values(mut self, effects: Vec<EffectIR>) -> Self {
+        self.post.splice(0..0, effects);
+        self
+    }
+}
+
 impl Compiler<'_> {
     /// Build capture effects (Node/Text + Set) based on capture type.
     pub(super) fn build_capture_effects(

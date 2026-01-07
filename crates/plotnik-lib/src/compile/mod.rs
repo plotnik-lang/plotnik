@@ -24,6 +24,8 @@ mod scope;
 mod sequences;
 
 #[cfg(test)]
+mod capture_tests;
+#[cfg(test)]
 mod compile_tests;
 
 pub use capture::CaptureEffects;
