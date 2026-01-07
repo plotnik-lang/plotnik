@@ -18,3 +18,9 @@ pub const STEP_SIZE: usize = 8;
 /// effects, neg_fields, and successors combined. When an epsilon
 /// transition needs more successors, it must be split into a cascade.
 pub const MAX_MATCH_PAYLOAD_SLOTS: usize = 28;
+
+/// Maximum pre-effects per Match instruction.
+///
+/// Pre-effect count is stored in 3 bits (max 7). When exceeded,
+/// overflow effects must be emitted in leading epsilon transitions.
+pub const MAX_PRE_EFFECTS: usize = 7;

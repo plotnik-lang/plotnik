@@ -420,6 +420,69 @@ impl Compiler<'_> {
             .push(MatchIR::at(label).next_many(successors).into());
     }
 
+    /// Emit a Match instruction, cascading pre-effects if they exceed the bytecode limit.
+    ///
+    /// When `pre_effects.len() > MAX_PRE_EFFECTS` (7), splits overflow into leading
+    /// epsilon transitions to avoid bytecode encoding overflow. The original label
+    /// is preserved as the entry point of the cascade.
+    ///
+    /// Returns the entry label (same as `instr.label`).
+    pub(super) fn emit_match_with_cascade(&mut self, mut instr: MatchIR) -> Label {
+        use crate::bytecode::MAX_PRE_EFFECTS;
+
+        let entry = instr.label;
+
+        if instr.pre_effects.len() <= MAX_PRE_EFFECTS {
+            self.instructions.push(instr.into());
+            return entry;
+        }
+
+        // Move all pre-effects to epsilon chain
+        let all_effects = std::mem::take(&mut instr.pre_effects);
+
+        // Create new label for the actual match instruction
+        let match_label = self.fresh_label();
+        instr.label = match_label;
+        self.instructions.push(instr.into());
+
+        // Emit cascade from entry → ... → match_label
+        self.emit_effects_chain(entry, match_label, all_effects);
+
+        entry
+    }
+
+    /// Emit a chain of epsilon transitions to execute effects in order.
+    ///
+    /// Splits effects into batches of `MAX_PRE_EFFECTS` (7), emitting epsilon
+    /// transitions: `entry → intermediate1 → ... → exit`.
+    fn emit_effects_chain(&mut self, entry: Label, exit: Label, mut effects: Vec<EffectIR>) {
+        use crate::bytecode::MAX_PRE_EFFECTS;
+
+        if effects.is_empty() {
+            // Just link entry to exit
+            self.instructions.push(MatchIR::epsilon(entry, exit).into());
+            return;
+        }
+
+        if effects.len() <= MAX_PRE_EFFECTS {
+            self.instructions
+                .push(MatchIR::epsilon(entry, exit).pre_effects(effects).into());
+            return;
+        }
+
+        // Take first batch, recurse for rest
+        let first_batch: Vec<_> = effects.drain(..MAX_PRE_EFFECTS).collect();
+        let intermediate = self.fresh_label();
+
+        self.instructions.push(
+            MatchIR::epsilon(entry, intermediate)
+                .pre_effects(first_batch)
+                .into(),
+        );
+
+        self.emit_effects_chain(intermediate, exit, effects);
+    }
+
     /// Emit a wildcard navigation step that accepts any node.
     ///
     /// Used for skip-retry logic in quantifiers: navigates to the next position

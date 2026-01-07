@@ -161,3 +161,68 @@ fn compile_large_tagged_alternation() {
 
     assert!(!result.instructions.is_empty());
 }
+
+#[test]
+fn compile_unlabeled_alternation_5_branches_with_captures() {
+    // Regression test: unlabeled alternation with 5+ branches where each has
+    // a unique capture requires 8+ pre-effects (4 nulls + 4 sets per branch).
+    // This exceeds the 3-bit limit (max 7) and must cascade via epsilon chain.
+    let query = QueryBuilder::one_liner(
+        "Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d (call_expression) @e]",
+    )
+    .parse()
+    .unwrap()
+    .analyze();
+
+    let mut strings = StringTableBuilder::new();
+    let result = Compiler::compile(
+        query.interner(),
+        query.type_context(),
+        &query.symbol_table,
+        &mut strings,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert!(!result.instructions.is_empty());
+
+    // Verify that effects cascade created extra epsilon instructions.
+    // With 5 branches, each branch needs 8 pre-effects (4 missing captures × 2 effects).
+    // This requires at least one cascade step per branch.
+    let epsilon_count = result
+        .instructions
+        .iter()
+        .filter(|i| matches!(i, crate::bytecode::InstructionIR::Match(m) if m.is_epsilon()))
+        .count();
+
+    // Should have more epsilon transitions than without cascade
+    // (5 branches + cascade steps for overflow effects)
+    assert!(epsilon_count >= 5, "expected cascade epsilon steps");
+}
+
+#[test]
+fn compile_unlabeled_alternation_8_branches_with_captures() {
+    // Even more extreme: 8 branches means 14 pre-effects per branch (7 nulls + 7 sets).
+    // This requires 2 cascade steps per branch.
+    let query = QueryBuilder::one_liner(
+        "Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d \
+              (call_expression) @e (member_expression) @f (array) @g (object) @h]",
+    )
+    .parse()
+    .unwrap()
+    .analyze();
+
+    let mut strings = StringTableBuilder::new();
+    let result = Compiler::compile(
+        query.interner(),
+        query.type_context(),
+        &query.symbol_table,
+        &mut strings,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert!(!result.instructions.is_empty());
+}

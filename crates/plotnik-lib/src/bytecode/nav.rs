@@ -76,15 +76,18 @@ impl Nav {
             Self::DownSkip => 7,
             Self::DownExact => 8,
             Self::Up(n) => {
-                debug_assert!((1..=63).contains(&n));
+                assert!((1..=63).contains(&n), "Up level overflow: {n} > 63");
                 0b01_000000 | n
             }
             Self::UpSkipTrivia(n) => {
-                debug_assert!((1..=63).contains(&n));
+                assert!(
+                    (1..=63).contains(&n),
+                    "UpSkipTrivia level overflow: {n} > 63"
+                );
                 0b10_000000 | n
             }
             Self::UpExact(n) => {
-                debug_assert!((1..=63).contains(&n));
+                assert!((1..=63).contains(&n), "UpExact level overflow: {n} > 63");
                 0b11_000000 | n
             }
         }
