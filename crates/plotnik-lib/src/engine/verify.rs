@@ -4,7 +4,10 @@
 //! Zero-cost in release builds.
 
 use crate::Colors;
-use crate::bytecode::{Module, StringsView, TypeData, TypeId, TypeKind, TypesView};
+use crate::bytecode::{Module, TypeId};
+#[cfg(debug_assertions)]
+use crate::bytecode::{StringsView, TypeData, TypeKind, TypesView};
+#[cfg(debug_assertions)]
 use crate::typegen::typescript::{self, Config, VoidType};
 
 use super::Value;

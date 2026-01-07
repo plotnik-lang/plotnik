@@ -52,4 +52,4 @@ Test:
   11                                        ▶
   12   !   [Enum(M1)] (x) [Node Set(M0) EndEnum Set(M3)]  17
   15   !   [Enum(M2)] (y) [EndEnum Set(M3)]  17
-  17   △                                    11
+  17   △   _                                11

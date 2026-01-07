@@ -43,5 +43,5 @@ Test:
   07   !   (parent)                         08
   08   ▽   (a) [Node Set(M0)]               10
   10   ▷   (b) [Node Set(M1)]               12
-  12   △                                    13
+  12   △   _                                13
   13                                        ▶

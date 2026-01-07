@@ -7,6 +7,7 @@ use std::num::NonZeroU16;
 
 use super::constants::{SECTION_ALIGN, STEP_SIZE};
 use super::effects::EffectOp;
+use super::ir::NodeTypeIR;
 use super::nav::Nav;
 
 /// Step address in bytecode (raw u16).
@@ -129,12 +130,12 @@ impl Opcode {
 #[derive(Clone, Copy, Debug)]
 pub struct Match<'a> {
     bytes: &'a [u8],
-    /// Segment index (0-15, currently only 0 is used).
+    /// Segment index (0-3, currently only 0 is used).
     pub segment: u8,
-    /// Navigation command.
+    /// Navigation command. `Epsilon` means no cursor movement or node check.
     pub nav: Nav,
-    /// Node type constraint (None = wildcard).
-    pub node_type: Option<NonZeroU16>,
+    /// Node type constraint (Any = wildcard, Named/Anonymous for specific checks).
+    pub node_type: NodeTypeIR,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
     /// Whether this is Match8 (no payload) or extended.
@@ -153,18 +154,23 @@ impl<'a> Match<'a> {
     ///
     /// The slice must start at the instruction and contain at least
     /// the full instruction size (determined by opcode).
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(bytes.len() >= 8, "Match instruction too short");
 
         let type_id_byte = bytes[0];
-        let segment = type_id_byte >> 4;
-        debug_assert!(segment == 0, "non-zero segment not yet supported");
+        // Header byte: segment(2) | node_kind(2) | opcode(4)
+        let segment = (type_id_byte >> 6) & 0x3;
+        let node_kind = (type_id_byte >> 4) & 0x3;
         let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        debug_assert!(segment == 0, "non-zero segment not yet supported");
         debug_assert!(opcode.is_match(), "expected Match opcode");
 
         let nav = Nav::from_byte(bytes[1]);
-        let node_type = NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]));
+        let node_type_val = u16::from_le_bytes([bytes[2], bytes[3]]);
+        let node_type = NodeTypeIR::from_bytes(node_kind, node_type_val);
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
         let (is_match8, match8_next, pre_count, neg_count, post_count, succ_count) =
@@ -207,7 +213,7 @@ impl<'a> Match<'a> {
     /// Check if this is an epsilon transition (no node interaction).
     #[inline]
     pub fn is_epsilon(&self) -> bool {
-        self.nav == Nav::Stay && self.node_type.is_none() && self.node_field.is_none()
+        self.nav == Nav::Epsilon
     }
 
     /// Number of successors.
@@ -282,7 +288,7 @@ impl<'a> Match<'a> {
 /// Call instruction for invoking definitions (recursion).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Call {
-    /// Segment index (0-15).
+    /// Segment index (0-3).
     pub(crate) segment: u8,
     /// Navigation to apply before jumping to target.
     pub(crate) nav: Nav,
@@ -307,14 +313,17 @@ impl Call {
     }
 
     /// Decode from 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// For Call, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = type_id_byte >> 4;
+        let segment = (type_id_byte >> 6) & 0x3;
+        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
         );
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert_eq!(opcode, Opcode::Call, "expected Call opcode");
 
         Self {
@@ -327,9 +336,12 @@ impl Call {
     }
 
     /// Encode to 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        bytes[0] = (self.segment << 4) | (Opcode::Call as u8);
+        // node_kind = 0 for Call
+        bytes[0] = (self.segment << 6) | (Opcode::Call as u8);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
         bytes[4..6].copy_from_slice(&self.next.get().to_le_bytes());
@@ -354,7 +366,7 @@ impl Call {
 /// Return instruction for returning from definitions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Return {
-    /// Segment index (0-15).
+    /// Segment index (0-3).
     pub(crate) segment: u8,
 }
 
@@ -365,23 +377,29 @@ impl Return {
     }
 
     /// Decode from 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// For Return, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = type_id_byte >> 4;
+        let segment = (type_id_byte >> 6) & 0x3;
+        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
         );
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert_eq!(opcode, Opcode::Return, "expected Return opcode");
 
         Self { segment }
     }
 
     /// Encode to 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        bytes[0] = (self.segment << 4) | (Opcode::Return as u8);
+        // node_kind = 0 for Return
+        bytes[0] = (self.segment << 6) | (Opcode::Return as u8);
         // bytes[1..8] are reserved/padding
         bytes
     }
@@ -400,7 +418,7 @@ impl Default for Return {
 /// the entry preamble: `Obj → Trampoline → EndObj → Accept`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Trampoline {
-    /// Segment index (0-15).
+    /// Segment index (0-3).
     pub(crate) segment: u8,
     /// Return address (where to continue after entrypoint returns).
     pub(crate) next: StepId,
@@ -413,14 +431,17 @@ impl Trampoline {
     }
 
     /// Decode from 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// For Trampoline, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = type_id_byte >> 4;
+        let segment = (type_id_byte >> 6) & 0x3;
+        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
         );
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
         assert_eq!(opcode, Opcode::Trampoline, "expected Trampoline opcode");
 
         Self {
@@ -430,9 +451,12 @@ impl Trampoline {
     }
 
     /// Encode to 8-byte bytecode.
+    ///
+    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        bytes[0] = (self.segment << 4) | (Opcode::Trampoline as u8);
+        // node_kind = 0 for Trampoline
+        bytes[0] = (self.segment << 6) | (Opcode::Trampoline as u8);
         // bytes[1] is padding
         bytes[2..4].copy_from_slice(&self.next.get().to_le_bytes());
         // bytes[4..8] are reserved/padding

@@ -45,5 +45,5 @@ Test:
   07   !   (binary_expression)              08
   08   ▽   (identifier) [Node Set(M0)]      10
   10   ▷   (number) [Node Set(M1)]          12
-  12   △                                    13
+  12   △   _                                13
   13                                        ▶

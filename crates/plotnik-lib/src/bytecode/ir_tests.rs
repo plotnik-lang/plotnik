@@ -4,7 +4,7 @@ use std::num::NonZeroU16;
 use plotnik_core::Symbol;
 
 use super::effects::EffectOpcode;
-use super::ir::{CallIR, EffectIR, InstructionIR, Label, MatchIR, MemberRef, ReturnIR};
+use super::ir::{CallIR, EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, ReturnIR};
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
 
@@ -12,7 +12,7 @@ use crate::analyze::type_check::TypeId;
 fn match_ir_size_match8() {
     let m = MatchIR::at(Label(0))
         .nav(Nav::Down)
-        .node_type(NonZeroU16::new(10))
+        .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
         .next(Label(1));
 
     assert_eq!(m.size(), 8);
@@ -22,7 +22,7 @@ fn match_ir_size_match8() {
 fn match_ir_size_extended() {
     let m = MatchIR::at(Label(0))
         .nav(Nav::Down)
-        .node_type(NonZeroU16::new(10))
+        .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
         .pre_effect(EffectIR::start_obj())
         .post_effect(EffectIR::node())
         .next(Label(1));

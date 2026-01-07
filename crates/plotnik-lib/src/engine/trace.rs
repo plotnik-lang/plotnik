@@ -25,8 +25,8 @@ use arborium_tree_sitter::Node;
 
 use crate::Colors;
 use crate::bytecode::{
-    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, Symbol, cols, format_effect, trace,
-    truncate_text, width_for_count,
+    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, Symbol, cols,
+    format_effect, trace, truncate_text, width_for_count,
 };
 
 use super::effect::RuntimeEffect;
@@ -67,6 +67,9 @@ pub trait Tracer {
 
     /// Called after navigation succeeds.
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>);
+
+    /// Called when navigation fails (no child/sibling exists).
+    fn trace_nav_failure(&mut self, nav: Nav);
 
     /// Called after type check succeeds.
     fn trace_match_success(&mut self, node: Node<'_>);
@@ -118,6 +121,9 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {}
+
+    #[inline(always)]
+    fn trace_nav_failure(&mut self, _nav: Nav) {}
 
     #[inline(always)]
     fn trace_match_success(&mut self, _node: Node<'_>) {}
@@ -299,9 +305,24 @@ impl<'s> PrintTracer<'s> {
         self.entrypoint_by_ip.get(&ip).map_or("?", |s| s.as_str())
     }
 
+    /// Format kind without text content.
+    ///
+    /// - Named nodes: `kind` (e.g., `identifier`)
+    /// - Anonymous nodes: `kind` dim green (e.g., `let`)
+    fn format_kind_simple(&self, kind: &str, is_named: bool) -> String {
+        if is_named {
+            kind.to_string()
+        } else {
+            let c = &self.colors;
+            format!("{}{}{}{}", c.dim, c.green, kind, c.reset)
+        }
+    }
+
     /// Format kind with source text, dynamically truncated to fit content width.
-    /// Text is displayed dimmed and green, no quotes.
-    fn format_kind_with_text(&self, kind: &str, text: &str) -> String {
+    ///
+    /// - Named nodes: `kind text` (e.g., `identifier fetchData`)
+    /// - Anonymous nodes: just `text` in green (kind == text, no redundancy)
+    fn format_kind_with_text(&self, kind: &str, text: &str, is_named: bool) -> String {
         let c = &self.colors;
 
         // Available content width = TOTAL_WIDTH - prefix_width + step_width
@@ -311,11 +332,16 @@ impl<'s> PrintTracer<'s> {
         // This simplifies to: TOTAL_WIDTH - 9 = 35
         let available = cols::TOTAL_WIDTH - 9;
 
-        // Text budget = available - kind.len() - 1 (space), minimum 12
-        let text_budget = available.saturating_sub(kind.len() + 1).max(12);
-
-        let truncated = truncate_text(text, text_budget);
-        format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
+        if is_named {
+            // Named: show kind + text
+            let text_budget = available.saturating_sub(kind.len() + 1).max(12);
+            let truncated = truncate_text(text, text_budget);
+            format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
+        } else {
+            // Anonymous: just text dim green (kind == text, no redundancy)
+            let truncated = truncate_text(text, available);
+            format!("{}{}{}{}", c.dim, c.green, truncated, c.reset)
+        }
     }
 
     /// Format a runtime effect for display.
@@ -369,16 +395,19 @@ impl<'s> PrintTracer<'s> {
             parts.push(format!("[{}]", pre.join(" ")));
         }
 
-        // Negated fields: !field1 !field2
-        for field_id in m.neg_fields() {
-            let name = self.node_field_name(field_id);
-            parts.push(format!("!{name}"));
-        }
+        // Skip neg_fields and node pattern for epsilon (no node interaction)
+        if !m.is_epsilon() {
+            // Negated fields: !field1 !field2
+            for field_id in m.neg_fields() {
+                let name = self.node_field_name(field_id);
+                parts.push(format!("!{name}"));
+            }
 
-        // Node pattern: field: (type) / (type) / field: _ / empty
-        let node_part = self.format_node_pattern(m);
-        if !node_part.is_empty() {
-            parts.push(node_part);
+            // Node pattern: field: (type) / (type) / field: _ / empty
+            let node_part = self.format_node_pattern(m);
+            if !node_part.is_empty() {
+                parts.push(node_part);
+            }
         }
 
         // Post-effects: [Effect1 Effect2]
@@ -390,7 +419,7 @@ impl<'s> PrintTracer<'s> {
         parts.join(" ")
     }
 
-    /// Format node pattern: `field: (type)` or `(type)` or `field: _` or empty.
+    /// Format node pattern: `field: (type)` or `(type)` or `field: _` or `"text"` or empty.
     fn format_node_pattern(&self, m: &Match<'_>) -> String {
         let mut result = String::new();
 
@@ -399,12 +428,31 @@ impl<'s> PrintTracer<'s> {
             result.push_str(": ");
         }
 
-        if let Some(t) = m.node_type {
-            result.push('(');
-            result.push_str(self.node_type_name(t.get()));
-            result.push(')');
-        } else if m.node_field.is_some() {
-            result.push('_');
+        match m.node_type {
+            NodeTypeIR::Any => {
+                // Any node wildcard: `_`
+                result.push('_');
+            }
+            NodeTypeIR::Named(None) => {
+                // Named wildcard: any named node
+                result.push_str("(_)");
+            }
+            NodeTypeIR::Named(Some(t)) => {
+                // Specific named node type
+                result.push('(');
+                result.push_str(self.node_type_name(t.get()));
+                result.push(')');
+            }
+            NodeTypeIR::Anonymous(None) => {
+                // Anonymous wildcard: any anonymous node
+                result.push_str("\"_\"");
+            }
+            NodeTypeIR::Anonymous(Some(t)) => {
+                // Specific anonymous node (literal token)
+                result.push('"');
+                result.push_str(self.node_type_name(t.get()));
+                result.push('"');
+            }
         }
 
         result
@@ -500,6 +548,7 @@ impl Tracer for PrintTracer<'_> {
 
         let kind = node.kind();
         let symbol = match nav {
+            Nav::Epsilon => Symbol::EPSILON,
             Nav::Down | Nav::DownSkip | Nav::DownExact => trace::NAV_DOWN,
             Nav::Next | Nav::NextSkip | Nav::NextExact => trace::NAV_NEXT,
             Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => trace::NAV_UP,
@@ -509,11 +558,29 @@ impl Tracer for PrintTracer<'_> {
         // Text only in VeryVerbose
         if self.verbosity == Verbosity::VeryVerbose {
             let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text);
+            let content = self.format_kind_with_text(kind, text, node.is_named());
             self.add_subline(symbol, &content);
         } else {
-            self.add_subline(symbol, kind);
+            let content = self.format_kind_simple(kind, node.is_named());
+            self.add_subline(symbol, &content);
         }
+    }
+
+    fn trace_nav_failure(&mut self, nav: Nav) {
+        // Navigation failure sub-lines hidden in default verbosity
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        // Show the failed navigation direction
+        let nav_symbol = match nav {
+            Nav::Down | Nav::DownSkip | Nav::DownExact => "▽",
+            Nav::Next | Nav::NextSkip | Nav::NextExact => "▷",
+            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => "△",
+            Nav::Stay | Nav::StayExact | Nav::Epsilon => "·",
+        };
+
+        self.add_subline(trace::MATCH_FAILURE, nav_symbol);
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {
@@ -522,10 +589,11 @@ impl Tracer for PrintTracer<'_> {
         // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
             let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text);
+            let content = self.format_kind_with_text(kind, text, node.is_named());
             self.add_subline(trace::MATCH_SUCCESS, &content);
         } else {
-            self.add_subline(trace::MATCH_SUCCESS, kind);
+            let content = self.format_kind_simple(kind, node.is_named());
+            self.add_subline(trace::MATCH_SUCCESS, &content);
         }
     }
 
@@ -535,10 +603,11 @@ impl Tracer for PrintTracer<'_> {
         // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
             let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text);
+            let content = self.format_kind_with_text(kind, text, node.is_named());
             self.add_subline(trace::MATCH_FAILURE, &content);
         } else {
-            self.add_subline(trace::MATCH_FAILURE, kind);
+            let content = self.format_kind_simple(kind, node.is_named());
+            self.add_subline(trace::MATCH_FAILURE, &content);
         }
     }
 

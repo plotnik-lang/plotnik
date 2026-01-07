@@ -50,4 +50,4 @@ Test:
   11                                        ▶
   12   !   [Null Set(M1)] (identifier) [Node Set(M0)]  18
   15   !   [Null Set(M0)] (number) [Node Set(M1)]  18
-  18   △                                    11
+  18   △   _                                11

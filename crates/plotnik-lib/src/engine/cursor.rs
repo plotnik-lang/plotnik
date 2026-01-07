@@ -103,6 +103,14 @@ impl<'t> CursorWrapper<'t> {
     /// or None if navigation failed (no children/siblings).
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
         match nav {
+            // Epsilon should never reach here - VM skips navigate for epsilon
+            Nav::Epsilon => {
+                debug_assert!(
+                    false,
+                    "navigate called with Epsilon - should be skipped by VM"
+                );
+                Some(SkipPolicy::Any)
+            }
             Nav::Stay => Some(SkipPolicy::Any),
             Nav::StayExact => Some(SkipPolicy::Exact),
             Nav::Down => self.go_first_child().then_some(SkipPolicy::Any),

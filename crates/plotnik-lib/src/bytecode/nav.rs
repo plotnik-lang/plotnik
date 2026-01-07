@@ -5,7 +5,11 @@
 /// Navigation command for VM execution.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Nav {
+    /// Epsilon transition: pure control flow, no cursor movement or node check.
+    /// Used for branching, quantifier loops, and effect-only transitions.
     #[default]
+    Epsilon,
+    /// Stay at current position.
     Stay,
     /// Stay at current position, exact match only (no continue_search).
     StayExact,
@@ -32,14 +36,15 @@ impl Nav {
 
         match mode {
             0b00 => match payload {
-                0 => Self::Stay,
-                1 => Self::StayExact,
-                2 => Self::Next,
-                3 => Self::NextSkip,
-                4 => Self::NextExact,
-                5 => Self::Down,
-                6 => Self::DownSkip,
-                7 => Self::DownExact,
+                0 => Self::Epsilon,
+                1 => Self::Stay,
+                2 => Self::StayExact,
+                3 => Self::Next,
+                4 => Self::NextSkip,
+                5 => Self::NextExact,
+                6 => Self::Down,
+                7 => Self::DownSkip,
+                8 => Self::DownExact,
                 _ => panic!("invalid nav standard: {payload}"),
             },
             0b01 => {
@@ -61,14 +66,15 @@ impl Nav {
     /// Encode to bytecode byte.
     pub fn to_byte(self) -> u8 {
         match self {
-            Self::Stay => 0,
-            Self::StayExact => 1,
-            Self::Next => 2,
-            Self::NextSkip => 3,
-            Self::NextExact => 4,
-            Self::Down => 5,
-            Self::DownSkip => 6,
-            Self::DownExact => 7,
+            Self::Epsilon => 0,
+            Self::Stay => 1,
+            Self::StayExact => 2,
+            Self::Next => 3,
+            Self::NextSkip => 4,
+            Self::NextExact => 5,
+            Self::Down => 6,
+            Self::DownSkip => 7,
+            Self::DownExact => 8,
             Self::Up(n) => {
                 debug_assert!((1..=63).contains(&n));
                 0b01_000000 | n
@@ -91,6 +97,7 @@ impl Nav {
     /// the parent context (quantifier's skip-retry, sequence advancement).
     pub fn to_exact(self) -> Self {
         match self {
+            Self::Epsilon => Self::Epsilon, // Epsilon stays epsilon
             Self::Down | Self::DownSkip => Self::DownExact,
             Self::Next | Self::NextSkip => Self::NextExact,
             Self::Stay => Self::StayExact,
