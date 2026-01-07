@@ -107,17 +107,16 @@ fn empty_sequence() {
     Q = {}
     "#};
 
-    let res = Query::expect_valid_cst(input);
+    let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Seq
-          BraceOpen "{"
-          BraceClose "}"
-    "#);
+    insta::assert_snapshot!(res, @r"
+    error: empty `{}` is not allowed
+      |
+    1 | Q = {}
+      |     ^^
+      |
+    help: sequences must contain at least one expression
+    ");
 }
 
 #[test]

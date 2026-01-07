@@ -10,7 +10,7 @@ use crate::Diagnostics;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
-use crate::analyze::validation::{validate_alt_kinds, validate_anchors};
+use crate::analyze::validation::{validate_alt_kinds, validate_anchors, validate_empty_constructs};
 use crate::analyze::{dependencies, validate_recursion};
 use crate::parser::{Parser, Root, SyntaxNode, lex};
 
@@ -74,6 +74,7 @@ impl QueryBuilder {
 
             validate_alt_kinds(source.id, &res.ast, &mut diag);
             validate_anchors(source.id, &res.ast, &mut diag);
+            validate_empty_constructs(source.id, &res.ast, &mut diag);
             total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed);
             ast.insert(source.id, res.ast);
         }

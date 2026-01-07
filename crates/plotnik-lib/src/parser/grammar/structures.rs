@@ -24,11 +24,8 @@ impl Parser<'_, '_> {
 
         match self.current() {
             SyntaxKind::ParenClose => {
+                // Empty tree `()` - validation phase will report EmptyTree error
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
-                self.diagnostics
-                    .report(self.source_id, DiagnosticKind::EmptyTree, open_paren_span)
-                    .emit();
-                // Fall through to close
             }
             SyntaxKind::Underscore => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
