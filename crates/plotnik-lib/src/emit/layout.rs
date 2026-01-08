@@ -1,7 +1,7 @@
 //! Cache-aligned instruction layout.
 //!
-//! Uses Pettis-Hansen inspired greedy chain extraction to place
-//! hot paths contiguously and avoid cache line straddling.
+//! Extracts linear chains from the control flow graph and places them
+//! contiguously. Pads instructions to prevent cache line straddling.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -161,17 +161,22 @@ fn assign_step_ids(
             };
             let size = instr.size();
 
-            // Cache line alignment for large instructions
-            if size >= 48 {
-                let line_offset = current_offset % CACHE_LINE;
-                if line_offset + size > CACHE_LINE {
-                    // Would straddle cache line - pad to next line
-                    let padding_bytes = CACHE_LINE - line_offset;
-                    let padding_steps = (padding_bytes / STEP_SIZE) as u16;
-                    current_step += padding_steps;
-                    current_offset += padding_bytes;
-                }
+            // Pad if instruction would straddle cache line boundary
+            let line_offset = current_offset % CACHE_LINE;
+            if line_offset + size > CACHE_LINE {
+                let padding_bytes = CACHE_LINE - line_offset;
+                let padding_steps = (padding_bytes / STEP_SIZE) as u16;
+                current_step += padding_steps;
+                current_offset += padding_bytes;
             }
+
+            // Invariant: instruction must not straddle cache line
+            assert!(
+                current_offset % CACHE_LINE + size <= CACHE_LINE,
+                "instruction at offset {} with size {} straddles 64-byte cache line",
+                current_offset,
+                size
+            );
 
             mapping.insert(label, current_step);
             let step_count = (size / STEP_SIZE) as u16;

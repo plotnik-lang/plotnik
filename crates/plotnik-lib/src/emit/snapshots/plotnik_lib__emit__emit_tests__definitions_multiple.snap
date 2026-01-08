@@ -30,7 +30,7 @@ N0: S3 → T1  ; Foo
 N1: S4 → T2  ; Bar
 
 [entrypoints]
-Bar = 10 :: T2
+Bar = 11 :: T2
 Foo = 06 :: T1
 
 [transitions]
@@ -41,11 +41,12 @@ _ObjWrap:
   05                                        ▶
 
 Foo:
-  06   ε                                    07
-  07   !   (identifier) [Node Set(M0)]      09
-  09                                        ▶
+  06   ε                                    08
+  07  ...  
+  08   !   (identifier) [Node Set(M0)]      10
+  10                                        ▶
 
 Bar:
-  10   ε                                    11
-  11   !   (string) [Node Set(M1)]          13
-  13                                        ▶
+  11   ε                                    12
+  12   !   (string) [Node Set(M1)]          14
+  14                                        ▶

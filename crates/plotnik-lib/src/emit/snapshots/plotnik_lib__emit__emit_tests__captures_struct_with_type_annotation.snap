@@ -38,8 +38,9 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   ε   [Obj]                            09
-  09   !   (identifier) [Node Set(M0)]      11
-  11   ε   [EndObj Set(M1)]                 13
-  13                                        ▶
+  06   ε                                    08
+  07  ...  
+  08   ε   [Obj]                            10
+  10   !   (identifier) [Node Set(M0)]      12
+  12   ε   [EndObj Set(M1)]                 14
+  14                                        ▶

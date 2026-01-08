@@ -216,6 +216,12 @@ impl<'a> Match<'a> {
         self.nav == Nav::Epsilon
     }
 
+    /// Check if this is a Match8 (8-byte fast-path instruction).
+    #[inline]
+    pub fn is_match8(&self) -> bool {
+        self.is_match8
+    }
+
     /// Number of successors.
     #[inline]
     pub fn succ_count(&self) -> usize {

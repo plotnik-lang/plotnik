@@ -195,6 +195,8 @@ pub struct PrintTracer<'s> {
     pub(crate) step_width: usize,
     /// Color palette.
     pub(crate) colors: Colors,
+    /// Previous instruction IP (for cache line boundary detection).
+    pub(crate) prev_ip: Option<u16>,
 }
 
 /// Builder for `PrintTracer`.
@@ -277,6 +279,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             pending_return_ip: None,
             step_width,
             colors: self.colors,
+            prev_ip: None,
         }
     }
 }
@@ -506,10 +509,47 @@ impl<'s> PrintTracer<'s> {
         }
         self.lines.push(self.format_def_label(name));
     }
+
+    /// Format cache line boundary separator (full-width dashes, dimmed).
+    fn format_cache_line_separator(&self) -> String {
+        // Content spans TOTAL_WIDTH (same as instruction lines before successors)
+        let c = self.colors;
+        format!(
+            "{:indent$}{}{}{}",
+            "",
+            c.dim,
+            "-".repeat(cols::TOTAL_WIDTH),
+            c.reset,
+            indent = cols::INDENT,
+        )
+    }
+
+    /// Check if IPs cross a cache line boundary and insert separator if so.
+    ///
+    /// Cache line = 64 bytes = 8 steps (each step is 8 bytes).
+    /// Only shows separator in verbose modes (-v, -vv).
+    fn check_cache_line_boundary(&mut self, ip: u16) {
+        // Only show cache line separators in verbose modes
+        if self.verbosity == Verbosity::Default {
+            self.prev_ip = Some(ip);
+            return;
+        }
+
+        const STEPS_PER_CACHE_LINE: u16 = 8;
+        if let Some(prev) = self.prev_ip
+            && prev / STEPS_PER_CACHE_LINE != ip / STEPS_PER_CACHE_LINE
+        {
+            self.lines.push(self.format_cache_line_separator());
+        }
+        self.prev_ip = Some(ip);
+    }
 }
 
 impl Tracer for PrintTracer<'_> {
     fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>) {
+        // Check for cache line boundary crossing
+        self.check_cache_line_boundary(ip);
+
         match instr {
             Instruction::Match(m) => {
                 // Show ε for epsilon transitions, empty otherwise (nav shown in sublines)
