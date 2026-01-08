@@ -1,3 +1,5 @@
+<br/>
+
 <p align="center">
   <img width="400" alt="The logo: a curled wood shaving on a workbench" src="https://github.com/user-attachments/assets/8f1162aa-5769-415d-babe-56b962256747" />
 </p>
