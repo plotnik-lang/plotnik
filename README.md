@@ -44,10 +44,10 @@ Tree-sitter gives you the syntax tree. Extracting structured data from it still 
 - [x] Tagged unions (discriminated unions)
 - [x] TypeScript type generation
 - [x] CLI: `exec` for matches, `infer` for types, `ast`/`trace`/`dump` for debug
-- [ ] Grammar verification (validate queries against tree-sitter node types)
+- [ ] Full validation against grammar (reject queries that can never match)
 - [ ] Compile-time queries via proc-macro
-- [ ] LSP server
-- [ ] Editor extensions
+- [ ] WASM
+- [ ] LSP, editor extensions
 
 ## Installation
 
