@@ -26,7 +26,9 @@
 
 <p align="center">
     <sub>
-    ⚠️ Beta: not for production use ⚠️<br/>
+      <strong>
+        ⚠️ BETA: NOT FOR PRODUCTION USE ⚠️<br/>
+      </strong>
     </sub>
 </p>
 
