@@ -293,7 +293,7 @@ Assignment:
   16   ◀   (Assignment)                           ◼
 ```
 
-First branch (Literal) matches immediately—checkpoint at 28 is never used.
+First branch (Literal) matches immediately — checkpoint at 28 is never used.
 
 ---
 
@@ -323,7 +323,7 @@ Expression:
        ○   string hello
 ```
 
-Both branches fail. No more checkpoints—query does not match. The CLI exits with code 1.
+Both branches fail. No more checkpoints — query does not match. The CLI exits with code 1.
 
 ---
 
@@ -421,7 +421,7 @@ Assignment:
        ○   number 42
 ```
 
-Type check fails at root—no navigation occurs. The CLI exits with code 1.
+Type check fails at root — no navigation occurs. The CLI exits with code 1.
 
 ---
 

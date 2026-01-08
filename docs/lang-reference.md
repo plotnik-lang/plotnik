@@ -2,7 +2,7 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
-Predicates (`#eq?`, `#match?`) and directives (`#set!`) are intentionally unsupported—filtering logic belongs in your host language.
+Predicates (`#eq?`, `#match?`) and directives (`#set!`) are intentionally unsupported — filtering logic belongs in your host language.
 
 ---
 
@@ -51,13 +51,13 @@ Matches `a.b` even if there's a comment like `a /* x */ .b` (trivia skipped), bu
 (call_expression (identifier) @fn . "(")  ; no trivia between name and paren
 ```
 
-When any side of the anchor is an anonymous node (literal token), the match is exact—no trivia allowed.
+When any side of the anchor is an anonymous node (literal token), the match is exact — no trivia allowed.
 
 **Rule**: The anchor is as strict as its strictest operand. Anonymous nodes demand precision; named nodes tolerate trivia.
 
 ### Partial Matching
 
-Node patterns are open—unmentioned children are ignored:
+Node patterns are open — unmentioned children are ignored:
 
 ```
 (binary_expression left: (identifier) @left)
@@ -78,7 +78,7 @@ Sequences `{...}` advance through siblings in order, skipping non-matching nodes
 )
 ```
 
-Fields participate in sequential matching—they're not independent lookups.
+Fields participate in sequential matching — they're not independent lookups.
 
 ---
 
@@ -206,11 +206,11 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 → { methods: { method: Node, name: Node }[] }
 ```
 
-This prevents association loss—each struct is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
+This prevents association loss — each struct is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
 
 ### The Node Type
 
-Default capture type—a reference to a tree-sitter node:
+Default capture type — a reference to a tree-sitter node:
 
 ```
 interface Node {
@@ -297,7 +297,7 @@ Use cases:
 Rules:
 
 - `@_` and `@_name` match like regular captures but produce no output
-- Named suppressive captures (`@_foo`) are equivalent to `@_`—the name is documentation only
+- Named suppressive captures (`@_foo`) are equivalent to `@_` — the name is documentation only
 - Type annotations are not allowed on suppressive captures
 - Nesting works: `@_outer` containing `@_inner` correctly suppresses both
 
@@ -351,7 +351,7 @@ Match named nodes (non-terminals and named terminals) by type:
 (binary_expression (identifier) (number))
 ```
 
-Children can be partial—this matches any `binary_expression` with at least one `string_literal` child:
+Children can be partial — this matches any `binary_expression` with at least one `string_literal` child:
 
 ```
 (binary_expression (string_literal))
@@ -490,7 +490,7 @@ decorator: (decorator)* @decorators   ; repeats the whole field
 value: [A: (x) B: (y)] @kind          ; captures the field (containing the alternation)
 ```
 
-This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type—for alternations, you get the tagged union, not a raw node.
+This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type — for alternations, you get the tagged union, not a raw node.
 
 ### Negated Fields
 
@@ -502,7 +502,7 @@ Assert a field is absent with `-`:
   -type_parameters)
 ```
 
-Negated fields don't affect the output type—they're purely structural constraints:
+Negated fields don't affect the output type — they're purely structural constraints:
 
 ```typescript
 {
@@ -532,7 +532,7 @@ Output types:
 { decorators: [Node, ...Node[]] }
 ```
 
-The `+` quantifier always produces non-empty arrays—no opt-out.
+The `+` quantifier always produces non-empty arrays — no opt-out.
 
 Plotnik also supports non-greedy variants: `*?`, `+?`, `??`
 
@@ -745,7 +745,7 @@ interface Target {
 
 ## Anchors
 
-The anchor `.` constrains sibling positions. Anchors don't affect types—they're structural constraints.
+The anchor `.` constrains sibling positions. Anchors don't affect types — they're structural constraints.
 
 ### Anchor Strictness
 
@@ -758,7 +758,7 @@ Anchor behavior depends on the node types being anchored:
 | `(a) . "x"` | Disallowed     | Disallowed          |
 | `"x" . "y"` | Disallowed     | Disallowed          |
 
-When anchoring named nodes, trivia (comments, whitespace) is skipped but no other named nodes may appear between. When any operand is an anonymous node (literal token), the anchor enforces exact adjacency—nothing in between.
+When anchoring named nodes, trivia (comments, whitespace) is skipped but no other named nodes may appear between. When any operand is an anonymous node (literal token), the anchor enforces exact adjacency — nothing in between.
 
 ### Position Anchors
 
@@ -792,7 +792,7 @@ Here, no trivia is allowed between the function name and the opening parenthesis
 
 ### Output Types
 
-Anchors are structural constraints only—they don't affect output types:
+Anchors are structural constraints only — they don't affect output types:
 
 ```typescript
 { first: Node }
@@ -835,7 +835,7 @@ The rules:
 
 - **Boundary anchors** (at start/end of sequence) need a parent named node to provide first/last child or adjacent sibling semantics
 - **Interior anchors** (between items in a sequence) are always valid because both sides are explicitly defined
-- **Alternations** cannot contain anchors directly—anchors must be inside a branch expression
+- **Alternations** cannot contain anchors directly — anchors must be inside a branch expression
 
 ---
 

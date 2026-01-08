@@ -10,7 +10,7 @@ Two principles guide the type system:
 
 1. **Flat structure**: Captures bubble up to the nearest scope boundary.
 
-2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require a struct capture. The alternative—parallel arrays—loses per-iteration association between `a[i]` and `b[i]`.
+2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require a struct capture. The alternative — parallel arrays — loses per-iteration association between `a[i]` and `b[i]`.
 
 ### Why Transparent Scoping
 
@@ -24,7 +24,7 @@ Extracting a pattern into a definition shouldn't change output:
 // Extracted
 Func = (function name: (identifier) @name)
 (Func)
-→ { name: Node }   // Same shape—@name bubbles through
+→ { name: Node }   // Same shape — @name bubbles through
 ```
 
 If definitions created implicit boundaries, extraction would wrap output in a new struct, breaking downstream types.
@@ -105,7 +105,7 @@ The strict rule forces you to think about structure upfront.
 
 ### Optional Bubbling
 
-The `?` quantifier does **not** add dimensionality—it produces at most one value, not a list. Therefore, optional groups without captures are allowed:
+The `?` quantifier does **not** add dimensionality — it produces at most one value, not a list. Therefore, optional groups without captures are allowed:
 
 ```
 { (decorator) @dec }?
@@ -215,7 +215,7 @@ Within each struct, inner quantifiers apply to fields:
 → { items: { decs: Node[], fn: Node }[] }
 ```
 
-Each struct has its own `decs` array—no cross-struct mixing.
+Each struct has its own `decs` array — no cross-struct mixing.
 
 ## 5. Type Unification in Alternations
 
@@ -257,7 +257,7 @@ When a quantified capture appears in some branches but not others, the missing b
 ]  // x: Node[]
 ```
 
-Untagged alternations are "I don't care which branch matched"—so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
+Untagged alternations are "I don't care which branch matched" — so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
 
 When types start to conflict, use tagged alternations:
 

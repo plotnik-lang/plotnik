@@ -21,7 +21,7 @@ This section defines the type system metadata used for code generation and runti
 | TypeScript | Binding-provided object with `startPosition`, `text`, etc. |
 | JSON       | Unique node identifier (e.g., `"node:42"` or path-based)   |
 
-The handle provides access to node metadata (kind, span, text) without copying the source. Lifetime management is platform-specific—Rust enforces it statically, bindings may use reference counting or arena allocation.
+The handle provides access to node metadata (kind, span, text) without copying the source. Lifetime management is platform-specific — Rust enforces it statically, bindings may use reference counting or arena allocation.
 
 **TypeKind (u8)**: Discriminator for `TypeDef`.
 
