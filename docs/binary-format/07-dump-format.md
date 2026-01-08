@@ -23,7 +23,7 @@ They require all three conditions:
 - `node_field == None` (no field constraint)
 
 A step with `nav == Stay` but with a type constraint (e.g., `(identifier)`) is NOT
-epsilon—it matches at the current cursor position.
+epsilon — it matches at the current cursor position.
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
 placed directly on match instructions rather than in separate epsilon steps. Structural

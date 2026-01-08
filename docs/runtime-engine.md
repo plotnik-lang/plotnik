@@ -6,7 +6,7 @@ Executes compiled query graphs against Tree-sitter syntax trees. See [06-transit
 
 ```rust
 struct VM<'t> {
-    cursor: TreeCursor<'t>,          // Never reset—preserves descendant_index for O(1) backtrack
+    cursor: TreeCursor<'t>,          // Never reset — preserves descendant_index for O(1) backtrack
     ip: StepId,                      // Current step index
     frames: Vec<Frame>,              // Call stack
     effects: EffectLog<'t>,          // Side-effect log
@@ -43,7 +43,7 @@ Fetch step at `ip` → dispatch by `type_id` → execute → update `ip`.
 
 ### Epsilon Transitions
 
-A `Match8` or `Match16–64` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition**—it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
+A `Match8` or `Match16–64` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition** — it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
 
 Common patterns:
 
@@ -97,7 +97,7 @@ struct Frame {
 }
 ```
 
-"Pop" just moves `current`—frames remain for checkpoint restoration.
+"Pop" just moves `current` — frames remain for checkpoint restoration.
 
 ### Pruning
 
@@ -110,7 +110,7 @@ arena.truncate(high_water + 1)
 
 Bounds arena to O(max_checkpoint_depth + current_call_depth).
 
-**O(1) Invariant**: The checkpoint stack maintains `max_frame_ref`—the highest `frame_index` referenced by any active checkpoint.
+**O(1) Invariant**: The checkpoint stack maintains `max_frame_ref` — the highest `frame_index` referenced by any active checkpoint.
 
 | Operation | Invariant Update                                     | Complexity     |
 | --------- | ---------------------------------------------------- | -------------- |
@@ -185,7 +185,7 @@ The `Node` and `Text` variants carry the actual `tree_sitter::Node` so the mater
 
 ### Bytecode vs Runtime Effects
 
-**Bytecode** (`EffectOp` in `bytecode/effects.rs`): Compact 2-byte encoding with 6-bit opcode + 10-bit payload. No embedded data—the `Node` opcode signals "capture `matched_node`" but doesn't carry it.
+**Bytecode** (`EffectOp` in `bytecode/effects.rs`): Compact 2-byte encoding with 6-bit opcode + 10-bit payload. No embedded data — the `Node` opcode signals "capture `matched_node`" but doesn't carry it.
 
 **Runtime** (`RuntimeEffect`): The VM interprets bytecode effects and produces runtime effects with embedded data. When the VM executes a bytecode `Node` effect, it emits `RuntimeEffect::Node(matched_node)`.
 
@@ -204,4 +204,4 @@ Exhaustion returns `RuntimeError`, not panic.
 
 ## Trivia Handling
 
-Per-language trivia list used for `*Skip` navigation. A node is never skipped if it matches the current target—`(comment)` still matches comments.
+Per-language trivia list used for `*Skip` navigation. A node is never skipped if it matches the current target — `(comment)` still matches comments.

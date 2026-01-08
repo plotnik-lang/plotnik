@@ -247,7 +247,7 @@ The compiler places effects based on semantic requirements: scope openers often 
 
 ### 4.3. Epsilon Transitions
 
-A Match instruction with `nav == Epsilon` is an **epsilon transition**—it succeeds unconditionally without cursor movement or node checking. The VM skips navigation and node matching entirely, only executing effects and proceeding to successors. This enables:
+A Match instruction with `nav == Epsilon` is an **epsilon transition** — it succeeds unconditionally without cursor movement or node checking. The VM skips navigation and node matching entirely, only executing effects and proceeding to successors. This enables:
 
 - **Branching at EOF**: `(a)?` must succeed when no node exists to match.
 - **Pure control flow**: Decision points for quantifiers.

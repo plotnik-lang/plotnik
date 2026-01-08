@@ -23,7 +23,7 @@ struct Checkpoint {
 }
 ```
 
-**Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root—`reset(node)` would invalidate all checkpoints.
+**Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root — `reset(node)` would invalidate all checkpoints.
 
 ### Why TreeCursor
 
@@ -35,10 +35,10 @@ struct Checkpoint {
 | `descendant_index()`  | O(1)       | —           |
 | `goto_descendant()`   | O(depth)   | —           |
 
-The `Node` API's `next_sibling()` is O(siblings)—unacceptable for repeated backtracking. TreeCursor provides O(1) sibling traversal and 4-byte checkpoints via `descendant_index`.
+The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated backtracking. TreeCursor provides O(1) sibling traversal and 4-byte checkpoints via `descendant_index`.
 
 - Checkpoint save: O(1)
-- Checkpoint restore: O(depth)—cold path only
+- Checkpoint restore: O(depth) — cold path only
 
 ## Nav Encoding
 
@@ -88,7 +88,7 @@ Each mode defines what happens when a match fails:
 
 | Mode              | Constraint                                    |
 | ----------------- | --------------------------------------------- |
-| `Up(n)`           | None—just ascend n levels                     |
+| `Up(n)`           | None — just ascend n levels                   |
 | `UpSkipTrivia(n)` | Must be at last non-trivia child, then ascend |
 | `UpExact(n)`      | Must be at last child, then ascend            |
 
@@ -185,7 +185,7 @@ Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
   05 *↑³                                        ◼
 ```
 
-Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet implemented—currently emits individual `Up(1)` steps.
+Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet implemented — currently emits individual `Up(1)` steps.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
@@ -249,7 +249,7 @@ for &fid in pattern.neg_fields {
 }
 ```
 
-Both constraints participate in the skip policy—a mismatch triggers retry (for `*`), fail-if-non-trivia (for `~`), or immediate fail (for `.`).
+Both constraints participate in the skip policy — a mismatch triggers retry (for `*`), fail-if-non-trivia (for `~`), or immediate fail (for `.`).
 
 ## Call Navigation
 

@@ -1,7 +1,7 @@
 //! Unification logic for alternation branches.
 //!
 //! Handles merging TypeFlow from different branches of untagged alternations.
-//! Tagged alternations don't unify—they produce Enum types directly.
+//! Tagged alternations don't unify — they produce Enum types directly.
 
 use std::collections::BTreeMap;
 

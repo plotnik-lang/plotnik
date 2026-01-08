@@ -76,8 +76,8 @@ The `.` anchor adapts to what it's anchoring:
 | Pattern     | Behavior                                    |
 | ----------- | ------------------------------------------- |
 | `(a) . (b)` | Skip trivia, no named nodes between         |
-| `"x" . (b)` | Strict—nothing between (anonymous involved) |
-| `(a) . "x"` | Strict—nothing between (anonymous involved) |
+| `"x" . (b)` | Strict — nothing between (anonymous involved) |
+| `(a) . "x"` | Strict — nothing between (anonymous involved) |
 
 Rule: anchor is as strict as its strictest operand.
 

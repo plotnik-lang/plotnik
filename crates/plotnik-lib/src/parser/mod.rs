@@ -12,7 +12,7 @@
 //!
 //! # Recovery Strategy
 //!
-//! The parser is resilient—it always produces a tree. Recovery follows these rules:
+//! The parser is resilient — it always produces a tree. Recovery follows these rules:
 //!
 //! 1. Unknown tokens get wrapped in `SyntaxKind::Error` nodes and consumed
 //! 2. Missing expected tokens emit a diagnostic but don't consume (parent may handle)

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// A lightweight handle to an interned string.
 ///
 /// Comparing two symbols is O(1). Symbols are ordered by insertion order,
-/// not lexicographically—use `Interner::resolve` if you need string ordering.
+/// not lexicographically — use `Interner::resolve` if you need string ordering.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Symbol(u32);
 
