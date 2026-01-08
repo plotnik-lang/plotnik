@@ -23,16 +23,17 @@ M0: S1 → T0  ; m: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 6 :: T1
+Test = 06 :: T1
 
 [transitions]
 _ObjWrap:
-  0   ε   [Obj]                             2
-  2       Trampoline                        3
-  3   ε   [EndObj]                          5
-  5                                         ▶
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
 Test:
-  6   ε                                     7
-  7   !   (MISSING) [Node Set(M0)]          9
-  9                                         ▶
+  06   ε                                    08
+  07  ...  
+  08   !   (MISSING) [Node Set(M0)]         10
+  10                                        ▶

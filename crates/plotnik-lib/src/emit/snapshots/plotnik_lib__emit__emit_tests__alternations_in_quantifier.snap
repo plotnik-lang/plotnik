@@ -53,23 +53,26 @@ Test:
   06   ε                                    07
   07   !   (object)                         08
   08   ε   [Arr]                            10
-  10   ε                                    39, 20
+  10   ε                                    42, 21
   12   ε   [EndArr Set(M5)]                 14
-  14   △   _                                19
-  15   ε   [EndObj Push]                    17
-  17   ε                                    45, 12
-  19                                        ▶
-  20   ε   [EndArr Set(M5)]                 19
-  22   ε   [Set(M4)]                        15
-  24   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum]  22
-  27   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum]  22
-  30   ε                                    24, 27
-  32   ε   [Obj]                            30
-  34   ▷   _                                37
-  35   ε                                    34, 12
-  37   ε                                    32, 35
-  39   ▽   _                                37
-  40   ▷   _                                43
-  41   ε                                    40, 12
-  43   ε                                    32, 41
-  45   ▷   _                                43
+  14   △   _                                20
+  15  ...  
+  16   ε   [EndObj Push]                    18
+  18   ε                                    48, 12
+  20                                        ▶
+  21   ε   [EndArr Set(M5)]                 20
+  23  ...  
+  24   ε   [Set(M4)]                        16
+  26   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum]  24
+  29   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum]  24
+  32   ε                                    26, 29
+  34   ε   [Obj]                            32
+  36   ▷   _                                40
+  37   ε                                    36, 12
+  39  ...  
+  40   ε                                    34, 37
+  42   ▽   _                                40
+  43   ▷   _                                46
+  44   ε                                    43, 12
+  46   ε                                    34, 44
+  48   ▷   _                                46

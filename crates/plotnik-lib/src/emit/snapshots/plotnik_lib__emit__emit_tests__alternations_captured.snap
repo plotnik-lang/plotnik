@@ -34,8 +34,9 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   ε                                    10, 12
-  09                                        ▶
-  10   !   (identifier) [Node Set(M0)]      09
-  12   !   (number) [Node Set(M0)]          09
+  06   ε                                    08
+  07  ...  
+  08   ε                                    11, 13
+  10                                        ▶
+  11   !   (identifier) [Node Set(M0)]      10
+  13   !   (number) [Node Set(M0)]          10

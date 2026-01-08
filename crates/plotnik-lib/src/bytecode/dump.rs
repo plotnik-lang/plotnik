@@ -12,6 +12,7 @@ use super::ids::TypeId;
 use super::instructions::StepId;
 use super::ir::NodeTypeIR;
 use super::module::{Instruction, Module};
+use super::nav::Nav;
 use super::type_meta::{TypeData, TypeKind};
 use super::{Call, Match, Return, Trampoline};
 
@@ -364,6 +365,30 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     out.push('\n');
 }
 
+/// Check if an instruction is padding (all-zeros Match8).
+///
+/// Padding slots contain zero bytes which decode as terminal epsilon Match8
+/// with Any node type, no field constraint, and next=0.
+fn is_padding(instr: &Instruction) -> bool {
+    match instr {
+        Instruction::Match(m) => {
+            m.is_match8()
+                && m.nav == Nav::Epsilon
+                && matches!(m.node_type, NodeTypeIR::Any)
+                && m.node_field.is_none()
+                && m.is_terminal()
+        }
+        _ => false,
+    }
+}
+
+/// Format a single padding step line.
+///
+/// Output: `  07  ... ` (step number and " ... " in symbol column)
+fn format_padding_step(step: u16, step_width: usize) -> String {
+    LineBuilder::new(step_width).instruction_prefix(step, Symbol::PADDING)
+}
+
 fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let header = module.header();
@@ -386,6 +411,14 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         }
 
         let instr = module.decode_step(step);
+
+        // Check for padding (all-zeros Match8 instruction)
+        if is_padding(&instr) {
+            writeln!(out, "{}", format_padding_step(step, step_width)).unwrap();
+            step += 1;
+            continue;
+        }
+
         let line = format_instruction(step, &instr, module, ctx, step_width);
         out.push_str(&line);
         out.push('\n');

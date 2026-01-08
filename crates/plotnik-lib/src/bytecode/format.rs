@@ -62,6 +62,9 @@ impl Symbol {
     /// Epsilon symbol for unconditional transitions.
     pub const EPSILON: Symbol = Symbol::new("  ", "ε", "  ");
 
+    /// Padding indicator (centered "..." in 5-char column).
+    pub const PADDING: Symbol = Symbol::new(" ", "...", " ");
+
     /// Format as a 5-character string.
     pub fn format(&self) -> String {
         format!("{}{}{}", self.left, self.center, self.right)

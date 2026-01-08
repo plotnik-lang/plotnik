@@ -36,7 +36,7 @@ N1: S4 → T2  ; Root
 
 [entrypoints]
 Expression = 06 :: T1
-Root       = 09 :: T2
+Root       = 10 :: T2
 
 [transitions]
 _ObjWrap:
@@ -46,15 +46,16 @@ _ObjWrap:
   05                                        ▶
 
 Expression:
-  06   ε                                    07
-  07   ε                                    16, 19
+  06   ε                                    08
+  07  ...  
+  08   ε                                    17, 20
 
 Root:
-  09   ε                                    10
-  10   !   (function_declaration)           11
-  11   ▽   name: (identifier) [Node Set(M2)]  13
-  13   △   _                                14
-  14                                        ▶
+  10   ε                                    11
+  11   !   (function_declaration)           12
+  12   ▽   name: (identifier) [Node Set(M2)]  14
+  14   △   _                                15
   15                                        ▶
-  16   !   [Null Set(M1)] (identifier) [Node Set(M0)]  15
-  19   !   [Null Set(M0)] (number) [Node Set(M1)]  15
+  16                                        ▶
+  17   !   [Null Set(M1)] (identifier) [Node Set(M0)]  16
+  20   !   [Null Set(M0)] (number) [Node Set(M1)]  16

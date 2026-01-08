@@ -37,13 +37,14 @@ _ObjWrap:
 Test:
   06   ε                                    07
   07   !   (function_declaration)           08
-  08   ε                                    11, 22
+  08   ε                                    11, 23
   10                                        ▶
   11   ε   [Null Set(M0)]                   10
-  13   !   (decorator) [Node Set(M0)]       23
-  15   ε   [Null Set(M0)]                   23
-  17   ▷   _                                20
-  18   ε                                    15, 17
-  20   ε                                    18, 13
-  22   ▽   _                                20
-  23   △   _                                10
+  13   !   (decorator) [Node Set(M0)]       24
+  15  ...  
+  16   ε   [Null Set(M0)]                   24
+  18   ▷   _                                21
+  19   ε                                    16, 18
+  21   ε                                    19, 13
+  23   ▽   _                                21
+  24   △   _                                10
