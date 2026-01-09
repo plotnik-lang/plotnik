@@ -1614,6 +1614,7 @@ version = "0.2.0"
 dependencies = [
  "arborium-tree-sitter",
  "clap",
+ "insta",
  "plotnik-core",
  "plotnik-langs",
  "plotnik-lib",

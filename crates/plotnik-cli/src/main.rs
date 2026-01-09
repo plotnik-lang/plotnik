@@ -2,8 +2,8 @@ mod cli;
 mod commands;
 
 use cli::{
-    AstParams, CheckParams, DumpParams, ExecParams, InferParams, LangsParams, TraceParams,
-    build_cli,
+    AstParams, CheckParams, DumpParams, ExecParams, InferParams, LangDumpParams, LangListParams,
+    TraceParams, build_cli,
 };
 
 fn main() {
@@ -34,10 +34,17 @@ fn main() {
             let params = TraceParams::from_matches(m);
             commands::trace::run(params.into());
         }
-        Some(("langs", m)) => {
-            let _params = LangsParams::from_matches(m);
-            commands::langs::run();
-        }
+        Some(("lang", m)) => match m.subcommand() {
+            Some(("list", sub_m)) => {
+                let _params = LangListParams::from_matches(sub_m);
+                commands::lang::run_list();
+            }
+            Some(("dump", sub_m)) => {
+                let params = LangDumpParams::from_matches(sub_m);
+                commands::lang::run_dump(&params.lang);
+            }
+            _ => unreachable!("clap should have caught this"),
+        },
         _ => unreachable!("clap should have caught this"),
     }
 }

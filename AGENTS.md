@@ -172,15 +172,16 @@ docs/
 
 Run: `cargo run -p plotnik -- <command>`
 
-| Command | Purpose                         |
-| ------- | ------------------------------- |
-| `ast`   | Show AST of query and/or source |
-| `check` | Validate query                  |
-| `dump`  | Show compiled bytecode          |
-| `infer` | Generate TypeScript types       |
-| `exec`  | Execute query, output JSON      |
-| `trace` | Trace execution for debugging   |
-| `langs` | List supported languages        |
+| Command     | Purpose                         |
+| ----------- | ------------------------------- |
+| `ast`       | Show AST of query and/or source |
+| `check`     | Validate query                  |
+| `dump`      | Show compiled bytecode          |
+| `infer`     | Generate TypeScript types       |
+| `exec`      | Execute query, output JSON      |
+| `trace`     | Trace execution for debugging   |
+| `lang list` | List supported languages        |
+| `lang dump` | Dump grammar for a language     |
 
 ## ast
 
@@ -265,12 +266,14 @@ cargo run -p plotnik -- trace query.ptk app.ts --no-result -vv
 
 Options: `-v` (verbose), `-vv` (very verbose), `--no-result`, `--fuel <N>`
 
-## langs
+## lang
 
-List supported tree-sitter languages.
+Language information and grammar tools.
 
 ```sh
-cargo run -p plotnik -- langs
+cargo run -p plotnik -- lang list                  # List languages with aliases
+cargo run -p plotnik -- lang dump json             # Dump JSON grammar
+cargo run -p plotnik -- lang dump typescript       # Dump TypeScript grammar
 ```
 
 # Coding Rules

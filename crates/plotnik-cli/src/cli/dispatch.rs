@@ -310,11 +310,23 @@ impl From<TraceParams> for TraceArgs {
     }
 }
 
-pub struct LangsParams;
+pub struct LangListParams;
 
-impl LangsParams {
+impl LangListParams {
     pub fn from_matches(_m: &ArgMatches) -> Self {
         Self
+    }
+}
+
+pub struct LangDumpParams {
+    pub lang: String,
+}
+
+impl LangDumpParams {
+    pub fn from_matches(m: &ArgMatches) -> Self {
+        Self {
+            lang: m.get_one::<String>("lang").cloned().unwrap(),
+        }
     }
 }
 

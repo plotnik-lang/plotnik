@@ -15,22 +15,26 @@ plotnik check -q 'Func = (function_declaration) @fn' -l typescript
 plotnik infer -q 'Func = (function_declaration) @fn' -l typescript
 
 # List supported languages
-plotnik langs
+plotnik lang list
+
+# Dump grammar for a language
+plotnik lang dump typescript
 ```
 
 ---
 
 ## Commands
 
-| Command | Input | Purpose                         | `-l` flag                             |
-| ------- | ----- | ------------------------------- | ------------------------------------- |
-| `ast`   | both  | Show AST of query and/or source | Inferred from extension               |
-| `dump`  | query | Show bytecode                   | Optional (enables linking)            |
-| `check` | query | Validate query                  | Optional (enables grammar validation) |
-| `infer` | query | Generate type definitions       | Required                              |
-| `exec`  | both  | Run query, output JSON          | Inferred from extension               |
-| `trace` | both  | Trace query execution           | Inferred from extension               |
-| `langs` | —     | List supported languages        | —                                     |
+| Command     | Input | Purpose                         | `-l` flag                             |
+| ----------- | ----- | ------------------------------- | ------------------------------------- |
+| `ast`       | both  | Show AST of query and/or source | Inferred from extension               |
+| `dump`      | query | Show bytecode                   | Optional (enables linking)            |
+| `check`     | query | Validate query                  | Optional (enables grammar validation) |
+| `infer`     | query | Generate type definitions       | Required                              |
+| `exec`      | both  | Run query, output JSON          | Inferred from extension               |
+| `trace`     | both  | Trace query execution           | Inferred from extension               |
+| `lang list` | —     | List supported languages        | —                                     |
+| `lang dump` | —     | Dump grammar for a language     | —                                     |
 
 ---
 
@@ -134,22 +138,47 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 | `--no-export`       | Don't add `export` keyword                    |
 | `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
 
-### langs
+### lang
 
-List all supported tree-sitter languages.
+Language information and grammar tools.
+
+#### lang list
+
+List all supported tree-sitter languages with their aliases.
 
 ```sh
-plotnik langs
+plotnik lang list
 ```
 
 ```
-Supported languages (107):
-  bash
-  c
-  cpp
-  css
-  ...
+bash (sh, shell)
+c
+cpp (c++, cxx, cc)
+javascript (js, jsx, ecmascript, es)
+typescript (ts)
+...
 ```
+
+#### lang dump
+
+Dump a language's grammar in Plotnik-like syntax. Useful for learning how to write queries against a grammar.
+
+```sh
+plotnik lang dump json
+plotnik lang dump typescript
+```
+
+The output uses a syntax similar to Plotnik queries:
+
+- `(node_kind)` — named node (queryable)
+- `"literal"` — anonymous node (queryable)
+- `(_hidden ...)` — hidden rule (not queryable, children inline)
+- `{...}` — sequence (ordered children)
+- `[...]` — alternation (first match)
+- `? * +` — quantifiers
+- `"x"!` — immediate token (no whitespace before)
+- `field: ...` — named field
+- `T :: supertype` — supertype declaration
 
 ### exec
 

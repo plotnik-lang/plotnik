@@ -1,0 +1,156 @@
+---
+source: crates/plotnik-cli/src/commands/lang_tests.rs
+expression: output
+---
+/*
+ * Grammar Dump
+ *
+ * Syntax:
+ *   (node_kind)        named node (queryable)
+ *   "literal"          anonymous node (queryable)
+ *   (_hidden ...)      hidden rule (not queryable, children inline)
+ *   {...}              sequence (ordered children)
+ *   [...]              alternation (first match)
+ *   ?  *  +            quantifiers (0-1, 0+, 1+)
+ *   "x"!               immediate token (no preceding whitespace)
+ *   field: ...         named field
+ *   T :: supertype     supertype declaration
+ */
+
+extras = [
+  /\s/
+  (comment)
+]
+
+_value :: supertype = [
+  (object)
+  (array)
+  (number)
+  (string)
+  (true)
+  (false)
+  (null)
+]
+
+document = (_value ...)*
+
+object = {
+  "{"
+  {
+    (pair)
+    {
+      ","
+      (pair)
+    }*
+  }?
+  "}"
+}
+
+pair = {
+  key: (string)
+  ":"
+  value: (_value ...)
+}
+
+array = {
+  "["
+  {
+    (_value ...)
+    {
+      ","
+      (_value ...)
+    }*
+  }?
+  "]"
+}
+
+string = [
+  {
+    "\""
+    "\""
+  }
+  {
+    "\""
+    (_string_content ...)
+    "\""
+  }
+]
+
+_string_content = [
+  (string_content)
+  (escape_sequence)
+]+
+
+string_content = /[^\\"\n]+/!
+
+escape_sequence = {
+  "\\"
+  /(\"|\\|\/|b|f|n|r|t|u)/
+}!
+
+number = [
+  {
+    {
+      "-"?
+      [
+        "0"
+        {
+          /[1-9]/
+          /\d+/?
+        }
+      ]
+    }
+    "."
+    /\d+/?
+    {
+      [
+        "e"
+        "E"
+      ]
+      {
+        "-"?
+        /\d+/
+      }
+    }?
+  }
+  {
+    {
+      "-"?
+      [
+        "0"
+        {
+          /[1-9]/
+          /\d+/?
+        }
+      ]
+    }
+    {
+      [
+        "e"
+        "E"
+      ]
+      {
+        "-"?
+        /\d+/
+      }
+    }?
+  }
+]
+
+true = "true"
+
+false = "false"
+
+null = "null"
+
+comment = [
+  {
+    "//"
+    /.*/
+  }
+  {
+    "/*"
+    /[^*]*\*+([^/*][^*]*\*+)*/
+    "/"
+  }
+]
