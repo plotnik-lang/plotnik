@@ -13,6 +13,7 @@
 use std::collections::HashMap;
 use std::num::NonZeroU16;
 
+pub mod grammar;
 mod interner;
 mod invariants;
 pub mod utils;
@@ -27,7 +28,7 @@ mod utils_tests;
 pub use interner::{Interner, Symbol};
 
 /// Raw node definition from `node-types.json`.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RawNode {
     #[serde(rename = "type")]
     pub type_name: String,
@@ -43,7 +44,7 @@ pub struct RawNode {
 }
 
 /// Cardinality constraints for a field or children slot.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RawCardinality {
     pub multiple: bool,
     pub required: bool,
@@ -51,7 +52,7 @@ pub struct RawCardinality {
 }
 
 /// Reference to a node type.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RawTypeRef {
     #[serde(rename = "type")]
     pub type_name: String,

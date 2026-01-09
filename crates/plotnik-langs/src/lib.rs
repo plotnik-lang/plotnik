@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use arborium_tree_sitter::Language;
 
-use plotnik_core::{Cardinality, NodeFieldId, NodeTypeId, NodeTypes, StaticNodeTypes};
+use plotnik_core::grammar::Grammar;
+use plotnik_core::{Cardinality, DynamicNodeTypes, NodeFieldId, NodeTypeId, NodeTypes, RawNode};
 
 pub mod builtin;
 pub mod dynamic;
@@ -62,34 +63,46 @@ pub trait LangImpl: Send + Sync {
     fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality>;
     fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId];
     fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool;
+
+    /// Get the grammar for this language (for grammar-verify).
+    fn grammar(&self) -> &Grammar;
 }
 
-/// Generic language implementation parameterized by node types.
-///
-/// This struct provides a single implementation of `LangImpl` that works with
-/// any `NodeTypes` implementation (static or dynamic).
+/// Language implementation with embedded grammar and node types.
 #[derive(Debug)]
-pub struct LangInner<N: NodeTypes> {
+pub struct LangInner {
     name: String,
     ts_lang: Language,
-    node_types: N,
+    node_types: DynamicNodeTypes,
+    grammar: Grammar,
 }
 
-impl LangInner<&'static StaticNodeTypes> {
-    pub fn new_static(name: &str, ts_lang: Language, node_types: &'static StaticNodeTypes) -> Self {
+impl LangInner {
+    /// Create a new language from raw node types and grammar.
+    pub fn new(name: &str, ts_lang: Language, raw_nodes: Vec<RawNode>, grammar: Grammar) -> Self {
+        let node_types = DynamicNodeTypes::build(
+            &raw_nodes,
+            |kind, named| {
+                let id = ts_lang.id_for_node_kind(kind, named);
+                NonZeroU16::new(id)
+            },
+            |field_name| ts_lang.field_id_for_name(field_name),
+        );
+
         Self {
             name: name.to_owned(),
             ts_lang,
             node_types,
+            grammar,
         }
     }
 
-    pub fn node_types(&self) -> &'static StaticNodeTypes {
-        self.node_types
+    pub fn node_types(&self) -> &DynamicNodeTypes {
+        &self.node_types
     }
 }
 
-impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
+impl LangImpl for LangInner {
     fn name(&self) -> &str {
         &self.name
     }
@@ -212,5 +225,9 @@ impl<N: NodeTypes + Send + Sync> LangImpl for LangInner<N> {
 
     fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
         self.node_types.is_valid_child_type(node_type_id, child)
+    }
+
+    fn grammar(&self) -> &Grammar {
+        &self.grammar
     }
 }

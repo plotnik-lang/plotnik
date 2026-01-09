@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use serde::Serialize;
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let manifest_path = PathBuf::from(&manifest_dir).join("Cargo.toml");
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR not set"));
 
-    // Collect enabled lang-* features from environment
     let enabled_features: Vec<String> = std::env::vars()
         .filter_map(|(key, _)| {
             key.strip_prefix("CARGO_FEATURE_LANG_")
@@ -38,20 +40,48 @@ fn main() {
             .parent()
             .expect("package has no parent dir");
 
+        let lang_key = feature_to_lang_key(&feature_name);
+
+        // Process grammar.json
+        let grammar_path = package_root.join("grammar/src/grammar.json");
+        if !grammar_path.exists() {
+            panic!(
+                "grammar.json not found for {}: {}",
+                package.name, grammar_path
+            );
+        }
+        process_json_file(
+            &grammar_path,
+            &out_dir,
+            &lang_key,
+            "GRAMMAR",
+            "grammar",
+            |json| {
+                plotnik_core::grammar::Grammar::from_json(json)
+                    .expect("failed to parse grammar.json")
+            },
+        );
+
+        // Process node-types.json
         let node_types_path = package_root.join("grammar/src/node-types.json");
-        if !node_types_path.exists() {
+        if node_types_path.exists() {
+            process_json_file(
+                &node_types_path,
+                &out_dir,
+                &lang_key,
+                "NODE_TYPES",
+                "node_types",
+                |json| {
+                    serde_json::from_str::<Vec<plotnik_core::RawNode>>(json)
+                        .expect("failed to parse node-types.json")
+                },
+            );
+        } else {
             panic!(
                 "node-types.json not found for {}: {}",
                 package.name, node_types_path
             );
         }
-
-        let env_var_name = format!(
-            "PLOTNIK_NODE_TYPES_{}",
-            feature_to_node_types_key(&feature_name),
-        );
-        println!("cargo::rustc-env={}={}", env_var_name, node_types_path);
-        println!("cargo::rerun-if-changed={}", node_types_path);
     }
 
     for (key, _) in std::env::vars() {
@@ -64,7 +94,40 @@ fn main() {
     println!("cargo::rerun-if-changed=Cargo.toml");
 }
 
-fn feature_to_node_types_key(feature: &str) -> String {
+/// Parse JSON, serialize to binary, write to OUT_DIR, and set env var.
+fn process_json_file<T, P, F>(
+    json_path: P,
+    out_dir: &Path,
+    lang_key: &str,
+    env_prefix: &str,
+    file_suffix: &str,
+    parse: F,
+) where
+    T: Serialize,
+    P: AsRef<Path>,
+    F: FnOnce(&str) -> T,
+{
+    let json_path = json_path.as_ref();
+    let json = std::fs::read_to_string(json_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", json_path.display(), e));
+
+    let parsed = parse(&json);
+
+    let binary = postcard::to_allocvec(&parsed).expect("serialization should not fail");
+    let binary_path = out_dir.join(format!("{}.{}", lang_key.to_lowercase(), file_suffix));
+    std::fs::write(&binary_path, &binary)
+        .unwrap_or_else(|e| panic!("failed to write {}: {}", binary_path.display(), e));
+
+    println!(
+        "cargo::rustc-env=PLOTNIK_{}_{}={}",
+        env_prefix,
+        lang_key,
+        binary_path.display()
+    );
+    println!("cargo::rerun-if-changed={}", json_path.display());
+}
+
+fn feature_to_lang_key(feature: &str) -> String {
     match feature {
         "lang-c-sharp" => "C_SHARP".to_string(),
         "lang-ssh-config" => "SSH_CONFIG".to_string(),
