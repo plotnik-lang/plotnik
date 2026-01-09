@@ -53,7 +53,7 @@ pub fn build_cli() -> Command {
         .subcommand(infer_command())
         .subcommand(exec_command())
         .subcommand(trace_command())
-        .subcommand(langs_command())
+        .subcommand(lang_command())
 }
 
 /// Show AST of query and/or source file.
@@ -260,7 +260,29 @@ pub fn trace_command() -> Command {
     )
 }
 
+/// Language information commands.
+pub fn lang_command() -> Command {
+    Command::new("lang")
+        .about("Language information and grammar dump")
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .subcommand(lang_list_command())
+        .subcommand(lang_dump_command())
+}
+
 /// List supported languages.
-pub fn langs_command() -> Command {
-    Command::new("langs").about("List supported languages")
+fn lang_list_command() -> Command {
+    Command::new("list").about("List supported languages with aliases")
+}
+
+/// Dump grammar for a language.
+fn lang_dump_command() -> Command {
+    Command::new("dump")
+        .about("Dump grammar in Plotnik-like syntax")
+        .arg(
+            clap::Arg::new("lang")
+                .help("Language name or alias")
+                .required(true)
+                .index(1),
+        )
 }

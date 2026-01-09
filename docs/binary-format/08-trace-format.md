@@ -146,8 +146,8 @@ Value:
   08   ε                                    11, 16
   10                                        ▶
   11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
-  14  ...  
-  15  ...  
+  14  ...
+  15  ...
   16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
   19   △   _                                10
 ```
@@ -191,7 +191,7 @@ Value:
        △   document
        ●   document 42
   --------------------------------------------
-  10   ◀   (Value)                          
+  10   ◀   (Value)
 
 _ObjWrap:
   --------------------------------------------
@@ -233,7 +233,7 @@ Value:
        ⬥   Enum "Num"
        ▽   string
        ○   string "hello"
-  08  ❮❮❮ 
+  08  ❮❮❮
   --------------------------------------------
   16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
        ⬥   Enum "Str"
@@ -246,7 +246,7 @@ Value:
        △   document
        ●   document "hello"
   --------------------------------------------
-  10   ◀   (Value)                          
+  10   ◀   (Value)
 
 _ObjWrap:
   --------------------------------------------
@@ -298,7 +298,7 @@ Value:
        ⬥   Enum "Num"
        ▽   true
        ○   true true
-  08  ❮❮❮ 
+  08  ❮❮❮
   --------------------------------------------
   16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
        ⬥   Enum "Str"
@@ -327,12 +327,12 @@ Value:
   08   ε                                    11, 16
   11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
        ○   string
-  08  ❮❮❮ 
+  08  ❮❮❮
   16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
        ●   string
   19       _                                10
        ●   document
-  10   ◀   (Value)                          
+  10   ◀   (Value)
 
 _ObjWrap:
   03   ε   [EndObj]                         05

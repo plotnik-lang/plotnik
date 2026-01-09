@@ -2,6 +2,17 @@ use std::sync::{Arc, LazyLock};
 
 use crate::{Lang, LangInner};
 
+/// Language metadata for listing.
+#[derive(Debug, Clone)]
+pub struct LangInfo {
+    /// Canonical name (first in names list).
+    pub name: &'static str,
+    /// All name aliases (includes canonical name).
+    pub aliases: &'static [&'static str],
+    /// File extensions.
+    pub extensions: &'static [&'static str],
+}
+
 macro_rules! define_langs {
     (
         $(
@@ -73,6 +84,20 @@ macro_rules! define_langs {
                 $(
                     #[cfg(feature = $feature)]
                     $fn_name(),
+                )*
+            ]
+        }
+
+        /// Get metadata for all available languages.
+        pub fn all_info() -> Vec<LangInfo> {
+            vec![
+                $(
+                    #[cfg(feature = $feature)]
+                    LangInfo {
+                        name: $name,
+                        aliases: &[$($alias),*],
+                        extensions: &[$($ext),*],
+                    },
                 )*
             ]
         }
