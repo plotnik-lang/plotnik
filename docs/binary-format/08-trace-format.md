@@ -119,400 +119,224 @@ The step number indicates _where_ we're restoring to. `❮❮❮` is centered in
 From `07-dump-format.md`:
 
 ```
-Ident = (identifier) @name :: string
-Expression = [
-    Literal: (number) @value
-    Variable: (identifier) @name
-]
-Assignment = (assignment_expression
-    left: (identifier) @target
-    right: (Expression) @value)
+Value = (document [
+    Num: (number) @n
+    Str: (string) @s
+])
 ```
+
+Run: `plotnik trace -q '<query>' -s '<source>' -l json -v`
 
 ### Bytecode Reference
 
 ```
 [entrypoints]
-Assignment = 12 :: T06
-Expression = 09 :: T05
-Ident      = 01 :: T02
+Value = 06 :: T3
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
-Ident:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04       (identifier) [Text Set(M0)]      06
-  06   ε   [EndObj]                         08
-  08                                        ▶
-
-Expression:
-  09   ε                                    10
-  10   ε                                    30, 36
-
-Assignment:
-  12   ε                                    13
-  13   ε   [Obj]                            15
-  15       (assignment_expression)          16
-  16   ▽   left: (identifier) [Node Set(M6)]  18
-  18   ▷   right: (Expression)           09 : 19
-  19   ε   [Set(M5)]                        21
-  21   △                                    22
-  22   ε   [EndObj]                         24
-  24                                        ▶
-  25                                        ▶
-  26   ε   [EndEnum]                        25
-  28       (number) [Node Set(M1)]          26
-  30   ε   [Enum(M3)]                       28
-  32   ε   [EndEnum]                        25
-  34       (identifier) [Node Set(M2)]      32
-  36   ε   [Enum(M4)]                       34
+Value:
+  06   ε                                    07
+  07   !   (document)                       08
+  08   ε                                    11, 16
+  10                                        ▶
+  11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+  14  ...  
+  15  ...  
+  16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+  19   △   _                                10
 ```
 
 ---
 
-**Note**: The following trace examples are illustrative and use simplified step numbers for clarity. The actual step numbers in your output may differ based on the current bytecode generation. The format and sub-line conventions remain the same.
+## Trace 1: Successful Match on First Branch (`-v`)
 
-## Trace 1: Successful Match with Backtracking (`-v`)
-
-**Entrypoint:** `Assignment`
-**Source:** `x = y`
+**Source:** `42` (JSON number)
 
 ```
-(assignment_expression              ; root
-  left: (identifier)                ; "x"
-  right: (identifier))              ; "y"
+(document
+  (number "42"))
 ```
 
 ### Execution Trace
 
 ```
-Assignment:
-  08   ε                                          09
-  09       (assignment_expression)                10
-       ●   assignment_expression x = y
-  10       left: (identifier) [Node Set(M6)]      12
-       ▽   identifier
-       ●   left:
-       ●   identifier x
+_ObjWrap:
+  00   ε   [Obj]                            02
+       ⬥   Obj
+  02       Trampoline                       03
+       ▶   (Value)
+
+Value:
+  06   ε                                    07
+  07       (document)                       08
+           document
+       ●   document 42
+  --------------------------------------------
+  08   ε                                    11, 16
+  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+       ⬥   Enum "Num"
+       ▽   number
+       ●   number 42
        ⬥   Node
-       ⬥   Set "target"
-  12       (Expression)                        05 : 13
-       ▷   identifier
-       ●   right:
-       ▶   (Expression)
-Expression:
-  05   ε                                          06
-  06   ε                                          22, 28
-  22   ε   [Enum(M3)]                             20
-       ⬥   Enum "Literal"
-  20       (number) [Node Set(M1)]                18
-       ○   identifier y
-  06  ❮❮❮
-  28   ε   [Enum(M4)]                             26
-       ⬥   Enum "Variable"
-  26       (identifier) [Node Set(M2)]            24
-       ●   identifier y
-       ⬥   Node
-       ⬥   Set "name"
-  24   ε   [EndEnum]                              17
+       ⬥   Set "n"
        ⬥   EndEnum
-  17   ◀   (Expression)
-Assignment:
-  13   ε   [Set(M5)]                              15
-       ⬥   Set "value"
-  15                                              16
-       △   assignment_expression
-  16   ◀   (Assignment)                           ◼
+  --------------------------------------------
+  19       _                                10
+       △   document
+       ●   document 42
+  --------------------------------------------
+  10   ◀   (Value)                          
+
+_ObjWrap:
+  --------------------------------------------
+  03   ε   [EndObj]                         05
+       ⬥   EndObj
+  05   ◀   _ObjWrap                         ◼
+```
+
+First branch (`Num`) matches — checkpoint at step 16 is never used.
+
+---
+
+## Trace 2: Successful Match with Backtracking (`-v`)
+
+**Source:** `"hello"` (JSON string)
+
+```
+(document
+  (string "\"hello\""))
+```
+
+### Execution Trace
+
+```
+_ObjWrap:
+  00   ε   [Obj]                            02
+       ⬥   Obj
+  02       Trampoline                       03
+       ▶   (Value)
+
+Value:
+  06   ε                                    07
+  07       (document)                       08
+           document
+       ●   document "hello"
+  --------------------------------------------
+  08   ε                                    11, 16
+  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+       ⬥   Enum "Num"
+       ▽   string
+       ○   string "hello"
+  08  ❮❮❮ 
+  --------------------------------------------
+  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+       ⬥   Enum "Str"
+       ▽   string
+       ●   string "hello"
+       ⬥   Node
+       ⬥   Set "s"
+       ⬥   EndEnum
+  19       _                                10
+       △   document
+       ●   document "hello"
+  --------------------------------------------
+  10   ◀   (Value)                          
+
+_ObjWrap:
+  --------------------------------------------
+  03   ε   [EndObj]                         05
+       ⬥   EndObj
+  05   ◀   _ObjWrap                         ◼
 ```
 
 ### Execution Summary
 
-1. **08→09**: Epsilon entry
-2. **09→10**: Match `(assignment_expression)` at root
-3. **10→12**: Navigate ▽, match `left: (identifier)`, capture "x" as `@target`
-4. **12→05**: Navigate ▷, check `right:`, call Expression
-5. **05→06→22**: Expression entry, checkpoint at 28
-6. **22→20**: Start Literal variant, try `(number)`
-7. **20**: `(identifier)` found, type mismatch, backtrack to checkpoint
-8. **28→26**: Start Variable variant, try `(identifier)`
-9. **26→24**: `(identifier) "y"` matches, capture as `@name`
-10. **24→17**: EndEnum, return from Expression
-11. **13→15**: Set `@value` field
-12. **15→16**: Navigate △ to root
-13. **16**: Return from Assignment
-
----
-
-## Trace 2: Successful Match without Backtracking (`-v`)
-
-**Entrypoint:** `Assignment`
-**Source:** `x = 1`
-
-```
-(assignment_expression
-  left: (identifier)                ; "x"
-  right: (number))                  ; "1"
-```
-
-### Execution Trace
-
-```
-Assignment:
-  08   ε                                          09
-  09       (assignment_expression)                10
-       ●   assignment_expression x = 1
-  10       left: (identifier) [Node Set(M6)]      12
-       ▽   identifier
-       ●   left:
-       ●   identifier x
-       ⬥   Node
-       ⬥   Set "target"
-  12       (Expression)                        05 : 13
-       ▷   number
-       ●   right:
-       ▶   (Expression)
-Expression:
-  05   ε                                          06
-  06   ε                                          22, 28
-  22   ε   [Enum(M3)]                             20
-       ⬥   Enum "Literal"
-  20       (number) [Node Set(M1)]                18
-       ●   number 1
-       ⬥   Node
-       ⬥   Set "value"
-  18   ε   [EndEnum]                              17
-       ⬥   EndEnum
-  17   ◀   (Expression)
-Assignment:
-  13   ε   [Set(M5)]                              15
-       ⬥   Set "value"
-  15                                              16
-       △   assignment_expression
-  16   ◀   (Assignment)                           ◼
-```
-
-First branch (Literal) matches immediately — checkpoint at 28 is never used.
+1. **00→02**: Preamble starts, emit `Obj`
+2. **02→Value**: `Trampoline` dispatches to entrypoint
+3. **07→08**: Match `(document)` succeeds
+4. **08**: Branch — create checkpoint at 16, try 11 first
+5. **11**: Try `Num` branch, navigate down, find `string` — type mismatch (`○`)
+6. **08 ❮❮❮**: Backtrack to checkpoint
+7. **16**: Try `Str` branch, navigate down, find `string` — match (`●`)
+8. **19→10**: Navigate up, return from `Value`
+9. **03→05**: Preamble cleanup, emit `EndObj`, accept (`◼`)
 
 ---
 
 ## Trace 3: Failed Match (`-v`)
 
-**Entrypoint:** `Expression`
-**Source:** `"hello"`
+**Source:** `true` (JSON boolean — neither number nor string)
 
 ```
-(string)                            ; string literal, not number or identifier
+(document
+  (true "true"))
 ```
 
 ### Execution Trace
 
 ```
-Expression:
-  05   ε                                          06
-  06   ε                                          22, 28
-  22   ε   [Enum(M3)]                             20
-       ⬥   Enum "Literal"
-  20       (number) [Node Set(M1)]                18
-       ○   string hello
-  06  ❮❮❮
-  28   ε   [Enum(M4)]                             26
-       ⬥   Enum "Variable"
-  26       (identifier) [Node Set(M2)]            24
-       ○   string hello
+_ObjWrap:
+  00   ε   [Obj]                            02
+       ⬥   Obj
+  02       Trampoline                       03
+       ▶   (Value)
+
+Value:
+  06   ε                                    07
+  07       (document)                       08
+           document
+       ●   document true
+  --------------------------------------------
+  08   ε                                    11, 16
+  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+       ⬥   Enum "Num"
+       ▽   true
+       ○   true true
+  08  ❮❮❮ 
+  --------------------------------------------
+  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+       ⬥   Enum "Str"
+       ▽   true
+       ○   true true
 ```
 
 Both branches fail. No more checkpoints — query does not match. The CLI exits with code 1.
 
 ---
 
-## Trace 4: Text Effect (String Capture) (`-v`)
+## Trace 4: Default Verbosity (Compact)
 
-**Entrypoint:** `Ident`
-**Source:** `foo`
-
-```
-(identifier)                        ; "foo"
-```
-
-### Execution Trace
+Same as Trace 2 but with default verbosity (no `-v` flag). Navigation and effect sub-lines are hidden:
 
 ```
-Ident:
-  01   ε                                          02
-  02       (identifier) [Text Set(M0)]            04
-       ●   identifier foo
-       ⬥   Text
-       ⬥   Set "name"
-  04   ◀   (Ident)                                ◼
-```
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Value)
 
-The `Text` effect extracts the node's source text as a string (from `@name :: string`).
+Value:
+  06   ε                                    07
+  07       (document)                       08
+       ●   document
+  08   ε                                    11, 16
+  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+       ○   string
+  08  ❮❮❮ 
+  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+       ●   string
+  19       _                                10
+       ●   document
+  10   ◀   (Value)                          
 
----
-
-## Trace 5: Search with Skipping (`-v`)
-
-To demonstrate skip behavior, consider a different query:
-
-```
-ReturnVal = (statement_block (return_statement) @ret)
-```
-
-**Bytecode:**
-
-```
-ReturnVal:
-  01   ε                                          02
-  02       (statement_block)                      03
-  03   ▽   (return_statement) [Node Set(M0)]      04
-  04   △                                          05
-  05                                              ◼
-```
-
-**Entrypoint:** `ReturnVal`
-**Source:** `{ x; return 1; }`
-
-```
-(statement_block
-  (expression_statement)           ; "x;"
-  (return_statement))              ; "return 1;"
-```
-
-### Execution Trace
-
-```
-ReturnVal:
-  01   ε                                          02
-  02       (statement_block)                      03
-       ●   statement_block { x; return 1; }
-  03       (return_statement) [Node Set(M0)]      04
-       ▽   expression_statement
-       ○   expression_statement x;
-       ▷   return_statement
-       ●   return_statement return 1;
-       ⬥   Node
-       ⬥   Set "ret"
-  04                                              05
-       △   statement_block
-  05   ◀   (ReturnVal)                            ◼
-```
-
-The navigation lands on `(expression_statement)`, type mismatch, skip `▷` to next sibling, find `(return_statement)`.
-
----
-
-## Trace 6: Immediate Failure (`-v`)
-
-**Entrypoint:** `Assignment`
-**Source:** `42`
-
-```
-(number)                           ; just a number literal
-```
-
-### Execution Trace
-
-```
-Assignment:
-  08   ε                                          09
-  09       (assignment_expression)                10
-       ○   number 42
-```
-
-Type check fails at root — no navigation occurs. The CLI exits with code 1.
-
----
-
-## Trace 7: Suppressive Capture (`-v`)
-
-Suppressive captures (`@_`) match structurally but don't emit effects. The trace shows:
-
-- `⬥ SuppressBegin` / `⬥ SuppressEnd` when entering/exiting suppression
-- `⬦` for data effects that are suppressed
-- `⬦ SuppressBegin` / `⬦ SuppressEnd` for nested suppression (already inside another `@_`)
-
-**Query:**
-
-```
-Pair = (pair key: (string) @_ value: (number) @value)
-```
-
-**Entrypoint:** `Pair`
-**Source:** `"x": 1`
-
-```
-(pair
-  key: (string)                    ; "x"
-  value: (number))                 ; 1
-```
-
-### Execution Trace
-
-```
-Pair:
-  01   ε                                          02
-  02   ε   [Obj]                                  04
-       ⬥   Obj
-  04       (pair)                                 05
-       ●   pair "x": 1
-  05       key: (string) [SuppressBegin]          06
-       ▽   string
-       ●   key:
-       ●   string "x"
-       ⬥   SuppressBegin
-  06   ε   [SuppressEnd]                          08
-       ⬦   Node
-       ⬦   Set "key"
-       ⬥   SuppressEnd
-  08       value: (number) [Node Set(M0)]         10
-       ▷   number
-       ●   value:
-       ●   number 1
-       ⬥   Node
-       ⬥   Set "value"
-  10                                              12
-       △   pair
-  12   ε   [EndObj]                               14
-       ⬥   EndObj
-  14   ◀   (Pair)                                 ◼
-```
-
-The `@_` capture on `key:` wraps its inner effects with `SuppressBegin`/`SuppressEnd`. Effects between them (`Node`, `Set "key"`) appear as `⬦` (suppressed). The `@value` capture emits normally with `⬥`.
-
----
-
-## Trace 8: Default Verbosity (Compact)
-
-Same as Trace 1 but with default verbosity (no `-v` flag). Navigation and effect sub-lines are hidden:
-
-```
-Assignment:
-  08   ε                                          09
-  09       (assignment_expression)                10
-       ●   assignment_expression
-  10       left: (identifier) [Node Set(M6)]      12
-       ●   identifier
-  12       (Expression)                        05 : 13
-       ▶   (Expression)
-Expression:
-  05   ε                                          06
-  06   ε                                          22, 28
-  22   ε   [Enum(M3)]                             20
-  20       (number) [Node Set(M1)]                18
-       ○   identifier
-  06  ❮❮❮
-  28   ε   [Enum(M4)]                             26
-  26       (identifier) [Node Set(M2)]            24
-       ●   identifier
-  24   ε   [EndEnum]                              17
-  17   ◀   (Expression)
-Assignment:
-  13   ε   [Set(M5)]                              15
-  15                                              16
-       ●   assignment_expression
-  16   ◀   (Assignment)                           ◼
+_ObjWrap:
+  03   ε   [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
 ```
 
 Default shows:
@@ -560,21 +384,17 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 
 ## Nav Symbols
 
-| Nav             | Symbol  | Meaning                         |
-| --------------- | ------- | ------------------------------- |
-| Stay            | (space) | No movement                     |
-| Stay (epsilon)  | ε       | No movement, no constraints     |
-| StayExact       | !       | Stay at position, exact only    |
-| Down            | ▽       | First child, skip any           |
-| DownSkip        | !▽      | First child, skip trivia        |
-| DownExact       | !!▽     | First child, exact              |
-| Next            | ▷       | Next sibling, skip any          |
-| NextSkip        | !▷      | Next sibling, skip trivia       |
-| NextExact       | !!▷     | Next sibling, exact             |
-| Up(1)           | △       | Ascend 1 level (no superscript) |
-| Up(n≥2)         | △ⁿ      | Ascend n levels                 |
-| UpSkipTrivia(n) | !△ⁿ     | Ascend n, last non-trivia       |
-| UpExact(n)      | !!△ⁿ    | Ascend n, last child            |
+In trace output, navigation symbols are **simplified** — skip/exact variants are not distinguished:
+
+| Nav                          | Symbol  | Meaning                      |
+| ---------------------------- | ------- | ---------------------------- |
+| Epsilon                      | ε       | Pure control flow, no cursor |
+| Stay, StayExact              | (space) | No movement                  |
+| Down, DownSkip, DownExact    | ▽       | Descended to child           |
+| Next, NextSkip, NextExact    | ▷       | Moved to sibling             |
+| Up(n), UpSkipTrivia, UpExact | △       | Ascended to parent           |
+
+> **Note**: For detailed nav symbols with mode modifiers (`!▽`, `!!▽`, etc.), see [07-dump-format.md](07-dump-format.md#nav-symbols). Trace format simplifies these for readability.
 
 ## Effects
 

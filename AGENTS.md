@@ -73,9 +73,9 @@ Nested = (call function: [(id) @name (Nested) @inner])
 
 The `.` anchor adapts to what it's anchoring:
 
-| Pattern     | Behavior                                    |
-| ----------- | ------------------------------------------- |
-| `(a) . (b)` | Skip trivia, no named nodes between         |
+| Pattern     | Behavior                                      |
+| ----------- | --------------------------------------------- |
+| `(a) . (b)` | Skip trivia, no named nodes between           |
 | `"x" . (b)` | Strict — nothing between (anonymous involved) |
 | `(a) . "x"` | Strict — nothing between (anonymous involved) |
 
