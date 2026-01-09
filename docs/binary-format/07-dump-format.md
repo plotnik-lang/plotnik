@@ -1,132 +1,90 @@
-# Bytecode Dump Implementation
+# Bytecode Dump Format
+
+The `dump` command displays compiled bytecode in a human-readable format.
 
 ## Example Query
 
 ```
-Ident = (identifier) @name :: string
-Expression = [
-    Literal: (number) @value
-    Variable: (identifier) @name
-]
-Assignment = (assignment_expression
-    left: (identifier) @target
-    right: (Expression) @value)
+Value = (document [
+    Num: (number) @n
+    Str: (string) @s
+])
 ```
+
+Run: `plotnik dump -q '<query>'`
 
 ## Bytecode Dump
 
 **Epsilon transitions** (`ε`) succeed unconditionally without cursor interaction.
-They require all three conditions:
-
-- `nav == Stay` (no cursor movement)
-- `node_type == None` (no type constraint)
-- `node_field == None` (no field constraint)
-
-A step with `nav == Stay` but with a type constraint (e.g., `(identifier)`) is NOT
-epsilon — it matches at the current cursor position.
+They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay).
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
 placed directly on match instructions rather than in separate epsilon steps. Structural
-effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) remain in epsilons.
+effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) may appear in epsilons or
+consolidated into match instructions.
 
 ```
 [flags]
 linked = false
 
 [strings]
-S00 "Beauty will save the world"
-S01 "name"
-S02 "value"
-S03 "Literal"
-S04 "Variable"
-S05 "target"
-S06 "Ident"
-S07 "Expression"
-S08 "Assignment"
-S09 "identifier"
-S10 "number"
-S11 "assignment_expression"
-S12 "right"
-S13 "left"
+S0 "Beauty will save the world"
+S1 "n"
+S2 "s"
+S3 "Num"
+S4 "Str"
+S5 "Value"
+S6 "document"
+S7 "number"
+S8 "string"
 
 [type_defs]
-T00 = <Node>
-T01 = <String>
-T02 = Struct  M0:1  ; { name }
-T03 = Struct  M1:1  ; { value }
-T04 = Struct  M2:1  ; { name }
-T05 = Enum    M3:2  ; Literal | Variable
-T06 = Struct  M5:2  ; { value, target }
-T07 = Struct  M7:1  ; { target }
-T08 = Struct  M8:1  ; { value }
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+T2 = Struct  M1:1  ; { s }
+T3 = Enum    M2:2  ; Num | Str
 
 [type_members]
-M0: S01 → T01  ; name: <String>
-M1: S02 → T00  ; value: <Node>
-M2: S01 → T00  ; name: <Node>
-M3: S03 → T03  ; Literal: T03
-M4: S04 → T04  ; Variable: T04
-M5: S02 → T05  ; value: Expression
-M6: S05 → T00  ; target: <Node>
-M7: S05 → T00  ; target: <Node>
-M8: S02 → T05  ; value: Expression
+M0: S1 → T0  ; n: <Node>
+M1: S2 → T0  ; s: <Node>
+M2: S3 → T1  ; Num: T1
+M3: S4 → T2  ; Str: T2
 
 [type_names]
-N0: S06 → T02  ; Ident
-N1: S07 → T05  ; Expression
-N2: S08 → T06  ; Assignment
+N0: S5 → T3  ; Value
 
 [entrypoints]
-Assignment = 12 :: T06
-Expression = 09 :: T05
-Ident      = 01 :: T02
+Value = 06 :: T3
 
 [transitions]
-  00   ε                                    ◼
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
 
-Ident:
-  01   ε                                    02
-  02   ε   [Obj]                            04
-  04       (identifier) [Text Set(M0)]      06
-  06   ε   [EndObj]                         08
-  08                                        ▶
-
-Expression:
-  09   ε                                    10
-  10   ε                                    30, 36
-
-Assignment:
-  12   ε                                    13
-  13   ε   [Obj]                            15
-  15       (assignment_expression)          16
-  16   ▽   left: (identifier) [Node Set(M6)]  18
-  18   ▷   right: (Expression)             09 : 19
-  19   ε   [Set(M5)]                        21
-  21   △                                    22
-  22   ε   [EndObj]                         24
-  24                                        ▶
-  25                                        ▶
-  26   ε   [EndEnum]                        25
-  28       (number) [Node Set(M1)]          26
-  30   ε   [Enum(M3)]                       28
-  32   ε   [EndEnum]                        25
-  34       (identifier) [Node Set(M2)]      32
-  36   ε   [Enum(M4)]                       34
+Value:
+  06   ε                                    07
+  07   !   (document)                       08
+  08   ε                                    11, 16
+  10                                        ▶
+  11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+  14  ...  
+  15  ...  
+  16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+  19   △   _                                10
 ```
+
+### Sections Explained
+
+- **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `Obj`/`EndObj` and dispatches via `Trampoline`.
+- **`Value`**: The compiled query definition. Step 08 branches to try `Num` (step 11) or `Str` (step 16).
+- **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
 ## Files
 
-- `crates/plotnik-lib/src/bytecode/dump.rs` (new)
-- `crates/plotnik-lib/src/bytecode/dump_tests.rs` (new)
-- `crates/plotnik-lib/src/bytecode/mod.rs` (add exports)
-
-## API
-
-```rust
-pub fn dump(module: &Module) -> String
-```
-
-Future: options for verbosity levels, hiding sections, etc.
+- `crates/plotnik-lib/src/bytecode/dump.rs` — Dump formatting logic
+- `crates/plotnik-lib/src/bytecode/format.rs` — Shared formatting utilities
 
 ## Instruction Format
 
@@ -178,6 +136,7 @@ Examples:
 | Epsilon          | `step  ε     [effects]                succ`     |
 | Call             | `step nav    field: (Name)        target : ret` |
 | Return           | `step                                 ▶`        |
+| Trampoline       | `step        Trampoline               succ`     |
 
 Successors aligned in right column. Omit empty `[pre]`, `[post]`, `(type)`, `field:`.
 
@@ -185,23 +144,23 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol  | Notes                               |
-| --------------- | ------- | ----------------------------------- |
-| Stay            | (blank) | No movement, 5 spaces               |
-| Stay (epsilon)  | ε       | Only when no type/field constraints |
-| StayExact       | !       | No movement, exact match only       |
-| Down            | ▽       | First child, skip any               |
-| DownSkip        | !▽      | First child, skip trivia            |
-| DownExact       | !!▽     | First child, exact                  |
-| Next            | ▷       | Next sibling, skip any              |
-| NextSkip        | !▷      | Next sibling, skip trivia           |
-| NextExact       | !!▷     | Next sibling, exact                 |
-| Up(1)           | △       | Ascend 1 level (no superscript)     |
-| Up(n≥2)         | △ⁿ      | Ascend n levels, skip any           |
-| UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
-| UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
+| Nav             | Symbol  | Notes                              |
+| --------------- | ------- | ---------------------------------- |
+| Epsilon         | ε       | Pure control flow, no cursor check |
+| Stay            | (blank) | No movement, 5 spaces              |
+| StayExact       | !       | No movement, exact match only      |
+| Down            | ▽       | First child, skip any              |
+| DownSkip        | !▽      | First child, skip trivia           |
+| DownExact       | !!▽     | First child, exact                 |
+| Next            | ▷       | Next sibling, skip any             |
+| NextSkip        | !▷      | Next sibling, skip trivia          |
+| NextExact       | !!▷     | Next sibling, exact                |
+| Up(1)           | △       | Ascend 1 level (no superscript)    |
+| Up(n≥2)         | △ⁿ      | Ascend n levels, skip any          |
+| UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia  |
+| UpExact(n)      | !!△ⁿ    | Ascend n, must be last child       |
 
-**Note**: `ε` only appears when all three conditions are met: Stay nav, no type constraint, no field constraint. A step matching `(identifier)` at current position shows spaces, not `ε`.
+**Note**: `ε` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `ε`.
 
 ## Effects
 

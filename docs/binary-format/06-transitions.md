@@ -42,16 +42,17 @@ type_id (u8)
 | `10`  | Anonymous | Anonymous node check (`"text"` literals)   |
 | `11`  | Reserved  | Reserved for future use                    |
 
-| Opcode | Name    | Size     | Description                          |
-| :----- | :------ | :------- | :----------------------------------- |
-| 0x0    | Match8  | 8 bytes  | Fast-path match (1 successor, no fx) |
-| 0x1    | Match16 | 16 bytes | Extended match with inline payload   |
-| 0x2    | Match24 | 24 bytes | Extended match with inline payload   |
-| 0x3    | Match32 | 32 bytes | Extended match with inline payload   |
-| 0x4    | Match48 | 48 bytes | Extended match with inline payload   |
-| 0x5    | Match64 | 64 bytes | Extended match with inline payload   |
-| 0x6    | Call    | 8 bytes  | Function call                        |
-| 0x7    | Return  | 8 bytes  | Return from call                     |
+| Opcode | Name       | Size     | Description                          |
+| :----- | :--------- | :------- | :----------------------------------- |
+| 0x0    | Match8     | 8 bytes  | Fast-path match (1 successor, no fx) |
+| 0x1    | Match16    | 16 bytes | Extended match with inline payload   |
+| 0x2    | Match24    | 24 bytes | Extended match with inline payload   |
+| 0x3    | Match32    | 32 bytes | Extended match with inline payload   |
+| 0x4    | Match48    | 48 bytes | Extended match with inline payload   |
+| 0x5    | Match64    | 64 bytes | Extended match with inline payload   |
+| 0x6    | Call       | 8 bytes  | Function call                        |
+| 0x7    | Return     | 8 bytes  | Return from call                     |
+| 0x8    | Trampoline | 8 bytes  | Universal entry point                |
 
 ### Terminal States
 
@@ -290,6 +291,28 @@ struct Return {
     _pad: [u8; 7],
 }
 ```
+
+### 4.6. Trampoline
+
+Universal entry point instruction. Like Call, but the target comes from VM context (external parameter) rather than being encoded in the instruction. Used at address 0 for the entry preamble.
+
+```rust
+#[repr(C)]
+struct Trampoline {
+    type_id: u8,        // segment(2) | 0 | 0x8
+    _pad1: u8,
+    next: u16,          // Return address (StepId)
+    _pad2: [u8; 4],
+}
+```
+
+The preamble at step 0 typically looks like: `Obj → Trampoline → EndObj → Accept`. When executed:
+
+1. VM pushes `next` (return address) onto call stack
+2. VM jumps to `entrypoint_target` (set from entrypoint before execution)
+3. When the entrypoint returns, execution continues at `next`
+
+This allows a single compiled preamble to dispatch to any entrypoint without recompilation.
 
 ## 5. Execution Semantics
 

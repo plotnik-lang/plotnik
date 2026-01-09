@@ -4,16 +4,11 @@ This section defines the type system metadata used for code generation and runti
 
 ## 1. Primitives
 
-**TypeId (u16)**: Index into the Type Definition table.
-
-- `0`: `Void` (Captures nothing)
-- `1`: `Node` (AST Node reference)
-- `2`: `String` (Source text)
-- `3..N`: Composite types (Index = `TypeId - 3`)
+**TypeId (u16)**: Zero-based index into the TypeDefs array. All types, including primitives, are stored as TypeDef entries.
 
 ### Node Semantics
 
-`TYPE_NODE` (1) represents a platform-dependent handle to a tree-sitter AST node:
+The `Node` type (`TypeKind = 1`) represents a platform-dependent handle to a tree-sitter AST node:
 
 | Context    | Representation                                             |
 | :--------- | :--------------------------------------------------------- |
@@ -25,12 +20,15 @@ The handle provides access to node metadata (kind, span, text) without copying t
 
 **TypeKind (u8)**: Discriminator for `TypeDef`.
 
-- `0`: `Optional` (Wraps another type)
-- `1`: `ArrayStar` (Zero or more)
-- `2`: `ArrayPlus` (One or more)
-- `3`: `Struct` (Record with named fields)
-- `4`: `Enum` (Discriminated union)
-- `5`: `Alias` (Named reference to another type, e.g., `@x :: Identifier`)
+- `0`: `Void` (Unit type, captures nothing)
+- `1`: `Node` (AST node reference)
+- `2`: `String` (Source text)
+- `3`: `Optional` (Wraps another type)
+- `4`: `ArrayZeroOrMore` (Zero or more, aka ArrayStar)
+- `5`: `ArrayOneOrMore` (One or more, aka ArrayPlus)
+- `6`: `Struct` (Record with named fields)
+- `7`: `Enum` (Discriminated union)
+- `8`: `Alias` (Named reference to another type, e.g., `@x :: Identifier`)
 
 ## 2. Layout
 
@@ -96,16 +94,19 @@ struct TypeDef {
 
 **Semantics of `data` and `count` fields**:
 
-| Kind        | `data` (u16)   | `count` (u8)   | Interpretation        |
-| :---------- | :------------- | :------------- | :-------------------- |
-| `Optional`  | `InnerTypeId`  | 0              | Wrapper `T?`          |
-| `ArrayStar` | `InnerTypeId`  | 0              | Wrapper `T[]`         |
-| `ArrayPlus` | `InnerTypeId`  | 0              | Wrapper `[T, ...T[]]` |
-| `Struct`    | `MemberIndex`  | `FieldCount`   | Record with fields    |
-| `Enum`      | `MemberIndex`  | `VariantCount` | Discriminated union   |
-| `Alias`     | `TargetTypeId` | 0              | Named type reference  |
+| Kind              | `data` (u16)   | `count` (u8)   | Interpretation        |
+| :---------------- | :------------- | :------------- | :-------------------- |
+| `Void`            | 0              | 0              | Unit type             |
+| `Node`            | 0              | 0              | AST node reference    |
+| `String`          | 0              | 0              | Source text           |
+| `Optional`        | `InnerTypeId`  | 0              | Wrapper `T?`          |
+| `ArrayZeroOrMore` | `InnerTypeId`  | 0              | Wrapper `T[]`         |
+| `ArrayOneOrMore`  | `InnerTypeId`  | 0              | Wrapper `[T, ...T[]]` |
+| `Struct`          | `MemberIndex`  | `FieldCount`   | Record with fields    |
+| `Enum`            | `MemberIndex`  | `VariantCount` | Discriminated union   |
+| `Alias`           | `TargetTypeId` | 0              | Named type reference  |
 
-> **Note**: The interpretation of `data` depends on `kind`. For wrappers and `Alias`, it's a `TypeId`. For `Struct` and `Enum`, it's an index into the TypeMembers section. Parsers must dispatch on `kind` first.
+> **Note**: For primitives (`Void`, `Node`, `String`), `data` and `count` are unused. For wrappers and `Alias`, `data` is a `TypeId`. For `Struct` and `Enum`, `data` is an index into the TypeMembers section. Parsers must dispatch on `kind` first.
 
 > **Limit**: `count` is u8, so structs/enums are limited to 255 members.
 
@@ -148,23 +149,29 @@ For code generation, build a reverse map (`TypeId → Option<StringId>`) to look
 
 ## 3. Examples
 
+> **Note**: In bytecode, only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node, String), then composite types. TypeId values depend on which primitives the query actually uses.
+
 ### 3.1. Simple Struct
 
 Query: `Q = (function name: (identifier) @name)`
 
-```text
-Strings: ["name", "Q"]
-          Str#0   Str#1
+Run `plotnik dump -q '<query>'` to see:
 
-TypeDefs:
-  T3: Struct { data=0, count=1, kind=Struct }
-
-TypeMembers:
-  [0]: name=Str#0 ("name"), ty=1 (Node)
-
-TypeNames:
-  [0]: name=Str#1 ("Q"), type_id=T3
 ```
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+```
+
+- `T0` is the `Node` primitive (only used primitive is emitted)
+- `T1` is a `Struct` with 1 member starting at `M0`
+- `M0` maps "name" to type `T0` (Node)
 
 ### 3.2. Recursive Enum
 
@@ -177,47 +184,53 @@ List = [
 ]
 ```
 
-```text
-Strings: ["List", "Nil", "Cons", "head", "tail"]
-          Str#0   Str#1  Str#2   Str#3   Str#4
+Run `plotnik dump -q '<query>'` to see:
 
-TypeDefs:
-  T3: Enum { data=0, count=2, kind=Enum }
-  T4: Struct { data=2, count=2, kind=Struct }  // Cons payload (anonymous)
+```
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:2  ; { head, tail }
+T3 = Enum    M2:2  ; Nil | Cons
 
-TypeMembers:
-  [0]: name=Str#1 ("Nil"),  ty=0 (Void)        // unit variant
-  [1]: name=Str#2 ("Cons"), ty=T4              // payload is struct
-  [2]: name=Str#3 ("head"), ty=1 (Node)
-  [3]: name=Str#4 ("tail"), ty=T3              // self-reference
+[type_members]
+M0: S1 → T1  ; head: <Node>
+M1: S2 → T3  ; tail: List
+M2: S3 → T0  ; Nil: <Void>
+M3: S4 → T2  ; Cons: T2
 
-TypeNames:
-  [0]: name=Str#0 ("List"), type_id=T3
+[type_names]
+N0: S5 → T3  ; List
 ```
 
-The `tail` field's type (`T3`) points back to the `List` enum. Recursive types are naturally representable since everything is indexed.
+- `T0` (Void) and `T1` (Node) are primitives used by the query
+- `T2` is the Cons payload struct with `head` and `tail` fields
+- `T3` is the `List` enum with `Nil` and `Cons` variants
+- `M1` shows `tail: List` — self-reference to `T3`
 
 ### 3.3. Custom Type Annotation
 
 Query: `Q = (identifier) @name :: Identifier`
 
-```text
-Strings: ["Identifier", "name", "Q"]
-          Str#0         Str#1   Str#2
+Run `plotnik dump -q '<query>'` to see:
 
-TypeDefs:
-  T3: Alias { data=1 (Node), count=0, kind=Alias }
-  T4: Struct { data=0, count=1, kind=Struct }
+```
+[type_defs]
+T0 = <Node>
+T1 = Alias(T0)
+T2 = Struct  M0:1  ; { name }
 
-TypeMembers:
-  [0]: name=Str#1 ("name"), ty=T3 (Identifier alias)
+[type_members]
+M0: S2 → T1  ; name: Identifier
 
-TypeNames:
-  [0]: name=Str#0 ("Identifier"), type_id=T3
-  [1]: name=Str#2 ("Q"), type_id=T4
+[type_names]
+N0: S1 → T1  ; Identifier
+N1: S3 → T2  ; Q
 ```
 
-The `Alias` type creates a distinct TypeId so the emitter can render `Identifier` instead of `Node`.
+- `T0` is the underlying `Node` primitive
+- `T1` is an `Alias` pointing to `T0`, named "Identifier"
+- The `name` field has type `T1` (the alias), so code generators emit `Identifier` instead of `Node`
 
 ## 4. Validation
 
