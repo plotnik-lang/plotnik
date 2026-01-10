@@ -1,0 +1,51 @@
+---
+source: crates/plotnik-lib/src/engine/engine_tests.rs
+---
+E = [
+    A: (identifier) @x
+    B: (_ (E)*)
+]
+Test = (program (E)* @items)
+---
+x; y;
+---
+{
+  "items": [
+    {
+      "$tag": "B",
+      "$data": [
+        {
+          "$tag": "A",
+          "$data": {
+            "x": {
+              "kind": "identifier",
+              "text": "x",
+              "span": [
+                0,
+                1
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$tag": "B",
+      "$data": [
+        {
+          "$tag": "A",
+          "$data": {
+            "x": {
+              "kind": "identifier",
+              "text": "y",
+              "span": [
+                3,
+                4
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
