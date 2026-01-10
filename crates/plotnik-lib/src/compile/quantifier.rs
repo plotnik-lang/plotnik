@@ -119,6 +119,25 @@ impl Compiler<'_> {
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
+        // When the inner returns a structured type (enum/struct) and this is a star/plus
+        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
+        // because the type system expects an array of these values.
+        let needs_implicit_array = matches!(kind, QuantifierKind::Star | QuantifierKind::Plus)
+            && self.is_ref_returning_structured(&inner);
+
+        if needs_implicit_array {
+            // Use array scope: Arr → quantifier with Push → EndArr → exit
+            // No capture effects on the array itself (no Set), just collect values
+            return self.compile_array_scope(
+                &Expr::QuantifiedExpr(quant.clone()),
+                exit,
+                nav_override,
+                vec![], // No capture effects (no @name to set)
+                capture,
+                false, // Not a string capture
+            );
+        }
+
         let config = QuantifierConfig {
             inner: &inner,
             kind,
@@ -216,6 +235,22 @@ impl Compiler<'_> {
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
 
+        // When the inner returns a structured type (enum/struct) and this is a star/plus
+        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
+        // with split exits for the skip/match paths.
+        let needs_implicit_array = matches!(kind, QuantifierKind::Star | QuantifierKind::Plus)
+            && self.is_ref_returning_structured(&inner);
+
+        if needs_implicit_array {
+            return self.compile_implicit_array_with_exits(
+                quant,
+                match_exit,
+                skip_exit,
+                nav_override,
+                capture,
+            );
+        }
+
         // Handle null injection for both passed captures and internal captures
         let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
         let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
@@ -274,8 +309,42 @@ impl Compiler<'_> {
             push_effects,
         );
 
-        // Emit Arr step at entry
-        self.emit_arr_step(inner_entry)
+        // Emit Arr step at entry (with outer pre-effects like Enum)
+        self.emit_arr_step(inner_entry, outer_capture.pre)
+    }
+
+    /// Compile an implicit array (star/plus without @capture) returning structured type,
+    /// as first-child with separate exits.
+    ///
+    /// Like `compile_array_capture_with_exits` but without explicit capture effects.
+    /// Used when `(RefName)*` where RefName returns enum/struct.
+    fn compile_implicit_array_with_exits(
+        &mut self,
+        quant: &ast::QuantifiedExpr,
+        match_exit: Label,
+        skip_exit: Label,
+        nav_override: Option<Nav>,
+        outer_capture: CaptureEffects,
+    ) -> Label {
+        // No capture effects since there's no @name
+        let capture_effects = vec![];
+
+        // Create two EndArr steps with different continuations
+        let match_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
+        let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
+
+        // Inner returns structured type, so no Node effect needed - just Push
+        let push_effects = CaptureEffects::new_post(vec![EffectIR::push()]);
+        let inner_entry = self.compile_star_for_array_with_exits(
+            &Expr::QuantifiedExpr(quant.clone()),
+            match_endarr,
+            skip_endarr,
+            nav_override,
+            push_effects,
+        );
+
+        // Emit Arr step at entry (with outer pre-effects like Enum)
+        self.emit_arr_step(inner_entry, outer_capture.pre)
     }
 
     /// Compile a star quantifier for array context with separate exits.

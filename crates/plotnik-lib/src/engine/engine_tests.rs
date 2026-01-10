@@ -672,3 +672,43 @@ fn regression_childless_node_with_inner_optional() {
         "foo; bar; baz"
     );
 }
+
+/// Regression test: recursive labeled alternation with uncaptured star quantifier
+/// should produce arrays, not nested tagged unions.
+///
+/// When `(RefName)*` is inside a labeled alternation variant (like Descend),
+/// and RefName returns an enum type, the quantifier needs to produce an array
+/// even without an explicit `@capture` annotation.
+#[test]
+fn regression_recursive_alternation_uncaptured_array() {
+    snap!(
+        indoc! {r#"
+            E = [
+                A: (identifier) @x
+                B: (_ (E)*)
+            ]
+            Test = (program (E)* @items)
+        "#},
+        "x; y;",
+        entry: "Test"
+    );
+}
+
+/// Regression test: labeled alternation variant with array capture payload.
+///
+/// When a labeled alternation variant has an array capture as its payload
+/// (e.g., `[First: (E)* @arr]`), the Enum effect must be emitted BEFORE the Arr
+/// effect. Previously, `compile_array_scope` forgot to emit `outer_capture.pre`,
+/// causing a stack mismatch panic in the materializer.
+#[test]
+fn regression_enum_variant_array_capture_payload() {
+    snap!(
+        indoc! {r#"
+            E = [A: (identifier) @x  B: (number) @y]
+            F = [First: (E)* @arr  Second: (E)+ @arr2]
+            Test = (program (expression_statement (F)))
+        "#},
+        "x",
+        entry: "Test"
+    );
+}

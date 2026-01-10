@@ -201,6 +201,7 @@ impl Compiler<'_> {
         let arr_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(arr_step, inner_entry)
+                .pre_effects(outer_capture.pre)
                 .pre_effect(EffectIR::start_arr())
                 .into(),
         );
@@ -284,11 +285,12 @@ impl Compiler<'_> {
         label
     }
 
-    /// Emit an Arr epsilon step.
-    pub(super) fn emit_arr_step(&mut self, successor: Label) -> Label {
+    /// Emit an Arr epsilon step with optional pre-effects before start_arr.
+    pub(super) fn emit_arr_step(&mut self, successor: Label, pre_effects: Vec<EffectIR>) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
+                .pre_effects(pre_effects)
                 .pre_effect(EffectIR::start_arr())
                 .into(),
         );
