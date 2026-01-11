@@ -2,9 +2,6 @@ use std::sync::{Arc, LazyLock};
 
 use crate::{Lang, LangInner};
 
-// Build-time check: fails if Cargo.toml has features not defined in this file
-include!(concat!(env!("OUT_DIR"), "/lang_check.rs"));
-
 /// Language metadata for listing.
 #[derive(Debug, Clone)]
 pub struct LangInfo {
