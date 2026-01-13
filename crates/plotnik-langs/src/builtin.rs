@@ -185,6 +185,22 @@ define_langs! {
         names: ["capnp", "capnproto"],
         extensions: ["capnp"],
     },
+    cedar => {
+        feature: "lang-cedar",
+        name: "cedar",
+        ts_lang: arborium_cedar::language(),
+        lang_key: "CEDAR",
+        names: ["cedar"],
+        extensions: ["cedar"],
+    },
+    cedarschema => {
+        feature: "lang-cedarschema",
+        name: "cedarschema",
+        ts_lang: arborium_cedarschema::language(),
+        lang_key: "CEDARSCHEMA",
+        names: ["cedarschema"],
+        extensions: ["cedarschema"],
+    },
     clojure => {
         feature: "lang-clojure",
         name: "clojure",
@@ -200,6 +216,14 @@ define_langs! {
         lang_key: "CMAKE",
         names: ["cmake"],
         extensions: ["cmake"],
+    },
+    cobol => {
+        feature: "lang-cobol",
+        name: "cobol",
+        ts_lang: arborium_cobol::language(),
+        lang_key: "COBOL",
+        names: ["cobol", "cob"],
+        extensions: ["cob", "cbl", "cpy"],
     },
     commonlisp => {
         feature: "lang-commonlisp",

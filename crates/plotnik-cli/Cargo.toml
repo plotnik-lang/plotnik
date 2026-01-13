@@ -46,8 +46,11 @@ all-languages = [
     "lang-c-sharp",
     "lang-caddy",
     "lang-capnp",
+    "lang-cedar",
+    "lang-cedarschema",
     "lang-clojure",
     "lang-cmake",
+    "lang-cobol",
     "lang-commonlisp",
     "lang-cpp",
     "lang-css",
@@ -147,8 +150,11 @@ lang-c = ["plotnik-langs/lang-c"]
 lang-c-sharp = ["plotnik-langs/lang-c-sharp"]
 lang-caddy = ["plotnik-langs/lang-caddy"]
 lang-capnp = ["plotnik-langs/lang-capnp"]
+lang-cedar = ["plotnik-langs/lang-cedar"]
+lang-cedarschema = ["plotnik-langs/lang-cedarschema"]
 lang-clojure = ["plotnik-langs/lang-clojure"]
 lang-cmake = ["plotnik-langs/lang-cmake"]
+lang-cobol = ["plotnik-langs/lang-cobol"]
 lang-commonlisp = ["plotnik-langs/lang-commonlisp"]
 lang-cpp = ["plotnik-langs/lang-cpp"]
 lang-css = ["plotnik-langs/lang-css"]
