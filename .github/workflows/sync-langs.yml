@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          token: ${{ secrets.PLOTNIK_PAT }}
 
       - name: Sync language features
         run: python3 scripts/sync-langs.py --ci
