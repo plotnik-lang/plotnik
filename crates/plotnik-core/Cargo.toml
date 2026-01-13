@@ -1,10 +1,10 @@
 [package]
 name = "plotnik-core"
-version = "0.2.0"
-edition = "2024"
-license = "Apache-2.0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Core data structures for Plotnik"
-repository = "https://github.com/plotnik-lang/plotnik"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }

@@ -1,0 +1,73 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+  workflow_call:
+    inputs:
+      bump:
+        required: true
+        type: string
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tomato-toml
+        run: cargo install tomato-toml --locked
+
+      - name: Calculate next version
+        id: version
+        run: |
+          current=$(tomato get workspace.package.version Cargo.toml)
+          IFS='.' read -r major minor patch <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) next="$((major + 1)).0.0" ;;
+            minor) next="$major.$((minor + 1)).0" ;;
+            patch) next="$major.$minor.$((patch + 1))" ;;
+          esac
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Bump versions
+        run: |
+          next="${{ steps.version.outputs.next }}"
+          tomato set workspace.package.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-core.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-langs.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
+          # plotnik-cli has explicit plotnik-langs dep (default-features = false workaround)
+          tomato set dependencies.plotnik-langs.version "$next" crates/plotnik-cli/Cargo.toml
+
+      - name: Update lockfile
+        run: cargo check --workspace
+
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          next="${{ steps.version.outputs.next }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "bump/v$next"
+          git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml
+          git commit -m "chore: Bump version to \`$next\`"
+          git push -u origin "bump/v$next"
+          gh pr create \
+            --title "chore: Bump version to \`$next\`" \
+            --body "Bump ${{ inputs.bump }} version: \`${{ steps.version.outputs.current }}\` → \`$next\`"
