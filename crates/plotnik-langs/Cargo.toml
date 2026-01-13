@@ -1,10 +1,10 @@
 [package]
 name = "plotnik-langs"
-version = "0.2.0"
-edition = "2024"
-license = "Apache-2.0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Tree-sitter language bindings for Plotnik query language"
-repository = "https://github.com/plotnik-lang/plotnik"
 documentation = "https://docs.rs/plotnik-langs"
 keywords = ["tree-sitter", "parser", "languages"]
 categories = ["parsing", "development-tools"]
@@ -233,7 +233,7 @@ lang-zsh = ["dep:arborium-zsh"]
 
 [dependencies]
 paste = "1.0"
-plotnik-core = { version = "0.2", path = "../plotnik-core" }
+plotnik-core.workspace = true
 postcard = { version = "1", features = ["alloc"] }
 arborium-tree-sitter = "2.5.0"
 arborium-ada = { version = "2.5.0", optional = true }
@@ -337,7 +337,7 @@ arborium-zsh = { version = "2.5.0", optional = true }
 
 [build-dependencies]
 cargo_metadata = "0.23"
-plotnik-core = { version = "0.2", path = "../plotnik-core" }
+plotnik-core.workspace = true
 postcard = { version = "1", features = ["alloc"] }
 serde = "1"
 serde_json = "1"
