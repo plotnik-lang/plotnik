@@ -1610,7 +1610,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "plotnik"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "arborium-tree-sitter",
  "clap",
@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "indexmap",
  "postcard",
@@ -1635,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-langs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "arborium-ada",
  "arborium-agda",
@@ -1746,7 +1746,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-lib"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "annotate-snippets",
  "arborium-tree-sitter",
