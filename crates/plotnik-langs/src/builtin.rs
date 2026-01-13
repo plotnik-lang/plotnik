@@ -465,14 +465,6 @@ define_langs! {
         names: ["julia", "jl"],
         extensions: ["jl"],
     },
-    kdl => {
-        feature: "lang-kdl",
-        name: "kdl",
-        ts_lang: arborium_kdl::language(),
-        lang_key: "KDL",
-        names: ["kdl"],
-        extensions: ["kdl"],
-    },
     kotlin => {
         feature: "lang-kotlin",
         name: "kotlin",
@@ -680,6 +672,14 @@ define_langs! {
         lang_key: "SCSS",
         names: ["scss", "sass"],
         extensions: ["scss", "sass"],
+    },
+    solidity => {
+        feature: "lang-solidity",
+        name: "solidity",
+        ts_lang: arborium_solidity::language(),
+        lang_key: "SOLIDITY",
+        names: ["solidity", "sol"],
+        extensions: ["sol"],
     },
     sparql => {
         feature: "lang-sparql",

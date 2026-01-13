@@ -1,0 +1,24 @@
+name: Sync arborium languages
+
+on:
+  push:
+    branches:
+      - 'renovate/arborium-crates'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync language features
+        run: python scripts/sync-langs.py
+
+      - name: Commit if changed
+        run: |
+          git diff --quiet crates/*/Cargo.toml && exit 0
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add crates/*/Cargo.toml
+          git commit -m "chore: Sync arborium language features"
+          git push

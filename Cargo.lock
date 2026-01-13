@@ -572,17 +572,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arborium-kdl"
-version = "2.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c612bc9e6722e220891ae7ddefc7a2e0092814e9d85941e78f095fc57500d284"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
 name = "arborium-kotlin"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -868,6 +857,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "054b5cd54e6baab906f53a2606958f5858265eb5e8eac4db1b9d66efbae844f0"
 dependencies = [
  "arborium-css",
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "arborium-solidity"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9c15dfc46eac8f5ea4fe97f7a9658be60eb641aeabe17bd4226e1c8e252b199"
+dependencies = [
  "arborium-sysroot",
  "cc",
  "tree-sitter-language",
@@ -1682,7 +1682,6 @@ dependencies = [
  "arborium-jq",
  "arborium-json",
  "arborium-julia",
- "arborium-kdl",
  "arborium-kotlin",
  "arborium-lean",
  "arborium-lua",
@@ -1709,6 +1708,7 @@ dependencies = [
  "arborium-scala",
  "arborium-scheme",
  "arborium-scss",
+ "arborium-solidity",
  "arborium-sparql",
  "arborium-sql",
  "arborium-ssh-config",
