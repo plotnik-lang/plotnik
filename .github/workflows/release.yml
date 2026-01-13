@@ -56,3 +56,6 @@ jobs:
       bump: patch
     secrets:
       PLOTNIK_PAT: ${{ secrets.PLOTNIK_PAT }}
+    permissions:
+      contents: write
+      pull-requests: write
