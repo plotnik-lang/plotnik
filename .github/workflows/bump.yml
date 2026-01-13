@@ -17,6 +17,9 @@ on:
       bump:
         required: true
         type: string
+    secrets:
+      PLOTNIK_PAT:
+        required: true
 
 jobs:
   bump:
@@ -59,7 +62,7 @@ jobs:
 
       - name: Create PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PLOTNIK_PAT }}
         run: |
           next="${{ steps.version.outputs.next }}"
           git config user.name "github-actions[bot]"
@@ -67,6 +70,7 @@ jobs:
           git checkout -b "bump/v$next"
           git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml
           git commit -m "chore: Bump version to \`$next\`"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"
           gh pr create \
             --title "chore: Bump version to \`$next\`" \
