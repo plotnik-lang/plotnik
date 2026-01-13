@@ -3,12 +3,12 @@ resolver = "2"
 members = ["crates/plotnik-cli", "crates/plotnik-lib", "crates/plotnik-langs", "crates/plotnik-core"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 license = "Apache-2.0"
 repository = "https://github.com/plotnik-lang/plotnik"
 edition = "2024"
 
 [workspace.dependencies]
-plotnik-core = { path = "crates/plotnik-core", version = "0.2.0" }
-plotnik-langs = { path = "crates/plotnik-langs", version = "0.2.0" }
-plotnik-lib = { path = "crates/plotnik-lib", version = "0.2.0" }
+plotnik-core = { path = "crates/plotnik-core", version = "0.2.1" }
+plotnik-langs = { path = "crates/plotnik-langs", version = "0.2.1" }
+plotnik-lib = { path = "crates/plotnik-lib", version = "0.2.1" }
