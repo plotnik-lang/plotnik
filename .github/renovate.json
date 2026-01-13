@@ -6,7 +6,8 @@
     {
       "matchManagers": ["cargo"],
       "groupName": "arborium crates",
-      "matchPackageNames": ["/^arborium-/"]
+      "matchPackageNames": ["/^arborium/"],
+      "rangeStrategy": "bump"
     }
   ]
 }

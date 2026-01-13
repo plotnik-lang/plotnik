@@ -34,6 +34,7 @@ default = [
     "lang-yaml",
 ]
 all-languages = [
+# @generated:all-languages:begin
     "lang-ada",
     "lang-agda",
     "lang-asciidoc",
@@ -79,7 +80,6 @@ all-languages = [
     "lang-jq",
     "lang-json",
     "lang-julia",
-    "lang-kdl",
     "lang-kotlin",
     "lang-lean",
     "lang-lua",
@@ -106,6 +106,7 @@ all-languages = [
     "lang-scala",
     "lang-scheme",
     "lang-scss",
+    "lang-solidity",
     "lang-sparql",
     "lang-sql",
     "lang-ssh-config",
@@ -132,7 +133,9 @@ all-languages = [
     "lang-yuri",
     "lang-zig",
     "lang-zsh",
+# @generated:all-languages:end
 ]
+# @generated:lang-features:begin
 lang-ada = ["plotnik-langs/lang-ada"]
 lang-agda = ["plotnik-langs/lang-agda"]
 lang-asciidoc = ["plotnik-langs/lang-asciidoc"]
@@ -178,7 +181,6 @@ lang-jinja2 = ["plotnik-langs/lang-jinja2"]
 lang-jq = ["plotnik-langs/lang-jq"]
 lang-json = ["plotnik-langs/lang-json"]
 lang-julia = ["plotnik-langs/lang-julia"]
-lang-kdl = ["plotnik-langs/lang-kdl"]
 lang-kotlin = ["plotnik-langs/lang-kotlin"]
 lang-lean = ["plotnik-langs/lang-lean"]
 lang-lua = ["plotnik-langs/lang-lua"]
@@ -205,6 +207,7 @@ lang-rust = ["plotnik-langs/lang-rust"]
 lang-scala = ["plotnik-langs/lang-scala"]
 lang-scheme = ["plotnik-langs/lang-scheme"]
 lang-scss = ["plotnik-langs/lang-scss"]
+lang-solidity = ["plotnik-langs/lang-solidity"]
 lang-sparql = ["plotnik-langs/lang-sparql"]
 lang-sql = ["plotnik-langs/lang-sql"]
 lang-ssh-config = ["plotnik-langs/lang-ssh-config"]
@@ -231,13 +234,14 @@ lang-yaml = ["plotnik-langs/lang-yaml"]
 lang-yuri = ["plotnik-langs/lang-yuri"]
 lang-zig = ["plotnik-langs/lang-zig"]
 lang-zsh = ["plotnik-langs/lang-zsh"]
+# @generated:lang-features:end
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 plotnik-core.workspace = true
 plotnik-langs = { path = "../plotnik-langs", version = "0.2.2", default-features = false }
 plotnik-lib.workspace = true
-arborium-tree-sitter = "2.5.0"
+arborium-tree-sitter = "2.7.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
