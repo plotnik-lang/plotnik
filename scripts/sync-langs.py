@@ -16,6 +16,24 @@ import urllib.request
 from pathlib import Path
 
 
+def parse_builtin_langs(path: Path) -> set[str]:
+    """Extract lang-* features defined in builtin.rs."""
+    content = path.read_text()
+    langs = set()
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("feature:"):
+            # feature: "lang-foo",
+            rest = line[len("feature:"):].strip()
+            if rest.startswith('"'):
+                rest = rest[1:]
+                if '"' in rest:
+                    lang = rest[:rest.index('"')]
+                    if lang.startswith("lang-"):
+                        langs.add(lang)
+    return langs
+
+
 def fetch_lang_features(version: str | None) -> tuple[str, list[str]]:
     """Fetch lang-* features from crates.io API."""
     url = "https://crates.io/api/v1/crates/arborium"
@@ -129,10 +147,40 @@ def update_plotnik_cli(path: Path, langs: list[str], dry_run: bool) -> bool:
     return True
 
 
+def check_builtin_consistency(builtin_path: Path, langs: list[str]) -> tuple[list[str], list[str]]:
+    """Check if builtin.rs defines all langs from crates.io.
+
+    Returns (added, removed) where:
+    - added: langs new in arborium, need to add to builtin.rs
+    - removed: langs removed from arborium, need to delete from builtin.rs
+    """
+    defined = parse_builtin_langs(builtin_path)
+    expected = set(langs)
+
+    added = sorted(expected - defined)
+    removed = sorted(defined - expected)
+    return added, removed
+
+
+def post_pr_comment(added: list[str], removed: list[str]) -> None:
+    """Post a comment to the current PR about builtin.rs inconsistency."""
+    import subprocess
+
+    lines = ["Update `crates/plotnik-langs/src/builtin.rs`:", ""]
+    if added:
+        lines.append("Add: " + ", ".join(f"`{lang}`" for lang in added))
+    if removed:
+        lines.append("Remove: " + ", ".join(f"`{lang}`" for lang in removed))
+
+    body = "\n".join(lines)
+    subprocess.run(["gh", "pr", "comment", "--body", body], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", help="arborium version (default: latest)")
     parser.add_argument("--dry-run", action="store_true", help="print changes without writing")
+    parser.add_argument("--ci", action="store_true", help="CI mode: post PR comment on mismatch")
     args = parser.parse_args()
 
     version, langs = fetch_lang_features(args.version)
@@ -141,6 +189,7 @@ def main():
     root = Path(__file__).resolve().parent.parent
     langs_toml = root / "crates/plotnik-langs/Cargo.toml"
     cli_toml = root / "crates/plotnik-cli/Cargo.toml"
+    builtin_rs = root / "crates/plotnik-langs/src/builtin.rs"
 
     changed = False
     changed |= update_plotnik_langs(langs_toml, version, langs, args.dry_run)
@@ -148,6 +197,17 @@ def main():
 
     if args.dry_run and changed:
         print("\nRun without --dry-run to apply changes")
+
+    added, removed = check_builtin_consistency(builtin_rs, langs)
+    if added or removed:
+        print("\nbuiltin.rs is out of sync with arborium:")
+        for lang in added:
+            print(f"  + {lang} (new in arborium, add to define_langs!)")
+        for lang in removed:
+            print(f"  - {lang} (removed from arborium, delete from define_langs!)")
+        if args.ci:
+            post_pr_comment(added, removed)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
