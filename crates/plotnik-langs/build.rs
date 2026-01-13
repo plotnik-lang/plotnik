@@ -14,6 +14,9 @@ fn main() {
         })
         .collect();
 
+    // Check for features not defined in builtin.rs
+    check_lang_definitions(&enabled_features, &out_dir, &manifest_dir);
+
     if enabled_features.is_empty() {
         println!("cargo::rerun-if-changed=build.rs");
         println!("cargo::rerun-if-changed=Cargo.toml");
@@ -137,6 +140,52 @@ fn feature_to_lang_key(feature: &str) -> String {
             .to_uppercase()
             .replace('-', "_"),
     }
+}
+
+fn check_lang_definitions(enabled_features: &[String], out_dir: &Path, manifest_dir: &str) {
+    // Parse builtin.rs to find defined languages
+    let builtin_path = PathBuf::from(manifest_dir).join("src/builtin.rs");
+    let builtin_src = std::fs::read_to_string(&builtin_path)
+        .expect("failed to read builtin.rs");
+
+    // Extract feature: "lang-*" patterns from define_langs! macro
+    let defined_langs: Vec<&str> = builtin_src
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with("feature:") {
+                // feature: "lang-foo",
+                trimmed
+                    .strip_prefix("feature:")
+                    .and_then(|s| s.trim().strip_prefix('"'))
+                    .and_then(|s| s.strip_suffix(',').or(Some(s)))
+                    .and_then(|s| s.strip_suffix('"'))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let mut errors = Vec::new();
+    for feature in enabled_features {
+        if !defined_langs.contains(&feature.as_str()) {
+            errors.push(format!(
+                "compile_error!(\"Feature `{feature}` enabled but not defined in builtin.rs. \
+                Add language metadata to define_langs! macro.\");"
+            ));
+        }
+    }
+
+    let check_file = out_dir.join("lang_check.rs");
+    if errors.is_empty() {
+        std::fs::write(&check_file, "// All enabled features are defined in builtin.rs\n")
+            .expect("failed to write lang_check.rs");
+    } else {
+        std::fs::write(&check_file, errors.join("\n"))
+            .expect("failed to write lang_check.rs");
+    }
+
+    println!("cargo::rerun-if-changed={}", builtin_path.display());
 }
 
 fn arborium_package_to_feature(package_name: &str) -> Option<String> {
