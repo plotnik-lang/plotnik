@@ -54,6 +54,5 @@ jobs:
     uses: ./.github/workflows/bump.yml
     with:
       bump: patch
-    permissions:
-      contents: write
-      pull-requests: write
+    secrets:
+      PLOTNIK_PAT: ${{ secrets.PLOTNIK_PAT }}
