@@ -193,6 +193,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "arborium-cedar"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09aa67e2e82e8d7812468f02aedc98f15fc6060e0b89986582646291d6b3eb4d"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "arborium-cedarschema"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0c2104e2e6fdec3cfc1e025ac61220d79123bf46db859b65fbcade8e3576d34"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "arborium-clojure"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -208,6 +230,17 @@ name = "arborium-cmake"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "868888bce46a321121c5138c98250cc6c7c400f4a843728ec5241bdb2b33edd4"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "arborium-cobol"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b35d057d5616c71b315a6e4fcb7031839056162f914d63aa438c9cc40d811d29"
 dependencies = [
  "arborium-sysroot",
  "cc",
@@ -1648,8 +1681,11 @@ dependencies = [
  "arborium-c-sharp",
  "arborium-caddy",
  "arborium-capnp",
+ "arborium-cedar",
+ "arborium-cedarschema",
  "arborium-clojure",
  "arborium-cmake",
+ "arborium-cobol",
  "arborium-commonlisp",
  "arborium-cpp",
  "arborium-css",

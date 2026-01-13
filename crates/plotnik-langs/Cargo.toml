@@ -43,8 +43,11 @@ all-languages = [
     "lang-c-sharp",
     "lang-caddy",
     "lang-capnp",
+    "lang-cedar",
+    "lang-cedarschema",
     "lang-clojure",
     "lang-cmake",
+    "lang-cobol",
     "lang-commonlisp",
     "lang-cpp",
     "lang-css",
@@ -146,8 +149,11 @@ lang-c = ["dep:arborium-c"]
 lang-c-sharp = ["dep:arborium-c-sharp"]
 lang-caddy = ["dep:arborium-caddy"]
 lang-capnp = ["dep:arborium-capnp"]
+lang-cedar = ["dep:arborium-cedar"]
+lang-cedarschema = ["dep:arborium-cedarschema"]
 lang-clojure = ["dep:arborium-clojure"]
 lang-cmake = ["dep:arborium-cmake"]
+lang-cobol = ["dep:arborium-cobol"]
 lang-commonlisp = ["dep:arborium-commonlisp"]
 lang-cpp = ["dep:arborium-cpp"]
 lang-css = ["dep:arborium-css"]
@@ -252,8 +258,11 @@ arborium-c = { version = "2.10.0", optional = true }
 arborium-c-sharp = { version = "2.10.0", optional = true }
 arborium-caddy = { version = "2.10.0", optional = true }
 arborium-capnp = { version = "2.10.0", optional = true }
+arborium-cedar = { version = "2.10.0", optional = true }
+arborium-cedarschema = { version = "2.10.0", optional = true }
 arborium-clojure = { version = "2.10.0", optional = true }
 arborium-cmake = { version = "2.10.0", optional = true }
+arborium-cobol = { version = "2.10.0", optional = true }
 arborium-commonlisp = { version = "2.10.0", optional = true }
 arborium-cpp = { version = "2.10.0", optional = true }
 arborium-css = { version = "2.10.0", optional = true }
