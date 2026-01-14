@@ -194,7 +194,7 @@ pub fn prepare_query(input: QueryInput) -> PreparedQuery {
     }
 
     let bytecode = emit_linked(&query).expect("emit failed");
-    let module = Module::from_bytes(bytecode).expect("module load failed");
+    let module = Module::load(&bytecode).expect("module load failed");
 
     let entrypoint = resolve_entrypoint(&module, input.entry);
     let tree = lang.parse(&source_code);

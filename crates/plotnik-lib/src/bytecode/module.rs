@@ -7,6 +7,7 @@ use std::io;
 use std::ops::Deref;
 use std::path::Path;
 
+use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
@@ -31,28 +32,69 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
-/// Storage for bytecode bytes.
-#[derive(Debug)]
-pub struct ByteStorage(Vec<u8>);
+/// Storage for bytecode bytes with guaranteed 64-byte alignment.
+///
+/// All bytecode must be 64-byte aligned for DFA deserialization and cache
+/// efficiency. This enum ensures alignment through two paths:
+/// - `Static`: Pre-aligned via `include_query_aligned!` macro
+/// - `Aligned`: Allocated with 64-byte alignment via `AlignedVec`
+pub enum ByteStorage {
+    /// Static bytes from `include_query_aligned!` (zero-copy, pre-aligned).
+    Static(&'static [u8]),
+    /// Owned bytes with guaranteed 64-byte alignment.
+    Aligned(AlignedVec),
+}
 
 impl Deref for ByteStorage {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        match self {
+            ByteStorage::Static(s) => s,
+            ByteStorage::Aligned(v) => v,
+        }
+    }
+}
+
+impl std::fmt::Debug for ByteStorage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ByteStorage::Static(s) => f.debug_tuple("Static").field(&s.len()).finish(),
+            ByteStorage::Aligned(v) => f.debug_tuple("Aligned").field(&v.len()).finish(),
+        }
     }
 }
 
 impl ByteStorage {
-    /// Create from owned bytes.
-    pub fn from_vec(bytes: Vec<u8>) -> Self {
-        Self(bytes)
+    /// Create from static bytes (zero-copy).
+    ///
+    /// The bytes must be 64-byte aligned. Use `include_query_aligned!` macro.
+    ///
+    /// # Panics
+    /// Panics if bytes are not 64-byte aligned.
+    pub fn from_static(bytes: &'static [u8]) -> Self {
+        assert!(
+            (bytes.as_ptr() as usize).is_multiple_of(64),
+            "static bytes must be 64-byte aligned; use include_query_aligned! macro"
+        );
+        Self::Static(bytes)
     }
 
-    /// Read a file into memory.
+    /// Create from an aligned vector (from compiler or file read).
+    pub fn from_aligned(vec: AlignedVec) -> Self {
+        Self::Aligned(vec)
+    }
+
+    /// Create by copying bytes into aligned storage.
+    ///
+    /// Use this when receiving bytes from unknown sources (e.g., network).
+    pub fn copy_from_slice(bytes: &[u8]) -> Self {
+        Self::Aligned(AlignedVec::copy_from_slice(bytes))
+    }
+
+    /// Read a file into aligned storage.
     pub fn from_file(path: impl AsRef<Path>) -> io::Result<Self> {
-        let bytes = std::fs::read(path)?;
-        Ok(Self(bytes))
+        Ok(Self::Aligned(AlignedVec::from_file(path)?))
     }
 }
 
@@ -118,15 +160,46 @@ pub struct Module {
 }
 
 impl Module {
-    /// Load a module from owned bytes.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::from_vec(bytes))
+    /// Load a module from an aligned vector (compiler output).
+    ///
+    /// This is the primary constructor for bytecode produced by the compiler.
+    pub fn from_aligned(vec: AlignedVec) -> Result<Self, ModuleError> {
+        Self::from_storage(ByteStorage::from_aligned(vec))
+    }
+
+    /// Load a module from static bytes (zero-copy).
+    ///
+    /// Use with `include_query_aligned!` to embed aligned bytecode:
+    /// ```ignore
+    /// use plotnik_lib::include_query_aligned;
+    ///
+    /// let module = Module::from_static(include_query_aligned!("query.ptk.bin"))?;
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if bytes are not 64-byte aligned.
+    pub fn from_static(bytes: &'static [u8]) -> Result<Self, ModuleError> {
+        Self::from_storage(ByteStorage::from_static(bytes))
     }
 
     /// Load a module from a file path.
+    ///
+    /// Reads the file into 64-byte aligned storage.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, ModuleError> {
-        let storage = ByteStorage::from_file(&path)?;
-        Self::from_storage(storage)
+        Self::from_storage(ByteStorage::from_file(&path)?)
+    }
+
+    /// Load a module from arbitrary bytes (copies into aligned storage).
+    ///
+    /// Use this for bytes from unknown sources (network, etc.). Always copies.
+    pub fn load(bytes: &[u8]) -> Result<Self, ModuleError> {
+        Self::from_storage(ByteStorage::copy_from_slice(bytes))
+    }
+
+    /// Load a module from owned bytes (copies into aligned storage).
+    #[deprecated(since = "0.1.0", note = "use `Module::from_aligned` for AlignedVec or `Module::load` for copying")]
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ModuleError> {
+        Self::load(&bytes)
     }
 
     /// Load a module from storage.

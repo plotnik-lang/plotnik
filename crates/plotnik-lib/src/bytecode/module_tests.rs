@@ -10,7 +10,7 @@ fn module_from_bytes_valid() {
     let input = "Test = (identifier) @id";
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     assert!(module.header().validate_magic());
     assert!(module.header().validate_version());
@@ -23,7 +23,7 @@ fn module_from_bytes_too_small() {
     let bytes = Query::expect_valid_linked_bytes(input);
     let truncated = bytes[..32].to_vec();
 
-    let err = Module::from_bytes(truncated).unwrap_err();
+    let err = Module::load(&truncated).unwrap_err();
     assert!(matches!(err, ModuleError::FileTooSmall(32)));
 }
 
@@ -34,7 +34,7 @@ fn module_from_bytes_invalid_magic() {
     let mut bytes = Query::expect_valid_linked_bytes(input);
     bytes[0] = b'X'; // Corrupt magic
 
-    let err = Module::from_bytes(bytes).unwrap_err();
+    let err = Module::load(&bytes).unwrap_err();
     assert!(matches!(err, ModuleError::InvalidMagic));
 }
 
@@ -45,7 +45,7 @@ fn module_from_bytes_wrong_version() {
     let mut bytes = Query::expect_valid_linked_bytes(input);
     bytes[4..8].copy_from_slice(&999u32.to_le_bytes()); // Wrong version
 
-    let err = Module::from_bytes(bytes).unwrap_err();
+    let err = Module::load(&bytes).unwrap_err();
     assert!(matches!(err, ModuleError::UnsupportedVersion(999)));
 }
 
@@ -57,7 +57,7 @@ fn module_from_bytes_size_mismatch() {
     let actual_size = bytes.len() as u32;
     bytes[12..16].copy_from_slice(&(actual_size + 100).to_le_bytes()); // Wrong total_size
 
-    let err = Module::from_bytes(bytes).unwrap_err();
+    let err = Module::load(&bytes).unwrap_err();
     assert!(matches!(
         err,
         ModuleError::SizeMismatch {
@@ -72,7 +72,7 @@ fn module_strings_view() {
     let input = "Test = (identifier) @id";
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let strings = module.strings();
     // String 0 is the easter egg (accessed via raw index, not StringId)
@@ -86,7 +86,7 @@ fn module_node_types_view() {
     let input = "Test = (identifier) @id";
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let node_types = module.node_types();
     assert!(!node_types.is_empty());
@@ -103,7 +103,7 @@ fn module_node_fields_view() {
     let input = "Test = (function_declaration name: (identifier) @name)";
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let fields = module.node_fields();
     assert!(!fields.is_empty());
@@ -124,7 +124,7 @@ fn module_types_view() {
     "#};
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let types = module.types();
     // Should have custom types (struct with fields)
@@ -140,7 +140,7 @@ fn module_entrypoints_view() {
     "#};
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let entrypoints = module.entrypoints();
     assert_eq!(entrypoints.len(), 2);
@@ -159,7 +159,7 @@ fn module_decode_step() {
     let input = "Test = (identifier) @id";
 
     let bytes = Query::expect_valid_linked_bytes(input);
-    let module = Module::from_bytes(bytes).unwrap();
+    let module = Module::load(&bytes).unwrap();
 
     let instr = module.decode_step(0);
     assert!(matches!(instr, crate::bytecode::Instruction::Match(_)));
@@ -192,13 +192,38 @@ fn module_from_path_mmap() {
 }
 
 #[test]
-fn byte_storage_deref() {
+fn byte_storage_copy_from_slice() {
     use crate::bytecode::ByteStorage;
 
-    let data = vec![1, 2, 3, 4, 5];
-    let storage = ByteStorage::from_vec(data.clone());
+    let data = [1u8, 2, 3, 4, 5];
+    let storage = ByteStorage::copy_from_slice(&data);
 
     assert_eq!(&*storage, &data[..]);
     assert_eq!(storage.len(), 5);
     assert_eq!(storage[2], 3);
+}
+
+#[test]
+fn byte_storage_from_aligned() {
+    use crate::bytecode::{AlignedVec, ByteStorage};
+
+    let vec = AlignedVec::copy_from_slice(&[1, 2, 3, 4, 5]);
+    let storage = ByteStorage::from_aligned(vec);
+
+    assert_eq!(&*storage, &[1, 2, 3, 4, 5]);
+    assert_eq!(storage.len(), 5);
+}
+
+#[test]
+fn module_load() {
+    let input = "Test = (identifier) @id";
+
+    let bytes = Query::expect_valid_linked_bytes(input);
+    let module = Module::load(&bytes).unwrap();
+
+    assert!(module.header().validate_magic());
+    assert!(module.header().validate_version());
+
+    let strings = module.strings();
+    assert_eq!(strings.get_by_index(0), "Beauty will save the world");
 }

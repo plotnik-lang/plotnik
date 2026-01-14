@@ -18,7 +18,7 @@ fn build_module(query: &str) -> (Module, TypeId) {
         .link(&lang);
     assert!(query_obj.is_valid(), "query should be valid");
     let bytecode = emit_linked(&query_obj).expect("emit failed");
-    let module = Module::from_bytes(bytecode).expect("decode failed");
+    let module = Module::load(&bytecode).expect("decode failed");
     let declared_type = module.entrypoints().get(0).result_type;
     (module, declared_type)
 }

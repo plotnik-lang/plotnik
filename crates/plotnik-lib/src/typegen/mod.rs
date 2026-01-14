@@ -9,7 +9,7 @@
 //! use plotnik_lib::typegen::typescript;
 //! use plotnik_lib::bytecode::Module;
 //!
-//! let module = Module::from_bytes(bytecode)?;
+//! let module = Module::load(&bytecode)?;
 //! let output = typescript::emit(&module);
 //! ```
 
