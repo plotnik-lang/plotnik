@@ -1,87 +1,44 @@
 # Binary Format: Type Metadata
 
-This section defines the type system metadata used for code generation and runtime validation. It allows consumers to understand the shape of the data extracted by the query.
+Type system metadata for code generation and runtime validation. Describes the shape of data extracted by queries.
 
-## 1. Primitives
+## Primitives
 
-**TypeId (u16)**: Zero-based index into the TypeDefs array. All types, including primitives, are stored as TypeDef entries.
+**TypeId (u16)**: Zero-based index into TypeDefs. All types, including primitives, are stored as TypeDef entries.
+
+**TypeKind (u8)**: Discriminator for TypeDef.
+
+| Value | Kind            | Description                    |
+| ----- | --------------- | ------------------------------ |
+| 0     | `Void`          | Unit type, captures nothing    |
+| 1     | `Node`          | AST node reference             |
+| 2     | `String`        | Source text                    |
+| 3     | `Optional`      | Wraps another type             |
+| 4     | `ArrayZeroOrMore` | Zero or more (T*)            |
+| 5     | `ArrayOneOrMore`  | One or more (T+)             |
+| 6     | `Struct`        | Record with named fields       |
+| 7     | `Enum`          | Discriminated union            |
+| 8     | `Alias`         | Named reference to another type |
 
 ### Node Semantics
 
-The `Node` type (`TypeKind = 1`) represents a platform-dependent handle to a tree-sitter AST node:
+The `Node` type represents a platform-dependent handle to a tree-sitter AST node:
 
 | Context    | Representation                                             |
 | :--------- | :--------------------------------------------------------- |
 | Rust       | `tree_sitter::Node<'tree>` (lifetime-bound reference)      |
 | TypeScript | Binding-provided object with `startPosition`, `text`, etc. |
-| JSON       | Unique node identifier (e.g., `"node:42"` or path-based)   |
+| JSON       | Unique node identifier (e.g., `"node:42"`)                 |
 
-The handle provides access to node metadata (kind, span, text) without copying the source. Lifetime management is platform-specific — Rust enforces it statically, bindings may use reference counting or arena allocation.
+## Sections
 
-**TypeKind (u8)**: Discriminator for `TypeDef`.
+Three separate sections store type metadata. Counts are in the main header.
 
-- `0`: `Void` (Unit type, captures nothing)
-- `1`: `Node` (AST node reference)
-- `2`: `String` (Source text)
-- `3`: `Optional` (Wraps another type)
-- `4`: `ArrayZeroOrMore` (Zero or more, aka ArrayStar)
-- `5`: `ArrayOneOrMore` (One or more, aka ArrayPlus)
-- `6`: `Struct` (Record with named fields)
-- `7`: `Enum` (Discriminated union)
-- `8`: `Alias` (Named reference to another type, e.g., `@x :: Identifier`)
+### TypeDefs
 
-## 2. Layout
-
-The TypeMeta section begins with an 8-byte header containing sub-section counts, followed by three 64-byte aligned sub-sections:
-
-```
-type_meta_offset
-│
-├─ TypeMetaHeader (8 bytes)
-│    type_defs_count: u16
-│    type_members_count: u16
-│    type_names_count: u16
-│    _pad: u16
-│
-├─ [padding to 64-byte boundary]
-│
-├─ TypeDefs[type_defs_count] (4 bytes each)
-│
-├─ [padding to 64-byte boundary]
-│
-├─ TypeMembers[type_members_count] (4 bytes each)
-│
-├─ [padding to 64-byte boundary]
-│
-└─ TypeNames[type_names_count] (4 bytes each)
-```
-
-```rust
-#[repr(C)]
-struct TypeMetaHeader {
-    type_defs_count: u16,
-    type_members_count: u16,
-    type_names_count: u16,
-    _pad: u16,
-}
-```
-
-**Sub-section offsets** (each aligned to 64-byte boundary):
-
-- TypeDefs: `align64(type_meta_offset + 8)`
-- TypeMembers: `align64(TypeDefs_offset + type_defs_count * 4)`
-- TypeNames: `align64(TypeMembers_offset + type_members_count * 4)`
-
-This separation ensures:
-
-- No wasted space (anonymous types don't need name storage)
-- Clean concerns (structure vs. naming)
-- Uniform 4-byte records within each sub-section
-- 64-byte alignment for cache-friendly access
-
-### 2.1. TypeDef (4 bytes)
-
-Describes the structure of a single type.
+- **Section Offset**: Computed (follows Trivia)
+- **Record Size**: 4 bytes
+- **Count**: `header.type_defs_count`
 
 ```rust
 #[repr(C)]
@@ -92,27 +49,27 @@ struct TypeDef {
 }
 ```
 
-**Semantics of `data` and `count` fields**:
+**Field semantics by kind**:
 
-| Kind              | `data` (u16)   | `count` (u8)   | Interpretation        |
-| :---------------- | :------------- | :------------- | :-------------------- |
-| `Void`            | 0              | 0              | Unit type             |
-| `Node`            | 0              | 0              | AST node reference    |
-| `String`          | 0              | 0              | Source text           |
-| `Optional`        | `InnerTypeId`  | 0              | Wrapper `T?`          |
-| `ArrayZeroOrMore` | `InnerTypeId`  | 0              | Wrapper `T[]`         |
-| `ArrayOneOrMore`  | `InnerTypeId`  | 0              | Wrapper `[T, ...T[]]` |
-| `Struct`          | `MemberIndex`  | `FieldCount`   | Record with fields    |
-| `Enum`            | `MemberIndex`  | `VariantCount` | Discriminated union   |
-| `Alias`           | `TargetTypeId` | 0              | Named type reference  |
+| Kind              | `data`         | `count`        |
+| :---------------- | :------------- | :------------- |
+| `Void`            | 0              | 0              |
+| `Node`            | 0              | 0              |
+| `String`          | 0              | 0              |
+| `Optional`        | Inner TypeId   | 0              |
+| `ArrayZeroOrMore` | Inner TypeId   | 0              |
+| `ArrayOneOrMore`  | Inner TypeId   | 0              |
+| `Alias`           | Target TypeId  | 0              |
+| `Struct`          | MemberIndex    | FieldCount     |
+| `Enum`            | MemberIndex    | VariantCount   |
 
-> **Note**: For primitives (`Void`, `Node`, `String`), `data` and `count` are unused. For wrappers and `Alias`, `data` is a `TypeId`. For `Struct` and `Enum`, `data` is an index into the TypeMembers section. Parsers must dispatch on `kind` first.
+> **Limit**: `count` is u8, so composites are limited to 255 members.
 
-> **Limit**: `count` is u8, so structs/enums are limited to 255 members.
+### TypeMembers
 
-### 2.2. TypeMember (4 bytes)
-
-Describes a field in a struct or a variant in an enum.
+- **Section Offset**: Computed (follows TypeDefs)
+- **Record Size**: 4 bytes
+- **Count**: `header.type_members_count`
 
 ```rust
 #[repr(C)]
@@ -125,9 +82,11 @@ struct TypeMember {
 For struct fields: `name` is the field name, `ty` is the field's type.
 For enum variants: `name` is the variant tag, `ty` is the payload type (use `Void` for unit variants).
 
-### 2.3. TypeName (4 bytes)
+### TypeNames
 
-Maps a name to a type. Only types that have names appear here.
+- **Section Offset**: Computed (follows TypeMembers)
+- **Record Size**: 4 bytes
+- **Count**: `header.type_names_count`
 
 ```rust
 #[repr(C)]
@@ -137,25 +96,20 @@ struct TypeName {
 }
 ```
 
-**Ordering**: Entries are sorted lexicographically by name (resolved via String Table) for binary search.
+Sorted lexicographically by name (resolved via String Table) for binary search.
 
 **Usage**:
+- Named definitions (`List = [...]`) get an entry
+- Custom type annotations (`@x :: Identifier`) create an Alias TypeDef with an entry
+- Anonymous types have no entry
 
-- Named definitions (`List = [...]`) get an entry mapping "List" to their TypeId
-- Custom type annotations (`@x :: Identifier`) create an Alias TypeDef, with an entry here
-- Anonymous types (inline structs, wrappers) have no entry
+## Examples
 
-For code generation, build a reverse map (`TypeId → Option<StringId>`) to look up names when emitting types.
+> **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node, String), then composite types.
 
-## 3. Examples
-
-> **Note**: In bytecode, only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node, String), then composite types. TypeId values depend on which primitives the query actually uses.
-
-### 3.1. Simple Struct
+### Simple Struct
 
 Query: `Q = (function name: (identifier) @name)`
-
-Run `plotnik dump -q '<query>'` to see:
 
 ```
 [type_defs]
@@ -169,22 +123,15 @@ M0: S1 → T0  ; name: <Node>
 N0: S2 → T1  ; Q
 ```
 
-- `T0` is the `Node` primitive (only used primitive is emitted)
-- `T1` is a `Struct` with 1 member starting at `M0`
-- `M0` maps "name" to type `T0` (Node)
-
-### 3.2. Recursive Enum
+### Recursive Enum
 
 Query:
-
 ```
 List = [
     Nil: (nil)
     Cons: (cons (a) @head (List) @tail)
 ]
 ```
-
-Run `plotnik dump -q '<query>'` to see:
 
 ```
 [type_defs]
@@ -203,16 +150,9 @@ M3: S4 → T2  ; Cons: T2
 N0: S5 → T3  ; List
 ```
 
-- `T0` (Void) and `T1` (Node) are primitives used by the query
-- `T2` is the Cons payload struct with `head` and `tail` fields
-- `T3` is the `List` enum with `Nil` and `Cons` variants
-- `M1` shows `tail: List` — self-reference to `T3`
-
-### 3.3. Custom Type Annotation
+### Custom Type Annotation
 
 Query: `Q = (identifier) @name :: Identifier`
-
-Run `plotnik dump -q '<query>'` to see:
 
 ```
 [type_defs]
@@ -228,11 +168,7 @@ N0: S1 → T1  ; Identifier
 N1: S3 → T2  ; Q
 ```
 
-- `T0` is the underlying `Node` primitive
-- `T1` is an `Alias` pointing to `T0`, named "Identifier"
-- The `name` field has type `T1` (the alias), so code generators emit `Identifier` instead of `Node`
-
-## 4. Validation
+## Validation
 
 Loaders must verify for `Struct`/`Enum` kinds:
 
@@ -240,7 +176,7 @@ Loaders must verify for `Struct`/`Enum` kinds:
 
 This prevents out-of-bounds reads from malformed binaries.
 
-## 5. Code Generation
+## Code Generation
 
 To emit types (TypeScript, Rust, etc.):
 

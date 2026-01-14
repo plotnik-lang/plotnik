@@ -530,20 +530,23 @@ impl MatchIR {
             let neg_count = self.neg_fields.len();
             let post_count = self.post_effects.len();
             let succ_count = self.successors.len();
+            let has_predicate = false; // TODO: predicates not yet implemented
 
-            // Validate bit-packed field limits (3 bits for counts, 6 bits for successors)
+            // Validate bit-packed field limits
+            // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
             assert!(
                 pre_count <= 7,
                 "pre_effects overflow: {pre_count} > 7 (use emit_match_with_cascade)"
             );
             assert!(neg_count <= 7, "neg_fields overflow: {neg_count} > 7");
             assert!(post_count <= 7, "post_effects overflow: {post_count} > 7");
-            assert!(succ_count <= 63, "successors overflow: {succ_count} > 63");
+            assert!(succ_count <= 31, "successors overflow: {succ_count} > 31");
 
             let counts = ((pre_count as u16) << 13)
                 | ((neg_count as u16) << 10)
                 | ((post_count as u16) << 7)
-                | ((succ_count as u16) << 1);
+                | ((succ_count as u16) << 2)
+                | ((has_predicate as u16) << 1);
             bytes[6..8].copy_from_slice(&counts.to_le_bytes());
 
             let mut offset = 8;

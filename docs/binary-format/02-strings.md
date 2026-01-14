@@ -16,7 +16,8 @@ This reservation has a practical purpose: since Match instructions use `0` to in
 
 Contains the raw UTF-8 bytes for all strings concatenated together.
 
-- **Section Offset**: `header.str_blob_offset`
+- **Section Offset**: Computed (first section after header, at offset 64)
+- **Size**: `header.str_blob_size`
 - **Content**: Raw bytes. Strings are **not** null-terminated.
 - **Padding**: The section is padded to a 64-byte boundary at the end.
 
@@ -24,7 +25,7 @@ Contains the raw UTF-8 bytes for all strings concatenated together.
 
 Lookup table mapping `StringId` to byte offsets within the String Blob.
 
-- **Section Offset**: `header.str_table_offset`
+- **Section Offset**: Computed (follows RegexBlob, 64-byte aligned)
 - **Record Size**: 4 bytes (`u32`).
 - **Capacity**: `header.str_table_count + 1` entries.
   - The table contains one extra entry at the end representing the total size of the unpadded blob.

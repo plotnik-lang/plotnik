@@ -13,67 +13,6 @@ impl TypeKind {
     pub const ARRAY_PLUS: Self = Self::ArrayOneOrMore;
 }
 
-/// TypeMeta section header (8 bytes).
-///
-/// Contains counts for the three sub-sections. Located at `type_meta_offset`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[repr(C)]
-pub struct TypeMetaHeader {
-    /// Number of TypeDef entries.
-    pub(crate) type_defs_count: u16,
-    /// Number of TypeMember entries.
-    pub(crate) type_members_count: u16,
-    /// Number of TypeName entries.
-    pub(crate) type_names_count: u16,
-    /// Padding for alignment.
-    pub(crate) _pad: u16,
-}
-
-const _: () = assert!(std::mem::size_of::<TypeMetaHeader>() == 8);
-
-impl TypeMetaHeader {
-    /// Create a new header.
-    pub fn new(type_defs_count: u16, type_members_count: u16, type_names_count: u16) -> Self {
-        Self {
-            type_defs_count,
-            type_members_count,
-            type_names_count,
-            _pad: 0,
-        }
-    }
-
-    /// Decode from 8 bytes.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= 8, "TypeMetaHeader too short");
-        Self {
-            type_defs_count: u16::from_le_bytes([bytes[0], bytes[1]]),
-            type_members_count: u16::from_le_bytes([bytes[2], bytes[3]]),
-            type_names_count: u16::from_le_bytes([bytes[4], bytes[5]]),
-            _pad: 0,
-        }
-    }
-
-    /// Encode to 8 bytes.
-    pub fn to_bytes(&self) -> [u8; 8] {
-        let mut bytes = [0u8; 8];
-        bytes[0..2].copy_from_slice(&self.type_defs_count.to_le_bytes());
-        bytes[2..4].copy_from_slice(&self.type_members_count.to_le_bytes());
-        bytes[4..6].copy_from_slice(&self.type_names_count.to_le_bytes());
-        // _pad is always 0
-        bytes
-    }
-
-    pub fn type_defs_count(&self) -> u16 {
-        self.type_defs_count
-    }
-    pub fn type_members_count(&self) -> u16 {
-        self.type_members_count
-    }
-    pub fn type_names_count(&self) -> u16 {
-        self.type_names_count
-    }
-}
-
 /// Type definition entry (4 bytes).
 ///
 /// Semantics of `data` and `count` depend on `kind`:

@@ -8,9 +8,7 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{TypeContext, TypeId};
 use crate::bytecode::Label;
-use crate::bytecode::{
-    Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry, TypeMetaHeader,
-};
+use crate::bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry};
 use crate::compile::Compiler;
 use crate::query::LinkedQuery;
 
@@ -120,6 +118,10 @@ fn emit_inner(
     // Trivia (empty for now)
     let trivia_entries: Vec<TriviaEntry> = Vec::new();
 
+    // Regex (empty for now - predicates not yet implemented)
+    let regex_table: Vec<u8> = vec![0, 0, 0, 0]; // sentinel: single u32 = 0
+    let regex_blob: Vec<u8> = Vec::new();
+
     // Resolve and serialize transitions
     let transitions_bytes =
         emit_transitions(&compile_result.instructions, &layout, &types, &strings);
@@ -133,51 +135,42 @@ fn emit_inner(
     let trivia_bytes = emit_trivia(&trivia_entries);
     let entrypoints_bytes = emit_entrypoints(&entrypoints);
 
-    // Build output with sections
+    // Build output with sections in v2 order:
+    // Header → StringBlob → RegexBlob → StringTable → RegexTable →
+    // NodeTypes → NodeFields → Trivia → TypeDefs → TypeMembers →
+    // TypeNames → Entrypoints → Transitions
     let mut output = vec![0u8; 64]; // Reserve header space
 
-    let str_blob_offset = emit_section(&mut output, &str_blob);
-    let str_table_offset = emit_section(&mut output, &str_table);
-    let node_types_offset = emit_section(&mut output, &node_types_bytes);
-    let node_fields_offset = emit_section(&mut output, &node_fields_bytes);
-    let trivia_offset = emit_section(&mut output, &trivia_bytes);
-
-    // Type metadata section (header + 3 aligned sub-sections)
-    let type_meta_offset = emit_section(
-        &mut output,
-        &TypeMetaHeader::new(
-            types.type_defs_count() as u16,
-            types.type_members_count() as u16,
-            types.type_names_count() as u16,
-        )
-        .to_bytes(),
-    );
+    emit_section(&mut output, &str_blob);
+    emit_section(&mut output, &regex_blob);
+    emit_section(&mut output, &str_table);
+    emit_section(&mut output, &regex_table);
+    emit_section(&mut output, &node_types_bytes);
+    emit_section(&mut output, &node_fields_bytes);
+    emit_section(&mut output, &trivia_bytes);
     emit_section(&mut output, &type_defs_bytes);
     emit_section(&mut output, &type_members_bytes);
     emit_section(&mut output, &type_names_bytes);
-
-    let entrypoints_offset = emit_section(&mut output, &entrypoints_bytes);
-    let transitions_offset = emit_section(&mut output, &transitions_bytes);
+    emit_section(&mut output, &entrypoints_bytes);
+    emit_section(&mut output, &transitions_bytes);
 
     pad_to_section(&mut output);
     let total_size = output.len() as u32;
 
-    // Build and write header
+    // Build header (offsets computed from counts and blob sizes)
     let mut header = Header {
-        str_blob_offset,
-        str_table_offset,
-        node_types_offset,
-        node_fields_offset,
-        trivia_offset,
-        type_meta_offset,
-        entrypoints_offset,
-        transitions_offset,
         str_table_count: strings.len() as u16,
         node_types_count: node_symbols.len() as u16,
         node_fields_count: field_symbols.len() as u16,
         trivia_count: trivia_entries.len() as u16,
+        regex_table_count: 0, // no regexes yet
+        type_defs_count: types.type_defs_count() as u16,
+        type_members_count: types.type_members_count() as u16,
+        type_names_count: types.type_names_count() as u16,
         entrypoints_count: entrypoints.len() as u16,
         transitions_count: layout.total_steps,
+        str_blob_size: str_blob.len() as u32,
+        regex_blob_size: regex_blob.len() as u32,
         total_size,
         ..Default::default()
     };
@@ -234,11 +227,9 @@ fn emit_transitions(
     bytes
 }
 
-fn emit_section(output: &mut Vec<u8>, data: &[u8]) -> u32 {
+fn emit_section(output: &mut Vec<u8>, data: &[u8]) {
     pad_to_section(output);
-    let offset = output.len() as u32;
     output.extend_from_slice(data);
-    offset
 }
 
 fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {

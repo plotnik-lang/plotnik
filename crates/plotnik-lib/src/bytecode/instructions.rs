@@ -147,6 +147,8 @@ pub struct Match<'a> {
     neg_count: u8,
     post_count: u8,
     succ_count: u8,
+    /// Whether this instruction has a predicate (4-byte payload).
+    has_predicate: bool,
 }
 
 impl<'a> Match<'a> {
@@ -173,11 +175,18 @@ impl<'a> Match<'a> {
         let node_type = NodeTypeIR::from_bytes(node_kind, node_type_val);
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
-        let (is_match8, match8_next, pre_count, neg_count, post_count, succ_count) =
+        let (is_match8, match8_next, pre_count, neg_count, post_count, succ_count, has_predicate) =
             if opcode == Opcode::Match8 {
                 let next = u16::from_le_bytes([bytes[6], bytes[7]]);
-                (true, next, 0, 0, 0, if next == 0 { 0 } else { 1 })
+                (true, next, 0, 0, 0, if next == 0 { 0 } else { 1 }, false)
             } else {
+                // counts field layout (16 bits):
+                // bits 15-13: pre_count (3)
+                // bits 12-10: neg_count (3)
+                // bits  9-7:  post_count (3)
+                // bits  6-2:  succ_count (5, max 31)
+                // bit   1:    has_predicate
+                // bit   0:    reserved
                 let counts = u16::from_le_bytes([bytes[6], bytes[7]]);
                 (
                     false,
@@ -185,7 +194,8 @@ impl<'a> Match<'a> {
                     ((counts >> 13) & 0x7) as u8,
                     ((counts >> 10) & 0x7) as u8,
                     ((counts >> 7) & 0x7) as u8,
-                    ((counts >> 1) & 0x3F) as u8,
+                    ((counts >> 2) & 0x1F) as u8,
+                    (counts >> 1) & 0x1 != 0,
                 )
             };
 
@@ -201,6 +211,7 @@ impl<'a> Match<'a> {
             neg_count,
             post_count,
             succ_count,
+            has_predicate,
         }
     }
 
@@ -284,10 +295,20 @@ impl<'a> Match<'a> {
         (0..self.succ_count as usize).map(move |i| self.successor(i))
     }
 
+    /// Whether this instruction has a predicate (text filter).
+    #[inline]
+    pub fn has_predicate(&self) -> bool {
+        self.has_predicate
+    }
+
     /// Byte offset where successors start in the payload.
+    /// Accounts for predicate (4 bytes) if present.
     #[inline]
     fn succ_offset(&self) -> usize {
-        8 + (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2
+        let effects_size =
+            (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2;
+        let predicate_size = if self.has_predicate { 4 } else { 0 };
+        8 + effects_size + predicate_size
     }
 }
 

@@ -22,13 +22,13 @@ pub use constants::{
 
 pub use ids::{StringId, TypeId};
 
-pub use header::{Header, flags};
+pub use header::{flags, Header, SectionOffsets};
 
 pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
 
 pub use entrypoint::Entrypoint;
 
-pub use type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
+pub use type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 
 pub use nav::Nav;
 
@@ -40,8 +40,8 @@ pub use instructions::{
 };
 
 pub use module::{
-    ByteStorage, EntrypointsView, Instruction, Module, ModuleError, StringsView, SymbolsView,
-    TriviaView, TypesView,
+    ByteStorage, EntrypointsView, Instruction, Module, ModuleError, RegexView, StringsView,
+    SymbolsView, TriviaView, TypesView,
 };
 
 pub use dump::dump;

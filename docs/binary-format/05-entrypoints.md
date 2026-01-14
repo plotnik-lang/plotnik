@@ -4,7 +4,7 @@ This section defines the named entry points for the query. Every named definitio
 
 ## Layout
 
-- **Section Offset**: `header.entrypoints_offset`
+- **Section Offset**: Computed (follows TypeNames)
 - **Record Size**: 8 bytes
 - **Count**: `header.entrypoints_count`
 - **Ordering**: Entries **must** be sorted lexicographically by the UTF-8 content of their `name` (resolved via String Table). This enables binary search at runtime.

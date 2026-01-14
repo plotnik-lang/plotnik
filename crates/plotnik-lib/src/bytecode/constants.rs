@@ -4,7 +4,8 @@
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
 /// Current bytecode format version.
-pub const VERSION: u32 = 1;
+/// v2: Removed explicit offsets (computed from counts), added regex section.
+pub const VERSION: u32 = 2;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
