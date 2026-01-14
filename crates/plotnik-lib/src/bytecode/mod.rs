@@ -2,6 +2,7 @@
 //!
 //! Implements the binary format specified in `docs/binary-format/`.
 
+mod aligned_vec;
 mod constants;
 mod dump;
 mod effects;
@@ -15,6 +16,8 @@ mod module;
 mod nav;
 mod sections;
 mod type_meta;
+
+pub use aligned_vec::AlignedVec;
 
 pub use constants::{
     MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE, VERSION,
@@ -56,6 +59,8 @@ pub use ir::{
     TrampolineIR,
 };
 
+#[cfg(test)]
+mod aligned_vec_tests;
 #[cfg(test)]
 mod effects_tests;
 #[cfg(test)]

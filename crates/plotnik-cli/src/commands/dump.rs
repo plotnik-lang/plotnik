@@ -82,7 +82,7 @@ pub fn run(args: DumpArgs) {
         query.emit().expect("bytecode emission failed")
     };
 
-    let module = Module::from_bytes(bytecode).expect("module loading failed");
+    let module = Module::load(&bytecode).expect("module loading failed");
     let colors = Colors::new(args.color);
     print!("{}", dump(&module, colors));
 }

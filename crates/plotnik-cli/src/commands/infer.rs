@@ -96,7 +96,7 @@ pub fn run(args: InferArgs) {
         }
         query.emit().expect("bytecode emission failed")
     };
-    let module = Module::from_bytes(bytecode).expect("module loading failed");
+    let module = Module::load(&bytecode).expect("module loading failed");
 
     // Emit TypeScript types
     let void_type = match args.void_type.as_deref() {
