@@ -7,12 +7,12 @@ use std::io;
 use std::ops::Deref;
 use std::path::Path;
 
-use super::header::Header;
+use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
-use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeMetaHeader, TypeName};
-use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
+use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
+use super::{Entrypoint, STEP_SIZE, VERSION};
 
 /// Read a little-endian u16 from bytes at the given offset.
 #[inline]
@@ -113,6 +113,8 @@ pub enum ModuleError {
 pub struct Module {
     storage: ByteStorage,
     header: Header,
+    /// Cached section offsets (computed from header counts).
+    offsets: SectionOffsets,
 }
 
 impl Module {
@@ -148,12 +150,24 @@ impl Module {
             });
         }
 
-        Ok(Self { storage, header })
+        // Compute all section offsets from header counts and blob sizes
+        let offsets = header.compute_offsets();
+
+        Ok(Self {
+            storage,
+            header,
+            offsets,
+        })
     }
 
     /// Get the parsed header.
     pub fn header(&self) -> &Header {
         &self.header
+    }
+
+    /// Get the computed section offsets.
+    pub fn offsets(&self) -> &SectionOffsets {
+        &self.offsets
     }
 
     /// Get the raw bytes.
@@ -164,21 +178,21 @@ impl Module {
     /// Decode an instruction at the given step index.
     #[inline]
     pub fn decode_step(&self, step: u16) -> Instruction<'_> {
-        let offset = self.header.transitions_offset as usize + (step as usize) * STEP_SIZE;
+        let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
 
     /// Get a view into the string table.
     pub fn strings(&self) -> StringsView<'_> {
         StringsView {
-            blob: &self.storage[self.header.str_blob_offset as usize..],
+            blob: &self.storage[self.offsets.str_blob as usize..],
             table: self.string_table_slice(),
         }
     }
 
     /// Get a view into the node type symbols.
     pub fn node_types(&self) -> SymbolsView<'_, NodeSymbol> {
-        let offset = self.header.node_types_offset as usize;
+        let offset = self.offsets.node_types as usize;
         let count = self.header.node_types_count as usize;
         SymbolsView {
             bytes: &self.storage[offset..offset + count * 4],
@@ -189,7 +203,7 @@ impl Module {
 
     /// Get a view into the node field symbols.
     pub fn node_fields(&self) -> SymbolsView<'_, FieldSymbol> {
-        let offset = self.header.node_fields_offset as usize;
+        let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
         SymbolsView {
             bytes: &self.storage[offset..offset + count * 4],
@@ -200,7 +214,7 @@ impl Module {
 
     /// Get a view into the trivia entries.
     pub fn trivia(&self) -> TriviaView<'_> {
-        let offset = self.header.trivia_offset as usize;
+        let offset = self.offsets.trivia as usize;
         let count = self.header.trivia_count as usize;
         TriviaView {
             bytes: &self.storage[offset..offset + count * 2],
@@ -208,18 +222,22 @@ impl Module {
         }
     }
 
+    /// Get a view into the regex table.
+    pub fn regexes(&self) -> RegexView<'_> {
+        RegexView {
+            blob: &self.storage[self.offsets.regex_blob as usize..],
+            table: self.regex_table_slice(),
+        }
+    }
+
     /// Get a view into the type metadata.
     pub fn types(&self) -> TypesView<'_> {
-        let meta_offset = self.header.type_meta_offset as usize;
-        let meta_header = TypeMetaHeader::from_bytes(&self.storage[meta_offset..]);
-
-        // Sub-section offsets (each aligned to 64-byte boundary)
-        let defs_offset = align64(meta_offset + 8);
-        let defs_count = meta_header.type_defs_count as usize;
-        let members_offset = align64(defs_offset + defs_count * 4);
-        let members_count = meta_header.type_members_count as usize;
-        let names_offset = align64(members_offset + members_count * 4);
-        let names_count = meta_header.type_names_count as usize;
+        let defs_offset = self.offsets.type_defs as usize;
+        let defs_count = self.header.type_defs_count as usize;
+        let members_offset = self.offsets.type_members as usize;
+        let members_count = self.header.type_members_count as usize;
+        let names_offset = self.offsets.type_names as usize;
+        let names_count = self.header.type_names_count as usize;
 
         TypesView {
             defs_bytes: &self.storage[defs_offset..defs_offset + defs_count * 4],
@@ -233,7 +251,7 @@ impl Module {
 
     /// Get a view into the entrypoints.
     pub fn entrypoints(&self) -> EntrypointsView<'_> {
-        let offset = self.header.entrypoints_offset as usize;
+        let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntrypointsView {
             bytes: &self.storage[offset..offset + count * 8],
@@ -241,22 +259,20 @@ impl Module {
         }
     }
 
-    // Helper to get string table as bytes
-    // The table has count+1 entries (includes sentinel for length calculation)
+    /// Helper to get string table as bytes.
+    /// The table has count+1 entries (includes sentinel for length calculation).
     fn string_table_slice(&self) -> &[u8] {
-        let offset = self.header.str_table_offset as usize;
+        let offset = self.offsets.str_table as usize;
         let count = self.header.str_table_count as usize;
         &self.storage[offset..offset + (count + 1) * 4]
     }
-}
 
-/// Align offset to 64-byte boundary.
-fn align64(offset: usize) -> usize {
-    let rem = offset % SECTION_ALIGN;
-    if rem == 0 {
-        offset
-    } else {
-        offset + SECTION_ALIGN - rem
+    /// Helper to get regex table as bytes.
+    /// The table has count+1 entries (includes sentinel for length calculation).
+    fn regex_table_slice(&self) -> &[u8] {
+        let offset = self.offsets.regex_table as usize;
+        let count = self.header.regex_table_count as usize;
+        &self.storage[offset..offset + (count + 1) * 4]
     }
 }
 
@@ -363,9 +379,27 @@ impl<'a> TriviaView<'a> {
     }
 }
 
+/// View into the regex table for lazy DFA lookup.
+pub struct RegexView<'a> {
+    blob: &'a [u8],
+    table: &'a [u8],
+}
+
+impl<'a> RegexView<'a> {
+    /// Get regex blob bytes by index.
+    ///
+    /// Returns the raw DFA bytes for the regex at the given index.
+    /// Use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
+    pub fn get_by_index(&self, idx: usize) -> &'a [u8] {
+        let start = read_u32_le(self.table, idx * 4) as usize;
+        let end = read_u32_le(self.table, (idx + 1) * 4) as usize;
+        &self.blob[start..end]
+    }
+}
+
 /// View into type metadata.
 ///
-/// The TypeMeta section contains three sub-sections:
+/// Types are stored in three sub-sections:
 /// - TypeDefs: structural topology (4 bytes each)
 /// - TypeMembers: fields and variants (4 bytes each)
 /// - TypeNames: name → TypeId mapping (4 bytes each)

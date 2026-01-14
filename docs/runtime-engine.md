@@ -6,7 +6,7 @@ Executes compiled query graphs against Tree-sitter syntax trees. See [06-transit
 
 ```rust
 struct VM<'t> {
-    cursor: TreeCursor<'t>,          // Never reset — preserves descendant_index for O(1) backtrack
+    cursor: TreeCursor<'t>,          // Never reset — preserves descendant_index for checkpointing
     ip: StepId,                      // Current step index
     frames: Vec<Frame>,              // Call stack
     effects: EffectLog<'t>,          // Side-effect log

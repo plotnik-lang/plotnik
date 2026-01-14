@@ -1,19 +1,6 @@
 use super::*;
 
 #[test]
-fn type_meta_header_size() {
-    assert_eq!(std::mem::size_of::<TypeMetaHeader>(), 8);
-}
-
-#[test]
-fn type_meta_header_roundtrip() {
-    let header = TypeMetaHeader::new(42, 100, 5);
-    let bytes = header.to_bytes();
-    let decoded = TypeMetaHeader::from_bytes(&bytes);
-    assert_eq!(decoded, header);
-}
-
-#[test]
 fn type_def_size() {
     assert_eq!(std::mem::size_of::<TypeDef>(), 4);
 }

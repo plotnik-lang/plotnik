@@ -4,7 +4,7 @@ This section contains the Virtual Machine (VM) instructions. It is a heap of 8-b
 
 ## 1. Addressing
 
-**StepId (u16)**: Zero-based index into this section. Byte offset = `header.transitions_offset + (StepId * 8)`.
+**StepId (u16)**: Zero-based index into this section. Byte offset = `transitions_offset + (StepId * 8)` where `transitions_offset` is computed (follows Entrypoints).
 
 - **StepId 0 is reserved as the Terminal Sentinel.** Jumping to StepId 0 means the match is complete (Accept).
 - Limit: 65,536 steps (512 KB section size).
@@ -187,37 +187,50 @@ struct MatchHeader {
 
 ```text
 counts (u16)
-┌─────────┬─────────┬──────────┬──────────┬───┐
-│ pre (3) │ neg (3) │ post (3) │ succ (6) │ 0 │
-└─────────┴─────────┴──────────┴──────────┴───┘
-  bits       bits      bits       bits     bit
- 15-13      12-10      9-7        6-1       0
+┌─────────┬─────────┬──────────┬──────────┬───────┬───┐
+│ pre (3) │ neg (3) │ post (3) │ succ (5) │ pred  │ 0 │
+└─────────┴─────────┴──────────┴──────────┴───────┴───┘
+  bits       bits      bits       bits      bit    bit
+ 15-13      12-10      9-7        6-2        1      0
 ```
 
 - **Bits 15-13**: `pre_count` (0-7)
 - **Bits 12-10**: `neg_count` (0-7)
 - **Bits 9-7**: `post_count` (0-7)
-- **Bits 6-1**: `succ_count` (0-63)
+- **Bits 6-2**: `succ_count` (0-31)
+- **Bit 1**: `has_predicate` (if set, payload includes 4-byte predicate before successors)
 - **Bit 0**: Reserved (must be 0)
-
-Extraction:
-
-```rust
-let pre_count  = (counts >> 13) & 0x7;
-let neg_count  = (counts >> 10) & 0x7;
-let post_count = (counts >> 7) & 0x7;
-let succ_count = (counts >> 1) & 0x3F;
-```
 
 **Payload** (immediately follows header):
 
-| Order | Content          | Type                     |
-| :---- | :--------------- | :----------------------- |
-| 1     | `pre_effects`    | `[EffectOp; pre_count]`  |
-| 2     | `negated_fields` | `[u16; neg_count]`       |
-| 3     | `post_effects`   | `[EffectOp; post_count]` |
-| 4     | `successors`     | `[u16; succ_count]`      |
-| 5     | Padding          | Zero bytes to step size  |
+| Order | Content          | Type                     | Condition         |
+| :---- | :--------------- | :----------------------- | :---------------- |
+| 1     | `pre_effects`    | `[EffectOp; pre_count]`  | always            |
+| 2     | `negated_fields` | `[u16; neg_count]`       | always            |
+| 3     | `post_effects`   | `[EffectOp; post_count]` | always            |
+| 4     | `predicate`      | `Predicate` (4 bytes)    | if `has_predicate` |
+| 5     | `successors`     | `[u16; succ_count]`      | always            |
+| 6     | Padding          | Zero bytes to step size  | always            |
+
+**Predicate** (4 bytes, when `has_predicate` is set):
+
+```rust
+#[repr(C)]
+struct Predicate {
+    op: u16,        // Bits 0-3: operator (1-7), rest reserved
+    value_ref: u16, // StringId (string ops) or RegexId (regex ops)
+}
+```
+
+| Op | Name   | Meaning                          |
+| -- | ------ | -------------------------------- |
+| 1  | `==`   | Exact string match               |
+| 2  | `!=`   | Not equal                        |
+| 3  | `^=`   | Starts with                      |
+| 4  | `$=`   | Ends with                        |
+| 5  | `*=`   | Contains                         |
+| 6  | `=~`   | Regex match (value_ref = RegexId)|
+| 7  | `!~`   | Regex non-match                  |
 
 **Payload Capacity**:
 
@@ -229,7 +242,7 @@ let succ_count = (counts >> 1) & 0x3F;
 | Match48 | 48         | 40            | 20            |
 | Match64 | 64         | 56            | 28            |
 
-The compiler selects the smallest step size that fits the payload. If the total exceeds 28 slots, the transition must be split into a chain.
+The compiler selects the smallest step size that fits the payload. If the total exceeds 28 slots, the transition must be split into a chain. With predicates (4 bytes = 2 slots), available slots for other payload items are reduced.
 
 **Continuation Logic**:
 

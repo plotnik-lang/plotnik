@@ -1,52 +1,78 @@
 # Binary Format: Symbols
 
-This section defines the symbol tables used to map external Tree-sitter IDs to internal string representations, and to define trivia kinds.
+Symbol tables map external tree-sitter IDs to internal string names.
 
-## 1. Node Types
+## 1. Regex
 
-A mapping from Tree-sitter's internal `u16` node type ID to a `StringId` in the query's string table. This allows the runtime to verify node kinds by name or display them for debugging.
+Precompiled DFA patterns for predicate matching. Uses the sentinel pattern like StringTable.
 
-- **Section Offset**: `header.node_types_offset`
+### RegexBlob
+
+- **Section Offset**: Computed (follows StringBlob)
+- **Size**: `header.regex_blob_size`
+
+Contains concatenated serialized DFAs (from `regex-automata`). Each DFA is deserialized via `DFA::from_bytes()` for O(1) loading.
+
+### RegexTable
+
+- **Section Offset**: Computed (follows StringTable)
+- **Record Size**: 4 bytes (`u32`)
+- **Count**: `header.regex_table_count + 1`
+
+Each entry is a byte offset into RegexBlob. The final entry is the blob size.
+
+To retrieve regex `i`:
+1. `start = table[i]`
+2. `end = table[i+1]`
+3. `bytes = blob[start..end]`
+
+## 2. Node Types
+
+Maps tree-sitter node type IDs to their string names.
+
+- **Section Offset**: Computed (follows RegexTable)
 - **Record Size**: 4 bytes
 - **Count**: `header.node_types_count`
 
 ```rust
 #[repr(C)]
 struct NodeSymbol {
-    id: u16,        // Tree-sitter Node Type ID
+    id: u16,        // Tree-sitter node type ID
     name: u16,      // StringId
 }
 ```
 
-## 2. Node Fields
+In **linked** bytecode, this table enables name lookup for debugging and error messages. In **unlinked** bytecode, this section is empty.
 
-A mapping from Tree-sitter's internal `u16` field ID to a `StringId`. Used for field verification during matching.
+## 3. Node Fields
 
-- **Section Offset**: `header.node_fields_offset`
+Maps tree-sitter field IDs to their string names.
+
+- **Section Offset**: Computed (follows NodeTypes)
 - **Record Size**: 4 bytes
 - **Count**: `header.node_fields_count`
 
 ```rust
 #[repr(C)]
 struct FieldSymbol {
-    id: u16,        // Tree-sitter Field ID
+    id: u16,        // Tree-sitter field ID
     name: u16,      // StringId
 }
 ```
 
-## 3. Trivia
+## 4. Trivia
 
-A list of node type IDs that are considered "trivia" (e.g., whitespace, comments). The runtime uses this list when executing navigation commands like `NextSkipTrivia` or `DownSkipTrivia`.
+Node types considered "trivia" (whitespace, comments). The runtime skips these during navigation with `NextSkip`, `DownSkip`, etc.
 
-- **Section Offset**: `header.trivia_offset`
+- **Section Offset**: Computed (follows NodeFields)
 - **Record Size**: 2 bytes
 - **Count**: `header.trivia_count`
 
 ```rust
 #[repr(C)]
 struct TriviaEntry {
-    node_type: u16, // Tree-sitter Node Type ID
+    node_type: u16, // Tree-sitter node type ID
 }
 ```
 
-The list is not required to be sorted. Runtimes should build a lookup structure (e.g., bitset indexed by node type) on load for O(1) trivia checks.
+Unsorted. Loaders should build a lookup structure (e.g., bitset indexed by node type) for O(1) trivia checks.
