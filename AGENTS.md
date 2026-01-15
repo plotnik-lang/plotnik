@@ -30,6 +30,8 @@
 | `[...]`             | Alternation (first match wins) |
 | `Name = ...`        | Named definition (entrypoint)  |
 | `(Name)`            | Use named expression           |
+| `(node == "x")`     | String predicate (== != ^= $= *=) |
+| `(node =~ /x/)`     | Regex predicate (=~ !~)        |
 
 ## Data Model Rules
 
@@ -99,8 +101,8 @@ Rule: anchor is as strict as its strictest operand.
 ; WRONG: dot capture syntax
 @function.name  ; use @function_name
 
-; WRONG: predicates (unsupported)
-(id) @x (#eq? @x "foo")
+; WRONG: tree-sitter predicate syntax
+(id) @x (#eq? @x "foo")  ; use (id == "foo") @x
 
 ; WRONG: boundary anchors without parent node
 {. (a)}  ; use (parent {. (a)})

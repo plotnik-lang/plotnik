@@ -7,6 +7,8 @@ use std::fmt::Write as _;
 
 use crate::colors::Colors;
 
+use crate::parser::PredicateOp;
+
 use super::format::{LineBuilder, Symbol, format_effect, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
@@ -436,9 +438,10 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
             let neg = m.neg_fields().count();
             let post = m.post_effects().count();
             let succ = m.succ_count();
-            let slots = pre + neg + post + succ;
+            let pred = if m.has_predicate() { 2 } else { 0 };
+            let slots = pre + neg + post + pred + succ;
 
-            if pre == 0 && neg == 0 && post == 0 && succ <= 1 {
+            if pre == 0 && neg == 0 && post == 0 && pred == 0 && succ <= 1 {
                 1 // Match8
             } else if slots <= 4 {
                 2 // Match16
@@ -474,7 +477,7 @@ fn format_instruction(
 fn format_match(
     step: u16,
     m: &Match,
-    _module: &Module,
+    module: &Module,
     ctx: &DumpContext,
     step_width: usize,
 ) -> String {
@@ -482,14 +485,14 @@ fn format_match(
     let symbol = nav_symbol(m.nav);
     let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
 
-    let content = format_match_content(m, ctx);
+    let content = format_match_content(m, module, ctx);
     let successors = format_match_successors(m, ctx, step_width);
 
     let base = format!("{prefix}{content}");
     builder.pad_successors(base, &successors)
 }
 
-fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
+fn format_match_content(m: &Match, module: &Module, ctx: &DumpContext) -> String {
     let mut parts = Vec::new();
 
     let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
@@ -510,6 +513,20 @@ fn format_match_content(m: &Match, ctx: &DumpContext) -> String {
         let node_part = format_node_pattern(m, ctx);
         if !node_part.is_empty() {
             parts.push(node_part);
+        }
+
+        // Format predicate if present
+        if let Some((op, is_regex, value_ref)) = m.predicate() {
+            let op = PredicateOp::from_byte(op);
+            let value = if is_regex {
+                let string_id = module.regexes().get_string_id(value_ref as usize);
+                let pattern = &ctx.all_strings[string_id.get() as usize];
+                format!("/{}/", pattern)
+            } else {
+                let s = &ctx.all_strings[value_ref as usize];
+                format!("{:?}", s)
+            };
+            parts.push(format!("{} {}", op.as_str(), value));
         }
     }
 

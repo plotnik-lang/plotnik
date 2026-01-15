@@ -16,15 +16,27 @@ Contains concatenated serialized DFAs (from `regex-automata`). Each DFA is deser
 ### RegexTable
 
 - **Section Offset**: Computed (follows StringTable)
-- **Record Size**: 4 bytes (`u32`)
+- **Record Size**: 8 bytes
 - **Count**: `header.regex_table_count + 1`
 
-Each entry is a byte offset into RegexBlob. The final entry is the blob size.
+Each entry stores both a StringId (for pattern display) and offset into RegexBlob (for DFA access):
+
+```rust
+#[repr(C)]
+struct RegexEntry {
+    string_id: u16,     // StringId of pattern text (for dump/trace)
+    reserved: u16,      // Reserved for future use
+    offset: u32,        // Byte offset into RegexBlob
+}
+```
+
+The final entry is a sentinel with `string_id = 0` and `offset = blob_size`.
 
 To retrieve regex `i`:
-1. `start = table[i]`
-2. `end = table[i+1]`
-3. `bytes = blob[start..end]`
+1. `pattern_id = table[i].string_id` → look up in StringTable for display
+2. `start = table[i].offset`
+3. `end = table[i+1].offset`
+4. `dfa_bytes = blob[start..end]`
 
 ## 2. Node Types
 

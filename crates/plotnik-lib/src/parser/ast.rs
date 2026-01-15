@@ -102,6 +102,8 @@ ast_node!(QuantifiedExpr, Quantifier);
 ast_node!(FieldExpr, Field);
 ast_node!(NegatedField, NegatedField);
 ast_node!(Anchor, Anchor);
+ast_node!(NodePredicate, NodePredicate);
+ast_node!(RegexLiteral, Regex);
 
 /// Either an expression or an anchor in a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -184,6 +186,93 @@ pub enum AltKind {
     Untagged,
     /// Mixed tagged and untagged branches (invalid)
     Mixed,
+}
+
+/// Predicate operator for node text filtering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PredicateOp {
+    /// `==` - equals
+    Eq,
+    /// `!=` - not equals
+    Ne,
+    /// `^=` - starts with
+    StartsWith,
+    /// `$=` - ends with
+    EndsWith,
+    /// `*=` - contains
+    Contains,
+    /// `=~` - regex match
+    RegexMatch,
+    /// `!~` - regex no match
+    RegexNoMatch,
+}
+
+impl PredicateOp {
+    pub fn from_syntax_kind(kind: SyntaxKind) -> Option<Self> {
+        match kind {
+            SyntaxKind::OpEq => Some(Self::Eq),
+            SyntaxKind::OpNe => Some(Self::Ne),
+            SyntaxKind::OpStartsWith => Some(Self::StartsWith),
+            SyntaxKind::OpEndsWith => Some(Self::EndsWith),
+            SyntaxKind::OpContains => Some(Self::Contains),
+            SyntaxKind::OpRegexMatch => Some(Self::RegexMatch),
+            SyntaxKind::OpRegexNoMatch => Some(Self::RegexNoMatch),
+            _ => None,
+        }
+    }
+
+    /// Decode from bytecode representation.
+    pub fn from_byte(b: u8) -> Self {
+        match b {
+            0 => Self::Eq,
+            1 => Self::Ne,
+            2 => Self::StartsWith,
+            3 => Self::EndsWith,
+            4 => Self::Contains,
+            5 => Self::RegexMatch,
+            6 => Self::RegexNoMatch,
+            _ => panic!("invalid predicate op byte: {b}"),
+        }
+    }
+
+    /// Encode for bytecode.
+    pub fn to_byte(self) -> u8 {
+        match self {
+            Self::Eq => 0,
+            Self::Ne => 1,
+            Self::StartsWith => 2,
+            Self::EndsWith => 3,
+            Self::Contains => 4,
+            Self::RegexMatch => 5,
+            Self::RegexNoMatch => 6,
+        }
+    }
+
+    /// Operator as display string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Eq => "==",
+            Self::Ne => "!=",
+            Self::StartsWith => "^=",
+            Self::EndsWith => "$=",
+            Self::Contains => "*=",
+            Self::RegexMatch => "=~",
+            Self::RegexNoMatch => "!~",
+        }
+    }
+
+    pub fn is_regex_op(&self) -> bool {
+        matches!(self, Self::RegexMatch | Self::RegexNoMatch)
+    }
+}
+
+/// Predicate value: either a string or a regex pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PredicateValue<'q> {
+    /// String literal value
+    String(&'q str),
+    /// Regex pattern (the content between `/` delimiters)
+    Regex(&'q str),
 }
 
 define_expr!(
@@ -287,6 +376,64 @@ impl NamedNode {
     /// Returns children interleaved with anchors, preserving order.
     pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
         self.0.children().filter_map(SeqItem::cast)
+    }
+
+    /// Returns the predicate if present: `(identifier == "foo")`.
+    pub fn predicate(&self) -> Option<NodePredicate> {
+        self.0.children().find_map(NodePredicate::cast)
+    }
+}
+
+impl NodePredicate {
+    /// Returns the operator token.
+    pub fn operator_token(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| PredicateOp::from_syntax_kind(t.kind()).is_some())
+    }
+
+    /// Returns the operator kind.
+    pub fn operator(&self) -> Option<PredicateOp> {
+        self.operator_token()
+            .and_then(|t| PredicateOp::from_syntax_kind(t.kind()))
+    }
+
+    /// Returns the string value if the predicate uses a string.
+    pub fn string_value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::StrVal)
+    }
+
+    /// Returns the regex literal if the predicate uses a regex.
+    pub fn regex(&self) -> Option<RegexLiteral> {
+        self.0.children().find_map(RegexLiteral::cast)
+    }
+
+    /// Returns the predicate value (string or regex pattern).
+    pub fn value<'q>(&self, source: &'q str) -> Option<PredicateValue<'q>> {
+        if let Some(str_token) = self.string_value() {
+            return Some(PredicateValue::String(token_src(&str_token, source)));
+        }
+        if let Some(regex) = self.regex() {
+            return Some(PredicateValue::Regex(regex.pattern(source)));
+        }
+        None
+    }
+}
+
+impl RegexLiteral {
+    /// Returns the regex pattern content (between the `/` delimiters).
+    pub fn pattern<'q>(&self, source: &'q str) -> &'q str {
+        let range = self.0.text_range();
+        let text = &source[usize::from(range.start())..usize::from(range.end())];
+
+        let Some(without_prefix) = text.strip_prefix('/') else {
+            return text;
+        };
+        without_prefix.strip_suffix('/').unwrap_or(without_prefix)
     }
 }
 

@@ -13,6 +13,7 @@ use super::instructions::{
 };
 use super::nav::Nav;
 use crate::analyze::type_check::TypeId;
+use crate::parser::PredicateOp;
 
 /// Node type constraint for Match instructions.
 ///
@@ -166,11 +167,15 @@ impl MemberRef {
             Self::Deferred {
                 field_name,
                 field_type,
-            } => lookup_member(field_name, field_type).unwrap_or(0),
+            } => lookup_member(field_name, field_type)
+                .expect("deferred member reference must resolve"),
             Self::DeferredByIndex {
                 parent_type,
                 relative_index,
-            } => get_member_base(parent_type).unwrap_or(0) + relative_index,
+            } => {
+                get_member_base(parent_type).expect("deferred member base must resolve")
+                    + relative_index
+            }
         }
     }
 }
@@ -283,6 +288,51 @@ impl EffectIR {
     }
 }
 
+/// Predicate value: string or regex pattern.
+///
+/// Both variants store StringId (index into StringTable). For regex predicates,
+/// the pattern string is also compiled to a DFA during emit.
+#[derive(Clone, Debug)]
+pub enum PredicateValueIR {
+    /// String comparison value.
+    String(crate::bytecode::StringId),
+    /// Regex pattern (StringId for pattern, compiled to DFA during emit).
+    Regex(crate::bytecode::StringId),
+}
+
+/// Predicate IR for node text filtering.
+///
+/// Applied after node type/field matching. Compares node text against
+/// a string literal or regex pattern.
+#[derive(Clone, Debug)]
+pub struct PredicateIR {
+    pub op: PredicateOp,
+    pub value: PredicateValueIR,
+}
+
+impl PredicateIR {
+    /// Create a string predicate (==, !=, ^=, $=, *=).
+    pub fn string(op: PredicateOp, value: crate::bytecode::StringId) -> Self {
+        Self {
+            op,
+            value: PredicateValueIR::String(value),
+        }
+    }
+
+    /// Create a regex predicate (=~, !~).
+    pub fn regex(op: PredicateOp, pattern_id: crate::bytecode::StringId) -> Self {
+        Self {
+            op,
+            value: PredicateValueIR::Regex(pattern_id),
+        }
+    }
+
+    /// Returns the operator as a u8 for bytecode encoding.
+    pub fn op_byte(&self) -> u8 {
+        self.op.to_byte()
+    }
+}
+
 /// Pre-layout instruction with symbolic references.
 #[derive(Clone, Debug)]
 pub enum InstructionIR {
@@ -326,18 +376,21 @@ impl InstructionIR {
     ///
     /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
     /// - `get_member_base`: maps parent TypeId to member base index
-    pub fn resolve<F, G>(
+    /// - `lookup_regex`: maps pattern to RegexTable index (for predicate regexes)
+    pub fn resolve<F, G, R>(
         &self,
         map: &BTreeMap<Label, StepAddr>,
         lookup_member: F,
         get_member_base: G,
+        lookup_regex: R,
     ) -> Vec<u8>
     where
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
+        R: Fn(crate::bytecode::StringId) -> Option<u16>,
     {
         match self {
-            Self::Match(m) => m.resolve(map, lookup_member, get_member_base),
+            Self::Match(m) => m.resolve(map, lookup_member, get_member_base, lookup_regex),
             Self::Call(c) => c.resolve(map).to_vec(),
             Self::Return(r) => r.resolve().to_vec(),
             Self::Trampoline(t) => t.resolve(map).to_vec(),
@@ -362,6 +415,8 @@ pub struct MatchIR {
     pub neg_fields: Vec<u16>,
     /// Effects to execute after successful match.
     pub post_effects: Vec<EffectIR>,
+    /// Predicate for node text filtering (None = no text check).
+    pub predicate: Option<PredicateIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
     pub successors: Vec<Label>,
 }
@@ -377,6 +432,7 @@ impl MatchIR {
             pre_effects: vec![],
             neg_fields: vec![],
             post_effects: vec![],
+            predicate: None,
             successors: vec![],
         }
     }
@@ -445,6 +501,12 @@ impl MatchIR {
         self
     }
 
+    /// Set the predicate for node text filtering.
+    pub fn predicate(mut self, p: PredicateIR) -> Self {
+        self.predicate = Some(p);
+        self
+    }
+
     /// Set a single successor.
     pub fn next(mut self, s: Label) -> Self {
         self.successors = vec![s];
@@ -459,10 +521,11 @@ impl MatchIR {
 
     /// Compute instruction size in bytes.
     pub fn size(&self) -> usize {
-        // Match8 can be used if: no effects, no neg_fields, and at most 1 successor
+        // Match8 can be used if: no effects, no neg_fields, no predicate, and at most 1 successor
         let can_use_match8 = self.pre_effects.is_empty()
             && self.neg_fields.is_empty()
             && self.post_effects.is_empty()
+            && self.predicate.is_none()
             && self.successors.len() <= 1;
 
         if can_use_match8 {
@@ -470,9 +533,12 @@ impl MatchIR {
         }
 
         // Extended match: count all payload slots
+        // Predicate uses 2 slots: op_byte(u8) + is_regex(u8) | value_ref(u16)
+        let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
         let slots = self.pre_effects.len()
             + self.neg_fields.len()
             + self.post_effects.len()
+            + predicate_slots
             + self.successors.len();
 
         select_match_opcode(slots).map(|op| op.size()).unwrap_or(64)
@@ -482,27 +548,33 @@ impl MatchIR {
     ///
     /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
     /// - `get_member_base`: maps parent TypeId to member base index
-    pub fn resolve<F, G>(
+    /// - `lookup_regex`: maps pattern to RegexTable index (for predicate regexes)
+    pub fn resolve<F, G, R>(
         &self,
         map: &BTreeMap<Label, StepAddr>,
         lookup_member: F,
         get_member_base: G,
+        lookup_regex: R,
     ) -> Vec<u8>
     where
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
+        R: Fn(crate::bytecode::StringId) -> Option<u16>,
     {
         let can_use_match8 = self.pre_effects.is_empty()
             && self.neg_fields.is_empty()
             && self.post_effects.is_empty()
+            && self.predicate.is_none()
             && self.successors.len() <= 1;
 
         let opcode = if can_use_match8 {
             Opcode::Match8
         } else {
+            let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
             let slots_needed = self.pre_effects.len()
                 + self.neg_fields.len()
                 + self.post_effects.len()
+                + predicate_slots
                 + self.successors.len();
             select_match_opcode(slots_needed).expect("instruction too large")
         };
@@ -530,7 +602,7 @@ impl MatchIR {
             let neg_count = self.neg_fields.len();
             let post_count = self.post_effects.len();
             let succ_count = self.successors.len();
-            let has_predicate = false; // TODO: predicates not yet implemented
+            let has_predicate = self.predicate.is_some();
 
             // Validate bit-packed field limits
             // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
@@ -562,6 +634,21 @@ impl MatchIR {
             for effect in &self.post_effects {
                 let resolved = effect.resolve(&lookup_member, &get_member_base);
                 bytes[offset..offset + 2].copy_from_slice(&resolved.to_bytes());
+                offset += 2;
+            }
+            // Emit predicate: op_byte(u8) + is_regex(u8) | value_ref(u16)
+            if let Some(pred) = &self.predicate {
+                let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
+                let op_and_flags = (pred.op_byte() as u16) | ((is_regex as u16) << 8);
+                bytes[offset..offset + 2].copy_from_slice(&op_and_flags.to_le_bytes());
+                offset += 2;
+
+                let value_ref = match &pred.value {
+                    PredicateValueIR::String(string_id) => string_id.get(),
+                    PredicateValueIR::Regex(string_id) => lookup_regex(*string_id)
+                        .expect("regex predicate must be interned"),
+                };
+                bytes[offset..offset + 2].copy_from_slice(&value_ref.to_le_bytes());
                 offset += 2;
             }
             for &label in &self.successors {

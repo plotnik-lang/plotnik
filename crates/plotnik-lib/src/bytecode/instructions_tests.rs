@@ -97,7 +97,7 @@ fn match_basic() {
         .node_type(NodeTypeIR::Named(NonZeroU16::new(42)))
         .node_field(NonZeroU16::new(7))
         .next(Label(1))
-        .resolve(&map, |_, _| None, |_| None);
+        .resolve(&map, |_, _| None, |_| None, |_| None);
 
     assert_eq!(bytes.len(), 8);
 
@@ -118,7 +118,7 @@ fn match_basic() {
 fn match_terminal() {
     let map = label_map(&[(0, 1)]);
 
-    let bytes = MatchIR::terminal(Label(0)).resolve(&map, |_, _| None, |_| None);
+    let bytes = MatchIR::terminal(Label(0)).resolve(&map, |_, _| None, |_| None, |_| None);
 
     assert_eq!(bytes.len(), 8);
 
@@ -144,7 +144,7 @@ fn match_extended() {
             super::ir::MemberRef::absolute(42),
         ))
         .next_many(vec![Label(1), Label(2)])
-        .resolve(&map, |_, _| None, |_| None);
+        .resolve(&map, |_, _| None, |_| None, |_| None);
 
     // 1 pre + 2 neg + 2 post + 2 succ = 7 slots → Match24 (8 slots capacity)
     assert_eq!(bytes.len(), 24);

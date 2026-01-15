@@ -55,8 +55,8 @@ pub use format::{
 };
 
 pub use ir::{
-    CallIR, EffectIR, InstructionIR, Label, LayoutResult, MatchIR, MemberRef, NodeTypeIR, ReturnIR,
-    TrampolineIR,
+    CallIR, EffectIR, InstructionIR, Label, LayoutResult, MatchIR, MemberRef, NodeTypeIR,
+    PredicateIR, PredicateValueIR, ReturnIR, TrampolineIR,
 };
 
 #[cfg(test)]

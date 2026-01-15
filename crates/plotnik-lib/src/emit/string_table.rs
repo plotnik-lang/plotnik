@@ -102,6 +102,11 @@ impl StringTableBuilder {
         self.mapping.get(&sym).copied()
     }
 
+    /// Look up a string by its StringId.
+    pub fn get_str(&self, id: StringId) -> &str {
+        &self.strings[id.get() as usize]
+    }
+
     /// Emit the string blob and offset table.
     ///
     /// Returns (blob_bytes, table_bytes).

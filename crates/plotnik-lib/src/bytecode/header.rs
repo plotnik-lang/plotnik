@@ -196,7 +196,7 @@ impl Header {
         let str_table_size = (self.str_table_count as u32 + 1) * 4;
 
         let regex_table = align_up(str_table + str_table_size, align);
-        let regex_table_size = (self.regex_table_count as u32 + 1) * 4;
+        let regex_table_size = (self.regex_table_count as u32 + 1) * 8;
 
         // Symbol sections
         let node_types = align_up(regex_table + regex_table_size, align);

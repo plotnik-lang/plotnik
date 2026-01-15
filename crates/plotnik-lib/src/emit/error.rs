@@ -17,8 +17,12 @@ pub enum EmitError {
     TooManyEntrypoints(usize),
     /// Too many transitions (exceeds u16 max).
     TooManyTransitions(usize),
+    /// Too many regexes (exceeds u16 max).
+    TooManyRegexes(usize),
     /// String not found in interner.
     StringNotFound(Symbol),
+    /// Regex compilation failed.
+    RegexCompile(String, String),
     /// Compilation error.
     Compile(crate::compile::CompileError),
 }
@@ -32,7 +36,9 @@ impl std::fmt::Display for EmitError {
             Self::TooManyTypeMembers(n) => write!(f, "too many type members: {n} (max 65535)"),
             Self::TooManyEntrypoints(n) => write!(f, "too many entrypoints: {n} (max 65535)"),
             Self::TooManyTransitions(n) => write!(f, "too many transitions: {n} (max 65535)"),
+            Self::TooManyRegexes(n) => write!(f, "too many regexes: {n} (max 65535)"),
             Self::StringNotFound(sym) => write!(f, "string not found for symbol: {sym:?}"),
+            Self::RegexCompile(pat, err) => write!(f, "regex compile error for '{pat}': {err}"),
             Self::Compile(e) => write!(f, "compilation error: {e}"),
         }
     }

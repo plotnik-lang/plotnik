@@ -20,6 +20,7 @@ pub enum DiagnosticKind {
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
+    UnclosedRegex,
 
     // User omitted something required - root cause errors
     ExpectedExpression,
@@ -27,6 +28,7 @@ pub enum DiagnosticKind {
     ExpectedCaptureName,
     ExpectedFieldName,
     ExpectedSubtype,
+    ExpectedPredicateValue,
 
     // User wrote something that doesn't belong
     EmptyTree,
@@ -81,6 +83,14 @@ pub enum DiagnosticKind {
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
 
+    // Predicate validation
+    PredicateOnNonLeaf,
+    EmptyRegex,
+    RegexBackreference,
+    RegexLookaround,
+    RegexNamedCapture,
+    RegexSyntaxError,
+
     // Link pass - grammar validation
     UnknownNodeType,
     UnknownField,
@@ -116,7 +126,7 @@ impl DiagnosticKind {
     pub fn is_structural_error(&self) -> bool {
         matches!(
             self,
-            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation
+            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation | Self::UnclosedRegex
         )
     }
 
@@ -130,6 +140,7 @@ impl DiagnosticKind {
                 | Self::ExpectedCaptureName
                 | Self::ExpectedFieldName
                 | Self::ExpectedSubtype
+                | Self::ExpectedPredicateValue
         )
     }
 
@@ -178,6 +189,7 @@ impl DiagnosticKind {
             Self::UnclosedTree => "missing closing `)`",
             Self::UnclosedSequence => "missing closing `}`",
             Self::UnclosedAlternation => "missing closing `]`",
+            Self::UnclosedRegex => "missing closing `/` for regex",
 
             // Expected token errors
             Self::ExpectedExpression => "expected an expression",
@@ -185,6 +197,7 @@ impl DiagnosticKind {
             Self::ExpectedCaptureName => "expected capture name",
             Self::ExpectedFieldName => "expected field name",
             Self::ExpectedSubtype => "expected subtype name",
+            Self::ExpectedPredicateValue => "expected string or regex after predicate operator",
 
             // Invalid syntax
             Self::EmptyTree => "empty `()` is not allowed",
@@ -246,6 +259,14 @@ impl DiagnosticKind {
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
+
+            // Predicate validation
+            Self::PredicateOnNonLeaf => "predicates match text content, but this node can contain children",
+            Self::EmptyRegex => "empty regex pattern",
+            Self::RegexBackreference => "backreferences are not supported in regex",
+            Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",
+            Self::RegexNamedCapture => "named captures are not supported in regex",
+            Self::RegexSyntaxError => "invalid regex syntax",
 
             // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",

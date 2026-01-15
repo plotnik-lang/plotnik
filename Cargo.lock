@@ -1794,6 +1794,8 @@ dependencies = [
  "memmap2",
  "plotnik-core",
  "plotnik-langs",
+ "regex-automata",
+ "regex-syntax",
  "rowan",
  "serde",
  "serde_json",
