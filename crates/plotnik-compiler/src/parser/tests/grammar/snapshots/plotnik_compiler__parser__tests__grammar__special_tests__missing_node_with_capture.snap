@@ -1,0 +1,18 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/special_tests.rs
+---
+Q = (MISSING ";") @missing_semi
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        KwMissing "MISSING"
+        DoubleQuote "\""
+        StrVal ";"
+        DoubleQuote "\""
+        ParenClose ")"
+      CaptureToken "@missing_semi"

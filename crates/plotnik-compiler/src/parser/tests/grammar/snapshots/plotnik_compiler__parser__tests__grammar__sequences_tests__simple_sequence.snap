@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = {(a) (b)}
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Tree
+        ParenOpen "("
+        Id "a"
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "b"
+        ParenClose ")"
+      BraceClose "}"

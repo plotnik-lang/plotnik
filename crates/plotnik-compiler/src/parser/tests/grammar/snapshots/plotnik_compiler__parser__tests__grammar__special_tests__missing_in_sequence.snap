@@ -1,0 +1,23 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/special_tests.rs
+---
+Q = {(MISSING ";") (identifier)}
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Tree
+        ParenOpen "("
+        KwMissing "MISSING"
+        DoubleQuote "\""
+        StrVal ";"
+        DoubleQuote "\""
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      BraceClose "}"

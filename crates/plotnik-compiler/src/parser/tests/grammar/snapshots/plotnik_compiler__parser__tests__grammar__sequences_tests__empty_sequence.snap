@@ -1,0 +1,11 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = {}
+---
+error: empty `{}` is not allowed
+  |
+1 | Q = {}
+  |     ^^
+  |
+help: sequences must contain at least one expression

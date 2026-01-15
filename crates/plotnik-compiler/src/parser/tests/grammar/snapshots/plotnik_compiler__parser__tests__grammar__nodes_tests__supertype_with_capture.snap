@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/nodes_tests.rs
+---
+Q = (expression/binary_expression) @expr
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "expression"
+        Slash "/"
+        Id "binary_expression"
+        ParenClose ")"
+      CaptureToken "@expr"

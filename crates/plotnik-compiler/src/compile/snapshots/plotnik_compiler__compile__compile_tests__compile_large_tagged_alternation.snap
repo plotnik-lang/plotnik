@@ -1,0 +1,255 @@
+---
+source: crates/plotnik-compiler/src/compile/compile_tests.rs
+---
+Q = [
+    A0: (identifier) @x0   A1: (identifier) @x1   A2: (identifier) @x2
+    A3: (identifier) @x3   A4: (identifier) @x4   A5: (identifier) @x5
+    A6: (identifier) @x6   A7: (identifier) @x7   A8: (identifier) @x8
+    A9: (identifier) @x9   A10: (identifier) @x10 A11: (identifier) @x11
+    A12: (identifier) @x12 A13: (identifier) @x13 A14: (identifier) @x14
+    A15: (identifier) @x15 A16: (identifier) @x16 A17: (identifier) @x17
+    A18: (identifier) @x18 A19: (identifier) @x19 A20: (identifier) @x20
+    A21: (identifier) @x21 A22: (identifier) @x22 A23: (identifier) @x23
+    A24: (identifier) @x24 A25: (identifier) @x25 A26: (identifier) @x26
+    A27: (identifier) @x27 A28: (identifier) @x28 A29: (identifier) @x29
+]
+---
+[strings]
+S00 "Beauty will save the world"
+S01 "x0"
+S02 "x1"
+S03 "x2"
+S04 "x3"
+S05 "x4"
+S06 "x5"
+S07 "x6"
+S08 "x7"
+S09 "x8"
+S10 "x9"
+S11 "x10"
+S12 "x11"
+S13 "x12"
+S14 "x13"
+S15 "x14"
+S16 "x15"
+S17 "x16"
+S18 "x17"
+S19 "x18"
+S20 "x19"
+S21 "x20"
+S22 "x21"
+S23 "x22"
+S24 "x23"
+S25 "x24"
+S26 "x25"
+S27 "x26"
+S28 "x27"
+S29 "x28"
+S30 "x29"
+S31 "A0"
+S32 "A1"
+S33 "A2"
+S34 "A3"
+S35 "A4"
+S36 "A5"
+S37 "A6"
+S38 "A7"
+S39 "A8"
+S40 "A9"
+S41 "A10"
+S42 "A11"
+S43 "A12"
+S44 "A13"
+S45 "A14"
+S46 "A15"
+S47 "A16"
+S48 "A17"
+S49 "A18"
+S50 "A19"
+S51 "A20"
+S52 "A21"
+S53 "A22"
+S54 "A23"
+S55 "A24"
+S56 "A25"
+S57 "A26"
+S58 "A27"
+S59 "A28"
+S60 "A29"
+S61 "Q"
+S62 "identifier"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M00:1  ; { x0 }
+T02 = Struct  M01:1  ; { x1 }
+T03 = Struct  M02:1  ; { x2 }
+T04 = Struct  M03:1  ; { x3 }
+T05 = Struct  M04:1  ; { x4 }
+T06 = Struct  M05:1  ; { x5 }
+T07 = Struct  M06:1  ; { x6 }
+T08 = Struct  M07:1  ; { x7 }
+T09 = Struct  M08:1  ; { x8 }
+T10 = Struct  M09:1  ; { x9 }
+T11 = Struct  M10:1  ; { x10 }
+T12 = Struct  M11:1  ; { x11 }
+T13 = Struct  M12:1  ; { x12 }
+T14 = Struct  M13:1  ; { x13 }
+T15 = Struct  M14:1  ; { x14 }
+T16 = Struct  M15:1  ; { x15 }
+T17 = Struct  M16:1  ; { x16 }
+T18 = Struct  M17:1  ; { x17 }
+T19 = Struct  M18:1  ; { x18 }
+T20 = Struct  M19:1  ; { x19 }
+T21 = Struct  M20:1  ; { x20 }
+T22 = Struct  M21:1  ; { x21 }
+T23 = Struct  M22:1  ; { x22 }
+T24 = Struct  M23:1  ; { x23 }
+T25 = Struct  M24:1  ; { x24 }
+T26 = Struct  M25:1  ; { x25 }
+T27 = Struct  M26:1  ; { x26 }
+T28 = Struct  M27:1  ; { x27 }
+T29 = Struct  M28:1  ; { x28 }
+T30 = Struct  M29:1  ; { x29 }
+T31 = Enum    M30:30  ; A0 | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A8 | A9 | A10 | A11 | A12 | A13 | A14 | A15 | A16 | A17 | A18 | A19 | A20 | A21 | A22 | A23 | A24 | A25 | A26 | A27 | A28 | A29
+
+[type_members]
+M00: S01 → T00  ; x0: <Node>
+M01: S02 → T00  ; x1: <Node>
+M02: S03 → T00  ; x2: <Node>
+M03: S04 → T00  ; x3: <Node>
+M04: S05 → T00  ; x4: <Node>
+M05: S06 → T00  ; x5: <Node>
+M06: S07 → T00  ; x6: <Node>
+M07: S08 → T00  ; x7: <Node>
+M08: S09 → T00  ; x8: <Node>
+M09: S10 → T00  ; x9: <Node>
+M10: S11 → T00  ; x10: <Node>
+M11: S12 → T00  ; x11: <Node>
+M12: S13 → T00  ; x12: <Node>
+M13: S14 → T00  ; x13: <Node>
+M14: S15 → T00  ; x14: <Node>
+M15: S16 → T00  ; x15: <Node>
+M16: S17 → T00  ; x16: <Node>
+M17: S18 → T00  ; x17: <Node>
+M18: S19 → T00  ; x18: <Node>
+M19: S20 → T00  ; x19: <Node>
+M20: S21 → T00  ; x20: <Node>
+M21: S22 → T00  ; x21: <Node>
+M22: S23 → T00  ; x22: <Node>
+M23: S24 → T00  ; x23: <Node>
+M24: S25 → T00  ; x24: <Node>
+M25: S26 → T00  ; x25: <Node>
+M26: S27 → T00  ; x26: <Node>
+M27: S28 → T00  ; x27: <Node>
+M28: S29 → T00  ; x28: <Node>
+M29: S30 → T00  ; x29: <Node>
+M30: S31 → T01  ; A0: T01
+M31: S32 → T02  ; A1: T02
+M32: S33 → T03  ; A2: T03
+M33: S34 → T04  ; A3: T04
+M34: S35 → T05  ; A4: T05
+M35: S36 → T06  ; A5: T06
+M36: S37 → T07  ; A6: T07
+M37: S38 → T08  ; A7: T08
+M38: S39 → T09  ; A8: T09
+M39: S40 → T10  ; A9: T10
+M40: S41 → T11  ; A10: T11
+M41: S42 → T12  ; A11: T12
+M42: S43 → T13  ; A12: T13
+M43: S44 → T14  ; A13: T14
+M44: S45 → T15  ; A14: T15
+M45: S46 → T16  ; A15: T16
+M46: S47 → T17  ; A16: T17
+M47: S48 → T18  ; A17: T18
+M48: S49 → T19  ; A18: T19
+M49: S50 → T20  ; A19: T20
+M50: S51 → T21  ; A20: T21
+M51: S52 → T22  ; A21: T22
+M52: S53 → T23  ; A22: T23
+M53: S54 → T24  ; A23: T24
+M54: S55 → T25  ; A24: T25
+M55: S56 → T26  ; A25: T26
+M56: S57 → T27  ; A26: T27
+M57: S58 → T28  ; A27: T28
+M58: S59 → T29  ; A28: T29
+M59: S60 → T30  ; A29: T30
+
+[type_names]
+N0: S61 → T31  ; Q
+
+[entrypoints]
+Q = 006 :: T31
+
+[transitions]
+_ObjWrap:
+  000   ε   [Obj]                           002
+  002       Trampoline                      003
+  003   ε   [EndObj]                        005
+  005                                       ▶
+
+Q:
+  006   ε                                   008
+  007  ...  
+  008   ε                                   120, 123, 128
+  010                                       ▶
+  011   !   [Enum(M30)] (identifier) [Node Set(M0) EndEnum]  010
+  014  ...  
+  015  ...  
+  016   !   [Enum(M31)] (identifier) [Node Set(M1) EndEnum]  010
+  019   !   [Enum(M32)] (identifier) [Node Set(M2) EndEnum]  010
+  022  ...  
+  023  ...  
+  024   !   [Enum(M33)] (identifier) [Node Set(M3) EndEnum]  010
+  027   !   [Enum(M34)] (identifier) [Node Set(M4) EndEnum]  010
+  030  ...  
+  031  ...  
+  032   !   [Enum(M35)] (identifier) [Node Set(M5) EndEnum]  010
+  035   !   [Enum(M36)] (identifier) [Node Set(M6) EndEnum]  010
+  038  ...  
+  039  ...  
+  040   !   [Enum(M37)] (identifier) [Node Set(M7) EndEnum]  010
+  043   !   [Enum(M38)] (identifier) [Node Set(M8) EndEnum]  010
+  046  ...  
+  047  ...  
+  048   !   [Enum(M39)] (identifier) [Node Set(M9) EndEnum]  010
+  051   !   [Enum(M40)] (identifier) [Node Set(M10) EndEnum]  010
+  054  ...  
+  055  ...  
+  056   !   [Enum(M41)] (identifier) [Node Set(M11) EndEnum]  010
+  059   !   [Enum(M42)] (identifier) [Node Set(M12) EndEnum]  010
+  062  ...  
+  063  ...  
+  064   !   [Enum(M43)] (identifier) [Node Set(M13) EndEnum]  010
+  067   !   [Enum(M44)] (identifier) [Node Set(M14) EndEnum]  010
+  070  ...  
+  071  ...  
+  072   !   [Enum(M45)] (identifier) [Node Set(M15) EndEnum]  010
+  075   !   [Enum(M46)] (identifier) [Node Set(M16) EndEnum]  010
+  078  ...  
+  079  ...  
+  080   !   [Enum(M47)] (identifier) [Node Set(M17) EndEnum]  010
+  083   !   [Enum(M48)] (identifier) [Node Set(M18) EndEnum]  010
+  086  ...  
+  087  ...  
+  088   !   [Enum(M49)] (identifier) [Node Set(M19) EndEnum]  010
+  091   !   [Enum(M50)] (identifier) [Node Set(M20) EndEnum]  010
+  094  ...  
+  095  ...  
+  096   !   [Enum(M51)] (identifier) [Node Set(M21) EndEnum]  010
+  099   !   [Enum(M52)] (identifier) [Node Set(M22) EndEnum]  010
+  102  ...  
+  103  ...  
+  104   !   [Enum(M53)] (identifier) [Node Set(M23) EndEnum]  010
+  107   !   [Enum(M54)] (identifier) [Node Set(M24) EndEnum]  010
+  110  ...  
+  111  ...  
+  112   !   [Enum(M55)] (identifier) [Node Set(M25) EndEnum]  010
+  115   !   [Enum(M56)] (identifier) [Node Set(M26) EndEnum]  010
+  118  ...  
+  119  ...  
+  120   !   [Enum(M57)] (identifier) [Node Set(M27) EndEnum]  010
+  123   !   [Enum(M58)] (identifier) [Node Set(M28) EndEnum]  010
+  126  ...  
+  127  ...  
+  128   !   [Enum(M59)] (identifier) [Node Set(M29) EndEnum]  010

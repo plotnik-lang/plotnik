@@ -1,0 +1,73 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/fields_tests.rs
+---
+Q = (node
+    foo: (foo)?
+    foo: (foo)??
+    bar: (bar)*
+    bar: (bar)*?
+    baz: (baz)+?
+    baz: (baz)+?)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "node"
+      Quantifier
+        Field
+          Id "foo"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "foo"
+            ParenClose ")"
+        Question "?"
+      Quantifier
+        Field
+          Id "foo"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "foo"
+            ParenClose ")"
+        QuestionQuestion "??"
+      Quantifier
+        Field
+          Id "bar"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "bar"
+            ParenClose ")"
+        Star "*"
+      Quantifier
+        Field
+          Id "bar"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "bar"
+            ParenClose ")"
+        StarQuestion "*?"
+      Quantifier
+        Field
+          Id "baz"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "baz"
+            ParenClose ")"
+        PlusQuestion "+?"
+      Quantifier
+        Field
+          Id "baz"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "baz"
+            ParenClose ")"
+        PlusQuestion "+?"
+      ParenClose ")"

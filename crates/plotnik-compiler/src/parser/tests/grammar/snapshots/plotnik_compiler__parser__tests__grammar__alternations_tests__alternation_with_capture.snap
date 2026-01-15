@@ -1,0 +1,24 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = [(identifier) (string)] @value
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+        Branch
+          Tree
+            ParenOpen "("
+            Id "string"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@value"

@@ -1,0 +1,22 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = ["true" "false"]
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Str
+          DoubleQuote "\""
+          StrVal "true"
+          DoubleQuote "\""
+      Branch
+        Str
+          DoubleQuote "\""
+          StrVal "false"
+          DoubleQuote "\""
+      BracketClose "]"

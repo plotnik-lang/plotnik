@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/nodes_tests.rs
+---
+Q = (function_definition name: (identifier))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function_definition"
+      Field
+        Id "name"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      ParenClose ")"

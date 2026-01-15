@@ -1,0 +1,34 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/fields_tests.rs
+---
+Q = (if
+    condition: (expr)
+    (then_block)
+    else: (else_block))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "if"
+      Field
+        Id "condition"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "expr"
+          ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "then_block"
+        ParenClose ")"
+      Field
+        Id "else"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "else_block"
+          ParenClose ")"
+      ParenClose ")"

@@ -1,0 +1,24 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = (block {(statement) (statement)})
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "block"
+      Seq
+        BraceOpen "{"
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+        BraceClose "}"
+      ParenClose ")"

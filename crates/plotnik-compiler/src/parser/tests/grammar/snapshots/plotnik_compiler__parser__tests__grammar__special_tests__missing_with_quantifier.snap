@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/special_tests.rs
+---
+Q = (MISSING identifier)?
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      Tree
+        ParenOpen "("
+        KwMissing "MISSING"
+        Id "identifier"
+        ParenClose ")"
+      Question "?"

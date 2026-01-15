@@ -1,0 +1,80 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Expression = [
+    Ident: (identifier) @name :: string
+    Num: (number) @value :: string
+    Str: (string) @value :: string
+    Binary: (binary_expression
+        left: (Expression) @left
+        right: (Expression) @right)
+]
+---
+Root
+  Def
+    Id "Expression"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Id "Ident"
+        Colon ":"
+        Capture
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+          CaptureToken "@name"
+          Type
+            DoubleColon "::"
+            Id "string"
+      Branch
+        Id "Num"
+        Colon ":"
+        Capture
+          Tree
+            ParenOpen "("
+            Id "number"
+            ParenClose ")"
+          CaptureToken "@value"
+          Type
+            DoubleColon "::"
+            Id "string"
+      Branch
+        Id "Str"
+        Colon ":"
+        Capture
+          Tree
+            ParenOpen "("
+            Id "string"
+            ParenClose ")"
+          CaptureToken "@value"
+          Type
+            DoubleColon "::"
+            Id "string"
+      Branch
+        Id "Binary"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "binary_expression"
+          Capture
+            Field
+              Id "left"
+              Colon ":"
+              Ref
+                ParenOpen "("
+                Id "Expression"
+                ParenClose ")"
+            CaptureToken "@left"
+          Capture
+            Field
+              Id "right"
+              Colon ":"
+              Ref
+                ParenOpen "("
+                Id "Expression"
+                ParenClose ")"
+            CaptureToken "@right"
+          ParenClose ")"
+      BracketClose "]"

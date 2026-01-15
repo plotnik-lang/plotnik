@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = (foo (bar))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "foo"
+      Tree
+        ParenOpen "("
+        Id "bar"
+        ParenClose ")"
+      ParenClose ")"

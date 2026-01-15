@@ -1,0 +1,31 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = (call
+    arguments: [(string) (number)]
+)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call"
+      Field
+        Id "arguments"
+        Colon ":"
+        Alt
+          BracketOpen "["
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
+          BracketClose "]"
+      ParenClose ")"

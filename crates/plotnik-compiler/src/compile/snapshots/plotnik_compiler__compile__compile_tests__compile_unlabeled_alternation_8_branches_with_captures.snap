@@ -1,0 +1,133 @@
+---
+source: crates/plotnik-compiler/src/compile/compile_tests.rs
+---
+Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d
+     (call_expression) @e (member_expression) @f (array) @g (object) @h]
+---
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "f"
+S07 "g"
+S08 "h"
+S09 "Q"
+S10 "identifier"
+S11 "number"
+S12 "string"
+S13 "binary_expression"
+S14 "call_expression"
+S15 "member_expression"
+S16 "array"
+S17 "object"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M00:8  ; { a, b, c, d, e, f, g, h }
+T02 = Struct  M08:1  ; { a }
+T03 = Struct  M09:1  ; { b }
+T04 = Struct  M10:1  ; { c }
+T05 = Struct  M11:1  ; { d }
+T06 = Struct  M12:1  ; { e }
+T07 = Struct  M13:1  ; { f }
+T08 = Struct  M14:1  ; { g }
+T09 = Struct  M15:1  ; { h }
+T10 = Struct  M16:2  ; { a, b }
+T11 = Struct  M18:3  ; { a, b, c }
+T12 = Struct  M21:4  ; { a, b, c, d }
+T13 = Struct  M25:5  ; { a, b, c, d, e }
+T14 = Struct  M30:6  ; { a, b, c, d, e, f }
+T15 = Struct  M36:7  ; { a, b, c, d, e, f, g }
+T16 = Optional(T00)  ; <Node>?
+
+[type_members]
+M00: S01 → T16  ; a: T16
+M01: S02 → T16  ; b: T16
+M02: S03 → T16  ; c: T16
+M03: S04 → T16  ; d: T16
+M04: S05 → T16  ; e: T16
+M05: S06 → T16  ; f: T16
+M06: S07 → T16  ; g: T16
+M07: S08 → T16  ; h: T16
+M08: S01 → T00  ; a: <Node>
+M09: S02 → T00  ; b: <Node>
+M10: S03 → T00  ; c: <Node>
+M11: S04 → T00  ; d: <Node>
+M12: S05 → T00  ; e: <Node>
+M13: S06 → T00  ; f: <Node>
+M14: S07 → T00  ; g: <Node>
+M15: S08 → T00  ; h: <Node>
+M16: S01 → T16  ; a: T16
+M17: S02 → T16  ; b: T16
+M18: S01 → T16  ; a: T16
+M19: S02 → T16  ; b: T16
+M20: S03 → T16  ; c: T16
+M21: S01 → T16  ; a: T16
+M22: S02 → T16  ; b: T16
+M23: S03 → T16  ; c: T16
+M24: S04 → T16  ; d: T16
+M25: S01 → T16  ; a: T16
+M26: S02 → T16  ; b: T16
+M27: S03 → T16  ; c: T16
+M28: S04 → T16  ; d: T16
+M29: S05 → T16  ; e: T16
+M30: S01 → T16  ; a: T16
+M31: S02 → T16  ; b: T16
+M32: S03 → T16  ; c: T16
+M33: S04 → T16  ; d: T16
+M34: S05 → T16  ; e: T16
+M35: S06 → T16  ; f: T16
+M36: S01 → T16  ; a: T16
+M37: S02 → T16  ; b: T16
+M38: S03 → T16  ; c: T16
+M39: S04 → T16  ; d: T16
+M40: S05 → T16  ; e: T16
+M41: S06 → T16  ; f: T16
+M42: S07 → T16  ; g: T16
+
+[type_names]
+N0: S09 → T01  ; Q
+
+[entrypoints]
+Q = 08 :: T01
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+  06                                        ▶
+  07  ...  
+
+Q:
+  08   ε                                    11, 21, 29, 37, 45, 53, 61, 69
+  11   ε   [Null Set(M1) Null Set(M2) Null Set(M3) Null]  16
+  14  ...  
+  15  ...  
+  16   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  19
+  19   !   (identifier) [Node Set(M0)]      06
+  21   ε   [Null Set(M0) Null Set(M2) Null Set(M3) Null]  24
+  24   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  27
+  27   !   (number) [Node Set(M1)]          06
+  29   ε   [Null Set(M0) Null Set(M1) Null Set(M3) Null]  32
+  32   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  35
+  35   !   (string) [Node Set(M2)]          06
+  37   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  40
+  40   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  43
+  43   !   (binary_expression) [Node Set(M3)]  06
+  45   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  48
+  48   ε   [Set(M3) Null Set(M5) Null Set(M6) Null Set(M7)]  51
+  51   !   (call_expression) [Node Set(M4)]  06
+  53   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  56
+  56   ε   [Set(M3) Null Set(M4) Null Set(M6) Null Set(M7)]  59
+  59   !   (member_expression) [Node Set(M5)]  06
+  61   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  64
+  64   ε   [Set(M3) Null Set(M4) Null Set(M5) Null Set(M7)]  67
+  67   !   (array) [Node Set(M6)]           06
+  69   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  72
+  72   ε   [Set(M3) Null Set(M4) Null Set(M5) Null Set(M6)]  75
+  75   !   (object) [Node Set(M7)]          06

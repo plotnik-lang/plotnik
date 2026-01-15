@@ -1,0 +1,25 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = {(a) (b)} @seq :: MySequence
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Seq
+        BraceOpen "{"
+        Tree
+          ParenOpen "("
+          Id "a"
+          ParenClose ")"
+        Tree
+          ParenOpen "("
+          Id "b"
+          ParenClose ")"
+        BraceClose "}"
+      CaptureToken "@seq"
+      Type
+        DoubleColon "::"
+        Id "MySequence"

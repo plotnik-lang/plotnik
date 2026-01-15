@@ -1,0 +1,39 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Literal = [(number) (string)]
+Expr = [(identifier) (Literal)]
+---
+Root
+  Def
+    Id "Literal"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          Id "number"
+          ParenClose ")"
+      Branch
+        Tree
+          ParenOpen "("
+          Id "string"
+          ParenClose ")"
+      BracketClose "]"
+  Def
+    Id "Expr"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Branch
+        Ref
+          ParenOpen "("
+          Id "Literal"
+          ParenClose ")"
+      BracketClose "]"

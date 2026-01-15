@@ -1,0 +1,27 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Expr = (identifier)
+Q = (program (Expr) @value)
+---
+Root
+  Def
+    Id "Expr"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "program"
+      Capture
+        Ref
+          ParenOpen "("
+          Id "Expr"
+          ParenClose ")"
+        CaptureToken "@value"
+      ParenClose ")"

@@ -1,0 +1,28 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = (expr
+    [(binary) (unary)]
+)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expr"
+      Alt
+        BracketOpen "["
+        Branch
+          Tree
+            ParenOpen "("
+            Id "binary"
+            ParenClose ")"
+        Branch
+          Tree
+            ParenOpen "("
+            Id "unary"
+            ParenClose ")"
+        BracketClose "]"
+      ParenClose ")"

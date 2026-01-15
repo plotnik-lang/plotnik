@@ -1,716 +1,162 @@
-use crate::Query;
-use indoc::indoc;
+//! Alternation parsing tests.
+
+use crate::shot_cst;
 
 #[test]
 fn alternation() {
-    let input = indoc! {r#"
-    Q = [(identifier) (string)]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "string"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [(identifier) (string)]
     "#);
 }
 
 #[test]
 fn alternation_with_anonymous() {
-    let input = indoc! {r#"
-    Q = ["true" "false"]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Str
-              DoubleQuote "\""
-              StrVal "true"
-              DoubleQuote "\""
-          Branch
-            Str
-              DoubleQuote "\""
-              StrVal "false"
-              DoubleQuote "\""
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = ["true" "false"]
     "#);
 }
 
 #[test]
 fn alternation_with_capture() {
-    let input = indoc! {r#"
-    Q = [(identifier) (string)] @value
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Capture
-          Alt
-            BracketOpen "["
-            Branch
-              Tree
-                ParenOpen "("
-                Id "identifier"
-                ParenClose ")"
-            Branch
-              Tree
-                ParenOpen "("
-                Id "string"
-                ParenClose ")"
-            BracketClose "]"
-          CaptureToken "@value"
+    shot_cst!(r#"
+        Q = [(identifier) (string)] @value
     "#);
 }
 
 #[test]
 fn alternation_with_quantifier() {
-    let input = indoc! {r#"
-    Q = [
-      (identifier)
-      (string)* @strings
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Capture
-              Quantifier
-                Tree
-                  ParenOpen "("
-                  Id "string"
-                  ParenClose ")"
-                Star "*"
-              CaptureToken "@strings"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [
+          (identifier)
+          (string)* @strings
+        ]
     "#);
 }
 
 #[test]
 fn alternation_nested() {
-    let input = indoc! {r#"
-    Q = (expr
-        [(binary) (unary)]
-    )
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "expr"
-          Alt
-            BracketOpen "["
-            Branch
-              Tree
-                ParenOpen "("
-                Id "binary"
-                ParenClose ")"
-            Branch
-              Tree
-                ParenOpen "("
-                Id "unary"
-                ParenClose ")"
-            BracketClose "]"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (expr
+            [(binary) (unary)]
+        )
     "#);
 }
 
 #[test]
 fn alternation_in_field() {
-    let input = indoc! {r#"
-    Q = (call
-        arguments: [(string) (number)]
-    )
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "call"
-          Field
-            Id "arguments"
-            Colon ":"
-            Alt
-              BracketOpen "["
-              Branch
-                Tree
-                  ParenOpen "("
-                  Id "string"
-                  ParenClose ")"
-              Branch
-                Tree
-                  ParenOpen "("
-                  Id "number"
-                  ParenClose ")"
-              BracketClose "]"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (call
+            arguments: [(string) (number)]
+        )
     "#);
 }
 
 #[test]
 fn unlabeled_alternation_three_items() {
-    let input = indoc! {r#"
-    Q = [(identifier) (number) (string)]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "number"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "string"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [(identifier) (number) (string)]
     "#);
 }
 
 #[test]
 fn tagged_alternation_simple() {
-    let input = indoc! {r#"
-    Q = [
-        Ident: (identifier)
-        Num: (number)
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Ident"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Id "Num"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "number"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [
+            Ident: (identifier)
+            Num: (number)
+        ]
     "#);
 }
 
 #[test]
 fn tagged_alternation_single_line() {
-    let input = indoc! {r#"
-    Q = [A: (a) B: (b) C: (c)]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "A"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "a"
-              ParenClose ")"
-          Branch
-            Id "B"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "b"
-              ParenClose ")"
-          Branch
-            Id "C"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "c"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [A: (a) B: (b) C: (c)]
     "#);
 }
 
 #[test]
 fn tagged_alternation_with_captures() {
-    let input = indoc! {r#"
-    Q = [
-        Assign: (assignment_expression left: (identifier) @left)
-        Call: (call_expression function: (identifier) @func)
-    ] @stmt
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Capture
-          Alt
-            BracketOpen "["
-            Branch
-              Id "Assign"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Id "assignment_expression"
-                Capture
-                  Field
-                    Id "left"
-                    Colon ":"
-                    Tree
-                      ParenOpen "("
-                      Id "identifier"
-                      ParenClose ")"
-                  CaptureToken "@left"
-                ParenClose ")"
-            Branch
-              Id "Call"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Id "call_expression"
-                Capture
-                  Field
-                    Id "function"
-                    Colon ":"
-                    Tree
-                      ParenOpen "("
-                      Id "identifier"
-                      ParenClose ")"
-                  CaptureToken "@func"
-                ParenClose ")"
-            BracketClose "]"
-          CaptureToken "@stmt"
+    shot_cst!(r#"
+        Q = [
+            Assign: (assignment_expression left: (identifier) @left)
+            Call: (call_expression function: (identifier) @func)
+        ] @stmt
     "#);
 }
 
 #[test]
 fn tagged_alternation_with_type_annotation() {
-    let input = indoc! {r#"
-    Q = [
-        Base: (identifier) @name
-        Access: (member_expression object: (_) @obj)
-    ] @chain :: MemberChain
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Capture
-          Alt
-            BracketOpen "["
-            Branch
-              Id "Base"
-              Colon ":"
-              Capture
-                Tree
-                  ParenOpen "("
-                  Id "identifier"
-                  ParenClose ")"
-                CaptureToken "@name"
-            Branch
-              Id "Access"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Id "member_expression"
-                Capture
-                  Field
-                    Id "object"
-                    Colon ":"
-                    Tree
-                      ParenOpen "("
-                      Underscore "_"
-                      ParenClose ")"
-                  CaptureToken "@obj"
-                ParenClose ")"
-            BracketClose "]"
-          CaptureToken "@chain"
-          Type
-            DoubleColon "::"
-            Id "MemberChain"
+    shot_cst!(r#"
+        Q = [
+            Base: (identifier) @name
+            Access: (member_expression object: (_) @obj)
+        ] @chain :: MemberChain
     "#);
 }
 
 #[test]
 fn tagged_alternation_nested() {
-    let input = indoc! {r#"
-    Q = (expr
-        [
-            Binary: (binary_expression)
-            Unary: (unary_expression)
-        ])
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "expr"
-          Alt
-            BracketOpen "["
-            Branch
-              Id "Binary"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Id "binary_expression"
-                ParenClose ")"
-            Branch
-              Id "Unary"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Id "unary_expression"
-                ParenClose ")"
-            BracketClose "]"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (expr
+            [
+                Binary: (binary_expression)
+                Unary: (unary_expression)
+            ])
     "#);
 }
 
 #[test]
 fn tagged_alternation_in_named_def() {
-    let input = indoc! {r#"
-    Statement = [
-        Assign: (assignment_expression)
-        Call: (call_expression)
-        Return: (return_statement)
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Statement"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Assign"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "assignment_expression"
-              ParenClose ")"
-          Branch
-            Id "Call"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "call_expression"
-              ParenClose ")"
-          Branch
-            Id "Return"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "return_statement"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Statement = [
+            Assign: (assignment_expression)
+            Call: (call_expression)
+            Return: (return_statement)
+        ]
     "#);
 }
 
 #[test]
 fn tagged_alternation_with_quantifier() {
-    let input = indoc! {r#"
-    Q = [
-        Single: (statement)
-        Multiple: (statement)+
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Single"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "statement"
-              ParenClose ")"
-          Branch
-            Id "Multiple"
-            Colon ":"
-            Quantifier
-              Tree
-                ParenOpen "("
-                Id "statement"
-                ParenClose ")"
-              Plus "+"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [
+            Single: (statement)
+            Multiple: (statement)+
+        ]
     "#);
 }
 
 #[test]
 fn tagged_alternation_with_sequence() {
-    let input = indoc! {r#"
-    Q = [
-        Pair: {(key) (value)}
-        Single: (value)
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Pair"
-            Colon ":"
-            Seq
-              BraceOpen "{"
-              Tree
-                ParenOpen "("
-                Id "key"
-                ParenClose ")"
-              Tree
-                ParenOpen "("
-                Id "value"
-                ParenClose ")"
-              BraceClose "}"
-          Branch
-            Id "Single"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "value"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [
+            Pair: {(key) (value)}
+            Single: (value)
+        ]
     "#);
 }
 
 #[test]
 fn tagged_alternation_with_nested_alternation() {
-    let input = indoc! {r#"
-    Q = [
-        Literal: [(number) (string)]
-        Ident: (identifier)
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Literal"
-            Colon ":"
-            Alt
-              BracketOpen "["
-              Branch
-                Tree
-                  ParenOpen "("
-                  Id "number"
-                  ParenClose ")"
-              Branch
-                Tree
-                  ParenOpen "("
-                  Id "string"
-                  ParenClose ")"
-              BracketClose "]"
-          Branch
-            Id "Ident"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [
+            Literal: [(number) (string)]
+            Ident: (identifier)
+        ]
     "#);
 }
 
 #[test]
 fn tagged_alternation_full_example() {
-    let input = indoc! {r#"
-    Expression = [
-        Ident: (identifier) @name :: string
-        Num: (number) @value :: string
-        Str: (string) @value :: string
-        Binary: (binary_expression
-            left: (Expression) @left
-            right: (Expression) @right)
-    ]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Expression"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Id "Ident"
-            Colon ":"
-            Capture
-              Tree
-                ParenOpen "("
-                Id "identifier"
-                ParenClose ")"
-              CaptureToken "@name"
-              Type
-                DoubleColon "::"
-                Id "string"
-          Branch
-            Id "Num"
-            Colon ":"
-            Capture
-              Tree
-                ParenOpen "("
-                Id "number"
-                ParenClose ")"
-              CaptureToken "@value"
-              Type
-                DoubleColon "::"
-                Id "string"
-          Branch
-            Id "Str"
-            Colon ":"
-            Capture
-              Tree
-                ParenOpen "("
-                Id "string"
-                ParenClose ")"
-              CaptureToken "@value"
-              Type
-                DoubleColon "::"
-                Id "string"
-          Branch
-            Id "Binary"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "binary_expression"
-              Capture
-                Field
-                  Id "left"
-                  Colon ":"
-                  Ref
-                    ParenOpen "("
-                    Id "Expression"
-                    ParenClose ")"
-                CaptureToken "@left"
-              Capture
-                Field
-                  Id "right"
-                  Colon ":"
-                  Ref
-                    ParenOpen "("
-                    Id "Expression"
-                    ParenClose ")"
-                CaptureToken "@right"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Expression = [
+            Ident: (identifier) @name :: string
+            Num: (number) @value :: string
+            Str: (string) @value :: string
+            Binary: (binary_expression
+                left: (Expression) @left
+                right: (Expression) @right)
+        ]
     "#);
 }

@@ -20,6 +20,9 @@ pub mod parser;
 pub mod query;
 pub mod typegen;
 
+#[cfg(test)]
+pub mod test_utils;
+
 /// Result type for analysis passes that produce both output and diagnostics.
 ///
 /// Each pass returns its typed output alongside any diagnostics it collected.

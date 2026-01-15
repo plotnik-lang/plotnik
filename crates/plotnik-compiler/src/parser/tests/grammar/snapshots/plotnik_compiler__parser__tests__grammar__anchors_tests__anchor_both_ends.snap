@@ -1,0 +1,21 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/anchors_tests.rs
+---
+Q = (array . (element) .)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "array"
+      Anchor
+        Dot "."
+      Tree
+        ParenOpen "("
+        Id "element"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      ParenClose ")"

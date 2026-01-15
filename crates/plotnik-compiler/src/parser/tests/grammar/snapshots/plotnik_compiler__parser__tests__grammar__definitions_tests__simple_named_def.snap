@@ -1,0 +1,13 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Expr = (identifier)
+---
+Root
+  Def
+    Id "Expr"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"

@@ -1,0 +1,29 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/fields_tests.rs
+---
+Q = (assignment
+    left: (identifier)
+    right: (expression))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "assignment"
+      Field
+        Id "left"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Field
+        Id "right"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "expression"
+          ParenClose ")"
+      ParenClose ")"

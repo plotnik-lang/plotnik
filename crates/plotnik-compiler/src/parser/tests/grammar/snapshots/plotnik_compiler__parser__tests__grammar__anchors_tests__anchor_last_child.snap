@@ -1,0 +1,19 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/anchors_tests.rs
+---
+Q = (block (last_statement) .)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "block"
+      Tree
+        ParenOpen "("
+        Id "last_statement"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      ParenClose ")"

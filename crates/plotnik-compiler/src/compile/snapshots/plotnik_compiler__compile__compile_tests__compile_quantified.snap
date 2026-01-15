@@ -1,0 +1,38 @@
+---
+source: crates/plotnik-compiler/src/compile/compile_tests.rs
+---
+Test = (identifier)*
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "Test"
+S2 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+
+[type_members]
+
+[type_names]
+N0: S1 → T1  ; Test
+
+[entrypoints]
+Test = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    13, 08
+  08                                        ▶
+  09   !   (identifier)                     18, 08
+  11   ▷   _                                09, 11, 08
+  13   !   _                                09, 11, 08
+  15  ...  
+  16   ▷   _                                09, 16, 08
+  18   ▷   _                                09, 16, 08

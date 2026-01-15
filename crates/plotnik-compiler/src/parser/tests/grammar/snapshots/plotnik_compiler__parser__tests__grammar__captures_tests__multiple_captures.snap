@@ -1,0 +1,35 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = (binary
+    left: (_) @left
+    right: (_) @right) @expr
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "binary"
+        Capture
+          Field
+            Id "left"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@left"
+        Capture
+          Field
+            Id "right"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@right"
+        ParenClose ")"
+      CaptureToken "@expr"
