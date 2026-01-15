@@ -23,6 +23,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     let ctx = DumpContext::new(module, colors);
 
     dump_strings(&mut out, module, &ctx);
+    dump_regexes(&mut out, module, &ctx);
     dump_types_defs(&mut out, module, &ctx);
     dump_types_members(&mut out, module, &ctx);
     dump_types_names(&mut out, module, &ctx);
@@ -139,6 +140,27 @@ fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
     for i in 0..count {
         let s = strings.get_by_index(i);
         writeln!(out, "S{i:0w$} {}{s:?}{}", c.green, c.reset).unwrap();
+    }
+    out.push('\n');
+}
+
+fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let count = module.header().regex_table_count as usize;
+    // Index 0 is reserved, so only print if there are actual regexes
+    if count <= 1 {
+        return;
+    }
+
+    let c = &ctx.colors;
+    let regexes = module.regexes();
+    let w = width_for_count(count);
+
+    writeln!(out, "{}[regex]{}", c.blue, c.reset).unwrap();
+    // Skip index 0 (reserved)
+    for i in 1..count {
+        let string_id = regexes.get_string_id(i);
+        let pattern = &ctx.all_strings[string_id.get() as usize];
+        writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset).unwrap();
     }
     out.push('\n');
 }
