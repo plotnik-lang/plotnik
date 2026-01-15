@@ -10,9 +10,9 @@
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
-use plotnik_bytecode::Nav;
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR, PredicateIR};
 use crate::parser::ast::{self, Expr};
+use plotnik_bytecode::Nav;
 
 use super::Compiler;
 use super::capture::CaptureEffects;
@@ -268,7 +268,7 @@ impl Compiler<'_> {
         };
         let name = name_token.text();
 
-        let Some(def_id) = self.type_ctx.get_def_id(self.interner, name) else {
+        let Some(def_id) = self.ctx.type_ctx.get_def_id(self.ctx.interner, name) else {
             return exit;
         };
 
@@ -277,9 +277,9 @@ impl Compiler<'_> {
         };
 
         // Check if the called definition returns a struct (needs scope isolation when captured)
-        let def_type_id = self.type_ctx.get_def_type(def_id);
+        let def_type_id = self.ctx.type_ctx.get_def_type(def_id);
         let ref_returns_struct = def_type_id
-            .and_then(|tid| self.type_ctx.get_type(tid))
+            .and_then(|tid| self.ctx.type_ctx.get_type(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
 
         // Determine if this is a captured ref that needs scope isolation
@@ -411,7 +411,9 @@ impl Compiler<'_> {
         }
 
         let inner = cap.inner();
-        let inner_info = inner.as_ref().and_then(|i| self.type_ctx.get_term_info(i));
+        let inner_info = inner
+            .as_ref()
+            .and_then(|i| self.ctx.type_ctx.get_term_info(i));
         let inner_is_bubble = inner_info
             .as_ref()
             .is_some_and(|info| info.flow.is_bubble());
@@ -472,7 +474,7 @@ impl Compiler<'_> {
             && inner_info
                 .as_ref()
                 .and_then(|info| info.flow.type_id())
-                .and_then(|id| self.type_ctx.get_type(id))
+                .and_then(|id| self.ctx.type_ctx.get_type(id))
                 .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
 
         if inner_is_scope_creating_scalar {
@@ -541,10 +543,10 @@ impl Compiler<'_> {
     ///
     /// Returns `NodeTypeIR::Anonymous` with the type ID.
     pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
-        if let Some(ids) = self.node_type_ids {
+        if let Some(ids) = self.ctx.node_types {
             // Linked mode: resolve to NodeTypeId from grammar
             for (&sym, &id) in ids {
-                if self.interner.resolve(sym) == text {
+                if self.ctx.interner.resolve(sym) == text {
                     return NodeTypeIR::Anonymous(NonZeroU16::new(id.get()));
                 }
             }
@@ -552,7 +554,7 @@ impl Compiler<'_> {
             NodeTypeIR::Anonymous(None)
         } else {
             // Unlinked mode: store StringId referencing the literal text
-            let string_id = self.strings.intern_str(text);
+            let string_id = self.ctx.strings.borrow_mut().intern_str(text);
             NodeTypeIR::Anonymous(Some(string_id.0))
         }
     }
@@ -574,10 +576,10 @@ impl Compiler<'_> {
         };
         let type_name = type_token.text();
 
-        if let Some(ids) = self.node_type_ids {
+        if let Some(ids) = self.ctx.node_types {
             // Linked mode: resolve to NodeTypeId from grammar
             for (&sym, &id) in ids {
-                if self.interner.resolve(sym) == type_name {
+                if self.ctx.interner.resolve(sym) == type_name {
                     return NodeTypeIR::Named(NonZeroU16::new(id.get()));
                 }
             }
@@ -585,7 +587,7 @@ impl Compiler<'_> {
             NodeTypeIR::Named(None)
         } else {
             // Unlinked mode: store StringId referencing the type name
-            let string_id = self.strings.intern_str(type_name);
+            let string_id = self.ctx.strings.borrow_mut().intern_str(type_name);
             NodeTypeIR::Named(Some(string_id.0))
         }
     }
@@ -605,10 +607,10 @@ impl Compiler<'_> {
     /// In linked mode, returns the grammar NodeFieldId.
     /// In unlinked mode, returns the StringId of the field name.
     pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> Option<NonZeroU16> {
-        if let Some(ids) = self.node_field_ids {
+        if let Some(ids) = self.ctx.node_fields {
             // Linked mode: resolve to NodeFieldId from grammar
             for (&sym, &id) in ids {
-                if self.interner.resolve(sym) == field_name {
+                if self.ctx.interner.resolve(sym) == field_name {
                     return NonZeroU16::new(id.get());
                 }
             }
@@ -616,7 +618,7 @@ impl Compiler<'_> {
             None
         } else {
             // Unlinked mode: store StringId referencing the field name
-            let string_id = self.strings.intern_str(field_name);
+            let string_id = self.ctx.strings.borrow_mut().intern_str(field_name);
             Some(string_id.0)
         }
     }
@@ -643,7 +645,7 @@ impl Compiler<'_> {
 
         // Try string value first
         if let Some(str_token) = pred.string_value() {
-            let string_id = self.strings.intern_str(str_token.text());
+            let string_id = self.ctx.strings.borrow_mut().intern_str(str_token.text());
             return Some(PredicateIR::string(op, string_id));
         }
 
@@ -653,7 +655,7 @@ impl Compiler<'_> {
             let text: String = regex.as_cst().text().into();
             let without_prefix = text.strip_prefix('/').unwrap_or(&text);
             let pattern = without_prefix.strip_suffix('/').unwrap_or(without_prefix);
-            let string_id = self.strings.intern_str(pattern);
+            let string_id = self.ctx.strings.borrow_mut().intern_str(pattern);
             return Some(PredicateIR::regex(op, string_id));
         }
 

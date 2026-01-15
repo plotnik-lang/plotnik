@@ -7,8 +7,8 @@ use std::collections::HashSet;
 
 use crate::analyze::type_check::{TypeContext, TypeId, TypeShape};
 use crate::bytecode::EffectIR;
-use plotnik_bytecode::EffectOpcode;
 use crate::parser::ast::{self, Expr};
+use plotnik_bytecode::EffectOpcode;
 
 use super::Compiler;
 use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope};
@@ -143,12 +143,12 @@ impl Compiler<'_> {
             if !inner_creates_scope(&ei) {
                 return false;
             }
-            let Some(info) = self.type_ctx.get_term_info(&ei) else {
+            let Some(info) = self.ctx.type_ctx.get_term_info(&ei) else {
                 return false;
             };
             info.flow
                 .type_id()
-                .and_then(|id| self.type_ctx.get_type(id))
+                .and_then(|id| self.ctx.type_ctx.get_type(id))
                 .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
         });
 
@@ -195,7 +195,7 @@ impl Compiler<'_> {
         }
 
         // Check the actual inferred type, not syntax
-        let Some(info) = self.type_ctx.get_term_info(&inner) else {
+        let Some(info) = self.ctx.type_ctx.get_term_info(&inner) else {
             return true;
         };
 
@@ -204,7 +204,7 @@ impl Compiler<'_> {
         !info
             .flow
             .type_id()
-            .and_then(|id| self.type_ctx.get_type(id))
+            .and_then(|id| self.ctx.type_ctx.get_type(id))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
     }
 
@@ -235,9 +235,9 @@ impl Compiler<'_> {
     /// In this case, we skip emitting Node/Text effects in captures.
     fn ref_returns_structured(&self, r: &ast::Ref) -> bool {
         r.name()
-            .and_then(|name| self.type_ctx.get_def_id(self.interner, name.text()))
-            .and_then(|def_id| self.type_ctx.get_def_type(def_id))
-            .and_then(|def_type| self.type_ctx.get_type(def_type))
+            .and_then(|name| self.ctx.type_ctx.get_def_id(self.ctx.interner, name.text()))
+            .and_then(|def_id| self.ctx.type_ctx.get_def_type(def_id))
+            .and_then(|def_type| self.ctx.type_ctx.get_type(def_type))
             .is_some_and(|shape| {
                 matches!(
                     shape,

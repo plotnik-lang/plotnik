@@ -1,7 +1,7 @@
-use super::regex_table::{deserialize_dfa, RegexTableBuilder};
+use super::regex_table::{RegexTableBuilder, deserialize_dfa};
 use plotnik_bytecode::StringId;
-use regex_automata::dfa::Automaton;
 use regex_automata::Input;
+use regex_automata::dfa::Automaton;
 
 #[test]
 fn intern_and_lookup() {
@@ -46,8 +46,18 @@ fn emit_and_deserialize() {
 
     // Deserialize and test first regex
     let dfa1 = deserialize_dfa(&blob[offset1..offset2]).unwrap();
-    assert!(dfa1.try_search_fwd(&Input::new("hello")).ok().flatten().is_some());
-    assert!(dfa1.try_search_fwd(&Input::new("world")).ok().flatten().is_none());
+    assert!(
+        dfa1.try_search_fwd(&Input::new("hello"))
+            .ok()
+            .flatten()
+            .is_some()
+    );
+    assert!(
+        dfa1.try_search_fwd(&Input::new("world"))
+            .ok()
+            .flatten()
+            .is_none()
+    );
 }
 
 #[test]
@@ -64,8 +74,18 @@ fn escaped_slash_pattern() {
     let offset2 = u32::from_le_bytes([table[20], table[21], table[22], table[23]]) as usize;
 
     let dfa = deserialize_dfa(&blob[offset1..offset2]).unwrap();
-    assert!(dfa.try_search_fwd(&Input::new("a/b")).ok().flatten().is_some());
-    assert!(dfa.try_search_fwd(&Input::new("ab")).ok().flatten().is_none());
+    assert!(
+        dfa.try_search_fwd(&Input::new("a/b"))
+            .ok()
+            .flatten()
+            .is_some()
+    );
+    assert!(
+        dfa.try_search_fwd(&Input::new("ab"))
+            .ok()
+            .flatten()
+            .is_none()
+    );
 }
 
 #[test]

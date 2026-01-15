@@ -1,8 +1,23 @@
 //! Integration tests for the compilation pipeline.
 
+use std::cell::RefCell;
+
 use super::*;
-use crate::emit::StringTableBuilder;
-use crate::query::QueryBuilder;
+use crate::{emit::StringTableBuilder, query::QueryBuilder};
+
+/// Helper to compile a query with default context.
+fn compile_query(query: &crate::query::QueryAnalyzed) -> CompileResult {
+    let strings = RefCell::new(StringTableBuilder::new());
+    let ctx = CompileCtx {
+        interner: query.interner(),
+        type_ctx: query.type_context(),
+        symbol_table: &query.symbol_table,
+        strings: &strings,
+        node_types: None,
+        node_fields: None,
+    };
+    Compiler::compile(&ctx).unwrap()
+}
 
 #[test]
 fn compile_simple_named_node() {
@@ -11,16 +26,7 @@ fn compile_simple_named_node() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     // Should have at least one instruction
     assert!(!result.instructions.is_empty());
@@ -35,16 +41,7 @@ fn compile_alternation() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -56,16 +53,7 @@ fn compile_sequence() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -77,16 +65,7 @@ fn compile_quantified() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -98,16 +77,7 @@ fn compile_capture() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -119,16 +89,7 @@ fn compile_nested() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -148,16 +109,7 @@ fn compile_large_tagged_alternation() {
         .unwrap()
         .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }
@@ -174,16 +126,7 @@ fn compile_unlabeled_alternation_5_branches_with_captures() {
     .unwrap()
     .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 
@@ -213,16 +156,7 @@ fn compile_unlabeled_alternation_8_branches_with_captures() {
     .unwrap()
     .analyze();
 
-    let mut strings = StringTableBuilder::new();
-    let result = Compiler::compile(
-        query.interner(),
-        query.type_context(),
-        &query.symbol_table,
-        &mut strings,
-        None,
-        None,
-    )
-    .unwrap();
+    let result = compile_query(&query);
 
     assert!(!result.instructions.is_empty());
 }

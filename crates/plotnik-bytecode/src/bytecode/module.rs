@@ -197,7 +197,10 @@ impl Module {
     }
 
     /// Load a module from owned bytes (copies into aligned storage).
-    #[deprecated(since = "0.1.0", note = "use `Module::from_aligned` for AlignedVec or `Module::load` for copying")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use `Module::from_aligned` for AlignedVec or `Module::load` for copying"
+    )]
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ModuleError> {
         Self::load(&bytes)
     }

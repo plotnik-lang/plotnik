@@ -36,7 +36,7 @@ N1: S7 → T4  ; Test
 
 [entrypoints]
 Inner = 06 :: T1
-Test  = 11 :: T4
+Test  = 09 :: T4
 
 [transitions]
 _ObjWrap:
@@ -46,21 +46,17 @@ _ObjWrap:
   05                                        ▶
 
 Inner:
-  06   ε                                    08
-  07  ...  
-  08   !   (identifier) [Node Set(M0)]      10
-  10                                        ▶
+  06   !   (identifier) [Node Set(M0)]      08
+  08                                        ▶
 
 Test:
-  11   ε                                    12
-  12   ε                                    26, 28
-  14                                        ▶
-  15  ...  
-  16   ε   [Set(M4)]                        14
-  18   ε   [EndEnum]                        16
-  20   ε   [EndObj]                         18
-  22   !   (Inner)                          06 : 20
+  09   ε                                    21, 24
+  11                                        ▶
+  12   ε   [Set(M4)]                        11
+  14   ε   [EndEnum]                        12
+  16   ε   [EndObj]                         14
+  18   !   (Inner)                          06 : 16
+  19   ε   [Obj]                            18
+  21   ε   [Enum(M2)]                       19
   23  ...  
-  24   ε   [Obj]                            22
-  26   ε   [Enum(M2)]                       24
-  28   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  16
+  24   !   [Enum(M3)] (number) [Node Set(M1) EndEnum Set(M4)]  11

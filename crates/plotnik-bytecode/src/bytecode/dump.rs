@@ -5,15 +5,15 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use plotnik_core::Colors;
 use crate::predicate_op::PredicateOp;
+use plotnik_core::Colors;
 
 use super::format::{LineBuilder, Symbol, format_effect, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
-use super::node_type_ir::NodeTypeIR;
 use super::nav::Nav;
+use super::node_type_ir::NodeTypeIR;
 use super::type_meta::{TypeData, TypeKind};
 use super::{Call, Match, Return, Trampoline};
 
@@ -31,7 +31,6 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 
     out
 }
-
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {

@@ -3,8 +3,8 @@
 //! Handles anchor-based navigation modes and navigation transformations
 //! for quantifier repeat iterations.
 
-use plotnik_bytecode::Nav;
 use crate::parser::{Expr, SeqItem};
+use plotnik_bytecode::Nav;
 
 // Re-export from parser for compile module consumers
 pub use crate::parser::is_truly_empty_scope;

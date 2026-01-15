@@ -49,12 +49,12 @@ fn compute_offsets_empty() {
 
     // New order: blobs first, then tables
     // All sections 64-byte aligned. With 0 counts, each table still has 1 sentinel entry (4 bytes)
-    assert_eq!(offsets.str_blob, 64);            // after header
-    assert_eq!(offsets.regex_blob, 64);          // 64 + align(0) = 64
-    assert_eq!(offsets.str_table, 64);           // 64 + align(0) = 64
-    assert_eq!(offsets.regex_table, 128);        // 64 + align(4) = 128
-    assert_eq!(offsets.node_types, 192);         // 128 + align(4) = 192
-    assert_eq!(offsets.node_fields, 192);        // 192 + align(0) = 192
+    assert_eq!(offsets.str_blob, 64); // after header
+    assert_eq!(offsets.regex_blob, 64); // 64 + align(0) = 64
+    assert_eq!(offsets.str_table, 64); // 64 + align(0) = 64
+    assert_eq!(offsets.regex_table, 128); // 64 + align(4) = 128
+    assert_eq!(offsets.node_types, 192); // 128 + align(4) = 192
+    assert_eq!(offsets.node_fields, 192); // 192 + align(0) = 192
     assert_eq!(offsets.trivia, 192);
     assert_eq!(offsets.type_defs, 192);
     assert_eq!(offsets.type_members, 192);
@@ -84,16 +84,16 @@ fn compute_offsets_with_data() {
     let offsets = h.compute_offsets();
 
     // New order: blobs first, then tables. All offsets 64-byte aligned.
-    assert_eq!(offsets.str_blob, 64);            // header end
-    assert_eq!(offsets.regex_blob, 192);         // 64 + 100 = 164 → 192
-    assert_eq!(offsets.str_table, 320);          // 192 + 128 = 320 (aligned)
-    assert_eq!(offsets.regex_table, 384);        // 320 + 24 = 344 → 384
-    assert_eq!(offsets.node_types, 448);         // 384 + 12 = 396 → 448
-    assert_eq!(offsets.node_fields, 512);        // 448 + 40 = 488 → 512
-    assert_eq!(offsets.trivia, 576);             // 512 + 20 = 532 → 576
-    assert_eq!(offsets.type_defs, 640);          // 576 + 6 = 582 → 640
-    assert_eq!(offsets.type_members, 704);       // 640 + 32 = 672 → 704
-    assert_eq!(offsets.type_names, 768);         // 704 + 48 = 752 → 768
-    assert_eq!(offsets.entrypoints, 832);        // 768 + 16 = 784 → 832
-    assert_eq!(offsets.transitions, 896);        // 832 + 16 = 848 → 896
+    assert_eq!(offsets.str_blob, 64); // header end
+    assert_eq!(offsets.regex_blob, 192); // 64 + 100 = 164 → 192
+    assert_eq!(offsets.str_table, 320); // 192 + 128 = 320 (aligned)
+    assert_eq!(offsets.regex_table, 384); // 320 + 24 = 344 → 384
+    assert_eq!(offsets.node_types, 448); // 384 + 12 = 396 → 448
+    assert_eq!(offsets.node_fields, 512); // 448 + 40 = 488 → 512
+    assert_eq!(offsets.trivia, 576); // 512 + 20 = 532 → 576
+    assert_eq!(offsets.type_defs, 640); // 576 + 6 = 582 → 640
+    assert_eq!(offsets.type_members, 704); // 640 + 32 = 672 → 704
+    assert_eq!(offsets.type_names, 768); // 704 + 48 = 752 → 768
+    assert_eq!(offsets.entrypoints, 832); // 768 + 16 = 784 → 832
+    assert_eq!(offsets.transitions, 896); // 832 + 16 = 848 → 896
 }

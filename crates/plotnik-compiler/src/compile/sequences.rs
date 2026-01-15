@@ -10,8 +10,8 @@ use plotnik_core::Symbol;
 
 use crate::analyze::type_check::{TypeId, TypeShape};
 use crate::bytecode::{EffectIR, Label, MemberRef};
-use plotnik_bytecode::{EffectOpcode, Nav};
 use crate::parser::ast::{self, Expr, SeqItem};
+use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
 use super::capture::CaptureEffects;
@@ -201,10 +201,11 @@ impl Compiler<'_> {
         // Get alternation's type info
         let alt_expr = Expr::AltExpr(alt.clone());
         let alt_type_id = self
+            .ctx
             .type_ctx
             .get_term_info(&alt_expr)
             .and_then(|info| info.flow.type_id());
-        let alt_type_shape = alt_type_id.and_then(|id| self.type_ctx.get_type(id));
+        let alt_type_shape = alt_type_id.and_then(|id| self.ctx.type_ctx.get_type(id));
 
         // Check if THIS alternation is syntactically tagged (all branches have labels).
         // This is distinct from whether the type is an Enum - a nested untagged alternation
@@ -224,7 +225,7 @@ impl Compiler<'_> {
                 .collect(),
             _ => BTreeMap::new(),
         };
-        let merged_fields = alt_type_id.and_then(|id| self.type_ctx.get_struct_fields(id));
+        let merged_fields = alt_type_id.and_then(|id| self.ctx.type_ctx.get_struct_fields(id));
 
         // Convert navigation to exact variant for alternation branches.
         // Branches should match at their exact cursor position only -
@@ -245,7 +246,7 @@ impl Compiler<'_> {
                 let label_text = label.text();
                 let (variant_idx, payload_type_id) = variant_info
                     .iter()
-                    .find(|(sym, _)| self.interner.resolve(**sym) == label_text)
+                    .find(|(sym, _)| self.ctx.interner.resolve(**sym) == label_text)
                     .map(|(_, &(idx, type_id))| (idx, type_id))
                     .expect("variant must exist for labeled branch");
 
@@ -277,7 +278,7 @@ impl Compiler<'_> {
                             .iter()
                             .enumerate()
                             .filter(|(_, (sym, _))| {
-                                !branch_captures.contains(self.interner.resolve(**sym))
+                                !branch_captures.contains(self.ctx.interner.resolve(**sym))
                             })
                             .flat_map(|(idx, _)| {
                                 [

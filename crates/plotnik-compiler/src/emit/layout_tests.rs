@@ -1,8 +1,8 @@
 use std::num::NonZeroU16;
 
 use super::layout::CacheAligned;
-use plotnik_bytecode::Nav;
 use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, NodeTypeIR, ReturnIR};
+use plotnik_bytecode::Nav;
 
 #[test]
 fn layout_empty() {

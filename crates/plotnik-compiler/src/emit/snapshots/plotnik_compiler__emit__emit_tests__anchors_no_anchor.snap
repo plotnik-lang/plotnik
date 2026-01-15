@@ -29,9 +29,8 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (array)                          08
-  08   ▽   (identifier)                     09
-  09   ▷   (number)                         10
-  10   △   _                                11
-  11                                        ▶
+  06   !   (array)                          07
+  07   ▽   (identifier)                     08
+  08   ▷   (number)                         09
+  09   △   _                                10
+  10                                        ▶

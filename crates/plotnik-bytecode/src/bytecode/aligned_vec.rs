@@ -102,7 +102,10 @@ impl std::fmt::Debug for AlignedVec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AlignedVec")
             .field("len", &self.len)
-            .field("aligned", &(self.blocks.as_ptr() as usize).is_multiple_of(ALIGN))
+            .field(
+                "aligned",
+                &(self.blocks.as_ptr() as usize).is_multiple_of(ALIGN),
+            )
             .finish()
     }
 }

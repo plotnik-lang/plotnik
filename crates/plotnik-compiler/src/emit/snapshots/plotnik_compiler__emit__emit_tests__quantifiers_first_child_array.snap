@@ -39,24 +39,18 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (array)                          08
-  08   ε   [Arr]                            10
-  10   ε                                    31, 24
-  12   !   (identifier) [Node Push]         14
-  14   ε                                    37, 21
-  16                                        ▶
-  17   ▽   (number) [Node Set(M1)]          38
-  19   ▷   (number) [Node Set(M1)]          38
-  21   ε   [EndArr Set(M0)]                 19
-  23  ...  
-  24   ε   [EndArr Set(M0)]                 17
-  26   ▷   _                                29
-  27   ε                                    26, 21
-  29   ε                                    12, 27
-  31   ▽   _                                29
-  32   ▷   _                                35
-  33   ε                                    32, 21
-  35   ε                                    12, 33
-  37   ▷   _                                35
-  38   △   _                                16
+  06   !   (array)                          08
+  07  ...  
+  08   ε   [Arr]                            24, 19
+  10                                        ▶
+  11   ▽   [EndArr Set(M0)] (number) [Node Set(M1)]  30
+  14  ...  
+  15  ...  
+  16   ▷   [EndArr Set(M0)] (number) [Node Set(M1)]  30
+  19   ε                                    11
+  20   !   (identifier) [Node Push]         28, 16
+  22   ▷   _                                20, 22, 16
+  24   ▽   _                                20, 22, 16
+  26   ▷   _                                20, 26, 16
+  28   ▷   _                                20, 26, 16
+  30   △   _                                10

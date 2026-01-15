@@ -32,22 +32,15 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (function_declaration)           08
-  08   ε   [Arr]                            10
-  10   ε                                    28, 21
-  12   ε   [EndArr Set(M0)]                 14
-  14   △   _                                20
+  06   !   (function_declaration)           08
+  07  ...  
+  08   ε   [Arr]                            18, 11
+  10                                        ▶
+  11   ε   [EndArr Set(M0)]                 10
+  13   !   (decorator) [Node Push]          22, 24
   15  ...  
-  16   !   (decorator) [Node Push]          18
-  18   ε                                    34, 12
-  20                                        ▶
-  21   ε   [EndArr Set(M0)]                 20
-  23   ▷   _                                26
-  24   ε                                    23, 12
-  26   ε                                    16, 24
-  28   ▽   _                                26
-  29   ▷   _                                32
-  30   ε                                    29, 12
-  32   ε                                    16, 30
-  34   ▷   _                                32
+  16   ▷   _                                13, 16, 24
+  18   ▽   _                                13, 16, 24
+  20   ▷   _                                13, 20, 24
+  22   ▷   _                                13, 20, 24
+  24   △   [EndArr Set(M0)] _               10

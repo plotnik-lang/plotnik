@@ -1,7 +1,7 @@
 //! Tests for the bytecode module.
 
-use super::module::{ByteStorage, ModuleError};
 use super::AlignedVec;
+use super::module::{ByteStorage, ModuleError};
 
 #[test]
 fn byte_storage_copy_from_slice() {

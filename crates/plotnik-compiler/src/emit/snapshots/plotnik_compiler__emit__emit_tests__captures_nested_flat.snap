@@ -40,11 +40,9 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    08
-  07  ...  
-  08   !   (array) [Node Set(M0)]           10
-  10   ▽   (array) [Node Set(M1)]           12
-  12   ▽   (identifier) [Node Set(M2)]      14
-  14   △   _                                15
-  15   △   _                                16
-  16                                        ▶
+  06   !   (array) [Node Set(M0)]           08
+  08   ▽   (array) [Node Set(M1)]           10
+  10   ▽   (identifier) [Node Set(M2)]      12
+  12   △   _                                13
+  13   △   _                                14
+  14                                        ▶

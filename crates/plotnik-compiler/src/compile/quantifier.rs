@@ -7,10 +7,10 @@
 //! - Whether skip/match need separate exits
 
 use crate::analyze::type_check::TypeId;
-use plotnik_bytecode::Nav;
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::SyntaxKind;
 use crate::parser::ast::{self, Expr};
+use plotnik_bytecode::Nav;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};
@@ -403,9 +403,9 @@ impl Compiler<'_> {
 
         // Determine if struct wrapper is needed (once, here)
         let needs_struct_wrapper =
-            in_array_context && check_needs_struct_wrapper(inner, self.type_ctx);
+            in_array_context && check_needs_struct_wrapper(inner, self.ctx.type_ctx);
         let row_type_id = if in_array_context {
-            get_row_type_id(inner, self.type_ctx)
+            get_row_type_id(inner, self.ctx.type_ctx)
         } else {
             None
         };

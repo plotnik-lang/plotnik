@@ -195,7 +195,12 @@ impl<'t> VM<'t> {
 
     /// Create a new VM for execution.
     #[deprecated(note = "Use VM::builder(source, tree).trivia_types(...).build() instead")]
-    pub fn new(source: &'t str, tree: &'t Tree, trivia_types: Vec<u16>, limits: FuelLimits) -> Self {
+    pub fn new(
+        source: &'t str,
+        tree: &'t Tree,
+        trivia_types: Vec<u16>,
+        limits: FuelLimits,
+    ) -> Self {
         Self::builder(source, tree)
             .trivia_types(trivia_types)
             .limits(limits)
@@ -360,8 +365,8 @@ impl<'t> VM<'t> {
             let dfa = plotnik_bytecode::deserialize_dfa(regex_bytes)
                 .expect("regex DFA deserialization failed");
 
-            use regex_automata::dfa::Automaton;
             use regex_automata::Input;
+            use regex_automata::dfa::Automaton;
             let input = Input::new(node_text);
             let matched = dfa.try_search_fwd(&input).ok().flatten().is_some();
 

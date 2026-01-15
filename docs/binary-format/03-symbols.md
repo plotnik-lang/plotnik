@@ -33,6 +33,7 @@ struct RegexEntry {
 The final entry is a sentinel with `string_id = 0` and `offset = blob_size`.
 
 To retrieve regex `i`:
+
 1. `pattern_id = table[i].string_id` → look up in StringTable for display
 2. `start = table[i].offset`
 3. `end = table[i+1].offset`
