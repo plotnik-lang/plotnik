@@ -15,6 +15,7 @@
 //! - `sequences`: Sequence and alternation compilation
 
 mod capture;
+mod collapse_prefix;
 mod collapse_up;
 mod compiler;
 mod dce;

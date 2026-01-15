@@ -106,7 +106,7 @@ impl Label {
 ///
 /// Enum variant indices use the traditional (parent_type, relative_index) approach
 /// since enum variants don't bubble between scopes.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemberRef {
     /// Already resolved to absolute index (for cases where it's known).
     Absolute(u16),
@@ -180,7 +180,7 @@ impl MemberRef {
 
 /// Effect operation with symbolic member references.
 /// Used during compilation; resolved to EffectOp during emission.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectIR {
     pub opcode: EffectOpcode,
     /// Payload for effects that don't use member indices.
@@ -290,7 +290,7 @@ impl EffectIR {
 ///
 /// Both variants store StringId (index into StringTable). For regex predicates,
 /// the pattern string is also compiled to a DFA during emit.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PredicateValueIR {
     /// String comparison value.
     String(plotnik_bytecode::StringId),
@@ -302,7 +302,7 @@ pub enum PredicateValueIR {
 ///
 /// Applied after node type/field matching. Compares node text against
 /// a string literal or regex pattern.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PredicateIR {
     pub op: PredicateOp,
     pub value: PredicateValueIR,
