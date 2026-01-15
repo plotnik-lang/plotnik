@@ -1,0 +1,84 @@
+---
+source: crates/plotnik-compiler/src/emit/layout_tests.rs
+---
+Test = (array
+    (identifier) @a
+    (identifier) @b
+    (identifier) @c
+    (identifier) @d
+    (identifier) @e
+    [(number) @x (string) @y]
+)
+---
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "x"
+S07 "y"
+S08 "Test"
+S09 "array"
+S10 "identifier"
+S11 "number"
+S12 "string"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M00:7  ; { a, b, c, d, e, x, y }
+T02 = Struct  M07:1  ; { a }
+T03 = Struct  M08:1  ; { b }
+T04 = Struct  M09:1  ; { c }
+T05 = Struct  M10:1  ; { d }
+T06 = Struct  M11:1  ; { e }
+T07 = Struct  M12:1  ; { x }
+T08 = Struct  M13:1  ; { y }
+T09 = Struct  M14:2  ; { x, y }
+T10 = Optional(T00)  ; <Node>?
+
+[type_members]
+M00: S01 → T00  ; a: <Node>
+M01: S02 → T00  ; b: <Node>
+M02: S03 → T00  ; c: <Node>
+M03: S04 → T00  ; d: <Node>
+M04: S05 → T00  ; e: <Node>
+M05: S06 → T10  ; x: T10
+M06: S07 → T10  ; y: T10
+M07: S01 → T00  ; a: <Node>
+M08: S02 → T00  ; b: <Node>
+M09: S03 → T00  ; c: <Node>
+M10: S04 → T00  ; d: <Node>
+M11: S05 → T00  ; e: <Node>
+M12: S06 → T00  ; x: <Node>
+M13: S07 → T00  ; y: <Node>
+M14: S06 → T10  ; x: T10
+M15: S07 → T10  ; y: T10
+
+[type_names]
+N0: S08 → T01  ; Test
+
+[entrypoints]
+Test = 06 :: T01
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   !   (array)                          08
+  07  ...  
+  08   ▽   (identifier) [Node Set(M0)]      10
+  10   ▷   (identifier) [Node Set(M1)]      12
+  12   ▷   (identifier) [Node Set(M2)]      14
+  14   ▷   (identifier) [Node Set(M3)]      16
+  16   ▷   (identifier) [Node Set(M4)]      19, 24
+  18                                        ▶
+  19 !!▷   [Null Set(M15)] (number) [Node Set(M5)]  22
+  22   △   _                                18
+  23  ...  
+  24 !!▷   [Null Set(M14)] (string) [Node Set(M6)]  22

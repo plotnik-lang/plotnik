@@ -44,8 +44,7 @@ Test:
   07  ...  
   08   ▽   function: _                      11, 16
   10                                        ▶
-  11   !   [Null Set(M1)] (identifier) [Node Set(M0)]  19
-  14  ...  
+  11   !   [Null Set(M1)] (identifier) [Node Set(M0)]  14
+  14   △   _                                10
   15  ...  
-  16   !   [Null Set(M0)] (number) [Node Set(M1)]  19
-  19   △   _                                10
+  16   !   [Null Set(M0)] (number) [Node Set(M1)]  14

@@ -1,0 +1,69 @@
+---
+source: crates/plotnik-compiler/src/emit/layout_tests.rs
+---
+Test = (object
+    {(pair) @a (pair) @b (pair) @c (pair) @d}* @items
+)
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "c"
+S4 "d"
+S5 "items"
+S6 "Test"
+S7 "object"
+S8 "pair"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M0:4  ; { a, b, c, d }
+T02 = ArrayStar(T01)  ; T01*
+T03 = Struct  M4:1  ; { items }
+T04 = Struct  M5:1  ; { a }
+T05 = Struct  M6:1  ; { b }
+T06 = Struct  M7:1  ; { c }
+T07 = Struct  M8:1  ; { d }
+
+[type_members]
+M0: S1 → T00  ; a: <Node>
+M1: S2 → T00  ; b: <Node>
+M2: S3 → T00  ; c: <Node>
+M3: S4 → T00  ; d: <Node>
+M4: S5 → T02  ; items: T02
+M5: S1 → T00  ; a: <Node>
+M6: S2 → T00  ; b: <Node>
+M7: S3 → T00  ; c: <Node>
+M8: S4 → T00  ; d: <Node>
+
+[type_names]
+N0: S6 → T03  ; Test
+
+[entrypoints]
+Test = 06 :: T03
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   !   (object)                         08
+  07  ...  
+  08   ε   [Arr]                            26, 12
+  10                                        ▶
+  11   ε                                    32
+  12   ε   [EndArr Set(M4)]                 10
+  14   ε   [EndObj Push]                    30, 11
+  16   ▷   (pair) [Node Set(M3)]            14
+  18   ▷   (pair) [Node Set(M2)]            16
+  20   ▷   (pair) [Node Set(M1)]            18
+  22   !   [Obj] (pair) [Node Set(M0)]      20
+  24   ▷   _                                22, 24, 32
+  26   ▽   _                                22, 24, 32
+  28   ▷   _                                22, 28, 32
+  30   ▷   _                                22, 28, 32
+  32   △   [EndArr Set(M4)] _               10
