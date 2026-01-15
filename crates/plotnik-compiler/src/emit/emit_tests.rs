@@ -279,8 +279,9 @@ fn sequences_nested() {
 
 #[test]
 fn sequences_in_quantifier() {
+    // Sequence with internal captures - valid for struct array
     snap!(indoc! {r#"
-        Test = (array {(identifier) (number)}* @items)
+        Test = (array {(identifier) @id (number) @num}* @items)
     "#});
 }
 

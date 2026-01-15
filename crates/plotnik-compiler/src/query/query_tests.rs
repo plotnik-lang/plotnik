@@ -36,6 +36,47 @@ impl QueryAnalyzed {
         query
     }
 
+    /// Parse and validate syntax only (no semantic analysis).
+    /// Use this for pure parser/grammar tests.
+    #[track_caller]
+    fn parse_syntax_only(src: &str) -> Self {
+        use crate::diagnostics::DiagnosticKind::*;
+        let source_map = SourceMap::one_liner(src);
+        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        // Only check for parse errors (not semantic errors)
+        let diag = query.diagnostics();
+        let has_parse_error = diag.raw().iter().any(|d| {
+            matches!(
+                d.kind,
+                UnclosedTree
+                    | UnclosedSequence
+                    | UnclosedAlternation
+                    | UnclosedRegex
+                    | ExpectedExpression
+                    | ExpectedTypeName
+                    | ExpectedCaptureName
+                    | ExpectedFieldName
+                    | ExpectedSubtype
+                    | ExpectedPredicateValue
+                    | EmptyTree
+                    | EmptyAnonymousNode
+                    | EmptySequence
+                    | EmptyAlternation
+                    | BareIdentifier
+                    | InvalidSeparator
+                    | UnexpectedToken
+            )
+        });
+
+        if has_parse_error {
+            panic!(
+                "Expected valid syntax, got parse error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        query
+    }
+
     #[track_caller]
     pub fn expect(src: &str) -> Self {
         let source_map = SourceMap::one_liner(src);
@@ -50,6 +91,12 @@ impl QueryAnalyzed {
     #[track_caller]
     pub fn expect_valid_cst(src: &str) -> String {
         Self::parse_and_validate(src).dump_cst()
+    }
+
+    /// Parse-only CST dump (for pure parser tests, no semantic validation).
+    #[track_caller]
+    pub fn parse_cst(src: &str) -> String {
+        Self::parse_syntax_only(src).dump_cst()
     }
 
     #[track_caller]

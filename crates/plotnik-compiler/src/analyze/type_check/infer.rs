@@ -581,9 +581,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                if !is_row_capture {
-                    self.check_strict_dimensionality(quant, &inner_info);
-                }
+                // Always check multi-element sequences (row capture doesn't help)
+                // Only skip internal capture check when is_row_capture
+                self.check_strict_dimensionality(quant, &inner_info, is_row_capture);
                 self.make_flow_array(inner_info.flow, &inner, quantifier.is_non_empty())
             }
         };
@@ -681,8 +681,46 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Check strict dimensionality rule for * and + quantifiers.
-    /// Captures inside a quantifier are forbidden unless marked as a row capture.
-    fn check_strict_dimensionality(&mut self, quant: &QuantifiedExpr, inner_info: &TermInfo) {
+    ///
+    /// Two checks:
+    /// 1. Multi-element patterns (Arity::Many) without captures can't be scalar arrays
+    ///    (applies regardless of is_row_capture - row capture doesn't help here)
+    /// 2. Internal captures require a row capture on the quantifier
+    ///    (skipped when is_row_capture=true)
+    fn check_strict_dimensionality(
+        &mut self,
+        quant: &QuantifiedExpr,
+        inner_info: &TermInfo,
+        is_row_capture: bool,
+    ) {
+        let op = quant
+            .operator()
+            .map(|t| t.text().to_string())
+            .unwrap_or_else(|| "*".to_string());
+
+        // Check 1: Multi-element patterns without captures can't be scalar arrays
+        // This check applies even with row capture - you can't meaningfully capture
+        // multiple nodes per iteration as a scalar
+        if inner_info.arity == Arity::Many && inner_info.flow.is_void() {
+            self.diag
+                .report(
+                    self.source_id,
+                    DiagnosticKind::MultiElementScalarCapture,
+                    quant.text_range(),
+                )
+                .message(format!(
+                    "sequence with `{}` matches multiple nodes but has no internal captures",
+                    op
+                ))
+                .emit();
+            return;
+        }
+
+        // Check 2: Internal captures require row capture (skip if already a row capture)
+        if is_row_capture {
+            return;
+        }
+
         let TypeFlow::Bubble(type_id) = &inner_info.flow else {
             return;
         };
@@ -694,11 +732,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         if fields.is_empty() {
             return;
         }
-
-        let op = quant
-            .operator()
-            .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "*".to_string());
 
         let capture_names: Vec<_> = fields
             .keys()
