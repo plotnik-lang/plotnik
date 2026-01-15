@@ -55,6 +55,9 @@ jobs:
           next="${{ steps.version.outputs.next }}"
           tomato set workspace.package.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-core.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-bytecode.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-compiler.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-vm.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-langs.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
           # plotnik-cli has explicit plotnik-langs dep (default-features = false workaround)
