@@ -3,14 +3,10 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (MISSING) @m
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "m"
 S2 "Test"
-S3 "MISSING"
 
 [type_defs]
 T0 = <Node>
@@ -35,5 +31,5 @@ _ObjWrap:
 Test:
   06   ε                                    08
   07  ...  
-  08   !   (MISSING) [Node Set(M0)]         10
+  08   !   (_) [Node Set(M0)]               10
   10                                        ▶

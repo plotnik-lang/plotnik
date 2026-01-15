@@ -9,7 +9,7 @@ use crate::bytecode::{Module, ModuleError};
 fn module_from_bytes_valid() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     assert!(module.header().validate_magic());
@@ -20,7 +20,7 @@ fn module_from_bytes_valid() {
 fn module_from_bytes_too_small() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let truncated = bytes[..32].to_vec();
 
     let err = Module::load(&truncated).unwrap_err();
@@ -31,7 +31,7 @@ fn module_from_bytes_too_small() {
 fn module_from_bytes_invalid_magic() {
     let input = "Test = (identifier) @id";
 
-    let mut bytes = Query::expect_valid_linked_bytes(input);
+    let mut bytes = Query::expect_valid_bytes(input);
     bytes[0] = b'X'; // Corrupt magic
 
     let err = Module::load(&bytes).unwrap_err();
@@ -42,7 +42,7 @@ fn module_from_bytes_invalid_magic() {
 fn module_from_bytes_wrong_version() {
     let input = "Test = (identifier) @id";
 
-    let mut bytes = Query::expect_valid_linked_bytes(input);
+    let mut bytes = Query::expect_valid_bytes(input);
     bytes[4..8].copy_from_slice(&999u32.to_le_bytes()); // Wrong version
 
     let err = Module::load(&bytes).unwrap_err();
@@ -53,7 +53,7 @@ fn module_from_bytes_wrong_version() {
 fn module_from_bytes_size_mismatch() {
     let input = "Test = (identifier) @id";
 
-    let mut bytes = Query::expect_valid_linked_bytes(input);
+    let mut bytes = Query::expect_valid_bytes(input);
     let actual_size = bytes.len() as u32;
     bytes[12..16].copy_from_slice(&(actual_size + 100).to_le_bytes()); // Wrong total_size
 
@@ -71,7 +71,7 @@ fn module_from_bytes_size_mismatch() {
 fn module_strings_view() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let strings = module.strings();
@@ -85,7 +85,7 @@ fn module_strings_view() {
 fn module_node_types_view() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let node_types = module.node_types();
@@ -102,7 +102,7 @@ fn module_node_types_view() {
 fn module_node_fields_view() {
     let input = "Test = (function_declaration name: (identifier) @name)";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let fields = module.node_fields();
@@ -123,7 +123,7 @@ fn module_types_view() {
             body: (_) @body)
     "#};
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let types = module.types();
@@ -139,7 +139,7 @@ fn module_entrypoints_view() {
         Bar = (string) @str
     "#};
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let entrypoints = module.entrypoints();
@@ -158,7 +158,7 @@ fn module_entrypoints_view() {
 fn module_decode_step() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     let instr = module.decode_step(0);
@@ -171,7 +171,7 @@ fn module_from_path_mmap() {
 
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
 
     // Write to temp file
     let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
@@ -218,7 +218,7 @@ fn byte_storage_from_aligned() {
 fn module_load() {
     let input = "Test = (identifier) @id";
 
-    let bytes = Query::expect_valid_linked_bytes(input);
+    let bytes = Query::expect_valid_bytes(input);
     let module = Module::load(&bytes).unwrap();
 
     assert!(module.header().validate_magic());

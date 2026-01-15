@@ -3,9 +3,6 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (program [(identifier) (number)] @x)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "x"

@@ -3,11 +3,8 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Item = (identifier) @name
 Collect = {(Item) @item}* @items
-Test = (parent (Collect))
+Test = (array (Collect))
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
@@ -17,7 +14,7 @@ S4 "Item"
 S5 "Collect"
 S6 "Test"
 S7 "identifier"
-S8 "parent"
+S8 "array"
 
 [type_defs]
 T0 = <Node>
@@ -61,7 +58,7 @@ Collect:
 
 Test:
   16   ε                                    17
-  17   !   (parent)                         18
+  17   !   (array)                          18
   18   ▽   (Collect)                        11 : 19
   19   △   _                                20
   20                                        ▶

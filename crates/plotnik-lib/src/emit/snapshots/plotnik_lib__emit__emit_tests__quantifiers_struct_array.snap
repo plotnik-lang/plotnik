@@ -3,9 +3,6 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (array {(identifier) @a (number) @b}* @items)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -13,8 +10,8 @@ S2 "b"
 S3 "items"
 S4 "Test"
 S5 "array"
-S6 "number"
-S7 "identifier"
+S6 "identifier"
+S7 "number"
 
 [type_defs]
 T0 = <Node>

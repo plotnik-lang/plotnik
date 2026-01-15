@@ -3,7 +3,7 @@
 use crate::Colors;
 use crate::QueryBuilder;
 use crate::bytecode::{Module, TypeId};
-use crate::emit::emit_linked;
+use crate::emit::emit;
 use crate::engine::value::{NodeHandle, Value};
 
 use super::debug_verify_type;
@@ -17,7 +17,7 @@ fn build_module(query: &str) -> (Module, TypeId) {
         .analyze()
         .link(&lang);
     assert!(query_obj.is_valid(), "query should be valid");
-    let bytecode = emit_linked(&query_obj).expect("emit failed");
+    let bytecode = emit(&query_obj).expect("emit failed");
     let module = Module::load(&bytecode).expect("decode failed");
     let declared_type = module.entrypoints().get(0).result_type;
     (module, declared_type)

@@ -3,9 +3,6 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = {{(identifier) @id (number) @num} @row}* @rows
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -13,8 +10,8 @@ S2 "num"
 S3 "row"
 S4 "rows"
 S5 "Test"
-S6 "number"
-S7 "identifier"
+S6 "identifier"
+S7 "number"
 
 [type_defs]
 T0 = <Node>

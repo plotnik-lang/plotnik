@@ -1,12 +1,9 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Inner = (call (identifier) @name)
-Outer = (parent {(Inner) @item}* @items)
+Inner = (call_expression (identifier) @name)
+Outer = (array {(Inner) @item}* @items)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
@@ -14,9 +11,9 @@ S2 "item"
 S3 "items"
 S4 "Inner"
 S5 "Outer"
-S6 "call"
+S6 "call_expression"
 S7 "identifier"
-S8 "parent"
+S8 "array"
 
 [type_defs]
 T0 = <Node>
@@ -47,14 +44,14 @@ _ObjWrap:
 
 Inner:
   06   ε                                    07
-  07   !   (call)                           08
+  07   !   (call_expression)                08
   08   ▽   (identifier) [Node Set(M0)]      10
   10   △   _                                11
   11                                        ▶
 
 Outer:
   12   ε                                    13
-  13   !   (parent)                         14
+  13   !   (array)                          14
   14   ε   [Arr]                            16
   16   ε                                    44, 27
   18   ε   [EndArr Set(M2)]                 20

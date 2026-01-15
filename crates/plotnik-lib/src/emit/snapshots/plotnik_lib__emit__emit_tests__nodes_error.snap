@@ -3,14 +3,10 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (ERROR) @err
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "err"
 S2 "Test"
-S3 "ERROR"
 
 [type_defs]
 T0 = <Node>
@@ -35,5 +31,5 @@ _ObjWrap:
 Test:
   06   ε                                    08
   07  ...  
-  08   !   (ERROR) [Node Set(M0)]           10
+  08   !   (_) [Node Set(M0)]               10
   10                                        ▶

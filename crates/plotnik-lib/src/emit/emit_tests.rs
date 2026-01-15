@@ -81,14 +81,14 @@ fn captures_multiple() {
 #[test]
 fn captures_nested_flat() {
     snap!(indoc! {r#"
-        Test = (a (b (c) @c) @b) @a
+        Test = (array (array (identifier) @c) @b) @a
     "#});
 }
 
 #[test]
 fn captures_deeply_nested() {
     snap!(indoc! {r#"
-        Test = (a (b (c (d) @d) @c) @b) @a
+        Test = (array (array (array (identifier) @d) @c) @b) @a
     "#});
 }
 
@@ -109,7 +109,7 @@ fn captures_with_type_custom() {
 #[test]
 fn captures_struct_scope() {
     snap!(indoc! {r#"
-        Test = {(a) @a (b) @b} @item
+        Test = {(identifier) @a (number) @b} @item
     "#});
 }
 
@@ -164,7 +164,7 @@ fn fields_multiple() {
 #[test]
 fn fields_negated() {
     snap!(indoc! {r#"
-        Test = (function_declaration name: (identifier) @name -type_parameters)
+        Test = (pair key: (property_identifier) @key -value)
     "#});
 }
 
@@ -250,7 +250,7 @@ fn quantifiers_sequence_in_called_def() {
     snap!(indoc! {r#"
         Item = (identifier) @name
         Collect = {(Item) @item}* @items
-        Test = (parent (Collect))
+        Test = (array (Collect))
     "#});
 }
 
@@ -259,28 +259,28 @@ fn quantifiers_sequence_in_called_def() {
 #[test]
 fn sequences_basic() {
     snap!(indoc! {r#"
-        Test = (parent {(a) (b)})
+        Test = (array {(identifier) (number)})
     "#});
 }
 
 #[test]
 fn sequences_with_captures() {
     snap!(indoc! {r#"
-        Test = (parent {(a) @a (b) @b})
+        Test = (array {(identifier) @a (number) @b})
     "#});
 }
 
 #[test]
 fn sequences_nested() {
     snap!(indoc! {r#"
-        Test = (parent {(a) {(b) (c)} (d)})
+        Test = (array {(identifier) {(number) (string)} (null)})
     "#});
 }
 
 #[test]
 fn sequences_in_quantifier() {
     snap!(indoc! {r#"
-        Test = (parent {(a) (b)}* @items)
+        Test = (array {(identifier) (number)}* @items)
     "#});
 }
 
@@ -352,7 +352,7 @@ fn alternations_tagged_in_field_constraint() {
     // The capture `@kind` applies to the field expression, but the value determines
     // whether it's a structured scope (enum in this case).
     snap!(indoc! {r#"
-        Test = (foo field: [A: (x) @a B: (y)] @kind)
+        Test = (pair key: [A: (identifier) @a B: (number)] @kind)
     "#});
 }
 
@@ -361,35 +361,35 @@ fn alternations_tagged_in_field_constraint() {
 #[test]
 fn anchors_between_siblings() {
     snap!(indoc! {r#"
-        Test = (parent (a) . (b))
+        Test = (array (identifier) . (number))
     "#});
 }
 
 #[test]
 fn anchors_first_child() {
     snap!(indoc! {r#"
-        Test = (parent . (first))
+        Test = (array . (identifier))
     "#});
 }
 
 #[test]
 fn anchors_last_child() {
     snap!(indoc! {r#"
-        Test = (parent (last) .)
+        Test = (array (identifier) .)
     "#});
 }
 
 #[test]
 fn anchors_with_anonymous() {
     snap!(indoc! {r#"
-        Test = (parent "+" . (next))
+        Test = (binary_expression "+" . (identifier))
     "#});
 }
 
 #[test]
 fn anchors_no_anchor() {
     snap!(indoc! {r#"
-        Test = (parent (a) (b))
+        Test = (array (identifier) (number))
     "#});
 }
 
@@ -421,8 +421,8 @@ fn definitions_reference() {
 #[test]
 fn definitions_nested_capture() {
     snap!(indoc! {r#"
-        Inner = (call (identifier) @name)
-        Outer = (parent {(Inner) @item}* @items)
+        Inner = (call_expression (identifier) @name)
+        Outer = (array {(Inner) @item}* @items)
     "#});
 }
 

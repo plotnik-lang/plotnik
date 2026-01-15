@@ -3,18 +3,15 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (call_expression function: [(identifier) @fn (number) @num])
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "fn"
 S2 "num"
 S3 "Test"
 S4 "call_expression"
-S5 "function"
-S6 "identifier"
-S7 "number"
+S5 "identifier"
+S6 "number"
+S7 "function"
 
 [type_defs]
 T0 = <Node>

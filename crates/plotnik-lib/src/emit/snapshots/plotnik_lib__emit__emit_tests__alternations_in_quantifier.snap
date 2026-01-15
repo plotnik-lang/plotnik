@@ -3,9 +3,6 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (object { [A: (pair) @a  B: (shorthand_property_identifier) @b] @item }* @items)
 ---
-[flags]
-linked = false
-
 [strings]
 S00 "Beauty will save the world"
 S01 "a"

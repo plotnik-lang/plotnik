@@ -1,17 +1,16 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Test = (a (b (c) @c) @b) @a
+Test = (array (array (identifier) @c) @b) @a
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
 S2 "b"
 S3 "c"
 S4 "Test"
+S5 "array"
+S6 "identifier"
 
 [type_defs]
 T0 = <Node>
@@ -43,9 +42,9 @@ _ObjWrap:
 Test:
   06   ε                                    08
   07  ...  
-  08   !   (a) [Node Set(M0)]               10
-  10   ▽   (b) [Node Set(M1)]               12
-  12   ▽   (c) [Node Set(M2)]               14
+  08   !   (array) [Node Set(M0)]           10
+  10   ▽   (array) [Node Set(M1)]           12
+  12   ▽   (identifier) [Node Set(M2)]      14
   14   △   _                                15
   15   △   _                                16
   16                                        ▶

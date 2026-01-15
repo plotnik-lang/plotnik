@@ -5,10 +5,6 @@
 //! - Type table building with field resolution
 //! - Cache-aligned instruction layout
 //! - Section assembly and header generation
-//!
-//! Entry points:
-//! - [`emit`]: Emit bytecode without language linking
-//! - [`emit_linked`]: Emit bytecode with node type/field validation
 
 mod emitter;
 mod error;
@@ -28,7 +24,7 @@ mod regex_table_tests;
 #[cfg(test)]
 mod type_table_tests;
 
-pub use emitter::{emit, emit_linked};
+pub use emitter::emit;
 pub use error::EmitError;
 pub use regex_table::{deserialize_dfa, RegexTableBuilder};
 pub use string_table::StringTableBuilder;

@@ -32,8 +32,7 @@ fn header_roundtrip() {
         type_names_count: 4,
         entrypoints_count: 1,
         transitions_count: 15,
-        flags: 0,
-        _reserved: [0; 18],
+        _reserved: [0; 20],
     };
 
     let bytes = h.to_bytes();
@@ -41,32 +40,6 @@ fn header_roundtrip() {
 
     let decoded = Header::from_bytes(&bytes);
     assert_eq!(decoded, h);
-}
-
-#[test]
-fn header_linked_flag() {
-    let mut h = Header::default();
-    assert!(!h.is_linked());
-
-    h.set_linked(true);
-    assert!(h.is_linked());
-    assert_eq!(h.flags, flags::LINKED);
-
-    h.set_linked(false);
-    assert!(!h.is_linked());
-    assert_eq!(h.flags, 0);
-}
-
-#[test]
-fn header_flags_roundtrip() {
-    let mut h = Header::default();
-    h.set_linked(true);
-
-    let bytes = h.to_bytes();
-    let decoded = Header::from_bytes(&bytes);
-
-    assert!(decoded.is_linked());
-    assert_eq!(decoded.flags, flags::LINKED);
 }
 
 #[test]

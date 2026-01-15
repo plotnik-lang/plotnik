@@ -10,9 +10,6 @@ Assignment = (assignment_expression
     left: (identifier) @target
     right: (Expression) @value)
 ---
-[flags]
-linked = false
-
 [strings]
 S00 "Beauty will save the world"
 S01 "name"
@@ -26,8 +23,8 @@ S08 "Assignment"
 S09 "identifier"
 S10 "number"
 S11 "assignment_expression"
-S12 "right"
-S13 "left"
+S12 "left"
+S13 "right"
 
 [type_defs]
 T00 = <Node>

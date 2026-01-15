@@ -4,9 +4,6 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 Inner = (identifier) @name
 Test = [A: (Inner)  B: (number) @b] @item
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "name"

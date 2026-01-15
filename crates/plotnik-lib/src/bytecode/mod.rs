@@ -25,7 +25,7 @@ pub use constants::{
 
 pub use ids::{StringId, TypeId};
 
-pub use header::{flags, Header, SectionOffsets};
+pub use header::{Header, SectionOffsets};
 
 pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
 

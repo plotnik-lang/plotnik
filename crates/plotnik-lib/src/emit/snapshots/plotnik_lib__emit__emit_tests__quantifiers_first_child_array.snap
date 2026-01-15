@@ -3,17 +3,14 @@ source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
 Test = (array (identifier)* @ids (number) @n)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "ids"
 S2 "n"
 S3 "Test"
 S4 "array"
-S5 "number"
-S6 "identifier"
+S5 "identifier"
+S6 "number"
 
 [type_defs]
 T0 = <Node>

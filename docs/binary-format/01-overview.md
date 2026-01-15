@@ -67,20 +67,20 @@ Section offsets are not stored in the header. Loaders compute them by:
    - Section size = count × record size (or explicit size for blobs)
 3. Blob sizes come from header: `str_blob_size` and `regex_blob_size`
 
-## Header (v2)
+## Header (v3)
 
 ```rust
 #[repr(C, align(64))]
 struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     magic: [u8; 4],          // b"PTKQ"
-    version: u32,            // 2
+    version: u32,            // 3
     checksum: u32,           // CRC32 of everything after header
     total_size: u32,
     str_blob_size: u32,
     regex_blob_size: u32,
 
-    // Bytes 24-45: Element counts (11 × u16) — order matches section order
+    // Bytes 24-43: Element counts (10 × u16) — order matches section order
     str_table_count: u16,
     regex_table_count: u16,
     node_types_count: u16,
@@ -91,20 +91,8 @@ struct Header {
     type_names_count: u16,
     entrypoints_count: u16,
     transitions_count: u16,
-    flags: u16,
 
-    // Bytes 46-63: Reserved
-    _reserved: [u8; 18],
+    // Bytes 44-63: Reserved
+    _reserved: [u8; 20],
 }
 ```
-
-### Flags
-
-| Bit | Name   | Description                                              |
-| --- | ------ | -------------------------------------------------------- |
-| 0   | LINKED | If set, bytecode contains resolved NodeTypeId/NodeFieldId |
-
-**Linked vs Unlinked**:
-
-- **Linked**: Match instructions store tree-sitter `NodeTypeId` and `NodeFieldId` directly. Executable immediately.
-- **Unlinked**: Match instructions store `StringId` references. Requires linking against a grammar before execution.

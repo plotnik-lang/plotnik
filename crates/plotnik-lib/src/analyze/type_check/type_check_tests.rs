@@ -117,7 +117,7 @@ fn capture_with_custom_type() {
 
 #[test]
 fn named_node_with_field_capture() {
-    let input = "Q = (function name: (identifier) @name)";
+    let input = "Q = (function_declaration name: (identifier) @name)";
 
     let res = Query::expect_valid_types(input);
 
@@ -137,9 +137,9 @@ fn named_node_with_field_capture() {
 #[test]
 fn named_node_multiple_field_captures() {
     let input = indoc! {r#"
-    Q = (function
+    Q = (function_declaration
       name: (identifier) @name
-      body: (block) @body
+      body: (statement_block) @body
     )
     "#};
 
@@ -164,9 +164,9 @@ fn named_node_captured_with_internal_captures() {
     // Capturing a named node does NOT create a scope boundary.
     // Internal captures bubble up alongside the outer capture.
     let input = indoc! {r#"
-    Q = (function
+    Q = (function_declaration
       name: (identifier) @name :: string
-      body: (block) @body
+      body: (statement_block) @body
     ) @func :: FunctionInfo
     "#};
 
@@ -192,8 +192,8 @@ fn named_node_captured_with_internal_captures() {
 #[test]
 fn nested_named_node_captures() {
     let input = indoc! {r#"
-    Q = (call
-      function: (member target: (identifier) @target)
+    Q = (call_expression
+      function: (member_expression object: (identifier) @target)
     )
     "#};
 
@@ -279,7 +279,7 @@ fn scalar_list_with_string_annotation_one_or_more() {
 #[test]
 fn row_list_basic() {
     let input = indoc! {r#"
-    Q = {(key) @k (value) @v}* @rows
+    Q = {(identifier) @k (number) @v}* @rows
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -305,7 +305,7 @@ fn row_list_basic() {
 #[test]
 fn row_list_non_empty() {
     let input = indoc! {r#"
-    Q = {(key) @k (value) @v}+ @rows
+    Q = {(identifier) @k (number) @v}+ @rows
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -350,7 +350,7 @@ fn optional_single_capture() {
 #[test]
 fn optional_group_bubbles_fields() {
     let input = indoc! {r#"
-    Q = {(modifier) @mod (decorator) @dec}?
+    Q = {(identifier) @mod (decorator) @dec}?
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -371,7 +371,7 @@ fn optional_group_bubbles_fields() {
 #[test]
 fn sequence_merges_fields() {
     let input = indoc! {r#"
-    Q = {(a) @a (b) @b}
+    Q = {(identifier) @a (number) @b}
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -393,7 +393,7 @@ fn sequence_merges_fields() {
 #[test]
 fn captured_sequence_creates_struct() {
     let input = indoc! {r#"
-    Q = {(a) @a (b) @b} @row
+    Q = {(identifier) @a (number) @b} @row
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -418,7 +418,7 @@ fn captured_sequence_creates_struct() {
 
 #[test]
 fn untagged_alt_same_capture_all_branches() {
-    let input = "Q = [(a) @x (b) @x]";
+    let input = "Q = [(identifier) @x (number) @x]";
 
     let res = Query::expect_valid_types(input);
 
@@ -437,7 +437,7 @@ fn untagged_alt_same_capture_all_branches() {
 
 #[test]
 fn untagged_alt_different_captures() {
-    let input = "Q = [(a) @a (b) @b]";
+    let input = "Q = [(identifier) @a (number) @b]";
 
     let res = Query::expect_valid_types(input);
 
@@ -459,8 +459,8 @@ fn untagged_alt_different_captures() {
 fn untagged_alt_partial_overlap() {
     let input = indoc! {r#"
     Q = [
-      {(a) @x (b) @y}
-      {(a) @x}
+      {(identifier) @x (number) @y}
+      {(identifier) @x}
     ]
     "#};
 
@@ -585,7 +585,7 @@ fn nested_captured_group() {
     let input = indoc! {r#"
     Q = {
       (identifier) @name
-      {(key) @k (value) @v} @pair
+      {(string) @k (number) @v} @pair
     }
     "#};
 
@@ -613,7 +613,7 @@ fn nested_captured_group() {
 #[test]
 fn error_star_with_internal_captures_no_row() {
     let input = indoc! {r#"
-    Bad = {(a) @a (b) @b}*
+    Bad = {(identifier) @a (number) @b}*
     "#};
 
     let res = Query::expect_invalid(input);
@@ -621,8 +621,8 @@ fn error_star_with_internal_captures_no_row() {
     insta::assert_snapshot!(res, @r"
     error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
       |
-    1 | Bad = {(a) @a (b) @b}*
-      |       ^^^^^^^^^^^^^^^^
+    1 | Bad = {(identifier) @a (number) @b}*
+      |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
     help: add a struct capture: `{...}* @name`
     ");
@@ -631,7 +631,7 @@ fn error_star_with_internal_captures_no_row() {
 #[test]
 fn error_plus_with_internal_capture_no_row() {
     let input = indoc! {r#"
-    Bad = {(c) @c}+
+    Bad = {(identifier) @c}+
     "#};
 
     let res = Query::expect_invalid(input);
@@ -639,8 +639,8 @@ fn error_plus_with_internal_capture_no_row() {
     insta::assert_snapshot!(res, @r"
     error: quantifier `+` contains captures (`@c`) but has no struct capture
       |
-    1 | Bad = {(c) @c}+
-      |       ^^^^^^^^^
+    1 | Bad = {(identifier) @c}+
+      |       ^^^^^^^^^^^^^^^^^^
       |
     help: add a struct capture: `{...}+ @name`
     ");
@@ -649,7 +649,7 @@ fn error_plus_with_internal_capture_no_row() {
 #[test]
 fn error_named_node_with_capture_quantified() {
     let input = indoc! {r#"
-    Bad = (func (identifier) @name)*
+    Bad = (array (identifier) @name)*
     "#};
 
     let res = Query::expect_invalid(input);
@@ -657,8 +657,8 @@ fn error_named_node_with_capture_quantified() {
     insta::assert_snapshot!(res, @r"
     error: quantifier `*` contains captures (`@name`) but has no struct capture
       |
-    1 | Bad = (func (identifier) @name)*
-      |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    1 | Bad = (array (identifier) @name)*
+      |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
     help: add a struct capture: `{...}* @name`
     ");
@@ -722,7 +722,7 @@ fn recursive_type_optional_self_ref() {
 #[test]
 fn recursive_type_in_quantified_context() {
     let input = indoc! {r#"
-    Item = (item (Item)* @children)
+    Item = (array (Item)* @children)
     "#};
 
     let res = Query::expect_valid_types(input);
@@ -872,8 +872,8 @@ fn scalar_propagates_through_sequence() {
 #[test]
 fn error_multiple_uncaptured_outputs() {
     let input = indoc! {r#"
-    A = [X: (x)]
-    B = [Y: (y)]
+    A = [X: (identifier)]
+    B = [Y: (number)]
     Q = (program (A) (B))
     "#};
 
@@ -892,8 +892,8 @@ fn error_multiple_uncaptured_outputs() {
 #[test]
 fn error_uncaptured_output_with_captures() {
     let input = indoc! {r#"
-    A = [X: (x)]
-    Q = (program (A) (identifier) @name)
+    A = [X: (identifier)]
+    Q = (program (A) (number) @name)
     "#};
 
     let res = Query::expect_invalid(input);
@@ -901,7 +901,7 @@ fn error_uncaptured_output_with_captures() {
     insta::assert_snapshot!(res, @r"
     error: output-producing expression requires capture when siblings have captures
       |
-    2 | Q = (program (A) (identifier) @name)
+    2 | Q = (program (A) (number) @name)
       |              ^^^
       |
     help: add `@name` to capture the output
@@ -911,8 +911,8 @@ fn error_uncaptured_output_with_captures() {
 #[test]
 fn output_captured_with_bubbles_ok() {
     let input = indoc! {r#"
-    A = [X: (x) Y: (y)]
-    Q = (program (A) @a (identifier) @name)
+    A = [X: (identifier) Y: (number)]
+    Q = (program (A) @a (string) @name)
     "#};
 
     let res = Query::expect_valid_types(input);

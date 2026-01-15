@@ -36,12 +36,5 @@ mod test_helpers {
         pub fn dump_diagnostics_raw(&self) -> String {
             self.diagnostics().render(self.source_map())
         }
-
-        pub fn emit_typescript(&self) -> String {
-            let bytecode = self.emit().expect("bytecode emission should succeed");
-            let module = crate::bytecode::Module::load(&bytecode)
-                .expect("module loading should succeed");
-            crate::typegen::typescript::emit(&module)
-        }
     }
 }
