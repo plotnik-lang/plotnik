@@ -7,7 +7,7 @@ use indoc::indoc;
 
 use crate::QueryBuilder;
 use crate::bytecode::Module;
-use crate::emit::emit_linked;
+use crate::emit::emit;
 
 use super::{Materializer, VM, ValueMaterializer};
 
@@ -28,7 +28,7 @@ fn execute_with_entry(query: &str, source: &str, entry: Option<&str>) -> String 
 
     assert!(query_obj.is_valid(), "query should be valid");
 
-    let bytecode = emit_linked(&query_obj).expect("emit failed");
+    let bytecode = emit(&query_obj).expect("emit failed");
     let module = Module::load(&bytecode).expect("decode failed");
 
     let tree = lang.parse(source);

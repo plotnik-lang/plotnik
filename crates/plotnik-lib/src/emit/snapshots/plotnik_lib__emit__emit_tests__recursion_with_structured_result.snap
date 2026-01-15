@@ -8,9 +8,6 @@ Expr = [
 
 Test = (program (Expr) @expr)
 ---
-[flags]
-linked = false
-
 [strings]
 S00 "Beauty will save the world"
 S01 "value"
@@ -23,10 +20,10 @@ S07 "Expr"
 S08 "Test"
 S09 "number"
 S10 "call_expression"
-S11 "arguments"
-S12 "function"
-S13 "identifier"
-S14 "program"
+S11 "identifier"
+S12 "program"
+S13 "function"
+S14 "arguments"
 
 [type_defs]
 T00 = <Node>

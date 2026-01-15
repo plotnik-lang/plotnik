@@ -1,32 +1,25 @@
 //! Bytecode file header (64 bytes).
 //!
-//! v2 layout: Offsets are computed from counts + SECTION_ALIGN (64 bytes).
+//! v3 layout: Offsets are computed from counts + SECTION_ALIGN (64 bytes).
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
 //! NodeTypes → NodeFields → Trivia → TypeDefs → TypeMembers → TypeNames →
 //! Entrypoints → Transitions
 
 use super::{MAGIC, SECTION_ALIGN, VERSION};
 
-/// Header flags (bit field).
-pub mod flags {
-    /// Bit 0: If set, bytecode is linked (instructions contain NodeTypeId/NodeFieldId).
-    /// If clear, bytecode is unlinked (instructions contain StringId references).
-    pub const LINKED: u16 = 0x0001;
-}
-
 /// File header - first 64 bytes of the bytecode file.
 ///
-/// v2 layout (offsets computed from counts):
+/// v3 layout (offsets computed from counts):
 /// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
-/// - 24-45: counts (11 × u16) — order matches section order
-/// - 46-63: reserved
+/// - 24-43: counts (10 × u16) — order matches section order
+/// - 44-63: reserved
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C, align(64))]
 pub struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     /// Magic bytes: b"PTKQ"
     pub magic: [u8; 4],
-    /// Format version (currently 2)
+    /// Format version (currently 3)
     pub version: u32,
     /// CRC32 checksum of everything after the header
     pub checksum: u32,
@@ -37,7 +30,7 @@ pub struct Header {
     /// Size of the regex blob in bytes.
     pub regex_blob_size: u32,
 
-    // Bytes 24-45: Element counts (11 × u16) — order matches section order
+    // Bytes 24-43: Element counts (10 × u16) — order matches section order
     pub str_table_count: u16,
     pub regex_table_count: u16,
     pub node_types_count: u16,
@@ -48,11 +41,9 @@ pub struct Header {
     pub type_names_count: u16,
     pub entrypoints_count: u16,
     pub transitions_count: u16,
-    /// Header flags (see `flags` module for bit definitions).
-    pub flags: u16,
 
-    // Bytes 46-63: Reserved
-    pub(crate) _reserved: [u8; 18],
+    // Bytes 44-63: Reserved
+    pub(crate) _reserved: [u8; 20],
 }
 
 const _: () = assert!(std::mem::size_of::<Header>() == 64);
@@ -76,8 +67,7 @@ impl Default for Header {
             type_names_count: 0,
             entrypoints_count: 0,
             transitions_count: 0,
-            flags: 0,
-            _reserved: [0; 18],
+            _reserved: [0; 20],
         }
     }
 }
@@ -107,8 +97,8 @@ impl Header {
     pub fn from_bytes(bytes: &[u8]) -> Self {
         assert!(bytes.len() >= 64, "header too short");
 
-        let mut reserved = [0u8; 18];
-        reserved.copy_from_slice(&bytes[46..64]);
+        let mut reserved = [0u8; 20];
+        reserved.copy_from_slice(&bytes[44..64]);
 
         Self {
             magic: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -127,7 +117,6 @@ impl Header {
             type_names_count: u16::from_le_bytes([bytes[38], bytes[39]]),
             entrypoints_count: u16::from_le_bytes([bytes[40], bytes[41]]),
             transitions_count: u16::from_le_bytes([bytes[42], bytes[43]]),
-            flags: u16::from_le_bytes([bytes[44], bytes[45]]),
             _reserved: reserved,
         }
     }
@@ -151,8 +140,7 @@ impl Header {
         bytes[38..40].copy_from_slice(&self.type_names_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[42..44].copy_from_slice(&self.transitions_count.to_le_bytes());
-        bytes[44..46].copy_from_slice(&self.flags.to_le_bytes());
-        bytes[46..64].copy_from_slice(&self._reserved);
+        bytes[44..64].copy_from_slice(&self._reserved);
         bytes
     }
 
@@ -162,20 +150,6 @@ impl Header {
 
     pub fn validate_version(&self) -> bool {
         self.version == VERSION
-    }
-
-    /// Returns true if the bytecode is linked (contains resolved grammar IDs).
-    pub fn is_linked(&self) -> bool {
-        self.flags & flags::LINKED != 0
-    }
-
-    /// Set the linked flag.
-    pub fn set_linked(&mut self, linked: bool) {
-        if linked {
-            self.flags |= flags::LINKED;
-        } else {
-            self.flags &= !flags::LINKED;
-        }
     }
 
     /// Compute section offsets from counts and blob sizes.

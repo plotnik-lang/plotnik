@@ -6,9 +6,6 @@ Expr = [
     Rec: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
 ]
 ---
-[flags]
-linked = false
-
 [strings]
 S00 "Beauty will save the world"
 S01 "value"
@@ -19,9 +16,9 @@ S05 "Rec"
 S06 "Expr"
 S07 "number"
 S08 "call_expression"
-S09 "arguments"
+S09 "identifier"
 S10 "function"
-S11 "identifier"
+S11 "arguments"
 
 [type_defs]
 T0 = <Node>

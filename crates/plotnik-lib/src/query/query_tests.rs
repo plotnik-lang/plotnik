@@ -93,7 +93,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_types(src: &str) -> String {
-        let query = Self::parse_and_validate(src);
+        let query = Self::parse_and_validate(src).link(&javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid types, got error:\n{}",
@@ -109,14 +109,6 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytecode(src: &str) -> String {
-        let query = Self::parse_and_validate(src);
-        let bytecode = query.emit().expect("bytecode emission should succeed");
-        let module = Module::load(&bytecode).expect("module loading should succeed");
-        crate::bytecode::dump(&module, crate::Colors::OFF)
-    }
-
-    #[track_caller]
-    pub fn expect_valid_linked_bytecode(src: &str) -> String {
         let query = Self::parse_and_validate(src).link(&javascript());
         if !query.is_valid() {
             panic!(
@@ -131,12 +123,6 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytes(src: &str) -> Vec<u8> {
-        let query = Self::parse_and_validate(src);
-        query.emit().expect("bytecode emission should succeed")
-    }
-
-    #[track_caller]
-    pub fn expect_valid_linked_bytes(src: &str) -> Vec<u8> {
         let query = Self::parse_and_validate(src).link(&javascript());
         if !query.is_valid() {
             panic!(

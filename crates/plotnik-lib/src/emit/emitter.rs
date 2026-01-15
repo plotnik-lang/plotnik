@@ -1,12 +1,8 @@
 //! Core bytecode emission logic.
-//!
-//! Contains the main entry points for emitting bytecode from compiled queries.
 
-use indexmap::IndexMap;
-use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
+use plotnik_core::Symbol;
 
-use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::type_check::{TypeContext, TypeId};
+use crate::analyze::type_check::TypeId;
 use crate::bytecode::{
     Entrypoint, FieldSymbol, Header, InstructionIR, Label, NodeSymbol, PredicateValueIR,
     SECTION_ALIGN, TriviaEntry,
@@ -20,47 +16,25 @@ use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
-/// Emit bytecode from type context only (no node validation).
-pub fn emit(
-    type_ctx: &TypeContext,
-    interner: &Interner,
-    symbol_table: &SymbolTable,
-) -> Result<Vec<u8>, EmitError> {
-    emit_inner(type_ctx, interner, symbol_table, None, None)
-}
+/// Emit bytecode from a LinkedQuery.
+pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
+    let type_ctx = query.type_context();
+    let interner = query.interner();
+    let symbol_table = &query.symbol_table;
+    let node_type_ids = query.node_type_ids();
+    let node_field_ids = query.node_field_ids();
 
-/// Emit bytecode from a LinkedQuery (includes node type/field validation info).
-pub fn emit_linked(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
-    emit_inner(
-        query.type_context(),
-        query.interner(),
-        &query.symbol_table,
-        Some(query.node_type_ids()),
-        Some(query.node_field_ids()),
-    )
-}
-
-/// Shared bytecode emission logic.
-fn emit_inner(
-    type_ctx: &TypeContext,
-    interner: &Interner,
-    symbol_table: &SymbolTable,
-    node_type_ids: Option<&IndexMap<Symbol, NodeTypeId>>,
-    node_field_ids: Option<&IndexMap<Symbol, NodeFieldId>>,
-) -> Result<Vec<u8>, EmitError> {
-    let is_linked = node_type_ids.is_some();
     let mut strings = StringTableBuilder::new();
     let mut types = TypeTableBuilder::new();
     types.build(type_ctx, interner, &mut strings)?;
 
-    // Compile transitions (strings are interned here for unlinked mode)
     let compile_result = Compiler::compile(
         interner,
         type_ctx,
         symbol_table,
         &mut strings,
-        node_type_ids,
-        node_field_ids,
+        Some(node_type_ids),
+        Some(node_field_ids),
     )
     .map_err(EmitError::Compile)?;
 
@@ -75,22 +49,18 @@ fn emit_inner(
         return Err(EmitError::TooManyTransitions(layout.total_steps as usize));
     }
 
-    // Collect node symbols (empty if not linked)
+    // Collect node symbols
     let mut node_symbols: Vec<NodeSymbol> = Vec::new();
-    if let Some(ids) = node_type_ids {
-        for (&sym, &node_id) in ids {
-            let name = strings.get_or_intern(sym, interner)?;
-            node_symbols.push(NodeSymbol::new(node_id.get(), name));
-        }
+    for (&sym, &node_id) in node_type_ids {
+        let name = strings.get_or_intern(sym, interner)?;
+        node_symbols.push(NodeSymbol::new(node_id.get(), name));
     }
 
-    // Collect field symbols (empty if not linked)
+    // Collect field symbols
     let mut field_symbols: Vec<FieldSymbol> = Vec::new();
-    if let Some(ids) = node_field_ids {
-        for (&sym, &field_id) in ids {
-            let name = strings.get_or_intern(sym, interner)?;
-            field_symbols.push(FieldSymbol::new(field_id.get(), name));
-        }
+    for (&sym, &field_id) in node_field_ids {
+        let name = strings.get_or_intern(sym, interner)?;
+        field_symbols.push(FieldSymbol::new(field_id.get(), name));
     }
 
     // Collect entrypoints with actual targets from layout
@@ -179,7 +149,6 @@ fn emit_inner(
         total_size,
         ..Default::default()
     };
-    header.set_linked(is_linked);
     header.checksum = crc32fast::hash(&output[64..]);
     output[..64].copy_from_slice(&header.to_bytes());
 

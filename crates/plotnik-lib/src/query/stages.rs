@@ -223,16 +223,6 @@ impl QueryAnalyzed {
         &self.interner
     }
 
-    /// Emit bytecode without language linking (no node type/field validation).
-    ///
-    /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
-    pub fn emit(&self) -> Result<Vec<u8>, crate::emit::EmitError> {
-        if !self.is_valid() {
-            return Err(crate::emit::EmitError::InvalidQuery);
-        }
-        crate::emit::emit(&self.type_context, &self.interner, &self.symbol_table)
-    }
-
     pub fn link(mut self, lang: &Lang) -> LinkedQuery {
         let mut output = link::LinkOutput::default();
 
@@ -295,14 +285,12 @@ impl LinkedQuery {
         &self.linking.node_field_ids
     }
 
-    /// Emit bytecode with node type/field symbols from language linking.
-    ///
-    /// Returns `Err(EmitError::InvalidQuery)` if the query has validation errors.
+    /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
     pub fn emit(&self) -> Result<Vec<u8>, crate::emit::EmitError> {
         if !self.is_valid() {
             return Err(crate::emit::EmitError::InvalidQuery);
         }
-        crate::emit::emit_linked(self)
+        crate::emit::emit(self)
     }
 }
 

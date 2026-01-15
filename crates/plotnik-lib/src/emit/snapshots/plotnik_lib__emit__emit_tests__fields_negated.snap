@@ -1,25 +1,22 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Test = (function_declaration name: (identifier) @name -type_parameters)
+Test = (pair key: (property_identifier) @key -value)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
-S1 "name"
+S1 "key"
 S2 "Test"
-S3 "function_declaration"
-S4 "type_parameters"
-S5 "identifier"
+S3 "pair"
+S4 "property_identifier"
+S5 "value"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T1 = Struct  M0:1  ; { key }
 
 [type_members]
-M0: S1 → T0  ; name: <Node>
+M0: S1 → T0  ; key: <Node>
 
 [type_names]
 N0: S2 → T1  ; Test
@@ -37,7 +34,7 @@ _ObjWrap:
 Test:
   06   ε                                    08
   07  ...  
-  08   !   -type_parameters (function_declaration)  10
-  10   ▽   name: (identifier) [Node Set(M0)]  12
+  08   !   -value (pair)                    10
+  10   ▽   key: (property_identifier) [Node Set(M0)]  12
   12   △   _                                13
   13                                        ▶

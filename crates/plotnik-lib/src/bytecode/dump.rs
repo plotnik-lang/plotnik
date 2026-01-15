@@ -23,7 +23,6 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     let mut out = String::new();
     let ctx = DumpContext::new(module, colors);
 
-    dump_header(&mut out, module, &ctx);
     dump_strings(&mut out, module, &ctx);
     dump_types_defs(&mut out, module, &ctx);
     dump_types_members(&mut out, module, &ctx);
@@ -34,25 +33,16 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     out
 }
 
-fn dump_header(out: &mut String, module: &Module, ctx: &DumpContext) {
-    let c = &ctx.colors;
-    let header = module.header();
-    writeln!(out, "{}[flags]{}", c.blue, c.reset).unwrap();
-    writeln!(out, "linked = {}", header.is_linked()).unwrap();
-    out.push('\n');
-}
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
-    /// Whether the bytecode is linked (contains grammar IDs vs StringIds).
-    is_linked: bool,
     /// Maps step ID to entrypoint name for labeling.
     step_labels: BTreeMap<u16, String>,
-    /// Maps node type ID to name (linked mode only).
+    /// Maps node type ID to name.
     node_type_names: BTreeMap<u16, String>,
-    /// Maps node field ID to name (linked mode only).
+    /// Maps node field ID to name.
     node_field_names: BTreeMap<u16, String>,
-    /// All strings (for unlinked mode lookups).
+    /// All strings (for predicate values, regex patterns, etc).
     all_strings: Vec<String>,
     /// Width for string indices (S#).
     str_width: usize,
@@ -71,7 +61,6 @@ struct DumpContext {
 impl DumpContext {
     fn new(module: &Module, colors: Colors) -> Self {
         let header = module.header();
-        let is_linked = header.is_linked();
         let strings = module.strings();
         let entrypoints = module.entrypoints();
         let node_types = module.node_types();
@@ -114,7 +103,6 @@ impl DumpContext {
         let step_width = width_for_count(header.transitions_count as usize);
 
         Self {
-            is_linked,
             step_labels,
             node_type_names,
             node_field_names,
@@ -133,29 +121,13 @@ impl DumpContext {
     }
 
     /// Get the name for a node type ID.
-    ///
-    /// In linked mode, this looks up the grammar's node type symbol table.
-    /// In unlinked mode, this looks up the StringId from the strings table.
     fn node_type_name(&self, id: u16) -> Option<&str> {
-        if self.is_linked {
-            self.node_type_names.get(&id).map(|s| s.as_str())
-        } else {
-            // In unlinked mode, id is a StringId
-            self.all_strings.get(id as usize).map(|s| s.as_str())
-        }
+        self.node_type_names.get(&id).map(|s| s.as_str())
     }
 
     /// Get the name for a node field ID.
-    ///
-    /// In linked mode, this looks up the grammar's node field symbol table.
-    /// In unlinked mode, this looks up the StringId from the strings table.
     fn node_field_name(&self, id: u16) -> Option<&str> {
-        if self.is_linked {
-            self.node_field_names.get(&id).map(|s| s.as_str())
-        } else {
-            // In unlinked mode, id is a StringId
-            self.all_strings.get(id as usize).map(|s| s.as_str())
-        }
+        self.node_field_names.get(&id).map(|s| s.as_str())
     }
 }
 

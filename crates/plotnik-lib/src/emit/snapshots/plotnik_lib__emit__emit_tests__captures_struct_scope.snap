@@ -1,17 +1,16 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Test = {(a) @a (b) @b} @item
+Test = {(identifier) @a (number) @b} @item
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
 S2 "b"
 S3 "item"
 S4 "Test"
+S5 "identifier"
+S6 "number"
 
 [type_defs]
 T0 = <Node>
@@ -44,7 +43,7 @@ Test:
   06   ε                                    08
   07  ...  
   08   ε   [Obj]                            10
-  10   !   (a) [Node Set(M0)]               12
-  12   ▷   (b) [Node Set(M1)]               14
+  10   !   (identifier) [Node Set(M0)]      12
+  12   ▷   (number) [Node Set(M1)]          14
   14   ε   [EndObj Set(M2)]                 16
   16                                        ▶

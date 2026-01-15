@@ -8,7 +8,7 @@ use arborium_tree_sitter as tree_sitter;
 use plotnik_langs::Lang;
 use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Entrypoint, Module};
-use plotnik_lib::emit::emit_linked;
+use plotnik_lib::emit::emit;
 
 use super::lang_resolver::{resolve_lang_required, suggest_language};
 use super::query_loader::load_query_source;
@@ -193,7 +193,7 @@ pub fn prepare_query(input: QueryInput) -> PreparedQuery {
         std::process::exit(1);
     }
 
-    let bytecode = emit_linked(&query).expect("emit failed");
+    let bytecode = emit(&query).expect("emit failed");
     let module = Module::load(&bytecode).expect("module load failed");
 
     let entrypoint = resolve_entrypoint(&module, input.entry);

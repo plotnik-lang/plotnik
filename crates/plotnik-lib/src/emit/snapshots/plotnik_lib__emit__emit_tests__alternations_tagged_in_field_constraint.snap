@@ -1,11 +1,8 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Test = (foo field: [A: (x) @a B: (y)] @kind)
+Test = (pair key: [A: (identifier) @a B: (number)] @kind)
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -13,10 +10,10 @@ S2 "A"
 S3 "B"
 S4 "kind"
 S5 "Test"
-S6 "foo"
-S7 "field"
-S8 "x"
-S9 "y"
+S6 "pair"
+S7 "identifier"
+S8 "number"
+S9 "key"
 
 [type_defs]
 T0 = <Void>
@@ -46,11 +43,11 @@ _ObjWrap:
 
 Test:
   06   ε                                    07
-  07   !   (foo)                            08
-  08   ▽   field: _                         09
+  07   !   (pair)                           08
+  08   ▽   key: _                           09
   09   ε                                    12, 16
   11                                        ▶
-  12   !   [Enum(M1)] (x) [Node Set(M0) EndEnum Set(M3)]  18
+  12   !   [Enum(M1)] (identifier) [Node Set(M0) EndEnum Set(M3)]  18
   15  ...  
-  16   !   [Enum(M2)] (y) [EndEnum Set(M3)]  18
+  16   !   [Enum(M2)] (number) [EndEnum Set(M3)]  18
   18   △   _                                11

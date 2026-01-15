@@ -1,16 +1,13 @@
 ---
 source: crates/plotnik-lib/src/emit/emit_tests.rs
 ---
-Test = (parent . (first))
+Test = (array . (identifier))
 ---
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "Test"
-S2 "parent"
-S3 "first"
+S2 "array"
+S3 "identifier"
 
 [type_defs]
 T0 = <Void>
@@ -32,7 +29,7 @@ _ObjWrap:
 
 Test:
   06   ε                                    07
-  07   !   (parent)                         08
-  08  !▽   (first)                          09
+  07   !   (array)                          08
+  08  !▽   (identifier)                     09
   09   △   _                                10
   10                                        ▶

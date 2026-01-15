@@ -28,6 +28,40 @@ pub fn resolve_lang_required(lang_name: &str) -> Result<Lang, String> {
     plotnik_langs::from_name(lang_name).ok_or_else(|| format!("unknown language: '{}'", lang_name))
 }
 
+/// Resolve language with user-friendly error handling.
+/// Tries explicit flag first, then infers from query path.
+/// Exits with error message if language cannot be determined.
+pub fn require_lang(
+    explicit: Option<&str>,
+    query_path: Option<&std::path::Path>,
+    command: &str,
+) -> Lang {
+    if let Some(lang_name) = explicit {
+        match resolve_lang_required(lang_name) {
+            Ok(l) => return l,
+            Err(msg) => {
+                eprintln!("error: {}", msg);
+                if let Some(suggestion) = suggest_language(lang_name) {
+                    eprintln!();
+                    eprintln!("Did you mean '{}'?", suggestion);
+                }
+                eprintln!();
+                eprintln!("Run 'plotnik langs' for the full list.");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if let Some(l) = resolve_lang(None, query_path) {
+        return l;
+    }
+
+    eprintln!("error: language is required for {}", command);
+    eprintln!();
+    eprintln!("hint: use -l <language> to specify the target language");
+    std::process::exit(1);
+}
+
 /// Suggest similar language names for typos.
 pub fn suggest_language(input: &str) -> Option<String> {
     let input_lower = input.to_lowercase();
