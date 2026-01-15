@@ -50,7 +50,5 @@ Test:
   08   ▽   (array) [Node Set(M1)]           10
   10   ▽   (array) [Node Set(M2)]           12
   12   ▽   (identifier) [Node Set(M3)]      14
-  14   △   _                                15
-  15   △   _                                16
-  16   △   _                                17
-  17                                        ▶
+  14   △³  _                                15
+  15                                        ▶

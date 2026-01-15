@@ -43,6 +43,5 @@ Test:
   06   !   (array) [Node Set(M0)]           08
   08   ▽   (array) [Node Set(M1)]           10
   10   ▽   (identifier) [Node Set(M2)]      12
-  12   △   _                                13
-  13   △   _                                14
-  14                                        ▶
+  12   △²  _                                13
+  13                                        ▶
