@@ -3,7 +3,7 @@
 //! Navigation determines how the VM moves through the tree-sitter AST.
 
 /// Navigation command for VM execution.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 pub enum Nav {
     /// Epsilon transition: pure control flow, no cursor movement or node check.
     /// Used for branching, quantifier loops, and effect-only transitions.
