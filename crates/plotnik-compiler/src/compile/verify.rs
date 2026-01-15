@@ -23,7 +23,7 @@ use super::compiler::CompileCtx;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticOp {
     /// Navigation (non-epsilon only, full detail preserved).
-    Nav(NavKind),
+    Nav(Nav),
 
     /// Named node match with optional type name.
     MatchNamed(Option<String>),
@@ -58,44 +58,6 @@ pub enum SemanticOp {
     CycleMarker(usize),
 }
 
-/// Navigation kind for fingerprinting.
-///
-/// Preserves full detail including Skip/Exact variants since these are semantically
-/// significant (determined by anchors).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum NavKind {
-    Stay,
-    StayExact,
-    Next,
-    NextSkip,
-    NextExact,
-    Down,
-    DownSkip,
-    DownExact,
-    Up(u8),
-    UpSkipTrivia(u8),
-    UpExact(u8),
-}
-
-impl From<Nav> for NavKind {
-    fn from(nav: Nav) -> Self {
-        match nav {
-            Nav::Epsilon => unreachable!("Epsilon should be filtered"),
-            Nav::Stay => Self::Stay,
-            Nav::StayExact => Self::StayExact,
-            Nav::Next => Self::Next,
-            Nav::NextSkip => Self::NextSkip,
-            Nav::NextExact => Self::NextExact,
-            Nav::Down => Self::Down,
-            Nav::DownSkip => Self::DownSkip,
-            Nav::DownExact => Self::DownExact,
-            Nav::Up(n) => Self::Up(n),
-            Nav::UpSkipTrivia(n) => Self::UpSkipTrivia(n),
-            Nav::UpExact(n) => Self::UpExact(n),
-        }
-    }
-}
-
 /// A semantic path: sequence of operations along one execution path.
 pub type Path = Vec<SemanticOp>;
 
@@ -115,7 +77,7 @@ fn collect_ops_from_match(instr: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> 
 
     // Epsilons are pure control flow - they don't navigate or check node types
     if instr.nav != Nav::Epsilon {
-        ops.push(SemanticOp::Nav(instr.nav.into()));
+        ops.push(SemanticOp::Nav(instr.nav));
 
         // Only non-epsilons perform actual node type checks
         match &instr.node_type {
