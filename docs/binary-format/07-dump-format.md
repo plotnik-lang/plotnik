@@ -81,6 +81,22 @@ Value:
 - **`Value`**: The compiled query definition. Step 08 branches to try `Num` (step 11) or `Str` (step 16).
 - **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
+### Regex Section
+
+When the query contains regex predicates (`=~` or `!~`), a `[regex]` section appears after `[strings]`:
+
+```
+[regex]
+R1 /pattern/
+R2 /another.*/
+```
+
+Format: `R<id> /<pattern>/`
+
+- Index 0 is reserved, so regex IDs start at 1
+- Patterns are displayed from the string table for readability
+- In transitions, predicates reference patterns inline: `(identifier) =~ /foo/`
+
 ## Files
 
 - `crates/plotnik-lib/src/bytecode/dump.rs` — Dump formatting logic
@@ -184,6 +200,7 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Prefix | Section      | Description |
 | ------ | ------------ | ----------- |
 | S##    | strings      | StringId    |
+| R##    | regex        | RegexId     |
 | T##    | type_defs    | TypeId      |
 | M##    | type_members | MemberIndex |
 | N##    | type_names   | NameIndex   |
