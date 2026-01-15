@@ -245,7 +245,7 @@ lang-zsh = ["plotnik-langs/lang-zsh"]
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 plotnik-core.workspace = true
-plotnik-langs = { path = "../plotnik-langs", version = "0.3.1", default-features = false }
+plotnik-langs = { path = "../plotnik-langs", version = "0.3.2", default-features = false }
 plotnik-lib.workspace = true
 arborium-tree-sitter = "2.10.0"
 serde = { version = "1.0", features = ["derive"] }
