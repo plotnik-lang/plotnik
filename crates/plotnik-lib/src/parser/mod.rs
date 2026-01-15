@@ -42,8 +42,8 @@ pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub use ast::{
     AltExpr, AltKind, Anchor, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
-    NegatedField, QuantifiedExpr, Ref, Root, SeqExpr, SeqItem, Type, is_truly_empty_scope,
-    token_src,
+    NegatedField, NodePredicate, PredicateOp, PredicateValue, QuantifiedExpr, Ref, RegexLiteral,
+    Root, SeqExpr, SeqItem, Type, is_truly_empty_scope, token_src,
 };
 
 pub use core::{ParseResult, Parser};

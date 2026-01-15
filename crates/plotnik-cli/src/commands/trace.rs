@@ -39,7 +39,7 @@ pub fn run(args: TraceArgs) {
         color: args.color,
     });
 
-    let vm = VM::builder(&tree)
+    let vm = VM::builder(&source_code, &tree)
         .trivia_types(trivia_types)
         .exec_fuel(args.fuel)
         .build();

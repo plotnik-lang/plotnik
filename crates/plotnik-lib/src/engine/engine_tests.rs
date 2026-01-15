@@ -33,7 +33,7 @@ fn execute_with_entry(query: &str, source: &str, entry: Option<&str>) -> String 
 
     let tree = lang.parse(source);
     let trivia = build_trivia_types(&module);
-    let vm = VM::builder(&tree).trivia_types(trivia).build();
+    let vm = VM::builder(source, &tree).trivia_types(trivia).build();
 
     let entrypoint = resolve_entrypoint(&module, entry);
     let effects = vm

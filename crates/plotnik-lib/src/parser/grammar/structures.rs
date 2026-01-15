@@ -3,7 +3,8 @@ use rowan::{Checkpoint, TextRange};
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::token_sets::{
-    ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, SEPARATORS, SEQ_RECOVERY_TOKENS, TREE_RECOVERY_TOKENS,
+    ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, PREDICATE_OPS, SEPARATORS, SEQ_RECOVERY_TOKENS,
+    TREE_RECOVERY_TOKENS,
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
 use crate::parser::lexer::token_text;
@@ -99,7 +100,89 @@ impl Parser<'_, '_> {
                 }
             }
         }
+
+        // Parse optional predicate: `(identifier == "foo")` or `(identifier =~ /pattern/)`
+        if !is_ref && self.currently_is_one_of(PREDICATE_OPS) {
+            self.parse_node_predicate();
+        }
+
         (is_ref, ref_name)
+    }
+
+    /// Parse a node predicate: `== "value"`, `=~ /pattern/`, etc.
+    fn parse_node_predicate(&mut self) {
+        self.start_node(SyntaxKind::NodePredicate);
+
+        // Consume the operator
+        self.bump();
+
+        // Parse the value (string or regex)
+        match self.current() {
+            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
+                self.bump_string_tokens();
+            }
+            SyntaxKind::RegexLiteral => {
+                // Regex literal from compound token - wrap in Regex node
+                self.start_node(SyntaxKind::Regex);
+                self.bump();
+                self.finish_node();
+            }
+            SyntaxKind::Slash => {
+                // Standalone slash - parse as regex (fallback, shouldn't happen normally)
+                self.parse_regex_literal();
+            }
+            _ => {
+                self.error(DiagnosticKind::ExpectedPredicateValue);
+            }
+        }
+
+        self.finish_node();
+    }
+
+    /// Parse a regex literal: `/pattern/`
+    ///
+    /// Regex literals consume all content verbatim (including whitespace and
+    /// comment-like sequences) until an unescaped closing `/` is found.
+    fn parse_regex_literal(&mut self) {
+        self.start_node(SyntaxKind::Regex);
+        self.bump(); // opening '/'
+
+        let mut found_close = false;
+
+        while !self.eof() && !self.has_fatal_error() {
+            let kind = self.nth_raw(0);
+
+            // Inside regex, include ALL tokens (trivia too)
+            if kind != SyntaxKind::Slash {
+                self.bump();
+                continue;
+            }
+
+            // Check for escaped slash by counting trailing backslashes in source
+            let slash_start: usize = self.tokens[self.pos].span.start().into();
+            let backslash_count = self.source[..slash_start]
+                .chars()
+                .rev()
+                .take_while(|&c| c == '\\')
+                .count();
+
+            // Odd number of backslashes means the slash is escaped
+            if backslash_count % 2 == 1 {
+                self.bump();
+                continue;
+            }
+
+            found_close = true;
+            break;
+        }
+
+        if found_close {
+            self.bump(); // closing '/'
+        } else {
+            self.error(DiagnosticKind::UnclosedRegex);
+        }
+
+        self.finish_node();
     }
 
     fn parse_tree_error(&mut self, checkpoint: Checkpoint) {
@@ -211,7 +294,7 @@ impl Parser<'_, '_> {
                 self.parse_expr();
                 continue;
             }
-            if self.currently_is(SyntaxKind::Predicate) {
+            if self.currently_is(SyntaxKind::TsPredicate) {
                 self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
                 continue;
             }

@@ -17,7 +17,7 @@ impl Parser<'_, '_> {
             return false;
         }
 
-        if self.currently_is(SyntaxKind::Predicate) {
+        if self.currently_is(SyntaxKind::TsPredicate) {
             self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
             return false;
         }

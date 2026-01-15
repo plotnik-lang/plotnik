@@ -188,6 +188,21 @@ impl<'a, 'q> Linker<'a, 'q> {
             Expr::NamedNode(node) => {
                 let child_ctx = self.make_node_context(node);
 
+                // Predicates are only valid on leaf nodes (grammar check)
+                if let Some(pred) = node.predicate()
+                    && let Some(ctx) = &child_ctx
+                    && (!self.lang.valid_child_types(ctx.parent_id).is_empty()
+                        || !self.lang.fields_for_node_type(ctx.parent_id).is_empty())
+                {
+                    self.diagnostics
+                        .report(
+                            self.source_id,
+                            DiagnosticKind::PredicateOnNonLeaf,
+                            pred.as_cst().text_range(),
+                        )
+                        .emit();
+                }
+
                 for child in node.children() {
                     if let Expr::FieldExpr(f) = &child {
                         self.validate_field_expr(f, child_ctx.as_ref(), visited);

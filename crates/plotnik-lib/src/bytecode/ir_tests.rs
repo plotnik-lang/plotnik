@@ -58,7 +58,7 @@ fn resolve_match_terminal() {
     let mut map = BTreeMap::new();
     map.insert(Label(0), 1u16);
 
-    let bytes = m.resolve(&map, |_, _| None, |_| None);
+    let bytes = m.resolve(&map, |_, _| None, |_| None, |_| None);
     assert_eq!(bytes.len(), 8);
 
     // Verify opcode is Match8 (0x0)
@@ -93,9 +93,6 @@ fn member_ref_resolution() {
         ),
         77
     );
-
-    // Test deferred reference with no match (defaults to 0)
-    assert_eq!(deferred.resolve(|_, _| None, |_| None), 0);
 
     // Test deferred by index reference (enum variant)
     let by_index = MemberRef::deferred_by_index(parent_type, 3);

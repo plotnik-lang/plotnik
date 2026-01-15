@@ -36,6 +36,7 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
 /// Post-processes the Logos output:
 /// - Coalesces consecutive lexer errors into single `Garbage` tokens
 /// - Splits `StringLiteral` tokens into quote + content + quote
+/// - Splits `RegexPredicateMatch`/`RegexPredicateNoMatch` into operator + whitespace + regex
 pub fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut lexer = SyntaxKind::lexer(source);
@@ -53,10 +54,19 @@ pub fn lex(source: &str) -> Vec<Token> {
                 }
 
                 let span = lexer.span();
-                if kind == SyntaxKind::StringLiteral {
-                    split_string_literal(source, span, &mut tokens);
-                } else {
-                    tokens.push(Token::new(kind, range_to_text_range(span)));
+                match kind {
+                    SyntaxKind::StringLiteral => {
+                        split_string_literal(source, span, &mut tokens);
+                    }
+                    SyntaxKind::RegexPredicateMatch => {
+                        split_regex_predicate(source, span, SyntaxKind::OpRegexMatch, &mut tokens);
+                    }
+                    SyntaxKind::RegexPredicateNoMatch => {
+                        split_regex_predicate(source, span, SyntaxKind::OpRegexNoMatch, &mut tokens);
+                    }
+                    _ => {
+                        tokens.push(Token::new(kind, range_to_text_range(span)));
+                    }
                 }
             }
             Some(Err(())) => {
@@ -105,6 +115,40 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
     }
 
     tokens.push(Token::new(quote_kind, range_to_text_range(end - 1..end)));
+}
+
+/// Splits a regex predicate token into: operator + whitespace (if any) + regex literal
+///
+/// Input: `=~ /pattern/` or `!~ /pattern/`
+/// Output: `OpRegexMatch`/`OpRegexNoMatch` + `Whitespace`? + `RegexLiteral`
+fn split_regex_predicate(
+    source: &str,
+    span: Range<usize>,
+    op_kind: SyntaxKind,
+    tokens: &mut Vec<Token>,
+) {
+    let text = &source[span.clone()];
+    let start = span.start;
+
+    // Operator is always 2 chars (=~ or !~)
+    tokens.push(Token::new(op_kind, range_to_text_range(start..start + 2)));
+
+    // Find where whitespace ends (where `/` starts)
+    let regex_start_in_text = text[2..].find('/').unwrap() + 2;
+
+    // Emit whitespace if present
+    if regex_start_in_text > 2 {
+        tokens.push(Token::new(
+            SyntaxKind::Whitespace,
+            range_to_text_range(start + 2..start + regex_start_in_text),
+        ));
+    }
+
+    // Emit regex literal (includes delimiters)
+    tokens.push(Token::new(
+        SyntaxKind::RegexLiteral,
+        range_to_text_range(start + regex_start_in_text..span.end),
+    ));
 }
 
 /// Retrieves the text slice for a token. O(1) slice into source.

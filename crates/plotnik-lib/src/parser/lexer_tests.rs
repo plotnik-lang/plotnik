@@ -282,22 +282,22 @@ fn error_unexpected_xml_self_closing() {
 
 #[test]
 fn error_predicate_eq() {
-    insta::assert_snapshot!(snapshot("#eq?"), @r##"Predicate "#eq?""##);
+    insta::assert_snapshot!(snapshot("#eq?"), @r##"TsPredicate "#eq?""##);
 }
 
 #[test]
 fn error_predicate_match() {
-    insta::assert_snapshot!(snapshot("#match?"), @r##"Predicate "#match?""##);
+    insta::assert_snapshot!(snapshot("#match?"), @r##"TsPredicate "#match?""##);
 }
 
 #[test]
 fn error_predicate_set() {
-    insta::assert_snapshot!(snapshot("#set!"), @r##"Predicate "#set!""##);
+    insta::assert_snapshot!(snapshot("#set!"), @r##"TsPredicate "#set!""##);
 }
 
 #[test]
 fn error_predicate_no_suffix() {
-    insta::assert_snapshot!(snapshot("#is_not"), @r##"Predicate "#is_not""##);
+    insta::assert_snapshot!(snapshot("#is_not"), @r##"TsPredicate "#is_not""##);
 }
 
 #[test]

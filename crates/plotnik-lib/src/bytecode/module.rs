@@ -345,7 +345,7 @@ impl Module {
     fn regex_table_slice(&self) -> &[u8] {
         let offset = self.offsets.regex_table as usize;
         let count = self.header.regex_table_count as usize;
-        &self.storage[offset..offset + (count + 1) * 4]
+        &self.storage[offset..offset + (count + 1) * 8]
     }
 }
 
@@ -453,20 +453,38 @@ impl<'a> TriviaView<'a> {
 }
 
 /// View into the regex table for lazy DFA lookup.
+///
+/// Table format per entry: `string_id (u16) | reserved (u16) | offset (u32)` = 8 bytes.
+/// This allows access to both the pattern string (via StringTable) and DFA bytes.
 pub struct RegexView<'a> {
     blob: &'a [u8],
     table: &'a [u8],
 }
 
 impl<'a> RegexView<'a> {
-    /// Get regex blob bytes by index.
+    /// Entry size in bytes: string_id (u16) + reserved (u16) + offset (u32).
+    const ENTRY_SIZE: usize = 8;
+
+    /// Get regex DFA bytes by index.
     ///
     /// Returns the raw DFA bytes for the regex at the given index.
     /// Use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
     pub fn get_by_index(&self, idx: usize) -> &'a [u8] {
-        let start = read_u32_le(self.table, idx * 4) as usize;
-        let end = read_u32_le(self.table, (idx + 1) * 4) as usize;
+        let entry_offset = idx * Self::ENTRY_SIZE;
+        let next_entry_offset = (idx + 1) * Self::ENTRY_SIZE;
+
+        let start = read_u32_le(self.table, entry_offset + 4) as usize;
+        let end = read_u32_le(self.table, next_entry_offset + 4) as usize;
         &self.blob[start..end]
+    }
+
+    /// Get the StringId of the pattern for a regex by index.
+    ///
+    /// This allows looking up the pattern text from StringTable for display.
+    pub fn get_string_id(&self, idx: usize) -> super::StringId {
+        let entry_offset = idx * Self::ENTRY_SIZE;
+        let string_id = read_u16_le(self.table, entry_offset);
+        super::StringId::new(string_id)
     }
 }
 

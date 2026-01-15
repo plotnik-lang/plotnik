@@ -301,6 +301,28 @@ impl<'a> Match<'a> {
         self.has_predicate
     }
 
+    /// Get predicate data if present: (op, is_regex, value_ref).
+    ///
+    /// - `op`: operator (0=Eq, 1=Ne, 2=StartsWith, 3=EndsWith, 4=Contains, 5=RegexMatch, 6=RegexNoMatch)
+    /// - `is_regex`: true if value_ref is a RegexTable index, false if StringTable index
+    /// - `value_ref`: index into the appropriate table
+    pub fn predicate(&self) -> Option<(u8, bool, u16)> {
+        if !self.has_predicate {
+            return None;
+        }
+
+        let effects_size =
+            (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2;
+        let offset = 8 + effects_size;
+
+        let op_and_flags = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
+        let op = (op_and_flags & 0xFF) as u8;
+        let is_regex = (op_and_flags >> 8) & 0x1 != 0;
+        let value_ref = u16::from_le_bytes([self.bytes[offset + 2], self.bytes[offset + 3]]);
+
+        Some((op, is_regex, value_ref))
+    }
+
     /// Byte offset where successors start in the payload.
     /// Accounts for predicate (4 bytes) if present.
     #[inline]

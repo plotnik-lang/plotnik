@@ -7,13 +7,16 @@ use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{TypeContext, TypeId};
-use crate::bytecode::Label;
-use crate::bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry};
+use crate::bytecode::{
+    Entrypoint, FieldSymbol, Header, InstructionIR, Label, NodeSymbol, PredicateValueIR,
+    SECTION_ALIGN, TriviaEntry,
+};
 use crate::compile::Compiler;
 use crate::query::LinkedQuery;
 
 use super::EmitError;
 use super::layout::CacheAligned;
+use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
@@ -118,16 +121,18 @@ fn emit_inner(
     // Trivia (empty for now)
     let trivia_entries: Vec<TriviaEntry> = Vec::new();
 
-    // Regex (empty for now - predicates not yet implemented)
-    let regex_table: Vec<u8> = vec![0, 0, 0, 0]; // sentinel: single u32 = 0
-    let regex_blob: Vec<u8> = Vec::new();
+    // Build regex table from predicates in compiled instructions
+    let mut regexes = RegexTableBuilder::new();
+    intern_regex_predicates(&compile_result.instructions, &strings, &mut regexes)?;
+    regexes.validate()?;
 
     // Resolve and serialize transitions
     let transitions_bytes =
-        emit_transitions(&compile_result.instructions, &layout, &types, &strings);
+        emit_transitions(&compile_result.instructions, &layout, &types, &strings, &regexes);
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
+    let (regex_blob, regex_table) = regexes.emit();
     let (type_defs_bytes, type_members_bytes, type_names_bytes) = types.emit();
 
     let node_types_bytes = emit_node_symbols(&node_symbols);
@@ -163,7 +168,7 @@ fn emit_inner(
         node_types_count: node_symbols.len() as u16,
         node_fields_count: field_symbols.len() as u16,
         trivia_count: trivia_entries.len() as u16,
-        regex_table_count: 0, // no regexes yet
+        regex_table_count: regexes.len() as u16,
         type_defs_count: types.type_defs_count() as u16,
         type_members_count: types.type_members_count() as u16,
         type_names_count: types.type_names_count() as u16,
@@ -196,6 +201,7 @@ fn emit_transitions(
     layout: &crate::bytecode::LayoutResult,
     types: &TypeTableBuilder,
     strings: &StringTableBuilder,
+    regexes: &RegexTableBuilder,
 ) -> Vec<u8> {
     // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps as usize * 8];
@@ -208,6 +214,9 @@ fn emit_transitions(
     };
     let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
 
+    // Predicate regex resolution closure.
+    let lookup_regex = |string_id: crate::bytecode::StringId| regexes.get(string_id);
+
     for instr in instructions {
         let label = instr.label();
         let Some(&step_id) = layout.label_to_step.get(&label) else {
@@ -215,7 +224,7 @@ fn emit_transitions(
         };
 
         let offset = step_id as usize * 8; // STEP_SIZE
-        let resolved = instr.resolve(&layout.label_to_step, lookup_member, get_member_base);
+        let resolved = instr.resolve(&layout.label_to_step, lookup_member, get_member_base, lookup_regex);
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();
@@ -225,6 +234,24 @@ fn emit_transitions(
     }
 
     bytes
+}
+
+/// Pre-scan instructions for regex predicates and intern them.
+fn intern_regex_predicates(
+    instructions: &[InstructionIR],
+    strings: &StringTableBuilder,
+    regexes: &mut RegexTableBuilder,
+) -> Result<(), EmitError> {
+    for instr in instructions {
+        if let InstructionIR::Match(m) = instr
+            && let Some(pred) = &m.predicate
+            && let PredicateValueIR::Regex(string_id) = &pred.value
+        {
+            let pattern = strings.get_str(*string_id);
+            regexes.intern(pattern, *string_id)?;
+        }
+    }
+    Ok(())
 }
 
 fn emit_section(output: &mut Vec<u8>, data: &[u8]) {

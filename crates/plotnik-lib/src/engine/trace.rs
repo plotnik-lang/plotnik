@@ -28,6 +28,7 @@ use crate::bytecode::{
     EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, Symbol, cols,
     format_effect, trace, truncate_text, width_for_count,
 };
+use crate::parser::PredicateOp;
 
 use super::effect::RuntimeEffect;
 
@@ -183,6 +184,10 @@ pub struct PrintTracer<'s> {
     pub(crate) node_field_names: BTreeMap<u16, String>,
     /// Maps member index to name (for Set/Enum effect display).
     pub(crate) member_names: Vec<String>,
+    /// All strings from StringTable (for predicate value display).
+    pub(crate) all_strings: Vec<String>,
+    /// Regex patterns indexed by RegexId (for predicate display).
+    pub(crate) regex_patterns: Vec<String>,
     /// Maps entrypoint target IP to name (for labels and call/return).
     pub(crate) entrypoint_by_ip: BTreeMap<u16, String>,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
@@ -234,6 +239,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     pub fn build(self) -> PrintTracer<'s> {
         let header = self.module.header();
         let strings = self.module.strings();
+        let regexes = self.module.regexes();
         let types = self.module.types();
         let node_types = self.module.node_types();
         let node_fields = self.module.node_fields();
@@ -256,6 +262,19 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             .map(|i| strings.get(types.get_member(i).name).to_string())
             .collect();
 
+        // Build all_strings for predicate value display (same as dump.rs)
+        let all_strings: Vec<String> = (0..header.str_table_count as usize)
+            .map(|i| strings.get_by_index(i).to_string())
+            .collect();
+
+        // Build regex patterns (indexed by RegexId → pattern string)
+        // Index 0 is reserved, so we start with an empty string placeholder
+        let mut regex_patterns = vec![String::new()];
+        for i in 1..header.regex_table_count as usize {
+            let string_id = regexes.get_string_id(i);
+            regex_patterns.push(strings.get(string_id).to_string());
+        }
+
         // Build entrypoint IP -> name lookup
         let mut entrypoint_by_ip = BTreeMap::new();
         for i in 0..entrypoints.len() {
@@ -273,6 +292,8 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             node_type_names,
             node_field_names,
             member_names,
+            all_strings,
+            regex_patterns,
             entrypoint_by_ip,
             checkpoint_ips: Vec::new(),
             definition_stack: Vec::new(),
@@ -388,7 +409,7 @@ impl<'s> PrintTracer<'s> {
 
     /// Format match content for instruction line (matches dump format exactly).
     ///
-    /// Order: [pre-effects] !neg_fields field: (type) [post-effects]
+    /// Order: [pre-effects] !neg_fields field: (type) predicate [post-effects]
     fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
@@ -410,6 +431,19 @@ impl<'s> PrintTracer<'s> {
             let node_part = self.format_node_pattern(m);
             if !node_part.is_empty() {
                 parts.push(node_part);
+            }
+
+            // Predicate: == "value" or =~ /pattern/
+            if let Some((op, is_regex, value_ref)) = m.predicate() {
+                let op = PredicateOp::from_byte(op);
+                let value = if is_regex {
+                    let pattern = &self.regex_patterns[value_ref as usize];
+                    format!("/{}/", pattern)
+                } else {
+                    let s = &self.all_strings[value_ref as usize];
+                    format!("{:?}", s)
+                };
+                parts.push(format!("{} {}", op.as_str(), value));
             }
         }
 
@@ -716,7 +750,10 @@ impl Tracer for PrintTracer<'_> {
             .pending_return_ip
             .take()
             .expect("trace_return without trace_instruction");
-        let name = self.definition_stack.pop().unwrap_or_default();
+        let name = self
+            .definition_stack
+            .pop()
+            .expect("trace_return requires balanced call stack");
         let content = self.format_def_name(&name);
         // Show ◼ when returning from top-level (stack now empty)
         let is_top_level = self.definition_stack.is_empty();

@@ -4,10 +4,12 @@
 //! - Alternation kind consistency (alt_kinds)
 //! - Anchor placement rules (anchors)
 //! - Empty constructs (empty_constructs)
+//! - Predicate regex patterns (predicates)
 
 pub mod alt_kinds;
 pub mod anchors;
 pub mod empty_constructs;
+pub mod predicates;
 
 #[cfg(test)]
 mod alt_kinds_tests;
@@ -15,7 +17,10 @@ mod alt_kinds_tests;
 mod anchors_tests;
 #[cfg(test)]
 mod empty_constructs_tests;
+#[cfg(test)]
+mod predicates_tests;
 
 pub use alt_kinds::validate_alt_kinds;
 pub use anchors::validate_anchors;
 pub use empty_constructs::validate_empty_constructs;
+pub use predicates::validate_predicates;

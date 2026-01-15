@@ -137,6 +137,49 @@ pub enum SyntaxKind {
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
+    /// `==` for predicate equals
+    #[token("==")]
+    OpEq,
+
+    /// `!=` for predicate not equals
+    #[token("!=")]
+    OpNe,
+
+    /// `^=` for predicate starts-with
+    #[token("^=")]
+    OpStartsWith,
+
+    /// `$=` for predicate ends-with
+    #[token("$=")]
+    OpEndsWith,
+
+    /// `*=` for predicate contains (defined after `Star` for correct precedence)
+    #[token("*=")]
+    OpContains,
+
+    /// `=~` for predicate regex match (when followed by string or error)
+    #[token("=~")]
+    OpRegexMatch,
+
+    /// `!~` for predicate regex no-match (when followed by string or error)
+    #[token("!~")]
+    OpRegexNoMatch,
+
+    /// `=~` followed by regex literal: `=~ /pattern/`
+    /// Compound token to avoid `//` being lexed as line comment.
+    #[regex(r"=~[ \t\r\n]*/", lex_regex_predicate)]
+    RegexPredicateMatch,
+
+    /// `!~` followed by regex literal: `!~ /pattern/`
+    #[regex(r"!~[ \t\r\n]*/", lex_regex_predicate)]
+    RegexPredicateNoMatch,
+
+    /// Regex literal token (after splitting compound predicate)
+    RegexLiteral,
+
+    /// Regex pattern content (between slashes, set by parser)
+    RegexContent,
+
     /// XML-like tags matched as errors (common LLM output)
     #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
     #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
@@ -144,7 +187,7 @@ pub enum SyntaxKind {
     XMLGarbage,
     /// Tree-sitter predicates (unsupported)
     #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*[?!]?")]
-    Predicate,
+    TsPredicate,
     /// Coalesced unrecognized characters
     Garbage,
     Error,
@@ -164,6 +207,10 @@ pub enum SyntaxKind {
     Anchor,
     NegatedField,
     Def,
+    /// Predicate on a node: `(identifier == "foo")`
+    NodePredicate,
+    /// Regex literal: `/pattern/`
+    Regex,
 
     // Must be last - used for bounds checking in `kind_from_raw`
     #[doc(hidden)]
@@ -171,6 +218,26 @@ pub enum SyntaxKind {
 }
 
 use SyntaxKind::*;
+
+/// Logos callback for regex predicate tokens.
+/// Called after matching `=~\s*/` or `!~\s*/`, consumes until closing unescaped `/`.
+fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
+    let remaining = lexer.remainder();
+    let mut backslash_count = 0;
+
+    for (i, c) in remaining.char_indices() {
+        if c == '/' && backslash_count % 2 == 0 {
+            // Found unescaped closing slash
+            lexer.bump(i + 1);
+            return true;
+        }
+        backslash_count = if c == '\\' { backslash_count + 1 } else { 0 };
+    }
+
+    // No closing slash - consume rest as unclosed regex (parser will error)
+    lexer.bump(remaining.len());
+    true
+}
 
 impl SyntaxKind {
     #[inline]
@@ -180,7 +247,7 @@ impl SyntaxKind {
 
     #[inline]
     pub fn is_error(self) -> bool {
-        matches!(self, Error | XMLGarbage | Garbage | Predicate)
+        matches!(self, Error | XMLGarbage | Garbage | TsPredicate)
     }
 }
 
@@ -214,22 +281,22 @@ pub type SyntaxNode = rowan::SyntaxNode<QLang>;
 pub type SyntaxToken = rowan::SyntaxToken<QLang>;
 pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 
-/// 64-bit bitset of `SyntaxKind`s for O(1) membership testing.
+/// 128-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct TokenSet(u64);
+pub struct TokenSet(u128);
 
 impl TokenSet {
     /// Creates an empty token set.
     pub const EMPTY: TokenSet = TokenSet(0);
 
-    /// Panics at compile time if any kind's discriminant >= 64.
+    /// Panics at compile time if any kind's discriminant >= 128.
     #[inline]
     pub const fn new(kinds: &[SyntaxKind]) -> Self {
-        let mut bits = 0u64;
+        let mut bits = 0u128;
         let mut i = 0;
         while i < kinds.len() {
             let kind = kinds[i] as u16;
-            assert!(kind < 64, "SyntaxKind value exceeds TokenSet capacity");
+            assert!(kind < 128, "SyntaxKind value exceeds TokenSet capacity");
             bits |= 1 << kind;
             i += 1;
         }
@@ -239,14 +306,14 @@ impl TokenSet {
     #[inline]
     pub const fn single(kind: SyntaxKind) -> Self {
         let kind = kind as u16;
-        assert!(kind < 64, "SyntaxKind value exceeds TokenSet capacity");
+        assert!(kind < 128, "SyntaxKind value exceeds TokenSet capacity");
         TokenSet(1 << kind)
     }
 
     #[inline]
     pub const fn contains(&self, kind: SyntaxKind) -> bool {
         let kind = kind as u16;
-        if kind >= 64 {
+        if kind >= 128 {
             return false;
         }
         self.0 & (1 << kind) != 0
@@ -261,7 +328,7 @@ impl TokenSet {
 impl std::fmt::Debug for TokenSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut list = f.debug_set();
-        for i in 0..64u16 {
+        for i in 0..128u16 {
             if self.0 & (1 << i) != 0 && i < __LAST as u16 {
                 let kind: SyntaxKind = unsafe { std::mem::transmute(i) };
                 list.entry(&kind);
@@ -337,4 +404,14 @@ pub mod token_sets {
 
     pub const SEQ_RECOVERY_TOKENS: TokenSet =
         TokenSet::new(&[BraceClose, ParenClose, BracketClose]);
+
+    pub const PREDICATE_OPS: TokenSet = TokenSet::new(&[
+        OpEq,
+        OpNe,
+        OpStartsWith,
+        OpEndsWith,
+        OpContains,
+        OpRegexMatch,
+        OpRegexNoMatch,
+    ]);
 }

@@ -2,7 +2,7 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
-Predicates (`#eq?`, `#match?`) and directives (`#set!`) are intentionally unsupported — filtering logic belongs in your host language.
+Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
 ---
 
@@ -370,6 +370,45 @@ Output type:
 ```typescript
 { left: Node, right: Node }
 ```
+
+### Predicates
+
+Filter nodes by their text content with inline predicates:
+
+```
+(identifier == "foo")         ; text equals "foo"
+(identifier != "bar")         ; text does not equal "bar"
+(identifier ^= "get")         ; text starts with "get"
+(identifier $= "_id")         ; text ends with "_id"
+(identifier *= "test")        ; text contains "test"
+(identifier =~ /^[A-Z]/)      ; text matches regex
+(identifier !~ /^_/)          ; text does not match regex
+```
+
+| Operator | Meaning           |
+| -------- | ----------------- |
+| `==`     | equals            |
+| `!=`     | not equals        |
+| `^=`     | starts with       |
+| `$=`     | ends with         |
+| `*=`     | contains          |
+| `=~`     | matches regex     |
+| `!~`     | does not match    |
+
+**Regex patterns** use `/pattern/` syntax. Full Unicode is supported. Patterns match anywhere in the text (use `^` and `$` anchors for full-match semantics).
+
+```
+(identifier =~ /^test_/)      ; starts with "test_"
+(identifier =~ /Handler$/)    ; ends with "Handler"
+(identifier =~ /^[A-Z][a-z]+(?:[A-Z][a-z]+)*$/)  ; PascalCase
+```
+
+**Unsupported regex features** (compile-time error):
+- Backreferences (`\1`, `\2`)
+- Lookahead/lookbehind (`(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)`)
+- Named captures (`(?P<name>...)`)
+
+Predicates don't affect output types — they're structural constraints like anchors.
 
 ### Anonymous Nodes
 
@@ -938,26 +977,28 @@ type Root = {
 
 ## Quick Reference
 
-| Feature              | Tree-sitter      | Plotnik                   |
-| -------------------- | ---------------- | ------------------------- |
-| Capture              | `@name`          | `@name` (snake_case only) |
-| Suppressive capture  |                  | `@_` or `@_name`          |
-| Type annotation      |                  | `@x :: T`                 |
-| Text extraction      |                  | `@x :: string`            |
-| Named node           | `(type)`         | `(type)`                  |
-| Anonymous node       | `"text"`         | `"text"`                  |
-| Any node             | `_`              | `_`                       |
-| Any named node       | `(_)`            | `(_)`                     |
-| Field constraint     | `field: pattern` | `field: pattern`          |
-| Negated field        | `!field`         | `-field`                  |
-| Quantifiers          | `?` `*` `+`      | `?` `*` `+`               |
-| Non-greedy           |                  | `??` `*?` `+?`            |
-| Sequence             | `((a) (b))`      | `{(a) (b)}`               |
-| Alternation          | `[a b]`          | `[a b]`                   |
-| Tagged alternation   |                  | `[A: (a) B: (b)]`         |
-| Anchor               | `.`              | `.`                       |
-| Named expression     |                  | `Name = pattern`          |
-| Use named expression |                  | `(Name)`                  |
+| Feature              | Tree-sitter        | Plotnik                       |
+| -------------------- | ------------------ | ----------------------------- |
+| Capture              | `@name`            | `@name` (snake_case only)     |
+| Suppressive capture  |                    | `@_` or `@_name`              |
+| Type annotation      |                    | `@x :: T`                     |
+| Text extraction      |                    | `@x :: string`                |
+| Named node           | `(type)`           | `(type)`                      |
+| Anonymous node       | `"text"`           | `"text"`                      |
+| Any node             | `_`                | `_`                           |
+| Any named node       | `(_)`              | `(_)`                         |
+| Field constraint     | `field: pattern`   | `field: pattern`              |
+| Negated field        | `!field`           | `-field`                      |
+| Quantifiers          | `?` `*` `+`        | `?` `*` `+`                   |
+| Non-greedy           |                    | `??` `*?` `+?`                |
+| Sequence             | `((a) (b))`        | `{(a) (b)}`                   |
+| Alternation          | `[a b]`            | `[a b]`                       |
+| Tagged alternation   |                    | `[A: (a) B: (b)]`             |
+| Anchor               | `.`                | `.`                           |
+| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`             |
+| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`               |
+| Named expression     |                    | `Name = pattern`              |
+| Use named expression |                    | `(Name)`                      |
 
 ---
 

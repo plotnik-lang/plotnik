@@ -41,10 +41,10 @@ fn test_is_trivia() {
 }
 
 #[test]
-fn test_syntax_kind_count_under_64() {
+fn test_syntax_kind_count_under_128() {
     assert!(
-        (__LAST as u16) < 64,
-        "SyntaxKind has {} variants, exceeds TokenSet capacity of 64",
+        (__LAST as u16) < 128,
+        "SyntaxKind has {} variants, exceeds TokenSet capacity of 128",
         __LAST as u16
     );
 }
@@ -54,7 +54,7 @@ fn test_is_error() {
     assert!(Error.is_error());
     assert!(XMLGarbage.is_error());
     assert!(Garbage.is_error());
-    assert!(Predicate.is_error());
+    assert!(TsPredicate.is_error());
     assert!(!ParenOpen.is_error());
     assert!(!Id.is_error());
     assert!(!Whitespace.is_error());

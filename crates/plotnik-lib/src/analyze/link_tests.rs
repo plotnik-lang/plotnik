@@ -2,6 +2,26 @@ use crate::Query;
 use indoc::indoc;
 
 #[test]
+fn predicate_on_non_leaf() {
+    let input = r"Q = (function_declaration == 'foo')";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: predicates match text content, but this node can contain children
+      |
+    1 | Q = (function_declaration == 'foo')
+      |                           ^^^^^^^^
+    ");
+}
+
+#[test]
+fn predicate_on_leaf_valid() {
+    let input = r#"Q = (identifier == "foo")"#;
+    Query::expect_valid_linking(input);
+}
+
+#[test]
 fn valid_query_with_field() {
     let input = indoc! {r#"
         Q = (function_declaration

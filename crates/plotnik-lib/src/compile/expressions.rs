@@ -11,7 +11,7 @@ use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
 use crate::bytecode::Nav;
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR, PredicateIR};
 use crate::parser::ast::{self, Expr};
 
 use super::Compiler;
@@ -33,20 +33,23 @@ impl Compiler<'_> {
         let node_type = self.resolve_node_type(node);
         let nav = nav_override.unwrap_or(Nav::Stay);
 
-        // Collect items and negated fields
+        // Collect items, negated fields, and predicate
         let items: Vec<_> = node.items().collect();
         let neg_fields = self.collect_neg_fields(node);
+        let predicate = self.compile_predicate(node);
 
         // If no items, just match and exit (capture effects go here)
         if items.is_empty() {
-            return self.emit_match_with_cascade(
-                MatchIR::epsilon(entry, exit)
-                    .nav(nav)
-                    .node_type(node_type)
-                    .neg_fields(neg_fields)
-                    .pre_effects(capture.pre)
-                    .post_effects(capture.post),
-            );
+            let mut m = MatchIR::epsilon(entry, exit)
+                .nav(nav)
+                .node_type(node_type)
+                .neg_fields(neg_fields)
+                .pre_effects(capture.pre)
+                .post_effects(capture.post);
+            if let Some(p) = predicate {
+                m = m.predicate(p);
+            }
+            return self.emit_match_with_cascade(m);
         }
 
         // Determine Up navigation based on trailing anchor
@@ -68,7 +71,7 @@ impl Compiler<'_> {
         // retry with the next sibling until we find one that IS last.
         if has_trailing_anchor {
             return self.compile_named_node_with_trailing_anchor(
-                entry, exit, nav, node_type, neg_fields, &items, up_nav, capture,
+                entry, exit, nav, node_type, neg_fields, predicate, &items, up_nav, capture,
             );
         }
 
@@ -111,14 +114,16 @@ impl Compiler<'_> {
             .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
 
         // Emit entry instruction with node_effects on post (executes right after match)
-        self.emit_match_with_cascade(
-            MatchIR::epsilon(entry, items_entry)
-                .nav(nav)
-                .node_type(node_type)
-                .neg_fields(neg_fields)
-                .pre_effects(capture.pre)
-                .post_effects(entry_effects),
-        );
+        let mut entry_match = MatchIR::epsilon(entry, items_entry)
+            .nav(nav)
+            .node_type(node_type)
+            .neg_fields(neg_fields)
+            .pre_effects(capture.pre)
+            .post_effects(entry_effects);
+        if let Some(p) = predicate {
+            entry_match = entry_match.predicate(p);
+        }
+        self.emit_match_with_cascade(entry_match);
 
         entry
     }
@@ -146,6 +151,7 @@ impl Compiler<'_> {
         nav: Nav,
         node_type: NodeTypeIR,
         neg_fields: Vec<u16>,
+        predicate: Option<PredicateIR>,
         items: &[ast::SeqItem],
         up_nav: Nav,
         capture: CaptureEffects,
@@ -187,13 +193,15 @@ impl Compiler<'_> {
         self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
 
         // entry: match parent node → down_wildcard (only pre_effects here)
-        self.emit_match_with_cascade(
-            MatchIR::epsilon(entry, down_wildcard)
-                .nav(nav)
-                .node_type(node_type)
-                .neg_fields(neg_fields)
-                .pre_effects(capture.pre),
-        );
+        let mut entry_match = MatchIR::epsilon(entry, down_wildcard)
+            .nav(nav)
+            .node_type(node_type)
+            .neg_fields(neg_fields)
+            .pre_effects(capture.pre);
+        if let Some(p) = predicate {
+            entry_match = entry_match.predicate(p);
+        }
+        self.emit_match_with_cascade(entry_match);
 
         entry
     }
@@ -624,5 +632,31 @@ impl Compiler<'_> {
             })
             .map(|id| id.get())
             .collect()
+    }
+
+    /// Compile a predicate from AST to IR.
+    ///
+    /// Returns `Some(PredicateIR)` if the node has a valid predicate, `None` otherwise.
+    pub(super) fn compile_predicate(&mut self, node: &ast::NamedNode) -> Option<PredicateIR> {
+        let pred = node.predicate()?;
+        let op = pred.operator()?;
+
+        // Try string value first
+        if let Some(str_token) = pred.string_value() {
+            let string_id = self.strings.intern_str(str_token.text());
+            return Some(PredicateIR::string(op, string_id));
+        }
+
+        // Try regex value
+        if let Some(regex) = pred.regex() {
+            // Get pattern text by stripping `/` delimiters from CST text
+            let text: String = regex.as_cst().text().into();
+            let without_prefix = text.strip_prefix('/').unwrap_or(&text);
+            let pattern = without_prefix.strip_suffix('/').unwrap_or(without_prefix);
+            let string_id = self.strings.intern_str(pattern);
+            return Some(PredicateIR::regex(op, string_id));
+        }
+
+        None
     }
 }

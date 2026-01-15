@@ -6,6 +6,7 @@ use crate::bytecode::{
     Call, EffectOp, EffectOpcode, Entrypoint, Instruction, Match, Module, Nav, NodeTypeIR,
     StepAddr, Trampoline,
 };
+use crate::parser::PredicateOp;
 
 /// Get the nav for continue_search (always a sibling move).
 /// Up/Stay/Epsilon variants return Next as a default since they don't do sibling search.
@@ -119,10 +120,14 @@ pub struct VM<'t> {
     /// Target address for Trampoline instruction.
     /// Set from entrypoint before execution; Trampoline jumps to this address.
     pub(crate) entrypoint_target: u16,
+
+    /// Source text for predicate evaluation.
+    pub(crate) source: &'t str,
 }
 
 /// Builder for VM instances.
 pub struct VMBuilder<'t> {
+    source: &'t str,
     tree: &'t Tree,
     trivia_types: Vec<u16>,
     limits: FuelLimits,
@@ -130,8 +135,9 @@ pub struct VMBuilder<'t> {
 
 impl<'t> VMBuilder<'t> {
     /// Create a new VM builder.
-    pub fn new(tree: &'t Tree) -> Self {
+    pub fn new(source: &'t str, tree: &'t Tree) -> Self {
         Self {
+            source,
             tree,
             trivia_types: Vec::new(),
             limits: FuelLimits::default(),
@@ -177,20 +183,21 @@ impl<'t> VMBuilder<'t> {
             skip_call_nav: false,
             suppress_depth: 0,
             entrypoint_target: 0,
+            source: self.source,
         }
     }
 }
 
 impl<'t> VM<'t> {
     /// Create a VM builder.
-    pub fn builder(tree: &'t Tree) -> VMBuilder<'t> {
-        VMBuilder::new(tree)
+    pub fn builder(source: &'t str, tree: &'t Tree) -> VMBuilder<'t> {
+        VMBuilder::new(source, tree)
     }
 
     /// Create a new VM for execution.
-    #[deprecated(note = "Use VM::builder(tree).trivia_types(...).build() instead")]
-    pub fn new(tree: &'t Tree, trivia_types: Vec<u16>, limits: FuelLimits) -> Self {
-        Self::builder(tree)
+    #[deprecated(note = "Use VM::builder(source, tree).trivia_types(...).build() instead")]
+    pub fn new(source: &'t str, tree: &'t Tree, trivia_types: Vec<u16>, limits: FuelLimits) -> Self {
+        Self::builder(source, tree)
             .trivia_types(trivia_types)
             .limits(limits)
             .build()
@@ -253,7 +260,7 @@ impl<'t> VM<'t> {
             tracer.trace_instruction(self.ip, &instr);
 
             let result = match instr {
-                Instruction::Match(m) => self.exec_match(m, tracer),
+                Instruction::Match(m) => self.exec_match(m, module, tracer),
                 Instruction::Call(c) => self.exec_call(c, tracer),
                 Instruction::Return(_) => self.exec_return(tracer),
                 Instruction::Trampoline(t) => self.exec_trampoline(t, tracer),
@@ -267,7 +274,12 @@ impl<'t> VM<'t> {
         }
     }
 
-    fn exec_match<T: Tracer>(&mut self, m: Match<'_>, tracer: &mut T) -> Result<(), RuntimeError> {
+    fn exec_match<T: Tracer>(
+        &mut self,
+        m: Match<'_>,
+        module: &Module,
+        tracer: &mut T,
+    ) -> Result<(), RuntimeError> {
         for effect_op in m.pre_effects() {
             self.emit_effect(effect_op, tracer);
         }
@@ -276,7 +288,7 @@ impl<'t> VM<'t> {
         // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
             self.matched_node = None;
-            self.navigate_and_match(m, tracer)?;
+            self.navigate_and_match(m, module, tracer)?;
         }
 
         for effect_op in m.post_effects() {
@@ -289,6 +301,7 @@ impl<'t> VM<'t> {
     fn navigate_and_match<T: Tracer>(
         &mut self,
         m: Match<'_>,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
@@ -319,7 +332,57 @@ impl<'t> VM<'t> {
             }
         }
 
+        // Check predicate if present
+        if let Some((op, is_regex, value_ref)) = m.predicate()
+            && !self.evaluate_predicate(op, is_regex, value_ref, module)
+        {
+            return self.backtrack(tracer);
+        }
+
         Ok(())
+    }
+
+    /// Evaluate a predicate against the matched node's text.
+    ///
+    /// - `op`: 0=Eq, 1=Ne, 2=StartsWith, 3=EndsWith, 4=Contains, 5=RegexMatch, 6=RegexNoMatch
+    /// - `is_regex`: true if value_ref is a RegexTable index
+    /// - `value_ref`: index into StringTable or RegexTable
+    fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {
+        let node = self.cursor.node();
+        let node_text = &self.source[node.start_byte()..node.end_byte()];
+        let op = PredicateOp::from_byte(op);
+
+        if is_regex {
+            let regex_bytes = module.regexes().get_by_index(value_ref as usize);
+            assert!(
+                !regex_bytes.is_empty(),
+                "regex predicate references empty DFA bytes"
+            );
+            let dfa = crate::emit::deserialize_dfa(regex_bytes)
+                .expect("regex DFA deserialization failed");
+
+            use regex_automata::dfa::Automaton;
+            use regex_automata::Input;
+            let input = Input::new(node_text);
+            let matched = dfa.try_search_fwd(&input).ok().flatten().is_some();
+
+            match op {
+                PredicateOp::RegexMatch => matched,
+                PredicateOp::RegexNoMatch => !matched,
+                _ => unreachable!("non-regex op with is_regex=true"),
+            }
+        } else {
+            let target = module.strings().get_by_index(value_ref as usize);
+
+            match op {
+                PredicateOp::Eq => node_text == target,
+                PredicateOp::Ne => node_text != target,
+                PredicateOp::StartsWith => node_text.starts_with(target),
+                PredicateOp::EndsWith => node_text.ends_with(target),
+                PredicateOp::Contains => node_text.contains(target),
+                _ => unreachable!("regex op with is_regex=false"),
+            }
+        }
     }
 
     /// Check if current node matches type and field constraints.

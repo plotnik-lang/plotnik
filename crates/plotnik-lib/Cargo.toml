@@ -25,6 +25,8 @@ crc32fast = "1.4"
 memmap2 = "0.9"
 plotnik-core.workspace = true
 plotnik-langs = { workspace = true, optional = true }
+regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
+regex-syntax = "0.8"
 
 [features]
 default = ["plotnik-langs"]
