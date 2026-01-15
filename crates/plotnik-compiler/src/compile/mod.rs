@@ -20,6 +20,7 @@ mod dce;
 pub(crate) mod epsilon_elim;
 mod error;
 mod expressions;
+mod lower;
 mod navigation;
 mod quantifier;
 mod scope;
@@ -30,6 +31,8 @@ mod verify;
 mod capture_tests;
 #[cfg(test)]
 mod compile_tests;
+#[cfg(test)]
+mod lower_tests;
 
 pub use capture::CaptureEffects;
 pub use compiler::{CompileCtx, Compiler};

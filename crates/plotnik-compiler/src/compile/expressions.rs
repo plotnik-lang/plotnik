@@ -49,7 +49,7 @@ impl Compiler<'_> {
             if let Some(p) = predicate {
                 m = m.predicate(p);
             }
-            return self.emit_match_with_cascade(m);
+            return self.emit_match(m);
         }
 
         // Determine Up navigation based on trailing anchor
@@ -123,7 +123,7 @@ impl Compiler<'_> {
         if let Some(p) = predicate {
             entry_match = entry_match.predicate(p);
         }
-        self.emit_match_with_cascade(entry_match);
+        self.emit_match(entry_match);
 
         entry
     }
@@ -201,7 +201,7 @@ impl Compiler<'_> {
         if let Some(p) = predicate {
             entry_match = entry_match.predicate(p);
         }
-        self.emit_match_with_cascade(entry_match);
+        self.emit_match(entry_match);
 
         entry
     }
@@ -236,7 +236,7 @@ impl Compiler<'_> {
             None => NodeTypeIR::Any, // `_` wildcard matches any node
         };
 
-        self.emit_match_with_cascade(
+        self.emit_match(
             MatchIR::epsilon(entry, exit)
                 .nav(nav)
                 .node_type(node_type)

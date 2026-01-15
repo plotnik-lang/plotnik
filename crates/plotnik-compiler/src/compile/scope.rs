@@ -394,95 +394,21 @@ impl Compiler<'_> {
 
     /// Emit an epsilon transition (no node interaction).
     ///
-    /// If there are more successors than fit in a single Match instruction,
-    /// this creates a cascade of epsilon transitions to preserve NFA semantics.
+    /// Cascading for bytecode limits is handled by the lowering pass.
     pub(super) fn emit_epsilon(&mut self, label: Label, successors: Vec<Label>) {
-        use plotnik_bytecode::MAX_MATCH_PAYLOAD_SLOTS;
-
-        if successors.len() <= MAX_MATCH_PAYLOAD_SLOTS {
-            self.push_epsilon(label, successors);
-            return;
-        }
-
-        // Split: first (MAX-1) successors + intermediate for rest.
-        // This preserves priority order: VM tries s0, s1, ..., then intermediate.
-        let split_at = MAX_MATCH_PAYLOAD_SLOTS - 1;
-        let (first_batch, rest) = successors.split_at(split_at);
-
-        let intermediate = self.fresh_label();
-        self.emit_epsilon(intermediate, rest.to_vec());
-
-        let mut batch = first_batch.to_vec();
-        batch.push(intermediate);
-        self.push_epsilon(label, batch);
-    }
-
-    fn push_epsilon(&mut self, label: Label, successors: Vec<Label>) {
         self.instructions
             .push(MatchIR::at(label).next_many(successors).into());
     }
 
-    /// Emit a Match instruction, cascading pre-effects if they exceed the bytecode limit.
+    /// Emit a Match instruction.
     ///
-    /// When `pre_effects.len() > MAX_PRE_EFFECTS` (7), splits overflow into leading
-    /// epsilon transitions to avoid bytecode encoding overflow. The original label
-    /// is preserved as the entry point of the cascade.
+    /// Cascading for bytecode limits is handled by the lowering pass.
     ///
     /// Returns the entry label (same as `instr.label`).
-    pub(super) fn emit_match_with_cascade(&mut self, mut instr: MatchIR) -> Label {
-        use plotnik_bytecode::MAX_PRE_EFFECTS;
-
+    pub(super) fn emit_match(&mut self, instr: MatchIR) -> Label {
         let entry = instr.label;
-
-        if instr.pre_effects.len() <= MAX_PRE_EFFECTS {
-            self.instructions.push(instr.into());
-            return entry;
-        }
-
-        // Move all pre-effects to epsilon chain
-        let all_effects = std::mem::take(&mut instr.pre_effects);
-
-        // Create new label for the actual match instruction
-        let match_label = self.fresh_label();
-        instr.label = match_label;
         self.instructions.push(instr.into());
-
-        // Emit cascade from entry → ... → match_label
-        self.emit_effects_chain(entry, match_label, all_effects);
-
         entry
-    }
-
-    /// Emit a chain of epsilon transitions to execute effects in order.
-    ///
-    /// Splits effects into batches of `MAX_PRE_EFFECTS` (7), emitting epsilon
-    /// transitions: `entry → intermediate1 → ... → exit`.
-    fn emit_effects_chain(&mut self, entry: Label, exit: Label, mut effects: Vec<EffectIR>) {
-        use plotnik_bytecode::MAX_PRE_EFFECTS;
-
-        if effects.is_empty() {
-            // Just link entry to exit
-            self.instructions.push(MatchIR::epsilon(entry, exit).into());
-            return;
-        }
-
-        if effects.len() <= MAX_PRE_EFFECTS {
-            self.instructions
-                .push(MatchIR::epsilon(entry, exit).pre_effects(effects).into());
-            return;
-        }
-
-        // Take first batch, recurse for rest
-        let first_batch: Vec<_> = effects.drain(..MAX_PRE_EFFECTS).collect();
-        let intermediate = self.fresh_label();
-
-        self.instructions.push(
-            MatchIR::epsilon(entry, intermediate)
-                .pre_effects(first_batch)
-                .into(),
-        );
-
-        self.emit_effects_chain(intermediate, exit, effects);
     }
 
     /// Emit a wildcard navigation step that accepts any node.

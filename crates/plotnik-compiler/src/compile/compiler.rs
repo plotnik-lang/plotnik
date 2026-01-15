@@ -15,6 +15,7 @@ use plotnik_bytecode::Nav;
 use super::capture::CaptureEffects;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
+use super::lower::lower;
 use super::error::{CompileError, CompileResult};
 use super::scope::StructScope;
 use super::verify::debug_verify_ir_fingerprint;
@@ -85,6 +86,9 @@ impl<'a> Compiler<'a> {
 
         // Remove unreachable instructions (bypassed epsilons, etc.)
         remove_unreachable(&mut result);
+
+        // Lower to bytecode-compatible form (cascade overflows)
+        lower(&mut result);
 
         Ok(result)
     }

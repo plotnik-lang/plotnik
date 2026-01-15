@@ -606,11 +606,20 @@ impl MatchIR {
             // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
             assert!(
                 pre_count <= 7,
-                "pre_effects overflow: {pre_count} > 7 (use emit_match_with_cascade)"
+                "pre_effects overflow: {pre_count} > 7 (lowering should have cascaded)"
             );
-            assert!(neg_count <= 7, "neg_fields overflow: {neg_count} > 7");
-            assert!(post_count <= 7, "post_effects overflow: {post_count} > 7");
-            assert!(succ_count <= 31, "successors overflow: {succ_count} > 31");
+            assert!(
+                neg_count <= 7,
+                "neg_fields overflow: {neg_count} > 7 (lowering should have cascaded)"
+            );
+            assert!(
+                post_count <= 7,
+                "post_effects overflow: {post_count} > 7 (lowering should have cascaded)"
+            );
+            assert!(
+                succ_count <= 31,
+                "successors overflow: {succ_count} > 31 (lowering should have cascaded)"
+            );
 
             let counts = ((pre_count as u16) << 13)
                 | ((neg_count as u16) << 10)
