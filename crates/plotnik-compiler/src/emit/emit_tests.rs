@@ -467,6 +467,18 @@ fn optional_null_injection() {
     "#});
 }
 
+// Optimization: prefix collapse
+
+#[test]
+fn opt_prefix_collapse() {
+    // Alternation branches with shared prefix: [(object ...) (object ...)]
+    // Without optimization: two separate (object) instructions
+    // With optimization: one (object) with merged successors
+    snap!(indoc! {r#"
+        Test = [(object (pair)) (object (string))]
+    "#});
+}
+
 // Comprehensive
 
 #[test]

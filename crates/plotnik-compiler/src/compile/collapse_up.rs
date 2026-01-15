@@ -26,6 +26,14 @@ pub fn collapse_up(result: &mut CompileResult) {
         .map(|(i, instr)| (instr.label(), i))
         .collect();
 
+    // Count predecessors for each label - only remove labels with exactly one predecessor
+    let mut predecessor_count: HashMap<Label, usize> = HashMap::new();
+    for instr in &result.instructions {
+        for succ in instr.successors() {
+            *predecessor_count.entry(succ).or_default() += 1;
+        }
+    }
+
     let mut removed: HashSet<Label> = HashSet::new();
 
     for i in 0..result.instructions.len() {
@@ -68,6 +76,12 @@ pub fn collapse_up(result: &mut CompileResult) {
             };
 
             if !same_up_mode(current_nav, succ.nav) || !is_effectless(succ) {
+                break;
+            }
+
+            // Only absorb if this label has exactly one predecessor
+            // (otherwise other instructions still need it)
+            if predecessor_count.get(&succ_label).copied().unwrap_or(0) != 1 {
                 break;
             }
 
