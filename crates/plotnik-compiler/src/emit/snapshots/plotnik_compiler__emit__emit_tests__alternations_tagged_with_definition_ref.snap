@@ -1,0 +1,66 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Inner = (identifier) @name
+Test = [A: (Inner)  B: (number) @b] @item
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "b"
+S3 "A"
+S4 "B"
+S5 "item"
+S6 "Inner"
+S7 "Test"
+S8 "identifier"
+S9 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { b }
+T3 = Enum    M2:2  ; A | B
+T4 = Struct  M4:1  ; { item }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T1  ; A: Inner
+M3: S4 → T2  ; B: T2
+M4: S5 → T3  ; item: T3
+
+[type_names]
+N0: S6 → T1  ; Inner
+N1: S7 → T4  ; Test
+
+[entrypoints]
+Inner = 06 :: T1
+Test  = 11 :: T4
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Inner:
+  06   ε                                    08
+  07  ...  
+  08   !   (identifier) [Node Set(M0)]      10
+  10                                        ▶
+
+Test:
+  11   ε                                    12
+  12   ε                                    26, 28
+  14                                        ▶
+  15  ...  
+  16   ε   [Set(M4)]                        14
+  18   ε   [EndEnum]                        16
+  20   ε   [EndObj]                         18
+  22   !   (Inner)                          06 : 20
+  23  ...  
+  24   ε   [Obj]                            22
+  26   ε   [Enum(M2)]                       24
+  28   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  16

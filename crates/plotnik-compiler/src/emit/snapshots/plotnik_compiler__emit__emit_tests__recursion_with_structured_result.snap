@@ -1,0 +1,82 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Expr = [
+  Lit: (number) @value :: string
+  Nested: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+]
+
+Test = (program (Expr) @expr)
+---
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "fn"
+S03 "inner"
+S04 "Lit"
+S05 "Nested"
+S06 "expr"
+S07 "Expr"
+S08 "Test"
+S09 "number"
+S10 "call_expression"
+S11 "identifier"
+S12 "program"
+S13 "function"
+S14 "arguments"
+
+[type_defs]
+T00 = <Node>
+T01 = <String>
+T02 = Struct  M0:1  ; { value }
+T03 = Struct  M1:2  ; { fn, inner }
+T04 = Enum    M3:2  ; Lit | Nested
+T05 = Struct  M5:1  ; { expr }
+T06 = Struct  M6:1  ; { fn }
+T07 = Struct  M7:1  ; { inner }
+
+[type_members]
+M0: S01 → T01  ; value: <String>
+M1: S02 → T00  ; fn: <Node>
+M2: S03 → T04  ; inner: Expr
+M3: S04 → T02  ; Lit: T02
+M4: S05 → T03  ; Nested: T03
+M5: S06 → T04  ; expr: Expr
+M6: S02 → T00  ; fn: <Node>
+M7: S03 → T04  ; inner: Expr
+
+[type_names]
+N0: S07 → T04  ; Expr
+N1: S08 → T05  ; Test
+
+[entrypoints]
+Expr = 06 :: T04
+Test = 10 :: T05
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Expr:
+  06   ε                                    08
+  07  ...  
+  08   ε                                    21, 29
+
+Test:
+  10   ε                                    11
+  11   !   (program)                        12
+  12   ▽   (Expr)                           06 : 13
+  13   ε   [Set(M5)]                        15
+  15   △   _                                16
+  16                                        ▶
+  17   ε   [Set(M2)]                        19
+  19   △   _                                24
+  20                                        ▶
+  21   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  20
+  24   ε   [EndEnum]                        20
+  26   ▷   arguments: (Expr)                06 : 17
+  27   ▽   function: (identifier) [Node Set(M1)]  26
+  29   !   [Enum(M4)] (call_expression)     27

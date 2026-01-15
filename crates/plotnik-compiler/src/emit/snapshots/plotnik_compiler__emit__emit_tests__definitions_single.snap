@@ -1,0 +1,36 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Foo = (identifier) @id
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "Foo"
+S3 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+
+[type_members]
+M0: S1 → T0  ; id: <Node>
+
+[type_names]
+N0: S2 → T1  ; Foo
+
+[entrypoints]
+Foo = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Foo:
+  06   ε                                    08
+  07  ...  
+  08   !   (identifier) [Node Set(M0)]      10
+  10                                        ▶

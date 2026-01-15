@@ -1657,6 +1657,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-bytecode"
+version = "0.2.2"
+dependencies = [
+ "insta",
+ "plotnik-core",
+ "regex-automata",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-compiler"
+version = "0.2.2"
+dependencies = [
+ "annotate-snippets",
+ "arborium-tree-sitter",
+ "crc32fast",
+ "indexmap",
+ "indoc",
+ "insta",
+ "logos",
+ "memmap2",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "plotnik-langs",
+ "regex-automata",
+ "regex-syntax",
+ "rowan",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "plotnik-core"
 version = "0.2.2"
 dependencies = [
@@ -1784,22 +1818,29 @@ dependencies = [
 name = "plotnik-lib"
 version = "0.2.2"
 dependencies = [
- "annotate-snippets",
  "arborium-tree-sitter",
- "crc32fast",
- "indexmap",
  "indoc",
  "insta",
- "logos",
- "memmap2",
+ "plotnik-bytecode",
+ "plotnik-compiler",
  "plotnik-core",
  "plotnik-langs",
- "regex-automata",
- "regex-syntax",
- "rowan",
+ "plotnik-vm",
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "plotnik-vm"
+version = "0.2.2"
+dependencies = [
+ "arborium-tree-sitter",
+ "insta",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "regex-automata",
+ "serde",
  "thiserror",
 ]
 

@@ -1,0 +1,58 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Test = (array (array (array (identifier) @d) @c) @b) @a
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "c"
+S4 "d"
+S5 "Test"
+S6 "array"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:4  ; { a, b, c, d }
+T2 = Struct  M4:1  ; { d }
+T3 = Struct  M5:2  ; { c, d }
+T4 = Struct  M7:3  ; { b, c, d }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+M2: S3 → T0  ; c: <Node>
+M3: S4 → T0  ; d: <Node>
+M4: S4 → T0  ; d: <Node>
+M5: S3 → T0  ; c: <Node>
+M6: S4 → T0  ; d: <Node>
+M7: S2 → T0  ; b: <Node>
+M8: S3 → T0  ; c: <Node>
+M9: S4 → T0  ; d: <Node>
+
+[type_names]
+N0: S5 → T1  ; Test
+
+[entrypoints]
+Test = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    08
+  07  ...  
+  08   !   (array) [Node Set(M0)]           10
+  10   ▽   (array) [Node Set(M1)]           12
+  12   ▽   (array) [Node Set(M2)]           14
+  14   ▽   (identifier) [Node Set(M3)]      16
+  16   △   _                                17
+  17   △   _                                18
+  18   △   _                                19
+  19                                        ▶

@@ -13,6 +13,7 @@
 use std::collections::HashMap;
 use std::num::NonZeroU16;
 
+pub mod colors;
 pub mod grammar;
 mod interner;
 mod invariants;
@@ -25,6 +26,7 @@ mod lib_tests;
 #[cfg(test)]
 mod utils_tests;
 
+pub use colors::Colors;
 pub use interner::{Interner, Symbol};
 
 /// Raw node definition from `node-types.json`.
