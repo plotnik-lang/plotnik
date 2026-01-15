@@ -4,9 +4,9 @@
 //! Zero-cost in release builds.
 
 use plotnik_bytecode::{Module, TypeId};
-use plotnik_core::Colors;
 #[cfg(debug_assertions)]
 use plotnik_bytecode::{StringsView, TypeData, TypeKind, TypesView};
+use plotnik_core::Colors;
 
 use super::Value;
 

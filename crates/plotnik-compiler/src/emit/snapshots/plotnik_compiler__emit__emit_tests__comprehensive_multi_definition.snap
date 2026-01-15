@@ -54,8 +54,8 @@ N1: S07 → T05  ; Expression
 N2: S08 → T06  ; Assignment
 
 [entrypoints]
-Assignment = 14 :: T06
-Expression = 11 :: T05
+Assignment = 11 :: T06
+Expression = 09 :: T05
 Ident      = 06 :: T02
 
 [transitions]
@@ -66,23 +66,20 @@ _ObjWrap:
   05                                        ▶
 
 Ident:
-  06   ε                                    08
-  07  ...  
-  08   !   (identifier) [Text Set(M0)]      10
-  10                                        ▶
+  06   !   (identifier) [Text Set(M0)]      08
+  08                                        ▶
 
 Expression:
-  11   ε                                    12
-  12   ε                                    24, 27
+  09   ε                                    20, 24
 
 Assignment:
-  14   ε                                    15
-  15   !   (assignment_expression)          16
-  16   ▽   left: (identifier) [Node Set(M6)]  18
-  18   ▷   right: (Expression)              11 : 19
-  19   ε   [Set(M5)]                        21
-  21   △   _                                22
-  22                                        ▶
-  23                                        ▶
-  24   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  23
-  27   !   [Enum(M4)] (identifier) [Node Set(M2) EndEnum]  23
+  11   !   (assignment_expression)          12
+  12   ▽   left: (identifier) [Node Set(M6)]  14
+  14   ▷   right: (Expression)              09 : 16
+  15  ...  
+  16   △   [Set(M5)] _                      18
+  18                                        ▶
+  19                                        ▶
+  20   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  19
+  23  ...  
+  24   !   [Enum(M4)] (identifier) [Node Set(M2) EndEnum]  19

@@ -25,7 +25,7 @@ N0: S3 → T2  ; Test
 N1: S4 → T1  ; FunctionInfo
 
 [entrypoints]
-Test = 06 :: T2
+Test = 08 :: T2
 
 [transitions]
 _ObjWrap:
@@ -33,11 +33,9 @@ _ObjWrap:
   02       Trampoline                       03
   03   ε   [EndObj]                         05
   05                                        ▶
+  06  ...  
+  07  ...  
 
 Test:
-  06   ε                                    08
-  07  ...  
-  08   ε   [Obj]                            10
-  10   !   (identifier) [Node Set(M0)]      12
-  12   ε   [EndObj Set(M1)]                 14
-  14                                        ▶
+  08   !   [Obj] (identifier) [Node Set(M0) EndObj Set(M1)]  11
+  11                                        ▶

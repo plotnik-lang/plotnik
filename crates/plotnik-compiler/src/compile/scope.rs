@@ -6,8 +6,8 @@ use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, MemberRef};
-use plotnik_bytecode::{EffectOpcode, Nav};
 use crate::parser::Expr;
+use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
 use super::capture::CaptureEffects;
@@ -44,9 +44,9 @@ impl Compiler<'_> {
     /// Uses (struct_type, relative_index) for deferred resolution.
     /// Member deduplication for call-site scoping will be added later.
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.type_ctx.get_struct_fields(type_id)?;
+        let fields = self.ctx.type_ctx.get_struct_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
-            if self.interner.resolve(field_sym) == capture_name {
+            if self.ctx.interner.resolve(field_sym) == capture_name {
                 return Some(MemberRef::deferred_by_index(type_id, relative_index as u16));
             }
         }

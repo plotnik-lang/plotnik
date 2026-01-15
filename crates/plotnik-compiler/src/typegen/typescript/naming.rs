@@ -120,7 +120,10 @@ impl Emitter<'_> {
         self.unique_name(&base)
     }
 
-    pub(super) fn generate_fallback_name(&mut self, type_def: &plotnik_bytecode::TypeDef) -> String {
+    pub(super) fn generate_fallback_name(
+        &mut self,
+        type_def: &plotnik_bytecode::TypeDef,
+    ) -> String {
         let base = match type_def.classify() {
             TypeData::Composite {
                 kind: TypeKind::Struct,

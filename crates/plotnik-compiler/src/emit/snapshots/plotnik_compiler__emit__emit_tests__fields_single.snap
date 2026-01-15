@@ -31,8 +31,8 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (function_declaration)           08
+  06   !   (function_declaration)           08
+  07  ...  
   08   ▽   name: (identifier) [Node Set(M0)]  10
   10   △   _                                11
   11                                        ▶

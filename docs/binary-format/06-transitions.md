@@ -203,14 +203,14 @@ counts (u16)
 
 **Payload** (immediately follows header):
 
-| Order | Content          | Type                     | Condition         |
-| :---- | :--------------- | :----------------------- | :---------------- |
-| 1     | `pre_effects`    | `[EffectOp; pre_count]`  | always            |
-| 2     | `negated_fields` | `[u16; neg_count]`       | always            |
-| 3     | `post_effects`   | `[EffectOp; post_count]` | always            |
+| Order | Content          | Type                     | Condition          |
+| :---- | :--------------- | :----------------------- | :----------------- |
+| 1     | `pre_effects`    | `[EffectOp; pre_count]`  | always             |
+| 2     | `negated_fields` | `[u16; neg_count]`       | always             |
+| 3     | `post_effects`   | `[EffectOp; post_count]` | always             |
 | 4     | `predicate`      | `Predicate` (4 bytes)    | if `has_predicate` |
-| 5     | `successors`     | `[u16; succ_count]`      | always            |
-| 6     | Padding          | Zero bytes to step size  | always            |
+| 5     | `successors`     | `[u16; succ_count]`      | always             |
+| 6     | Padding          | Zero bytes to step size  | always             |
 
 **Predicate** (4 bytes, when `has_predicate` is set):
 
@@ -222,15 +222,15 @@ struct Predicate {
 }
 ```
 
-| Op | Name   | Meaning                          |
-| -- | ------ | -------------------------------- |
-| 1  | `==`   | Exact string match               |
-| 2  | `!=`   | Not equal                        |
-| 3  | `^=`   | Starts with                      |
-| 4  | `$=`   | Ends with                        |
-| 5  | `*=`   | Contains                         |
-| 6  | `=~`   | Regex match (value_ref = RegexId)|
-| 7  | `!~`   | Regex non-match                  |
+| Op  | Name | Meaning                           |
+| --- | ---- | --------------------------------- |
+| 1   | `==` | Exact string match                |
+| 2   | `!=` | Not equal                         |
+| 3   | `^=` | Starts with                       |
+| 4   | `$=` | Ends with                         |
+| 5   | `*=` | Contains                          |
+| 6   | `=~` | Regex match (value_ref = RegexId) |
+| 7   | `!~` | Regex non-match                   |
 
 **Payload Capacity**:
 

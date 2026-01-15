@@ -1,6 +1,6 @@
 use super::capture::CaptureEffects;
-use plotnik_bytecode::EffectOpcode;
 use crate::bytecode::{EffectIR, MemberRef};
+use plotnik_bytecode::EffectOpcode;
 
 #[test]
 fn nest_scope_preserves_outer_and_nests_inner() {

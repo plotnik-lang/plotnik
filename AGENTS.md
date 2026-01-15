@@ -12,26 +12,26 @@
 
 ## Core Constructs
 
-| Syntax              | Meaning                        |
-| ------------------- | ------------------------------ |
-| `(node_kind)`       | Named node                     |
-| `"text"` / `'text'` | Anonymous node (literal token) |
-| `(_)`               | Any named node                 |
-| `_`                 | Any node                       |
-| `@name`             | Capture (snake_case only)      |
-| `@x :: T`           | Type annotation                |
-| `@x :: string`      | Extract node text              |
-| `field: pattern`    | Field constraint               |
-| `-field`            | Negated field (assert absent)  |
-| `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)      |
-| `??` `*?` `+?`      | Non-greedy variants            |
-| `.`                 | Anchor (adjacency, see below)  |
-| `{...}`             | Sequence (siblings in order)   |
-| `[...]`             | Alternation (first match wins) |
-| `Name = ...`        | Named definition (entrypoint)  |
-| `(Name)`            | Use named expression           |
-| `(node == "x")`     | String predicate (== != ^= $= *=) |
-| `(node =~ /x/)`     | Regex predicate (=~ !~)        |
+| Syntax              | Meaning                            |
+| ------------------- | ---------------------------------- |
+| `(node_kind)`       | Named node                         |
+| `"text"` / `'text'` | Anonymous node (literal token)     |
+| `(_)`               | Any named node                     |
+| `_`                 | Any node                           |
+| `@name`             | Capture (snake_case only)          |
+| `@x :: T`           | Type annotation                    |
+| `@x :: string`      | Extract node text                  |
+| `field: pattern`    | Field constraint                   |
+| `-field`            | Negated field (assert absent)      |
+| `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)          |
+| `??` `*?` `+?`      | Non-greedy variants                |
+| `.`                 | Anchor (adjacency, see below)      |
+| `{...}`             | Sequence (siblings in order)       |
+| `[...]`             | Alternation (first match wins)     |
+| `Name = ...`        | Named definition (entrypoint)      |
+| `(Name)`            | Use named expression               |
+| `(node == "x")`     | String predicate (== != ^= $= \*=) |
+| `(node =~ /x/)`     | Regex predicate (=~ !~)            |
 
 ## Data Model Rules
 
@@ -148,23 +148,26 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 
 ```
 crates/
+  plotnik-bytecode/    # Binary format definitions
+    src/
+      bytecode/        # Instruction set, modules, linking
+      type_system/     # Shared type primitives
   plotnik-cli/         # CLI tool
     src/commands/      # Subcommands (ast, check, dump, exec, infer, trace, langs)
-  plotnik-core/        # Node type database (NodeTypes, StaticNodeTypes) and string interning (Interner, Symbol)
-  plotnik-lib/         # Plotnik as library
+  plotnik-compiler/    # Compilation pipeline
     src/
       analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)
-      bytecode/        # Binary format definitions
       compile/         # Thompson NFA construction (AST → IR)
       diagnostics/     # User-friendly error reporting
       emit/            # Bytecode emission (IR → binary)
-      engine/          # Runtime VM (execution, backtracking, effects)
       parser/          # Syntactic parsing (lexer, grammar, AST)
       query/           # Query facade (Query, QueryBuilder, SourceMap)
-      type_system/     # Shared type primitives
       typegen/         # Type declaration extraction (bytecode → .d.ts)
+  plotnik-core/        # Node type database (NodeTypes, StaticNodeTypes) and string interning (Interner, Symbol)
   plotnik-langs/       # Tree-sitter language bindings
-  plotnik-macros/      # Proc macros
+  plotnik-lib/         # Facade crate re-exporting bytecode, compiler, vm
+  plotnik-vm/          # Runtime VM
+    src/engine/        # Execution, backtracking, effects
 docs/
   binary-format/       # Bytecode format specification
   lang-reference.md    # Language specification

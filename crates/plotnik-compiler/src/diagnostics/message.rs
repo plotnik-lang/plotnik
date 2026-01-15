@@ -126,7 +126,10 @@ impl DiagnosticKind {
     pub fn is_structural_error(&self) -> bool {
         matches!(
             self,
-            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation | Self::UnclosedRegex
+            Self::UnclosedTree
+                | Self::UnclosedSequence
+                | Self::UnclosedAlternation
+                | Self::UnclosedRegex
         )
     }
 
@@ -261,7 +264,9 @@ impl DiagnosticKind {
             Self::IncompatibleStructShapes => "incompatible struct shapes",
 
             // Predicate validation
-            Self::PredicateOnNonLeaf => "predicates match text content, but this node can contain children",
+            Self::PredicateOnNonLeaf => {
+                "predicates match text content, but this node can contain children"
+            }
             Self::EmptyRegex => "empty regex pattern",
             Self::RegexBackreference => "backreferences are not supported in regex",
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",

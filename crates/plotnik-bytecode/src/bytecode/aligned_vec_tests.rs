@@ -1,4 +1,4 @@
-use super::aligned_vec::{AlignedVec, ALIGN};
+use super::aligned_vec::{ALIGN, AlignedVec};
 
 fn is_aligned(ptr: *const u8) -> bool {
     (ptr as usize).is_multiple_of(ALIGN)

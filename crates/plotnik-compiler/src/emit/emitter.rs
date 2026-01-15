@@ -1,12 +1,14 @@
 //! Core bytecode emission logic.
 
+use std::cell::RefCell;
+
 use plotnik_core::Symbol;
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{InstructionIR, Label, PredicateValueIR};
-use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry};
-use crate::compile::Compiler;
+use crate::compile::{CompileCtx, Compiler};
 use crate::query::LinkedQuery;
+use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry};
 
 use super::EmitError;
 use super::layout::CacheAligned;
@@ -22,19 +24,19 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let node_type_ids = query.node_type_ids();
     let node_field_ids = query.node_field_ids();
 
-    let mut strings = StringTableBuilder::new();
+    let strings = RefCell::new(StringTableBuilder::new());
     let mut types = TypeTableBuilder::new();
-    types.build(type_ctx, interner, &mut strings)?;
+    types.build(type_ctx, interner, &mut strings.borrow_mut())?;
 
-    let compile_result = Compiler::compile(
+    let ctx = CompileCtx {
         interner,
         type_ctx,
         symbol_table,
-        &mut strings,
-        Some(node_type_ids),
-        Some(node_field_ids),
-    )
-    .map_err(EmitError::Compile)?;
+        strings: &strings,
+        node_types: Some(node_type_ids),
+        node_fields: Some(node_field_ids),
+    };
+    let compile_result = Compiler::compile(&ctx).map_err(EmitError::Compile)?;
 
     // Layout with cache alignment
     // Preamble entry FIRST ensures it gets the lowest address (step 0)
@@ -50,14 +52,14 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     // Collect node symbols
     let mut node_symbols: Vec<NodeSymbol> = Vec::new();
     for (&sym, &node_id) in node_type_ids {
-        let name = strings.get_or_intern(sym, interner)?;
+        let name = strings.borrow_mut().get_or_intern(sym, interner)?;
         node_symbols.push(NodeSymbol::new(node_id.get(), name));
     }
 
     // Collect field symbols
     let mut field_symbols: Vec<FieldSymbol> = Vec::new();
     for (&sym, &field_id) in node_field_ids {
-        let name = strings.get_or_intern(sym, interner)?;
+        let name = strings.borrow_mut().get_or_intern(sym, interner)?;
         field_symbols.push(FieldSymbol::new(field_id.get(), name));
     }
 
@@ -65,7 +67,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
-        let name = strings.get_or_intern(name_sym, interner)?;
+        let name = strings.borrow_mut().get_or_intern(name_sym, interner)?;
         let result_type = types.resolve_type(type_id, type_ctx)?;
 
         // Get actual target from compiled result
@@ -78,6 +80,9 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
         entrypoints.push(Entrypoint::new(name, target, result_type));
     }
+
+    // Move strings out of RefCell for final emission
+    let strings = strings.into_inner();
 
     // Validate counts
     strings.validate()?;
@@ -95,8 +100,13 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     regexes.validate()?;
 
     // Resolve and serialize transitions
-    let transitions_bytes =
-        emit_transitions(&compile_result.instructions, &layout, &types, &strings, &regexes);
+    let transitions_bytes = emit_transitions(
+        &compile_result.instructions,
+        &layout,
+        &types,
+        &strings,
+        &regexes,
+    );
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -191,7 +201,12 @@ fn emit_transitions(
         };
 
         let offset = step_id as usize * 8; // STEP_SIZE
-        let resolved = instr.resolve(&layout.label_to_step, lookup_member, get_member_base, lookup_regex);
+        let resolved = instr.resolve(
+            &layout.label_to_step,
+            lookup_member,
+            get_member_base,
+            lookup_regex,
+        );
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();

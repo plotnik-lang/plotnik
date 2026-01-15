@@ -7,11 +7,11 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
+use crate::analyze::type_check::TypeId;
 use plotnik_bytecode::{
     Call, EffectOp, EffectOpcode, Nav, Opcode, PredicateOp, Return, StepAddr, StepId, Trampoline,
     select_match_opcode,
 };
-use crate::analyze::type_check::TypeId;
 
 /// Node type constraint for Match instructions.
 ///
@@ -643,8 +643,9 @@ impl MatchIR {
 
                 let value_ref = match &pred.value {
                     PredicateValueIR::String(string_id) => string_id.get(),
-                    PredicateValueIR::Regex(string_id) => lookup_regex(*string_id)
-                        .expect("regex predicate must be interned"),
+                    PredicateValueIR::Regex(string_id) => {
+                        lookup_regex(*string_id).expect("regex predicate must be interned")
+                    }
                 };
                 bytes[offset..offset + 2].copy_from_slice(&value_ref.to_le_bytes());
                 offset += 2;

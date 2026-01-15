@@ -1,27 +1,40 @@
 //! Core compiler state and entry points.
 
+use std::cell::RefCell;
+
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
-use plotnik_bytecode::Nav;
 use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::emit::StringTableBuilder;
 use crate::parser::Expr;
+use plotnik_bytecode::Nav;
 
 use super::capture::CaptureEffects;
+use super::dce::remove_unreachable;
+use super::epsilon_elim::eliminate_epsilons;
 use super::error::{CompileError, CompileResult};
 use super::scope::StructScope;
+use super::verify::debug_verify_ir_fingerprint;
+
+/// Compilation context bundling all shared compilation state.
+///
+/// Uses `RefCell` for `strings` to allow interior mutability while
+/// sharing the context across compilation phases.
+pub struct CompileCtx<'a> {
+    pub interner: &'a Interner,
+    pub type_ctx: &'a TypeContext,
+    pub symbol_table: &'a SymbolTable,
+    pub strings: &'a RefCell<StringTableBuilder>,
+    pub node_types: Option<&'a IndexMap<Symbol, NodeTypeId>>,
+    pub node_fields: Option<&'a IndexMap<Symbol, NodeFieldId>>,
+}
 
 /// Compiler state for Thompson construction.
 pub struct Compiler<'a> {
-    pub(super) interner: &'a Interner,
-    pub(super) type_ctx: &'a TypeContext,
-    pub(crate) symbol_table: &'a SymbolTable,
-    pub(super) strings: &'a mut StringTableBuilder,
-    pub(super) node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
-    pub(super) node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
+    pub(super) ctx: &'a CompileCtx<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
@@ -30,111 +43,50 @@ pub struct Compiler<'a> {
     pub(super) scope_stack: Vec<StructScope>,
 }
 
-/// Builder for `Compiler`.
-pub struct CompilerBuilder<'a> {
-    interner: &'a Interner,
-    type_ctx: &'a TypeContext,
-    symbol_table: &'a SymbolTable,
-    strings: &'a mut StringTableBuilder,
-    node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
-    node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
-}
-
-impl<'a> CompilerBuilder<'a> {
-    /// Create a new builder with required parameters.
-    pub fn new(
-        interner: &'a Interner,
-        type_ctx: &'a TypeContext,
-        symbol_table: &'a SymbolTable,
-        strings: &'a mut StringTableBuilder,
-    ) -> Self {
+impl<'a> Compiler<'a> {
+    /// Create a new compiler with the given context.
+    pub fn new(ctx: &'a CompileCtx<'a>) -> Self {
         Self {
-            interner,
-            type_ctx,
-            symbol_table,
-            strings,
-            node_type_ids: None,
-            node_field_ids: None,
-        }
-    }
-
-    /// Set node type and field IDs for linked compilation.
-    pub fn linked(
-        mut self,
-        node_type_ids: &'a IndexMap<Symbol, NodeTypeId>,
-        node_field_ids: &'a IndexMap<Symbol, NodeFieldId>,
-    ) -> Self {
-        self.node_type_ids = Some(node_type_ids);
-        self.node_field_ids = Some(node_field_ids);
-        self
-    }
-
-    /// Build the Compiler.
-    pub fn build(self) -> Compiler<'a> {
-        Compiler {
-            interner: self.interner,
-            type_ctx: self.type_ctx,
-            symbol_table: self.symbol_table,
-            strings: self.strings,
-            node_type_ids: self.node_type_ids,
-            node_field_ids: self.node_field_ids,
+            ctx,
             instructions: Vec::new(),
             next_label_id: 0,
             def_entries: IndexMap::new(),
             scope_stack: Vec::new(),
         }
     }
-}
-
-impl<'a> Compiler<'a> {
-    /// Create a builder for Compiler.
-    pub fn builder(
-        interner: &'a Interner,
-        type_ctx: &'a TypeContext,
-        symbol_table: &'a SymbolTable,
-        strings: &'a mut StringTableBuilder,
-    ) -> CompilerBuilder<'a> {
-        CompilerBuilder::new(interner, type_ctx, symbol_table, strings)
-    }
 
     /// Compile all definitions in the query.
-    pub fn compile(
-        interner: &'a Interner,
-        type_ctx: &'a TypeContext,
-        symbol_table: &'a SymbolTable,
-        strings: &'a mut StringTableBuilder,
-        node_type_ids: Option<&'a IndexMap<Symbol, NodeTypeId>>,
-        node_field_ids: Option<&'a IndexMap<Symbol, NodeFieldId>>,
-    ) -> Result<CompileResult, CompileError> {
-        let mut compiler =
-            if let (Some(type_ids), Some(field_ids)) = (node_type_ids, node_field_ids) {
-                Compiler::builder(interner, type_ctx, symbol_table, strings)
-                    .linked(type_ids, field_ids)
-                    .build()
-            } else {
-                Compiler::builder(interner, type_ctx, symbol_table, strings).build()
-            };
+    pub fn compile(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
+        let mut compiler = Compiler::new(ctx);
 
         // Emit universal preamble first: Obj -> Trampoline -> EndObj -> Return
         // This wraps any entrypoint to create the top-level scope.
         let preamble_entry = compiler.emit_preamble();
 
         // Pre-allocate entry labels for all definitions
-        for (def_id, _) in type_ctx.iter_def_types() {
+        for (def_id, _) in ctx.type_ctx.iter_def_types() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
         }
 
         // Compile each definition
-        for (def_id, _) in type_ctx.iter_def_types() {
+        for (def_id, _) in ctx.type_ctx.iter_def_types() {
             compiler.compile_def(def_id)?;
         }
 
-        Ok(CompileResult {
+        let mut result = CompileResult {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
             preamble_entry,
-        })
+        };
+
+        // Eliminate epsilon transitions (with semantic verification in debug builds)
+        eliminate_epsilons(&mut result, ctx);
+
+        // Remove unreachable instructions (bypassed epsilons, etc.)
+        remove_unreachable(&mut result);
+
+        Ok(result)
     }
 
     /// Emit the universal preamble: Obj -> Trampoline -> EndObj -> Return
@@ -165,10 +117,10 @@ impl<'a> Compiler<'a> {
 
     /// Compile a single definition.
     fn compile_def(&mut self, def_id: DefId) -> Result<(), CompileError> {
-        let name_sym = self.type_ctx.def_name_sym(def_id);
-        let name = self.interner.resolve(name_sym);
+        let name_sym = self.ctx.type_ctx.def_name_sym(def_id);
+        let name = self.ctx.interner.resolve(name_sym);
 
-        let Some(body) = self.symbol_table.get(name) else {
+        let Some(body) = self.ctx.symbol_table.get(name) else {
             return Err(CompileError::DefinitionNotFound(name.to_string()));
         };
 
@@ -189,7 +141,7 @@ impl<'a> Compiler<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Obj/EndObj wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
-        let body_entry = if let Some(type_id) = self.type_ctx.get_def_type(def_id) {
+        let body_entry = if let Some(type_id) = self.ctx.type_ctx.get_def_type(def_id) {
             self.with_scope(type_id, |this| {
                 this.compile_expr_with_nav(body, return_label, body_nav)
             })
@@ -201,6 +153,15 @@ impl<'a> Compiler<'a> {
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
+
+        // Debug-only: verify IR semantic fingerprint
+        debug_verify_ir_fingerprint(
+            &self.instructions,
+            entry_label,
+            &self.def_entries,
+            name,
+            self.ctx,
+        );
 
         Ok(())
     }

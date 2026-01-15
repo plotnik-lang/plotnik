@@ -62,7 +62,12 @@ pub fn lex(source: &str) -> Vec<Token> {
                         split_regex_predicate(source, span, SyntaxKind::OpRegexMatch, &mut tokens);
                     }
                     SyntaxKind::RegexPredicateNoMatch => {
-                        split_regex_predicate(source, span, SyntaxKind::OpRegexNoMatch, &mut tokens);
+                        split_regex_predicate(
+                            source,
+                            span,
+                            SyntaxKind::OpRegexNoMatch,
+                            &mut tokens,
+                        );
                     }
                     _ => {
                         tokens.push(Token::new(kind, range_to_text_range(span)));

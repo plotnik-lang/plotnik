@@ -39,19 +39,12 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (program)                        08
-  08   ε                                    28, 16
-  10                                        ▶
-  11   ▽   (number) [Node Set(M1)]          29
-  13   ▷   (number) [Node Set(M1)]          29
-  15  ...  
-  16   ε   [Null Set(M0)]                   11
-  18   !   (identifier) [Node Set(M0)]      13
-  20   ε   [Null Set(M0)]                   13
-  22   ▷   _                                26
-  23  ...  
-  24   ε                                    22, 20
-  26   ε                                    18, 24
-  28   ▽   _                                26
-  29   △   _                                10
+  06   !   (program)                        20, 09
+  08                                        ▶
+  09   ▽   [Null Set(M0)] (number) [Node Set(M1)]  22
+  12   ▷   (number) [Node Set(M1)]          22
+  14   !   (identifier) [Node Set(M0)]      12
+  16   ε   [Null Set(M0)]                   12
+  18   ▷   _                                14, 18, 16
+  20   ▽   _                                14, 18, 16
+  22   △   _                                08

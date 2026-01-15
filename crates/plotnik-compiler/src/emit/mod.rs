@@ -18,14 +18,14 @@ mod emit_tests;
 #[cfg(test)]
 mod layout_tests;
 #[cfg(test)]
-mod string_table_tests;
-#[cfg(test)]
 mod regex_table_tests;
+#[cfg(test)]
+mod string_table_tests;
 #[cfg(test)]
 mod type_table_tests;
 
 pub use emitter::emit;
 pub use error::EmitError;
-pub use regex_table::{deserialize_dfa, RegexTableBuilder};
+pub use regex_table::{RegexTableBuilder, deserialize_dfa};
 pub use string_table::StringTableBuilder;
 pub use type_table::TypeTableBuilder;

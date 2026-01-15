@@ -35,7 +35,9 @@ pub fn run(args: ExecArgs) {
         color: args.color,
     });
 
-    let vm = VM::builder(&source_code, &tree).trivia_types(trivia_types).build();
+    let vm = VM::builder(&source_code, &tree)
+        .trivia_types(trivia_types)
+        .build();
     let effects = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {

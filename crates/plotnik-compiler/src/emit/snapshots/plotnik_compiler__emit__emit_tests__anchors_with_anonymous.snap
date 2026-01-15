@@ -29,9 +29,8 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   ε                                    07
-  07   !   (binary_expression)              08
-  08   ▽   "+"                              09
-  09 !!▷   (identifier)                     10
-  10   △   _                                11
-  11                                        ▶
+  06   !   (binary_expression)              07
+  07   ▽   "+"                              08
+  08 !!▷   (identifier)                     09
+  09   △   _                                10
+  10                                        ▶

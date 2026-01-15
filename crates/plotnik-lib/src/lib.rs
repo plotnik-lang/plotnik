@@ -20,8 +20,8 @@
 pub use plotnik_core::colors;
 
 // Re-export modules from plotnik-bytecode
-pub use plotnik_bytecode::type_system;
 pub use plotnik_bytecode as bytecode;
+pub use plotnik_bytecode::type_system;
 
 // Re-export modules from plotnik-compiler
 pub use plotnik_compiler::analyze;
@@ -47,7 +47,7 @@ pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 // Re-export VM types
 pub use plotnik_vm::{
     EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
-    Tracer, Value, ValueMaterializer, Verbosity, VM, debug_verify_type,
+    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

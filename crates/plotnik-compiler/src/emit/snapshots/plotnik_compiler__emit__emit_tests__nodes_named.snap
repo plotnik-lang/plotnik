@@ -20,17 +20,15 @@ M0: S1 → T0  ; id: <Node>
 N0: S2 → T1  ; Test
 
 [entrypoints]
-Test = 06 :: T1
+Test = 6 :: T1
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
-  02       Trampoline                       03
-  03   ε   [EndObj]                         05
-  05                                        ▶
+  0   ε   [Obj]                             2
+  2       Trampoline                        3
+  3   ε   [EndObj]                          5
+  5                                         ▶
 
 Test:
-  06   ε                                    08
-  07  ...  
-  08   !   (identifier) [Node Set(M0)]      10
-  10                                        ▶
+  6   !   (identifier) [Node Set(M0)]       8
+  8                                         ▶

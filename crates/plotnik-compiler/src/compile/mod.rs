@@ -16,12 +16,15 @@
 
 mod capture;
 mod compiler;
+mod dce;
+pub(crate) mod epsilon_elim;
 mod error;
 mod expressions;
 mod navigation;
 mod quantifier;
 mod scope;
 mod sequences;
+mod verify;
 
 #[cfg(test)]
 mod capture_tests;
@@ -29,5 +32,5 @@ mod capture_tests;
 mod compile_tests;
 
 pub use capture::CaptureEffects;
-pub use compiler::Compiler;
+pub use compiler::{CompileCtx, Compiler};
 pub use error::{CompileError, CompileResult};

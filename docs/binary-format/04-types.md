@@ -8,17 +8,17 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 **TypeKind (u8)**: Discriminator for TypeDef.
 
-| Value | Kind            | Description                    |
-| ----- | --------------- | ------------------------------ |
-| 0     | `Void`          | Unit type, captures nothing    |
-| 1     | `Node`          | AST node reference             |
-| 2     | `String`        | Source text                    |
-| 3     | `Optional`      | Wraps another type             |
-| 4     | `ArrayZeroOrMore` | Zero or more (T*)            |
-| 5     | `ArrayOneOrMore`  | One or more (T+)             |
-| 6     | `Struct`        | Record with named fields       |
-| 7     | `Enum`          | Discriminated union            |
-| 8     | `Alias`         | Named reference to another type |
+| Value | Kind              | Description                     |
+| ----- | ----------------- | ------------------------------- |
+| 0     | `Void`            | Unit type, captures nothing     |
+| 1     | `Node`            | AST node reference              |
+| 2     | `String`          | Source text                     |
+| 3     | `Optional`        | Wraps another type              |
+| 4     | `ArrayZeroOrMore` | Zero or more (T\*)              |
+| 5     | `ArrayOneOrMore`  | One or more (T+)                |
+| 6     | `Struct`          | Record with named fields        |
+| 7     | `Enum`            | Discriminated union             |
+| 8     | `Alias`           | Named reference to another type |
 
 ### Node Semantics
 
@@ -51,17 +51,17 @@ struct TypeDef {
 
 **Field semantics by kind**:
 
-| Kind              | `data`         | `count`        |
-| :---------------- | :------------- | :------------- |
-| `Void`            | 0              | 0              |
-| `Node`            | 0              | 0              |
-| `String`          | 0              | 0              |
-| `Optional`        | Inner TypeId   | 0              |
-| `ArrayZeroOrMore` | Inner TypeId   | 0              |
-| `ArrayOneOrMore`  | Inner TypeId   | 0              |
-| `Alias`           | Target TypeId  | 0              |
-| `Struct`          | MemberIndex    | FieldCount     |
-| `Enum`            | MemberIndex    | VariantCount   |
+| Kind              | `data`        | `count`      |
+| :---------------- | :------------ | :----------- |
+| `Void`            | 0             | 0            |
+| `Node`            | 0             | 0            |
+| `String`          | 0             | 0            |
+| `Optional`        | Inner TypeId  | 0            |
+| `ArrayZeroOrMore` | Inner TypeId  | 0            |
+| `ArrayOneOrMore`  | Inner TypeId  | 0            |
+| `Alias`           | Target TypeId | 0            |
+| `Struct`          | MemberIndex   | FieldCount   |
+| `Enum`            | MemberIndex   | VariantCount |
 
 > **Limit**: `count` is u8, so composites are limited to 255 members.
 
@@ -99,6 +99,7 @@ struct TypeName {
 Sorted lexicographically by name (resolved via String Table) for binary search.
 
 **Usage**:
+
 - Named definitions (`List = [...]`) get an entry
 - Custom type annotations (`@x :: Identifier`) create an Alias TypeDef with an entry
 - Anonymous types have no entry
@@ -126,6 +127,7 @@ N0: S2 → T1  ; Q
 ### Recursive Enum
 
 Query:
+
 ```
 List = [
     Nil: (nil)

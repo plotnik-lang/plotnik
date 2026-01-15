@@ -5,7 +5,7 @@
 //! - Lookahead/lookbehind (`(?=...)`, `(?!...)`, etc.)
 //! - Named captures (`(?P<name>...)`)
 
-use regex_syntax::ast::{self, visit, Ast, GroupKind, Visitor as RegexVisitor};
+use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
 use rowan::TextRange;
 
 use crate::SourceId;
@@ -13,12 +13,7 @@ use crate::analyze::visitor::{Visitor, walk_named_node};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{NamedNode, Root};
 
-pub fn validate_predicates(
-    source_id: SourceId,
-    source: &str,
-    ast: &Root,
-    diag: &mut Diagnostics,
-) {
+pub fn validate_predicates(source_id: SourceId, source: &str, ast: &Root, diag: &mut Diagnostics) {
     let mut validator = PredicateValidator {
         diag,
         source_id,
@@ -69,13 +64,16 @@ impl PredicateValidator<'_, '_> {
                 let span = self.map_regex_span(e.span(), regex_range);
                 let report = match e.kind() {
                     ast::ErrorKind::UnsupportedBackreference => {
-                        self.diag.report(self.source_id, DiagnosticKind::RegexBackreference, span)
+                        self.diag
+                            .report(self.source_id, DiagnosticKind::RegexBackreference, span)
                     }
                     ast::ErrorKind::UnsupportedLookAround => {
                         // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
                         use rowan::TextSize;
-                        let adjusted = TextRange::new(span.start() + TextSize::from(1u32), span.end());
-                        self.diag.report(self.source_id, DiagnosticKind::RegexLookaround, adjusted)
+                        let adjusted =
+                            TextRange::new(span.start() + TextSize::from(1u32), span.end());
+                        self.diag
+                            .report(self.source_id, DiagnosticKind::RegexLookaround, adjusted)
                     }
                     _ => self
                         .diag
@@ -128,8 +126,16 @@ impl RegexVisitor for NamedCaptureDetector {
             && let GroupKind::CaptureName { name, .. } = &group.kind
         {
             // Span for `?P<name>` (skip opening paren, include closing `>`)
-            let start = ast::Position::new(group.span.start.offset + 1, group.span.start.line, group.span.start.column + 1);
-            let end = ast::Position::new(name.span.end.offset + 1, name.span.end.line, name.span.end.column + 1);
+            let start = ast::Position::new(
+                group.span.start.offset + 1,
+                group.span.start.line,
+                group.span.start.column + 1,
+            );
+            let end = ast::Position::new(
+                name.span.end.offset + 1,
+                name.span.end.line,
+                name.span.end.column + 1,
+            );
             self.named_captures.push(ast::Span::new(start, end));
         }
         Ok(())

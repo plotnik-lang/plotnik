@@ -24,21 +24,21 @@
 
 Sections appear in fixed order, each starting on a 64-byte boundary:
 
-| #  | Section       | Record Size | Count Source          |
-| -- | ------------- | ----------- | --------------------- |
-| 0  | Header        | 64 bytes    | (fixed)               |
-| 1  | [StringBlob]  | 1           | `str_blob_size`       |
-| 2  | [RegexBlob]   | 1           | `regex_blob_size`     |
-| 3  | [StringTable] | 4           | `str_table_count + 1` |
-| 4  | [RegexTable]  | 8           | `regex_table_count + 1`     |
-| 5  | [NodeTypes]   | 4           | `node_types_count`    |
-| 6  | [NodeFields]  | 4           | `node_fields_count`   |
-| 7  | [Trivia]      | 2           | `trivia_count`        |
-| 8  | [TypeDefs]    | 4           | `type_defs_count`     |
-| 9  | [TypeMembers] | 4           | `type_members_count`  |
-| 10 | [TypeNames]   | 4           | `type_names_count`    |
-| 11 | [Entrypoints] | 8           | `entrypoints_count`   |
-| 12 | [Transitions] | 8           | `transitions_count`   |
+| #   | Section       | Record Size | Count Source            |
+| --- | ------------- | ----------- | ----------------------- |
+| 0   | Header        | 64 bytes    | (fixed)                 |
+| 1   | [StringBlob]  | 1           | `str_blob_size`         |
+| 2   | [RegexBlob]   | 1           | `regex_blob_size`       |
+| 3   | [StringTable] | 4           | `str_table_count + 1`   |
+| 4   | [RegexTable]  | 8           | `regex_table_count + 1` |
+| 5   | [NodeTypes]   | 4           | `node_types_count`      |
+| 6   | [NodeFields]  | 4           | `node_fields_count`     |
+| 7   | [Trivia]      | 2           | `trivia_count`          |
+| 8   | [TypeDefs]    | 4           | `type_defs_count`       |
+| 9   | [TypeMembers] | 4           | `type_members_count`    |
+| 10  | [TypeNames]   | 4           | `type_names_count`      |
+| 11  | [Entrypoints] | 8           | `entrypoints_count`     |
+| 12  | [Transitions] | 8           | `transitions_count`     |
 
 [StringBlob]: 02-strings.md
 [StringTable]: 02-strings.md

@@ -3,7 +3,7 @@ name: Sync arborium languages
 on:
   push:
     branches:
-      - 'renovate/arborium-crates'
+      - "renovate/arborium-crates"
 
 permissions:
   contents: write
