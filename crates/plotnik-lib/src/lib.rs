@@ -16,49 +16,39 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze;
-pub mod bytecode;
-pub mod colors;
-pub mod compile;
-pub mod diagnostics;
-pub mod emit;
-pub mod engine;
-pub mod parser;
-pub mod query;
-pub mod type_system;
-pub mod typegen;
+// Re-export modules from plotnik-core
+pub use plotnik_core::colors;
 
-/// Result type for analysis passes that produce both output and diagnostics.
-///
-/// Each pass returns its typed output alongside any diagnostics it collected.
-/// Fatal errors (like fuel exhaustion) use the outer `Result`.
-pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
+// Re-export modules from plotnik-bytecode
+pub use plotnik_bytecode::type_system;
+pub use plotnik_bytecode as bytecode;
 
-pub use colors::Colors;
-pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity, Span};
-pub use query::{Query, QueryBuilder};
-pub use query::{SourceId, SourceMap};
+// Re-export modules from plotnik-compiler
+pub use plotnik_compiler::analyze;
+pub use plotnik_compiler::compile;
+pub use plotnik_compiler::diagnostics;
+pub use plotnik_compiler::emit;
+pub use plotnik_compiler::parser;
+pub use plotnik_compiler::query;
+pub use plotnik_compiler::typegen;
 
-/// Errors that can occur during query parsing.
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum Error {
-    /// Execution fuel exhausted (too many parser operations).
-    #[error("execution limit exceeded")]
-    ExecFuelExhausted,
+// Re-export modules from plotnik-vm
+pub use plotnik_vm::engine;
 
-    /// Recursion fuel exhausted (input nested too deeply).
-    #[error("recursion limit exceeded")]
-    RecursionLimitExceeded,
+// Re-export key types from core
+pub use plotnik_core::Colors;
 
-    #[error("query parsing failed with {} errors", .0.error_count())]
-    QueryParseError(Diagnostics),
+// Re-export key types from compiler
+pub use plotnik_compiler::{
+    Diagnostics, DiagnosticsPrinter, Error, PassResult, Result, Severity, Span,
+};
+pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
-    #[error("query analysis failed with {} errors", .0.error_count())]
-    QueryAnalyzeError(Diagnostics),
-}
-
-/// Result type for query operations.
-pub type Result<T> = std::result::Result<T, Error>;
+// Re-export VM types
+pub use plotnik_vm::{
+    EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
+    Tracer, Value, ValueMaterializer, Verbosity, VM, debug_verify_type,
+};
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).
 ///

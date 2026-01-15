@@ -1,0 +1,41 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Test = (array {(identifier) {(number) (string)} (null)})
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "Test"
+S2 "array"
+S3 "identifier"
+S4 "number"
+S5 "string"
+S6 "null"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Test
+
+[entrypoints]
+Test = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   ε                                    07
+  07   !   (array)                          08
+  08   ▽   (identifier)                     09
+  09   ▷   (number)                         10
+  10   ▷   (string)                         11
+  11   ▷   (null)                           12
+  12   △   _                                13
+  13                                        ▶

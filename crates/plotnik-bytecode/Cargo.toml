@@ -1,0 +1,18 @@
+[package]
+name = "plotnik-bytecode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Bytecode format and runtime types for Plotnik"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
+[dependencies]
+plotnik-core.workspace = true
+regex-automata = { version = "0.4", features = ["dfa-search"] }
+thiserror = "2.0.17"
+
+[dev-dependencies]
+insta = { version = "=1.46.0", features = ["yaml"] }

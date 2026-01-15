@@ -1,26 +1,29 @@
 [package]
-name = "plotnik-lib"
+name = "plotnik-compiler"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Typed query language for tree-sitter AST"
-documentation = "https://docs.rs/plotnik-lib"
-readme = "../../README.md"
-keywords = ["tree-sitter", "query", "ast", "parser"]
-categories = ["parsing", "development-tools"]
+description = "Compiler for Plotnik query language (parser, analyzer, bytecode emitter)"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [dependencies]
 plotnik-bytecode.workspace = true
-plotnik-compiler.workspace = true
 plotnik-core.workspace = true
-plotnik-vm.workspace = true
 plotnik-langs = { workspace = true, optional = true }
-arborium-tree-sitter = "2.10.0"
+annotate-snippets = "0.12.9"
+logos = "0.16.0"
+indexmap = "2"
+rowan = "0.16.1"
 serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0.17"
+arborium-tree-sitter = "2.10.0"
+crc32fast = "1.4"
+memmap2 = "0.9"
+regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
+regex-syntax = "0.8"
 
 [features]
 default = ["plotnik-langs"]

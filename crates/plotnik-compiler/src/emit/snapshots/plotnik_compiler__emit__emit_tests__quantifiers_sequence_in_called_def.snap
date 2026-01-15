@@ -1,0 +1,83 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Item = (identifier) @name
+Collect = {(Item) @item}* @items
+Test = (array (Collect))
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "items"
+S4 "Item"
+S5 "Collect"
+S6 "Test"
+S7 "identifier"
+S8 "array"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { item }
+T3 = ArrayStar(T2)  ; T2*
+T4 = Struct  M2:1  ; { items }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; item: Item
+M2: S3 → T3  ; items: T3
+
+[type_names]
+N0: S4 → T1  ; Item
+N1: S5 → T4  ; Collect
+N2: S6 → T4  ; Test
+
+[entrypoints]
+Collect = 11 :: T4
+Item    = 06 :: T1
+Test    = 16 :: T4
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Item:
+  06   ε                                    08
+  07  ...  
+  08   !   (identifier) [Node Set(M0)]      10
+  10                                        ▶
+
+Collect:
+  11   ε                                    12
+  12   ε   [Arr]                            14
+  14   ε                                    44, 27
+
+Test:
+  16   ε                                    17
+  17   !   (array)                          18
+  18   ▽   (Collect)                        11 : 19
+  19   △   _                                20
+  20                                        ▶
+  21   ε   [EndObj Push]                    24
+  23  ...  
+  24   ε                                    50, 27
+  26                                        ▶
+  27   ε   [EndArr Set(M2)]                 26
+  29   ε   [Set(M1)]                        21
+  31  ...  
+  32   ε   [EndObj]                         29
+  34   !   (Item)                           06 : 32
+  35   ε   [Obj]                            34
+  37   ε   [Obj]                            35
+  39   ▷   _                                42
+  40   ε                                    39, 27
+  42   ε                                    37, 40
+  44   !   _                                42
+  45   ▷   _                                48
+  46   ε                                    45, 27
+  48   ε                                    37, 46
+  50   ▷   _                                48

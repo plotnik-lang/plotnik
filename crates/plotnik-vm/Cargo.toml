@@ -1,0 +1,21 @@
+[package]
+name = "plotnik-vm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Runtime VM for executing compiled Plotnik queries"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-core.workspace = true
+arborium-tree-sitter = "2.10.0"
+regex-automata = { version = "0.4", features = ["dfa-search"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0.17"
+
+[dev-dependencies]
+insta = { version = "=1.46.0", features = ["yaml"] }

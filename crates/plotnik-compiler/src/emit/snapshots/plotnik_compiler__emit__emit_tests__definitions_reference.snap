@@ -1,0 +1,58 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Expression = [(identifier) @name (number) @value]
+Root = (function_declaration name: (identifier) @name)
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "value"
+S3 "Expression"
+S4 "Root"
+S5 "identifier"
+S6 "number"
+S7 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { name, value }
+T2 = Struct  M2:1  ; { name }
+T3 = Struct  M3:1  ; { value }
+T4 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T4  ; name: T4
+M1: S2 → T4  ; value: T4
+M2: S1 → T0  ; name: <Node>
+M3: S2 → T0  ; value: <Node>
+
+[type_names]
+N0: S3 → T1  ; Expression
+N1: S4 → T2  ; Root
+
+[entrypoints]
+Expression = 06 :: T1
+Root       = 10 :: T2
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Expression:
+  06   ε                                    08
+  07  ...  
+  08   ε                                    17, 20
+
+Root:
+  10   ε                                    11
+  11   !   (function_declaration)           12
+  12   ▽   name: (identifier) [Node Set(M2)]  14
+  14   △   _                                15
+  15                                        ▶
+  16                                        ▶
+  17   !   [Null Set(M1)] (identifier) [Node Set(M0)]  16
+  20   !   [Null Set(M0)] (number) [Node Set(M1)]  16
