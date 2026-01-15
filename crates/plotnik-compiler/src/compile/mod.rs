@@ -15,6 +15,7 @@
 //! - `sequences`: Sequence and alternation compilation
 
 mod capture;
+mod collapse_up;
 mod compiler;
 mod dce;
 pub(crate) mod epsilon_elim;
@@ -29,6 +30,8 @@ mod verify;
 
 #[cfg(test)]
 mod capture_tests;
+#[cfg(test)]
+mod collapse_up_tests;
 #[cfg(test)]
 mod compile_tests;
 #[cfg(test)]

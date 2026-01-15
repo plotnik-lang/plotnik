@@ -13,6 +13,7 @@ use crate::parser::Expr;
 use plotnik_bytecode::Nav;
 
 use super::capture::CaptureEffects;
+use super::collapse_up::collapse_up;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
 use super::lower::lower;
@@ -86,6 +87,9 @@ impl<'a> Compiler<'a> {
 
         // Remove unreachable instructions (bypassed epsilons, etc.)
         remove_unreachable(&mut result);
+
+        // Collapse consecutive Up instructions of the same mode
+        collapse_up(&mut result);
 
         // Lower to bytecode-compatible form (cascade overflows)
         lower(&mut result);
