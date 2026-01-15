@@ -665,6 +665,39 @@ fn error_named_node_with_capture_quantified() {
 }
 
 #[test]
+fn error_multi_element_sequence_no_captures() {
+    let input = "Bad = {(identifier) (number)}* @items";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: sequence with `*` matches multiple nodes but has no internal captures
+      |
+    1 | Bad = {(identifier) (number)}* @items
+      |       ^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+    help: add internal captures: `{(a) @a (b) @b}* @items`
+    ");
+}
+
+#[test]
+fn error_multi_element_alternation_branch() {
+    // Alternation where one branch is multi-element
+    let input = "Bad = [(identifier) {(number) (string)}]* @items";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: sequence with `*` matches multiple nodes but has no internal captures
+      |
+    1 | Bad = [(identifier) {(number) (string)}]* @items
+      |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+    help: add internal captures: `{(a) @a (b) @b}* @items`
+    ");
+}
+
+#[test]
 fn recursive_type_with_alternation() {
     let input = indoc! {r#"
     Expr = [

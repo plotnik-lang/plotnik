@@ -77,6 +77,7 @@ pub enum DiagnosticKind {
     MultiCaptureQuantifierNoName,
     UnusedBranchLabels,
     StrictDimensionalityViolation,
+    MultiElementScalarCapture,
     UncapturedOutputWithCaptures,
     AmbiguousUncapturedOutputs,
     DuplicateCaptureInScope,
@@ -181,6 +182,9 @@ impl DiagnosticKind {
             Self::AmbiguousUncapturedOutputs => {
                 Some("capture each expression explicitly: `(X) @x (Y) @y`")
             }
+            Self::MultiElementScalarCapture => {
+                Some("add internal captures: `{(a) @a (b) @b}* @items`")
+            }
             _ => None,
         }
     }
@@ -253,6 +257,9 @@ impl DiagnosticKind {
             Self::StrictDimensionalityViolation => {
                 "quantifier with captures requires a struct capture"
             }
+            Self::MultiElementScalarCapture => {
+                "cannot capture multi-element pattern as scalar array"
+            }
             Self::UncapturedOutputWithCaptures => {
                 "output-producing expression requires capture when siblings have captures"
             }
@@ -301,6 +308,7 @@ impl DiagnosticKind {
 
             // Type inference errors with context
             Self::StrictDimensionalityViolation => "{}".to_string(),
+            Self::MultiElementScalarCapture => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }

@@ -1,29 +1,38 @@
 ---
 source: crates/plotnik-compiler/src/emit/emit_tests.rs
 ---
-Test = (array {(identifier) (number)}* @items)
+Test = (array {(identifier) @id (number) @num}* @items)
 ---
 [strings]
 S0 "Beauty will save the world"
-S1 "items"
-S2 "Test"
-S3 "array"
-S4 "identifier"
-S5 "number"
+S1 "id"
+S2 "num"
+S3 "items"
+S4 "Test"
+S5 "array"
+S6 "identifier"
+S7 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:1  ; { items }
+T1 = Struct  M0:2  ; { id, num }
+T2 = ArrayStar(T1)  ; T1*
+T3 = Struct  M2:1  ; { items }
+T4 = Struct  M3:1  ; { id }
+T5 = Struct  M4:1  ; { num }
 
 [type_members]
-M0: S1 → T1  ; items: T1
+M0: S1 → T0  ; id: <Node>
+M1: S2 → T0  ; num: <Node>
+M2: S3 → T2  ; items: T2
+M3: S1 → T0  ; id: <Node>
+M4: S2 → T0  ; num: <Node>
 
 [type_names]
-N0: S2 → T2  ; Test
+N0: S4 → T3  ; Test
 
 [entrypoints]
-Test = 06 :: T2
+Test = 06 :: T3
 
 [transitions]
 _ObjWrap:
@@ -35,13 +44,15 @@ _ObjWrap:
 Test:
   06   !   (array)                          08
   07  ...  
-  08   ε   [Arr]                            18, 11
+  08   ε   [Arr]                            22, 12
   10                                        ▶
-  11   ε   [EndArr Set(M0)]                 10
-  13   ▷   (number) [Node Push]             22, 24
-  15   !   (identifier)                     13
-  16   ▷   _                                15, 16, 24
-  18   ▽   _                                15, 16, 24
-  20   ▷   _                                15, 20, 24
-  22   ▷   _                                15, 20, 24
-  24   △   [EndArr Set(M0)] _               10
+  11   ε                                    28
+  12   ε   [EndArr Set(M2)]                 10
+  14   ε   [EndObj Push]                    26, 11
+  16   ▷   (number) [Node Set(M1)]          14
+  18   !   [Obj] (identifier) [Node Set(M0)]  16
+  20   ▷   _                                18, 20, 28
+  22   ▽   _                                18, 20, 28
+  24   ▷   _                                18, 24, 28
+  26   ▷   _                                18, 24, 28
+  28   △   [EndArr Set(M2)] _               10

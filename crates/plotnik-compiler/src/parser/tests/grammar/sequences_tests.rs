@@ -177,11 +177,14 @@ fn sequence_with_captures() {
 
 #[test]
 fn sequence_with_quantifier() {
+    // Note: This tests parser behavior only. The pattern `{(a) (b)}+` is
+    // semantically invalid (multi-element sequence without captures), but
+    // we're only testing that the parser produces the correct CST.
     let input = indoc! {r#"
     Q = {(a) (b)}+
     "#};
 
-    let res = Query::expect_valid_cst(input);
+    let res = Query::parse_cst(input);
 
     insta::assert_snapshot!(res, @r#"
     Root
@@ -306,11 +309,14 @@ fn sequence_with_alternation() {
 
 #[test]
 fn sequence_comma_separated_expression() {
+    // Note: This tests parser behavior only. The inner pattern `{"," (number)}*`
+    // is semantically invalid (multi-element sequence without captures), but
+    // we're only testing that the parser produces the correct CST.
     let input = indoc! {r#"
     Q = {(number) {"," (number)}*}
     "#};
 
-    let res = Query::expect_valid_cst(input);
+    let res = Query::parse_cst(input);
 
     insta::assert_snapshot!(res, @r#"
     Root
