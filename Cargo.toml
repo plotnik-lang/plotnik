@@ -11,15 +11,15 @@ members = [
 ]
 
 [workspace.package]
-version = "0.3.1"
+version = "0.3.2"
 license = "Apache-2.0"
 repository = "https://github.com/plotnik-lang/plotnik"
 edition = "2024"
 
 [workspace.dependencies]
-plotnik-bytecode = { path = "crates/plotnik-bytecode", version = "0.3.1" }
-plotnik-compiler = { path = "crates/plotnik-compiler", version = "0.3.1" }
-plotnik-core = { path = "crates/plotnik-core", version = "0.3.1" }
-plotnik-langs = { path = "crates/plotnik-langs", version = "0.3.1" }
-plotnik-lib = { path = "crates/plotnik-lib", version = "0.3.1" }
-plotnik-vm = { path = "crates/plotnik-vm", version = "0.3.1" }
+plotnik-bytecode = { path = "crates/plotnik-bytecode", version = "0.3.2" }
+plotnik-compiler = { path = "crates/plotnik-compiler", version = "0.3.2" }
+plotnik-core = { path = "crates/plotnik-core", version = "0.3.2" }
+plotnik-langs = { path = "crates/plotnik-langs", version = "0.3.2" }
+plotnik-lib = { path = "crates/plotnik-lib", version = "0.3.2" }
+plotnik-vm = { path = "crates/plotnik-vm", version = "0.3.2" }
