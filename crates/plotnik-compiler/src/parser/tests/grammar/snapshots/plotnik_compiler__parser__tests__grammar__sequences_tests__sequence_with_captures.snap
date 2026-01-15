@@ -1,0 +1,26 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = {(comment)* @comments (function) @fn}
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Capture
+        Quantifier
+          Tree
+            ParenOpen "("
+            Id "comment"
+            ParenClose ")"
+          Star "*"
+        CaptureToken "@comments"
+      Capture
+        Tree
+          ParenOpen "("
+          Id "function"
+          ParenClose ")"
+        CaptureToken "@fn"
+      BraceClose "}"

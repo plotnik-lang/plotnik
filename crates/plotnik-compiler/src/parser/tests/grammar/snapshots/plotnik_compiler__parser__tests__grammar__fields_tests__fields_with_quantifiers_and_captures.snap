@@ -1,0 +1,24 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/fields_tests.rs
+---
+Q = (node foo: (bar)* @baz)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "node"
+      Capture
+        Quantifier
+          Field
+            Id "foo"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Id "bar"
+              ParenClose ")"
+          Star "*"
+        CaptureToken "@baz"
+      ParenClose ")"

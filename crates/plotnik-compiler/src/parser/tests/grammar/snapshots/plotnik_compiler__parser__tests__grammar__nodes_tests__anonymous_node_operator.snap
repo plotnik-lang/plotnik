@@ -1,0 +1,13 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/nodes_tests.rs
+---
+Q = "+="
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Str
+      DoubleQuote "\""
+      StrVal "+="
+      DoubleQuote "\""

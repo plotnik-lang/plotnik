@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = ","* @commas
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Str
+          DoubleQuote "\""
+          StrVal ","
+          DoubleQuote "\""
+        Star "*"
+      CaptureToken "@commas"

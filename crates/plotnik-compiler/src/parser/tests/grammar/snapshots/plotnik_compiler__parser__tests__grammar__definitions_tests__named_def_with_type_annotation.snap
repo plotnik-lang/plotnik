@@ -1,0 +1,36 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Func = (function_declaration
+    name: (identifier) @name :: string
+    body: (_) @body)
+---
+Root
+  Def
+    Id "Func"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function_declaration"
+      Capture
+        Field
+          Id "name"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+        CaptureToken "@name"
+        Type
+          DoubleColon "::"
+          Id "string"
+      Capture
+        Field
+          Id "body"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        CaptureToken "@body"
+      ParenClose ")"

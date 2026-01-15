@@ -1,0 +1,15 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/quantifiers_tests.rs
+---
+Q = (statement)+
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      Tree
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      Plus "+"

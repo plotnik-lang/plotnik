@@ -1,0 +1,29 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = [
+    Ident: (identifier)
+    Num: (number)
+]
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Id "Ident"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Branch
+        Id "Num"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "number"
+          ParenClose ")"
+      BracketClose "]"

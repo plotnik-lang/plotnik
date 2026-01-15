@@ -1,0 +1,22 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/nodes_tests.rs
+---
+Q = (statement/expression_statement
+    (expression/call_expression))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "statement"
+      Slash "/"
+      Id "expression_statement"
+      Tree
+        ParenOpen "("
+        Id "expression"
+        Slash "/"
+        Id "call_expression"
+        ParenClose ")"
+      ParenClose ")"

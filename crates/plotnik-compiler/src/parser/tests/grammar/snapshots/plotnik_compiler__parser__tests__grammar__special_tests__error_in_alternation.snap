@@ -1,0 +1,22 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/special_tests.rs
+---
+Q = [(ERROR) (identifier)]
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          KwError "ERROR"
+          ParenClose ")"
+      Branch
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      BracketClose "]"

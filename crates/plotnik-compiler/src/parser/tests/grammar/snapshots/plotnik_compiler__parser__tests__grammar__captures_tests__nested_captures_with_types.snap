@@ -1,0 +1,51 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = (function
+    name: (identifier) @name :: string
+    body: (block
+        (statement)* @body_stmts :: Statement)) @func :: Function
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "function"
+        Capture
+          Field
+            Id "name"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+          CaptureToken "@name"
+          Type
+            DoubleColon "::"
+            Id "string"
+        Field
+          Id "body"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "block"
+            Capture
+              Quantifier
+                Tree
+                  ParenOpen "("
+                  Id "statement"
+                  ParenClose ")"
+                Star "*"
+              CaptureToken "@body_stmts"
+              Type
+                DoubleColon "::"
+                Id "Statement"
+            ParenClose ")"
+        ParenClose ")"
+      CaptureToken "@func"
+      Type
+        DoubleColon "::"
+        Id "Function"

@@ -1,378 +1,115 @@
-use crate::Query;
-use indoc::indoc;
+//! Node parsing tests.
+
+use crate::shot_cst;
 
 #[test]
 fn empty_input() {
-    insta::assert_snapshot!(Query::expect_valid_cst(""), @"Root");
+    shot_cst!("");
 }
 
 #[test]
 fn simple_named_node() {
-    let input = indoc! {r#"
-    Q = (identifier)
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (identifier)
     "#);
 }
 
 #[test]
 fn nested_node() {
-    let input = indoc! {r#"
-    Q = (function_definition name: (identifier))
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "function_definition"
-          Field
-            Id "name"
-            Colon ":"
-            Tree
-              ParenOpen "("
-              Id "identifier"
-              ParenClose ")"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (function_definition name: (identifier))
     "#);
 }
 
 #[test]
 fn deeply_nested() {
-    let input = indoc! {r#"
-    Q = (a
-        (b
-        (c
-            (d))))
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "a"
-          Tree
-            ParenOpen "("
-            Id "b"
-            Tree
-              ParenOpen "("
-              Id "c"
-              Tree
-                ParenOpen "("
-                Id "d"
-                ParenClose ")"
-              ParenClose ")"
-            ParenClose ")"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (a
+            (b
+            (c
+                (d))))
     "#);
 }
 
 #[test]
 fn sibling_children() {
-    let input = indoc! {r#"
-    Q = (block
-        (statement)
-        (statement)
-        (statement))
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "block"
-          Tree
-            ParenOpen "("
-            Id "statement"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "statement"
-            ParenClose ")"
-          Tree
-            ParenOpen "("
-            Id "statement"
-            ParenClose ")"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (block
+            (statement)
+            (statement)
+            (statement))
     "#);
 }
 
 #[test]
 fn wildcard() {
-    let input = indoc! {r#"
-    Q = (_)
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Underscore "_"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (_)
     "#);
 }
 
 #[test]
 fn anonymous_node() {
-    let input = indoc! {r#"
-    Q = "if"
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Str
-          DoubleQuote "\""
-          StrVal "if"
-          DoubleQuote "\""
+    shot_cst!(r#"
+        Q = "if"
     "#);
 }
 
 #[test]
 fn anonymous_node_operator() {
-    let input = indoc! {r#"
-    Q = "+="
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Str
-          DoubleQuote "\""
-          StrVal "+="
-          DoubleQuote "\""
+    shot_cst!(r#"
+        Q = "+="
     "#);
 }
 
 #[test]
 fn supertype_basic() {
-    let input = indoc! {r#"
-    Q = (expression/binary_expression)
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "expression"
-          Slash "/"
-          Id "binary_expression"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (expression/binary_expression)
     "#);
 }
 
 #[test]
 fn supertype_with_string_subtype() {
-    let input = indoc! {r#"
-    Q = (expression/"()")
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "expression"
-          Slash "/"
-          DoubleQuote "\""
-          StrVal "()"
-          DoubleQuote "\""
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (expression/"()")
     "#);
 }
 
 #[test]
 fn supertype_with_capture() {
-    let input = indoc! {r#"
-    Q = (expression/binary_expression) @expr
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Capture
-          Tree
-            ParenOpen "("
-            Id "expression"
-            Slash "/"
-            Id "binary_expression"
-            ParenClose ")"
-          CaptureToken "@expr"
+    shot_cst!(r#"
+        Q = (expression/binary_expression) @expr
     "#);
 }
 
 #[test]
 fn supertype_with_children() {
-    let input = indoc! {r#"
-    Q = (expression/binary_expression
-        left: (_) @left
-        right: (_) @right)
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "expression"
-          Slash "/"
-          Id "binary_expression"
-          Capture
-            Field
-              Id "left"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Underscore "_"
-                ParenClose ")"
-            CaptureToken "@left"
-          Capture
-            Field
-              Id "right"
-              Colon ":"
-              Tree
-                ParenOpen "("
-                Underscore "_"
-                ParenClose ")"
-            CaptureToken "@right"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (expression/binary_expression
+            left: (_) @left
+            right: (_) @right)
     "#);
 }
 
 #[test]
 fn supertype_nested() {
-    let input = indoc! {r#"
-    Q = (statement/expression_statement
-        (expression/call_expression))
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "statement"
-          Slash "/"
-          Id "expression_statement"
-          Tree
-            ParenOpen "("
-            Id "expression"
-            Slash "/"
-            Id "call_expression"
-            ParenClose ")"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (statement/expression_statement
+            (expression/call_expression))
     "#);
 }
 
 #[test]
 fn supertype_in_alternation() {
-    let input = indoc! {r#"
-    Q = [(expression/identifier) (expression/number)]
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Alt
-          BracketOpen "["
-          Branch
-            Tree
-              ParenOpen "("
-              Id "expression"
-              Slash "/"
-              Id "identifier"
-              ParenClose ")"
-          Branch
-            Tree
-              ParenOpen "("
-              Id "expression"
-              Slash "/"
-              Id "number"
-              ParenClose ")"
-          BracketClose "]"
+    shot_cst!(r#"
+        Q = [(expression/identifier) (expression/number)]
     "#);
 }
 
 #[test]
 fn no_supertype_plain_node() {
-    let input = indoc! {r#"
-    Q = (identifier)
-    "#};
-
-    let res = Query::expect_valid_cst(input);
-
-    insta::assert_snapshot!(res, @r#"
-    Root
-      Def
-        Id "Q"
-        Equals "="
-        Tree
-          ParenOpen "("
-          Id "identifier"
-          ParenClose ")"
+    shot_cst!(r#"
+        Q = (identifier)
     "#);
 }

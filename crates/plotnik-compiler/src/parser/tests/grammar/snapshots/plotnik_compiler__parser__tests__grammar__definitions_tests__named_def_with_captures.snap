@@ -1,0 +1,41 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+BinaryOp = (binary_expression
+    left: (_) @left
+    operator: _ @op
+    right: (_) @right)
+---
+Root
+  Def
+    Id "BinaryOp"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "binary_expression"
+      Capture
+        Field
+          Id "left"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        CaptureToken "@left"
+      Capture
+        Field
+          Id "operator"
+          Colon ":"
+          Wildcard
+            Underscore "_"
+        CaptureToken "@op"
+      Capture
+        Field
+          Id "right"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        CaptureToken "@right"
+      ParenClose ")"

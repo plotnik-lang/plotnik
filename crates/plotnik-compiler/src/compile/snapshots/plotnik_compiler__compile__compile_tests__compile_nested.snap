@@ -1,0 +1,39 @@
+---
+source: crates/plotnik-compiler/src/compile/compile_tests.rs
+---
+Test = (call_expression function: (identifier) @fn)
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "Test"
+S3 "call_expression"
+S4 "identifier"
+S5 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { fn }
+
+[type_members]
+M0: S1 → T0  ; fn: <Node>
+
+[type_names]
+N0: S2 → T1  ; Test
+
+[entrypoints]
+Test = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Test:
+  06   !   (call_expression)                08
+  07  ...  
+  08   ▽   function: (identifier) [Node Set(M0)]  10
+  10   △   _                                11
+  11                                        ▶

@@ -1,0 +1,37 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Statement = [
+    Assign: (assignment_expression)
+    Call: (call_expression)
+    Return: (return_statement)
+]
+---
+Root
+  Def
+    Id "Statement"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Id "Assign"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "assignment_expression"
+          ParenClose ")"
+      Branch
+        Id "Call"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "call_expression"
+          ParenClose ")"
+      Branch
+        Id "Return"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "return_statement"
+          ParenClose ")"
+      BracketClose "]"

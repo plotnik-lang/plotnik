@@ -1,0 +1,28 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
+---
+Q = (parent {. (first) (second) .})
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "parent"
+      Seq
+        BraceOpen "{"
+        Anchor
+          Dot "."
+        Tree
+          ParenOpen "("
+          Id "first"
+          ParenClose ")"
+        Tree
+          ParenOpen "("
+          Id "second"
+          ParenClose ")"
+        Anchor
+          Dot "."
+        BraceClose "}"
+      ParenClose ")"

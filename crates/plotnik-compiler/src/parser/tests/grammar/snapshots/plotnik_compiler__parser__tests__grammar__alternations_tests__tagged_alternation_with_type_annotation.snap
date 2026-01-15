@@ -1,0 +1,45 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = [
+    Base: (identifier) @name
+    Access: (member_expression object: (_) @obj)
+] @chain :: MemberChain
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Id "Base"
+          Colon ":"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+            CaptureToken "@name"
+        Branch
+          Id "Access"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "member_expression"
+            Capture
+              Field
+                Id "object"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Underscore "_"
+                  ParenClose ")"
+              CaptureToken "@obj"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@chain"
+      Type
+        DoubleColon "::"
+        Id "MemberChain"

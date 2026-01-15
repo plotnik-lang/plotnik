@@ -1,3 +1,7 @@
+//! Trivia (whitespace, comments) preservation tests.
+//!
+//! These tests use expect_valid_cst_full to verify trivia nodes are captured.
+
 use crate::Query;
 use indoc::indoc;
 

@@ -1,0 +1,18 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = "return" @kw :: string
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Str
+        DoubleQuote "\""
+        StrVal "return"
+        DoubleQuote "\""
+      CaptureToken "@kw"
+      Type
+        DoubleColon "::"
+        Id "string"

@@ -1,0 +1,21 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Expr = (expression)
+Stmt = (statement)
+---
+Root
+  Def
+    Id "Expr"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expression"
+      ParenClose ")"
+  Def
+    Id "Stmt"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "statement"
+      ParenClose ")"

@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/fields_tests.rs
+---
+Q = (function -async)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function"
+      NegatedField
+        Minus "-"
+        Id "async"
+      ParenClose ")"

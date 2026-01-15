@@ -1,0 +1,89 @@
+---
+source: crates/plotnik-compiler/src/compile/compile_tests.rs
+---
+Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d (call_expression) @e]
+---
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "Q"
+S07 "identifier"
+S08 "number"
+S09 "string"
+S10 "binary_expression"
+S11 "call_expression"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M00:5  ; { a, b, c, d, e }
+T02 = Struct  M05:1  ; { a }
+T03 = Struct  M06:1  ; { b }
+T04 = Struct  M07:1  ; { c }
+T05 = Struct  M08:1  ; { d }
+T06 = Struct  M09:1  ; { e }
+T07 = Struct  M10:2  ; { a, b }
+T08 = Struct  M12:3  ; { a, b, c }
+T09 = Struct  M15:4  ; { a, b, c, d }
+T10 = Optional(T00)  ; <Node>?
+
+[type_members]
+M00: S01 → T10  ; a: T10
+M01: S02 → T10  ; b: T10
+M02: S03 → T10  ; c: T10
+M03: S04 → T10  ; d: T10
+M04: S05 → T10  ; e: T10
+M05: S01 → T00  ; a: <Node>
+M06: S02 → T00  ; b: <Node>
+M07: S03 → T00  ; c: <Node>
+M08: S04 → T00  ; d: <Node>
+M09: S05 → T00  ; e: <Node>
+M10: S01 → T10  ; a: T10
+M11: S02 → T10  ; b: T10
+M12: S01 → T10  ; a: T10
+M13: S02 → T10  ; b: T10
+M14: S03 → T10  ; c: T10
+M15: S01 → T10  ; a: T10
+M16: S02 → T10  ; b: T10
+M17: S03 → T10  ; c: T10
+M18: S04 → T10  ; d: T10
+
+[type_names]
+N0: S06 → T01  ; Q
+
+[entrypoints]
+Q = 08 :: T01
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+  06                                        ▶
+  07  ...  
+
+Q:
+  08   ε                                    11, 18, 26, 34, 42
+  11   ε   [Null Set(M1) Null Set(M2) Null Set(M3) Null]  14
+  14   ε   [Set(M4)]                        16
+  16   !   (identifier) [Node Set(M0)]      06
+  18   ε   [Null Set(M0) Null Set(M2) Null Set(M3) Null]  21
+  21   ε   [Set(M4)]                        24
+  23  ...  
+  24   !   (number) [Node Set(M1)]          06
+  26   ε   [Null Set(M0) Null Set(M1) Null Set(M3) Null]  29
+  29   ε   [Set(M4)]                        32
+  31  ...  
+  32   !   (string) [Node Set(M2)]          06
+  34   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  37
+  37   ε   [Set(M4)]                        40
+  39  ...  
+  40   !   (binary_expression) [Node Set(M3)]  06
+  42   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  45
+  45   ε   [Set(M3)]                        48
+  47  ...  
+  48   !   (call_expression) [Node Set(M4)]  06

@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = (statement)+ @stmts :: Statement
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+        Plus "+"
+      CaptureToken "@stmts"
+      Type
+        DoubleColon "::"
+        Id "Statement"

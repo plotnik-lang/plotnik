@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+Pair = {(identifier) (expression)}
+---
+Root
+  Def
+    Id "Pair"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Tree
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "expression"
+        ParenClose ")"
+      BraceClose "}"

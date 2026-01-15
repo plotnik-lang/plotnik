@@ -1,0 +1,28 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/nodes_tests.rs
+---
+Q = (a
+    (b
+    (c
+        (d))))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "a"
+      Tree
+        ParenOpen "("
+        Id "b"
+        Tree
+          ParenOpen "("
+          Id "c"
+          Tree
+            ParenOpen "("
+            Id "d"
+            ParenClose ")"
+          ParenClose ")"
+        ParenClose ")"
+      ParenClose ")"

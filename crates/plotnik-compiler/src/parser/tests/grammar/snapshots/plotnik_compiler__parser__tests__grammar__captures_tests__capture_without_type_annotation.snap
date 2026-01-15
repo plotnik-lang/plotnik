@@ -1,0 +1,15 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/captures_tests.rs
+---
+Q = (identifier) @name
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      CaptureToken "@name"

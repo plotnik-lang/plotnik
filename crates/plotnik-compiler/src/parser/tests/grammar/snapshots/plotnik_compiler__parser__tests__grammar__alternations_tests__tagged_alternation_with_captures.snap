@@ -1,0 +1,49 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/alternations_tests.rs
+---
+Q = [
+    Assign: (assignment_expression left: (identifier) @left)
+    Call: (call_expression function: (identifier) @func)
+] @stmt
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Id "Assign"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "assignment_expression"
+            Capture
+              Field
+                Id "left"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Id "identifier"
+                  ParenClose ")"
+              CaptureToken "@left"
+            ParenClose ")"
+        Branch
+          Id "Call"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "call_expression"
+            Capture
+              Field
+                Id "function"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Id "identifier"
+                  ParenClose ")"
+              CaptureToken "@func"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@stmt"

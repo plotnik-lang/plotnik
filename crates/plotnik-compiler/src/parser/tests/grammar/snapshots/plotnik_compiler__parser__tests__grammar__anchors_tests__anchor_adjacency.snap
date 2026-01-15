@@ -1,0 +1,27 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/anchors_tests.rs
+---
+Q = (dotted_name (identifier) @a . (identifier) @b)
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "dotted_name"
+      Capture
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+        CaptureToken "@a"
+      Anchor
+        Dot "."
+      Capture
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+        CaptureToken "@b"
+      ParenClose ")"

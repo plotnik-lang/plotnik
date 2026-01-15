@@ -1,0 +1,25 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/special_tests.rs
+---
+Q = (function_definition
+    body: (block (ERROR)))
+---
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function_definition"
+      Field
+        Id "body"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "block"
+          Tree
+            ParenOpen "("
+            KwError "ERROR"
+            ParenClose ")"
+          ParenClose ")"
+      ParenClose ")"

@@ -1,0 +1,42 @@
+---
+source: crates/plotnik-compiler/src/parser/tests/grammar/definitions_tests.rs
+---
+NestedCall = (call_expression
+    function: [(identifier) @name (NestedCall) @inner]
+    arguments: (arguments))
+---
+Root
+  Def
+    Id "NestedCall"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call_expression"
+      Field
+        Id "function"
+        Colon ":"
+        Alt
+          BracketOpen "["
+          Branch
+            Capture
+              Tree
+                ParenOpen "("
+                Id "identifier"
+                ParenClose ")"
+              CaptureToken "@name"
+          Branch
+            Capture
+              Ref
+                ParenOpen "("
+                Id "NestedCall"
+                ParenClose ")"
+              CaptureToken "@inner"
+          BracketClose "]"
+      Field
+        Id "arguments"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "arguments"
+          ParenClose ")"
+      ParenClose ")"
