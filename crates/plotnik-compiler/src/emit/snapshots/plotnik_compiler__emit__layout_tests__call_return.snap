@@ -1,0 +1,51 @@
+---
+source: crates/plotnik-compiler/src/emit/layout_tests.rs
+---
+Inner = (identifier) @name
+Test = (array (Inner) @item)
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "Inner"
+S4 "Test"
+S5 "identifier"
+S6 "array"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { item }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; item: Inner
+
+[type_names]
+N0: S3 → T1  ; Inner
+N1: S4 → T2  ; Test
+
+[entrypoints]
+Inner = 06 :: T1
+Test  = 09 :: T2
+
+[transitions]
+_ObjWrap:
+  00   ε   [Obj]                            02
+  02       Trampoline                       03
+  03   ε   [EndObj]                         05
+  05                                        ▶
+
+Inner:
+  06   !   (identifier) [Node Set(M0)]      08
+  08                                        ▶
+
+Test:
+  09   !   (array) [Obj]                    11
+  11   ▽   (Inner)                          06 : 12
+  12   ε   [EndObj]                         14
+  14   ε                                    16
+  15  ...  
+  16   △   [Set(M1)] _                      18
+  18                                        ▶
