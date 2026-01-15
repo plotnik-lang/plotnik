@@ -368,7 +368,10 @@ impl<'t> VM<'t> {
             use regex_automata::Input;
             use regex_automata::dfa::Automaton;
             let input = Input::new(node_text);
-            let matched = dfa.try_search_fwd(&input).ok().flatten().is_some();
+            let matched = dfa
+                .try_search_fwd(&input)
+                .expect("DFA search failed")
+                .is_some();
 
             match op {
                 PredicateOp::RegexMatch => matched,
