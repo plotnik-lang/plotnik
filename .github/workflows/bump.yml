@@ -81,3 +81,4 @@ jobs:
           gh pr create \
             --title "chore: Bump version to \`$next\`" \
             --body "Bump ${{ inputs.bump }} version: \`${{ steps.version.outputs.current }}\` → \`$next\`"
+          gh pr merge --auto --squash
