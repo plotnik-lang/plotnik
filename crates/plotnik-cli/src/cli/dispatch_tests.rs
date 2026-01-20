@@ -712,3 +712,62 @@ fn check_accepts_raw_flag() {
         result.err()
     );
 }
+
+// Extension-based detection tests for ast command
+
+#[test]
+fn ast_detects_ptk_as_query() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "query.ptk"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // .ptk extension → treat as query
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, None);
+}
+
+#[test]
+fn ast_detects_non_ptk_as_source() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "app.js"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // Non-.ptk extension → treat as source
+    assert_eq!(params.query_path, None);
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_no_extension_detection_with_two_positionals() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "query.ptk", "app.js"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // Two positionals → first is query, second is source (no detection)
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+#[test]
+fn ast_no_extension_detection_with_inline_query() {
+    let cmd = ast_command();
+    let result = cmd.try_get_matches_from(["ast", "-q", "(id) @x", "app.js"]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = AstParams::from_matches(&m);
+
+    // -q provided → positional shift takes precedence, no extension detection
+    assert_eq!(params.query_path, None);
+    assert_eq!(params.query_text, Some("(id) @x".to_string()));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
