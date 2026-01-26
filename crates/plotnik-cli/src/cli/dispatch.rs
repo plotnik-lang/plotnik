@@ -39,6 +39,11 @@ impl AstParams {
         let (query_path, source_path) =
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
+        // Extension-based detection: when a single file is provided without -q,
+        // .ptk → query, otherwise → source (detect language from extension).
+        let (query_path, source_path) =
+            detect_file_type_by_extension(query_path, source_path, query_text.is_some());
+
         Self {
             query_path,
             query_text,
@@ -351,4 +356,29 @@ fn shift_positional_to_source(
     } else {
         (query_path, source_path)
     }
+}
+
+/// Detect file type by extension for ast command.
+/// When a single file is provided without -q: .ptk → query, otherwise → source.
+fn detect_file_type_by_extension(
+    query_path: Option<PathBuf>,
+    source_path: Option<PathBuf>,
+    has_query_text: bool,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    // Only apply when: single positional file, no -q flag, no explicit source
+    if has_query_text || source_path.is_some() {
+        return (query_path, source_path);
+    }
+
+    let Some(path) = query_path else {
+        return (None, None);
+    };
+
+    // .ptk extension → treat as query
+    if path.extension().is_some_and(|ext| ext == "ptk") {
+        return (Some(path), None);
+    }
+
+    // Any other extension → treat as source file
+    (None, Some(path))
 }
