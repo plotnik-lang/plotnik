@@ -60,19 +60,20 @@ pub fn build_cli() -> Command {
 ///
 /// Accepts all runtime flags for unified CLI experience.
 /// Shows query AST when query is provided, source AST when source is provided.
+/// Single positional file is auto-detected: .ptk → query, otherwise → source.
 pub fn ast_command() -> Command {
     let cmd = Command::new("ast")
         .about("Show AST of query and/or source file")
         .override_usage(
             "\
-  plotnik ast <QUERY> [SOURCE]
+  plotnik ast <FILE>                 # auto-detect by extension
+  plotnik ast <QUERY> <SOURCE>       # both ASTs
   plotnik ast -q <TEXT> [SOURCE]
-  plotnik ast <SOURCE>
   plotnik ast -s <TEXT> -l <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik ast query.ptk               # query AST
+  plotnik ast query.ptk               # query AST (.ptk extension)
   plotnik ast app.ts                  # source AST (tree-sitter)
   plotnik ast query.ptk app.ts        # both ASTs
   plotnik ast query.ptk app.ts --raw  # CST / include anonymous nodes
