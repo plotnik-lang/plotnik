@@ -737,6 +737,14 @@ define_langs! {
         names: ["starlark", "bazel", "bzl"],
         extensions: ["bzl", "bazel"],
     },
+    styx => {
+        feature: "lang-styx",
+        name: "styx",
+        ts_lang: arborium_styx::language(),
+        lang_key: "STYX",
+        names: ["styx"],
+        extensions: ["styx"],
+    },
     svelte => {
         feature: "lang-svelte",
         name: "svelte",

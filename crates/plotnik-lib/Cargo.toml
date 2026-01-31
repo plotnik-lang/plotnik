@@ -19,7 +19,7 @@ plotnik-compiler.workspace = true
 plotnik-core.workspace = true
 plotnik-vm.workspace = true
 plotnik-langs = { workspace = true, optional = true }
-arborium-tree-sitter = "2.10.0"
+arborium-tree-sitter = "2.12.4"
 serde = { version = "1.0", features = ["derive"] }
 
 [features]
