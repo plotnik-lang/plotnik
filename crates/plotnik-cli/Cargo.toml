@@ -114,6 +114,7 @@ all-languages = [
     "lang-sql",
     "lang-ssh-config",
     "lang-starlark",
+    "lang-styx",
     "lang-svelte",
     "lang-swift",
     "lang-textproto",
@@ -218,6 +219,7 @@ lang-sparql = ["plotnik-langs/lang-sparql"]
 lang-sql = ["plotnik-langs/lang-sql"]
 lang-ssh-config = ["plotnik-langs/lang-ssh-config"]
 lang-starlark = ["plotnik-langs/lang-starlark"]
+lang-styx = ["plotnik-langs/lang-styx"]
 lang-svelte = ["plotnik-langs/lang-svelte"]
 lang-swift = ["plotnik-langs/lang-swift"]
 lang-textproto = ["plotnik-langs/lang-textproto"]

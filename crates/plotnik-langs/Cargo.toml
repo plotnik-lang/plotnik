@@ -111,6 +111,7 @@ all-languages = [
     "lang-sql",
     "lang-ssh-config",
     "lang-starlark",
+    "lang-styx",
     "lang-svelte",
     "lang-swift",
     "lang-textproto",
@@ -217,6 +218,7 @@ lang-sparql = ["dep:arborium-sparql"]
 lang-sql = ["dep:arborium-sql"]
 lang-ssh-config = ["dep:arborium-ssh-config"]
 lang-starlark = ["dep:arborium-starlark"]
+lang-styx = ["dep:arborium-styx"]
 lang-svelte = ["dep:arborium-svelte"]
 lang-swift = ["dep:arborium-swift"]
 lang-textproto = ["dep:arborium-textproto"]
@@ -326,6 +328,7 @@ arborium-sparql = { version = "2.12.4", optional = true }
 arborium-sql = { version = "2.12.4", optional = true }
 arborium-ssh-config = { version = "2.12.4", optional = true }
 arborium-starlark = { version = "2.12.4", optional = true }
+arborium-styx = { version = "2.12.4", optional = true }
 arborium-svelte = { version = "2.12.4", optional = true }
 arborium-swift = { version = "2.12.4", optional = true }
 arborium-textproto = { version = "2.12.4", optional = true }
