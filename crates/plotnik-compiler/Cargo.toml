@@ -19,7 +19,7 @@ indexmap = "2"
 rowan = "0.16.1"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0.17"
-arborium-tree-sitter = "2.12.4"
+arborium-tree-sitter = "2.13.0"
 crc32fast = "1.4"
 memmap2 = "0.9"
 regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
