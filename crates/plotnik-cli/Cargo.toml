@@ -249,7 +249,7 @@ clap = { version = "4.5", features = ["derive"] }
 plotnik-core.workspace = true
 plotnik-langs = { path = "../plotnik-langs", version = "0.3.3", default-features = false }
 plotnik-lib.workspace = true
-arborium-tree-sitter = "2.12.4"
+arborium-tree-sitter = "2.13.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
