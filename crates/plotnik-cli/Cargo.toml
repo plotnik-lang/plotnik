@@ -255,4 +255,4 @@ serde_json = "1.0"
 thiserror = "2.0"
 
 [dev-dependencies]
-insta = "=1.46.1"
+insta = "=1.46.3"
