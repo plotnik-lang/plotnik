@@ -963,6 +963,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arborium-styx"
+version = "2.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
+dependencies = [
+ "arborium-sysroot",
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "arborium-svelte"
 version = "2.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
