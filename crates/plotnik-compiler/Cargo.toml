@@ -12,7 +12,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
-plotnik-langs = { workspace = true, optional = true }
+plotnik-langs = { path = "../plotnik-langs", version = "0.3.3", default-features = false }
 annotate-snippets = "0.12.9"
 logos = "0.16.0"
 indexmap = "2"
@@ -27,6 +27,7 @@ regex-syntax = "0.8"
 
 [features]
 default = ["plotnik-langs"]
+plotnik-langs = ["plotnik-langs/default"]
 
 [dev-dependencies]
 insta = { version = "=1.46.1", features = ["yaml"] }

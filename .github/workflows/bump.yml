@@ -60,8 +60,11 @@ jobs:
           tomato set workspace.dependencies.plotnik-vm.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-langs.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
-          # plotnik-cli has explicit plotnik-langs dep (default-features = false workaround)
+          # explicit default-features = false overrides need local version bumps too
+          tomato set dependencies.plotnik-langs.version "$next" crates/plotnik-compiler/Cargo.toml
+          tomato set dependencies.plotnik-compiler.version "$next" crates/plotnik-lib/Cargo.toml
           tomato set dependencies.plotnik-langs.version "$next" crates/plotnik-cli/Cargo.toml
+          tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
 
       - name: Update lockfile
         run: cargo check --workspace

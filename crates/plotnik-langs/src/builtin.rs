@@ -1,6 +1,4 @@
-use std::sync::{Arc, LazyLock};
-
-use crate::{Lang, LangInner};
+use crate::Lang;
 
 /// Language metadata for listing.
 #[derive(Debug, Clone)]
@@ -31,7 +29,7 @@ macro_rules! define_langs {
             #[cfg(feature = $feature)]
             pub fn $fn_name() -> Lang {
                 paste::paste! {
-                    static LANG: LazyLock<Lang> = LazyLock::new(|| {
+                    static LANG: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| {
                         static NODE_TYPES_BYTES: &[u8] = include_bytes!(env!(
                             concat!("PLOTNIK_NODE_TYPES_", $lang_key)
                         ));
@@ -46,7 +44,7 @@ macro_rules! define_langs {
                         let grammar = plotnik_core::grammar::Grammar::from_binary(GRAMMAR_BYTES)
                             .expect("invalid embedded grammar");
 
-                        Arc::new(LangInner::new(
+                        std::sync::Arc::new(crate::LangInner::new(
                             $name,
                             $ts_lang.into(),
                             raw_nodes,
@@ -54,7 +52,7 @@ macro_rules! define_langs {
                         ))
                     });
                 }
-                Arc::clone(&LANG)
+                std::sync::Arc::clone(&LANG)
             }
         )*
 
