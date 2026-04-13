@@ -385,15 +385,15 @@ Filter nodes by their text content with inline predicates:
 (identifier !~ /^_/)          ; text does not match regex
 ```
 
-| Operator | Meaning           |
-| -------- | ----------------- |
-| `==`     | equals            |
-| `!=`     | not equals        |
-| `^=`     | starts with       |
-| `$=`     | ends with         |
-| `*=`     | contains          |
-| `=~`     | matches regex     |
-| `!~`     | does not match    |
+| Operator | Meaning        |
+| -------- | -------------- |
+| `==`     | equals         |
+| `!=`     | not equals     |
+| `^=`     | starts with    |
+| `$=`     | ends with      |
+| `*=`     | contains       |
+| `=~`     | matches regex  |
+| `!~`     | does not match |
 
 **Regex patterns** use `/pattern/` syntax. Full Unicode is supported. Patterns match anywhere in the text (use `^` and `$` anchors for full-match semantics).
 
@@ -404,6 +404,7 @@ Filter nodes by their text content with inline predicates:
 ```
 
 **Unsupported regex features** (compile-time error):
+
 - Backreferences (`\1`, `\2`)
 - Lookahead/lookbehind (`(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)`)
 - Named captures (`(?P<name>...)`)
@@ -977,28 +978,28 @@ type Root = {
 
 ## Quick Reference
 
-| Feature              | Tree-sitter        | Plotnik                       |
-| -------------------- | ------------------ | ----------------------------- |
-| Capture              | `@name`            | `@name` (snake_case only)     |
-| Suppressive capture  |                    | `@_` or `@_name`              |
-| Type annotation      |                    | `@x :: T`                     |
-| Text extraction      |                    | `@x :: string`                |
-| Named node           | `(type)`           | `(type)`                      |
-| Anonymous node       | `"text"`           | `"text"`                      |
-| Any node             | `_`                | `_`                           |
-| Any named node       | `(_)`              | `(_)`                         |
-| Field constraint     | `field: pattern`   | `field: pattern`              |
-| Negated field        | `!field`           | `-field`                      |
-| Quantifiers          | `?` `*` `+`        | `?` `*` `+`                   |
-| Non-greedy           |                    | `??` `*?` `+?`                |
-| Sequence             | `((a) (b))`        | `{(a) (b)}`                   |
-| Alternation          | `[a b]`            | `[a b]`                       |
-| Tagged alternation   |                    | `[A: (a) B: (b)]`             |
-| Anchor               | `.`                | `.`                           |
-| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`             |
-| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`               |
-| Named expression     |                    | `Name = pattern`              |
-| Use named expression |                    | `(Name)`                      |
+| Feature              | Tree-sitter        | Plotnik                   |
+| -------------------- | ------------------ | ------------------------- |
+| Capture              | `@name`            | `@name` (snake_case only) |
+| Suppressive capture  |                    | `@_` or `@_name`          |
+| Type annotation      |                    | `@x :: T`                 |
+| Text extraction      |                    | `@x :: string`            |
+| Named node           | `(type)`           | `(type)`                  |
+| Anonymous node       | `"text"`           | `"text"`                  |
+| Any node             | `_`                | `_`                       |
+| Any named node       | `(_)`              | `(_)`                     |
+| Field constraint     | `field: pattern`   | `field: pattern`          |
+| Negated field        | `!field`           | `-field`                  |
+| Quantifiers          | `?` `*` `+`        | `?` `*` `+`               |
+| Non-greedy           |                    | `??` `*?` `+?`            |
+| Sequence             | `((a) (b))`        | `{(a) (b)}`               |
+| Alternation          | `[a b]`            | `[a b]`                   |
+| Tagged alternation   |                    | `[A: (a) B: (b)]`         |
+| Anchor               | `.`                | `.`                       |
+| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`         |
+| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`           |
+| Named expression     |                    | `Name = pattern`          |
+| Use named expression |                    | `(Name)`                  |
 
 ---
 

@@ -1,6 +1,6 @@
 //! Sequence parsing tests.
 
-use crate::{shot_cst, shot_error, Query};
+use crate::{Query, shot_cst, shot_error};
 
 #[test]
 fn treesitter_sequence_parses_as_seq() {
@@ -46,37 +46,47 @@ fn treesitter_single_item_sequence_parses_as_seq() {
 
 #[test]
 fn named_node_with_child_remains_tree() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = (foo (bar))
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn simple_sequence() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = {(a) (b)}
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn empty_sequence() {
-    shot_error!(r#"
+    shot_error!(
+        r#"
         Q = {}
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn sequence_single_element() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = {(identifier)}
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn sequence_with_captures() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = {(comment)* @comments (function) @fn}
-    "#);
+    "#
+    );
 }
 
 #[test]
@@ -106,23 +116,29 @@ fn sequence_with_quantifier() {
 
 #[test]
 fn nested_sequences() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = {{(a)} {(b)}}
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn sequence_in_named_node() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = (block {(statement) (statement)})
-    "#);
+    "#
+    );
 }
 
 #[test]
 fn sequence_with_alternation() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = {[(a) (b)] (c)}
-    "#);
+    "#
+    );
 }
 
 #[test]
@@ -159,7 +175,9 @@ fn sequence_comma_separated_expression() {
 
 #[test]
 fn sequence_with_anchor() {
-    shot_cst!(r#"
+    shot_cst!(
+        r#"
         Q = (parent {. (first) (second) .})
-    "#);
+    "#
+    );
 }
