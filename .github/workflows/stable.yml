@@ -22,15 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           components: clippy
 
       - name: Using Rust cache
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           cache-all-crates: "true"
           cache-on-failure: "true"
@@ -50,3 +50,33 @@ jobs:
 
       - name: Test
         run: make test
+
+  feature-flags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: clippy
+
+      - name: Using Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          cache-all-crates: "true"
+          cache-on-failure: "true"
+          prefix-key: v0-rust-stable
+
+      - name: No-default-features langs
+        run: cargo clippy -p plotnik-langs --no-default-features -- -D warnings
+
+      - name: No-default-features compiler
+        run: cargo check -p plotnik-compiler --no-default-features
+
+      - name: Single non-default language
+        run: cargo check -p plotnik --no-default-features --features lang-styx
+
+      - name: All-features workspace
+        run: cargo check --workspace --all-targets --all-features

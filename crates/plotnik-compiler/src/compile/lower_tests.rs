@@ -1,9 +1,9 @@
 //! Unit tests for the lowering pass.
 
-use plotnik_bytecode::{EffectOpcode, Nav, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
+use plotnik_bytecode::{EffectOpcode, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
-use super::lower::lower;
 use super::CompileResult;
+use super::lower::lower;
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
 
 const MAX_POST_EFFECTS: usize = 7;
@@ -16,10 +16,12 @@ fn make_effect(_idx: u16) -> EffectIR {
 #[test]
 fn lower_no_overflow_unchanged() {
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0))
-            .pre_effects((0..3).map(make_effect))
-            .next(Label(1))
-            .into()],
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .pre_effects((0..3).map(make_effect))
+                .next(Label(1))
+                .into(),
+        ],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -32,11 +34,13 @@ fn lower_no_overflow_unchanged() {
 #[test]
 fn lower_pre_effects_overflow() {
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0))
-            .nav(Nav::Down)
-            .pre_effects((0..10).map(make_effect))
-            .next(Label(1))
-            .into()],
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::Down)
+                .pre_effects((0..10).map(make_effect))
+                .next(Label(1))
+                .into(),
+        ],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -59,11 +63,13 @@ fn lower_pre_effects_overflow() {
 #[test]
 fn lower_post_effects_overflow() {
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0))
-            .nav(Nav::Down)
-            .post_effects((0..10).map(make_effect))
-            .next(Label(1))
-            .into()],
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::Down)
+                .post_effects((0..10).map(make_effect))
+                .next(Label(1))
+                .into(),
+        ],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -89,11 +95,13 @@ fn lower_post_effects_overflow() {
 #[test]
 fn lower_neg_fields_overflow() {
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0))
-            .nav(Nav::Down)
-            .neg_fields(0..10)
-            .next(Label(1))
-            .into()],
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::Down)
+                .neg_fields(0..10)
+                .next(Label(1))
+                .into(),
+        ],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -146,13 +154,15 @@ fn lower_successors_overflow() {
 #[test]
 fn lower_combined_overflow() {
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0))
-            .nav(Nav::Down)
-            .pre_effects((0..10).map(make_effect))
-            .post_effects((0..10).map(make_effect))
-            .neg_fields(0..10)
-            .next(Label(1))
-            .into()],
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::Down)
+                .pre_effects((0..10).map(make_effect))
+                .post_effects((0..10).map(make_effect))
+                .neg_fields(0..10)
+                .next(Label(1))
+                .into(),
+        ],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };

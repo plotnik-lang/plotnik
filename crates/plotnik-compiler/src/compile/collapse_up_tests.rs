@@ -2,8 +2,8 @@
 
 use plotnik_bytecode::Nav;
 
-use super::collapse_up::collapse_up;
 use super::CompileResult;
+use super::collapse_up::collapse_up;
 use crate::bytecode::{InstructionIR, Label, MatchIR};
 
 #[test]
