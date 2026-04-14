@@ -17,8 +17,8 @@ use super::collapse_prefix::collapse_prefix;
 use super::collapse_up::collapse_up;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
-use super::lower::lower;
 use super::error::{CompileError, CompileResult};
+use super::lower::lower;
 use super::scope::StructScope;
 use super::verify::debug_verify_ir_fingerprint;
 

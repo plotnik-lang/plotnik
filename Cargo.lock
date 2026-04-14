@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "annotate-snippets"
-version = "0.12.13"
+version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74fc7650eedcb2fee505aad48491529e408f0e854c2d9f63eb86c1361b9b3f93"
+checksum = "92570a3f9c98e7e84df84b71d0965ac99b1871fcd75a3773a3bd1bad13f64cf7"
 dependencies = [
  "anstyle",
  "memchr",
@@ -963,61 +963,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arborium-styx"
-version = "2.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-styx"
-version = "2.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-styx"
-version = "2.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-styx"
-version = "2.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "arborium-styx"
-version = "2.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9482afa498f41904ea0753acd9dba43863996f172534d76189daa62388dac62"
-dependencies = [
- "arborium-sysroot",
- "cc",
- "tree-sitter-language",
-]
-
-[[package]]
 name = "arborium-svelte"
 version = "2.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1545,9 +1490,9 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
-version = "0.16.1"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
 
 [[package]]
 name = "heapless"
@@ -1571,12 +1516,12 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "indexmap"
-version = "2.13.0"
+version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7714e70437a7dc3ac8eb7e6f8df75fd8eb422675fc7678aff7364301092b1017"
+checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "serde",
  "serde_core",
 ]
@@ -1885,7 +1830,6 @@ dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler",
  "plotnik-core",
- "plotnik-langs",
  "plotnik-vm",
  "serde",
  "serde_json",

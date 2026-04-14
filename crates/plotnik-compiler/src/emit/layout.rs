@@ -141,7 +141,10 @@ impl BlockRefs {
     }
 
     fn count(&self, from_block: usize, to_block: usize) -> usize {
-        self.direct.get(&(from_block, to_block)).copied().unwrap_or(0)
+        self.direct
+            .get(&(from_block, to_block))
+            .copied()
+            .unwrap_or(0)
     }
 
     fn predecessors(&self, block: usize) -> &[usize] {
@@ -271,10 +274,7 @@ fn build_layout_ir(
 }
 
 /// Build block reference counts from current layout.
-fn build_block_refs(
-    ir: &LayoutIR,
-    label_to_instr: &BTreeMap<Label, &InstructionIR>,
-) -> BlockRefs {
+fn build_block_refs(ir: &LayoutIR, label_to_instr: &BTreeMap<Label, &InstructionIR>) -> BlockRefs {
     let mut refs = BlockRefs::new();
 
     for (&label, &block_idx) in &ir.label_to_block {
@@ -344,7 +344,9 @@ fn pack_successors(
             .max_by(|&a, &b| {
                 let score_a = block_score(pred_block, a, refs);
                 let score_b = block_score(pred_block, b, refs);
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
 
         if let Some(candidate) = best {
@@ -422,4 +424,3 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
     entry_chains.extend(other_chains);
     entry_chains
 }
-

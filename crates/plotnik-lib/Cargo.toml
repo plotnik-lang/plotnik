@@ -15,18 +15,18 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [dependencies]
 plotnik-bytecode.workspace = true
-plotnik-compiler.workspace = true
+plotnik-compiler = { path = "../plotnik-compiler", version = "0.3.3", default-features = false }
 plotnik-core.workspace = true
 plotnik-vm.workspace = true
-plotnik-langs = { workspace = true, optional = true }
 arborium-tree-sitter = "2.12.4"
 serde = { version = "1.0", features = ["derive"] }
 
 [features]
 default = ["plotnik-langs"]
+plotnik-langs = ["plotnik-compiler/plotnik-langs"]
 
 [dev-dependencies]
-insta = { version = "=1.46.1", features = ["yaml"] }
+insta = { version = "=1.47.2", features = ["yaml"] }
 indoc = "=2.0.7"
 serde_json = "=1.0.149"
 tempfile = "=3.27.0"
