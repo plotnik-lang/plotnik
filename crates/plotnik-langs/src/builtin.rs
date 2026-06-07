@@ -30,16 +30,16 @@ macro_rules! define_langs {
             pub fn $fn_name() -> Lang {
                 paste::paste! {
                     static LANG: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| {
-                        static NODE_TYPES_BYTES: &[u8] = include_bytes!(env!(
-                            concat!("PLOTNIK_NODE_TYPES_", $lang_key)
+                        static NODE_SHAPES_BYTES: &[u8] = include_bytes!(env!(
+                            concat!("PLOTNIK_NODE_SHAPES_", $lang_key)
                         ));
                         static GRAMMAR_BYTES: &[u8] = include_bytes!(env!(
                             concat!("PLOTNIK_GRAMMAR_", $lang_key)
                         ));
 
-                        let raw_nodes: Vec<plotnik_core::RawNode> =
-                            postcard::from_bytes(NODE_TYPES_BYTES)
-                                .expect("invalid embedded node types");
+                        let node_shapes: Vec<plotnik_core::NodeShape> =
+                            postcard::from_bytes(NODE_SHAPES_BYTES)
+                                .expect("invalid embedded node shapes");
 
                         let grammar = plotnik_core::grammar::Grammar::from_binary(GRAMMAR_BYTES)
                             .expect("invalid embedded grammar");
@@ -47,7 +47,7 @@ macro_rules! define_langs {
                         std::sync::Arc::new(crate::LangInner::new(
                             $name,
                             $ts_lang.into(),
-                            raw_nodes,
+                            node_shapes,
                             grammar,
                         ))
                     });

@@ -11,8 +11,8 @@ fn parse_minimal_grammar() {
     }"#;
 
     let grammar = Grammar::from_json(json).unwrap();
-    assert_eq!(grammar.name, "test");
-    assert_eq!(grammar.rules.len(), 2);
+    assert_eq!(grammar.name(), "test");
+    assert_eq!(grammar.rules().len(), 2);
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn parse_seq_and_choice() {
     }"#;
 
     let grammar = Grammar::from_json(json).unwrap();
-    assert!(matches!(grammar.rules[0].1, Rule::Seq(_)));
+    assert!(matches!(grammar.rules()[0].1, Rule::Seq(_)));
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn parse_field() {
     }"#;
 
     let grammar = Grammar::from_json(json).unwrap();
-    assert!(matches!(grammar.rules[0].1, Rule::Field { .. }));
+    assert!(matches!(grammar.rules()[0].1, Rule::Field { .. }));
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn preserves_rule_order() {
     let grammar = Grammar::from_json(json).unwrap();
 
     // Entry rule should be first (program), not alphabetically sorted
-    assert_eq!(grammar.rules[0].0, "program");
-    assert_eq!(grammar.rules[1].0, "statement");
-    assert_eq!(grammar.rules[2].0, "expression");
+    assert_eq!(grammar.rules()[0].0, "program");
+    assert_eq!(grammar.rules()[1].0, "statement");
+    assert_eq!(grammar.rules()[2].0, "expression");
 }

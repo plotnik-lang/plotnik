@@ -10,7 +10,13 @@ description = "Core data structures for Plotnik"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [dependencies]
+fixedbitset = "0.5"
 indexmap = { version = "2", features = ["serde"] }
+log = "0.4"
 postcard = { version = "1", features = ["alloc"] }
+regex-syntax = "0.8"
+rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
+topological-sort = "0.2"

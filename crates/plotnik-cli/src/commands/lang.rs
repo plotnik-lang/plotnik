@@ -38,7 +38,7 @@ pub struct GrammarRenderer<'a> {
 impl<'a> GrammarRenderer<'a> {
     pub fn new(grammar: &'a Grammar) -> Self {
         let hidden_rules: HashSet<_> = grammar
-            .rules
+            .rules()
             .iter()
             .filter(|(name, _)| name.starts_with('_'))
             .map(|(name, _)| name.as_str())
@@ -84,11 +84,11 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_extras(&self, out: &mut String) {
-        self.render_rule_list("extras", &self.grammar.extras, out);
+        self.render_rule_list("extras", self.grammar.extras(), out);
     }
 
     fn render_externals(&self, out: &mut String) {
-        self.render_rule_list("externals", &self.grammar.externals, out);
+        self.render_rule_list("externals", self.grammar.externals(), out);
     }
 
     fn render_rule_list(&self, label: &str, rules: &[Rule], out: &mut String) {
@@ -107,8 +107,8 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_supertypes(&self, out: &mut String) {
-        for supertype in &self.grammar.supertypes {
-            if let Some((_, rule)) = self.grammar.rules.iter().find(|(n, _)| n == supertype) {
+        for supertype in self.grammar.supertypes() {
+            if let Some((_, rule)) = self.grammar.rules().iter().find(|(n, _)| n == supertype) {
                 out.push_str(supertype);
                 out.push_str(" :: supertype = ");
                 self.render_rule(rule, out, 0);
@@ -118,9 +118,9 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_rules(&self, out: &mut String) {
-        let supertypes_set: HashSet<_> = self.grammar.supertypes.iter().collect();
+        let supertypes_set: HashSet<_> = self.grammar.supertypes().iter().collect();
 
-        for (name, rule) in &self.grammar.rules {
+        for (name, rule) in self.grammar.rules() {
             if supertypes_set.contains(name) {
                 continue;
             }

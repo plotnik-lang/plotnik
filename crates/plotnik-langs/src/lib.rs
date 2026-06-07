@@ -4,7 +4,10 @@ use std::sync::Arc;
 use arborium_tree_sitter::Language;
 
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Cardinality, DynamicNodeTypes, NodeFieldId, NodeTypeId, NodeTypes, RawNode};
+use plotnik_core::{
+    Cardinality, DynamicNodeTypes, NodeFieldId, NodeShape, NodeShapeBuildError, NodeTypeId,
+    NodeTypes,
+};
 
 pub mod builtin;
 pub mod dynamic;
@@ -68,7 +71,7 @@ pub trait LangImpl: Send + Sync {
     fn grammar(&self) -> &Grammar;
 }
 
-/// Language implementation with embedded grammar and node types.
+/// Language implementation with embedded grammar-derived node metadata.
 #[derive(Debug)]
 pub struct LangInner {
     name: String,
@@ -78,23 +81,39 @@ pub struct LangInner {
 }
 
 impl LangInner {
-    /// Create a new language from raw node types and grammar.
-    pub fn new(name: &str, ts_lang: Language, raw_nodes: Vec<RawNode>, grammar: Grammar) -> Self {
-        let node_types = DynamicNodeTypes::build(
-            &raw_nodes,
+    /// Create a new language from grammar-derived node shapes.
+    pub fn new(
+        name: &str,
+        ts_lang: Language,
+        node_shapes: Vec<NodeShape>,
+        grammar: Grammar,
+    ) -> Self {
+        Self::try_new(name, ts_lang, node_shapes, grammar)
+            .expect("grammar-derived node shapes should resolve against tree-sitter language")
+    }
+
+    /// Try to create a language from grammar-derived node shapes.
+    pub fn try_new(
+        name: &str,
+        ts_lang: Language,
+        node_shapes: Vec<NodeShape>,
+        grammar: Grammar,
+    ) -> Result<Self, NodeShapeBuildError> {
+        let node_types = DynamicNodeTypes::try_build(
+            &node_shapes,
             |kind, named| {
                 let id = ts_lang.id_for_node_kind(kind, named);
                 NonZeroU16::new(id)
             },
             |field_name| ts_lang.field_id_for_name(field_name),
-        );
+        )?;
 
-        Self {
+        Ok(Self {
             name: name.to_owned(),
             ts_lang,
             node_types,
             grammar,
-        }
+        })
     }
 
     pub fn node_types(&self) -> &DynamicNodeTypes {

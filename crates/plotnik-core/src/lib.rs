@@ -1,16 +1,16 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-//! Core data structures for Plotnik node type information.
+//! Core data structures for Plotnik grammar-derived node information.
 //!
 //! Two layers:
-//! - **Deserialization layer**: 1:1 mapping to `node-types.json`
-//! - **Analysis layer**: ID-indexed structures for efficient lookups
+//! - **Grammar layer**: derived from tree-sitter `grammar.json`
+//! - **Lookup layer**: ID-indexed structures for efficient runtime checks
 //!
 //! Two implementations:
 //! - **Dynamic** (`DynamicNodeTypes`): HashMap-based, for runtime construction
 //! - **Static** (`StaticNodeTypes`): Array-based, zero runtime init
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;
 
 pub mod colors;
@@ -29,9 +29,9 @@ mod utils_tests;
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
 
-/// Raw node definition from `node-types.json`.
+/// Grammar-derived metadata for a syntax node kind.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RawNode {
+pub struct NodeShape {
     #[serde(rename = "type")]
     pub type_name: String,
     pub named: bool,
@@ -40,31 +40,75 @@ pub struct RawNode {
     #[serde(default)]
     pub extra: bool,
     #[serde(default)]
-    pub fields: HashMap<String, RawCardinality>,
-    pub children: Option<RawCardinality>,
-    pub subtypes: Option<Vec<RawTypeRef>>,
+    pub fields: HashMap<String, NodeSlot>,
+    pub children: Option<NodeSlot>,
+    pub subtypes: Option<Vec<NodeKindRef>>,
 }
 
 /// Cardinality constraints for a field or children slot.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RawCardinality {
+pub struct NodeSlot {
     pub multiple: bool,
     pub required: bool,
-    pub types: Vec<RawTypeRef>,
+    pub types: Vec<NodeKindRef>,
 }
 
-/// Reference to a node type.
+/// Reference to a node kind.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RawTypeRef {
+pub struct NodeKindRef {
     #[serde(rename = "type")]
     pub type_name: String,
     pub named: bool,
 }
 
-/// Parse `node-types.json` content into raw nodes.
-pub fn parse_node_types(json: &str) -> Result<Vec<RawNode>, serde_json::Error> {
-    serde_json::from_str(json)
+/// Error while resolving grammar-derived node shapes against a tree-sitter language.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NodeShapeBuildError {
+    UnknownField {
+        node_kind: String,
+        field: String,
+    },
+    UnknownFieldType {
+        node_kind: String,
+        field: String,
+        kind: String,
+        named: bool,
+    },
+    UnknownChildType {
+        node_kind: String,
+        kind: String,
+        named: bool,
+    },
 }
+
+impl std::fmt::Display for NodeShapeBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownField { node_kind, field } => {
+                write!(f, "unknown field {field:?} on node kind {node_kind:?}")
+            }
+            Self::UnknownFieldType {
+                node_kind,
+                field,
+                kind,
+                named,
+            } => write!(
+                f,
+                "unknown field type {kind:?} (named: {named}) for field {field:?} on node kind {node_kind:?}"
+            ),
+            Self::UnknownChildType {
+                node_kind,
+                kind,
+                named,
+            } => write!(
+                f,
+                "unknown child type {kind:?} (named: {named}) for node kind {node_kind:?}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for NodeShapeBuildError {}
 
 /// Node type ID (tree-sitter uses u16, but 0 is internal-only).
 pub type NodeTypeId = NonZeroU16;
@@ -359,6 +403,33 @@ pub struct DynamicNodeTypes {
     root: Option<NodeTypeId>,
 }
 
+fn resolve_slot_types<F, E>(
+    slot: &NodeSlot,
+    known_shapes: &HashSet<(&str, bool)>,
+    node_id_for_name: &F,
+    error: E,
+) -> Result<Vec<NodeTypeId>, NodeShapeBuildError>
+where
+    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    E: Fn(&NodeKindRef) -> NodeShapeBuildError,
+{
+    let mut resolved = Vec::new();
+    for kind_ref in &slot.types {
+        if let Some(node_id) = node_id_for_name(&kind_ref.type_name, kind_ref.named) {
+            resolved.push(node_id);
+            continue;
+        }
+
+        if known_shapes.contains(&(kind_ref.type_name.as_str(), kind_ref.named)) {
+            continue;
+        }
+
+        Err(error(kind_ref))?;
+    }
+
+    Ok(resolved)
+}
+
 impl DynamicNodeTypes {
     pub fn from_raw(
         nodes: HashMap<NodeTypeId, NodeTypeInfo>,
@@ -372,8 +443,12 @@ impl DynamicNodeTypes {
         }
     }
 
-    /// Build from raw nodes and ID resolution functions.
-    pub fn build<F, G>(raw_nodes: &[RawNode], node_id_for_name: F, field_id_for_name: G) -> Self
+    /// Build from grammar-derived node shapes and ID resolution functions.
+    pub fn try_build<F, G>(
+        node_shapes: &[NodeShape],
+        node_id_for_name: F,
+        field_id_for_name: G,
+    ) -> Result<Self, NodeShapeBuildError>
     where
         F: Fn(&str, bool) -> Option<NodeTypeId>,
         G: Fn(&str) -> Option<NodeFieldId>,
@@ -381,76 +456,104 @@ impl DynamicNodeTypes {
         let mut nodes = HashMap::new();
         let mut extras = Vec::new();
         let mut root = None;
+        let known_shapes = node_shapes
+            .iter()
+            .map(|shape| (shape.type_name.as_str(), shape.named))
+            .collect::<HashSet<_>>();
 
-        for raw in raw_nodes {
-            let Some(node_id) = node_id_for_name(&raw.type_name, raw.named) else {
+        for shape in node_shapes {
+            let Some(node_id) = node_id_for_name(&shape.type_name, shape.named) else {
                 continue;
             };
 
-            if raw.root {
+            if shape.root {
                 root = Some(node_id);
             }
 
-            if raw.extra {
+            if shape.extra {
                 extras.push(node_id);
             }
 
             let mut fields = HashMap::new();
-            for (field_name, raw_card) in &raw.fields {
-                let Some(field_id) = field_id_for_name(field_name) else {
-                    continue;
-                };
+            for (field_name, slot) in &shape.fields {
+                let field_id = field_id_for_name(field_name).ok_or_else(|| {
+                    NodeShapeBuildError::UnknownField {
+                        node_kind: shape.type_name.clone(),
+                        field: field_name.clone(),
+                    }
+                })?;
 
-                let valid_types = raw_card
-                    .types
-                    .iter()
-                    .filter_map(|t| node_id_for_name(&t.type_name, t.named))
-                    .collect();
+                let valid_types =
+                    resolve_slot_types(slot, &known_shapes, &node_id_for_name, |kind_ref| {
+                        NodeShapeBuildError::UnknownFieldType {
+                            node_kind: shape.type_name.clone(),
+                            field: field_name.clone(),
+                            kind: kind_ref.type_name.clone(),
+                            named: kind_ref.named,
+                        }
+                    })?;
 
                 fields.insert(
                     field_id,
                     FieldInfo {
                         cardinality: Cardinality {
-                            multiple: raw_card.multiple,
-                            required: raw_card.required,
+                            multiple: slot.multiple,
+                            required: slot.required,
                         },
                         valid_types,
                     },
                 );
             }
 
-            let children = raw.children.as_ref().map(|raw_card| {
-                let valid_types = raw_card
-                    .types
-                    .iter()
-                    .filter_map(|t| node_id_for_name(&t.type_name, t.named))
-                    .collect();
+            let children = shape
+                .children
+                .as_ref()
+                .map(|slot| {
+                    let valid_types =
+                        resolve_slot_types(slot, &known_shapes, &node_id_for_name, |kind_ref| {
+                            NodeShapeBuildError::UnknownChildType {
+                                node_kind: shape.type_name.clone(),
+                                kind: kind_ref.type_name.clone(),
+                                named: kind_ref.named,
+                            }
+                        })?;
 
-                ChildrenInfo {
-                    cardinality: Cardinality {
-                        multiple: raw_card.multiple,
-                        required: raw_card.required,
-                    },
-                    valid_types,
-                }
-            });
+                    Ok(ChildrenInfo {
+                        cardinality: Cardinality {
+                            multiple: slot.multiple,
+                            required: slot.required,
+                        },
+                        valid_types,
+                    })
+                })
+                .transpose()?;
 
             nodes.insert(
                 node_id,
                 NodeTypeInfo {
-                    name: raw.type_name.clone(),
-                    named: raw.named,
+                    name: shape.type_name.clone(),
+                    named: shape.named,
                     fields,
                     children,
                 },
             );
         }
 
-        Self {
+        Ok(Self {
             nodes,
             extras,
             root,
-        }
+        })
+    }
+
+    /// Build from node shapes that have already been checked against a language.
+    pub fn build<F, G>(node_shapes: &[NodeShape], node_id_for_name: F, field_id_for_name: G) -> Self
+    where
+        F: Fn(&str, bool) -> Option<NodeTypeId>,
+        G: Fn(&str) -> Option<NodeFieldId>,
+    {
+        Self::try_build(node_shapes, node_id_for_name, field_id_for_name)
+            .expect("grammar-derived node shapes should resolve against tree-sitter language")
     }
 
     pub fn get(&self, node_type_id: NodeTypeId) -> Option<&NodeTypeInfo> {

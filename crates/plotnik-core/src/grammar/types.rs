@@ -2,9 +2,55 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Complete tree-sitter grammar.
+/// Tree-sitter grammar plus derived metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Grammar {
+    raw: RawGrammar,
+}
+
+impl Grammar {
+    pub(crate) fn from_raw(raw: RawGrammar) -> Self {
+        Self { raw }
+    }
+
+    /// Grammar name (e.g., "javascript", "rust").
+    pub fn name(&self) -> &str {
+        &self.raw.name
+    }
+
+    /// Production rules, preserving definition order.
+    pub fn rules(&self) -> &[(String, Rule)] {
+        &self.raw.rules
+    }
+
+    /// Extra/trivia nodes (comments, whitespace).
+    pub fn extras(&self) -> &[Rule] {
+        &self.raw.extras
+    }
+
+    /// External scanner tokens.
+    pub fn externals(&self) -> &[Rule] {
+        &self.raw.externals
+    }
+
+    /// Supertype rules.
+    pub fn supertypes(&self) -> &[String] {
+        &self.raw.supertypes
+    }
+
+    /// Rules to inline (hidden).
+    pub fn inline(&self) -> &[String] {
+        &self.raw.inline
+    }
+
+    pub(crate) fn raw(&self) -> &RawGrammar {
+        &self.raw
+    }
+}
+
+/// Direct parsed representation of tree-sitter grammar.json.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct RawGrammar {
     /// Grammar name (e.g., "javascript", "rust").
     pub name: String,
     /// Production rules, preserving definition order.

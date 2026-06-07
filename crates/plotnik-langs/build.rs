@@ -42,7 +42,6 @@ fn main() {
 
         let lang_key = feature_to_lang_key(&feature_name);
 
-        // Process grammar.json
         let grammar_path = package_root.join("grammar/src/grammar.json");
         if !grammar_path.exists() {
             panic!(
@@ -50,38 +49,21 @@ fn main() {
                 package.name, grammar_path
             );
         }
-        process_json_file(
-            &grammar_path,
+        let grammar_json = std::fs::read_to_string(&grammar_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {}", grammar_path, e));
+        let grammar = plotnik_core::grammar::Grammar::from_json(&grammar_json)
+            .expect("failed to parse grammar.json");
+        println!("cargo::rerun-if-changed={grammar_path}");
+
+        write_binary(&out_dir, &lang_key, "GRAMMAR", "grammar", &grammar);
+
+        write_binary(
             &out_dir,
             &lang_key,
-            "GRAMMAR",
-            "grammar",
-            |json| {
-                plotnik_core::grammar::Grammar::from_json(json)
-                    .expect("failed to parse grammar.json")
-            },
+            "NODE_SHAPES",
+            "node_shapes",
+            &grammar.node_shapes(),
         );
-
-        // Process node-types.json
-        let node_types_path = package_root.join("grammar/src/node-types.json");
-        if node_types_path.exists() {
-            process_json_file(
-                &node_types_path,
-                &out_dir,
-                &lang_key,
-                "NODE_TYPES",
-                "node_types",
-                |json| {
-                    serde_json::from_str::<Vec<plotnik_core::RawNode>>(json)
-                        .expect("failed to parse node-types.json")
-                },
-            );
-        } else {
-            panic!(
-                "node-types.json not found for {}: {}",
-                package.name, node_types_path
-            );
-        }
     }
 
     for (key, _) in std::env::vars() {
@@ -94,26 +76,12 @@ fn main() {
     println!("cargo::rerun-if-changed=Cargo.toml");
 }
 
-/// Parse JSON, serialize to binary, write to OUT_DIR, and set env var.
-fn process_json_file<T, P, F>(
-    json_path: P,
-    out_dir: &Path,
-    lang_key: &str,
-    env_prefix: &str,
-    file_suffix: &str,
-    parse: F,
-) where
+/// Serialize to binary, write to OUT_DIR, and set env var.
+fn write_binary<T>(out_dir: &Path, lang_key: &str, env_prefix: &str, file_suffix: &str, parsed: &T)
+where
     T: Serialize,
-    P: AsRef<Path>,
-    F: FnOnce(&str) -> T,
 {
-    let json_path = json_path.as_ref();
-    let json = std::fs::read_to_string(json_path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {}", json_path.display(), e));
-
-    let parsed = parse(&json);
-
-    let binary = postcard::to_allocvec(&parsed).expect("serialization should not fail");
+    let binary = postcard::to_allocvec(parsed).expect("serialization should not fail");
     let binary_path = out_dir.join(format!("{}.{}", lang_key.to_lowercase(), file_suffix));
     std::fs::write(&binary_path, &binary)
         .unwrap_or_else(|e| panic!("failed to write {}: {}", binary_path.display(), e));
@@ -124,7 +92,6 @@ fn process_json_file<T, P, F>(
         lang_key,
         binary_path.display()
     );
-    println!("cargo::rerun-if-changed={}", json_path.display());
 }
 
 fn feature_to_lang_key(feature: &str) -> String {

@@ -1,5 +1,6 @@
 use plotnik_langs::Lang;
 
+#[cfg(feature = "lang-json")]
 use super::lang::GrammarRenderer;
 
 fn smoke_test(lang: Lang, source: &str, expected_root: &str) {

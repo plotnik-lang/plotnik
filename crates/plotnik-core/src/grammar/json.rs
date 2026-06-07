@@ -5,13 +5,14 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::types::{Grammar, Precedence, PrecedenceEntry, Rule};
+use super::types::{Grammar, Precedence, PrecedenceEntry, RawGrammar, Rule};
 
 /// Error during grammar parsing.
 #[derive(Debug)]
 pub enum GrammarError {
     Json(serde_json::Error),
     Binary(postcard::Error),
+    Analysis(String),
 }
 
 impl std::fmt::Display for GrammarError {
@@ -19,6 +20,7 @@ impl std::fmt::Display for GrammarError {
         match self {
             Self::Json(e) => write!(f, "JSON parse error: {e}"),
             Self::Binary(e) => write!(f, "binary decode error: {e}"),
+            Self::Analysis(e) => write!(f, "grammar analysis error: {e}"),
         }
     }
 }
@@ -28,6 +30,7 @@ impl std::error::Error for GrammarError {
         match self {
             Self::Json(e) => Some(e),
             Self::Binary(e) => Some(e),
+            Self::Analysis(_) => None,
         }
     }
 }
@@ -35,14 +38,14 @@ impl std::error::Error for GrammarError {
 impl Grammar {
     /// Parse grammar from JSON string.
     pub fn from_json(json: &str) -> Result<Self, GrammarError> {
-        let raw: RawGrammar = serde_json::from_str(json).map_err(GrammarError::Json)?;
-        Ok(raw.into())
+        let raw: RawJsonGrammar = serde_json::from_str(json).map_err(GrammarError::Json)?;
+        Ok(Self::from_raw(raw.into()))
     }
 }
 
 /// Raw grammar structure matching tree-sitter's JSON format.
 #[derive(Debug, Deserialize)]
-struct RawGrammar {
+struct RawJsonGrammar {
     name: String,
     rules: IndexMap<String, RawRule>,
     #[serde(default)]
@@ -65,8 +68,8 @@ struct RawGrammar {
     inherits: Option<String>,
 }
 
-impl From<RawGrammar> for Grammar {
-    fn from(raw: RawGrammar) -> Self {
+impl From<RawJsonGrammar> for RawGrammar {
+    fn from(raw: RawJsonGrammar) -> Self {
         // IndexMap preserves insertion order, which matches tree-sitter's definition order.
         // The entry rule is always first.
         Self {
