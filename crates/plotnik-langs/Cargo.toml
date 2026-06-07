@@ -267,7 +267,7 @@ lang-zsh = ["dep:arborium-zsh"]
 paste = "1.0"
 plotnik-core.workspace = true
 postcard = { version = "1", features = ["alloc"] }
-arborium-tree-sitter = "2.15.0"
+arborium-tree-sitter = "2.18.0"
 # @generated:lang-deps:begin
 arborium-ada = { version = "2.18.0", optional = true }
 arborium-agda = { version = "2.18.0", optional = true }
