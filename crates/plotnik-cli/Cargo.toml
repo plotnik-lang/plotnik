@@ -66,6 +66,7 @@ all-languages = [
     "lang-erlang",
     "lang-fish",
     "lang-fsharp",
+    "lang-gitattributes",
     "lang-gleam",
     "lang-glsl",
     "lang-go",
@@ -81,11 +82,16 @@ all-languages = [
     "lang-javascript",
     "lang-jinja2",
     "lang-jq",
+    "lang-jsdoc",
     "lang-json",
     "lang-julia",
+    "lang-just",
+    "lang-kconfig",
+    "lang-kdl",
     "lang-kotlin",
     "lang-lean",
     "lang-lua",
+    "lang-make",
     "lang-markdown",
     "lang-matlab",
     "lang-meson",
@@ -94,14 +100,18 @@ all-languages = [
     "lang-nix",
     "lang-objc",
     "lang-ocaml",
+    "lang-odin",
     "lang-perl",
     "lang-php",
     "lang-postscript",
     "lang-powershell",
     "lang-prolog",
+    "lang-proto",
     "lang-python",
     "lang-query",
     "lang-r",
+    "lang-regex",
+    "lang-rego",
     "lang-rescript",
     "lang-ron",
     "lang-ruby",
@@ -171,6 +181,7 @@ lang-elm = ["plotnik-langs/lang-elm"]
 lang-erlang = ["plotnik-langs/lang-erlang"]
 lang-fish = ["plotnik-langs/lang-fish"]
 lang-fsharp = ["plotnik-langs/lang-fsharp"]
+lang-gitattributes = ["plotnik-langs/lang-gitattributes"]
 lang-gleam = ["plotnik-langs/lang-gleam"]
 lang-glsl = ["plotnik-langs/lang-glsl"]
 lang-go = ["plotnik-langs/lang-go"]
@@ -186,11 +197,16 @@ lang-java = ["plotnik-langs/lang-java"]
 lang-javascript = ["plotnik-langs/lang-javascript"]
 lang-jinja2 = ["plotnik-langs/lang-jinja2"]
 lang-jq = ["plotnik-langs/lang-jq"]
+lang-jsdoc = ["plotnik-langs/lang-jsdoc"]
 lang-json = ["plotnik-langs/lang-json"]
 lang-julia = ["plotnik-langs/lang-julia"]
+lang-just = ["plotnik-langs/lang-just"]
+lang-kconfig = ["plotnik-langs/lang-kconfig"]
+lang-kdl = ["plotnik-langs/lang-kdl"]
 lang-kotlin = ["plotnik-langs/lang-kotlin"]
 lang-lean = ["plotnik-langs/lang-lean"]
 lang-lua = ["plotnik-langs/lang-lua"]
+lang-make = ["plotnik-langs/lang-make"]
 lang-markdown = ["plotnik-langs/lang-markdown"]
 lang-matlab = ["plotnik-langs/lang-matlab"]
 lang-meson = ["plotnik-langs/lang-meson"]
@@ -199,14 +215,18 @@ lang-ninja = ["plotnik-langs/lang-ninja"]
 lang-nix = ["plotnik-langs/lang-nix"]
 lang-objc = ["plotnik-langs/lang-objc"]
 lang-ocaml = ["plotnik-langs/lang-ocaml"]
+lang-odin = ["plotnik-langs/lang-odin"]
 lang-perl = ["plotnik-langs/lang-perl"]
 lang-php = ["plotnik-langs/lang-php"]
 lang-postscript = ["plotnik-langs/lang-postscript"]
 lang-powershell = ["plotnik-langs/lang-powershell"]
 lang-prolog = ["plotnik-langs/lang-prolog"]
+lang-proto = ["plotnik-langs/lang-proto"]
 lang-python = ["plotnik-langs/lang-python"]
 lang-query = ["plotnik-langs/lang-query"]
 lang-r = ["plotnik-langs/lang-r"]
+lang-regex = ["plotnik-langs/lang-regex"]
+lang-rego = ["plotnik-langs/lang-rego"]
 lang-rescript = ["plotnik-langs/lang-rescript"]
 lang-ron = ["plotnik-langs/lang-ron"]
 lang-ruby = ["plotnik-langs/lang-ruby"]
@@ -249,7 +269,7 @@ clap = { version = "4.5", features = ["derive"] }
 plotnik-core.workspace = true
 plotnik-langs = { path = "../plotnik-langs", version = "0.3.3", default-features = false }
 plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false }
-arborium-tree-sitter = "2.12.4"
+arborium-tree-sitter = "2.15.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

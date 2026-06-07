@@ -18,7 +18,7 @@ plotnik-bytecode.workspace = true
 plotnik-compiler = { path = "../plotnik-compiler", version = "0.3.3", default-features = false }
 plotnik-core.workspace = true
 plotnik-vm.workspace = true
-arborium-tree-sitter = "2.12.4"
+arborium-tree-sitter = "2.15.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [features]
