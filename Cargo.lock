@@ -1162,9 +1162,9 @@ dependencies = [
 
 [[package]]
 name = "arborium-tree-sitter"
-version = "2.17.0"
+version = "2.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4879b6a79798d45d29d54bf000fd4d1b88a8e654e0b0cb762ac402944129233b"
+checksum = "b9ad69424e8485446412c60b72f6ea33b682d46d85acd8a925e1902d15a4310a"
 dependencies = [
  "arborium-sysroot",
  "cc",
