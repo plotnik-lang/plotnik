@@ -10,8 +10,8 @@ use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::emit::emit;
 
 use super::lang_resolver::{resolve_lang_required, suggest_language};
-use super::language_registry::{self, Lang};
 use super::query_loader::load_query_source;
+use plotnik::language_registry::{self, Lang};
 
 /// Load source code from file, stdin, or inline text.
 pub fn load_source(

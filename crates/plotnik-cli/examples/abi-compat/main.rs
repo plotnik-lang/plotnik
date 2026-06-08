@@ -263,5 +263,5 @@ fn format_id(id: Option<u16>) -> String {
 }
 
 fn usage() -> String {
-    "usage: cargo run --manifest-path examples/abi-compat/Cargo.toml -- [LANG ...]\n\nWith no LANG arguments, checks every language in the shared Plotnik CLI registry.".to_string()
+    "usage: cargo run --example abi-compat -- [LANG ...]\n\nWith no LANG arguments, checks every language in the Plotnik CLI registry enabled by the selected Cargo features.".to_string()
 }

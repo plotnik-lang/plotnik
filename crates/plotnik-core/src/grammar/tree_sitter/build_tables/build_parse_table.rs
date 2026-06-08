@@ -20,7 +20,7 @@ use super::super::{
     },
 };
 use super::{
-    item::{ParseItem, ParseItemSet, ParseItemSetCore, ParseItemSetEntry},
+    item::{ParseItem, ParseItemSet, ParseItemSetEntry},
     item_set_builder::ParseItemSetBuilder,
 };
 
@@ -56,7 +56,6 @@ struct ParseTableBuilder<'a> {
     syntax_grammar: &'a SyntaxGrammar,
     lexical_grammar: &'a LexicalGrammar,
     variable_info: &'a [VariableInfo],
-    core_ids_by_core: FxHashMap<ParseItemSetCore<'a>, usize>,
     state_ids_by_item_set: IndexMap<ParseItemSet<'a>, ParseStateId, BuildHasherDefault<FxHasher>>,
     parse_state_info_by_id: Vec<ParseStateInfo<'a>>,
     parse_state_queue: VecDeque<ParseStateQueueEntry>,
@@ -77,8 +76,6 @@ pub enum ParseTableBuilderError {
         "The non-terminal rule `{0}` is used in a non-terminal `extra` rule, which is not allowed."
     )]
     ImproperNonTerminalExtra(String),
-    #[error("State count `{0}` exceeds the max value {max}.", max=u16::MAX)]
-    StateCount(usize),
 }
 
 #[derive(Default, Debug, Serialize, Error, Deserialize)]
@@ -252,14 +249,12 @@ impl<'a> ParseTableBuilder<'a> {
             variable_info,
             non_terminal_extra_states: Vec::new(),
             state_ids_by_item_set: IndexMap::default(),
-            core_ids_by_core: FxHashMap::default(),
             parse_state_info_by_id: Vec::new(),
             parse_state_queue: VecDeque::new(),
             actual_conflicts: syntax_grammar.expected_conflicts.iter().cloned().collect(),
             parse_table: ParseTable {
                 states: Vec::new(),
                 symbols: Vec::new(),
-                external_lex_states: Vec::new(),
                 production_infos: Vec::new(),
                 max_aliased_production_length: 1,
             },
@@ -388,22 +383,15 @@ impl<'a> ParseTableBuilder<'a> {
                 #[cfg(plotnik_grammar_profile)]
                 super::super::profile::parse_state_new();
 
-                let core = v.key().core();
-                let core_count = self.core_ids_by_core.len();
-                let core_id = *self.core_ids_by_core.entry(core).or_insert(core_count);
-
                 let state_id = self.parse_table.states.len();
                 self.parse_state_info_by_id
                     .push((preceding_symbols.clone(), v.key().clone()));
 
                 self.parse_table.states.push(ParseState {
                     id: state_id,
-                    lex_state_id: 0,
-                    external_lex_state_id: 0,
                     terminal_entries: IndexMap::default(),
                     nonterminal_entries: IndexMap::default(),
                     reserved_words: TokenSet::default(),
-                    core_id,
                 });
                 self.parse_state_queue.push_back(ParseStateQueueEntry {
                     state_id,

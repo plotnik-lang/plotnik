@@ -3,7 +3,7 @@ use std::process::exit;
 
 use plotnik_core::grammar::raw::{RawGrammar, RawRule};
 
-use super::language_registry;
+use plotnik::language_registry;
 
 /// List all supported languages with aliases.
 pub fn run_list() {

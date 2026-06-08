@@ -1,7 +1,7 @@
 use plotnik_core::grammar::raw::{RawGrammar, RawRule};
 
 use super::lang::GrammarRenderer;
-use super::language_registry::{self, Lang};
+use plotnik::language_registry::{self, Lang};
 
 fn smoke_test(lang: &Lang, source: &str, expected_root: &str) {
     let tree = lang.parse(source);

@@ -7,7 +7,6 @@
 
 mod bitvec;
 mod build_tables;
-mod dedup;
 mod grammars;
 mod nfa;
 mod node_shapes;
@@ -29,19 +28,6 @@ use grammars::{
 use prepare_grammar::prepare_grammar;
 use rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType};
 use tables::ParseTable;
-
-bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct OptLevel: u32 {
-        const MergeStates = 1 << 0;
-    }
-}
-
-impl Default for OptLevel {
-    fn default() -> Self {
-        Self::MergeStates
-    }
-}
 
 pub(super) struct GrammarMetadata {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -65,22 +51,6 @@ pub(super) struct FieldSymbol {
 }
 
 pub(super) fn metadata_for_raw(raw: &RawGrammar) -> Result<GrammarMetadata, String> {
-    metadata_for_raw_with_lowering(raw, Lowering::MetadataOnly)
-}
-
-pub(super) fn full_metadata_for_raw(raw: &RawGrammar) -> Result<GrammarMetadata, String> {
-    metadata_for_raw_with_lowering(raw, Lowering::Full)
-}
-
-enum Lowering {
-    MetadataOnly,
-    Full,
-}
-
-fn metadata_for_raw_with_lowering(
-    raw: &RawGrammar,
-    lowering: Lowering,
-) -> Result<GrammarMetadata, String> {
     let input = input_grammar(raw);
     let (syntax_grammar, lexical_grammar, inlines, aliases) =
         prepare_grammar(&input).map_err(|error| error.to_string())?;
@@ -93,25 +63,13 @@ fn metadata_for_raw_with_lowering(
         &variable_info,
     )
     .map_err(|error| error.to_string())?;
-    let parse_table = match lowering {
-        Lowering::MetadataOnly => build_tables::build_metadata_tables(
-            &syntax_grammar,
-            &lexical_grammar,
-            &variable_info,
-            &inlines,
-        )
-        .map(|tables| tables.parse_table),
-        Lowering::Full => build_tables::build_tables(
-            &syntax_grammar,
-            &lexical_grammar,
-            &aliases,
-            &variable_info,
-            &inlines,
-            None,
-            OptLevel::default(),
-        )
-        .map(|tables| tables.parse_table),
-    }
+    let parse_table = build_tables::build_metadata_tables(
+        &syntax_grammar,
+        &lexical_grammar,
+        &variable_info,
+        &inlines,
+    )
+    .map(|tables| tables.parse_table)
     .map_err(|error| error.to_string())?;
 
     Ok(GrammarMetadata {

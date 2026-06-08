@@ -1,12 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::{
-    nfa::CharacterSet,
-    rules::{Alias, Symbol, TokenSet},
-};
+use super::rules::{Alias, Symbol, TokenSet};
 pub type ProductionInfoId = usize;
 pub type ParseStateId = usize;
-pub type LexStateId = usize;
 
 use std::hash::BuildHasherDefault;
 
@@ -48,9 +44,6 @@ pub struct ParseState {
     pub terminal_entries: IndexMap<Symbol, ParseTableEntry, BuildHasherDefault<FxHasher>>,
     pub nonterminal_entries: IndexMap<Symbol, GotoAction, BuildHasherDefault<FxHasher>>,
     pub reserved_words: TokenSet,
-    pub lex_state_id: usize,
-    pub external_lex_state_id: usize,
-    pub core_id: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -71,25 +64,6 @@ pub struct ParseTable {
     pub symbols: Vec<Symbol>,
     pub production_infos: Vec<ProductionInfo>,
     pub max_aliased_production_length: usize,
-    pub external_lex_states: Vec<TokenSet>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AdvanceAction {
-    pub state: LexStateId,
-    pub in_main_token: bool,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LexState {
-    pub accept_action: Option<Symbol>,
-    pub eof_action: Option<AdvanceAction>,
-    pub advance_actions: Vec<(CharacterSet, AdvanceAction)>,
-}
-
-#[derive(Debug, PartialEq, Eq, Default)]
-pub struct LexTable {
-    pub states: Vec<LexState>,
 }
 
 impl ParseTableEntry {

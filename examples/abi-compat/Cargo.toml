@@ -7,4 +7,4 @@ publish = false
 [workspace]
 
 [dependencies]
-plotnik-core = { path = "../../crates/plotnik-core" }
+plotnik = { path = "../../crates/plotnik-cli", default-features = false, features = ["all-languages"] }

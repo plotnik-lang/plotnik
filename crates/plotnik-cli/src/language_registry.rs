@@ -57,6 +57,10 @@ impl Lang {
         })
     }
 
+    pub fn language(&self) -> &Language {
+        &self.language
+    }
+
     pub fn parse(&self, source: &str) -> Tree {
         let mut parser = Parser::new();
         parser

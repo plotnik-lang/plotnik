@@ -3,8 +3,6 @@
 //! This module provides types for representing tree-sitter `grammar.json` files,
 //! with support for JSON deserialization and compact binary serialization.
 
-#[doc(hidden)]
-pub mod compat;
 mod json;
 pub mod raw;
 mod tree_sitter;

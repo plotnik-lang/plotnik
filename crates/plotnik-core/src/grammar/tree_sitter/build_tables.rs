@@ -1,41 +1,23 @@
-mod build_lex_table;
 mod build_parse_table;
 mod coincident_tokens;
 mod item;
 pub(super) mod item_set_builder;
-mod minimize_parse_table;
 pub(super) mod token_conflicts;
 
-use std::collections::BTreeSet;
-
 use build_parse_table::BuildTableResult;
-pub use build_parse_table::ParseTableBuilderError;
-use log::{debug, info};
-use rustc_hash::FxHashMap;
+use log::debug;
 
 use self::{
-    build_lex_table::build_lex_table,
-    build_parse_table::{ParseStateInfo, build_parse_table},
-    coincident_tokens::CoincidentTokenIndex,
-    item_set_builder::ParseItemSetBuilder,
-    minimize_parse_table::minimize_parse_table,
-    token_conflicts::TokenConflictMap,
+    build_parse_table::build_parse_table, coincident_tokens::CoincidentTokenIndex,
+    item_set_builder::ParseItemSetBuilder, token_conflicts::TokenConflictMap,
 };
 use super::{
-    OptLevel,
     grammars::{InlinedProductionMap, LexicalGrammar, SyntaxGrammar},
-    nfa::{CharacterSet, NfaCursor},
+    nfa::NfaCursor,
     node_shapes::VariableInfo,
-    rules::{AliasMap, Symbol, SymbolType, TokenSet},
-    tables::{LexTable, ParseAction, ParseTable, ParseTableEntry},
+    rules::{Symbol, SymbolType, TokenSet},
+    tables::{ParseAction, ParseTable, ParseTableEntry},
 };
-
-pub struct Tables {
-    pub parse_table: ParseTable,
-    pub main_lex_table: LexTable,
-    pub keyword_lex_table: LexTable,
-    pub large_character_sets: Vec<(Option<Symbol>, CharacterSet)>,
-}
 
 pub struct MetadataTables {
     pub parse_table: ParseTable,
@@ -76,84 +58,6 @@ pub fn build_metadata_tables(
     populate_used_symbols(&mut parse_table, syntax_grammar, lexical_grammar);
 
     Ok(MetadataTables { parse_table })
-}
-
-pub fn build_tables(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    simple_aliases: &AliasMap,
-    variable_info: &[VariableInfo],
-    inlines: &InlinedProductionMap,
-    report_symbol_name: Option<&str>,
-    optimizations: OptLevel,
-) -> BuildTableResult<Tables> {
-    let item_set_builder = ParseItemSetBuilder::new(syntax_grammar, lexical_grammar, inlines);
-    let following_tokens =
-        get_following_tokens(syntax_grammar, lexical_grammar, inlines, &item_set_builder);
-    let (mut parse_table, parse_state_info) = build_parse_table(
-        syntax_grammar,
-        lexical_grammar,
-        item_set_builder,
-        variable_info,
-    )?;
-    let token_conflict_map = TokenConflictMap::new(lexical_grammar, following_tokens);
-    let coincident_token_index = CoincidentTokenIndex::new(&parse_table, lexical_grammar);
-    let keywords = identify_keywords(
-        lexical_grammar,
-        &parse_table,
-        syntax_grammar.word_token,
-        &token_conflict_map,
-        &coincident_token_index,
-    );
-    populate_error_state(
-        &mut parse_table,
-        syntax_grammar,
-        lexical_grammar,
-        &coincident_token_index,
-        &token_conflict_map,
-        &keywords,
-    );
-    populate_used_symbols(&mut parse_table, syntax_grammar, lexical_grammar);
-    minimize_parse_table(
-        &mut parse_table,
-        syntax_grammar,
-        lexical_grammar,
-        simple_aliases,
-        &token_conflict_map,
-        &keywords,
-        optimizations,
-    );
-    let lex_tables = build_lex_table(
-        &mut parse_table,
-        syntax_grammar,
-        lexical_grammar,
-        &keywords,
-        &coincident_token_index,
-        &token_conflict_map,
-    );
-    populate_external_lex_states(&mut parse_table, syntax_grammar);
-    mark_fragile_tokens(&mut parse_table, &token_conflict_map);
-
-    if let Some(report_symbol_name) = report_symbol_name {
-        report_state_info(
-            syntax_grammar,
-            lexical_grammar,
-            &parse_table,
-            &parse_state_info,
-            report_symbol_name,
-        );
-    }
-
-    if parse_table.states.len() > u16::MAX as usize {
-        Err(ParseTableBuilderError::StateCount(parse_table.states.len()))?;
-    }
-
-    Ok(Tables {
-        parse_table,
-        main_lex_table: lex_tables.main_lex_table,
-        keyword_lex_table: lex_tables.keyword_lex_table,
-        large_character_sets: lex_tables.large_character_sets,
-    })
 }
 
 pub(super) fn get_following_tokens(
@@ -324,42 +228,6 @@ fn populate_used_symbols(
     }
 }
 
-fn populate_external_lex_states(parse_table: &mut ParseTable, syntax_grammar: &SyntaxGrammar) {
-    let mut external_tokens_by_corresponding_internal_token = FxHashMap::default();
-    for (i, external_token) in syntax_grammar.external_tokens.iter().enumerate() {
-        if let Some(symbol) = external_token.corresponding_internal_token {
-            external_tokens_by_corresponding_internal_token.insert(symbol.index, i);
-        }
-    }
-
-    // Ensure that external lex state 0 represents the absence of any
-    // external tokens.
-    parse_table.external_lex_states.push(TokenSet::new());
-
-    for i in 0..parse_table.states.len() {
-        let mut external_tokens = TokenSet::new();
-        for token in parse_table.states[i].terminal_entries.keys() {
-            if token.is_external() {
-                external_tokens.insert(*token);
-            } else if token.is_terminal()
-                && let Some(index) =
-                    external_tokens_by_corresponding_internal_token.get(&token.index)
-            {
-                external_tokens.insert(Symbol::external(*index));
-            }
-        }
-
-        parse_table.states[i].external_lex_state_id = parse_table
-            .external_lex_states
-            .iter()
-            .position(|tokens| *tokens == external_tokens)
-            .unwrap_or_else(|| {
-                parse_table.external_lex_states.push(external_tokens);
-                parse_table.external_lex_states.len() - 1
-            });
-    }
-}
-
 fn identify_keywords(
     lexical_grammar: &LexicalGrammar,
     parse_table: &ParseTable,
@@ -464,117 +332,6 @@ fn identify_keywords(
             true
         })
         .collect()
-}
-
-fn mark_fragile_tokens(parse_table: &mut ParseTable, token_conflict_map: &TokenConflictMap) {
-    let mut valid_terminal_indices = Vec::new();
-    for state in &mut parse_table.states {
-        valid_terminal_indices.clear();
-        for token in state.terminal_entries.keys() {
-            if token.is_terminal() {
-                valid_terminal_indices.push(token.index);
-            }
-        }
-        for (token, entry) in &mut state.terminal_entries {
-            if token.is_terminal() {
-                for &i in &valid_terminal_indices {
-                    if token_conflict_map.does_overlap(i, token.index) {
-                        entry.reusable = false;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn report_state_info<'a>(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    parse_table: &ParseTable,
-    parse_state_info: &[ParseStateInfo<'a>],
-    report_symbol_name: &'a str,
-) {
-    let mut all_state_indices = BTreeSet::new();
-    let mut symbols_with_state_indices = (0..syntax_grammar.variables.len())
-        .map(|i| (Symbol::non_terminal(i), BTreeSet::new()))
-        .collect::<Vec<_>>();
-
-    for (i, state) in parse_table.states.iter().enumerate() {
-        all_state_indices.insert(i);
-        let item_set = &parse_state_info[state.id];
-        for entry in &item_set.1.entries {
-            if !entry.item.is_augmented() {
-                symbols_with_state_indices[entry.item.variable_index as usize]
-                    .1
-                    .insert(i);
-            }
-        }
-    }
-
-    symbols_with_state_indices.sort_unstable_by_key(|(_, states)| -(states.len() as i32));
-
-    let max_symbol_name_length = syntax_grammar
-        .variables
-        .iter()
-        .map(|v| v.name.len())
-        .max()
-        .unwrap();
-    for (symbol, states) in &symbols_with_state_indices {
-        info!(
-            "{:width$}\t{}",
-            syntax_grammar.variables[symbol.index].name,
-            states.len(),
-            width = max_symbol_name_length
-        );
-    }
-    info!("");
-
-    let state_indices = if report_symbol_name == "*" {
-        Some(&all_state_indices)
-    } else {
-        symbols_with_state_indices
-            .iter()
-            .find_map(|(symbol, state_indices)| {
-                if syntax_grammar.variables[symbol.index].name == report_symbol_name {
-                    Some(state_indices)
-                } else {
-                    None
-                }
-            })
-    };
-
-    if let Some(state_indices) = state_indices {
-        let mut state_indices = state_indices.iter().copied().collect::<Vec<_>>();
-        state_indices.sort_unstable_by_key(|i| (parse_table.states[*i].core_id, *i));
-
-        for state_index in state_indices {
-            let id = parse_table.states[state_index].id;
-            let (preceding_symbols, item_set) = &parse_state_info[id];
-            info!("state index: {state_index}");
-            info!("state id: {id}");
-            info!(
-                "symbol sequence: {}",
-                preceding_symbols
-                    .iter()
-                    .map(|symbol| {
-                        if symbol.is_terminal() {
-                            lexical_grammar.variables[symbol.index].name.clone()
-                        } else if symbol.is_external() {
-                            syntax_grammar.external_tokens[symbol.index].name.clone()
-                        } else {
-                            syntax_grammar.variables[symbol.index].name.clone()
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            );
-            info!(
-                "\nitems:\n{}",
-                item::ParseItemSetDisplay(item_set, syntax_grammar, lexical_grammar),
-            );
-        }
-    }
 }
 
 fn all_chars_are_alphabetical(cursor: &NfaCursor) -> bool {

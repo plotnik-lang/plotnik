@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::language_registry::{self, Lang};
+use plotnik::language_registry::{self, Lang};
 
 /// Resolve language from explicit flag or infer from workspace directory name.
 ///
