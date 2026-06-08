@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
-    grammars::{
-        Production, ProductionStep, ReservedWordSetId, SyntaxGrammar, SyntaxVariable, Variable,
+    prepared::{
+        ExtractedSyntaxGrammar, Production, ProductionStep, ReservedWordSetId, SyntaxGrammar,
+        SyntaxVariable, Variable,
     },
-    rules::{Alias, Associativity, Precedence, Rule, Symbol, TokenSet},
+    rules::{Alias, Associativity, Precedence, Rule, Symbol},
 };
-use super::ExtractedSyntaxGrammar;
 
 pub type FlattenGrammarResult<T> = Result<T, FlattenGrammarError>;
 
@@ -271,7 +271,7 @@ fn validate_productions(
     Ok(())
 }
 
-pub(super) fn flatten_grammar(
+pub(in crate::grammar) fn flatten_grammar(
     grammar: ExtractedSyntaxGrammar,
 ) -> FlattenGrammarResult<SyntaxGrammar> {
     let mut reserved_word_set_ids_by_name = FxHashMap::default();
@@ -287,26 +287,13 @@ pub(super) fn flatten_grammar(
         .collect::<FlattenGrammarResult<Vec<_>>>()?;
 
     validate_productions(&variables, &grammar.variables_to_inline)?;
-    let mut reserved_word_sets = grammar
-        .reserved_word_sets
-        .into_iter()
-        .map(|set| set.reserved_words.into_iter().collect())
-        .collect::<Vec<_>>();
-
-    // If no default reserved word set is specified, there are no reserved words.
-    if reserved_word_sets.is_empty() {
-        reserved_word_sets.push(TokenSet::default());
-    }
 
     Ok(SyntaxGrammar {
         extra_symbols: grammar.extra_symbols,
-        expected_conflicts: grammar.expected_conflicts,
         variables_to_inline: grammar.variables_to_inline,
-        precedence_orderings: grammar.precedence_orderings,
         external_tokens: grammar.external_tokens,
         supertype_symbols: grammar.supertype_symbols,
         word_token: grammar.word_token,
-        reserved_word_sets,
         variables,
     })
 }

@@ -1,5 +1,5 @@
-use super::super::{
-    grammars::{LexicalGrammar, SyntaxGrammar},
+use super::{
+    prepared::{LexicalGrammar, SyntaxGrammar},
     rules::{Alias, AliasMap, Symbol, SymbolType},
 };
 

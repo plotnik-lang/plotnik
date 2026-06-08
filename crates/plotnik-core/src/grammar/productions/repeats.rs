@@ -3,10 +3,9 @@ use std::mem;
 use rustc_hash::FxHashMap;
 
 use super::super::{
-    grammars::{Variable, VariableType},
+    prepared::{ExtractedSyntaxGrammar, Variable, VariableType},
     rules::{Rule, Symbol},
 };
-use super::ExtractedSyntaxGrammar;
 
 struct Expander {
     variable_name: String,
@@ -102,7 +101,9 @@ impl Expander {
     }
 }
 
-pub(super) fn expand_repeats(mut grammar: ExtractedSyntaxGrammar) -> ExtractedSyntaxGrammar {
+pub(in crate::grammar) fn expand_repeats(
+    mut grammar: ExtractedSyntaxGrammar,
+) -> ExtractedSyntaxGrammar {
     let mut expander = Expander {
         variable_name: String::new(),
         repeat_count_in_variable: 0,

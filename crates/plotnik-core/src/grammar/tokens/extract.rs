@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
-    grammars::{ExternalToken, ReservedWordContext, Variable, VariableType},
+    prepared::{
+        ExternalToken, ExtractedLexicalGrammar, ExtractedSyntaxGrammar, ReservedWordContext,
+        ResolvedGrammar, Variable, VariableType,
+    },
     rules::{MetadataParams, Rule, Symbol, SymbolType},
 };
-use super::{ExtractedLexicalGrammar, ExtractedSyntaxGrammar, InternedGrammar};
 
 pub type ExtractTokensResult<T> = Result<T, ExtractTokensError>;
 
@@ -57,8 +59,8 @@ impl std::fmt::Display for NonTerminalWordTokenError {
     }
 }
 
-pub(super) fn extract_tokens(
-    mut grammar: InternedGrammar,
+pub(in crate::grammar) fn extract_tokens(
+    mut grammar: ResolvedGrammar,
 ) -> ExtractTokensResult<(ExtractedSyntaxGrammar, ExtractedLexicalGrammar)> {
     let mut extractor = TokenExtractor {
         current_variable_name: String::new(),
@@ -115,20 +117,6 @@ pub(super) fn extract_tokens(
     for variable in &mut variables {
         variable.rule = symbol_replacer.replace_symbols_in_rule(&variable.rule);
     }
-
-    let expected_conflicts = grammar
-        .expected_conflicts
-        .into_iter()
-        .map(|conflict| {
-            let mut result = conflict
-                .iter()
-                .map(|symbol| symbol_replacer.replace_symbol(*symbol))
-                .collect::<Vec<_>>();
-            result.sort_unstable();
-            result.dedup();
-            result
-        })
-        .collect();
 
     let supertype_symbols: Vec<Symbol> = grammar
         .supertype_symbols
@@ -243,13 +231,11 @@ pub(super) fn extract_tokens(
     Ok((
         ExtractedSyntaxGrammar {
             variables,
-            expected_conflicts,
             extra_symbols,
             variables_to_inline,
             supertype_symbols,
             external_tokens,
             word_token,
-            precedence_orderings: grammar.precedence_orderings,
             reserved_word_sets: reserved_word_contexts,
         },
         ExtractedLexicalGrammar {

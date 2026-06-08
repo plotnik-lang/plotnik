@@ -2,11 +2,10 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::super::{
-    grammars::{InputGrammar, ReservedWordContext, Variable, VariableType},
+use super::{
+    prepared::{ReservedWordContext, ResolvedGrammar, Variable, VariableType},
     rules::{Rule, Symbol},
 };
-use super::InternedGrammar;
 
 pub type InternSymbolsResult<T> = Result<T, InternSymbolsError>;
 
@@ -24,15 +23,28 @@ pub enum InternSymbolsError {
     UndefinedWordToken(String),
 }
 
-pub(super) fn intern_symbols(grammar: &InputGrammar) -> InternSymbolsResult<InternedGrammar> {
-    let interner = Interner { grammar };
+#[allow(clippy::too_many_arguments)]
+pub(super) fn resolve_symbols(
+    source_variables: &[Variable],
+    extra_rules: &[Rule],
+    expected_conflicts: &[Vec<String>],
+    external_rules: &[Rule],
+    variables_to_inline: &[String],
+    supertype_names: &[String],
+    word_token_name: Option<&str>,
+    reserved_word_sets: &[ReservedWordContext<Rule>],
+) -> InternSymbolsResult<ResolvedGrammar> {
+    let interner = Interner {
+        variables: source_variables,
+        external_rules,
+    };
 
-    if variable_type_for_name(&grammar.variables[0].name) == VariableType::Hidden {
+    if variable_type_for_name(&source_variables[0].name) == VariableType::Hidden {
         Err(InternSymbolsError::HiddenStartRule)?;
     }
 
-    let mut variables = Vec::with_capacity(grammar.variables.len());
-    for variable in &grammar.variables {
+    let mut variables = Vec::with_capacity(source_variables.len());
+    for variable in source_variables {
         variables.push(Variable {
             name: variable.name.clone(),
             kind: variable_type_for_name(&variable.name),
@@ -40,8 +52,8 @@ pub(super) fn intern_symbols(grammar: &InputGrammar) -> InternSymbolsResult<Inte
         });
     }
 
-    let mut external_tokens = Vec::with_capacity(grammar.external_tokens.len());
-    for external_token in &grammar.external_tokens {
+    let mut external_tokens = Vec::with_capacity(external_rules.len());
+    for external_token in external_rules {
         let rule = interner.intern_rule(external_token, None)?;
         let (name, kind) = if let Rule::NamedSymbol(name) = external_token {
             (name.clone(), variable_type_for_name(name))
@@ -51,20 +63,20 @@ pub(super) fn intern_symbols(grammar: &InputGrammar) -> InternSymbolsResult<Inte
         external_tokens.push(Variable { name, kind, rule });
     }
 
-    let mut extra_symbols = Vec::with_capacity(grammar.extra_symbols.len());
-    for extra_token in &grammar.extra_symbols {
+    let mut extra_symbols = Vec::with_capacity(extra_rules.len());
+    for extra_token in extra_rules {
         extra_symbols.push(interner.intern_rule(extra_token, None)?);
     }
 
-    let mut supertype_symbols = Vec::with_capacity(grammar.supertype_symbols.len());
-    for supertype_symbol_name in &grammar.supertype_symbols {
+    let mut supertype_symbols = Vec::with_capacity(supertype_names.len());
+    for supertype_symbol_name in supertype_names {
         supertype_symbols.push(interner.intern_name(supertype_symbol_name).ok_or_else(|| {
             InternSymbolsError::UndefinedSupertype(supertype_symbol_name.clone())
         })?);
     }
 
-    let mut reserved_words = Vec::with_capacity(grammar.reserved_words.len());
-    for reserved_word_set in &grammar.reserved_words {
+    let mut reserved_words = Vec::with_capacity(reserved_word_sets.len());
+    for reserved_word_set in reserved_word_sets {
         let mut interned_set = Vec::with_capacity(reserved_word_set.reserved_words.len());
         for rule in &reserved_word_set.reserved_words {
             interned_set.push(interner.intern_rule(rule, None)?);
@@ -75,31 +87,26 @@ pub(super) fn intern_symbols(grammar: &InputGrammar) -> InternSymbolsResult<Inte
         });
     }
 
-    let mut expected_conflicts = Vec::with_capacity(grammar.expected_conflicts.len());
-    for conflict in &grammar.expected_conflicts {
-        let mut interned_conflict = Vec::with_capacity(conflict.len());
+    for conflict in expected_conflicts {
         for name in conflict {
-            interned_conflict.push(
-                interner
-                    .intern_name(name)
-                    .ok_or_else(|| InternSymbolsError::UndefinedConflict(name.clone()))?,
-            );
+            interner
+                .intern_name(name)
+                .ok_or_else(|| InternSymbolsError::UndefinedConflict(name.clone()))?;
         }
-        expected_conflicts.push(interned_conflict);
     }
 
-    let mut variables_to_inline = Vec::new();
-    for name in &grammar.variables_to_inline {
+    let mut interned_inlines = Vec::new();
+    for name in variables_to_inline {
         if let Some(symbol) = interner.intern_name(name) {
-            variables_to_inline.push(symbol);
+            interned_inlines.push(symbol);
         }
     }
 
-    let word_token = if let Some(name) = grammar.word_token.as_ref() {
+    let word_token = if let Some(name) = word_token_name {
         Some(
             interner
                 .intern_name(name)
-                .ok_or_else(|| InternSymbolsError::UndefinedWordToken(name.clone()))?,
+                .ok_or_else(|| InternSymbolsError::UndefinedWordToken(name.to_string()))?,
         )
     } else {
         None
@@ -112,21 +119,20 @@ pub(super) fn intern_symbols(grammar: &InputGrammar) -> InternSymbolsResult<Inte
         }
     }
 
-    Ok(InternedGrammar {
+    Ok(ResolvedGrammar {
         variables,
         external_tokens,
         extra_symbols,
-        expected_conflicts,
-        variables_to_inline,
+        variables_to_inline: interned_inlines,
         supertype_symbols,
         word_token,
-        precedence_orderings: grammar.precedence_orderings.clone(),
         reserved_word_sets: reserved_words,
     })
 }
 
 struct Interner<'a> {
-    grammar: &'a InputGrammar,
+    variables: &'a [Variable],
+    external_rules: &'a [Rule],
 }
 
 impl Interner<'_> {
@@ -166,13 +172,13 @@ impl Interner<'_> {
     }
 
     fn intern_name(&self, symbol: &str) -> Option<Symbol> {
-        for (i, variable) in self.grammar.variables.iter().enumerate() {
+        for (i, variable) in self.variables.iter().enumerate() {
             if variable.name == symbol {
                 return Some(Symbol::non_terminal(i));
             }
         }
 
-        for (i, external_token) in self.grammar.external_tokens.iter().enumerate() {
+        for (i, external_token) in self.external_rules.iter().enumerate() {
             if let Rule::NamedSymbol(name) = external_token
                 && name == symbol
             {

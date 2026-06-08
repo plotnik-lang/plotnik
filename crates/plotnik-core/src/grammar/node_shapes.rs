@@ -6,10 +6,10 @@ use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::super::types::{NodeKindRef, NodeShape, NodeSlot};
+use super::types::{NodeKindRef, NodeShape, NodeSlot};
 
 use super::{
-    grammars::{LexicalGrammar, SyntaxGrammar, VariableType},
+    prepared::{LexicalGrammar, SyntaxGrammar, VariableType},
     rules::{Alias, AliasMap, Symbol, SymbolType},
 };
 
@@ -457,34 +457,6 @@ fn get_aliases_by_symbol(
         std::iter::once(&None).cloned().collect(),
     );
     aliases_by_symbol
-}
-
-pub fn get_supertype_symbol_map(
-    syntax_grammar: &SyntaxGrammar,
-    default_aliases: &AliasMap,
-    variable_info: &[VariableInfo],
-) -> BTreeMap<Symbol, Vec<ChildType>> {
-    let aliases_by_symbol = get_aliases_by_symbol(syntax_grammar, default_aliases);
-    let mut supertype_symbol_map = BTreeMap::new();
-
-    let mut symbols_by_alias = FxHashMap::default();
-    for (symbol, aliases) in &aliases_by_symbol {
-        for alias in aliases.iter().flatten() {
-            symbols_by_alias
-                .entry(alias)
-                .or_insert_with(Vec::new)
-                .push(*symbol);
-        }
-    }
-
-    for (i, info) in variable_info.iter().enumerate() {
-        let symbol = Symbol::non_terminal(i);
-        if syntax_grammar.supertype_symbols.contains(&symbol) {
-            let subtypes = info.children.types.clone();
-            supertype_symbol_map.insert(symbol, subtypes);
-        }
-    }
-    supertype_symbol_map
 }
 
 pub type SuperTypeCycleResult<T> = Result<T, SuperTypeCycleError>;

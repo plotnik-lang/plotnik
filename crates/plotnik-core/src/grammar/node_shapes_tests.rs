@@ -1,12 +1,4 @@
-use super::raw::RawGrammar;
-use super::types::NodeShape;
-
-fn find_node<'a>(nodes: &'a [NodeShape], type_name: &str, named: bool) -> &'a NodeShape {
-    nodes
-        .iter()
-        .find(|node| node.type_name == type_name && node.named == named)
-        .unwrap()
-}
+use super::{Grammar, raw::RawGrammar};
 
 #[test]
 fn derives_root_fields_children_and_extras() {
@@ -33,28 +25,30 @@ fn derives_root_fields_children_and_extras() {
     }"##;
 
     let raw = RawGrammar::from_json(json).unwrap();
-    let nodes = super::tree_sitter::metadata_for_raw(&raw)
-        .unwrap()
-        .node_shapes;
+    let grammar = Grammar::from_raw(&raw).unwrap();
 
-    let program = find_node(&nodes, "program", true);
-    assert!(program.root);
-    let children = program.children.as_ref().unwrap();
+    let program = grammar.resolve_named_node("program").unwrap();
+    let statement = grammar.resolve_named_node("statement").unwrap();
+    assert_eq!(grammar.root(), Some(program));
+    let children = grammar.children_cardinality(program).unwrap();
     assert!(children.required);
     assert!(children.multiple);
-    assert_eq!(children.types[0].type_name, "statement");
+    assert!(grammar.is_valid_child_type(program, statement));
 
-    let function = find_node(&nodes, "function", true);
-    let name = function.fields.get("name").unwrap();
+    let function = grammar.resolve_named_node("function").unwrap();
+    let identifier = grammar.resolve_named_node("identifier").unwrap();
+    let name_field = grammar.resolve_field("name").unwrap();
+    let name = grammar.field_cardinality(function, name_field).unwrap();
     assert!(name.required);
     assert!(!name.multiple);
-    assert_eq!(name.types[0].type_name, "identifier");
+    assert!(grammar.is_valid_field_type(function, name_field, identifier));
 
-    let body = function.fields.get("body").unwrap();
-    assert_eq!(body.types[0].type_name, "block");
+    let block = grammar.resolve_named_node("block").unwrap();
+    let body_field = grammar.resolve_field("body").unwrap();
+    assert!(grammar.is_valid_field_type(function, body_field, block));
 
-    let comment = find_node(&nodes, "comment", true);
-    assert!(comment.extra);
+    let comment = grammar.resolve_named_node("comment").unwrap();
+    assert!(grammar.is_extra(comment));
 }
 
 #[test]
@@ -77,13 +71,12 @@ fn derives_supertype_subtypes() {
     }"#;
 
     let raw = RawGrammar::from_json(json).unwrap();
-    let nodes = super::tree_sitter::metadata_for_raw(&raw)
-        .unwrap()
-        .node_shapes;
-    let expression = find_node(&nodes, "expression", true);
-    let subtypes = expression.subtypes.as_ref().unwrap();
+    let grammar = Grammar::from_raw(&raw).unwrap();
+    let expression = grammar.resolve_named_node("expression").unwrap();
+    let identifier = grammar.resolve_named_node("identifier").unwrap();
+    let number = grammar.resolve_named_node("number").unwrap();
+    let subtypes = grammar.subtypes(expression);
 
-    assert_eq!(subtypes.len(), 2);
-    assert_eq!(subtypes[0].type_name, "identifier");
-    assert_eq!(subtypes[1].type_name, "number");
+    assert!(grammar.is_supertype(expression));
+    assert_eq!(subtypes, [identifier, number]);
 }

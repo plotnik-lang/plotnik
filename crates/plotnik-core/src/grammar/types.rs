@@ -9,7 +9,27 @@ use crate::{Cardinality, NodeFieldId, NodeTypeId};
 
 use super::json::GrammarError;
 use super::raw::RawGrammar;
-use super::tree_sitter::GrammarMetadata;
+
+pub(super) struct GrammarMetadata {
+    pub(super) node_shapes: Vec<NodeShape>,
+    pub(super) symbols: Vec<NodeSymbol>,
+    pub(super) fields: Vec<FieldSymbol>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct NodeSymbol {
+    pub(super) id: u16,
+    pub(super) type_name: String,
+    pub(super) named: bool,
+    pub(super) visible: bool,
+    pub(super) supertype: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct FieldSymbol {
+    pub(super) id: u16,
+    pub(super) name: String,
+}
 
 /// Tree-sitter grammar plus Plotnik's derived compile-time metadata.
 #[derive(Debug, Clone)]
@@ -34,7 +54,103 @@ pub struct Grammar {
 impl Grammar {
     /// Build production grammar metadata from a raw source-format grammar.
     pub fn from_raw(raw: &RawGrammar) -> Result<Self, GrammarError> {
-        let metadata = super::tree_sitter::metadata_for_raw(raw).map_err(GrammarError::Analysis)?;
+        use super::{
+            aliases::extract_default_aliases,
+            lower::{
+                convert_precedence_entry, convert_rule, derive_fields, derive_symbols,
+                retain_reachable_rules,
+            },
+            node_shapes,
+            prepared::{ReservedWordContext, Variable, VariableType},
+            productions::{expand_repeats, flatten_grammar, process_inlines},
+            symbols::resolve_symbols,
+            tokens::{expand_tokens, extract_tokens},
+            validation::{validate_indirect_recursion, validate_precedences},
+        };
+
+        let mut variables = raw
+            .rules
+            .iter()
+            .map(|(name, rule)| Variable {
+                name: name.clone(),
+                kind: VariableType::Named,
+                rule: convert_rule(rule),
+            })
+            .collect::<Vec<_>>();
+        let mut extra_symbols = raw.extras.iter().map(convert_rule).collect::<Vec<_>>();
+        let mut expected_conflicts = raw.conflicts.clone();
+        let mut precedence_orderings = raw
+            .precedences
+            .iter()
+            .map(|entries| entries.iter().map(convert_precedence_entry).collect())
+            .collect::<Vec<_>>();
+        let mut external_tokens = raw.externals.iter().map(convert_rule).collect::<Vec<_>>();
+        let mut variables_to_inline = raw.inline.clone();
+        let mut supertype_symbols = raw.supertypes.clone();
+        let word_token = raw.word.clone();
+        let mut reserved_words = raw
+            .reserved
+            .iter()
+            .map(|(name, rules)| ReservedWordContext {
+                name: name.clone(),
+                reserved_words: rules.iter().map(convert_rule).collect(),
+            })
+            .collect::<Vec<_>>();
+
+        retain_reachable_rules(
+            &mut variables,
+            &mut extra_symbols,
+            &mut expected_conflicts,
+            &mut precedence_orderings,
+            &mut external_tokens,
+            &mut variables_to_inline,
+            &mut supertype_symbols,
+            word_token.as_deref(),
+            &mut reserved_words,
+        );
+        validate_precedences(&variables, &precedence_orderings)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        validate_indirect_recursion(&variables)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+
+        let resolved_grammar = resolve_symbols(
+            &variables,
+            &extra_symbols,
+            &expected_conflicts,
+            &external_tokens,
+            &variables_to_inline,
+            &supertype_symbols,
+            word_token.as_deref(),
+            &reserved_words,
+        )
+        .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let (syntax_grammar, lexical_grammar) = extract_tokens(resolved_grammar)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let syntax_grammar = expand_repeats(syntax_grammar);
+        let mut syntax_grammar = flatten_grammar(syntax_grammar)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let lexical_grammar = expand_tokens(lexical_grammar)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let aliases = extract_default_aliases(&mut syntax_grammar, &lexical_grammar);
+        let inlines = process_inlines(&syntax_grammar, &lexical_grammar)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+
+        let variable_info =
+            node_shapes::get_variable_info(&syntax_grammar, &lexical_grammar, &aliases)
+                .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let node_shapes = node_shapes::generate_node_shapes(
+            &syntax_grammar,
+            &lexical_grammar,
+            &aliases,
+            &variable_info,
+        )
+        .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let metadata = GrammarMetadata {
+            node_shapes,
+            symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
+            fields: derive_fields(&syntax_grammar, &inlines, &variable_info),
+        };
+
         Self::from_metadata(raw.name.clone(), metadata).map_err(GrammarError::Analysis)
     }
 

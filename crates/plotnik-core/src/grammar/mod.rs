@@ -1,17 +1,24 @@
-//! Grammar types for tree-sitter grammars.
-//!
-//! This module provides types for representing tree-sitter `grammar.json` files,
-//! with support for JSON deserialization and compact binary serialization.
+//! Grammar metadata derived from tree-sitter `grammar.json` files.
 
+mod aliases;
 mod json;
+mod lower;
+mod nfa;
+mod node_shapes;
+mod prepared;
+mod productions;
 pub mod raw;
-mod tree_sitter;
+mod rules;
+mod symbols;
+mod tokens;
 mod types;
+mod validation;
 
 #[cfg(test)]
 mod json_tests;
 #[cfg(test)]
 mod node_shapes_tests;
+
 #[cfg(test)]
 mod types_tests;
 

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
-    grammars::{InlinedProductionMap, LexicalGrammar, Production, ProductionStep, SyntaxGrammar},
+    prepared::{InlinedProductionMap, LexicalGrammar, Production, ProductionStep, SyntaxGrammar},
     rules::SymbolType,
 };
 
@@ -65,28 +65,8 @@ impl InlinedProductionMapBuilder {
             }
         }
 
-        self.build_production_map(grammar)
-    }
-
-    fn build_production_map(self, grammar: &SyntaxGrammar) -> InlinedProductionMap {
-        let productions = self.productions;
-        let production_indices_by_step_id = self.production_indices_by_step_id;
-        let production_map = production_indices_by_step_id
-            .into_iter()
-            .map(|(step_id, production_indices)| {
-                let production = core::ptr::from_ref::<Production>(step_id.variable.map_or_else(
-                    || &productions[step_id.production],
-                    |variable_index| {
-                        &grammar.variables[variable_index].productions[step_id.production]
-                    },
-                ));
-                ((production, step_id.step as u32), production_indices)
-            })
-            .collect();
-
         InlinedProductionMap {
-            productions,
-            production_map,
+            productions: self.productions,
         }
     }
 
@@ -204,7 +184,7 @@ pub enum ProcessInlinesError {
     FirstRule(String),
 }
 
-pub(super) fn process_inlines(
+pub(in crate::grammar) fn process_inlines(
     grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
 ) -> ProcessInlinesResult<InlinedProductionMap> {

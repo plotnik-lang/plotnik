@@ -10,7 +10,6 @@ description = "Core data structures for Plotnik"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [dependencies]
-bit-vec = "0.9"
 bitflags = "2"
 indexmap = { version = "2", features = ["serde"] }
 log = "0.4"

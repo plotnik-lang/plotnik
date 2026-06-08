@@ -6,11 +6,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
-    grammars::{LexicalGrammar, LexicalVariable},
     nfa::{CharacterSet, Nfa, NfaState},
+    prepared::{ExtractedLexicalGrammar, LexicalGrammar, LexicalVariable},
     rules::{Precedence, Rule},
 };
-use super::ExtractedLexicalGrammar;
 
 const STRING_IMPLICIT_PRECEDENCE: i32 = 2;
 const DEFAULT_IMPLICIT_PRECEDENCE: i32 = 0;

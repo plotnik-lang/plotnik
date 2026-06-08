@@ -1,173 +1,96 @@
-//! Private subset of Tree-sitter grammar lowering.
-//!
-//! Adapted from tree-sitter's MIT-licensed `tree-sitter-generate` crate.
-//! This module exists only to derive Plotnik grammar metadata from grammar.json.
+//! Raw grammar lowering helpers.
 
-#![allow(dead_code)]
-
-mod grammars;
-mod nfa;
-mod node_shapes;
-mod prepare_grammar;
-mod rules;
-
-#[cfg(test)]
-mod rules_tests;
-
-use super::raw::{
-    RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
-    RawRule as PlotnikRule,
-};
 use std::collections::BTreeSet;
 
-use super::types::NodeShape;
-
-use grammars::{
-    InlinedProductionMap, InputGrammar, LexicalGrammar, Production, ReservedWordContext,
-    SyntaxGrammar, Variable, VariableType,
-};
-use prepare_grammar::prepare_grammar;
-use rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-pub(super) struct GrammarMetadata {
-    pub(super) node_shapes: Vec<NodeShape>,
-    pub(super) symbols: Vec<NodeSymbol>,
-    pub(super) fields: Vec<FieldSymbol>,
-}
+use super::raw::{
+    RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
+    RawRule as PlotnikRule,
+};
+use super::{
+    node_shapes,
+    prepared::{
+        InlinedProductionMap, LexicalGrammar, PrecedenceEntry, Production, ReservedWordContext,
+        SyntaxGrammar, Variable, VariableType,
+    },
+    rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType},
+    types::{FieldSymbol, NodeSymbol},
+};
 
-#[derive(Debug, Clone)]
-pub(super) struct NodeSymbol {
-    pub(super) id: u16,
-    pub(super) type_name: String,
-    pub(super) named: bool,
-    pub(super) visible: bool,
-    pub(super) supertype: bool,
-}
-
-#[derive(Debug, Clone)]
-pub(super) struct FieldSymbol {
-    pub(super) id: u16,
-    pub(super) name: String,
-}
-
-pub(super) fn metadata_for_raw(raw: &RawGrammar) -> Result<GrammarMetadata, String> {
-    let input = input_grammar(raw);
-    let (syntax_grammar, lexical_grammar, inlines, aliases) =
-        prepare_grammar(&input).map_err(|error| error.to_string())?;
-    let variable_info = node_shapes::get_variable_info(&syntax_grammar, &lexical_grammar, &aliases)
-        .map_err(|error| error.to_string())?;
-    let node_shapes = node_shapes::generate_node_shapes(
-        &syntax_grammar,
-        &lexical_grammar,
-        &aliases,
-        &variable_info,
-    )
-    .map_err(|error| error.to_string())?;
-
-    Ok(GrammarMetadata {
-        node_shapes,
-        symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
-        fields: derive_fields(&syntax_grammar, &inlines, &variable_info),
-    })
-}
-
-fn input_grammar(raw: &RawGrammar) -> InputGrammar {
-    normalize_input_grammar(InputGrammar {
-        name: raw.name.clone(),
-        variables: raw
-            .rules
-            .iter()
-            .map(|(name, rule)| Variable {
-                name: name.clone(),
-                kind: VariableType::Named,
-                rule: convert_rule(rule),
-            })
-            .collect(),
-        extra_symbols: raw.extras.iter().map(convert_rule).collect(),
-        expected_conflicts: raw.conflicts.clone(),
-        precedence_orderings: raw
-            .precedences
-            .iter()
-            .map(|entries| entries.iter().map(convert_precedence_entry).collect())
-            .collect(),
-        external_tokens: raw.externals.iter().map(convert_rule).collect(),
-        variables_to_inline: raw.inline.clone(),
-        supertype_symbols: raw.supertypes.clone(),
-        word_token: raw.word.clone(),
-        reserved_words: raw
-            .reserved
-            .iter()
-            .map(|(name, rules)| ReservedWordContext {
-                name: name.clone(),
-                reserved_words: rules.iter().map(convert_rule).collect(),
-            })
-            .collect(),
-    })
-}
-
-fn normalize_input_grammar(mut grammar: InputGrammar) -> InputGrammar {
-    let used = reachable_rule_names(&grammar);
-    let dropped = grammar
-        .variables
+#[allow(clippy::too_many_arguments)]
+pub(super) fn retain_reachable_rules(
+    variables: &mut Vec<Variable>,
+    extra_symbols: &mut Vec<Rule>,
+    expected_conflicts: &mut Vec<Vec<String>>,
+    precedence_orderings: &mut Vec<Vec<PrecedenceEntry>>,
+    external_tokens: &mut Vec<Rule>,
+    variables_to_inline: &mut Vec<String>,
+    supertype_symbols: &mut Vec<String>,
+    word_token: Option<&str>,
+    reserved_words: &mut [ReservedWordContext<Rule>],
+) {
+    let used = reachable_rule_names(
+        variables,
+        word_token,
+        extra_symbols,
+        external_tokens,
+        reserved_words,
+    );
+    let dropped = variables
         .iter()
         .filter(|variable| !used.contains(variable.name.as_str()))
         .map(|variable| variable.name.clone())
         .collect::<Vec<_>>();
 
-    grammar
-        .variables
-        .retain(|variable| used.contains(variable.name.as_str()));
+    variables.retain(|variable| used.contains(variable.name.as_str()));
 
     for name in &dropped {
-        grammar
-            .expected_conflicts
-            .retain(|conflict| !conflict.contains(name));
-        grammar.supertype_symbols.retain(|symbol| symbol != name);
-        grammar.variables_to_inline.retain(|symbol| symbol != name);
-        grammar
-            .extra_symbols
-            .retain(|rule| !rule_is_referenced(rule, name, true));
-        grammar
-            .external_tokens
-            .retain(|rule| !rule_is_referenced(rule, name, true));
-        grammar.precedence_orderings.retain(|ordering| {
-            !ordering.iter().any(|entry| {
-                matches!(entry, grammars::PrecedenceEntry::Symbol(symbol) if symbol == name)
-            })
+        expected_conflicts.retain(|conflict| !conflict.contains(name));
+        supertype_symbols.retain(|symbol| symbol != name);
+        variables_to_inline.retain(|symbol| symbol != name);
+        extra_symbols.retain(|rule| !rule_is_referenced(rule, name, true));
+        external_tokens.retain(|rule| !rule_is_referenced(rule, name, true));
+        precedence_orderings.retain(|ordering| {
+            !ordering
+                .iter()
+                .any(|entry| matches!(entry, PrecedenceEntry::Symbol(symbol) if symbol == name))
         });
-        for context in &mut grammar.reserved_words {
+        for context in reserved_words.iter_mut() {
             context
                 .reserved_words
                 .retain(|rule| !rule_is_referenced(rule, name, false));
         }
     }
-
-    grammar
 }
 
-fn reachable_rule_names(grammar: &InputGrammar) -> FxHashSet<String> {
-    let by_name = grammar
-        .variables
+fn reachable_rule_names<'a>(
+    variables: &'a [Variable],
+    word_token: Option<&'a str>,
+    extra_symbols: &'a [Rule],
+    external_tokens: &'a [Rule],
+    reserved_words: &'a [ReservedWordContext<Rule>],
+) -> FxHashSet<String> {
+    let by_name = variables
         .iter()
         .map(|variable| (variable.name.as_str(), &variable.rule))
         .collect::<FxHashMap<_, _>>();
     let mut visited = FxHashSet::<&str>::default();
     let mut stack = Vec::<&str>::new();
 
-    if let Some(start) = grammar.variables.first() {
+    if let Some(start) = variables.first() {
         stack.push(start.name.as_str());
     }
-    if let Some(word_token) = grammar.word_token.as_deref() {
+    if let Some(word_token) = word_token {
         stack.push(word_token);
     }
-    for rule in &grammar.extra_symbols {
+    for rule in extra_symbols {
         collect_referenced_names(rule, false, &mut stack);
     }
-    for rule in &grammar.external_tokens {
+    for rule in external_tokens {
         collect_referenced_names(rule, true, &mut stack);
     }
-    for context in &grammar.reserved_words {
+    for context in reserved_words {
         for rule in &context.reserved_words {
             collect_referenced_names(rule, false, &mut stack);
         }
@@ -219,7 +142,7 @@ fn rule_is_referenced(rule: &Rule, target: &str, is_external: bool) -> bool {
     }
 }
 
-fn convert_rule(rule: &PlotnikRule) -> Rule {
+pub(super) fn convert_rule(rule: &PlotnikRule) -> Rule {
     match rule {
         PlotnikRule::BLANK => Rule::Blank,
         PlotnikRule::STRING { value } => Rule::String(value.clone()),
@@ -276,14 +199,14 @@ fn convert_precedence(precedence: &PlotnikPrecedence) -> Precedence {
     }
 }
 
-fn convert_precedence_entry(entry: &PlotnikPrecedenceEntry) -> grammars::PrecedenceEntry {
+pub(super) fn convert_precedence_entry(entry: &PlotnikPrecedenceEntry) -> PrecedenceEntry {
     match entry {
-        PlotnikPrecedenceEntry::STRING { value } => grammars::PrecedenceEntry::Name(value.clone()),
-        PlotnikPrecedenceEntry::SYMBOL { name } => grammars::PrecedenceEntry::Symbol(name.clone()),
+        PlotnikPrecedenceEntry::STRING { value } => PrecedenceEntry::Name(value.clone()),
+        PlotnikPrecedenceEntry::SYMBOL { name } => PrecedenceEntry::Symbol(name.clone()),
     }
 }
 
-fn derive_fields(
+pub(super) fn derive_fields(
     syntax_grammar: &SyntaxGrammar,
     inlines: &InlinedProductionMap,
     variable_info: &[node_shapes::VariableInfo],
@@ -324,7 +247,7 @@ fn collect_field_names(
     }
 }
 
-fn derive_symbols(
+pub(super) fn derive_symbols(
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
     inlines: &InlinedProductionMap,

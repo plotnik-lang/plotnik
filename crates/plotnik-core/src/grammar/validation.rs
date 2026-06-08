@@ -1,93 +1,18 @@
-mod expand_repeats;
-mod expand_tokens;
-mod extract_default_aliases;
-mod extract_tokens;
-mod flatten_grammar;
-mod intern_symbols;
-mod process_inlines;
-
 use std::{
     cmp::Ordering,
     collections::{BTreeSet, hash_map},
     mem,
 };
 
-pub use expand_tokens::ExpandTokensError;
-pub use extract_tokens::ExtractTokensError;
-pub use flatten_grammar::FlattenGrammarError;
 use indexmap::IndexMap;
-pub use intern_symbols::InternSymbolsError;
-pub use process_inlines::ProcessInlinesError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub use self::expand_tokens::expand_tokens;
-use self::{
-    expand_repeats::expand_repeats, extract_default_aliases::extract_default_aliases,
-    extract_tokens::extract_tokens, flatten_grammar::flatten_grammar,
-    intern_symbols::intern_symbols, process_inlines::process_inlines,
-};
-use super::grammars::ReservedWordContext;
 use super::{
-    grammars::{
-        ExternalToken, InlinedProductionMap, InputGrammar, LexicalGrammar, PrecedenceEntry,
-        SyntaxGrammar, Variable,
-    },
-    rules::{AliasMap, Precedence, Rule, Symbol},
+    prepared::{PrecedenceEntry, Variable},
+    rules::{Precedence, Rule},
 };
-
-pub struct IntermediateGrammar<T, U> {
-    variables: Vec<Variable>,
-    extra_symbols: Vec<T>,
-    expected_conflicts: Vec<Vec<Symbol>>,
-    precedence_orderings: Vec<Vec<PrecedenceEntry>>,
-    external_tokens: Vec<U>,
-    variables_to_inline: Vec<Symbol>,
-    supertype_symbols: Vec<Symbol>,
-    word_token: Option<Symbol>,
-    reserved_word_sets: Vec<ReservedWordContext<T>>,
-}
-
-pub type InternedGrammar = IntermediateGrammar<Rule, Variable>;
-
-pub type ExtractedSyntaxGrammar = IntermediateGrammar<Symbol, ExternalToken>;
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ExtractedLexicalGrammar {
-    pub variables: Vec<Variable>,
-    pub separators: Vec<Rule>,
-}
-
-impl<T, U> Default for IntermediateGrammar<T, U> {
-    fn default() -> Self {
-        Self {
-            variables: Vec::default(),
-            extra_symbols: Vec::default(),
-            expected_conflicts: Vec::default(),
-            precedence_orderings: Vec::default(),
-            external_tokens: Vec::default(),
-            variables_to_inline: Vec::default(),
-            supertype_symbols: Vec::default(),
-            word_token: Option::default(),
-            reserved_word_sets: Vec::default(),
-        }
-    }
-}
-
-pub type PrepareGrammarResult<T> = Result<T, PrepareGrammarError>;
-
-#[derive(Debug, Error, Serialize, Deserialize)]
-#[error(transparent)]
-pub enum PrepareGrammarError {
-    ValidatePrecedences(#[from] ValidatePrecedenceError),
-    ValidateIndirectRecursion(#[from] IndirectRecursionError),
-    InternSymbols(#[from] InternSymbolsError),
-    ExtractTokens(#[from] ExtractTokensError),
-    FlattenGrammar(#[from] FlattenGrammarError),
-    ExpandTokens(#[from] ExpandTokensError),
-    ProcessInlines(#[from] ProcessInlinesError),
-}
 
 pub type ValidatePrecedenceResult<T> = Result<T, ValidatePrecedenceError>;
 
@@ -148,36 +73,15 @@ impl std::fmt::Display for ConflictingPrecedenceOrderingError {
     }
 }
 
-/// Transform an input grammar into separate components that are ready
-/// for parse table construction.
-pub fn prepare_grammar(
-    input_grammar: &InputGrammar,
-) -> PrepareGrammarResult<(
-    SyntaxGrammar,
-    LexicalGrammar,
-    InlinedProductionMap,
-    AliasMap,
-)> {
-    validate_precedences(input_grammar)?;
-    validate_indirect_recursion(input_grammar)?;
-
-    let interned_grammar = intern_symbols(input_grammar)?;
-    let (syntax_grammar, lexical_grammar) = extract_tokens(interned_grammar)?;
-    let syntax_grammar = expand_repeats(syntax_grammar);
-    let mut syntax_grammar = flatten_grammar(syntax_grammar)?;
-    let lexical_grammar = expand_tokens(lexical_grammar)?;
-    let default_aliases = extract_default_aliases(&mut syntax_grammar, &lexical_grammar);
-    let inlines = process_inlines(&syntax_grammar, &lexical_grammar)?;
-    Ok((syntax_grammar, lexical_grammar, inlines, default_aliases))
-}
-
 /// Check for indirect recursion cycles in the grammar that can cause infinite loops while
 /// parsing. An indirect recursion cycle occurs when a non-terminal can derive itself through
 /// a chain of single-symbol productions (e.g., A -> B, B -> A).
-fn validate_indirect_recursion(grammar: &InputGrammar) -> Result<(), IndirectRecursionError> {
+pub(super) fn validate_indirect_recursion(
+    variables: &[Variable],
+) -> Result<(), IndirectRecursionError> {
     let mut epsilon_transitions: IndexMap<&str, BTreeSet<String>> = IndexMap::new();
 
-    for variable in &grammar.variables {
+    for variable in variables {
         let productions = get_single_symbol_productions(&variable.rule);
         // Filter out rules that *directly* reference themselves, as this doesn't
         // cause a parsing loop.
@@ -251,7 +155,10 @@ fn get_cycle<'a>(
 /// Check that all of the named precedences used in the grammar are declared
 /// within the `precedences` lists, and also that there are no conflicting
 /// precedence orderings declared in those lists.
-fn validate_precedences(grammar: &InputGrammar) -> ValidatePrecedenceResult<()> {
+pub(super) fn validate_precedences(
+    variables: &[Variable],
+    precedence_orderings: &[Vec<PrecedenceEntry>],
+) -> ValidatePrecedenceResult<()> {
     // Check that no rule contains a named precedence that is not present in
     // any of the `precedences` lists.
     fn validate(
@@ -283,7 +190,7 @@ fn validate_precedences(grammar: &InputGrammar) -> ValidatePrecedenceResult<()> 
     // For any two precedence names `a` and `b`, if `a` comes before `b`
     // in some list, then it cannot come *after* `b` in any list.
     let mut pairs = FxHashMap::default();
-    for list in &grammar.precedence_orderings {
+    for list in precedence_orderings {
         for (i, mut entry1) in list.iter().enumerate() {
             for mut entry2 in list.iter().skip(i + 1) {
                 if entry2 == entry1 {
@@ -311,8 +218,7 @@ fn validate_precedences(grammar: &InputGrammar) -> ValidatePrecedenceResult<()> 
         }
     }
 
-    let precedence_names = grammar
-        .precedence_orderings
+    let precedence_names = precedence_orderings
         .iter()
         .flat_map(|l| l.iter())
         .filter_map(|p| {
@@ -323,7 +229,7 @@ fn validate_precedences(grammar: &InputGrammar) -> ValidatePrecedenceResult<()> 
             }
         })
         .collect::<FxHashSet<&String>>();
-    for variable in &grammar.variables {
+    for variable in variables {
         validate(&variable.name, &variable.rule, &precedence_names)?;
     }
 
