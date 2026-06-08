@@ -11,7 +11,6 @@ mod nfa;
 mod node_shapes;
 mod prepare_grammar;
 mod rules;
-mod tables;
 
 use super::raw::{
     RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
