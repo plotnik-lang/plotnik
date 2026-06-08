@@ -1,9 +1,6 @@
 use std::fmt;
 
-use super::{
-    nfa::Nfa,
-    rules::{Alias, Associativity, Precedence, Rule, Symbol},
-};
+use super::rules::{Alias, Rule, Symbol};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VariableType {
@@ -30,6 +27,13 @@ pub enum PrecedenceEntry {
 pub struct ReservedWordContext<T> {
     pub name: String,
     pub reserved_words: Vec<T>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExternalToken {
+    pub name: String,
+    pub kind: VariableType,
+    pub corresponding_internal_token: Option<Symbol>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -64,13 +68,10 @@ pub struct ExtractedLexicalGrammar {
 pub struct LexicalVariable {
     pub name: String,
     pub kind: VariableType,
-    pub implicit_precedence: i32,
-    pub start_state: u32,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct LexicalGrammar {
-    pub nfa: Nfa,
     pub variables: Vec<LexicalVariable>,
 }
 
@@ -79,26 +80,24 @@ pub struct LexicalGrammar {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ProductionStep {
     pub symbol: Symbol,
-    pub precedence: Precedence,
-    pub associativity: Option<Associativity>,
     pub alias: Option<Alias>,
     pub field_name: Option<String>,
-    pub reserved_word_set_id: ReservedWordSetId,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ReservedWordSetId(pub usize);
-
-impl fmt::Display for ReservedWordSetId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+impl ProductionStep {
+    pub(in crate::grammar) fn inherit_inline_metadata_from(&mut self, parent: &Self) {
+        if let Some(alias) = &parent.alias {
+            self.alias = Some(alias.clone());
+        }
+        if let Some(field_name) = &parent.field_name {
+            self.field_name = Some(field_name.clone());
+        }
     }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Production {
     pub steps: Vec<ProductionStep>,
-    pub dynamic_precedence: i32,
 }
 
 #[derive(Default)]
@@ -113,20 +112,13 @@ pub struct SyntaxVariable {
     pub productions: Vec<Production>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ExternalToken {
-    pub name: String,
-    pub kind: VariableType,
-    pub corresponding_internal_token: Option<Symbol>,
-}
-
 #[derive(Debug, Default)]
 pub struct SyntaxGrammar {
     pub variables: Vec<SyntaxVariable>,
     pub extra_symbols: Vec<Symbol>,
     pub external_tokens: Vec<ExternalToken>,
-    pub supertype_symbols: Vec<Symbol>,
     pub variables_to_inline: Vec<Symbol>,
+    pub supertype_symbols: Vec<Symbol>,
     pub word_token: Option<Symbol>,
 }
 

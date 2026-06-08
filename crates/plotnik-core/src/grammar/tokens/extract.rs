@@ -83,36 +83,11 @@ pub(in crate::grammar) fn extract_tokens(
         lexical_variables.push(variable);
     }
 
-    // If a variable's entire rule was extracted as a token and that token didn't
-    // appear within any other rule, then remove that variable from the syntax
-    // grammar, giving its name to the token in the lexical grammar. Any symbols
-    // that pointed to that variable will need to be updated to point to the
-    // variable in the lexical grammar. Symbols that pointed to later variables
-    // will need to have their indices decremented.
-    let mut variables = Vec::with_capacity(grammar.variables.len());
-    let mut symbol_replacer = SymbolReplacer {
-        replacements: FxHashMap::default(),
-    };
-    for (i, variable) in grammar.variables.into_iter().enumerate() {
-        if let Rule::Symbol(Symbol {
-            kind: SymbolType::Terminal,
-            index,
-        }) = variable.rule
-            && i > 0
-            && extractor.extracted_usage_counts[index] == 1
-        {
-            let lexical_variable = &mut lexical_variables[index];
-            if lexical_variable.kind == VariableType::Auxiliary
-                || variable.kind != VariableType::Hidden
-            {
-                lexical_variable.kind = variable.kind;
-                lexical_variable.name = variable.name;
-                symbol_replacer.replacements.insert(i, index);
-                continue;
-            }
-        }
-        variables.push(variable);
-    }
+    let (mut variables, mut symbol_replacer) = promote_extracted_tokens(
+        grammar.variables,
+        &mut lexical_variables,
+        &extractor.extracted_usage_counts,
+    );
 
     for variable in &mut variables {
         variable.rule = symbol_replacer.replace_symbols_in_rule(&variable.rule);
@@ -140,10 +115,10 @@ pub(in crate::grammar) fn extract_tokens(
     let mut separators = Vec::new();
     let mut extra_symbols = Vec::new();
     for rule in grammar.extra_symbols {
-        if let Rule::Symbol(symbol) = rule {
-            extra_symbols.push(symbol_replacer.replace_symbol(symbol));
-        } else if let Some(index) = lexical_variables.iter().position(|v| v.rule == rule) {
-            extra_symbols.push(Symbol::terminal(index));
+        if let Some(symbol) =
+            extracted_token_symbol_for_rule(&rule, &lexical_variables, &symbol_replacer)
+        {
+            extra_symbols.push(symbol);
         } else {
             separators.push(rule);
         }
@@ -201,13 +176,12 @@ pub(in crate::grammar) fn extract_tokens(
     for reserved_word_context in grammar.reserved_word_sets {
         let mut reserved_words = Vec::with_capacity(reserved_word_contexts.len());
         for reserved_rule in reserved_word_context.reserved_words {
-            if let Rule::Symbol(symbol) = reserved_rule {
-                reserved_words.push(symbol_replacer.replace_symbol(symbol));
-            } else if let Some(index) = lexical_variables
-                .iter()
-                .position(|v| v.rule == reserved_rule)
-            {
-                reserved_words.push(Symbol::terminal(index));
+            if let Some(symbol) = extracted_token_symbol_for_rule(
+                &reserved_rule,
+                &lexical_variables,
+                &symbol_replacer,
+            ) {
+                reserved_words.push(symbol);
             } else {
                 let rule = if let Rule::Metadata { rule, .. } = &reserved_rule {
                     rule.as_ref()
@@ -232,9 +206,9 @@ pub(in crate::grammar) fn extract_tokens(
         ExtractedSyntaxGrammar {
             variables,
             extra_symbols,
+            external_tokens,
             variables_to_inline,
             supertype_symbols,
-            external_tokens,
             word_token,
             reserved_word_sets: reserved_word_contexts,
         },
@@ -257,6 +231,61 @@ struct SymbolReplacer {
     replacements: FxHashMap<usize, usize>,
 }
 
+fn promote_extracted_tokens(
+    variables: Vec<Variable>,
+    lexical_variables: &mut [Variable],
+    extracted_usage_counts: &[usize],
+) -> (Vec<Variable>, SymbolReplacer) {
+    // If a variable's entire rule was extracted as a token and that token didn't
+    // appear within any other rule, then remove that variable from the syntax
+    // grammar, giving its name to the token in the lexical grammar. Any symbols
+    // that pointed to that variable will need to be updated to point to the
+    // variable in the lexical grammar. Symbols that pointed to later variables
+    // will need to have their indices decremented.
+    let mut retained_variables = Vec::with_capacity(variables.len());
+    let mut symbol_replacer = SymbolReplacer {
+        replacements: FxHashMap::default(),
+    };
+
+    for (i, variable) in variables.into_iter().enumerate() {
+        if let Rule::Symbol(Symbol {
+            kind: SymbolType::Terminal,
+            index,
+        }) = variable.rule
+            && i > 0
+            && extracted_usage_counts[index] == 1
+        {
+            let lexical_variable = &mut lexical_variables[index];
+            if lexical_variable.kind == VariableType::Auxiliary
+                || variable.kind != VariableType::Hidden
+            {
+                lexical_variable.kind = variable.kind;
+                lexical_variable.name = variable.name;
+                symbol_replacer.replacements.insert(i, index);
+                continue;
+            }
+        }
+        retained_variables.push(variable);
+    }
+
+    (retained_variables, symbol_replacer)
+}
+
+fn extracted_token_symbol_for_rule(
+    rule: &Rule,
+    lexical_variables: &[Variable],
+    symbol_replacer: &SymbolReplacer,
+) -> Option<Symbol> {
+    if let Rule::Symbol(symbol) = rule {
+        return Some(symbol_replacer.replace_symbol(*symbol));
+    }
+
+    lexical_variables
+        .iter()
+        .position(|variable| variable.rule == *rule)
+        .map(Symbol::terminal)
+}
+
 impl TokenExtractor {
     fn extract_tokens_in_variable(
         &mut self,
@@ -275,31 +304,7 @@ impl TokenExtractor {
         match input {
             Rule::String(name) => Ok(self.extract_token(input, Some(name))?.into()),
             Rule::Pattern(..) => Ok(self.extract_token(input, None)?.into()),
-            Rule::Metadata { params, rule } => {
-                if params.is_token {
-                    let mut params = params.clone();
-                    params.is_token = false;
-
-                    let string_value = if let Rule::String(value) = rule.as_ref() {
-                        Some(value)
-                    } else {
-                        None
-                    };
-
-                    let rule_to_extract = if params == MetadataParams::default() {
-                        rule.as_ref()
-                    } else {
-                        input
-                    };
-
-                    Ok(self.extract_token(rule_to_extract, string_value)?.into())
-                } else {
-                    Ok(Rule::Metadata {
-                        params: params.clone(),
-                        rule: Box::new(self.extract_tokens_in_rule(rule)?),
-                    })
-                }
-            }
+            Rule::Metadata { params, rule } => self.extract_metadata_rule(input, params, rule),
             Rule::Repeat(content) => Ok(Rule::Repeat(Box::new(
                 self.extract_tokens_in_rule(content)?,
             ))),
@@ -321,6 +326,37 @@ impl TokenExtractor {
             }),
             _ => Ok(input.clone()),
         }
+    }
+
+    fn extract_metadata_rule(
+        &mut self,
+        input: &Rule,
+        params: &MetadataParams,
+        rule: &Rule,
+    ) -> ExtractTokensResult<Rule> {
+        if params.is_token {
+            let mut params = params.clone();
+            params.is_token = false;
+
+            let string_value = if let Rule::String(value) = rule {
+                Some(value)
+            } else {
+                None
+            };
+
+            let rule_to_extract = if params == MetadataParams::default() {
+                rule
+            } else {
+                input
+            };
+
+            return Ok(self.extract_token(rule_to_extract, string_value)?.into());
+        }
+
+        Ok(Rule::Metadata {
+            params: params.clone(),
+            rule: Box::new(self.extract_tokens_in_rule(rule)?),
+        })
     }
 
     fn extract_token(

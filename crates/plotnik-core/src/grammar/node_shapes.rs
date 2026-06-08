@@ -9,9 +9,11 @@ use thiserror::Error;
 use super::types::{NodeKindRef, NodeShape, NodeSlot};
 
 use super::{
-    prepared::{LexicalGrammar, SyntaxGrammar, VariableType},
+    prepared::{LexicalGrammar, ProductionStep, SyntaxGrammar, VariableType},
     rules::{Alias, AliasMap, Symbol, SymbolType},
 };
+
+const START_RULE_INDEX: usize = 0;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ChildType {
@@ -213,7 +215,7 @@ pub fn get_variable_info(
     default_aliases: &AliasMap,
 ) -> VariableInfoResult<Vec<VariableInfo>> {
     let child_type_is_visible = |t: &ChildType| {
-        variable_type_for_child_type(t, syntax_grammar, lexical_grammar) >= VariableType::Anonymous
+        variable_type_for_child_type(t, syntax_grammar, lexical_grammar).is_visible()
     };
 
     let child_type_is_named = |t: &ChildType| {
@@ -247,13 +249,9 @@ pub fn get_variable_info(
 
                 for step in &production.steps {
                     let child_symbol = step.symbol;
-                    let child_type = if let Some(alias) = &step.alias {
-                        ChildType::Aliased(alias.clone())
-                    } else if let Some(alias) = default_aliases.get(&step.symbol) {
-                        ChildType::Aliased(alias.clone())
-                    } else {
-                        ChildType::Normal(child_symbol)
-                    };
+                    let child_type = effective_step_alias(step, default_aliases)
+                        .cloned()
+                        .map_or(ChildType::Normal(child_symbol), ChildType::Aliased);
 
                     let child_is_hidden = !child_type_is_visible(&child_type)
                         && !syntax_grammar.supertype_symbols.contains(&child_symbol);
@@ -389,21 +387,39 @@ pub fn get_variable_info(
         all_initialized = true;
     }
 
+    validate_supertype_info(&result, syntax_grammar)?;
+    retain_visible_child_types(&mut result, syntax_grammar, &child_type_is_visible);
+
+    Ok(result)
+}
+
+fn validate_supertype_info(
+    variable_info: &[VariableInfo],
+    syntax_grammar: &SyntaxGrammar,
+) -> VariableInfoResult<()> {
     for supertype_symbol in &syntax_grammar.supertype_symbols {
-        if result[supertype_symbol.index].has_multi_step_production {
+        if variable_info[supertype_symbol.index].has_multi_step_production {
             let variable = &syntax_grammar.variables[supertype_symbol.index];
             Err(VariableInfoError::InvalidSupertype(variable.name.clone()))?;
         }
     }
 
+    Ok(())
+}
+
+fn retain_visible_child_types(
+    variable_info: &mut [VariableInfo],
+    syntax_grammar: &SyntaxGrammar,
+    child_type_is_visible: &impl Fn(&ChildType) -> bool,
+) {
     // Update all of the node type lists to eliminate hidden nodes.
     for supertype_symbol in &syntax_grammar.supertype_symbols {
-        result[supertype_symbol.index]
+        variable_info[supertype_symbol.index]
             .children
             .types
             .retain(child_type_is_visible);
     }
-    for variable_info in &mut result {
+    for variable_info in variable_info {
         for field_info in variable_info.fields.values_mut() {
             field_info.types.retain(child_type_is_visible);
         }
@@ -413,50 +429,6 @@ pub fn get_variable_info(
             .types
             .retain(child_type_is_visible);
     }
-
-    Ok(result)
-}
-
-fn get_aliases_by_symbol(
-    syntax_grammar: &SyntaxGrammar,
-    default_aliases: &AliasMap,
-) -> FxHashMap<Symbol, BTreeSet<Option<Alias>>> {
-    let mut aliases_by_symbol = FxHashMap::default();
-    for (symbol, alias) in default_aliases {
-        aliases_by_symbol.insert(*symbol, {
-            let mut aliases = BTreeSet::new();
-            aliases.insert(Some(alias.clone()));
-            aliases
-        });
-    }
-    for extra_symbol in &syntax_grammar.extra_symbols {
-        if !default_aliases.contains_key(extra_symbol) {
-            aliases_by_symbol
-                .entry(*extra_symbol)
-                .or_insert_with(BTreeSet::new)
-                .insert(None);
-        }
-    }
-    for variable in &syntax_grammar.variables {
-        for production in &variable.productions {
-            for step in &production.steps {
-                aliases_by_symbol
-                    .entry(step.symbol)
-                    .or_insert_with(BTreeSet::new)
-                    .insert(
-                        step.alias
-                            .as_ref()
-                            .or_else(|| default_aliases.get(&step.symbol))
-                            .cloned(),
-                    );
-            }
-        }
-    }
-    aliases_by_symbol.insert(
-        Symbol::non_terminal(0),
-        std::iter::once(&None).cloned().collect(),
-    );
-    aliases_by_symbol
 }
 
 pub type SuperTypeCycleResult<T> = Result<T, SuperTypeCycleError>;
@@ -488,54 +460,20 @@ pub fn generate_node_shapes_json(
 ) -> SuperTypeCycleResult<Vec<NodeShapeJSON>> {
     let mut node_shapes_json = BTreeMap::new();
 
-    let child_type_to_node_type = |child_type: &ChildType| match child_type {
-        ChildType::Aliased(alias) => NodeTypeJSON {
-            kind: alias.value.clone(),
-            named: alias.is_named,
-        },
-        ChildType::Normal(symbol) => {
-            if let Some(alias) = default_aliases.get(symbol) {
-                NodeTypeJSON {
-                    kind: alias.value.clone(),
-                    named: alias.is_named,
-                }
-            } else {
-                match symbol.kind {
-                    SymbolType::NonTerminal => {
-                        let variable = &syntax_grammar.variables[symbol.index];
-                        NodeTypeJSON {
-                            kind: variable.name.clone(),
-                            named: variable.kind != VariableType::Anonymous,
-                        }
-                    }
-                    SymbolType::Terminal => {
-                        let variable = &lexical_grammar.variables[symbol.index];
-                        NodeTypeJSON {
-                            kind: variable.name.clone(),
-                            named: variable.kind != VariableType::Anonymous,
-                        }
-                    }
-                    SymbolType::External => {
-                        let variable = &syntax_grammar.external_tokens[symbol.index];
-                        NodeTypeJSON {
-                            kind: variable.name.clone(),
-                            named: variable.kind != VariableType::Anonymous,
-                        }
-                    }
-                    _ => panic!("Unexpected symbol type"),
-                }
-            }
-        }
-    };
-
     let populate_field_info_json = |json: &mut FieldInfoJSON, info: &FieldInfo| {
         if info.types.is_empty() {
             json.required = false;
         } else {
             json.multiple |= info.quantity.multiple;
             json.required &= info.quantity.required;
-            json.types
-                .extend(info.types.iter().map(child_type_to_node_type));
+            json.types.extend(info.types.iter().map(|child_type| {
+                child_type_to_node_type(
+                    child_type,
+                    syntax_grammar,
+                    lexical_grammar,
+                    default_aliases,
+                )
+            }));
             json.types.sort_unstable();
             json.types.dedup();
         }
@@ -543,30 +481,7 @@ pub fn generate_node_shapes_json(
 
     let aliases_by_symbol = get_aliases_by_symbol(syntax_grammar, default_aliases);
 
-    let empty = BTreeSet::new();
-    let extra_names = syntax_grammar
-        .extra_symbols
-        .iter()
-        .flat_map(|symbol| {
-            aliases_by_symbol
-                .get(symbol)
-                .unwrap_or(&empty)
-                .iter()
-                .map(|alias| {
-                    alias.as_ref().map_or_else(
-                        || match symbol.kind {
-                            SymbolType::NonTerminal => &syntax_grammar.variables[symbol.index].name,
-                            SymbolType::Terminal => &lexical_grammar.variables[symbol.index].name,
-                            SymbolType::External => {
-                                &syntax_grammar.external_tokens[symbol.index].name
-                            }
-                            _ => unreachable!(),
-                        },
-                        |alias| &alias.value,
-                    )
-                })
-        })
-        .collect::<FxHashSet<_>>();
+    let extra_names = collect_extra_names(syntax_grammar, lexical_grammar, &aliases_by_symbol);
 
     let mut subtype_map = Vec::new();
     for (i, info) in variable_info.iter().enumerate() {
@@ -579,7 +494,7 @@ pub fn generate_node_shapes_json(
                     kind: variable.name.clone(),
                     named: true,
                     root: false,
-                    extra: extra_names.contains(&variable.name),
+                    extra: extra_names.contains(variable.name.as_str()),
                     fields: None,
                     children: None,
                     subtypes: None,
@@ -588,7 +503,14 @@ pub fn generate_node_shapes_json(
                 .children
                 .types
                 .iter()
-                .map(child_type_to_node_type)
+                .map(|child_type| {
+                    child_type_to_node_type(
+                        child_type,
+                        syntax_grammar,
+                        lexical_grammar,
+                        default_aliases,
+                    )
+                })
                 .collect::<Vec<_>>();
             subtypes.sort_unstable();
             subtypes.dedup();
@@ -608,17 +530,13 @@ pub fn generate_node_shapes_json(
             // If a rule is aliased under multiple names, then its information
             // contributes to multiple entries in the final JSON.
             for alias in aliases_by_symbol.get(&symbol).unwrap_or(&BTreeSet::new()) {
-                let kind;
-                let is_named;
-                if let Some(alias) = alias {
-                    kind = &alias.value;
-                    is_named = alias.is_named;
+                let (kind, is_named) = if let Some(alias) = alias {
+                    (&alias.value, alias.is_named)
                 } else if variable.kind.is_visible() {
-                    kind = &variable.name;
-                    is_named = variable.kind == VariableType::Named;
+                    (&variable.name, variable.kind == VariableType::Named)
                 } else {
                     continue;
-                }
+                };
 
                 // There may already be an entry with this name, because multiple
                 // rules may be aliased with the same name.
@@ -628,8 +546,8 @@ pub fn generate_node_shapes_json(
                     NodeShapeJSON {
                         kind: kind.clone(),
                         named: is_named,
-                        root: i == 0,
-                        extra: extra_names.contains(&kind),
+                        root: i == START_RULE_INDEX,
+                        extra: extra_names.contains(kind.as_str()),
                         fields: Some(BTreeMap::new()),
                         children: None,
                         subtypes: None,
@@ -689,78 +607,13 @@ pub fn generate_node_shapes_json(
         }
     }
 
-    let mut anonymous_node_shapes = Vec::new();
-
-    let regular_tokens = lexical_grammar
-        .variables
-        .iter()
-        .enumerate()
-        .flat_map(|(i, variable)| {
-            aliases_by_symbol
-                .get(&Symbol::terminal(i))
-                .unwrap_or(&empty)
-                .iter()
-                .map(move |alias| {
-                    alias
-                        .as_ref()
-                        .map_or((&variable.name, variable.kind), |alias| {
-                            (&alias.value, alias.kind())
-                        })
-                })
-        });
-    let external_tokens =
-        syntax_grammar
-            .external_tokens
-            .iter()
-            .enumerate()
-            .flat_map(|(i, token)| {
-                aliases_by_symbol
-                    .get(&Symbol::external(i))
-                    .unwrap_or(&empty)
-                    .iter()
-                    .map(move |alias| {
-                        alias.as_ref().map_or((&token.name, token.kind), |alias| {
-                            (&alias.value, alias.kind())
-                        })
-                    })
-            });
-
-    for (name, kind) in regular_tokens.chain(external_tokens) {
-        match kind {
-            VariableType::Named => {
-                let node_shape_json =
-                    node_shapes_json
-                        .entry(name.clone())
-                        .or_insert_with(|| NodeShapeJSON {
-                            kind: name.clone(),
-                            named: true,
-                            root: false,
-                            extra: extra_names.contains(&name),
-                            fields: None,
-                            children: None,
-                            subtypes: None,
-                        });
-                if let Some(children) = &mut node_shape_json.children {
-                    children.required = false;
-                }
-                if let Some(fields) = &mut node_shape_json.fields {
-                    for field in fields.values_mut() {
-                        field.required = false;
-                    }
-                }
-            }
-            VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeJSON {
-                kind: name.clone(),
-                named: false,
-                root: false,
-                extra: extra_names.contains(&name),
-                fields: None,
-                children: None,
-                subtypes: None,
-            }),
-            _ => {}
-        }
-    }
+    let anonymous_node_shapes = add_token_node_shapes(
+        &mut node_shapes_json,
+        syntax_grammar,
+        lexical_grammar,
+        &aliases_by_symbol,
+        &extra_names,
+    );
 
     let mut result = node_shapes_json
         .into_iter()
@@ -797,6 +650,224 @@ pub fn generate_node_shapes(
         variable_info,
     )
     .map(|shapes| shapes.into_iter().map(Into::into).collect())
+}
+
+fn get_aliases_by_symbol(
+    syntax_grammar: &SyntaxGrammar,
+    default_aliases: &AliasMap,
+) -> FxHashMap<Symbol, BTreeSet<Option<Alias>>> {
+    let mut aliases_by_symbol = FxHashMap::default();
+    for (symbol, alias) in default_aliases {
+        aliases_by_symbol.insert(*symbol, {
+            let mut aliases = BTreeSet::new();
+            aliases.insert(Some(alias.clone()));
+            aliases
+        });
+    }
+    for extra_symbol in &syntax_grammar.extra_symbols {
+        if !default_aliases.contains_key(extra_symbol) {
+            aliases_by_symbol
+                .entry(*extra_symbol)
+                .or_insert_with(BTreeSet::new)
+                .insert(None);
+        }
+    }
+    for variable in &syntax_grammar.variables {
+        for production in &variable.productions {
+            for step in &production.steps {
+                aliases_by_symbol
+                    .entry(step.symbol)
+                    .or_insert_with(BTreeSet::new)
+                    .insert(effective_step_alias(step, default_aliases).cloned());
+            }
+        }
+    }
+    aliases_by_symbol.insert(
+        Symbol::non_terminal(START_RULE_INDEX),
+        std::iter::once(&None).cloned().collect(),
+    );
+    aliases_by_symbol
+}
+
+fn effective_step_alias<'a>(
+    step: &'a ProductionStep,
+    default_aliases: &'a AliasMap,
+) -> Option<&'a Alias> {
+    step.alias
+        .as_ref()
+        .or_else(|| default_aliases.get(&step.symbol))
+}
+
+fn child_type_to_node_type(
+    child_type: &ChildType,
+    syntax_grammar: &SyntaxGrammar,
+    lexical_grammar: &LexicalGrammar,
+    default_aliases: &AliasMap,
+) -> NodeTypeJSON {
+    match child_type {
+        ChildType::Aliased(alias) => alias_to_node_type(alias),
+        ChildType::Normal(symbol) => default_aliases.get(symbol).map_or_else(
+            || symbol_to_node_type(*symbol, syntax_grammar, lexical_grammar),
+            alias_to_node_type,
+        ),
+    }
+}
+
+fn alias_to_node_type(alias: &Alias) -> NodeTypeJSON {
+    NodeTypeJSON {
+        kind: alias.value.clone(),
+        named: alias.is_named,
+    }
+}
+
+fn symbol_to_node_type(
+    symbol: Symbol,
+    syntax_grammar: &SyntaxGrammar,
+    lexical_grammar: &LexicalGrammar,
+) -> NodeTypeJSON {
+    let (name, kind) = symbol_node_metadata(symbol, syntax_grammar, lexical_grammar);
+    NodeTypeJSON {
+        kind: name.to_string(),
+        named: kind != VariableType::Anonymous,
+    }
+}
+
+fn collect_extra_names<'a>(
+    syntax_grammar: &'a SyntaxGrammar,
+    lexical_grammar: &'a LexicalGrammar,
+    aliases_by_symbol: &'a FxHashMap<Symbol, BTreeSet<Option<Alias>>>,
+) -> FxHashSet<&'a str> {
+    let mut names = FxHashSet::default();
+    for symbol in &syntax_grammar.extra_symbols {
+        let Some(aliases) = aliases_by_symbol.get(symbol) else {
+            continue;
+        };
+
+        for alias in aliases {
+            let name = alias.as_ref().map_or_else(
+                || symbol_node_metadata(*symbol, syntax_grammar, lexical_grammar).0,
+                |alias| alias.value.as_str(),
+            );
+            names.insert(name);
+        }
+    }
+    names
+}
+
+fn add_token_node_shapes(
+    node_shapes_json: &mut BTreeMap<String, NodeShapeJSON>,
+    syntax_grammar: &SyntaxGrammar,
+    lexical_grammar: &LexicalGrammar,
+    aliases_by_symbol: &FxHashMap<Symbol, BTreeSet<Option<Alias>>>,
+    extra_names: &FxHashSet<&str>,
+) -> Vec<NodeShapeJSON> {
+    let empty = BTreeSet::new();
+    let mut anonymous_node_shapes = Vec::new();
+
+    for (i, variable) in lexical_grammar.variables.iter().enumerate() {
+        for alias in aliases_by_symbol
+            .get(&Symbol::terminal(i))
+            .unwrap_or(&empty)
+        {
+            let (name, kind) = alias.as_ref().map_or_else(
+                || (variable.name.as_str(), variable.kind),
+                |alias| (alias.value.as_str(), alias.kind()),
+            );
+            add_token_node_shape(
+                node_shapes_json,
+                &mut anonymous_node_shapes,
+                name,
+                kind,
+                extra_names,
+            );
+        }
+    }
+
+    for (i, token) in syntax_grammar.external_tokens.iter().enumerate() {
+        for alias in aliases_by_symbol
+            .get(&Symbol::external(i))
+            .unwrap_or(&empty)
+        {
+            let (name, kind) = alias.as_ref().map_or_else(
+                || (token.name.as_str(), token.kind),
+                |alias| (alias.value.as_str(), alias.kind()),
+            );
+            add_token_node_shape(
+                node_shapes_json,
+                &mut anonymous_node_shapes,
+                name,
+                kind,
+                extra_names,
+            );
+        }
+    }
+
+    anonymous_node_shapes
+}
+
+fn add_token_node_shape(
+    node_shapes_json: &mut BTreeMap<String, NodeShapeJSON>,
+    anonymous_node_shapes: &mut Vec<NodeShapeJSON>,
+    name: &str,
+    kind: VariableType,
+    extra_names: &FxHashSet<&str>,
+) {
+    match kind {
+        VariableType::Named => {
+            let node_shape_json =
+                node_shapes_json
+                    .entry(name.to_string())
+                    .or_insert_with(|| NodeShapeJSON {
+                        kind: name.to_string(),
+                        named: true,
+                        root: false,
+                        extra: extra_names.contains(name),
+                        fields: None,
+                        children: None,
+                        subtypes: None,
+                    });
+            if let Some(children) = &mut node_shape_json.children {
+                children.required = false;
+            }
+            if let Some(fields) = &mut node_shape_json.fields {
+                for field in fields.values_mut() {
+                    field.required = false;
+                }
+            }
+        }
+        VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeJSON {
+            kind: name.to_string(),
+            named: false,
+            root: false,
+            extra: extra_names.contains(name),
+            fields: None,
+            children: None,
+            subtypes: None,
+        }),
+        _ => {}
+    }
+}
+
+fn symbol_node_metadata<'a>(
+    symbol: Symbol,
+    syntax_grammar: &'a SyntaxGrammar,
+    lexical_grammar: &'a LexicalGrammar,
+) -> (&'a str, VariableType) {
+    match symbol.kind {
+        SymbolType::NonTerminal => {
+            let variable = &syntax_grammar.variables[symbol.index];
+            (&variable.name, variable.kind)
+        }
+        SymbolType::Terminal => {
+            let variable = &lexical_grammar.variables[symbol.index];
+            (&variable.name, variable.kind)
+        }
+        SymbolType::External => {
+            let token = &syntax_grammar.external_tokens[symbol.index];
+            (&token.name, token.kind)
+        }
+        SymbolType::End | SymbolType::EndOfNonTerminalExtra => panic!("Unexpected symbol type"),
+    }
 }
 
 fn sort_subtypes_topologically(
@@ -854,13 +925,13 @@ fn variable_type_for_child_type(
                 VariableType::Named
             } else if syntax_grammar.variables_to_inline.contains(symbol) {
                 VariableType::Hidden
+            } else if matches!(
+                symbol.kind,
+                SymbolType::End | SymbolType::EndOfNonTerminalExtra
+            ) {
+                VariableType::Hidden
             } else {
-                match symbol.kind {
-                    SymbolType::NonTerminal => syntax_grammar.variables[symbol.index].kind,
-                    SymbolType::Terminal => lexical_grammar.variables[symbol.index].kind,
-                    SymbolType::External => syntax_grammar.external_tokens[symbol.index].kind,
-                    _ => VariableType::Hidden,
-                }
+                symbol_node_metadata(*symbol, syntax_grammar, lexical_grammar).1
             }
         }
     }

@@ -11,10 +11,6 @@ use super::super::{
     rules::{Precedence, Rule},
 };
 
-const STRING_IMPLICIT_PRECEDENCE: i32 = 2;
-const DEFAULT_IMPLICIT_PRECEDENCE: i32 = 0;
-const MAIN_TOKEN_PRECEDENCE_BOOST: i32 = 1;
-
 struct NfaBuilder {
     nfa: Nfa,
     is_sep: bool,
@@ -52,21 +48,6 @@ impl std::fmt::Display for ExpandTokensProcessingError {
             self.rule, self.error
         )?;
         Ok(())
-    }
-}
-
-fn get_implicit_precedence(rule: &Rule) -> i32 {
-    match rule {
-        // Tree-sitter gives literal string tokens a built-in priority over regex tokens.
-        Rule::String(_) => STRING_IMPLICIT_PRECEDENCE,
-        Rule::Metadata { rule, params } => {
-            if params.is_main_token {
-                get_implicit_precedence(rule) + MAIN_TOKEN_PRECEDENCE_BOOST
-            } else {
-                get_implicit_precedence(rule)
-            }
-        }
-        _ => DEFAULT_IMPLICIT_PRECEDENCE,
     }
 }
 
@@ -130,15 +111,10 @@ pub fn expand_tokens(mut grammar: ExtractedLexicalGrammar) -> ExpandTokensResult
         variables.push(LexicalVariable {
             name: variable.name,
             kind: variable.kind,
-            implicit_precedence: get_implicit_precedence(&variable.rule),
-            start_state: builder.nfa.last_state_id(),
         });
     }
 
-    Ok(LexicalGrammar {
-        nfa: builder.nfa,
-        variables,
-    })
+    Ok(LexicalGrammar { variables })
 }
 
 pub type ExpandRuleResult<T> = Result<T, ExpandRuleError>;
@@ -163,22 +139,32 @@ pub enum ExpandRegexError {
     Assertion,
 }
 
+fn normalize_tree_sitter_regex(regex: &str) -> String {
+    // With unicode enabled, `\w`, `\s` and `\d` expand to character sets that are much
+    // larger than intended, so replace them with Tree-sitter's ASCII-oriented sets.
+    // Use `\p{L}`, `\p{Z}` and `\p{N}` when the full unicode ranges are intended.
+    regex
+        .replace(r"\w", r"[0-9A-Za-z_]")
+        .replace(r"\s", r"[\t-\r ]")
+        .replace(r"\d", r"[0-9]")
+        .replace(r"\W", r"[^0-9A-Za-z_]")
+        .replace(r"\S", r"[^\t-\r ]")
+        .replace(r"\D", r"[^0-9]")
+}
+
+fn is_case_folded_long_s_set(chars: &CharacterSet) -> bool {
+    let case_folded_long_s_ranges = ['s'..='s', 'S'..='S', 'ſ'..='ſ'];
+    chars.range_count() == case_folded_long_s_ranges.len()
+        && chars
+            .ranges()
+            .all(|range| case_folded_long_s_ranges.contains(&range))
+}
+
 impl NfaBuilder {
     fn expand_rule(&mut self, rule: &Rule, mut next_state_id: u32) -> ExpandRuleResult<bool> {
         match rule {
             Rule::Pattern(s, f) => {
-                // With unicode enabled, `\w`, `\s` and `\d` expand to character sets that are much
-                // larger than intended, so we replace them with the actual
-                // character sets they should represent. If the full unicode range
-                // of `\w`, `\s` or `\d` are needed then `\p{L}`, `\p{Z}` and `\p{N}` should be
-                // used.
-                let s = s
-                    .replace(r"\w", r"[0-9A-Za-z_]")
-                    .replace(r"\s", r"[\t-\r ]")
-                    .replace(r"\d", r"[0-9]")
-                    .replace(r"\W", r"[^0-9A-Za-z_]")
-                    .replace(r"\S", r"[^\t-\r ]")
-                    .replace(r"\D", r"[^0-9]");
+                let s = normalize_tree_sitter_regex(s);
                 let mut parser = ParserBuilder::new()
                     .case_insensitive(f.contains('i'))
                     .unicode(true)
@@ -190,13 +176,7 @@ impl NfaBuilder {
                 self.expand_regex(&hir, next_state_id)
                     .map_err(ExpandRuleError::ExpandRegex)
             }
-            Rule::String(s) => {
-                for c in s.chars().rev() {
-                    self.push_advance(CharacterSet::from_char(c), next_state_id);
-                    next_state_id = self.nfa.last_state_id();
-                }
-                Ok(!s.is_empty())
-            }
+            Rule::String(s) => Ok(self.push_literal(s, next_state_id)),
             Rule::Choice(elements) => {
                 let mut alternative_state_ids = Vec::with_capacity(elements.len());
                 for element in elements {
@@ -206,12 +186,7 @@ impl NfaBuilder {
                         alternative_state_ids.push(next_state_id);
                     }
                 }
-                alternative_state_ids.sort_unstable();
-                alternative_state_ids.dedup();
-                alternative_state_ids.retain(|i| *i != self.nfa.last_state_id());
-                for alternative_state_id in alternative_state_ids {
-                    self.push_split(alternative_state_id);
-                }
+                self.push_alternative_splits(alternative_state_ids);
                 Ok(true)
             }
             Rule::Seq(elements) => {
@@ -260,16 +235,9 @@ impl NfaBuilder {
         match hir.kind() {
             HirKind::Empty => Ok(false),
             HirKind::Literal(literal) => {
-                for character in std::str::from_utf8(&literal.0)
-                    .map_err(|e| ExpandRegexError::Utf8(e.to_string()))?
-                    .chars()
-                    .rev()
-                {
-                    let char_set = CharacterSet::from_char(character);
-                    self.push_advance(char_set, next_state_id);
-                    next_state_id = self.nfa.last_state_id();
-                }
-
+                let literal = std::str::from_utf8(&literal.0)
+                    .map_err(|e| ExpandRegexError::Utf8(e.to_string()))?;
+                self.push_literal(literal, next_state_id);
                 Ok(true)
             }
             HirKind::Class(class) => match class {
@@ -279,14 +247,10 @@ impl NfaBuilder {
                         chars = chars.add_range(c.start(), c.end());
                     }
 
-                    // For some reason, the long s `ſ` is included if the letter `s` is in a
-                    // pattern, so we remove it.
-                    if chars.range_count() == 3
-                        && chars
-                            .ranges()
-                            // exact check to ensure that `ſ` wasn't intentionally added.
-                            .all(|r| ['s'..='s', 'S'..='S', 'ſ'..='ſ'].contains(&r))
-                    {
+                    // regex-syntax applies Unicode case folding for `s`, which includes
+                    // the long s `ſ`. Tree-sitter's syntax expects `/s/i` to match only
+                    // `s` and `S`, so remove that fold artifact when it is the only extra range.
+                    if is_case_folded_long_s_set(&chars) {
                         chars = chars.difference(CharacterSet::from_char('ſ'));
                     }
                     self.push_advance(chars, next_state_id);
@@ -349,12 +313,7 @@ impl NfaBuilder {
                         alternative_state_ids.push(next_state_id);
                     }
                 }
-                alternative_state_ids.sort_unstable();
-                alternative_state_ids.dedup();
-                alternative_state_ids.retain(|i| *i != self.nfa.last_state_id());
-                for alternative_state_id in alternative_state_ids {
-                    self.push_split(alternative_state_id);
-                }
+                self.push_alternative_splits(alternative_state_ids);
                 Ok(true)
             }
         }
@@ -408,6 +367,23 @@ impl NfaBuilder {
             }
         }
         Ok(result)
+    }
+
+    fn push_literal(&mut self, literal: &str, mut next_state_id: u32) -> bool {
+        for character in literal.chars().rev() {
+            self.push_advance(CharacterSet::from_char(character), next_state_id);
+            next_state_id = self.nfa.last_state_id();
+        }
+        !literal.is_empty()
+    }
+
+    fn push_alternative_splits(&mut self, mut alternative_state_ids: Vec<u32>) {
+        alternative_state_ids.sort_unstable();
+        alternative_state_ids.dedup();
+        alternative_state_ids.retain(|i| *i != self.nfa.last_state_id());
+        for alternative_state_id in alternative_state_ids {
+            self.push_split(alternative_state_id);
+        }
     }
 
     fn push_advance(&mut self, chars: CharacterSet, state_id: u32) {

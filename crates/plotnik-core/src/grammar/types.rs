@@ -559,63 +559,88 @@ where
             extra_node_types.push(node_id);
         }
 
-        let mut fields = HashMap::new();
-        for (field_name, slot) in &shape.fields {
-            let field_id =
-                field_id_for_name(field_name).ok_or_else(|| NodeShapeBuildError::UnknownField {
-                    node_kind: shape.type_name.clone(),
-                    field: field_name.clone(),
-                })?;
-
-            let valid_types =
-                resolve_slot_types(slot, &known_shapes, &node_id_for_name, |kind_ref| {
-                    NodeShapeBuildError::UnknownFieldType {
-                        node_kind: shape.type_name.clone(),
-                        field: field_name.clone(),
-                        kind: kind_ref.type_name.clone(),
-                        named: kind_ref.named,
-                    }
-                })?;
-
-            fields.insert(
-                field_id,
-                FieldConstraints {
-                    cardinality: Cardinality {
-                        multiple: slot.multiple,
-                        required: slot.required,
-                    },
-                    valid_types,
-                },
-            );
-        }
-
-        let children = shape
-            .children
-            .as_ref()
-            .map(|slot| {
-                let valid_types =
-                    resolve_slot_types(slot, &known_shapes, &node_id_for_name, |kind_ref| {
-                        NodeShapeBuildError::UnknownChildType {
-                            node_kind: shape.type_name.clone(),
-                            kind: kind_ref.type_name.clone(),
-                            named: kind_ref.named,
-                        }
-                    })?;
-
-                Ok(ChildrenConstraints {
-                    cardinality: Cardinality {
-                        multiple: slot.multiple,
-                        required: slot.required,
-                    },
-                    valid_types,
-                })
-            })
-            .transpose()?;
+        let fields =
+            build_field_constraints(shape, &known_shapes, &node_id_for_name, &field_id_for_name)?;
+        let children = build_children_constraints(shape, &known_shapes, &node_id_for_name)?;
 
         node_constraints.insert(node_id, NodeConstraints { fields, children });
     }
 
     Ok((node_constraints, extra_node_types, root_node_type))
+}
+
+fn build_field_constraints<F, G>(
+    shape: &NodeShape,
+    known_shapes: &HashSet<(&str, bool)>,
+    node_id_for_name: &F,
+    field_id_for_name: &G,
+) -> Result<HashMap<NodeFieldId, FieldConstraints>, NodeShapeBuildError>
+where
+    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    G: Fn(&str) -> Option<NodeFieldId>,
+{
+    let mut fields = HashMap::new();
+    for (field_name, slot) in &shape.fields {
+        let field_id =
+            field_id_for_name(field_name).ok_or_else(|| NodeShapeBuildError::UnknownField {
+                node_kind: shape.type_name.clone(),
+                field: field_name.clone(),
+            })?;
+
+        let valid_types = resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
+            NodeShapeBuildError::UnknownFieldType {
+                node_kind: shape.type_name.clone(),
+                field: field_name.clone(),
+                kind: kind_ref.type_name.clone(),
+                named: kind_ref.named,
+            }
+        })?;
+
+        fields.insert(
+            field_id,
+            FieldConstraints {
+                cardinality: Cardinality {
+                    multiple: slot.multiple,
+                    required: slot.required,
+                },
+                valid_types,
+            },
+        );
+    }
+
+    Ok(fields)
+}
+
+fn build_children_constraints<F>(
+    shape: &NodeShape,
+    known_shapes: &HashSet<(&str, bool)>,
+    node_id_for_name: &F,
+) -> Result<Option<ChildrenConstraints>, NodeShapeBuildError>
+where
+    F: Fn(&str, bool) -> Option<NodeTypeId>,
+{
+    shape
+        .children
+        .as_ref()
+        .map(|slot| {
+            let valid_types =
+                resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
+                    NodeShapeBuildError::UnknownChildType {
+                        node_kind: shape.type_name.clone(),
+                        kind: kind_ref.type_name.clone(),
+                        named: kind_ref.named,
+                    }
+                })?;
+
+            Ok(ChildrenConstraints {
+                cardinality: Cardinality {
+                    multiple: slot.multiple,
+                    required: slot.required,
+                },
+                valid_types,
+            })
+        })
+        .transpose()
 }
 
 fn resolve_slot_types<F, E>(

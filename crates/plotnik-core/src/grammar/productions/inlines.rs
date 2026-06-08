@@ -8,6 +8,50 @@ use super::super::{
     rules::SymbolType,
 };
 
+pub type ProcessInlinesResult<T> = Result<T, ProcessInlinesError>;
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+pub enum ProcessInlinesError {
+    #[error("External token `{0}` cannot be inlined")]
+    ExternalToken(String),
+    #[error("Token `{0}` cannot be inlined")]
+    Token(String),
+    #[error("Rule `{0}` cannot be inlined because it is the first rule")]
+    FirstRule(String),
+}
+
+pub(in crate::grammar) fn process_inlines(
+    grammar: &SyntaxGrammar,
+    lexical_grammar: &LexicalGrammar,
+) -> ProcessInlinesResult<InlinedProductionMap> {
+    for symbol in &grammar.variables_to_inline {
+        match symbol.kind {
+            SymbolType::External => {
+                Err(ProcessInlinesError::ExternalToken(
+                    grammar.external_tokens[symbol.index].name.clone(),
+                ))?;
+            }
+            SymbolType::Terminal => {
+                Err(ProcessInlinesError::Token(
+                    lexical_grammar.variables[symbol.index].name.clone(),
+                ))?;
+            }
+            SymbolType::NonTerminal if symbol.index == 0 => {
+                Err(ProcessInlinesError::FirstRule(
+                    grammar.variables[symbol.index].name.clone(),
+                ))?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(InlinedProductionMapBuilder {
+        productions: Vec::new(),
+        production_indices_by_step_id: FxHashMap::default(),
+    }
+    .build(grammar))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct ProductionStepId {
     // A `None` value here means that the production itself was produced via inlining,
@@ -85,45 +129,17 @@ impl InlinedProductionMapBuilder {
                 if grammar.variables_to_inline.contains(&symbol) {
                     // Remove the production from the vector, replacing it with a placeholder.
                     let production = productions_to_add
-                        .splice(i..=i, std::iter::once(&Production::default()).cloned())
+                        .splice(i..=i, std::iter::once(Production::default()))
                         .next()
                         .unwrap();
 
                     // Replace the placeholder with the inlined productions.
                     productions_to_add.splice(
                         i..=i,
-                        grammar.variables[symbol.index].productions.iter().map(|p| {
-                            let mut production = production.clone();
-                            let removed_step = production
-                                .steps
-                                .splice(step_index..=step_index, p.steps.iter().cloned())
-                                .next()
-                                .unwrap();
-                            let inserted_steps =
-                                &mut production.steps[step_index..(step_index + p.steps.len())];
-                            if let Some(alias) = removed_step.alias {
-                                for inserted_step in inserted_steps.iter_mut() {
-                                    inserted_step.alias = Some(alias.clone());
-                                }
-                            }
-                            if let Some(field_name) = removed_step.field_name {
-                                for inserted_step in inserted_steps.iter_mut() {
-                                    inserted_step.field_name = Some(field_name.clone());
-                                }
-                            }
-                            if let Some(last_inserted_step) = inserted_steps.last_mut() {
-                                if last_inserted_step.precedence.is_none() {
-                                    last_inserted_step.precedence = removed_step.precedence;
-                                }
-                                if last_inserted_step.associativity.is_none() {
-                                    last_inserted_step.associativity = removed_step.associativity;
-                                }
-                            }
-                            if p.dynamic_precedence.abs() > production.dynamic_precedence.abs() {
-                                production.dynamic_precedence = p.dynamic_precedence;
-                            }
-                            production
-                        }),
+                        grammar.variables[symbol.index]
+                            .productions
+                            .iter()
+                            .map(|inlined| inline_production(&production, step_index, inlined)),
                     );
 
                     continue;
@@ -172,46 +188,20 @@ impl InlinedProductionMapBuilder {
     }
 }
 
-pub type ProcessInlinesResult<T> = Result<T, ProcessInlinesError>;
-
-#[derive(Debug, Error, Serialize, Deserialize)]
-pub enum ProcessInlinesError {
-    #[error("External token `{0}` cannot be inlined")]
-    ExternalToken(String),
-    #[error("Token `{0}` cannot be inlined")]
-    Token(String),
-    #[error("Rule `{0}` cannot be inlined because it is the first rule")]
-    FirstRule(String),
-}
-
-pub(in crate::grammar) fn process_inlines(
-    grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-) -> ProcessInlinesResult<InlinedProductionMap> {
-    for symbol in &grammar.variables_to_inline {
-        match symbol.kind {
-            SymbolType::External => {
-                Err(ProcessInlinesError::ExternalToken(
-                    grammar.external_tokens[symbol.index].name.clone(),
-                ))?;
-            }
-            SymbolType::Terminal => {
-                Err(ProcessInlinesError::Token(
-                    lexical_grammar.variables[symbol.index].name.clone(),
-                ))?;
-            }
-            SymbolType::NonTerminal if symbol.index == 0 => {
-                Err(ProcessInlinesError::FirstRule(
-                    grammar.variables[symbol.index].name.clone(),
-                ))?;
-            }
-            _ => {}
-        }
+fn inline_production(
+    production: &Production,
+    step_index: usize,
+    inlined: &Production,
+) -> Production {
+    let mut production = production.clone();
+    let removed_step = production
+        .steps
+        .splice(step_index..=step_index, inlined.steps.iter().cloned())
+        .next()
+        .unwrap();
+    let inserted_steps = &mut production.steps[step_index..(step_index + inlined.steps.len())];
+    for inserted_step in inserted_steps {
+        inserted_step.inherit_inline_metadata_from(&removed_step);
     }
-
-    Ok(InlinedProductionMapBuilder {
-        productions: Vec::new(),
-        production_indices_by_step_id: FxHashMap::default(),
-    }
-    .build(grammar))
+    production
 }

@@ -121,8 +121,8 @@ pub(super) fn resolve_symbols(
 
     Ok(ResolvedGrammar {
         variables,
-        external_tokens,
         extra_symbols,
+        external_tokens,
         variables_to_inline: interned_inlines,
         supertype_symbols,
         word_token,

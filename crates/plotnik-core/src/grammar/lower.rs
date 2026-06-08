@@ -18,6 +18,9 @@ use super::{
     types::{FieldSymbol, NodeSymbol},
 };
 
+const TREE_SITTER_PUBLIC_NAME_SEPARATOR: char = '\0';
+const FIRST_SYMBOL_POSITION_AFTER_END: usize = 1;
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn retain_reachable_rules(
     variables: &mut Vec<Variable>,
@@ -46,21 +49,16 @@ pub(super) fn retain_reachable_rules(
     variables.retain(|variable| used.contains(variable.name.as_str()));
 
     for name in &dropped {
-        expected_conflicts.retain(|conflict| !conflict.contains(name));
-        supertype_symbols.retain(|symbol| symbol != name);
-        variables_to_inline.retain(|symbol| symbol != name);
-        extra_symbols.retain(|rule| !rule_is_referenced(rule, name, true));
-        external_tokens.retain(|rule| !rule_is_referenced(rule, name, true));
-        precedence_orderings.retain(|ordering| {
-            !ordering
-                .iter()
-                .any(|entry| matches!(entry, PrecedenceEntry::Symbol(symbol) if symbol == name))
-        });
-        for context in reserved_words.iter_mut() {
-            context
-                .reserved_words
-                .retain(|rule| !rule_is_referenced(rule, name, false));
-        }
+        remove_dropped_rule_references(
+            name,
+            extra_symbols,
+            expected_conflicts,
+            precedence_orderings,
+            external_tokens,
+            variables_to_inline,
+            supertype_symbols,
+            reserved_words,
+        );
     }
 }
 
@@ -108,37 +106,66 @@ fn reachable_rule_names<'a>(
     visited.into_iter().map(String::from).collect()
 }
 
+#[allow(clippy::too_many_arguments)]
+fn remove_dropped_rule_references(
+    name: &str,
+    extra_symbols: &mut Vec<Rule>,
+    expected_conflicts: &mut Vec<Vec<String>>,
+    precedence_orderings: &mut Vec<Vec<PrecedenceEntry>>,
+    external_tokens: &mut Vec<Rule>,
+    variables_to_inline: &mut Vec<String>,
+    supertype_symbols: &mut Vec<String>,
+    reserved_words: &mut [ReservedWordContext<Rule>],
+) {
+    expected_conflicts.retain(|conflict| !conflict.iter().any(|symbol| symbol == name));
+    supertype_symbols.retain(|symbol| symbol != name);
+    variables_to_inline.retain(|symbol| symbol != name);
+    extra_symbols.retain(|rule| !rule_is_referenced(rule, name, true));
+    external_tokens.retain(|rule| !rule_is_referenced(rule, name, true));
+    precedence_orderings.retain(|ordering| {
+        !ordering
+            .iter()
+            .any(|entry| matches!(entry, PrecedenceEntry::Symbol(symbol) if symbol == name))
+    });
+    for context in reserved_words {
+        context
+            .reserved_words
+            .retain(|rule| !rule_is_referenced(rule, name, false));
+    }
+}
+
 fn collect_referenced_names<'a>(rule: &'a Rule, skip_top_level: bool, out: &mut Vec<&'a str>) {
+    for_each_referenced_name(rule, skip_top_level, &mut |name| out.push(name));
+}
+
+fn rule_is_referenced(rule: &Rule, target: &str, skip_top_level: bool) -> bool {
+    let mut found = false;
+    for_each_referenced_name(rule, skip_top_level, &mut |name| {
+        found |= name == target;
+    });
+    found
+}
+
+fn for_each_referenced_name<'a, F>(rule: &'a Rule, skip_top_level: bool, visit: &mut F)
+where
+    F: FnMut(&'a str),
+{
     match rule {
         Rule::NamedSymbol(name) => {
             if !skip_top_level {
-                out.push(name.as_str());
+                visit(name.as_str());
             }
         }
         Rule::Choice(rules) | Rule::Seq(rules) => {
             for rule in rules {
-                collect_referenced_names(rule, false, out);
+                for_each_referenced_name(rule, false, visit);
             }
         }
         Rule::Metadata { rule, .. } | Rule::Reserved { rule, .. } => {
-            collect_referenced_names(rule, skip_top_level, out);
+            for_each_referenced_name(rule, skip_top_level, visit);
         }
-        Rule::Repeat(rule) => collect_referenced_names(rule, false, out),
+        Rule::Repeat(rule) => for_each_referenced_name(rule, false, visit),
         Rule::Blank | Rule::String(_) | Rule::Pattern(_, _) | Rule::Symbol(_) => {}
-    }
-}
-
-fn rule_is_referenced(rule: &Rule, target: &str, is_external: bool) -> bool {
-    match rule {
-        Rule::NamedSymbol(name) => name == target && !is_external,
-        Rule::Choice(rules) | Rule::Seq(rules) => rules
-            .iter()
-            .any(|rule| rule_is_referenced(rule, target, false)),
-        Rule::Metadata { rule, .. } | Rule::Reserved { rule, .. } => {
-            rule_is_referenced(rule, target, is_external)
-        }
-        Rule::Repeat(rule) => rule_is_referenced(rule, target, false),
-        Rule::Blank | Rule::String(_) | Rule::Pattern(_, _) | Rule::Symbol(_) => false,
     }
 }
 
@@ -314,7 +341,11 @@ pub(super) fn derive_symbols(
 }
 
 fn public_node_type_name(name: &str) -> String {
-    name.split('\0').next().unwrap_or(name).to_string()
+    // Tree-sitter appends private disambiguators after NUL; public node names stop before it.
+    name.split(TREE_SITTER_PUBLIC_NAME_SEPARATOR)
+        .next()
+        .unwrap_or(name)
+        .to_string()
 }
 
 fn derive_symbol_order(
@@ -332,7 +363,7 @@ fn derive_symbol_order(
     for index in 0..lexical_grammar.variables.len() {
         let symbol = Symbol::terminal(index);
         if syntax_grammar.word_token == Some(symbol) {
-            symbols.insert(1, symbol);
+            symbols.insert(FIRST_SYMBOL_POSITION_AFTER_END, symbol);
         } else {
             symbols.push(symbol);
         }

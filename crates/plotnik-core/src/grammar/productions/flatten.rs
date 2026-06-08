@@ -1,14 +1,13 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::super::{
     prepared::{
-        ExtractedSyntaxGrammar, Production, ProductionStep, ReservedWordSetId, SyntaxGrammar,
-        SyntaxVariable, Variable,
+        ExtractedSyntaxGrammar, Production, ProductionStep, SyntaxGrammar, SyntaxVariable, Variable,
     },
-    rules::{Alias, Associativity, Precedence, Rule, Symbol},
+    rules::{Alias, MetadataParams, Rule, Symbol},
 };
 
 pub type FlattenGrammarResult<T> = Result<T, FlattenGrammarError>;
@@ -29,27 +28,46 @@ unless they are used only as the grammar's start rule.
     RecursiveInline(String),
 }
 
+pub(in crate::grammar) fn flatten_grammar(
+    grammar: ExtractedSyntaxGrammar,
+) -> FlattenGrammarResult<SyntaxGrammar> {
+    let reserved_word_set_names = grammar
+        .reserved_word_sets
+        .iter()
+        .map(|set| set.name.clone())
+        .collect();
+
+    let mut flattener = RuleFlattener::new(reserved_word_set_names);
+    let variables = grammar
+        .variables
+        .into_iter()
+        .map(|variable| flattener.flatten_variable(variable))
+        .collect::<FlattenGrammarResult<Vec<_>>>()?;
+
+    validate_productions(&variables, &grammar.variables_to_inline)?;
+
+    Ok(SyntaxGrammar {
+        variables,
+        extra_symbols: grammar.extra_symbols,
+        external_tokens: grammar.external_tokens,
+        variables_to_inline: grammar.variables_to_inline,
+        supertype_symbols: grammar.supertype_symbols,
+        word_token: grammar.word_token,
+    })
+}
+
 struct RuleFlattener {
     production: Production,
-    reserved_word_set_ids: FxHashMap<String, ReservedWordSetId>,
-    precedence_stack: Vec<Precedence>,
-    associativity_stack: Vec<Associativity>,
-    reserved_word_stack: Vec<ReservedWordSetId>,
+    reserved_word_set_names: FxHashSet<String>,
     alias_stack: Vec<Alias>,
     field_name_stack: Vec<String>,
 }
 
 impl RuleFlattener {
-    const fn new(reserved_word_set_ids: FxHashMap<String, ReservedWordSetId>) -> Self {
+    fn new(reserved_word_set_names: FxHashSet<String>) -> Self {
         Self {
-            production: Production {
-                steps: Vec::new(),
-                dynamic_precedence: 0,
-            },
-            reserved_word_set_ids,
-            precedence_stack: Vec::new(),
-            associativity_stack: Vec::new(),
-            reserved_word_stack: Vec::new(),
+            production: Production { steps: Vec::new() },
+            reserved_word_set_names,
             alias_stack: Vec::new(),
             field_name_stack: Vec::new(),
         }
@@ -74,113 +92,30 @@ impl RuleFlattener {
     fn flatten_rule(&mut self, rule: Rule) -> FlattenGrammarResult<Production> {
         self.production = Production::default();
         self.alias_stack.clear();
-        self.reserved_word_stack.clear();
-        self.precedence_stack.clear();
-        self.associativity_stack.clear();
         self.field_name_stack.clear();
-        self.apply(rule, true)?;
+        self.apply(rule)?;
         Ok(self.production.clone())
     }
 
-    fn apply(&mut self, rule: Rule, at_end: bool) -> FlattenGrammarResult<bool> {
+    fn apply(&mut self, rule: Rule) -> FlattenGrammarResult<bool> {
         match rule {
             Rule::Seq(members) => {
                 let mut result = false;
-                let last_index = members.len() - 1;
-                for (i, member) in members.into_iter().enumerate() {
-                    result |= self.apply(member, i == last_index && at_end)?;
+                for member in members {
+                    result |= self.apply(member)?;
                 }
                 Ok(result)
             }
-            Rule::Metadata { rule, params } => {
-                let mut has_precedence = false;
-                if !params.precedence.is_none() {
-                    has_precedence = true;
-                    self.precedence_stack.push(params.precedence);
-                }
-
-                let mut has_associativity = false;
-                if let Some(associativity) = params.associativity {
-                    has_associativity = true;
-                    self.associativity_stack.push(associativity);
-                }
-
-                let mut has_alias = false;
-                if let Some(alias) = params.alias {
-                    has_alias = true;
-                    self.alias_stack.push(alias);
-                }
-
-                let mut has_field_name = false;
-                if let Some(field_name) = params.field_name {
-                    has_field_name = true;
-                    self.field_name_stack.push(field_name);
-                }
-
-                // Dynamic precedence can be negative; keep the strongest magnitude
-                // while preserving its sign for the runtime conflict resolver.
-                if params.dynamic_precedence.abs() > self.production.dynamic_precedence.abs() {
-                    self.production.dynamic_precedence = params.dynamic_precedence;
-                }
-
-                let did_push = self.apply(*rule, at_end)?;
-
-                if has_precedence {
-                    self.precedence_stack.pop();
-                    if did_push && !at_end {
-                        self.production.steps.last_mut().unwrap().precedence = self
-                            .precedence_stack
-                            .last()
-                            .cloned()
-                            .unwrap_or(Precedence::None);
-                    }
-                }
-
-                if has_associativity {
-                    self.associativity_stack.pop();
-                    if did_push && !at_end {
-                        self.production.steps.last_mut().unwrap().associativity =
-                            self.associativity_stack.last().copied();
-                    }
-                }
-
-                if has_alias {
-                    self.alias_stack.pop();
-                }
-
-                if has_field_name {
-                    self.field_name_stack.pop();
-                }
-
-                Ok(did_push)
-            }
+            Rule::Metadata { rule, params } => self.apply_metadata(*rule, params),
             Rule::Reserved { rule, context_name } => {
-                self.reserved_word_stack.push(
-                    self.reserved_word_set_ids
-                        .get(&context_name)
-                        .copied()
-                        .ok_or_else(|| {
-                            FlattenGrammarError::NoReservedWordSet(context_name.clone())
-                        })?,
-                );
-                let did_push = self.apply(*rule, at_end)?;
-                self.reserved_word_stack.pop();
-                Ok(did_push)
+                if !self.reserved_word_set_names.contains(&context_name) {
+                    Err(FlattenGrammarError::NoReservedWordSet(context_name))?;
+                }
+                self.apply(*rule)
             }
             Rule::Symbol(symbol) => {
                 self.production.steps.push(ProductionStep {
                     symbol,
-                    precedence: self
-                        .precedence_stack
-                        .last()
-                        .cloned()
-                        .unwrap_or(Precedence::None),
-                    associativity: self.associativity_stack.last().copied(),
-                    reserved_word_set_id: self
-                        .reserved_word_stack
-                        .last()
-                        .copied()
-                        .unwrap_or_default(),
                     alias: self.alias_stack.last().cloned(),
                     field_name: self.field_name_stack.last().cloned(),
                 });
@@ -188,6 +123,33 @@ impl RuleFlattener {
             }
             _ => Ok(false),
         }
+    }
+
+    fn apply_metadata(&mut self, rule: Rule, params: MetadataParams) -> FlattenGrammarResult<bool> {
+        let pushed_alias = if let Some(alias) = params.alias {
+            self.alias_stack.push(alias);
+            true
+        } else {
+            false
+        };
+
+        let pushed_field_name = if let Some(field_name) = params.field_name {
+            self.field_name_stack.push(field_name);
+            true
+        } else {
+            false
+        };
+
+        let did_push = self.apply(rule)?;
+
+        if pushed_alias {
+            self.alias_stack.pop();
+        }
+        if pushed_field_name {
+            self.field_name_stack.pop();
+        }
+
+        Ok(did_push)
     }
 }
 
@@ -269,31 +231,4 @@ fn validate_productions(
     }
 
     Ok(())
-}
-
-pub(in crate::grammar) fn flatten_grammar(
-    grammar: ExtractedSyntaxGrammar,
-) -> FlattenGrammarResult<SyntaxGrammar> {
-    let mut reserved_word_set_ids_by_name = FxHashMap::default();
-    for (ix, set) in grammar.reserved_word_sets.iter().enumerate() {
-        reserved_word_set_ids_by_name.insert(set.name.clone(), ReservedWordSetId(ix));
-    }
-
-    let mut flattener = RuleFlattener::new(reserved_word_set_ids_by_name);
-    let variables = grammar
-        .variables
-        .into_iter()
-        .map(|variable| flattener.flatten_variable(variable))
-        .collect::<FlattenGrammarResult<Vec<_>>>()?;
-
-    validate_productions(&variables, &grammar.variables_to_inline)?;
-
-    Ok(SyntaxGrammar {
-        extra_symbols: grammar.extra_symbols,
-        variables_to_inline: grammar.variables_to_inline,
-        external_tokens: grammar.external_tokens,
-        supertype_symbols: grammar.supertype_symbols,
-        word_token: grammar.word_token,
-        variables,
-    })
 }

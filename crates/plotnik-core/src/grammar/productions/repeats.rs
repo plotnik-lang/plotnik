@@ -7,6 +7,33 @@ use super::super::{
     rules::{Rule, Symbol},
 };
 
+pub(in crate::grammar) fn expand_repeats(
+    mut grammar: ExtractedSyntaxGrammar,
+) -> ExtractedSyntaxGrammar {
+    let mut expander = Expander {
+        variable_name: String::new(),
+        repeat_count_in_variable: 0,
+        preceding_symbol_count: grammar.variables.len(),
+        auxiliary_variables: Vec::new(),
+        existing_repeats: FxHashMap::default(),
+    };
+
+    for (i, variable) in grammar.variables.iter_mut().enumerate() {
+        let expanded_top_level_repetition = expander.expand_variable(i, variable);
+
+        // If a hidden variable had a top-level repetition and it was converted to
+        // a recursive rule, then it can't be inlined.
+        if expanded_top_level_repetition {
+            grammar
+                .variables_to_inline
+                .retain(|symbol| *symbol != Symbol::non_terminal(i));
+        }
+    }
+
+    grammar.variables.extend(expander.auxiliary_variables);
+    grammar
+}
+
 struct Expander {
     variable_name: String,
     repeat_count_in_variable: usize,
@@ -99,31 +126,4 @@ impl Expander {
             rule,
         ])
     }
-}
-
-pub(in crate::grammar) fn expand_repeats(
-    mut grammar: ExtractedSyntaxGrammar,
-) -> ExtractedSyntaxGrammar {
-    let mut expander = Expander {
-        variable_name: String::new(),
-        repeat_count_in_variable: 0,
-        preceding_symbol_count: grammar.variables.len(),
-        auxiliary_variables: Vec::new(),
-        existing_repeats: FxHashMap::default(),
-    };
-
-    for (i, variable) in grammar.variables.iter_mut().enumerate() {
-        let expanded_top_level_repetition = expander.expand_variable(i, variable);
-
-        // If a hidden variable had a top-level repetition and it was converted to
-        // a recursive rule, then it can't be inlined.
-        if expanded_top_level_repetition {
-            grammar
-                .variables_to_inline
-                .retain(|symbol| *symbol != Symbol::non_terminal(i));
-        }
-    }
-
-    grammar.variables.extend(expander.auxiliary_variables);
-    grammar
 }

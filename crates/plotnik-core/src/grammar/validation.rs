@@ -159,36 +159,16 @@ pub(super) fn validate_precedences(
     variables: &[Variable],
     precedence_orderings: &[Vec<PrecedenceEntry>],
 ) -> ValidatePrecedenceResult<()> {
-    // Check that no rule contains a named precedence that is not present in
-    // any of the `precedences` lists.
-    fn validate(
-        rule_name: &str,
-        rule: &Rule,
-        names: &FxHashSet<&String>,
-    ) -> ValidatePrecedenceResult<()> {
-        match rule {
-            Rule::Repeat(rule) => validate(rule_name, rule, names),
-            Rule::Seq(elements) | Rule::Choice(elements) => elements
-                .iter()
-                .try_for_each(|e| validate(rule_name, e, names)),
-            Rule::Metadata { rule, params } => {
-                if let Precedence::Name(n) = &params.precedence
-                    && !names.contains(n)
-                {
-                    Err(UndeclaredPrecedenceError {
-                        precedence: n.clone(),
-                        rule: rule_name.to_string(),
-                    })?;
-                }
-                validate(rule_name, rule, names)?;
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    }
+    validate_conflicting_precedence_orderings(precedence_orderings)?;
+    validate_declared_precedences(variables, precedence_orderings)?;
+    Ok(())
+}
 
-    // For any two precedence names `a` and `b`, if `a` comes before `b`
-    // in some list, then it cannot come *after* `b` in any list.
+// For any two precedence names `a` and `b`, if `a` comes before `b`
+// in some list, then it cannot come *after* `b` in any list.
+fn validate_conflicting_precedence_orderings(
+    precedence_orderings: &[Vec<PrecedenceEntry>],
+) -> ValidatePrecedenceResult<()> {
     let mut pairs = FxHashMap::default();
     for list in precedence_orderings {
         for (i, mut entry1) in list.iter().enumerate() {
@@ -196,11 +176,14 @@ pub(super) fn validate_precedences(
                 if entry2 == entry1 {
                     continue;
                 }
-                let mut ordering = Ordering::Greater;
-                if entry1 > entry2 {
-                    ordering = Ordering::Less;
+
+                let ordering = if entry1 > entry2 {
                     mem::swap(&mut entry1, &mut entry2);
-                }
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                };
+
                 match pairs.entry((entry1, entry2)) {
                     hash_map::Entry::Vacant(e) => {
                         e.insert(ordering);
@@ -218,6 +201,15 @@ pub(super) fn validate_precedences(
         }
     }
 
+    Ok(())
+}
+
+// Check that no rule contains a named precedence that is not present in
+// any of the `precedences` lists.
+fn validate_declared_precedences(
+    variables: &[Variable],
+    precedence_orderings: &[Vec<PrecedenceEntry>],
+) -> ValidatePrecedenceResult<()> {
     let precedence_names = precedence_orderings
         .iter()
         .flat_map(|l| l.iter())
@@ -229,9 +221,36 @@ pub(super) fn validate_precedences(
             }
         })
         .collect::<FxHashSet<&String>>();
+
     for variable in variables {
-        validate(&variable.name, &variable.rule, &precedence_names)?;
+        validate_declared_precedences_in_rule(&variable.name, &variable.rule, &precedence_names)?;
     }
 
     Ok(())
+}
+
+fn validate_declared_precedences_in_rule(
+    rule_name: &str,
+    rule: &Rule,
+    names: &FxHashSet<&String>,
+) -> ValidatePrecedenceResult<()> {
+    match rule {
+        Rule::Repeat(rule) => validate_declared_precedences_in_rule(rule_name, rule, names),
+        Rule::Seq(elements) | Rule::Choice(elements) => elements
+            .iter()
+            .try_for_each(|e| validate_declared_precedences_in_rule(rule_name, e, names)),
+        Rule::Metadata { rule, params } => {
+            if let Precedence::Name(n) = &params.precedence
+                && !names.contains(n)
+            {
+                Err(UndeclaredPrecedenceError {
+                    precedence: n.clone(),
+                    rule: rule_name.to_string(),
+                })?;
+            }
+            validate_declared_precedences_in_rule(rule_name, rule, names)?;
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }

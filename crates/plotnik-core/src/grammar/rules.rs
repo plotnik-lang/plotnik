@@ -175,13 +175,6 @@ impl Alias {
     }
 }
 
-impl Precedence {
-    #[must_use]
-    pub const fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-}
-
 impl Symbol {
     #[must_use]
     pub fn is_terminal(&self) -> bool {
