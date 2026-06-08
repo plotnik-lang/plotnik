@@ -5,12 +5,14 @@
 
 #![allow(dead_code)]
 
-mod bitvec;
 mod grammars;
 mod nfa;
 mod node_shapes;
 mod prepare_grammar;
 mod rules;
+
+#[cfg(test)]
+mod rules_tests;
 
 use super::raw::{
     RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,

@@ -1,9 +1,12 @@
-use std::{collections::BTreeMap, fmt, hash::Hash};
+use std::{cmp::Ordering, collections::BTreeMap, fmt, hash::Hash};
 
+use bit_vec::BitVec;
 use serde::{Deserialize, Serialize};
 
-use super::bitvec::{BitVec, SetBitsIter};
 use super::grammars::VariableType;
+
+type BitBlock = usize;
+type TokenBits = BitVec<BitBlock>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SymbolType {
@@ -79,8 +82,8 @@ pub enum Rule {
 // the token is present in the set.
 #[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct TokenSet {
-    terminal_bits: BitVec,
-    external_bits: BitVec,
+    terminal_bits: TokenBits,
+    external_bits: TokenBits,
     eof: bool,
     end_of_nonterminal_extra: bool,
 }
@@ -323,29 +326,24 @@ impl From<Symbol> for Rule {
 
 impl TokenSet {
     #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            terminal_bits: BitVec::new(),
-            external_bits: BitVec::new(),
-            eof: false,
-            end_of_nonterminal_extra: false,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     #[must_use]
     pub fn with_capacity(n_terminals: usize, n_externals: usize) -> Self {
         Self {
-            terminal_bits: BitVec::with_capacity(n_terminals),
-            external_bits: BitVec::with_capacity(n_externals),
+            terminal_bits: TokenBits::with_capacity_general(n_terminals),
+            external_bits: TokenBits::with_capacity_general(n_externals),
             eof: false,
             end_of_nonterminal_extra: false,
         }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Symbol> + '_ {
-        SetBitsIter::new(self.terminal_bits.as_slice())
+        set_bit_indices(&self.terminal_bits)
             .map(Symbol::terminal)
-            .chain(SetBitsIter::new(self.external_bits.as_slice()).map(Symbol::external))
+            .chain(set_bit_indices(&self.external_bits).map(Symbol::external))
             .chain(if self.eof { Some(Symbol::end()) } else { None })
             .chain(if self.end_of_nonterminal_extra {
                 Some(Symbol::end_of_nonterminal_extra())
@@ -355,7 +353,7 @@ impl TokenSet {
     }
 
     pub fn terminals(&self) -> impl Iterator<Item = Symbol> + '_ {
-        SetBitsIter::new(self.terminal_bits.as_slice()).map(Symbol::terminal)
+        set_bit_indices(&self.terminal_bits).map(Symbol::terminal)
     }
 
     #[inline]
@@ -379,8 +377,8 @@ impl TokenSet {
     /// Raw word slice backing the terminal bitset.
     #[inline]
     #[must_use]
-    pub fn terminal_bits_words(&self) -> &[super::bitvec::BitBlock] {
-        self.terminal_bits.as_slice()
+    pub fn terminal_bits_words(&self) -> &[BitBlock] {
+        self.terminal_bits.storage()
     }
 
     pub fn insert(&mut self, other: Symbol) {
@@ -398,7 +396,7 @@ impl TokenSet {
             }
         };
         if other.index >= vec.len() {
-            vec.resize(other.index + 1, false);
+            vec.grow(other.index + 1 - vec.len(), false);
         }
         vec.set(other.index, true);
     }
@@ -425,11 +423,9 @@ impl TokenSet {
                 };
             }
         };
-        if other.index < vec.len() && vec[other.index] {
+        if vec.get(other.index).unwrap_or(false) {
             vec.set(other.index, false);
-            while vec.last() == Some(false) {
-                vec.pop();
-            }
+            trim_trailing_unset_bits(vec);
             return true;
         }
         false
@@ -439,34 +435,24 @@ impl TokenSet {
     pub fn is_empty(&self) -> bool {
         !self.eof
             && !self.end_of_nonterminal_extra
-            && self.terminal_bits.as_slice().iter().all(|&w| w == 0)
-            && self.external_bits.as_slice().iter().all(|&w| w == 0)
+            && self.terminal_bits.none()
+            && self.external_bits.none()
     }
 
     #[must_use]
     pub fn len(&self) -> usize {
         usize::from(self.eof)
             + usize::from(self.end_of_nonterminal_extra)
-            + self
-                .terminal_bits
-                .as_slice()
-                .iter()
-                .map(|w| w.count_ones() as usize)
-                .sum::<usize>()
-            + self
-                .external_bits
-                .as_slice()
-                .iter()
-                .map(|w| w.count_ones() as usize)
-                .sum::<usize>()
+            + count_set_bits(&self.terminal_bits)
+            + count_set_bits(&self.external_bits)
     }
 
     pub fn insert_all_terminals(&mut self, other: &Self) -> bool {
-        self.terminal_bits.insert_all(&other.terminal_bits)
+        insert_all_bits(&mut self.terminal_bits, &other.terminal_bits)
     }
 
     fn insert_all_externals(&mut self, other: &Self) -> bool {
-        self.external_bits.insert_all(&other.external_bits)
+        insert_all_bits(&mut self.external_bits, &other.external_bits)
     }
 
     pub fn insert_all(&mut self, other: &Self) -> bool {
@@ -492,6 +478,40 @@ impl FromIterator<Symbol> for TokenSet {
             result.insert(symbol);
         }
         result
+    }
+}
+
+fn set_bit_indices(bits: &TokenBits) -> impl Iterator<Item = usize> + '_ {
+    bits.iter()
+        .enumerate()
+        .filter_map(|(index, bit)| bit.then_some(index))
+}
+
+fn count_set_bits(bits: &TokenBits) -> usize {
+    bits.storage()
+        .iter()
+        .map(|word| word.count_ones() as usize)
+        .sum()
+}
+
+fn insert_all_bits(bits: &mut TokenBits, other: &TokenBits) -> bool {
+    match bits.len().cmp(&other.len()) {
+        Ordering::Less => {
+            bits.grow(other.len() - bits.len(), false);
+            bits.or(other)
+        }
+        Ordering::Equal => bits.or(other),
+        Ordering::Greater => {
+            let mut padded_other = other.clone();
+            padded_other.grow(bits.len() - other.len(), false);
+            bits.or(&padded_other)
+        }
+    }
+}
+
+fn trim_trailing_unset_bits(bits: &mut TokenBits) {
+    while bits.len() > 0 && bits.get(bits.len() - 1) == Some(false) {
+        bits.truncate(bits.len() - 1);
     }
 }
 
