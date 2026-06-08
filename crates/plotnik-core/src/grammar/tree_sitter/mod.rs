@@ -6,7 +6,6 @@
 #![allow(dead_code, unexpected_cfgs)]
 
 mod bitvec;
-mod build_tables;
 mod grammars;
 mod nfa;
 mod node_shapes;
@@ -20,15 +19,17 @@ use super::raw::{
     RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
     RawRule as PlotnikRule,
 };
+use std::collections::BTreeSet;
+
 use super::types::NodeShape;
 
 use grammars::{
-    InputGrammar, LexicalGrammar, ReservedWordContext, SyntaxGrammar, Variable, VariableType,
+    InlinedProductionMap, InputGrammar, LexicalGrammar, Production, ReservedWordContext,
+    SyntaxGrammar, Variable, VariableType,
 };
 use prepare_grammar::prepare_grammar;
 use rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType};
 use rustc_hash::{FxHashMap, FxHashSet};
-use tables::ParseTable;
 
 pub(super) struct GrammarMetadata {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -64,19 +65,11 @@ pub(super) fn metadata_for_raw(raw: &RawGrammar) -> Result<GrammarMetadata, Stri
         &variable_info,
     )
     .map_err(|error| error.to_string())?;
-    let parse_table = build_tables::build_metadata_tables(
-        &syntax_grammar,
-        &lexical_grammar,
-        &variable_info,
-        &inlines,
-    )
-    .map(|tables| tables.parse_table)
-    .map_err(|error| error.to_string())?;
 
     Ok(GrammarMetadata {
         node_shapes,
-        symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &parse_table, &aliases),
-        fields: derive_fields(&parse_table),
+        symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
+        fields: derive_fields(&syntax_grammar, &inlines, &variable_info),
     })
 }
 
@@ -291,15 +284,15 @@ fn convert_precedence_entry(entry: &PlotnikPrecedenceEntry) -> grammars::Precede
     }
 }
 
-fn derive_fields(parse_table: &ParseTable) -> Vec<FieldSymbol> {
-    let mut field_names = Vec::<String>::new();
-    for production_info in &parse_table.production_infos {
-        for field_name in production_info.field_map.keys() {
-            if let Err(index) = field_names.binary_search(field_name) {
-                field_names.insert(index, field_name.clone());
-            }
-        }
-    }
+fn derive_fields(
+    syntax_grammar: &SyntaxGrammar,
+    inlines: &InlinedProductionMap,
+    variable_info: &[node_shapes::VariableInfo],
+) -> Vec<FieldSymbol> {
+    let mut field_names = BTreeSet::<String>::new();
+    for_each_metadata_production(syntax_grammar, inlines, |production| {
+        collect_field_names(production, syntax_grammar, variable_info, &mut field_names);
+    });
 
     field_names
         .into_iter()
@@ -311,30 +304,53 @@ fn derive_fields(parse_table: &ParseTable) -> Vec<FieldSymbol> {
         .collect()
 }
 
+fn collect_field_names(
+    production: &Production,
+    syntax_grammar: &SyntaxGrammar,
+    variable_info: &[node_shapes::VariableInfo],
+    field_names: &mut BTreeSet<String>,
+) {
+    for step in &production.steps {
+        if let Some(field_name) = &step.field_name {
+            field_names.insert(field_name.clone());
+        }
+
+        if step.symbol.is_non_terminal()
+            && !syntax_grammar.variables[step.symbol.index]
+                .kind
+                .is_visible()
+        {
+            field_names.extend(variable_info[step.symbol.index].fields.keys().cloned());
+        }
+    }
+}
+
 fn derive_symbols(
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
-    parse_table: &ParseTable,
+    inlines: &InlinedProductionMap,
     default_aliases: &AliasMap,
 ) -> Vec<NodeSymbol> {
-    let symbol_ids = symbol_ids(parse_table);
+    let symbol_order = derive_symbol_order(syntax_grammar, lexical_grammar);
+    let symbol_ids = symbol_ids(&symbol_order);
     let symbol_map = public_symbol_map(
         syntax_grammar,
         lexical_grammar,
-        parse_table,
+        &symbol_order,
         default_aliases,
     );
     let unique_aliases = unique_aliases(
         syntax_grammar,
         lexical_grammar,
-        parse_table,
+        inlines,
+        &symbol_order,
         default_aliases,
         &symbol_ids,
         &symbol_map,
     );
 
     let mut symbols = Vec::new();
-    for symbol in &parse_table.symbols {
+    for symbol in &symbol_order {
         let public_id = symbol_ids[&symbol_map[symbol]];
         let (type_name, kind) = default_aliases.get(symbol).map_or_else(
             || metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol),
@@ -349,7 +365,7 @@ fn derive_symbols(
 
         symbols.push(NodeSymbol {
             id: public_id,
-            type_name: type_name.to_string(),
+            type_name: public_node_type_name(type_name),
             named,
             visible,
             supertype,
@@ -360,12 +376,12 @@ fn derive_symbols(
         .values()
         .copied()
         .max()
-        .expect("tree-sitter parse table includes end symbol")
+        .expect("tree-sitter symbol order includes end symbol")
         + 1;
     for (index, alias) in unique_aliases.iter().enumerate() {
         symbols.push(NodeSymbol {
             id: first_alias_id + u16::try_from(index).expect("tree-sitter alias IDs fit in u16"),
-            type_name: alias.value.clone(),
+            type_name: public_node_type_name(&alias.value),
             named: alias.is_named,
             visible: true,
             supertype: false,
@@ -375,12 +391,53 @@ fn derive_symbols(
     symbols
 }
 
-fn symbol_ids(parse_table: &ParseTable) -> rustc_hash::FxHashMap<Symbol, u16> {
+fn public_node_type_name(name: &str) -> String {
+    name.split('\0').next().unwrap_or(name).to_string()
+}
+
+fn derive_symbol_order(
+    syntax_grammar: &SyntaxGrammar,
+    lexical_grammar: &LexicalGrammar,
+) -> Vec<Symbol> {
+    let mut symbols = Vec::with_capacity(
+        1 + lexical_grammar.variables.len()
+            + syntax_grammar.external_tokens.len()
+            + syntax_grammar.variables.len(),
+    );
+
+    symbols.push(Symbol::end());
+
+    for index in 0..lexical_grammar.variables.len() {
+        let symbol = Symbol::terminal(index);
+        if syntax_grammar.word_token == Some(symbol) {
+            symbols.insert(1, symbol);
+        } else {
+            symbols.push(symbol);
+        }
+    }
+
+    for (index, token) in syntax_grammar.external_tokens.iter().enumerate() {
+        if token.corresponding_internal_token.is_none() {
+            symbols.push(Symbol::external(index));
+        }
+    }
+
+    for index in 0..syntax_grammar.variables.len() {
+        let symbol = Symbol::non_terminal(index);
+        if !syntax_grammar.variables_to_inline.contains(&symbol) {
+            symbols.push(symbol);
+        }
+    }
+
+    symbols
+}
+
+fn symbol_ids(symbols: &[Symbol]) -> rustc_hash::FxHashMap<Symbol, u16> {
     let mut ids = rustc_hash::FxHashMap::default();
     ids.insert(Symbol::end(), 0);
 
     let mut next_id = 1u16;
-    for symbol in &parse_table.symbols {
+    for symbol in symbols {
         if *symbol == Symbol::end() {
             continue;
         }
@@ -397,17 +454,17 @@ fn symbol_ids(parse_table: &ParseTable) -> rustc_hash::FxHashMap<Symbol, u16> {
 fn public_symbol_map(
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
-    parse_table: &ParseTable,
+    symbols: &[Symbol],
     default_aliases: &AliasMap,
 ) -> rustc_hash::FxHashMap<Symbol, Symbol> {
     let mut symbol_map = rustc_hash::FxHashMap::default();
 
-    for symbol in &parse_table.symbols {
+    for symbol in symbols {
         let mut mapping = *symbol;
 
         if let Some(alias) = default_aliases.get(symbol) {
             let kind = alias.kind();
-            for other_symbol in &parse_table.symbols {
+            for other_symbol in symbols {
                 if let Some(other_alias) = default_aliases.get(other_symbol) {
                     if other_symbol < &mapping && other_alias == alias {
                         mapping = *other_symbol;
@@ -421,7 +478,7 @@ fn public_symbol_map(
             }
         } else if symbol.is_terminal() {
             let metadata = metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol);
-            for other_symbol in &parse_table.symbols {
+            for other_symbol in symbols {
                 if metadata_for_symbol(syntax_grammar, lexical_grammar, *other_symbol) == metadata {
                     if let Some(mapped) = symbol_map.get(other_symbol)
                         && mapped == symbol
@@ -443,19 +500,24 @@ fn public_symbol_map(
 fn unique_aliases(
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
-    parse_table: &ParseTable,
+    inlines: &InlinedProductionMap,
+    symbols: &[Symbol],
     default_aliases: &AliasMap,
     symbol_ids: &rustc_hash::FxHashMap<Symbol, u16>,
     symbol_map: &rustc_hash::FxHashMap<Symbol, Symbol>,
 ) -> Vec<Alias> {
     let mut aliases = Vec::new();
 
-    for production_info in &parse_table.production_infos {
-        for alias in production_info.alias_sequence.iter().flatten() {
+    for_each_metadata_production(syntax_grammar, inlines, |production| {
+        for alias in production
+            .steps
+            .iter()
+            .filter_map(|step| step.alias.as_ref())
+        {
             let has_existing_symbol = symbols_for_alias(
                 syntax_grammar,
                 lexical_grammar,
-                parse_table,
+                symbols,
                 default_aliases,
                 alias,
             )
@@ -471,20 +533,35 @@ fn unique_aliases(
                 aliases.insert(index, alias.clone());
             }
         }
-    }
+    });
 
     aliases
+}
+
+fn for_each_metadata_production(
+    syntax_grammar: &SyntaxGrammar,
+    inlines: &InlinedProductionMap,
+    mut visit: impl FnMut(&Production),
+) {
+    for variable in &syntax_grammar.variables {
+        for production in &variable.productions {
+            visit(production);
+        }
+    }
+
+    for production in &inlines.productions {
+        visit(production);
+    }
 }
 
 fn symbols_for_alias(
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
-    parse_table: &ParseTable,
+    symbols: &[Symbol],
     default_aliases: &AliasMap,
     alias: &Alias,
 ) -> Vec<Symbol> {
-    parse_table
-        .symbols
+    symbols
         .iter()
         .copied()
         .filter(|symbol| {

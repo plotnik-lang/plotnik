@@ -20,6 +20,23 @@ fn parse_minimal_grammar() {
 }
 
 #[test]
+fn exposes_nul_anonymous_node_as_empty_string() {
+    let json = r#"{
+        "name": "test",
+        "rules": {
+            "source_file": { "type": "STRING", "value": "\u0000" }
+        }
+    }"#;
+
+    let raw = RawGrammar::from_json(json).unwrap();
+    let grammar = Grammar::from_raw(&raw).unwrap();
+
+    assert!(grammar.resolve_anonymous_node("").is_some());
+    assert_eq!(grammar.resolve_anonymous_node("\0"), None);
+    assert_eq!(grammar.all_anonymous_node_kinds(), [""]);
+}
+
+#[test]
 fn parse_seq_and_choice() {
     let json = r#"{
         "name": "test",
