@@ -3,15 +3,13 @@
 //! Adapted from tree-sitter's MIT-licensed `tree-sitter-generate` crate.
 //! This module exists only to derive Plotnik grammar metadata from grammar.json.
 
-#![allow(dead_code, unexpected_cfgs)]
+#![allow(dead_code)]
 
 mod bitvec;
 mod grammars;
 mod nfa;
 mod node_shapes;
 mod prepare_grammar;
-#[cfg(plotnik_grammar_profile)]
-pub(super) mod profile;
 mod rules;
 mod tables;
 

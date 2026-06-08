@@ -370,19 +370,11 @@ impl<'a> ParseTableBuilder<'a> {
         match self.state_ids_by_item_set.entry(item_set) {
             // If an equivalent item set has already been processed, then return
             // the existing parse state index.
-            Entry::Occupied(o) => {
-                #[cfg(plotnik_grammar_profile)]
-                super::super::profile::parse_state_reused();
-
-                *o.get()
-            }
+            Entry::Occupied(o) => *o.get(),
 
             // Otherwise, insert a new parse state and add it to the queue of
             // parse states to populate.
             Entry::Vacant(v) => {
-                #[cfg(plotnik_grammar_profile)]
-                super::super::profile::parse_state_new();
-
                 let state_id = self.parse_table.states.len();
                 self.parse_state_info_by_id
                     .push((preceding_symbols.clone(), v.key().clone()));

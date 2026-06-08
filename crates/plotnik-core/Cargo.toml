@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Core data structures for Plotnik"
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)', 'cfg(plotnik_grammar_profile)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
 
 [dependencies]
 bitflags = "2"

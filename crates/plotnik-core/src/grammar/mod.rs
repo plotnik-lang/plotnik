@@ -17,8 +17,3 @@ mod types_tests;
 
 pub use json::GrammarError;
 pub use types::Grammar;
-
-#[cfg(plotnik_grammar_profile)]
-pub mod profile {
-    pub use super::tree_sitter::profile::{ProfileSnapshot, reset, snapshot};
-}

@@ -170,15 +170,9 @@ impl<'a> ParseItem<'a> {
 impl<'a> ParseItemSet<'a> {
     #[inline]
     pub fn insert(&mut self, item: ParseItem<'a>) -> &mut ParseItemSetEntry<'a> {
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::item_set_insert_len(self.entries.len());
-
         if let Some(last) = self.entries.last() {
             match last.item.cmp(&item) {
                 Ordering::Less => {
-                    #[cfg(plotnik_grammar_profile)]
-                    super::super::profile::item_set_insert_appended();
-
                     self.entries.push(ParseItemSetEntry {
                         item,
                         lookaheads: TokenSet::new(),
@@ -188,9 +182,6 @@ impl<'a> ParseItemSet<'a> {
                     return &mut self.entries[index];
                 }
                 Ordering::Equal => {
-                    #[cfg(plotnik_grammar_profile)]
-                    super::super::profile::item_set_insert_last_equal();
-
                     let index = self.entries.len() - 1;
                     return &mut self.entries[index];
                 }
@@ -198,14 +189,8 @@ impl<'a> ParseItemSet<'a> {
             }
         }
 
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::item_set_insert_binary_search();
-
         match self.entries.binary_search_by(|e| e.item.cmp(&item)) {
             Err(i) => {
-                #[cfg(plotnik_grammar_profile)]
-                super::super::profile::item_set_insert_binary_new(self.entries.len() - i);
-
                 self.entries.insert(
                     i,
                     ParseItemSetEntry {
@@ -216,12 +201,7 @@ impl<'a> ParseItemSet<'a> {
                 );
                 &mut self.entries[i]
             }
-            Ok(i) => {
-                #[cfg(plotnik_grammar_profile)]
-                super::super::profile::item_set_insert_binary_existing();
-
-                &mut self.entries[i]
-            }
+            Ok(i) => &mut self.entries[i],
         }
     }
 
@@ -378,9 +358,6 @@ impl fmt::Display for ParseItemSetDisplay<'_> {
 
 impl Hash for ParseItem<'_> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::parse_item_hash(self.production.steps.len());
-
         hasher.write_u32(self.variable_index);
         hasher.write_u32(self.step_index);
         hasher.write_i32(self.production.dynamic_precedence);
@@ -411,9 +388,6 @@ impl Hash for ParseItem<'_> {
 impl PartialEq for ParseItem<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::parse_item_eq();
-
         if self.variable_index != other.variable_index
             || self.step_index != other.step_index
             || self.production.dynamic_precedence != other.production.dynamic_precedence
@@ -430,9 +404,6 @@ impl PartialEq for ParseItem<'_> {
         }
 
         for (i, step) in self.production.steps.iter().enumerate() {
-            #[cfg(plotnik_grammar_profile)]
-            super::super::profile::parse_item_eq_step();
-
             // See the previous comment (in the `Hash::hash` impl) regarding comparisons
             // of parse items' already-completed steps.
             if i < self.step_index as usize {
@@ -459,9 +430,6 @@ impl PartialEq for ParseItem<'_> {
 impl Ord for ParseItem<'_> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::parse_item_cmp();
-
         let ordering = self
             .step_index
             .cmp(&other.step_index)
@@ -498,9 +466,6 @@ impl Ord for ParseItem<'_> {
         }
 
         for (i, step) in self.production.steps.iter().enumerate() {
-            #[cfg(plotnik_grammar_profile)]
-            super::super::profile::parse_item_cmp_step();
-
             // See the previous comment (in the `Hash::hash` impl) regarding comparisons
             // of parse items' already-completed steps.
             let ordering = if i < self.step_index as usize {

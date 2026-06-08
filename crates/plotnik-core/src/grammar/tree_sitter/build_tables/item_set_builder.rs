@@ -263,15 +263,7 @@ impl<'a> ParseItemSetBuilder<'a> {
                 .inlines
                 .inlined_productions(entry.item.production, entry.item.step_index)
             {
-                #[cfg(plotnik_grammar_profile)]
-                let mut inlined_production_count = 0usize;
-
                 for production in productions {
-                    #[cfg(plotnik_grammar_profile)]
-                    {
-                        inlined_production_count += 1;
-                    }
-
                     self.add_item(
                         &mut result,
                         &ParseItemSetEntry {
@@ -281,16 +273,10 @@ impl<'a> ParseItemSetBuilder<'a> {
                         },
                     );
                 }
-
-                #[cfg(plotnik_grammar_profile)]
-                super::super::profile::inline_site(inlined_production_count);
             } else {
                 self.add_item(&mut result, entry);
             }
         }
-
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::transitive_closure(item_set.entries.len(), result.entries.len());
 
         result
     }
@@ -312,14 +298,6 @@ impl<'a> ParseItemSetBuilder<'a> {
     }
 
     fn add_item(&self, set: &mut ParseItemSet<'a>, entry: &ParseItemSetEntry<'a>) {
-        #[cfg(plotnik_grammar_profile)]
-        let is_nonterminal = entry
-            .item
-            .step()
-            .is_some_and(|step| step.symbol.is_non_terminal());
-        #[cfg(plotnik_grammar_profile)]
-        super::super::profile::add_item(is_nonterminal);
-
         if let Some(step) = entry.item.step()
             && step.symbol.is_non_terminal()
         {
@@ -336,11 +314,6 @@ impl<'a> ParseItemSetBuilder<'a> {
             };
 
             // Use the pre-computed *additions* to expand the non-terminal.
-            #[cfg(plotnik_grammar_profile)]
-            super::super::profile::closure_additions(
-                self.transitive_closure_additions[step.symbol.index].len(),
-            );
-
             for addition in &self.transitive_closure_additions[step.symbol.index] {
                 let entry = set.insert(addition.item);
                 entry.lookaheads.insert_all(&addition.info.lookaheads);
