@@ -96,7 +96,7 @@ fn preserves_rule_order() {
 }
 
 #[test]
-fn postcard_round_trips_raw_grammar() {
+fn json_round_trips_raw_grammar() {
     let json = r#"{
         "name": "test",
         "rules": {
@@ -106,10 +106,6 @@ fn postcard_round_trips_raw_grammar() {
 
     let raw = RawGrammar::from_json(json).unwrap();
     let encoded_json = raw.to_json().unwrap();
+
     assert_eq!(RawGrammar::from_json(&encoded_json).unwrap(), raw);
-
-    let bytes = raw.to_postcard().unwrap();
-    let decoded = RawGrammar::from_postcard(&bytes).unwrap();
-
-    assert_eq!(decoded, raw);
 }

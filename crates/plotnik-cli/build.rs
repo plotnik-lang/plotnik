@@ -1,6 +1,9 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use plotnik_core::grammar::raw::RawGrammar;
 
 fn main() {
@@ -54,19 +57,22 @@ fn main() {
         let raw = RawGrammar::from_json(&json).unwrap_or_else(|error| {
             panic!("failed to parse {}: {error}", grammar_path);
         });
-        let bytes = raw.to_postcard().unwrap_or_else(|error| {
-            panic!("failed to encode {}: {error}", grammar_path);
+        let compact_json = raw.to_json().unwrap_or_else(|error| {
+            panic!("failed to serialize {}: {error}", grammar_path);
+        });
+        let bytes = gzip(compact_json.as_bytes()).unwrap_or_else(|error| {
+            panic!("failed to compress {}: {error}", grammar_path);
         });
 
         let file_key = feature_to_file_key(&feature_name);
-        let out_path = out_dir.join(format!("{file_key}.grammar.bin"));
+        let out_path = out_dir.join(format!("{file_key}.grammar.json.gz"));
         fs::write(&out_path, bytes).unwrap_or_else(|error| {
             panic!("failed to write {}: {error}", out_path.display());
         });
 
         let env_key = feature_to_env_key(&feature_name);
         println!(
-            "cargo::rustc-env=PLOTNIK_GRAMMAR_BIN_{}={}",
+            "cargo::rustc-env=PLOTNIK_GRAMMAR_JSON_GZ_{}={}",
             env_key,
             out_path.display()
         );
@@ -81,6 +87,12 @@ fn main() {
 
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=Cargo.toml");
+}
+
+fn gzip(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(bytes)?;
+    encoder.finish()
 }
 
 fn feature_to_file_key(feature: &str) -> String {

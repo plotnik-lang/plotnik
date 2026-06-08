@@ -1,6 +1,8 @@
+use std::io::Read;
 use std::sync::OnceLock;
 
 use arborium_tree_sitter::{Language, Parser, Tree};
+use flate2::read::GzDecoder;
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
 #[derive(Debug)]
@@ -9,7 +11,7 @@ pub struct Lang {
     aliases: &'static [&'static str],
     extensions: &'static [&'static str],
     language: Language,
-    raw_bytes: &'static [u8],
+    raw_json_gz: &'static [u8],
     raw: OnceLock<RawGrammar>,
     grammar: OnceLock<Grammar>,
 }
@@ -20,14 +22,14 @@ impl Lang {
         aliases: &'static [&'static str],
         extensions: &'static [&'static str],
         language: Language,
-        raw_bytes: &'static [u8],
+        raw_json_gz: &'static [u8],
     ) -> Self {
         Self {
             name,
             aliases,
             extensions,
             language,
-            raw_bytes,
+            raw_json_gz,
             raw: OnceLock::new(),
             grammar: OnceLock::new(),
         }
@@ -47,7 +49,8 @@ impl Lang {
 
     pub fn raw(&self) -> &RawGrammar {
         self.raw.get_or_init(|| {
-            RawGrammar::from_postcard(self.raw_bytes).expect("invalid embedded grammar postcard")
+            let json = gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip");
+            RawGrammar::from_json(&json).expect("invalid embedded grammar JSON")
         })
     }
 
@@ -68,6 +71,13 @@ impl Lang {
             .expect("failed to set language");
         parser.parse(source, None).expect("failed to parse source")
     }
+}
+
+fn gunzip(bytes: &[u8]) -> std::io::Result<String> {
+    let mut decoder = GzDecoder::new(bytes);
+    let mut json = String::new();
+    decoder.read_to_string(&mut json)?;
+    Ok(json)
 }
 
 macro_rules! define_langs {
@@ -94,7 +104,7 @@ macro_rules! define_langs {
                             &[$($alias),*],
                             &[$($ext),*],
                             $ts_lang.into(),
-                            include_bytes!(env!(concat!("PLOTNIK_GRAMMAR_BIN_", $lang_key))),
+                            include_bytes!(env!(concat!("PLOTNIK_GRAMMAR_JSON_GZ_", $lang_key))),
                         )
                     });
 

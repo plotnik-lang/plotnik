@@ -383,12 +383,11 @@ arborium-yuri = { version = "2.18.0", optional = true }
 arborium-zig = { version = "2.18.0", optional = true }
 arborium-zsh = { version = "2.18.0", optional = true }
 # @generated:lang-deps:end
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
+flate2 = "1.1"
 
 [build-dependencies]
 cargo_metadata = "0.23"
+flate2 = "1.1"
 plotnik-core.workspace = true
 
 [dev-dependencies]
