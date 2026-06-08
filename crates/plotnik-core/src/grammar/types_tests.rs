@@ -1,8 +1,7 @@
 use std::num::NonZeroU16;
 
-use super::{
-    DynamicNodeTypes, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, NodeTypeId, NodeTypes,
-};
+use super::types::{NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, build_node_constraints};
+use crate::NodeTypeId;
 
 fn node_id_for_name(kind: &str, named: bool) -> Option<NodeTypeId> {
     match (kind, named) {
@@ -20,44 +19,27 @@ fn field_id_for_name(field: &str) -> Option<NonZeroU16> {
 }
 
 #[test]
-fn try_build_resolves_all_node_shape_references() {
+fn builds_node_constraints_from_node_shapes() {
     let shapes = vec![NodeShape {
         type_name: "root".to_string(),
         named: true,
         root: true,
         extra: false,
-        fields: [(
-            "body".to_string(),
-            NodeSlot {
-                multiple: false,
-                required: true,
-                types: vec![NodeKindRef {
-                    type_name: "child".to_string(),
-                    named: true,
-                }],
-            },
-        )]
-        .into(),
-        children: Some(NodeSlot {
-            multiple: true,
-            required: false,
-            types: vec![NodeKindRef {
-                type_name: "child".to_string(),
-                named: true,
-            }],
-        }),
+        fields: [("body".to_string(), child_slot(false, true))].into(),
+        children: Some(child_slot(true, false)),
         subtypes: None,
     }];
 
-    let node_types = DynamicNodeTypes::try_build(&shapes, node_id_for_name, field_id_for_name)
-        .expect("node shapes should resolve");
+    let (node_constraints, _, root_node_type) =
+        build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
+            .expect("node shapes should resolve");
 
-    assert_eq!(node_types.root(), NonZeroU16::new(1));
-    assert_eq!(node_types.len(), 1);
+    assert_eq!(root_node_type, NonZeroU16::new(1));
+    assert_eq!(node_constraints.len(), 1);
 }
 
 #[test]
-fn try_build_rejects_unknown_child_types() {
+fn rejects_unknown_child_types() {
     let shapes = vec![NodeShape {
         type_name: "root".to_string(),
         named: true,
@@ -75,7 +57,7 @@ fn try_build_rejects_unknown_child_types() {
         subtypes: None,
     }];
 
-    let err = DynamicNodeTypes::try_build(&shapes, node_id_for_name, field_id_for_name)
+    let err = build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
         .expect_err("unknown child type should fail");
 
     assert_eq!(
@@ -89,7 +71,7 @@ fn try_build_rejects_unknown_child_types() {
 }
 
 #[test]
-fn try_build_skips_known_abstract_child_shapes() {
+fn skips_known_abstract_child_shapes() {
     let shapes = vec![
         NodeShape {
             type_name: "root".to_string(),
@@ -118,9 +100,22 @@ fn try_build_skips_known_abstract_child_shapes() {
         },
     ];
 
-    let node_types = DynamicNodeTypes::try_build(&shapes, node_id_for_name, field_id_for_name)
-        .expect("known abstract shapes should not be runtime node ids");
+    let (node_constraints, _, _) =
+        build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
+            .expect("known abstract shapes should not be runtime node ids");
     let root_id = NonZeroU16::new(1).unwrap();
 
-    assert_eq!(node_types.valid_child_types(root_id), &[]);
+    let children = node_constraints[&root_id].children.as_ref().unwrap();
+    assert_eq!(children.valid_types, &[]);
+}
+
+fn child_slot(multiple: bool, required: bool) -> NodeSlot {
+    NodeSlot {
+        multiple,
+        required,
+        types: vec![NodeKindRef {
+            type_name: "child".to_string(),
+            named: true,
+        }],
+    }
 }

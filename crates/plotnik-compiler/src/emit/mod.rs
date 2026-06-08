@@ -13,7 +13,7 @@ mod regex_table;
 mod string_table;
 mod type_table;
 
-#[cfg(all(test, feature = "plotnik-langs"))]
+#[cfg(test)]
 mod emit_tests;
 #[cfg(test)]
 mod layout_tests;

@@ -3,18 +3,24 @@
 //! This module provides types for representing tree-sitter `grammar.json` files,
 //! with support for JSON deserialization and compact binary serialization.
 
-mod binary;
+#[doc(hidden)]
+pub mod compat;
 mod json;
-mod node_shapes;
+pub mod raw;
 mod tree_sitter;
 mod types;
 
 #[cfg(test)]
-mod binary_tests;
-#[cfg(test)]
 mod json_tests;
 #[cfg(test)]
 mod node_shapes_tests;
+#[cfg(test)]
+mod types_tests;
 
 pub use json::GrammarError;
-pub use types::{Grammar, Precedence, PrecedenceEntry, Rule};
+pub use types::Grammar;
+
+#[cfg(plotnik_grammar_profile)]
+pub mod profile {
+    pub use super::tree_sitter::profile::{ProfileSnapshot, reset, snapshot};
+}

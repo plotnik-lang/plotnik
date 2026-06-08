@@ -1,10 +1,7 @@
-use super::*;
+use super::raw::RawGrammar;
+use super::types::NodeShape;
 
-fn find_node<'a>(
-    nodes: &'a [crate::NodeShape],
-    type_name: &str,
-    named: bool,
-) -> &'a crate::NodeShape {
+fn find_node<'a>(nodes: &'a [NodeShape], type_name: &str, named: bool) -> &'a NodeShape {
     nodes
         .iter()
         .find(|node| node.type_name == type_name && node.named == named)
@@ -35,7 +32,10 @@ fn derives_root_fields_children_and_extras() {
         "extras": [{ "type": "SYMBOL", "name": "comment" }]
     }"##;
 
-    let nodes = Grammar::from_json(json).unwrap().node_shapes();
+    let raw = RawGrammar::from_json(json).unwrap();
+    let nodes = super::tree_sitter::metadata_for_raw(&raw)
+        .unwrap()
+        .node_shapes;
 
     let program = find_node(&nodes, "program", true);
     assert!(program.root);
@@ -76,7 +76,10 @@ fn derives_supertype_subtypes() {
         "supertypes": ["expression"]
     }"#;
 
-    let nodes = Grammar::from_json(json).unwrap().node_shapes();
+    let raw = RawGrammar::from_json(json).unwrap();
+    let nodes = super::tree_sitter::metadata_for_raw(&raw)
+        .unwrap()
+        .node_shapes;
     let expression = find_node(&nodes, "expression", true);
     let subtypes = expression.subtypes.as_ref().unwrap();
 

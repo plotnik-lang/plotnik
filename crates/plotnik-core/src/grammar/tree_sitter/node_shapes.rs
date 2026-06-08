@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{NodeKindRef, NodeShape, NodeSlot};
+use super::super::types::{NodeKindRef, NodeShape, NodeSlot};
 
 use super::{
     grammars::{LexicalGrammar, SyntaxGrammar, VariableType},

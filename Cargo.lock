@@ -1797,78 +1797,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
 name = "plotnik"
-version = "0.3.3"
-dependencies = [
- "arborium-tree-sitter",
- "clap",
- "insta",
- "plotnik-core",
- "plotnik-langs",
- "plotnik-lib",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "plotnik-bytecode"
-version = "0.3.3"
-dependencies = [
- "insta",
- "plotnik-core",
- "regex-automata",
- "thiserror",
-]
-
-[[package]]
-name = "plotnik-compiler"
-version = "0.3.3"
-dependencies = [
- "annotate-snippets",
- "arborium-tree-sitter",
- "crc32fast",
- "indexmap",
- "indoc",
- "insta",
- "logos",
- "memmap2",
- "plotnik-bytecode",
- "plotnik-core",
- "plotnik-langs",
- "regex-automata",
- "regex-syntax",
- "rowan",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "plotnik-core"
-version = "0.3.3"
-dependencies = [
- "fixedbitset",
- "indexmap",
- "log",
- "postcard",
- "regex-syntax",
- "rustc-hash 2.1.2",
- "serde",
- "serde_json",
- "thiserror",
- "topological-sort",
-]
-
-[[package]]
-name = "plotnik-langs"
 version = "0.3.3"
 dependencies = [
  "arborium-ada",
@@ -1985,18 +1914,70 @@ dependencies = [
  "arborium-zig",
  "arborium-zsh",
  "cargo_metadata",
- "paste",
+ "clap",
+ "insta",
  "plotnik-core",
- "postcard",
+ "plotnik-lib",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-bytecode"
+version = "0.3.3"
+dependencies = [
+ "insta",
+ "plotnik-core",
+ "regex-automata",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-compiler"
+version = "0.3.3"
+dependencies = [
+ "annotate-snippets",
+ "arborium-javascript",
+ "cargo_metadata",
+ "crc32fast",
+ "indexmap",
+ "indoc",
+ "insta",
+ "logos",
+ "memmap2",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "regex-automata",
+ "regex-syntax",
+ "rowan",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-core"
+version = "0.3.3"
+dependencies = [
+ "bitflags",
+ "fixedbitset",
+ "indexmap",
+ "log",
+ "postcard",
+ "regex-syntax",
+ "rustc-hash 2.1.2",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "topological-sort",
 ]
 
 [[package]]
 name = "plotnik-lib"
 version = "0.3.3"
 dependencies = [
- "arborium-tree-sitter",
  "indoc",
  "insta",
  "plotnik-bytecode",

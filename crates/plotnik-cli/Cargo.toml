@@ -9,7 +9,7 @@ documentation = "https://docs.rs/plotnik"
 keywords = ["tree-sitter", "query", "ast", "parser", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../../README.md"
-include = ["src/**/*", "Cargo.toml"]
+include = ["src/**/*", "build.rs", "Cargo.toml"]
 
 [[bin]]
 name = "plotnik"
@@ -150,129 +150,246 @@ all-languages = [
 # @generated:all-languages:end
 ]
 # @generated:lang-features:begin
-lang-ada = ["plotnik-langs/lang-ada"]
-lang-agda = ["plotnik-langs/lang-agda"]
-lang-asciidoc = ["plotnik-langs/lang-asciidoc"]
-lang-asm = ["plotnik-langs/lang-asm"]
-lang-awk = ["plotnik-langs/lang-awk"]
-lang-bash = ["plotnik-langs/lang-bash"]
-lang-batch = ["plotnik-langs/lang-batch"]
-lang-c = ["plotnik-langs/lang-c"]
-lang-c-sharp = ["plotnik-langs/lang-c-sharp"]
-lang-caddy = ["plotnik-langs/lang-caddy"]
-lang-capnp = ["plotnik-langs/lang-capnp"]
-lang-cedar = ["plotnik-langs/lang-cedar"]
-lang-cedarschema = ["plotnik-langs/lang-cedarschema"]
-lang-clojure = ["plotnik-langs/lang-clojure"]
-lang-cmake = ["plotnik-langs/lang-cmake"]
-lang-cobol = ["plotnik-langs/lang-cobol"]
-lang-commonlisp = ["plotnik-langs/lang-commonlisp"]
-lang-cpp = ["plotnik-langs/lang-cpp"]
-lang-css = ["plotnik-langs/lang-css"]
-lang-d = ["plotnik-langs/lang-d"]
-lang-dart = ["plotnik-langs/lang-dart"]
-lang-devicetree = ["plotnik-langs/lang-devicetree"]
-lang-diff = ["plotnik-langs/lang-diff"]
-lang-dockerfile = ["plotnik-langs/lang-dockerfile"]
-lang-dot = ["plotnik-langs/lang-dot"]
-lang-elisp = ["plotnik-langs/lang-elisp"]
-lang-elixir = ["plotnik-langs/lang-elixir"]
-lang-elm = ["plotnik-langs/lang-elm"]
-lang-erlang = ["plotnik-langs/lang-erlang"]
-lang-fish = ["plotnik-langs/lang-fish"]
-lang-fsharp = ["plotnik-langs/lang-fsharp"]
-lang-gitattributes = ["plotnik-langs/lang-gitattributes"]
-lang-gleam = ["plotnik-langs/lang-gleam"]
-lang-glsl = ["plotnik-langs/lang-glsl"]
-lang-go = ["plotnik-langs/lang-go"]
-lang-graphql = ["plotnik-langs/lang-graphql"]
-lang-groovy = ["plotnik-langs/lang-groovy"]
-lang-haskell = ["plotnik-langs/lang-haskell"]
-lang-hcl = ["plotnik-langs/lang-hcl"]
-lang-hlsl = ["plotnik-langs/lang-hlsl"]
-lang-html = ["plotnik-langs/lang-html"]
-lang-idris = ["plotnik-langs/lang-idris"]
-lang-ini = ["plotnik-langs/lang-ini"]
-lang-java = ["plotnik-langs/lang-java"]
-lang-javascript = ["plotnik-langs/lang-javascript"]
-lang-jinja2 = ["plotnik-langs/lang-jinja2"]
-lang-jq = ["plotnik-langs/lang-jq"]
-lang-jsdoc = ["plotnik-langs/lang-jsdoc"]
-lang-json = ["plotnik-langs/lang-json"]
-lang-julia = ["plotnik-langs/lang-julia"]
-lang-just = ["plotnik-langs/lang-just"]
-lang-kconfig = ["plotnik-langs/lang-kconfig"]
-lang-kdl = ["plotnik-langs/lang-kdl"]
-lang-kotlin = ["plotnik-langs/lang-kotlin"]
-lang-lean = ["plotnik-langs/lang-lean"]
-lang-lua = ["plotnik-langs/lang-lua"]
-lang-make = ["plotnik-langs/lang-make"]
-lang-markdown = ["plotnik-langs/lang-markdown"]
-lang-matlab = ["plotnik-langs/lang-matlab"]
-lang-meson = ["plotnik-langs/lang-meson"]
-lang-nginx = ["plotnik-langs/lang-nginx"]
-lang-ninja = ["plotnik-langs/lang-ninja"]
-lang-nix = ["plotnik-langs/lang-nix"]
-lang-objc = ["plotnik-langs/lang-objc"]
-lang-ocaml = ["plotnik-langs/lang-ocaml"]
-lang-odin = ["plotnik-langs/lang-odin"]
-lang-perl = ["plotnik-langs/lang-perl"]
-lang-php = ["plotnik-langs/lang-php"]
-lang-postscript = ["plotnik-langs/lang-postscript"]
-lang-powershell = ["plotnik-langs/lang-powershell"]
-lang-prolog = ["plotnik-langs/lang-prolog"]
-lang-proto = ["plotnik-langs/lang-proto"]
-lang-python = ["plotnik-langs/lang-python"]
-lang-query = ["plotnik-langs/lang-query"]
-lang-r = ["plotnik-langs/lang-r"]
-lang-regex = ["plotnik-langs/lang-regex"]
-lang-rego = ["plotnik-langs/lang-rego"]
-lang-rescript = ["plotnik-langs/lang-rescript"]
-lang-ron = ["plotnik-langs/lang-ron"]
-lang-ruby = ["plotnik-langs/lang-ruby"]
-lang-rust = ["plotnik-langs/lang-rust"]
-lang-scala = ["plotnik-langs/lang-scala"]
-lang-scheme = ["plotnik-langs/lang-scheme"]
-lang-scss = ["plotnik-langs/lang-scss"]
-lang-solidity = ["plotnik-langs/lang-solidity"]
-lang-sparql = ["plotnik-langs/lang-sparql"]
-lang-sql = ["plotnik-langs/lang-sql"]
-lang-ssh-config = ["plotnik-langs/lang-ssh-config"]
-lang-starlark = ["plotnik-langs/lang-starlark"]
-lang-styx = ["plotnik-langs/lang-styx"]
-lang-svelte = ["plotnik-langs/lang-svelte"]
-lang-swift = ["plotnik-langs/lang-swift"]
-lang-textproto = ["plotnik-langs/lang-textproto"]
-lang-thrift = ["plotnik-langs/lang-thrift"]
-lang-tlaplus = ["plotnik-langs/lang-tlaplus"]
-lang-toml = ["plotnik-langs/lang-toml"]
-lang-tsx = ["plotnik-langs/lang-tsx"]
-lang-typescript = ["plotnik-langs/lang-typescript"]
-lang-typst = ["plotnik-langs/lang-typst"]
-lang-uiua = ["plotnik-langs/lang-uiua"]
-lang-vb = ["plotnik-langs/lang-vb"]
-lang-verilog = ["plotnik-langs/lang-verilog"]
-lang-vhdl = ["plotnik-langs/lang-vhdl"]
-lang-vim = ["plotnik-langs/lang-vim"]
-lang-vue = ["plotnik-langs/lang-vue"]
-lang-wit = ["plotnik-langs/lang-wit"]
-lang-x86asm = ["plotnik-langs/lang-x86asm"]
-lang-xml = ["plotnik-langs/lang-xml"]
-lang-yaml = ["plotnik-langs/lang-yaml"]
-lang-yuri = ["plotnik-langs/lang-yuri"]
-lang-zig = ["plotnik-langs/lang-zig"]
-lang-zsh = ["plotnik-langs/lang-zsh"]
+lang-ada = ["dep:arborium-ada"]
+lang-agda = ["dep:arborium-agda"]
+lang-asciidoc = ["dep:arborium-asciidoc"]
+lang-asm = ["dep:arborium-asm"]
+lang-awk = ["dep:arborium-awk"]
+lang-bash = ["dep:arborium-bash"]
+lang-batch = ["dep:arborium-batch"]
+lang-c = ["dep:arborium-c"]
+lang-c-sharp = ["dep:arborium-c-sharp"]
+lang-caddy = ["dep:arborium-caddy"]
+lang-capnp = ["dep:arborium-capnp"]
+lang-cedar = ["dep:arborium-cedar"]
+lang-cedarschema = ["dep:arborium-cedarschema"]
+lang-clojure = ["dep:arborium-clojure"]
+lang-cmake = ["dep:arborium-cmake"]
+lang-cobol = ["dep:arborium-cobol"]
+lang-commonlisp = ["dep:arborium-commonlisp"]
+lang-cpp = ["dep:arborium-cpp"]
+lang-css = ["dep:arborium-css"]
+lang-d = ["dep:arborium-d"]
+lang-dart = ["dep:arborium-dart"]
+lang-devicetree = ["dep:arborium-devicetree"]
+lang-diff = ["dep:arborium-diff"]
+lang-dockerfile = ["dep:arborium-dockerfile"]
+lang-dot = ["dep:arborium-dot"]
+lang-elisp = ["dep:arborium-elisp"]
+lang-elixir = ["dep:arborium-elixir"]
+lang-elm = ["dep:arborium-elm"]
+lang-erlang = ["dep:arborium-erlang"]
+lang-fish = ["dep:arborium-fish"]
+lang-fsharp = ["dep:arborium-fsharp"]
+lang-gitattributes = ["dep:arborium-gitattributes"]
+lang-gleam = ["dep:arborium-gleam"]
+lang-glsl = ["dep:arborium-glsl"]
+lang-go = ["dep:arborium-go"]
+lang-graphql = ["dep:arborium-graphql"]
+lang-groovy = ["dep:arborium-groovy"]
+lang-haskell = ["dep:arborium-haskell"]
+lang-hcl = ["dep:arborium-hcl"]
+lang-hlsl = ["dep:arborium-hlsl"]
+lang-html = ["dep:arborium-html"]
+lang-idris = ["dep:arborium-idris"]
+lang-ini = ["dep:arborium-ini"]
+lang-java = ["dep:arborium-java"]
+lang-javascript = ["dep:arborium-javascript"]
+lang-jinja2 = ["dep:arborium-jinja2"]
+lang-jq = ["dep:arborium-jq"]
+lang-jsdoc = ["dep:arborium-jsdoc"]
+lang-json = ["dep:arborium-json"]
+lang-julia = ["dep:arborium-julia"]
+lang-just = ["dep:arborium-just"]
+lang-kconfig = ["dep:arborium-kconfig"]
+lang-kdl = ["dep:arborium-kdl"]
+lang-kotlin = ["dep:arborium-kotlin"]
+lang-lean = ["dep:arborium-lean"]
+lang-lua = ["dep:arborium-lua"]
+lang-make = ["dep:arborium-make"]
+lang-markdown = ["dep:arborium-markdown"]
+lang-matlab = ["dep:arborium-matlab"]
+lang-meson = ["dep:arborium-meson"]
+lang-nginx = ["dep:arborium-nginx"]
+lang-ninja = ["dep:arborium-ninja"]
+lang-nix = ["dep:arborium-nix"]
+lang-objc = ["dep:arborium-objc"]
+lang-ocaml = ["dep:arborium-ocaml"]
+lang-odin = ["dep:arborium-odin"]
+lang-perl = ["dep:arborium-perl"]
+lang-php = ["dep:arborium-php"]
+lang-postscript = ["dep:arborium-postscript"]
+lang-powershell = ["dep:arborium-powershell"]
+lang-prolog = ["dep:arborium-prolog"]
+lang-proto = ["dep:arborium-proto"]
+lang-python = ["dep:arborium-python"]
+lang-query = ["dep:arborium-query"]
+lang-r = ["dep:arborium-r"]
+lang-regex = ["dep:arborium-regex"]
+lang-rego = ["dep:arborium-rego"]
+lang-rescript = ["dep:arborium-rescript"]
+lang-ron = ["dep:arborium-ron"]
+lang-ruby = ["dep:arborium-ruby"]
+lang-rust = ["dep:arborium-rust"]
+lang-scala = ["dep:arborium-scala"]
+lang-scheme = ["dep:arborium-scheme"]
+lang-scss = ["dep:arborium-scss"]
+lang-solidity = ["dep:arborium-solidity"]
+lang-sparql = ["dep:arborium-sparql"]
+lang-sql = ["dep:arborium-sql"]
+lang-ssh-config = ["dep:arborium-ssh-config"]
+lang-starlark = ["dep:arborium-starlark"]
+lang-styx = ["dep:arborium-styx"]
+lang-svelte = ["dep:arborium-svelte"]
+lang-swift = ["dep:arborium-swift"]
+lang-textproto = ["dep:arborium-textproto"]
+lang-thrift = ["dep:arborium-thrift"]
+lang-tlaplus = ["dep:arborium-tlaplus"]
+lang-toml = ["dep:arborium-toml"]
+lang-tsx = ["dep:arborium-tsx"]
+lang-typescript = ["dep:arborium-typescript"]
+lang-typst = ["dep:arborium-typst"]
+lang-uiua = ["dep:arborium-uiua"]
+lang-vb = ["dep:arborium-vb"]
+lang-verilog = ["dep:arborium-verilog"]
+lang-vhdl = ["dep:arborium-vhdl"]
+lang-vim = ["dep:arborium-vim"]
+lang-vue = ["dep:arborium-vue"]
+lang-wit = ["dep:arborium-wit"]
+lang-x86asm = ["dep:arborium-x86asm"]
+lang-xml = ["dep:arborium-xml"]
+lang-yaml = ["dep:arborium-yaml"]
+lang-yuri = ["dep:arborium-yuri"]
+lang-zig = ["dep:arborium-zig"]
+lang-zsh = ["dep:arborium-zsh"]
 # @generated:lang-features:end
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 plotnik-core.workspace = true
-plotnik-langs = { path = "../plotnik-langs", version = "0.3.3", default-features = false }
 plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false }
 arborium-tree-sitter = "2.18.0"
+# @generated:lang-deps:begin
+arborium-ada = { version = "2.18.0", optional = true }
+arborium-agda = { version = "2.18.0", optional = true }
+arborium-asciidoc = { version = "2.18.0", optional = true }
+arborium-asm = { version = "2.18.0", optional = true }
+arborium-awk = { version = "2.18.0", optional = true }
+arborium-bash = { version = "2.18.0", optional = true }
+arborium-batch = { version = "2.18.0", optional = true }
+arborium-c = { version = "2.18.0", optional = true }
+arborium-c-sharp = { version = "2.18.0", optional = true }
+arborium-caddy = { version = "2.18.0", optional = true }
+arborium-capnp = { version = "2.18.0", optional = true }
+arborium-cedar = { version = "2.18.0", optional = true }
+arborium-cedarschema = { version = "2.18.0", optional = true }
+arborium-clojure = { version = "2.18.0", optional = true }
+arborium-cmake = { version = "2.18.0", optional = true }
+arborium-cobol = { version = "2.18.0", optional = true }
+arborium-commonlisp = { version = "2.18.0", optional = true }
+arborium-cpp = { version = "2.18.0", optional = true }
+arborium-css = { version = "2.18.0", optional = true }
+arborium-d = { version = "2.18.0", optional = true }
+arborium-dart = { version = "2.18.0", optional = true }
+arborium-devicetree = { version = "2.18.0", optional = true }
+arborium-diff = { version = "2.18.0", optional = true }
+arborium-dockerfile = { version = "2.18.0", optional = true }
+arborium-dot = { version = "2.18.0", optional = true }
+arborium-elisp = { version = "2.18.0", optional = true }
+arborium-elixir = { version = "2.18.0", optional = true }
+arborium-elm = { version = "2.18.0", optional = true }
+arborium-erlang = { version = "2.18.0", optional = true }
+arborium-fish = { version = "2.18.0", optional = true }
+arborium-fsharp = { version = "2.18.0", optional = true }
+arborium-gitattributes = { version = "2.18.0", optional = true }
+arborium-gleam = { version = "2.18.0", optional = true }
+arborium-glsl = { version = "2.18.0", optional = true }
+arborium-go = { version = "2.18.0", optional = true }
+arborium-graphql = { version = "2.18.0", optional = true }
+arborium-groovy = { version = "2.18.0", optional = true }
+arborium-haskell = { version = "2.18.0", optional = true }
+arborium-hcl = { version = "2.18.0", optional = true }
+arborium-hlsl = { version = "2.18.0", optional = true }
+arborium-html = { version = "2.18.0", optional = true }
+arborium-idris = { version = "2.18.0", optional = true }
+arborium-ini = { version = "2.18.0", optional = true }
+arborium-java = { version = "2.18.0", optional = true }
+arborium-javascript = { version = "2.18.0", optional = true }
+arborium-jinja2 = { version = "2.18.0", optional = true }
+arborium-jq = { version = "2.18.0", optional = true }
+arborium-jsdoc = { version = "2.18.0", optional = true }
+arborium-json = { version = "2.18.0", optional = true }
+arborium-julia = { version = "2.18.0", optional = true }
+arborium-just = { version = "2.18.0", optional = true }
+arborium-kconfig = { version = "2.18.0", optional = true }
+arborium-kdl = { version = "2.18.0", optional = true }
+arborium-kotlin = { version = "2.18.0", optional = true }
+arborium-lean = { version = "2.18.0", optional = true }
+arborium-lua = { version = "2.18.0", optional = true }
+arborium-make = { version = "2.18.0", optional = true }
+arborium-markdown = { version = "2.18.0", optional = true }
+arborium-matlab = { version = "2.18.0", optional = true }
+arborium-meson = { version = "2.18.0", optional = true }
+arborium-nginx = { version = "2.18.0", optional = true }
+arborium-ninja = { version = "2.18.0", optional = true }
+arborium-nix = { version = "2.18.0", optional = true }
+arborium-objc = { version = "2.18.0", optional = true }
+arborium-ocaml = { version = "2.18.0", optional = true }
+arborium-odin = { version = "2.18.0", optional = true }
+arborium-perl = { version = "2.18.0", optional = true }
+arborium-php = { version = "2.18.0", optional = true }
+arborium-postscript = { version = "2.18.0", optional = true }
+arborium-powershell = { version = "2.18.0", optional = true }
+arborium-prolog = { version = "2.18.0", optional = true }
+arborium-proto = { version = "2.18.0", optional = true }
+arborium-python = { version = "2.18.0", optional = true }
+arborium-query = { version = "2.18.0", optional = true }
+arborium-r = { version = "2.18.0", optional = true }
+arborium-regex = { version = "2.18.0", optional = true }
+arborium-rego = { version = "2.18.0", optional = true }
+arborium-rescript = { version = "2.18.0", optional = true }
+arborium-ron = { version = "2.18.0", optional = true }
+arborium-ruby = { version = "2.18.0", optional = true }
+arborium-rust = { version = "2.18.0", optional = true }
+arborium-scala = { version = "2.18.0", optional = true }
+arborium-scheme = { version = "2.18.0", optional = true }
+arborium-scss = { version = "2.18.0", optional = true }
+arborium-solidity = { version = "2.18.0", optional = true }
+arborium-sparql = { version = "2.18.0", optional = true }
+arborium-sql = { version = "2.18.0", optional = true }
+arborium-ssh-config = { version = "2.18.0", optional = true }
+arborium-starlark = { version = "2.18.0", optional = true }
+arborium-styx = { version = "2.18.0", optional = true }
+arborium-svelte = { version = "2.18.0", optional = true }
+arborium-swift = { version = "2.18.0", optional = true }
+arborium-textproto = { version = "2.18.0", optional = true }
+arborium-thrift = { version = "2.18.0", optional = true }
+arborium-tlaplus = { version = "2.18.0", optional = true }
+arborium-toml = { version = "2.18.0", optional = true }
+arborium-tsx = { version = "2.18.0", optional = true }
+arborium-typescript = { version = "2.18.0", optional = true }
+arborium-typst = { version = "2.18.0", optional = true }
+arborium-uiua = { version = "2.18.0", optional = true }
+arborium-vb = { version = "2.18.0", optional = true }
+arborium-verilog = { version = "2.18.0", optional = true }
+arborium-vhdl = { version = "2.18.0", optional = true }
+arborium-vim = { version = "2.18.0", optional = true }
+arborium-vue = { version = "2.18.0", optional = true }
+arborium-wit = { version = "2.18.0", optional = true }
+arborium-x86asm = { version = "2.18.0", optional = true }
+arborium-xml = { version = "2.18.0", optional = true }
+arborium-yaml = { version = "2.18.0", optional = true }
+arborium-yuri = { version = "2.18.0", optional = true }
+arborium-zig = { version = "2.18.0", optional = true }
+arborium-zsh = { version = "2.18.0", optional = true }
+# @generated:lang-deps:end
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+
+[build-dependencies]
+cargo_metadata = "0.23"
+plotnik-core.workspace = true
 
 [dev-dependencies]
 insta = "=1.47.2"

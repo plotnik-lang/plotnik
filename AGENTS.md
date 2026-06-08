@@ -152,7 +152,7 @@ crates/
     src/
       bytecode/        # Instruction set, modules, linking
       type_system/     # Shared type primitives
-  plotnik-cli/         # CLI tool
+  plotnik-cli/         # CLI tool and language-feature registry
     src/commands/      # Subcommands (ast, check, dump, exec, infer, trace, langs)
   plotnik-compiler/    # Compilation pipeline
     src/
@@ -163,8 +163,7 @@ crates/
       parser/          # Syntactic parsing (lexer, grammar, AST)
       query/           # Query facade (Query, QueryBuilder, SourceMap)
       typegen/         # Type declaration extraction (bytecode → .d.ts)
-  plotnik-core/        # Node type database (NodeTypes, StaticNodeTypes) and string interning (Interner, Symbol)
-  plotnik-langs/       # Tree-sitter language bindings
+  plotnik-core/        # Grammar metadata, node type database, and string interning (Interner, Symbol)
   plotnik-lib/         # Facade crate re-exporting bytecode, compiler, vm
   plotnik-vm/          # Runtime VM
     src/engine/        # Execution, backtracking, effects

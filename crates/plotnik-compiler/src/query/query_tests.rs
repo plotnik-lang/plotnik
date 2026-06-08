@@ -1,13 +1,22 @@
 use plotnik_bytecode::{Module, dump};
 use plotnik_core::Colors;
-use plotnik_langs::{Lang, from_name};
+use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+use std::sync::LazyLock;
 
 use crate::SourceMap;
 
 use super::{LinkedQuery, QueryAnalyzed, QueryBuilder};
 
-fn javascript() -> Lang {
-    from_name("javascript").expect("javascript lang")
+fn javascript() -> &'static Grammar {
+    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
+        let raw = RawGrammar::from_json(include_str!(env!(
+            "PLOTNIK_COMPILER_JAVASCRIPT_GRAMMAR_JSON"
+        )))
+        .expect("javascript grammar fixture");
+        Grammar::from_raw(&raw).expect("javascript grammar metadata")
+    });
+
+    &GRAMMAR
 }
 
 macro_rules! expect_invalid {

@@ -1,44 +1,44 @@
 use std::collections::HashSet;
 use std::process::exit;
 
-use plotnik_core::grammar::{Grammar, Rule};
+use plotnik_core::grammar::raw::{RawGrammar, RawRule};
+
+use super::language_registry;
 
 /// List all supported languages with aliases.
 pub fn run_list() {
-    let infos = plotnik_langs::all_info();
-    for info in infos {
-        let aliases: Vec<_> = info.aliases.iter().skip(1).copied().collect();
+    for lang in language_registry::all() {
+        let aliases: Vec<_> = lang.aliases().iter().skip(1).copied().collect();
         if aliases.is_empty() {
-            println!("{}", info.name);
+            println!("{}", lang.name());
         } else {
-            println!("{} ({})", info.name, aliases.join(", "));
+            println!("{} ({})", lang.name(), aliases.join(", "));
         }
     }
 }
 
 /// Dump grammar for a language.
 pub fn run_dump(lang_name: &str) {
-    let Some(lang) = plotnik_langs::from_name(lang_name) else {
+    let Some(lang) = language_registry::from_name(lang_name) else {
         eprintln!("error: unknown language '{lang_name}'");
         eprintln!();
         eprintln!("Run 'plotnik lang list' to see available languages.");
         exit(1);
     };
 
-    let grammar = lang.grammar();
-    let renderer = GrammarRenderer::new(grammar);
+    let renderer = GrammarRenderer::new(lang.raw());
     print!("{}", renderer.render());
 }
 
 pub struct GrammarRenderer<'a> {
-    grammar: &'a Grammar,
+    grammar: &'a RawGrammar,
     hidden_rules: HashSet<&'a str>,
 }
 
 impl<'a> GrammarRenderer<'a> {
-    pub fn new(grammar: &'a Grammar) -> Self {
+    pub fn new(grammar: &'a RawGrammar) -> Self {
         let hidden_rules: HashSet<_> = grammar
-            .rules()
+            .rules
             .iter()
             .filter(|(name, _)| name.starts_with('_'))
             .map(|(name, _)| name.as_str())
@@ -84,14 +84,14 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_extras(&self, out: &mut String) {
-        self.render_rule_list("extras", self.grammar.extras(), out);
+        self.render_rule_list("extras", &self.grammar.extras, out);
     }
 
     fn render_externals(&self, out: &mut String) {
-        self.render_rule_list("externals", self.grammar.externals(), out);
+        self.render_rule_list("externals", &self.grammar.externals, out);
     }
 
-    fn render_rule_list(&self, label: &str, rules: &[Rule], out: &mut String) {
+    fn render_rule_list(&self, label: &str, rules: &[RawRule], out: &mut String) {
         if rules.is_empty() {
             return;
         }
@@ -107,8 +107,8 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_supertypes(&self, out: &mut String) {
-        for supertype in self.grammar.supertypes() {
-            if let Some((_, rule)) = self.grammar.rules().iter().find(|(n, _)| n == supertype) {
+        for supertype in &self.grammar.supertypes {
+            if let Some(rule) = self.grammar.rules.get(supertype) {
                 out.push_str(supertype);
                 out.push_str(" :: supertype = ");
                 self.render_rule(rule, out, 0);
@@ -118,10 +118,11 @@ impl<'a> GrammarRenderer<'a> {
     }
 
     fn render_rules(&self, out: &mut String) {
-        let supertypes_set: HashSet<_> = self.grammar.supertypes().iter().collect();
+        let supertypes_set: HashSet<_> =
+            self.grammar.supertypes.iter().map(String::as_str).collect();
 
-        for (name, rule) in self.grammar.rules() {
-            if supertypes_set.contains(name) {
+        for (name, rule) in &self.grammar.rules {
+            if supertypes_set.contains(name.as_str()) {
                 continue;
             }
 
@@ -132,13 +133,13 @@ impl<'a> GrammarRenderer<'a> {
         }
     }
 
-    fn render_rule(&self, rule: &Rule, out: &mut String, indent: usize) {
+    fn render_rule(&self, rule: &RawRule, out: &mut String, indent: usize) {
         match rule {
-            Rule::Blank => out.push_str("()"),
+            RawRule::BLANK => out.push_str("()"),
 
-            Rule::String(s) => {
+            RawRule::STRING { value } => {
                 out.push('"');
-                for c in s.chars() {
+                for c in value.chars() {
                     match c {
                         '"' => out.push_str("\\\""),
                         '\\' => out.push_str("\\\\"),
@@ -151,7 +152,7 @@ impl<'a> GrammarRenderer<'a> {
                 out.push('"');
             }
 
-            Rule::Pattern { value, flags } => {
+            RawRule::PATTERN { value, flags } => {
                 out.push('/');
                 out.push_str(value);
                 out.push('/');
@@ -160,7 +161,7 @@ impl<'a> GrammarRenderer<'a> {
                 }
             }
 
-            Rule::Symbol(name) => {
+            RawRule::SYMBOL { name } => {
                 out.push('(');
                 out.push_str(name);
                 if self.hidden_rules.contains(name.as_str()) {
@@ -170,36 +171,36 @@ impl<'a> GrammarRenderer<'a> {
                 }
             }
 
-            Rule::Seq(children) => {
-                self.render_block(children, '{', '}', indent, out);
+            RawRule::SEQ { members } => {
+                self.render_block(members, '{', '}', indent, out);
             }
 
-            Rule::Choice(children) => {
-                if let Some(simplified) = self.simplify_optional(children) {
+            RawRule::CHOICE { members } => {
+                if let Some(simplified) = self.simplify_optional(members) {
                     self.render_rule(&simplified, out, indent);
                     out.push('?');
                 } else {
-                    self.render_block(children, '[', ']', indent, out);
+                    self.render_block(members, '[', ']', indent, out);
                 }
             }
 
-            Rule::Repeat(inner) => {
-                self.render_rule(inner, out, indent);
+            RawRule::REPEAT { content } => {
+                self.render_rule(content, out, indent);
                 out.push('*');
             }
 
-            Rule::Repeat1(inner) => {
-                self.render_rule(inner, out, indent);
+            RawRule::REPEAT1 { content } => {
+                self.render_rule(content, out, indent);
                 out.push('+');
             }
 
-            Rule::Field { name, content } => {
+            RawRule::FIELD { name, content } => {
                 out.push_str(name);
                 out.push_str(": ");
                 self.render_rule(content, out, indent);
             }
 
-            Rule::Alias {
+            RawRule::ALIAS {
                 content: _,
                 value,
                 named,
@@ -210,23 +211,23 @@ impl<'a> GrammarRenderer<'a> {
                 out.push(close);
             }
 
-            Rule::Token(inner) => {
-                self.render_rule(inner, out, indent);
-            }
-
-            Rule::ImmediateToken(inner) => {
-                self.render_rule(inner, out, indent);
-                out.push('!');
-            }
-
-            Rule::Prec { content, .. }
-            | Rule::PrecLeft { content, .. }
-            | Rule::PrecRight { content, .. }
-            | Rule::PrecDynamic { content, .. } => {
+            RawRule::TOKEN { content } => {
                 self.render_rule(content, out, indent);
             }
 
-            Rule::Reserved { content, .. } => {
+            RawRule::IMMEDIATE_TOKEN { content } => {
+                self.render_rule(content, out, indent);
+                out.push('!');
+            }
+
+            RawRule::PREC { content, .. }
+            | RawRule::PREC_LEFT { content, .. }
+            | RawRule::PREC_RIGHT { content, .. }
+            | RawRule::PREC_DYNAMIC { content, .. } => {
+                self.render_rule(content, out, indent);
+            }
+
+            RawRule::RESERVED { content, .. } => {
                 self.render_rule(content, out, indent);
             }
         }
@@ -234,7 +235,7 @@ impl<'a> GrammarRenderer<'a> {
 
     fn render_block(
         &self,
-        children: &[Rule],
+        children: &[RawRule],
         open: char,
         close: char,
         indent: usize,
@@ -256,13 +257,13 @@ impl<'a> GrammarRenderer<'a> {
         out.push(close);
     }
 
-    fn simplify_optional(&self, children: &[Rule]) -> Option<Rule> {
+    fn simplify_optional(&self, children: &[RawRule]) -> Option<RawRule> {
         if children.len() != 2 {
             return None;
         }
 
         match (&children[0], &children[1]) {
-            (Rule::Blank, other) | (other, Rule::Blank) => Some(other.clone()),
+            (RawRule::BLANK, other) | (other, RawRule::BLANK) => Some(other.clone()),
             _ => None,
         }
     }

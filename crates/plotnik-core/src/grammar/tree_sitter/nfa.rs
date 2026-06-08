@@ -144,6 +144,46 @@ impl CharacterSet {
         i
     }
 
+    #[must_use]
+    pub fn does_intersect(&self, other: &Self) -> bool {
+        let mut left_ranges = self.ranges.iter();
+        let mut right_ranges = other.ranges.iter();
+        let mut left_range = left_ranges.next();
+        let mut right_range = right_ranges.next();
+        while let (Some(left), Some(right)) = (&left_range, &right_range) {
+            if left.end <= right.start {
+                left_range = left_ranges.next();
+            } else if left.start >= right.end {
+                right_range = right_ranges.next();
+            } else {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[must_use]
+    pub fn is_subset_of(&self, other: &Self) -> bool {
+        let mut other_ranges = other.ranges.iter();
+        let mut other_range = other_ranges.next();
+
+        'left: for left in &self.ranges {
+            while let Some(right) = other_range {
+                if right.end <= left.start {
+                    other_range = other_ranges.next();
+                    continue;
+                }
+                if right.start <= left.start && left.end <= right.end {
+                    continue 'left;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        true
+    }
+
     /// Get the set of characters that are present in both this set
     /// and the other set. Remove those common characters from both
     /// of the operands.

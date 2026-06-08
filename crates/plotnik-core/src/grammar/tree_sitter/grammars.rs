@@ -213,6 +213,49 @@ impl VariableType {
     }
 }
 
+impl Production {
+    #[must_use]
+    pub fn first_symbol(&self) -> Option<Symbol> {
+        self.steps.first().map(|step| step.symbol)
+    }
+}
+
+impl LexicalGrammar {
+    pub fn variable_indices_for_nfa_states<'a>(
+        &'a self,
+        state_ids: &'a [u32],
+    ) -> impl Iterator<Item = usize> + 'a {
+        let mut prev = None;
+        state_ids.iter().filter_map(move |state_id| {
+            let variable_id = self.variable_index_for_nfa_state(*state_id);
+            if prev == Some(variable_id) {
+                None
+            } else {
+                prev = Some(variable_id);
+                prev
+            }
+        })
+    }
+
+    #[must_use]
+    pub fn variable_index_for_nfa_state(&self, state_id: u32) -> usize {
+        self.variables
+            .partition_point(|variable| variable.start_state < state_id)
+    }
+}
+
+impl SyntaxVariable {
+    #[must_use]
+    pub fn is_auxiliary(&self) -> bool {
+        self.kind == VariableType::Auxiliary
+    }
+
+    #[must_use]
+    pub fn is_hidden(&self) -> bool {
+        self.kind == VariableType::Hidden || self.kind == VariableType::Auxiliary
+    }
+}
+
 impl InlinedProductionMap {
     #[must_use]
     pub fn inlined_productions<'a>(

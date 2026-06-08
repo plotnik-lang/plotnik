@@ -5,12 +5,12 @@ use std::io::{self, Read};
 use std::path::Path;
 
 use arborium_tree_sitter as tree_sitter;
-use plotnik_langs::Lang;
 use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::emit::emit;
 
 use super::lang_resolver::{resolve_lang_required, suggest_language};
+use super::language_registry::{self, Lang};
 use super::query_loader::load_query_source;
 
 /// Load source code from file, stdin, or inline text.
@@ -43,7 +43,7 @@ pub fn load_source(
 }
 
 /// Resolve source language from --lang flag or file extension.
-pub fn resolve_lang(lang_name: Option<&str>, source_path: Option<&Path>) -> Lang {
+pub fn resolve_lang(lang_name: Option<&str>, source_path: Option<&Path>) -> &'static Lang {
     if let Some(name) = lang_name {
         return resolve_lang_required(name).unwrap_or_else(|msg| {
             eprintln!("error: {}", msg);
@@ -61,7 +61,7 @@ pub fn resolve_lang(lang_name: Option<&str>, source_path: Option<&Path>) -> Lang
         && path.as_os_str() != "-"
         && let Some(ext) = path.extension().and_then(|e| e.to_str())
     {
-        if let Some(lang) = plotnik_langs::from_ext(ext) {
+        if let Some(lang) = language_registry::from_ext(ext) {
             return lang;
         }
         eprintln!(
@@ -176,7 +176,7 @@ pub fn prepare_query(input: QueryInput) -> PreparedQuery {
     let lang = resolve_lang(input.lang, input.source_path);
 
     let query = match QueryBuilder::new(source_map).parse() {
-        Ok(parsed) => parsed.analyze().link(&lang),
+        Ok(parsed) => parsed.analyze().link(lang.grammar()),
         Err(e) => {
             eprintln!("error: {}", e);
             std::process::exit(1);

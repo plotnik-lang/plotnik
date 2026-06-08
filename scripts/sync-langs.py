@@ -2,8 +2,8 @@
 """Sync arborium language features from crates.io.
 
 Fetches available lang-* features from arborium crate and updates:
-- crates/plotnik-langs/Cargo.toml (features + dependencies)
-- crates/plotnik-cli/Cargo.toml (feature re-exports)
+- crates/plotnik-cli/Cargo.toml (features + optional Arborium dependencies)
+- crates/plotnik-cli/src/commands/language_registry.rs (definition consistency check)
 
 Usage:
     python scripts/sync-langs.py [--version VERSION] [--dry-run]
@@ -65,54 +65,7 @@ def replace_section(content: str, start_marker: str, end_marker: str, new_conten
     return result
 
 
-def update_plotnik_langs(path: Path, version: str, langs: list[str], dry_run: bool) -> bool:
-    """Update plotnik-langs/Cargo.toml."""
-    content = path.read_text()
-    original = content
-
-    # Generate all-languages array
-    all_langs_items = "\n".join(f'    "{lang}",' for lang in langs)
-    content = replace_section(
-        content,
-        "# @generated:all-languages:begin",
-        "# @generated:all-languages:end",
-        all_langs_items,
-    )
-
-    # Generate individual features
-    features = "\n".join(f'{lang} = ["dep:arborium-{lang[5:]}"]' for lang in langs)
-    content = replace_section(
-        content,
-        "# @generated:lang-features:begin",
-        "# @generated:lang-features:end",
-        features,
-    )
-
-    # Generate dependencies
-    deps = "\n".join(
-        f'arborium-{lang[5:]} = {{ version = "{version}", optional = true }}'
-        for lang in langs
-    )
-    content = replace_section(
-        content,
-        "# @generated:lang-deps:begin",
-        "# @generated:lang-deps:end",
-        deps,
-    )
-
-    if content == original:
-        print(f"  {path}: no changes")
-        return False
-
-    if dry_run:
-        print(f"  {path}: would update")
-    else:
-        path.write_text(content)
-        print(f"  {path}: updated")
-    return True
-
-
-def update_plotnik_cli(path: Path, langs: list[str], dry_run: bool) -> bool:
+def update_plotnik_cli(path: Path, version: str, langs: list[str], dry_run: bool) -> bool:
     """Update plotnik-cli/Cargo.toml."""
     content = path.read_text()
     original = content
@@ -126,13 +79,25 @@ def update_plotnik_cli(path: Path, langs: list[str], dry_run: bool) -> bool:
         all_langs_items,
     )
 
-    # Generate individual features (re-exports)
-    features = "\n".join(f'{lang} = ["plotnik-langs/{lang}"]' for lang in langs)
+    # Generate individual features.
+    features = "\n".join(f'{lang} = ["dep:arborium-{lang[5:]}"]' for lang in langs)
     content = replace_section(
         content,
         "# @generated:lang-features:begin",
         "# @generated:lang-features:end",
         features,
+    )
+
+    # Generate optional Arborium dependencies.
+    deps = "\n".join(
+        f'arborium-{lang[5:]} = {{ version = "{version}", optional = true }}'
+        for lang in langs
+    )
+    content = replace_section(
+        content,
+        "# @generated:lang-deps:begin",
+        "# @generated:lang-deps:end",
+        deps,
     )
 
     if content == original:
@@ -166,7 +131,7 @@ def post_pr_comment(added: list[str], removed: list[str]) -> None:
     """Post a comment to the current PR about builtin.rs inconsistency."""
     import subprocess
 
-    lines = ["Update `crates/plotnik-langs/src/builtin.rs`:", ""]
+    lines = ["Update `crates/plotnik-cli/src/commands/language_registry.rs`:", ""]
     if added:
         lines.append("Add: " + ", ".join(f"`{lang}`" for lang in added))
     if removed:
@@ -187,20 +152,18 @@ def main():
     print(f"Found {len(langs)} languages in arborium {version}")
 
     root = Path(__file__).resolve().parent.parent
-    langs_toml = root / "crates/plotnik-langs/Cargo.toml"
     cli_toml = root / "crates/plotnik-cli/Cargo.toml"
-    builtin_rs = root / "crates/plotnik-langs/src/builtin.rs"
+    registry_rs = root / "crates/plotnik-cli/src/commands/language_registry.rs"
 
     changed = False
-    changed |= update_plotnik_langs(langs_toml, version, langs, args.dry_run)
-    changed |= update_plotnik_cli(cli_toml, langs, args.dry_run)
+    changed |= update_plotnik_cli(cli_toml, version, langs, args.dry_run)
 
     if args.dry_run and changed:
         print("\nRun without --dry-run to apply changes")
 
-    added, removed = check_builtin_consistency(builtin_rs, langs)
+    added, removed = check_builtin_consistency(registry_rs, langs)
     if added or removed:
-        print("\nbuiltin.rs is out of sync with arborium:")
+        print("\nlanguage_registry.rs is out of sync with arborium:")
         for lang in added:
             print(f"  + {lang} (new in arborium, add to define_langs!)")
         for lang in removed:

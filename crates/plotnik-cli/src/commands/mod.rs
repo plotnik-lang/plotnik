@@ -5,6 +5,7 @@ pub mod exec;
 pub mod infer;
 pub mod lang;
 pub mod lang_resolver;
+pub mod language_registry;
 pub mod query_loader;
 pub mod run_common;
 pub mod trace;

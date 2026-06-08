@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use plotnik_langs::Lang;
+use super::language_registry::{self, Lang};
 
 /// Resolve language from explicit flag or infer from workspace directory name.
 ///
 /// Directory inference: `queries.ts/` → typescript, `queries.javascript/` → javascript
-pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option<Lang> {
+pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option<&'static Lang> {
     // Explicit flag takes precedence
     if let Some(name) = explicit {
-        return plotnik_langs::from_name(name);
+        return language_registry::from_name(name);
     }
 
     // Infer from directory name extension: "queries.ts" → "ts"
@@ -17,15 +17,16 @@ pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option
         && let Some(name) = path.file_name().and_then(|n| n.to_str())
         && let Some((_, ext)) = name.rsplit_once('.')
     {
-        return plotnik_langs::from_ext(ext);
+        return language_registry::from_ext(ext);
     }
 
     None
 }
 
 /// Resolve language, returning an error message if unknown.
-pub fn resolve_lang_required(lang_name: &str) -> Result<Lang, String> {
-    plotnik_langs::from_name(lang_name).ok_or_else(|| format!("unknown language: '{}'", lang_name))
+pub fn resolve_lang_required(lang_name: &str) -> Result<&'static Lang, String> {
+    language_registry::from_name(lang_name)
+        .ok_or_else(|| format!("unknown language: '{}'", lang_name))
 }
 
 /// Resolve language with user-friendly error handling.
@@ -35,7 +36,7 @@ pub fn require_lang(
     explicit: Option<&str>,
     query_path: Option<&std::path::Path>,
     command: &str,
-) -> Lang {
+) -> &'static Lang {
     if let Some(lang_name) = explicit {
         match resolve_lang_required(lang_name) {
             Ok(l) => return l,
@@ -65,7 +66,7 @@ pub fn require_lang(
 /// Suggest similar language names for typos.
 pub fn suggest_language(input: &str) -> Option<String> {
     let input_lower = input.to_lowercase();
-    plotnik_langs::all()
+    language_registry::all()
         .into_iter()
         .filter(|lang| levenshtein(lang.name(), &input_lower) <= 2)
         .min_by_key(|lang| levenshtein(lang.name(), &input_lower))
