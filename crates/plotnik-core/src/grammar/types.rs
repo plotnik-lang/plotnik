@@ -27,6 +27,7 @@ pub struct Grammar {
     subtypes: HashMap<NodeTypeId, Vec<NodeTypeId>>,
     fields_by_node: HashMap<NodeTypeId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
+    all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
 }
 
@@ -119,6 +120,9 @@ impl Grammar {
         let mut all_named_node_kinds = named_node_ids.keys().cloned().collect::<Vec<_>>();
         all_named_node_kinds.sort();
 
+        let mut all_anonymous_node_kinds = anonymous_node_ids.keys().cloned().collect::<Vec<_>>();
+        all_anonymous_node_kinds.sort();
+
         let mut all_field_names = field_ids.keys().cloned().collect::<Vec<_>>();
         all_field_names.sort();
 
@@ -136,6 +140,7 @@ impl Grammar {
             subtypes,
             fields_by_node,
             all_named_node_kinds,
+            all_anonymous_node_kinds,
             all_field_names,
         })
     }
@@ -172,6 +177,13 @@ impl Grammar {
 
     pub fn all_named_node_kinds(&self) -> Vec<&str> {
         self.all_named_node_kinds
+            .iter()
+            .map(String::as_str)
+            .collect()
+    }
+
+    pub fn all_anonymous_node_kinds(&self) -> Vec<&str> {
+        self.all_anonymous_node_kinds
             .iter()
             .map(String::as_str)
             .collect()

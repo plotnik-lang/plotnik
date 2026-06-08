@@ -27,6 +27,7 @@ use grammars::{
 };
 use prepare_grammar::prepare_grammar;
 use rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType};
+use rustc_hash::{FxHashMap, FxHashSet};
 use tables::ParseTable;
 
 pub(super) struct GrammarMetadata {
@@ -80,7 +81,7 @@ pub(super) fn metadata_for_raw(raw: &RawGrammar) -> Result<GrammarMetadata, Stri
 }
 
 fn input_grammar(raw: &RawGrammar) -> InputGrammar {
-    InputGrammar {
+    normalize_input_grammar(InputGrammar {
         name: raw.name.clone(),
         variables: raw
             .rules
@@ -110,6 +111,119 @@ fn input_grammar(raw: &RawGrammar) -> InputGrammar {
                 reserved_words: rules.iter().map(convert_rule).collect(),
             })
             .collect(),
+    })
+}
+
+fn normalize_input_grammar(mut grammar: InputGrammar) -> InputGrammar {
+    let used = reachable_rule_names(&grammar);
+    let dropped = grammar
+        .variables
+        .iter()
+        .filter(|variable| !used.contains(variable.name.as_str()))
+        .map(|variable| variable.name.clone())
+        .collect::<Vec<_>>();
+
+    grammar
+        .variables
+        .retain(|variable| used.contains(variable.name.as_str()));
+
+    for name in &dropped {
+        grammar
+            .expected_conflicts
+            .retain(|conflict| !conflict.contains(name));
+        grammar.supertype_symbols.retain(|symbol| symbol != name);
+        grammar.variables_to_inline.retain(|symbol| symbol != name);
+        grammar
+            .extra_symbols
+            .retain(|rule| !rule_is_referenced(rule, name, true));
+        grammar
+            .external_tokens
+            .retain(|rule| !rule_is_referenced(rule, name, true));
+        grammar.precedence_orderings.retain(|ordering| {
+            !ordering.iter().any(|entry| {
+                matches!(entry, grammars::PrecedenceEntry::Symbol(symbol) if symbol == name)
+            })
+        });
+        for context in &mut grammar.reserved_words {
+            context
+                .reserved_words
+                .retain(|rule| !rule_is_referenced(rule, name, false));
+        }
+    }
+
+    grammar
+}
+
+fn reachable_rule_names(grammar: &InputGrammar) -> FxHashSet<String> {
+    let by_name = grammar
+        .variables
+        .iter()
+        .map(|variable| (variable.name.as_str(), &variable.rule))
+        .collect::<FxHashMap<_, _>>();
+    let mut visited = FxHashSet::<&str>::default();
+    let mut stack = Vec::<&str>::new();
+
+    if let Some(start) = grammar.variables.first() {
+        stack.push(start.name.as_str());
+    }
+    if let Some(word_token) = grammar.word_token.as_deref() {
+        stack.push(word_token);
+    }
+    for rule in &grammar.extra_symbols {
+        collect_referenced_names(rule, false, &mut stack);
+    }
+    for rule in &grammar.external_tokens {
+        collect_referenced_names(rule, true, &mut stack);
+    }
+    for context in &grammar.reserved_words {
+        for rule in &context.reserved_words {
+            collect_referenced_names(rule, false, &mut stack);
+        }
+    }
+
+    while let Some(name) = stack.pop() {
+        if !visited.insert(name) {
+            continue;
+        }
+        if let Some(rule) = by_name.get(name) {
+            collect_referenced_names(rule, false, &mut stack);
+        }
+    }
+
+    visited.into_iter().map(String::from).collect()
+}
+
+fn collect_referenced_names<'a>(rule: &'a Rule, skip_top_level: bool, out: &mut Vec<&'a str>) {
+    match rule {
+        Rule::NamedSymbol(name) => {
+            if !skip_top_level {
+                out.push(name.as_str());
+            }
+        }
+        Rule::Choice(rules) | Rule::Seq(rules) => {
+            for rule in rules {
+                collect_referenced_names(rule, false, out);
+            }
+        }
+        Rule::Metadata { rule, .. } | Rule::Reserved { rule, .. } => {
+            collect_referenced_names(rule, skip_top_level, out);
+        }
+        Rule::Repeat(rule) => collect_referenced_names(rule, false, out),
+        Rule::Blank | Rule::String(_) | Rule::Pattern(_, _) | Rule::Symbol(_) => {}
+    }
+}
+
+fn rule_is_referenced(rule: &Rule, target: &str, is_external: bool) -> bool {
+    match rule {
+        Rule::NamedSymbol(name) => name == target && !is_external,
+        Rule::Choice(rules) | Rule::Seq(rules) => rules
+            .iter()
+            .any(|rule| rule_is_referenced(rule, target, false)),
+        Rule::Metadata { rule, .. } | Rule::Reserved { rule, .. } => {
+            rule_is_referenced(rule, target, is_external)
+        }
+        Rule::Repeat(rule) => rule_is_referenced(rule, target, false),
+        Rule::Blank | Rule::String(_) | Rule::Pattern(_, _) | Rule::Symbol(_) => false,
     }
 }
 

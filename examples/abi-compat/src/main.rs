@@ -163,6 +163,20 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         }
     }
 
+    for name in production.all_anonymous_node_kinds() {
+        let key = NodeKey {
+            type_name: name.to_string(),
+            named: false,
+        };
+        if !seen_nodes.contains(&key) {
+            differences.push(Difference::Node {
+                key,
+                production: production.resolve_anonymous_node(name).map(NonZeroU16::get),
+                reference: None,
+            });
+        }
+    }
+
     for name in production.all_field_names() {
         if !seen_fields.contains(name) {
             differences.push(Difference::Field {
