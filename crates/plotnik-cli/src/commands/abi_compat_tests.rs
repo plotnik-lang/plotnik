@@ -1,83 +1,9 @@
 use std::collections::HashSet;
 use std::num::NonZeroU16;
-use std::process::ExitCode;
 
 use plotnik::language_registry::{self, Lang};
 
-fn main() -> ExitCode {
-    match run() {
-        Ok(true) => ExitCode::SUCCESS,
-        Ok(false) => ExitCode::FAILURE,
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn run() -> Result<bool, String> {
-    let langs = selected_langs()?;
-    let mut ok = true;
-
-    for lang in langs {
-        ok &= check_lang(lang);
-    }
-
-    Ok(ok)
-}
-
-fn selected_langs() -> Result<Vec<&'static Lang>, String> {
-    let args = std::env::args().skip(1).collect::<Vec<_>>();
-    if args.is_empty() {
-        return Ok(language_registry::all());
-    }
-
-    let mut langs = Vec::new();
-    let mut seen = HashSet::new();
-    for arg in args {
-        if arg == "-h" || arg == "--help" {
-            return Err(usage());
-        }
-        if arg.starts_with('-') {
-            return Err(format!("unknown argument: {arg}\n\n{}", usage()));
-        }
-
-        let Some(lang) = language_registry::from_name(&arg) else {
-            return Err(format!("unknown language: {arg}\n\n{}", usage()));
-        };
-        if seen.insert(lang.name()) {
-            langs.push(lang);
-        }
-    }
-
-    Ok(langs)
-}
-
-fn check_lang(lang: &Lang) -> bool {
-    match compare_lang(lang) {
-        CheckResult::Match => {
-            println!("{} [OK]", display_name(lang));
-            true
-        }
-        CheckResult::Mismatch { differences } => {
-            println!("{} [FAIL]", display_name(lang));
-            for difference in differences {
-                println!("  {}", format_difference(&difference));
-            }
-            false
-        }
-    }
-}
-
-fn display_name(lang: &Lang) -> String {
-    let raw_name = &lang.raw().name;
-    if raw_name == lang.name() {
-        lang.name().to_string()
-    } else {
-        format!("{} [{}]", lang.name(), raw_name)
-    }
-}
-
+#[derive(Debug)]
 enum CheckResult {
     Match,
     Mismatch { differences: Vec<Difference> },
@@ -95,6 +21,12 @@ enum Difference {
         production: Option<u16>,
         reference: Option<u16>,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct NodeKey {
+    type_name: String,
+    named: bool,
 }
 
 fn compare_lang(lang: &Lang) -> CheckResult {
@@ -232,12 +164,6 @@ fn push_field_difference(
     });
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct NodeKey {
-    type_name: String,
-    named: bool,
-}
-
 impl std::fmt::Display for NodeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.named {
@@ -276,6 +202,20 @@ fn format_id(id: Option<u16>) -> String {
         .unwrap_or_else(|| "<missing>".to_string())
 }
 
-fn usage() -> String {
-    "usage: cargo run --example abi-compat -- [LANG ...]\n\nWith no LANG arguments, checks every language in the Plotnik CLI registry enabled by the selected Cargo features.".to_string()
+#[test]
+fn abi_compat_all_languages() {
+    let langs = language_registry::all();
+    assert!(!langs.is_empty(), "no languages registered");
+
+    for lang in langs {
+        let result = compare_lang(lang);
+        if let CheckResult::Mismatch { differences } = &result {
+            let details: Vec<String> = differences.iter().map(format_difference).collect();
+            panic!(
+                "ABI mismatch for '{}':\n  {}",
+                lang.name(),
+                details.join("\n  ")
+            );
+        }
+    }
 }
