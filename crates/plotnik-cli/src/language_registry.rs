@@ -17,6 +17,7 @@ pub struct Lang {
 }
 
 impl Lang {
+    #[allow(dead_code)]
     fn new(
         name: &'static str,
         aliases: &'static [&'static str],
@@ -122,6 +123,7 @@ macro_rules! define_langs {
             }
         }
 
+        #[allow(unused_variables)]
         pub fn from_ext(ext: &str) -> Option<&'static Lang> {
             $(
                 #[cfg(feature = $feature)]
