@@ -923,12 +923,12 @@ fn variable_type_for_child_type(
         ChildType::Normal(symbol) => {
             if syntax_grammar.supertype_symbols.contains(symbol) {
                 VariableType::Named
-            } else if syntax_grammar.variables_to_inline.contains(symbol) {
-                VariableType::Hidden
-            } else if matches!(
-                symbol.kind,
-                SymbolType::End | SymbolType::EndOfNonTerminalExtra
-            ) {
+            } else if syntax_grammar.variables_to_inline.contains(symbol)
+                || matches!(
+                    symbol.kind,
+                    SymbolType::End | SymbolType::EndOfNonTerminalExtra
+                )
+            {
                 VariableType::Hidden
             } else {
                 symbol_node_metadata(*symbol, syntax_grammar, lexical_grammar).1

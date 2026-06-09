@@ -456,17 +456,17 @@ pub(crate) struct NodeKindRef {
 /// Error while resolving grammar-derived node shapes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NodeShapeBuildError {
-    UnknownField {
+    Field {
         node_kind: String,
         field: String,
     },
-    UnknownFieldType {
+    FieldType {
         node_kind: String,
         field: String,
         kind: String,
         named: bool,
     },
-    UnknownChildType {
+    ChildType {
         node_kind: String,
         kind: String,
         named: bool,
@@ -476,10 +476,10 @@ pub(crate) enum NodeShapeBuildError {
 impl std::fmt::Display for NodeShapeBuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownField { node_kind, field } => {
+            Self::Field { node_kind, field } => {
                 write!(f, "unknown field {field:?} on node kind {node_kind:?}")
             }
-            Self::UnknownFieldType {
+            Self::FieldType {
                 node_kind,
                 field,
                 kind,
@@ -488,7 +488,7 @@ impl std::fmt::Display for NodeShapeBuildError {
                 f,
                 "unknown field type {kind:?} (named: {named}) for field {field:?} on node kind {node_kind:?}"
             ),
-            Self::UnknownChildType {
+            Self::ChildType {
                 node_kind,
                 kind,
                 named,
@@ -581,14 +581,13 @@ where
 {
     let mut fields = HashMap::new();
     for (field_name, slot) in &shape.fields {
-        let field_id =
-            field_id_for_name(field_name).ok_or_else(|| NodeShapeBuildError::UnknownField {
-                node_kind: shape.type_name.clone(),
-                field: field_name.clone(),
-            })?;
+        let field_id = field_id_for_name(field_name).ok_or_else(|| NodeShapeBuildError::Field {
+            node_kind: shape.type_name.clone(),
+            field: field_name.clone(),
+        })?;
 
         let valid_types = resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
-            NodeShapeBuildError::UnknownFieldType {
+            NodeShapeBuildError::FieldType {
                 node_kind: shape.type_name.clone(),
                 field: field_name.clone(),
                 kind: kind_ref.type_name.clone(),
@@ -625,7 +624,7 @@ where
         .map(|slot| {
             let valid_types =
                 resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
-                    NodeShapeBuildError::UnknownChildType {
+                    NodeShapeBuildError::ChildType {
                         node_kind: shape.type_name.clone(),
                         kind: kind_ref.type_name.clone(),
                         named: kind_ref.named,

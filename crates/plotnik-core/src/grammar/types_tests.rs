@@ -62,7 +62,7 @@ fn rejects_unknown_child_types() {
 
     assert_eq!(
         err,
-        NodeShapeBuildError::UnknownChildType {
+        NodeShapeBuildError::ChildType {
             node_kind: "root".to_string(),
             kind: "missing".to_string(),
             named: true,

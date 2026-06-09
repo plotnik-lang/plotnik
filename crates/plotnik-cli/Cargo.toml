@@ -16,23 +16,7 @@ name = "plotnik"
 path = "src/main.rs"
 
 [features]
-default = [
-    "lang-bash",
-    "lang-c",
-    "lang-cpp",
-    "lang-css",
-    "lang-go",
-    "lang-html",
-    "lang-java",
-    "lang-javascript",
-    "lang-json",
-    "lang-python",
-    "lang-rust",
-    "lang-toml",
-    "lang-tsx",
-    "lang-typescript",
-    "lang-yaml",
-]
+default = ["all-languages"]
 all-languages = [
 # @generated:all-languages:begin
     "lang-ada",

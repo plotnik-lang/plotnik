@@ -130,7 +130,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_linking(src: &str) -> LinkedQuery {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -142,7 +142,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_invalid_linking(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if query.is_valid() {
             panic!("Expected failed linking, got valid");
         }
@@ -151,7 +151,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_types(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid types, got error:\n{}",
@@ -159,7 +159,6 @@ impl QueryAnalyzed {
             );
         }
 
-        // Emit to bytecode and then emit TypeScript from the bytecode module
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::load(&bytecode).expect("module loading should succeed");
         crate::typegen::typescript::emit(&module)
@@ -167,7 +166,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytecode(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -181,7 +180,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytes(src: &str) -> Vec<u8> {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",

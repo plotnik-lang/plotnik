@@ -4,65 +4,48 @@
 //! Catches compilation bugs that change the sequence of navigation, effects, or matches.
 //! Zero-cost in release builds.
 
-use std::collections::BTreeSet;
-
 use indexmap::IndexMap;
-use plotnik_bytecode::Nav;
-use plotnik_core::Symbol;
 
 use crate::analyze::type_check::DefId;
-use crate::bytecode::{InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, PredicateValueIR};
-use crate::emit::StringTableBuilder;
+use crate::bytecode::{InstructionIR, Label};
 
 use super::compiler::CompileCtx;
 
-/// Semantic operation for fingerprinting.
-///
-/// Captures semantically significant operations while ignoring compilation artifacts
-/// like member indices, label addresses, and instruction sizes.
+#[cfg(debug_assertions)]
+use plotnik_bytecode::Nav;
+
+#[cfg(debug_assertions)]
+use std::collections::BTreeSet;
+
+#[cfg(debug_assertions)]
+use plotnik_core::Symbol;
+
+#[cfg(debug_assertions)]
+use crate::bytecode::{MatchIR, MemberRef, NodeTypeIR, PredicateValueIR};
+
+#[cfg(debug_assertions)]
+use crate::emit::StringTableBuilder;
+
+#[cfg(debug_assertions)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticOp {
-    /// Navigation (non-epsilon only, full detail preserved).
     Nav(Nav),
-
-    /// Named node match with optional type name.
     MatchNamed(Option<String>),
-
-    /// Anonymous node match with optional literal value.
     MatchAnon(Option<String>),
-
-    /// Any node wildcard (_).
     MatchAny,
-
-    /// Field constraint.
     Field(String),
-
-    /// Negated field constraint.
     NegField(String),
-
-    /// Predicate with operation (as byte for Ord) and value.
     Predicate(u8, String),
-
-    /// Effect with opcode (as byte for Ord) and optional member name.
     Effect(u8, Option<String>),
-
-    /// Call to named definition.
     Call(String),
-
-    /// Return from definition.
     Return,
-
-    /// Cycle marker (back-edge in quantifier loop).
-    /// The index is the position in the path where the cycle returns to,
-    /// making it independent of specific bytecode labels.
     CycleMarker(usize),
 }
 
-/// A semantic path: sequence of operations along one execution path.
+#[cfg(debug_assertions)]
 pub type Path = Vec<SemanticOp>;
 
-/// Fingerprint: set of all semantic paths through the IR.
-/// Using BTreeSet for deterministic ordering.
+#[cfg(debug_assertions)]
 pub type Fingerprint = BTreeSet<Path>;
 
 /// Collect semantic operations from a single MatchIR instruction.
