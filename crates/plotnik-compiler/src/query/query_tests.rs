@@ -1,13 +1,22 @@
 use plotnik_bytecode::{Module, dump};
 use plotnik_core::Colors;
-use plotnik_langs::{Lang, from_name};
+use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+use std::sync::LazyLock;
 
 use crate::SourceMap;
 
 use super::{LinkedQuery, QueryAnalyzed, QueryBuilder};
 
-fn javascript() -> Lang {
-    from_name("javascript").expect("javascript lang")
+fn javascript() -> &'static Grammar {
+    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
+        let raw = RawGrammar::from_json(include_str!(env!(
+            "PLOTNIK_COMPILER_JAVASCRIPT_GRAMMAR_JSON"
+        )))
+        .expect("javascript grammar fixture");
+        Grammar::from_raw(&raw).expect("javascript grammar metadata")
+    });
+
+    &GRAMMAR
 }
 
 macro_rules! expect_invalid {
@@ -121,7 +130,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_linking(src: &str) -> LinkedQuery {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -133,7 +142,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_invalid_linking(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if query.is_valid() {
             panic!("Expected failed linking, got valid");
         }
@@ -142,7 +151,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_types(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid types, got error:\n{}",
@@ -150,7 +159,6 @@ impl QueryAnalyzed {
             );
         }
 
-        // Emit to bytecode and then emit TypeScript from the bytecode module
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::load(&bytecode).expect("module loading should succeed");
         crate::typegen::typescript::emit(&module)
@@ -158,7 +166,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytecode(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -172,7 +180,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_valid_bytes(src: &str) -> Vec<u8> {
-        let query = Self::parse_and_validate(src).link(&javascript());
+        let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",

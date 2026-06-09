@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 
 use indexmap::{IndexMap, IndexSet};
+use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
-use plotnik_langs::Lang;
 use rowan::TextRange;
 
 /// Output from the link phase for binary emission.
@@ -34,7 +34,7 @@ use crate::query::{AstMap, SourceId, SourceMap};
 /// modularity. It orchestrates the resolution and validation phases.
 pub fn link<'q>(
     interner: &mut Interner,
-    lang: &Lang,
+    grammar: &Grammar,
     source_map: &'q SourceMap,
     ast_map: &AstMap,
     symbol_table: &SymbolTable,
@@ -48,7 +48,7 @@ pub fn link<'q>(
     for (&source_id, root) in ast_map {
         let mut linker = Linker {
             interner,
-            lang,
+            grammar,
             source_map,
             symbol_table,
             source_id,
@@ -64,7 +64,7 @@ pub fn link<'q>(
 struct Linker<'a, 'q> {
     // Refs
     interner: &'a mut Interner,
-    lang: &'a Lang,
+    grammar: &'a Grammar,
     source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
     source_id: SourceId,
@@ -106,7 +106,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         if self.node_type_ids.contains_key(type_name) {
             return;
         }
-        let resolved = self.lang.resolve_named_node(type_name);
+        let resolved = self.grammar.resolve_named_node(type_name);
         self.node_type_ids
             .insert(token_src(&type_token, self.source()), resolved);
         if let Some(id) = resolved {
@@ -114,7 +114,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             self.output.node_type_ids.entry(sym).or_insert(id);
         }
         if resolved.is_none() {
-            let all_types = self.lang.all_named_node_kinds();
+            let all_types = self.grammar.all_named_node_kinds();
             let max_dist = (type_name.len() / 3).clamp(2, 4);
             let suggestion = find_similar(type_name, &all_types, max_dist);
 
@@ -142,7 +142,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         if self.node_field_ids.contains_key(field_name) {
             return;
         }
-        let resolved = self.lang.resolve_field(field_name);
+        let resolved = self.grammar.resolve_field(field_name);
         self.node_field_ids
             .insert(token_src(&name_token, self.source()), resolved);
         if let Some(id) = resolved {
@@ -150,7 +150,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             self.output.node_field_ids.entry(sym).or_insert(id);
             return;
         }
-        let all_fields = self.lang.all_field_names();
+        let all_fields = self.grammar.all_field_names();
         let max_dist = (field_name.len() / 3).clamp(2, 4);
         let suggestion = find_similar(field_name, &all_fields, max_dist);
 
@@ -191,8 +191,8 @@ impl<'a, 'q> Linker<'a, 'q> {
                 // Predicates are only valid on leaf nodes (grammar check)
                 if let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
-                    && (!self.lang.valid_child_types(ctx.parent_id).is_empty()
-                        || !self.lang.fields_for_node_type(ctx.parent_id).is_empty())
+                    && (!self.grammar.valid_child_types(ctx.parent_id).is_empty()
+                        || !self.grammar.fields_for_node_type(ctx.parent_id).is_empty())
                 {
                     self.diagnostics
                         .report(
@@ -274,7 +274,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         let type_name = type_token.text();
         let parent_id = self.node_type_ids.get(type_name).copied().flatten()?;
         // Verify the node type exists in the grammar
-        self.lang.node_type_name(parent_id)?;
+        self.grammar.node_type_name(parent_id)?;
         Some(ValidationContext {
             parent_id,
             parent_range: type_token.text_range(),
@@ -300,7 +300,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         };
         let Some(ctx) = ctx else { return };
 
-        if !self.lang.has_field(ctx.parent_id, field_id) {
+        if !self.grammar.has_field(ctx.parent_id, field_id) {
             self.emit_field_not_on_node(
                 name_token.text_range(),
                 name_token.text(),
@@ -324,7 +324,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             return;
         };
 
-        if self.lang.has_field(ctx.parent_id, field_id) {
+        if self.grammar.has_field(ctx.parent_id, field_id) {
             return;
         }
         self.emit_field_not_on_node(
@@ -342,9 +342,9 @@ impl<'a, 'q> Linker<'a, 'q> {
         parent_id: NodeTypeId,
         parent_range: TextRange,
     ) {
-        let valid_fields = self.lang.fields_for_node_type(parent_id);
+        let valid_fields = self.grammar.fields_for_node_type(parent_id);
         let parent_name = self
-            .lang
+            .grammar
             .node_type_name(parent_id)
             .expect("validated parent_id must have a name");
 
@@ -440,7 +440,7 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
             return;
         }
 
-        let resolved = self.linker.lang.resolve_anonymous_node(value);
+        let resolved = self.linker.grammar.resolve_anonymous_node(value);
         self.linker
             .node_type_ids
             .insert(token_src(&value_token, self.linker.source()), resolved);

@@ -20,7 +20,7 @@ pub mod visitor;
 
 #[cfg(test)]
 mod dependencies_tests;
-#[cfg(all(test, feature = "plotnik-langs"))]
+#[cfg(test)]
 mod link_tests;
 #[cfg(test)]
 mod refs_tests;

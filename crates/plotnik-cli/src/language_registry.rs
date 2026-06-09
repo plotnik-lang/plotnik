@@ -1,14 +1,84 @@
-use crate::Lang;
+use std::io::Read;
+use std::sync::OnceLock;
 
-/// Language metadata for listing.
-#[derive(Debug, Clone)]
-pub struct LangInfo {
-    /// Canonical name (first in names list).
-    pub name: &'static str,
-    /// All name aliases (includes canonical name).
-    pub aliases: &'static [&'static str],
-    /// File extensions.
-    pub extensions: &'static [&'static str],
+use arborium_tree_sitter::{Language, Parser, Tree};
+use flate2::read::GzDecoder;
+use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+
+#[derive(Debug)]
+pub struct Lang {
+    name: &'static str,
+    aliases: &'static [&'static str],
+    extensions: &'static [&'static str],
+    language: Language,
+    raw_json_gz: &'static [u8],
+    raw: OnceLock<RawGrammar>,
+    grammar: OnceLock<Grammar>,
+}
+
+impl Lang {
+    #[allow(dead_code)]
+    fn new(
+        name: &'static str,
+        aliases: &'static [&'static str],
+        extensions: &'static [&'static str],
+        language: Language,
+        raw_json_gz: &'static [u8],
+    ) -> Self {
+        Self {
+            name,
+            aliases,
+            extensions,
+            language,
+            raw_json_gz,
+            raw: OnceLock::new(),
+            grammar: OnceLock::new(),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name
+    }
+
+    pub fn aliases(&self) -> &[&'static str] {
+        self.aliases
+    }
+
+    pub fn extensions(&self) -> &[&'static str] {
+        self.extensions
+    }
+
+    pub fn raw(&self) -> &RawGrammar {
+        self.raw.get_or_init(|| {
+            let json = gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip");
+            RawGrammar::from_json(&json).expect("invalid embedded grammar JSON")
+        })
+    }
+
+    pub fn grammar(&self) -> &Grammar {
+        self.grammar.get_or_init(|| {
+            Grammar::from_raw(self.raw()).expect("invalid embedded grammar metadata")
+        })
+    }
+
+    pub fn language(&self) -> &Language {
+        &self.language
+    }
+
+    pub fn parse(&self, source: &str) -> Tree {
+        let mut parser = Parser::new();
+        parser
+            .set_language(&self.language)
+            .expect("failed to set language");
+        parser.parse(source, None).expect("failed to parse source")
+    }
+}
+
+fn gunzip(bytes: &[u8]) -> std::io::Result<String> {
+    let mut decoder = GzDecoder::new(bytes);
+    let mut json = String::new();
+    decoder.read_to_string(&mut json)?;
+    Ok(json)
 }
 
 macro_rules! define_langs {
@@ -24,39 +94,26 @@ macro_rules! define_langs {
             }
         ),* $(,)?
     ) => {
-        // Generate static Lang definitions with LazyLock
+        // Generate static language definitions with LazyLock.
         $(
             #[cfg(feature = $feature)]
-            pub fn $fn_name() -> Lang {
-                paste::paste! {
-                    static LANG: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| {
-                        static NODE_TYPES_BYTES: &[u8] = include_bytes!(env!(
-                            concat!("PLOTNIK_NODE_TYPES_", $lang_key)
-                        ));
-                        static GRAMMAR_BYTES: &[u8] = include_bytes!(env!(
-                            concat!("PLOTNIK_GRAMMAR_", $lang_key)
-                        ));
-
-                        let raw_nodes: Vec<plotnik_core::RawNode> =
-                            postcard::from_bytes(NODE_TYPES_BYTES)
-                                .expect("invalid embedded node types");
-
-                        let grammar = plotnik_core::grammar::Grammar::from_binary(GRAMMAR_BYTES)
-                            .expect("invalid embedded grammar");
-
-                        std::sync::Arc::new(crate::LangInner::new(
+            pub fn $fn_name() -> &'static Lang {
+                static LANGUAGE: std::sync::LazyLock<Lang> =
+                    std::sync::LazyLock::new(|| {
+                        Lang::new(
                             $name,
+                            &[$($alias),*],
+                            &[$($ext),*],
                             $ts_lang.into(),
-                            raw_nodes,
-                            grammar,
-                        ))
+                            include_bytes!(env!(concat!("PLOTNIK_GRAMMAR_JSON_GZ_", $lang_key))),
+                        )
                     });
-                }
-                std::sync::Arc::clone(&LANG)
+
+                &LANGUAGE
             }
         )*
 
-        pub fn from_name(s: &str) -> Option<Lang> {
+        pub fn from_name(s: &str) -> Option<&'static Lang> {
             match s.to_ascii_lowercase().as_str() {
                 $(
                     #[cfg(feature = $feature)]
@@ -66,36 +123,30 @@ macro_rules! define_langs {
             }
         }
 
-        #[allow(unreachable_patterns)]
-        pub fn from_ext(ext: &str) -> Option<Lang> {
-            match ext.to_ascii_lowercase().as_str() {
-                $(
-                    #[cfg(feature = $feature)]
-                    $($ext)|* => Some($fn_name()),
-                )*
-                _ => None,
-            }
+        #[allow(unused_variables)]
+        pub fn from_ext(ext: &str) -> Option<&'static Lang> {
+            $(
+                #[cfg(feature = $feature)]
+                {
+                    let lang = $fn_name();
+                    if lang
+                        .extensions()
+                        .iter()
+                        .any(|candidate| candidate.eq_ignore_ascii_case(ext))
+                    {
+                        return Some(lang);
+                    }
+                }
+            )*
+
+            None
         }
 
-        pub fn all() -> Vec<Lang> {
+        pub fn all() -> Vec<&'static Lang> {
             vec![
                 $(
                     #[cfg(feature = $feature)]
                     $fn_name(),
-                )*
-            ]
-        }
-
-        /// Get metadata for all available languages.
-        pub fn all_info() -> Vec<LangInfo> {
-            vec![
-                $(
-                    #[cfg(feature = $feature)]
-                    LangInfo {
-                        name: $name,
-                        aliases: &[$($alias),*],
-                        extensions: &[$($ext),*],
-                    },
                 )*
             ]
         }

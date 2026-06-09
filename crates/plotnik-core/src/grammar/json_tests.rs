@@ -1,4 +1,5 @@
-use super::*;
+use super::Grammar;
+use super::raw::{RawGrammar, RawRule};
 
 #[test]
 fn parse_minimal_grammar() {
@@ -10,9 +11,29 @@ fn parse_minimal_grammar() {
         }
     }"#;
 
-    let grammar = Grammar::from_json(json).unwrap();
-    assert_eq!(grammar.name, "test");
-    assert_eq!(grammar.rules.len(), 2);
+    let raw = RawGrammar::from_json(json).unwrap();
+    let grammar = Grammar::from_raw(&raw).unwrap();
+
+    assert_eq!(raw.name, "test");
+    assert_eq!(grammar.name(), "test");
+    assert_eq!(raw.rules.len(), 2);
+}
+
+#[test]
+fn exposes_nul_anonymous_node_as_empty_string() {
+    let json = r#"{
+        "name": "test",
+        "rules": {
+            "source_file": { "type": "STRING", "value": "\u0000" }
+        }
+    }"#;
+
+    let raw = RawGrammar::from_json(json).unwrap();
+    let grammar = Grammar::from_raw(&raw).unwrap();
+
+    assert!(grammar.resolve_anonymous_node("").is_some());
+    assert_eq!(grammar.resolve_anonymous_node("\0"), None);
+    assert_eq!(grammar.all_anonymous_node_kinds(), [""]);
 }
 
 #[test]
@@ -33,8 +54,9 @@ fn parse_seq_and_choice() {
         }
     }"#;
 
-    let grammar = Grammar::from_json(json).unwrap();
-    assert!(matches!(grammar.rules[0].1, Rule::Seq(_)));
+    let raw = RawGrammar::from_json(json).unwrap();
+
+    assert!(matches!(raw.rules["root"], RawRule::SEQ { .. }));
 }
 
 #[test]
@@ -46,12 +68,14 @@ fn parse_field() {
                 "type": "FIELD",
                 "name": "name",
                 "content": { "type": "SYMBOL", "name": "identifier" }
-            }
+            },
+            "identifier": { "type": "PATTERN", "value": "[a-z]+" }
         }
     }"#;
 
-    let grammar = Grammar::from_json(json).unwrap();
-    assert!(matches!(grammar.rules[0].1, Rule::Field { .. }));
+    let raw = RawGrammar::from_json(json).unwrap();
+
+    assert!(matches!(raw.rules["func"], RawRule::FIELD { .. }));
 }
 
 #[test]
@@ -65,10 +89,23 @@ fn preserves_rule_order() {
         }
     }"#;
 
-    let grammar = Grammar::from_json(json).unwrap();
+    let raw = RawGrammar::from_json(json).unwrap();
+    let rule_names = raw.rules.keys().map(String::as_str).collect::<Vec<_>>();
 
-    // Entry rule should be first (program), not alphabetically sorted
-    assert_eq!(grammar.rules[0].0, "program");
-    assert_eq!(grammar.rules[1].0, "statement");
-    assert_eq!(grammar.rules[2].0, "expression");
+    assert_eq!(rule_names, ["program", "statement", "expression"]);
+}
+
+#[test]
+fn json_round_trips_raw_grammar() {
+    let json = r#"{
+        "name": "test",
+        "rules": {
+            "program": { "type": "STRING", "value": "x" }
+        }
+    }"#;
+
+    let raw = RawGrammar::from_json(json).unwrap();
+    let encoded_json = raw.to_json().unwrap();
+
+    assert_eq!(RawGrammar::from_json(&encoded_json).unwrap(), raw);
 }

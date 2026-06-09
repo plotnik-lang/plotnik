@@ -70,7 +70,7 @@ jobs:
           prefix-key: v0-rust-stable
 
       - name: No-default-features langs
-        run: cargo clippy -p plotnik-langs --no-default-features -- -D warnings
+        run: cargo clippy -p plotnik --no-default-features -- -D warnings
 
       - name: No-default-features compiler
         run: cargo check -p plotnik-compiler --no-default-features

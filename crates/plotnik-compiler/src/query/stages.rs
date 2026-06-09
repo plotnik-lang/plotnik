@@ -2,8 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
 
+use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
-use plotnik_langs::Lang;
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
@@ -223,12 +223,12 @@ impl QueryAnalyzed {
         &self.interner
     }
 
-    pub fn link(mut self, lang: &Lang) -> LinkedQuery {
+    pub fn link(mut self, grammar: &Grammar) -> LinkedQuery {
         let mut output = link::LinkOutput::default();
 
         link::link(
             &mut self.interner,
-            lang,
+            grammar,
             &self.query_parsed.source_map,
             &self.query_parsed.ast_map,
             &self.symbol_table,

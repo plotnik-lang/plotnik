@@ -40,7 +40,7 @@ pub fn run(args: DumpArgs) {
 
     let lang = require_lang(args.lang.as_deref(), args.query_path.as_deref(), "dump");
 
-    let linked = query.link(&lang);
+    let linked = query.link(lang.grammar());
     if !linked.is_valid() {
         eprint!(
             "{}",

@@ -10,4 +10,7 @@ pub mod run_common;
 pub mod trace;
 
 #[cfg(test)]
+mod abi_compat_tests;
+
+#[cfg(test)]
 mod lang_tests;

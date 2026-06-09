@@ -54,7 +54,7 @@ pub fn run(args: CheckArgs) {
 
     let (is_valid, diagnostics, source_map) = match lang {
         Some(lang) => {
-            let linked = query.link(&lang);
+            let linked = query.link(lang.grammar());
             let valid = if args.strict {
                 !linked.diagnostics().has_errors() && !linked.diagnostics().has_warnings()
             } else {
