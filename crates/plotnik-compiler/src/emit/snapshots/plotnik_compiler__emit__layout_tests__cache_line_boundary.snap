@@ -71,14 +71,14 @@ _ObjWrap:
 
 Test:
   06   !   (array)                          08
-  07  ...  
+  07   △   _                                20
   08   ▽   (identifier) [Node Set(M0)]      10
   10   ▷   (identifier) [Node Set(M1)]      12
   12   ▷   (identifier) [Node Set(M2)]      14
   14   ▷   (identifier) [Node Set(M3)]      16
-  16   ▷   (identifier) [Node Set(M4)]      19, 24
-  18                                        ▶
-  19 !!▷   [Null Set(M15)] (number) [Node Set(M5)]  22
-  22   △   _                                18
-  23  ...  
-  24 !!▷   [Null Set(M14)] (string) [Node Set(M6)]  22
+  16   ▷   (identifier) [Node Set(M4)]      18
+  18   ▷   _                                21, 24, 27
+  20                                        ▶
+  21   !   [Null Set(M15)] (number) [Node Set(M5)]  07
+  24   !   [Null Set(M14)] (string) [Node Set(M6)]  07
+  27   ▷   _                                21, 24, 27

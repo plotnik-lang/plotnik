@@ -1,22 +1,21 @@
 ---
 source: crates/plotnik-compiler/src/emit/emit_tests.rs
 ---
-Test = (program [(identifier) (number)] @x)
+Test = (program [(expression_statement) @expr])
 ---
 [strings]
 S0 "Beauty will save the world"
-S1 "x"
+S1 "expr"
 S2 "Test"
 S3 "program"
-S4 "identifier"
-S5 "number"
+S4 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { x }
+T1 = Struct  M0:1  ; { expr }
 
 [type_members]
-M0: S1 → T0  ; x: <Node>
+M0: S1 → T0  ; expr: <Node>
 
 [type_names]
 N0: S2 → T1  ; Test
@@ -33,10 +32,9 @@ _ObjWrap:
 
 Test:
   06   !   (program)                        08
-  07   △   _                                10
-  08   ▽   _                                11, 13, 16
-  10                                        ▶
-  11   !   (identifier) [Node Set(M0)]      07
-  13   !   (number) [Node Set(M0)]          07
-  15  ...  
-  16   ▷   _                                11, 13, 16
+  07  ...  
+  08   ▽   _                                10, 14
+  10   !   (expression_statement) [Node Set(M0)]  12
+  12   △   _                                13
+  13                                        ▶
+  14   ▷   _                                10, 14
