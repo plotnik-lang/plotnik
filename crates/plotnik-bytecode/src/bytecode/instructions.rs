@@ -259,7 +259,7 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Iterate over pre-effects (executed before match attempt).
+    /// Iterate over pre-effects (executed after transition acceptance, before post-effects).
     #[inline]
     pub fn pre_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
         let start = 8; // payload starts at byte 8

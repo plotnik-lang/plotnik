@@ -284,15 +284,15 @@ impl<'t> VM<'t> {
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), RuntimeError> {
-        for effect_op in m.pre_effects() {
-            self.emit_effect(effect_op, tracer);
-        }
-
         // Only clear matched_node for non-epsilon transitions.
         // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
             self.matched_node = None;
             self.navigate_and_match(m, module, tracer)?;
+        }
+
+        for effect_op in m.pre_effects() {
+            self.emit_effect(effect_op, tracer);
         }
 
         for effect_op in m.post_effects() {
@@ -316,11 +316,10 @@ impl<'t> VM<'t> {
 
         let cont_nav = continuation_nav(m.nav);
         loop {
-            if !self.node_matches(m, tracer) {
-                self.advance_or_backtrack(policy, cont_nav, tracer)?;
-                continue;
+            if self.candidate_matches(m, module, tracer) {
+                break;
             }
-            break;
+            self.advance_or_backtrack(policy, cont_nav, tracer)?;
         }
 
         tracer.trace_match_success(self.cursor.node());
@@ -329,20 +328,6 @@ impl<'t> VM<'t> {
         }
 
         self.matched_node = Some(self.cursor.node());
-
-        for field_id in m.neg_fields() {
-            if self.cursor.node().child_by_field_id(field_id).is_some() {
-                return self.backtrack(tracer);
-            }
-        }
-
-        // Check predicate if present
-        if let Some((op, is_regex, value_ref)) = m.predicate()
-            && !self.evaluate_predicate(op, is_regex, value_ref, module)
-        {
-            return self.backtrack(tracer);
-        }
-
         Ok(())
     }
 
@@ -392,38 +377,31 @@ impl<'t> VM<'t> {
         }
     }
 
-    /// Check if current node matches type and field constraints.
-    fn node_matches<T: Tracer>(&self, m: Match<'_>, tracer: &mut T) -> bool {
+    /// Check if current candidate passes pure match constraints.
+    fn candidate_matches<T: Tracer>(&self, m: Match<'_>, module: &Module, tracer: &mut T) -> bool {
         let node = self.cursor.node();
 
-        // Check node type constraint
         match m.node_type {
-            NodeTypeIR::Any => {
-                // Any node matches - no check needed
-            }
+            NodeTypeIR::Any => {}
             NodeTypeIR::Named(None) => {
-                // `(_)` wildcard: must be a named node
                 if !node.is_named() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
             NodeTypeIR::Named(Some(expected)) => {
-                // Specific named type: check namedness and kind_id
                 if !node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
             NodeTypeIR::Anonymous(None) => {
-                // Any anonymous node: must NOT be named
                 if node.is_named() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
             NodeTypeIR::Anonymous(Some(expected)) => {
-                // Specific anonymous type: check namedness and kind_id
                 if node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
@@ -431,13 +409,25 @@ impl<'t> VM<'t> {
             }
         }
 
-        // Check field constraint
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)
         {
             tracer.trace_field_failure(node);
             return false;
         }
+
+        for field_id in m.neg_fields() {
+            if node.child_by_field_id(field_id).is_some() {
+                return false;
+            }
+        }
+
+        if let Some((op, is_regex, value_ref)) = m.predicate()
+            && !self.evaluate_predicate(op, is_regex, value_ref, module)
+        {
+            return false;
+        }
+
         true
     }
 
