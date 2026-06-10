@@ -1,5 +1,16 @@
 //! Integration tests for the compilation pipeline.
 
+use std::cell::RefCell;
+use std::num::NonZeroU16;
+
+use indexmap::IndexMap;
+use plotnik_core::{Interner, NodeType};
+
+use crate::analyze::symbol_table::SymbolTable;
+use crate::analyze::type_check::TypeContext;
+use crate::bytecode::NodeTypeIR;
+use crate::compile::{CompileCtx, Compiler};
+use crate::emit::StringTableBuilder;
 use crate::shot_bytecode;
 
 #[test]
@@ -10,6 +21,35 @@ fn compile_simple_named_node() {
 #[test]
 fn compile_alternation() {
     shot_bytecode!("Test = [(identifier) (number)]");
+}
+
+#[test]
+fn resolve_anonymous_node_type_uses_anonymous_namespace() {
+    let mut interner = Interner::new();
+    let number = interner.intern("number");
+    let named_id = NonZeroU16::new(1).unwrap();
+    let anonymous_id = NonZeroU16::new(2).unwrap();
+    let node_types = IndexMap::from([
+        (NodeType::Named(number), named_id),
+        (NodeType::Anonymous(number), anonymous_id),
+    ]);
+    let type_ctx = TypeContext::new();
+    let symbol_table = SymbolTable::new();
+    let strings = RefCell::new(StringTableBuilder::new());
+    let ctx = CompileCtx {
+        interner: &interner,
+        type_ctx: &type_ctx,
+        symbol_table: &symbol_table,
+        strings: &strings,
+        node_types: Some(&node_types),
+        node_fields: None,
+    };
+    let mut compiler = Compiler::new(&ctx);
+
+    assert_eq!(
+        compiler.resolve_anonymous_node_type("number"),
+        NodeTypeIR::Anonymous(Some(anonymous_id))
+    );
 }
 
 #[test]

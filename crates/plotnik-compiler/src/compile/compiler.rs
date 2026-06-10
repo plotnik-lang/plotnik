@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 
 use indexmap::IndexMap;
-use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
@@ -31,7 +31,7 @@ pub struct CompileCtx<'a> {
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
     pub strings: &'a RefCell<StringTableBuilder>,
-    pub node_types: Option<&'a IndexMap<Symbol, NodeTypeId>>,
+    pub node_types: Option<&'a IndexMap<NodeType<Symbol>, NodeTypeId>>,
     pub node_fields: Option<&'a IndexMap<Symbol, NodeFieldId>>,
 }
 

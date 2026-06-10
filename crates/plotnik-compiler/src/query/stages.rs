@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use indexmap::IndexMap;
 
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
@@ -277,7 +277,7 @@ impl LinkedQuery {
         &self.inner.interner
     }
 
-    pub fn node_type_ids(&self) -> &IndexMap<Symbol, NodeTypeId> {
+    pub fn node_type_ids(&self) -> &IndexMap<NodeType<Symbol>, NodeTypeId> {
         &self.linking.node_type_ids
     }
 

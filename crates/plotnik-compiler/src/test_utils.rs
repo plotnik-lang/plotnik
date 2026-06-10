@@ -1,5 +1,28 @@
 //! Test utilities and snapshot macros.
 
+use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+
+pub fn colliding_node_type_grammar() -> Grammar {
+    let raw = RawGrammar::from_json(
+        r#"{
+        "name": "collision",
+        "rules": {
+            "program": {
+                "type": "CHOICE",
+                "members": [
+                    { "type": "SYMBOL", "name": "number" },
+                    { "type": "STRING", "value": "number" }
+                ]
+            },
+            "number": { "type": "STRING", "value": "literal" }
+        }
+    }"#,
+    )
+    .expect("collision grammar fixture");
+
+    Grammar::from_raw(&raw).expect("collision grammar metadata")
+}
+
 /// Snapshot test for bytecode output.
 #[macro_export]
 macro_rules! shot_bytecode {

@@ -5,7 +5,7 @@ use std::num::NonZeroU16;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Cardinality, NodeFieldId, NodeTypeId};
+use crate::{Cardinality, NodeFieldId, NodeType, NodeTypeId};
 
 use super::json::GrammarError;
 use super::raw::RawGrammar;
@@ -155,7 +155,7 @@ impl Grammar {
     }
 
     fn from_metadata(name: String, metadata: GrammarMetadata) -> Result<Self, String> {
-        let mut node_ids = HashMap::<(String, bool), NodeTypeId>::new();
+        let mut node_ids = HashMap::<NodeType<&str>, NodeTypeId>::new();
         let mut named_node_ids = HashMap::new();
         let mut anonymous_node_ids = HashMap::new();
         let mut node_names = HashMap::new();
@@ -173,9 +173,12 @@ impl Grammar {
                 continue;
             }
 
-            node_ids
-                .entry((symbol.type_name.clone(), symbol.named))
-                .or_insert(node_id);
+            let node_type = if symbol.named {
+                NodeType::Named(symbol.type_name.as_str())
+            } else {
+                NodeType::Anonymous(symbol.type_name.as_str())
+            };
+            node_ids.entry(node_type).or_insert(node_id);
 
             if symbol.named {
                 named_node_ids
@@ -198,7 +201,7 @@ impl Grammar {
 
         let (node_constraints, extra_node_types, root_node_type) = build_node_constraints(
             &metadata.node_shapes,
-            |name, named| node_ids.get(&(name.to_string(), named)).copied(),
+            |node_type| node_ids.get(&node_type).copied(),
             |name| field_ids.get(name).copied(),
         )
         .map_err(format_node_shape_error)?;
@@ -208,24 +211,20 @@ impl Grammar {
             let Some(shape_subtypes) = &shape.subtypes else {
                 continue;
             };
-            let Some(supertype) = node_ids.get(&(shape.type_name.clone(), shape.named)) else {
+            let Some(supertype) = node_ids.get(&shape.node_type()) else {
                 continue;
             };
 
             let resolved = shape_subtypes
                 .iter()
-                .filter_map(|subtype| {
-                    node_ids
-                        .get(&(subtype.type_name.clone(), subtype.named))
-                        .copied()
-                })
+                .filter_map(|subtype| node_ids.get(&subtype.node_type()).copied())
                 .collect::<Vec<_>>();
             subtypes.insert(*supertype, resolved);
         }
 
         let mut fields_by_node = HashMap::new();
         for shape in &metadata.node_shapes {
-            let Some(node_id) = node_ids.get(&(shape.type_name.clone(), shape.named)) else {
+            let Some(node_id) = node_ids.get(&shape.node_type()) else {
                 continue;
             };
             let mut fields = shape.fields.keys().cloned().collect::<Vec<_>>();
@@ -437,6 +436,16 @@ pub(crate) struct NodeShape {
     pub(crate) subtypes: Option<Vec<NodeKindRef>>,
 }
 
+impl NodeShape {
+    fn node_type(&self) -> NodeType<&str> {
+        if self.named {
+            NodeType::Named(self.type_name.as_str())
+        } else {
+            NodeType::Anonymous(self.type_name.as_str())
+        }
+    }
+}
+
 /// Cardinality constraints for a field or children slot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeSlot {
@@ -451,6 +460,16 @@ pub(crate) struct NodeKindRef {
     #[serde(rename = "type")]
     pub(crate) type_name: String,
     pub(crate) named: bool,
+}
+
+impl NodeKindRef {
+    fn node_type(&self) -> NodeType<&str> {
+        if self.named {
+            NodeType::Named(self.type_name.as_str())
+        } else {
+            NodeType::Anonymous(self.type_name.as_str())
+        }
+    }
 }
 
 /// Error while resolving grammar-derived node shapes.
@@ -531,11 +550,11 @@ type NodeConstraintBuild = (
 
 pub(crate) fn build_node_constraints<F, G>(
     node_shapes: &[NodeShape],
-    node_id_for_name: F,
+    node_id_for_type: F,
     field_id_for_name: G,
 ) -> Result<NodeConstraintBuild, NodeShapeBuildError>
 where
-    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
     G: Fn(&str) -> Option<NodeFieldId>,
 {
     let mut node_constraints = HashMap::new();
@@ -543,11 +562,11 @@ where
     let mut root_node_type = None;
     let known_shapes = node_shapes
         .iter()
-        .map(|shape| (shape.type_name.as_str(), shape.named))
+        .map(NodeShape::node_type)
         .collect::<HashSet<_>>();
 
     for shape in node_shapes {
-        let Some(node_id) = node_id_for_name(&shape.type_name, shape.named) else {
+        let Some(node_id) = node_id_for_type(shape.node_type()) else {
             continue;
         };
 
@@ -560,8 +579,8 @@ where
         }
 
         let fields =
-            build_field_constraints(shape, &known_shapes, &node_id_for_name, &field_id_for_name)?;
-        let children = build_children_constraints(shape, &known_shapes, &node_id_for_name)?;
+            build_field_constraints(shape, &known_shapes, &node_id_for_type, &field_id_for_name)?;
+        let children = build_children_constraints(shape, &known_shapes, &node_id_for_type)?;
 
         node_constraints.insert(node_id, NodeConstraints { fields, children });
     }
@@ -571,12 +590,12 @@ where
 
 fn build_field_constraints<F, G>(
     shape: &NodeShape,
-    known_shapes: &HashSet<(&str, bool)>,
-    node_id_for_name: &F,
+    known_shapes: &HashSet<NodeType<&str>>,
+    node_id_for_type: &F,
     field_id_for_name: &G,
 ) -> Result<HashMap<NodeFieldId, FieldConstraints>, NodeShapeBuildError>
 where
-    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
     G: Fn(&str) -> Option<NodeFieldId>,
 {
     let mut fields = HashMap::new();
@@ -586,7 +605,7 @@ where
             field: field_name.clone(),
         })?;
 
-        let valid_types = resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
+        let valid_types = resolve_slot_types(slot, known_shapes, node_id_for_type, |kind_ref| {
             NodeShapeBuildError::FieldType {
                 node_kind: shape.type_name.clone(),
                 field: field_name.clone(),
@@ -612,18 +631,18 @@ where
 
 fn build_children_constraints<F>(
     shape: &NodeShape,
-    known_shapes: &HashSet<(&str, bool)>,
-    node_id_for_name: &F,
+    known_shapes: &HashSet<NodeType<&str>>,
+    node_id_for_type: &F,
 ) -> Result<Option<ChildrenConstraints>, NodeShapeBuildError>
 where
-    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
 {
     shape
         .children
         .as_ref()
         .map(|slot| {
             let valid_types =
-                resolve_slot_types(slot, known_shapes, node_id_for_name, |kind_ref| {
+                resolve_slot_types(slot, known_shapes, node_id_for_type, |kind_ref| {
                     NodeShapeBuildError::ChildType {
                         node_kind: shape.type_name.clone(),
                         kind: kind_ref.type_name.clone(),
@@ -644,22 +663,23 @@ where
 
 fn resolve_slot_types<F, E>(
     slot: &NodeSlot,
-    known_shapes: &HashSet<(&str, bool)>,
-    node_id_for_name: &F,
+    known_shapes: &HashSet<NodeType<&str>>,
+    node_id_for_type: &F,
     error: E,
 ) -> Result<Vec<NodeTypeId>, NodeShapeBuildError>
 where
-    F: Fn(&str, bool) -> Option<NodeTypeId>,
+    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
     E: Fn(&NodeKindRef) -> NodeShapeBuildError,
 {
     let mut resolved = Vec::new();
     for kind_ref in &slot.types {
-        if let Some(node_id) = node_id_for_name(&kind_ref.type_name, kind_ref.named) {
+        let node_type = kind_ref.node_type();
+        if let Some(node_id) = node_id_for_type(node_type) {
             resolved.push(node_id);
             continue;
         }
 
-        if known_shapes.contains(&(kind_ref.type_name.as_str(), kind_ref.named)) {
+        if known_shapes.contains(&node_type) {
             continue;
         }
 

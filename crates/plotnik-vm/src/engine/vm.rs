@@ -409,8 +409,8 @@ impl<'t> VM<'t> {
                 }
             }
             NodeTypeIR::Named(Some(expected)) => {
-                // Specific named type: check kind_id
-                if node.kind_id() != expected.get() {
+                // Specific named type: check namedness and kind_id
+                if !node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
@@ -423,8 +423,8 @@ impl<'t> VM<'t> {
                 }
             }
             NodeTypeIR::Anonymous(Some(expected)) => {
-                // Specific anonymous type: check kind_id
-                if node.kind_id() != expected.get() {
+                // Specific anonymous type: check namedness and kind_id
+                if node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
                 }

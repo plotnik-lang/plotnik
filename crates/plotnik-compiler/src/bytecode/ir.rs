@@ -18,12 +18,12 @@ use plotnik_bytecode::{
 /// Distinguishes between named nodes (`(identifier)`), anonymous nodes (`"text"`),
 /// and wildcards (`_`, `(_)`). Encoded in bytecode header byte bits 5-4.
 ///
-/// | `node_kind` | Value | Meaning      | `node_type=0`       | `node_type>0`     |
-/// | ----------- | ----- | ------------ | ------------------- | ----------------- |
-/// | `00`        | Any   | `_` pattern  | No check            | (invalid)         |
-/// | `01`        | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `kind_id()` |
-/// | `10`        | Anon  | `"text"`     | Check `!is_named()` | Check `kind_id()` |
-/// | `11`        | -     | Reserved     | Error               | Error             |
+/// | `node_kind` | Value | Meaning      | `node_type=0`       | `node_type>0`                     |
+/// | ----------- | ----- | ------------ | ------------------- | --------------------------------- |
+/// | `00`        | Any   | `_` pattern  | No check            | (invalid)                         |
+/// | `01`        | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `is_named()` + `kind_id()`  |
+/// | `10`        | Anon  | `"text"`     | Check `!is_named()` | Check `!is_named()` + `kind_id()` |
+/// | `11`        | -     | Reserved     | Error               | Error                             |
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum NodeTypeIR {
     /// Any node (`_` pattern) - no type check performed.
@@ -31,11 +31,11 @@ pub enum NodeTypeIR {
     Any,
     /// Named node constraint (`(_)` or `(identifier)`).
     /// - `None` = any named node (check `is_named()`)
-    /// - `Some(id)` = specific named type (check `kind_id()`)
+    /// - `Some(id)` = specific named type (check `is_named()` and `kind_id()`)
     Named(Option<NonZeroU16>),
     /// Anonymous node constraint (`"text"` literals).
     /// - `None` = any anonymous node (check `!is_named()`)
-    /// - `Some(id)` = specific anonymous type (check `kind_id()`)
+    /// - `Some(id)` = specific anonymous type (check `!is_named()` and `kind_id()`)
     Anonymous(Option<NonZeroU16>),
 }
 

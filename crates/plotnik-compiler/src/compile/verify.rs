@@ -18,7 +18,7 @@ use plotnik_bytecode::Nav;
 use std::collections::BTreeSet;
 
 #[cfg(debug_assertions)]
-use plotnik_core::Symbol;
+use plotnik_core::{NodeType, Symbol};
 
 #[cfg(debug_assertions)]
 use crate::bytecode::{MatchIR, MemberRef, NodeTypeIR, PredicateValueIR};
@@ -119,14 +119,18 @@ fn resolve_member_name(
 #[cfg(debug_assertions)]
 fn resolve_node_type_name(
     id: std::num::NonZeroU16,
-    node_types: Option<&indexmap::IndexMap<Symbol, plotnik_core::NodeTypeId>>,
+    node_types: Option<&indexmap::IndexMap<NodeType<Symbol>, plotnik_core::NodeTypeId>>,
     interner: &plotnik_core::Interner,
 ) -> Option<String> {
     let types = node_types?;
-    for (sym, type_id) in types {
-        if type_id.get() == id.get() {
-            return interner.try_resolve(*sym).map(|s| s.to_string());
+    for (node_type, type_id) in types {
+        if type_id.get() != id.get() {
+            continue;
         }
+        let sym = match node_type {
+            NodeType::Named(sym) | NodeType::Anonymous(sym) => *sym,
+        };
+        return interner.try_resolve(sym).map(|s| s.to_string());
     }
     None
 }

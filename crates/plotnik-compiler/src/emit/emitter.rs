@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use plotnik_core::Symbol;
+use plotnik_core::{NodeType, Symbol};
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{InstructionIR, Label, PredicateValueIR};
@@ -51,7 +51,10 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
     // Collect node symbols
     let mut node_symbols: Vec<NodeSymbol> = Vec::new();
-    for (&sym, &node_id) in node_type_ids {
+    for (node_type, &node_id) in node_type_ids {
+        let sym = match node_type {
+            NodeType::Named(sym) | NodeType::Anonymous(sym) => *sym,
+        };
         let name = strings.borrow_mut().get_or_intern(sym, interner)?;
         node_symbols.push(NodeSymbol::new(node_id.get(), name));
     }

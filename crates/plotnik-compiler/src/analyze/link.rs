@@ -8,14 +8,14 @@ use std::collections::HashMap;
 
 use indexmap::{IndexMap, IndexSet};
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Interner, NodeFieldId, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 use rowan::TextRange;
 
 /// Output from the link phase for binary emission.
 #[derive(Default)]
 pub struct LinkOutput {
-    /// Interned name → NodeTypeId (for binary: StringId → NodeTypeId)
-    pub node_type_ids: IndexMap<Symbol, NodeTypeId>,
+    /// Interned named/anonymous node type → NodeTypeId (for binary: StringId → NodeTypeId)
+    pub node_type_ids: IndexMap<NodeType<Symbol>, NodeTypeId>,
     /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
     pub node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
@@ -42,7 +42,7 @@ pub fn link<'q>(
     diagnostics: &mut Diagnostics,
 ) {
     // Local deduplication maps (not exposed in output)
-    let mut node_type_ids: HashMap<&'q str, Option<NodeTypeId>> = HashMap::new();
+    let mut node_type_ids: HashMap<NodeType<&'q str>, Option<NodeTypeId>> = HashMap::new();
     let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
 
     for (&source_id, root) in ast_map {
@@ -68,7 +68,7 @@ struct Linker<'a, 'q> {
     source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
     source_id: SourceId,
-    node_type_ids: &'a mut HashMap<&'q str, Option<NodeTypeId>>,
+    node_type_ids: &'a mut HashMap<NodeType<&'q str>, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     output: &'a mut LinkOutput,
     diagnostics: &'a mut Diagnostics,
@@ -103,15 +103,18 @@ impl<'a, 'q> Linker<'a, 'q> {
             return;
         }
         let type_name = type_token.text();
-        if self.node_type_ids.contains_key(type_name) {
+        let key = NodeType::Named(token_src(&type_token, self.source()));
+        if self.node_type_ids.contains_key(&key) {
             return;
         }
         let resolved = self.grammar.resolve_named_node(type_name);
-        self.node_type_ids
-            .insert(token_src(&type_token, self.source()), resolved);
+        self.node_type_ids.insert(key, resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(type_name);
-            self.output.node_type_ids.entry(sym).or_insert(id);
+            self.output
+                .node_type_ids
+                .entry(NodeType::Named(sym))
+                .or_insert(id);
         }
         if resolved.is_none() {
             let all_types = self.grammar.all_named_node_kinds();
@@ -271,8 +274,8 @@ impl<'a, 'q> Linker<'a, 'q> {
         ) {
             return None;
         }
-        let type_name = type_token.text();
-        let parent_id = self.node_type_ids.get(type_name).copied().flatten()?;
+        let key = NodeType::Named(token_src(&type_token, self.source()));
+        let parent_id = self.node_type_ids.get(&key).copied().flatten()?;
         // Verify the node type exists in the grammar
         self.grammar.node_type_name(parent_id)?;
         Some(ValidationContext {
@@ -436,18 +439,21 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
             return;
         };
         let value = value_token.text();
-        if self.linker.node_type_ids.contains_key(value) {
+        let key = NodeType::Anonymous(token_src(&value_token, self.linker.source()));
+        if self.linker.node_type_ids.contains_key(&key) {
             return;
         }
 
         let resolved = self.linker.grammar.resolve_anonymous_node(value);
-        self.linker
-            .node_type_ids
-            .insert(token_src(&value_token, self.linker.source()), resolved);
+        self.linker.node_type_ids.insert(key, resolved);
 
         if let Some(id) = resolved {
             let sym = self.linker.interner.intern(value);
-            self.linker.output.node_type_ids.entry(sym).or_insert(id);
+            self.linker
+                .output
+                .node_type_ids
+                .entry(NodeType::Anonymous(sym))
+                .or_insert(id);
             return;
         }
 

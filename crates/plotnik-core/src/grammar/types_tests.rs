@@ -1,12 +1,12 @@
 use std::num::NonZeroU16;
 
 use super::types::{NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, build_node_constraints};
-use crate::NodeTypeId;
+use crate::{NodeType, NodeTypeId};
 
-fn node_id_for_name(kind: &str, named: bool) -> Option<NodeTypeId> {
-    match (kind, named) {
-        ("root", true) => NonZeroU16::new(1),
-        ("child", true) => NonZeroU16::new(2),
+fn node_id_for_type(node_type: NodeType<&str>) -> Option<NodeTypeId> {
+    match node_type {
+        NodeType::Named("root") => NonZeroU16::new(1),
+        NodeType::Named("child") => NonZeroU16::new(2),
         _ => None,
     }
 }
@@ -31,7 +31,7 @@ fn builds_node_constraints_from_node_shapes() {
     }];
 
     let (node_constraints, _, root_node_type) =
-        build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
+        build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
             .expect("node shapes should resolve");
 
     assert_eq!(root_node_type, NonZeroU16::new(1));
@@ -57,7 +57,7 @@ fn rejects_unknown_child_types() {
         subtypes: None,
     }];
 
-    let err = build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
+    let err = build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
         .expect_err("unknown child type should fail");
 
     assert_eq!(
@@ -101,7 +101,7 @@ fn skips_known_abstract_child_shapes() {
     ];
 
     let (node_constraints, _, _) =
-        build_node_constraints(&shapes, node_id_for_name, field_id_for_name)
+        build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
             .expect("known abstract shapes should not be runtime node ids");
     let root_id = NonZeroU16::new(1).unwrap();
 
