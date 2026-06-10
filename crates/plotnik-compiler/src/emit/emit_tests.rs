@@ -413,6 +413,15 @@ fn alternations_no_internal_captures() {
 }
 
 #[test]
+fn alternations_in_child_position() {
+    shot_bytecode!(
+        r#"
+        Test = (program [(expression_statement) @expr])
+    "#
+    );
+}
+
+#[test]
 fn alternations_tagged_in_field_constraint() {
     shot_bytecode!(
         r#"
@@ -433,10 +442,28 @@ fn anchors_between_siblings() {
 }
 
 #[test]
+fn anchors_between_siblings_with_alternation() {
+    shot_bytecode!(
+        r#"
+        Test = (program (expression_statement (binary_expression (identifier) @left . [(identifier) @right])))
+    "#
+    );
+}
+
+#[test]
 fn anchors_first_child() {
     shot_bytecode!(
         r#"
         Test = (array . (identifier))
+    "#
+    );
+}
+
+#[test]
+fn anchors_first_child_with_alternation() {
+    shot_bytecode!(
+        r#"
+        Test = (program (expression_statement (call_expression arguments: (arguments . [(identifier) @arg]))))
     "#
     );
 }

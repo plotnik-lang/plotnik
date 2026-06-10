@@ -17,6 +17,26 @@ use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};
 
+fn alt_search_nav(first_nav: Option<Nav>) -> Option<Nav> {
+    match first_nav {
+        Some(nav @ (Nav::Down | Nav::Next | Nav::Stay)) => Some(nav),
+        _ => None,
+    }
+}
+
+fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: Option<Nav>) -> Option<Nav> {
+    if search_nav.is_some() {
+        return Some(Nav::StayExact);
+    }
+
+    let nav = match first_nav {
+        None => Nav::StayExact,
+        Some(nav @ (Nav::DownSkip | Nav::NextSkip | Nav::UpSkipTrivia(_))) => nav,
+        Some(nav) => nav.to_exact(),
+    };
+    Some(nav)
+}
+
 impl Compiler<'_> {
     /// Compile a sequence with capture effects (passed to last item).
     pub(super) fn compile_seq_inner(
@@ -227,11 +247,11 @@ impl Compiler<'_> {
         };
         let merged_fields = alt_type_id.and_then(|id| self.ctx.type_ctx.get_struct_fields(id));
 
-        // Convert navigation to exact variant for alternation branches.
-        // Branches should match at their exact cursor position only -
-        // the search among positions is owned by the parent context.
-        // When first_nav is None (standalone definition), use StayExact.
-        let branch_nav = Some(first_nav.map_or(Nav::StayExact, Nav::to_exact));
+        // Branches match at the current candidate position. For resumable search
+        // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
+        // wrapper below; otherwise the branch performs the exact navigation.
+        let search_nav = alt_search_nav(first_nav);
+        let branch_nav = exact_nav_for_alt_branch(first_nav, search_nav);
 
         // Compile each branch, collecting entry labels
         let mut successors = Vec::new();
@@ -305,13 +325,36 @@ impl Compiler<'_> {
         if successors.is_empty() {
             return exit;
         }
-        if successors.len() == 1 {
-            return successors[0];
+
+        let alt_entry = if successors.len() == 1 {
+            successors[0]
+        } else {
+            // Emit epsilon branch to choose among alternatives.
+            let entry = self.fresh_label();
+            self.emit_epsilon(entry, successors);
+            entry
+        };
+
+        if let Some(nav) = search_nav {
+            return self.compile_alt_search_wrapper(nav, alt_entry);
         }
 
-        // Emit epsilon branch to choose among alternatives
-        let entry = self.fresh_label();
-        self.emit_epsilon(entry, successors);
-        entry
+        alt_entry
+    }
+
+    /// Compile alternation search as: navigate to candidate, try all exact branches,
+    /// then advance and retry if the chosen branch or its continuation fails.
+    fn compile_alt_search_wrapper(&mut self, nav: Nav, alt_entry: Label) -> Label {
+        let try_label = self.fresh_label();
+
+        let retry_nav = self.fresh_label();
+        let next_nav = repeat_nav_for(Some(nav)).expect("search navs have repeat navs");
+        self.emit_wildcard_nav(retry_nav, next_nav, try_label);
+
+        self.emit_branch_epsilon_at(try_label, alt_entry, retry_nav, true);
+
+        let navigate = self.fresh_label();
+        self.emit_wildcard_nav(navigate, nav, try_label);
+        navigate
     }
 }
