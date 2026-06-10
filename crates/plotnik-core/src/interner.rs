@@ -79,6 +79,11 @@ impl Interner {
         sym
     }
 
+    /// Return the symbol for an already-interned string.
+    pub fn get(&self, s: &str) -> Option<Symbol> {
+        self.map.get(s).copied()
+    }
+
     /// Resolve a Symbol back to its string.
     ///
     /// # Panics

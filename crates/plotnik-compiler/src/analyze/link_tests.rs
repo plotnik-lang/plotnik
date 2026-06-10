@@ -1,5 +1,48 @@
-use crate::Query;
+use crate::test_utils::colliding_node_type_grammar;
+use crate::{Query, QueryBuilder, SourceMap};
 use indoc::indoc;
+use plotnik_core::NodeType;
+
+fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
+    let grammar = colliding_node_type_grammar();
+    let mut source_map = SourceMap::new();
+    for (path, content) in files {
+        source_map.add_file(path, content);
+    }
+
+    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+    if !query.is_valid() {
+        panic!(
+            "Expected valid query, got error:\n{}",
+            query.dump_diagnostics()
+        );
+    }
+
+    let query = query.link(&grammar);
+    if !query.is_valid() {
+        panic!(
+            "Expected valid linking, got error:\n{}",
+            query.dump_diagnostics()
+        );
+    }
+
+    let sym = query
+        .interner()
+        .get("number")
+        .expect("linked node name must be interned");
+    let named_id = grammar.resolve_named_node("number").unwrap();
+    let anonymous_id = grammar.resolve_anonymous_node("number").unwrap();
+
+    assert_ne!(named_id, anonymous_id);
+    assert_eq!(
+        query.node_type_ids().get(&NodeType::Named(sym)),
+        Some(&named_id)
+    );
+    assert_eq!(
+        query.node_type_ids().get(&NodeType::Anonymous(sym)),
+        Some(&anonymous_id)
+    );
+}
 
 #[test]
 fn predicate_on_non_leaf() {
@@ -19,6 +62,18 @@ fn predicate_on_non_leaf() {
 fn predicate_on_leaf_valid() {
     let input = r#"Q = (identifier == "foo")"#;
     Query::expect_valid_linking(input);
+}
+
+#[test]
+fn resolves_named_and_anonymous_node_types_with_same_name() {
+    assert_links_colliding_node_types(&[
+        ("named.ptk", "A = (number)"),
+        ("anonymous.ptk", "Q = \"number\""),
+    ]);
+    assert_links_colliding_node_types(&[
+        ("anonymous.ptk", "Q = \"number\""),
+        ("named.ptk", "A = (number)"),
+    ]);
 }
 
 #[test]

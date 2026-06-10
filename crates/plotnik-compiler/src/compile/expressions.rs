@@ -13,6 +13,7 @@ use crate::analyze::type_check::TypeShape;
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR, PredicateIR};
 use crate::parser::ast::{self, Expr};
 use plotnik_bytecode::Nav;
+use plotnik_core::NodeType;
 
 use super::Compiler;
 use super::capture::CaptureEffects;
@@ -545,13 +546,14 @@ impl Compiler<'_> {
     pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
         if let Some(ids) = self.ctx.node_types {
             // Linked mode: resolve to NodeTypeId from grammar
-            for (&sym, &id) in ids {
-                if self.ctx.interner.resolve(sym) == text {
-                    return NodeTypeIR::Anonymous(NonZeroU16::new(id.get()));
-                }
-            }
-            // If not found in grammar, treat as anonymous wildcard
-            NodeTypeIR::Anonymous(None)
+            let Some(sym) = self.ctx.interner.get(text) else {
+                return NodeTypeIR::Anonymous(None);
+            };
+            ids.get(&NodeType::Anonymous(sym))
+                .and_then(|id| NonZeroU16::new(id.get()))
+                .map_or(NodeTypeIR::Anonymous(None), |id| {
+                    NodeTypeIR::Anonymous(Some(id))
+                })
         } else {
             // Unlinked mode: store StringId referencing the literal text
             let string_id = self.ctx.strings.borrow_mut().intern_str(text);
@@ -578,13 +580,12 @@ impl Compiler<'_> {
 
         if let Some(ids) = self.ctx.node_types {
             // Linked mode: resolve to NodeTypeId from grammar
-            for (&sym, &id) in ids {
-                if self.ctx.interner.resolve(sym) == type_name {
-                    return NodeTypeIR::Named(NonZeroU16::new(id.get()));
-                }
-            }
-            // If not found in grammar, treat as any named (linked mode)
-            NodeTypeIR::Named(None)
+            let Some(sym) = self.ctx.interner.get(type_name) else {
+                return NodeTypeIR::Named(None);
+            };
+            ids.get(&NodeType::Named(sym))
+                .and_then(|id| NonZeroU16::new(id.get()))
+                .map_or(NodeTypeIR::Named(None), |id| NodeTypeIR::Named(Some(id)))
         } else {
             // Unlinked mode: store StringId referencing the type name
             let string_id = self.ctx.strings.borrow_mut().intern_str(type_name);

@@ -18,6 +18,13 @@ mod utils_tests;
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
 
+/// Concrete node type identity, preserving tree-sitter's named/anonymous namespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NodeType<T> {
+    Named(T),
+    Anonymous(T),
+}
+
 /// Node type ID (tree-sitter uses u16, but 0 is internal-only).
 pub type NodeTypeId = NonZeroU16;
 
