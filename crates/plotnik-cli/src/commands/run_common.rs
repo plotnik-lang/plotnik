@@ -118,14 +118,6 @@ pub fn validate(
     Ok(())
 }
 
-/// Build trivia type list from module.
-pub fn build_trivia_types(module: &Module) -> Vec<u16> {
-    let trivia_view = module.trivia();
-    (0..trivia_view.len())
-        .map(|i| trivia_view.get(i).node_type)
-        .collect()
-}
-
 /// Common input parameters for exec/trace commands.
 pub struct QueryInput<'a> {
     pub query_path: Option<&'a Path>,
@@ -142,7 +134,6 @@ pub struct PreparedQuery {
     pub module: Module,
     pub entrypoint: Entrypoint,
     pub tree: tree_sitter::Tree,
-    pub trivia_types: Vec<u16>,
     pub source_code: String,
 }
 
@@ -198,13 +189,11 @@ pub fn prepare_query(input: QueryInput) -> PreparedQuery {
 
     let entrypoint = resolve_entrypoint(&module, input.entry);
     let tree = lang.parse(&source_code);
-    let trivia_types = build_trivia_types(&module);
 
     PreparedQuery {
         module,
         entrypoint,
         tree,
-        trivia_types,
         source_code,
     }
 }

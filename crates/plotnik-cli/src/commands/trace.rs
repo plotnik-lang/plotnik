@@ -27,7 +27,6 @@ pub fn run(args: TraceArgs) {
         module,
         entrypoint,
         tree,
-        trivia_types,
         source_code,
     } = run_common::prepare_query(QueryInput {
         query_path: args.query_path.as_deref(),
@@ -40,7 +39,6 @@ pub fn run(args: TraceArgs) {
     });
 
     let vm = VM::builder(&source_code, &tree)
-        .trivia_types(trivia_types)
         .exec_fuel(args.fuel)
         .build();
     let colors = Colors::new(args.color);

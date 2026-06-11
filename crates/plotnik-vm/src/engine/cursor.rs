@@ -38,20 +38,12 @@ pub enum UpMode {
 /// checkpoint saves and O(depth) restores.
 pub struct CursorWrapper<'t> {
     cursor: TreeCursor<'t>,
-    /// Trivia node type IDs (for skip policies).
-    trivia_types: Vec<u16>,
 }
 
 impl<'t> CursorWrapper<'t> {
     /// Create a wrapper around a tree cursor.
-    ///
-    /// `trivia_types` is the list of node type IDs considered trivia
-    /// (e.g., comments, whitespace).
-    pub fn new(cursor: TreeCursor<'t>, trivia_types: Vec<u16>) -> Self {
-        Self {
-            cursor,
-            trivia_types,
-        }
+    pub fn new(cursor: TreeCursor<'t>) -> Self {
+        Self { cursor }
     }
 
     /// Get the current node.
@@ -90,11 +82,12 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_parent()
     }
 
-    /// Check if a node type is trivia.
+    /// Check if a node is trivia.
     #[inline]
     pub fn is_trivia(&self, node: &Node<'_>) -> bool {
-        // Anonymous nodes are typically trivia (punctuation, operators)
-        !node.is_named() || self.trivia_types.contains(&node.kind_id())
+        // D2/D3: anonymous-node skipping is documented anchor semantics;
+        // is_extra is per-instance parser truth.
+        !node.is_named() || node.is_extra()
     }
 
     /// Navigate according to Nav command, preparing for match attempt.
