@@ -495,6 +495,15 @@ fn anchors_no_anchor() {
     );
 }
 
+#[test]
+fn anchors_explicit_comment_pattern_emits_match_before_skip_nav() {
+    shot_bytecode!(
+        r#"
+        Test = (program {(comment) @c . (function_declaration) @f})
+    "#
+    );
+}
+
 // Named expressions
 
 #[test]
