@@ -26,13 +26,12 @@ fn header_roundtrip() {
         regex_table_count: 3,
         node_types_count: 20,
         node_fields_count: 5,
-        trivia_count: 2,
         type_defs_count: 8,
         type_members_count: 12,
         type_names_count: 4,
         entrypoints_count: 1,
         transitions_count: 15,
-        _reserved: [0; 20],
+        _reserved: [0; 22],
     };
 
     let bytes = h.to_bytes();
@@ -47,15 +46,13 @@ fn compute_offsets_empty() {
     let h = Header::default();
     let offsets = h.compute_offsets();
 
-    // New order: blobs first, then tables
-    // All sections 64-byte aligned. With 0 counts, each table still has 1 sentinel entry (4 bytes)
+    // Blobs first, then tables. String and regex tables each include one sentinel entry.
     assert_eq!(offsets.str_blob, 64); // after header
     assert_eq!(offsets.regex_blob, 64); // 64 + align(0) = 64
     assert_eq!(offsets.str_table, 64); // 64 + align(0) = 64
     assert_eq!(offsets.regex_table, 128); // 64 + align(4) = 128
-    assert_eq!(offsets.node_types, 192); // 128 + align(4) = 192
+    assert_eq!(offsets.node_types, 192); // 128 + align(8) = 192
     assert_eq!(offsets.node_fields, 192); // 192 + align(0) = 192
-    assert_eq!(offsets.trivia, 192);
     assert_eq!(offsets.type_defs, 192);
     assert_eq!(offsets.type_members, 192);
     assert_eq!(offsets.type_names, 192);
@@ -67,10 +64,9 @@ fn compute_offsets_empty() {
 fn compute_offsets_with_data() {
     let h = Header {
         str_table_count: 5,     // (5+1)*4 = 24 bytes
-        regex_table_count: 2,   // (2+1)*4 = 12 bytes
+        regex_table_count: 2,   // (2+1)*8 = 24 bytes
         node_types_count: 10,   // 10*4 = 40 bytes
         node_fields_count: 5,   // 5*4 = 20 bytes
-        trivia_count: 3,        // 3*2 = 6 bytes
         type_defs_count: 8,     // 8*4 = 32 bytes
         type_members_count: 12, // 12*4 = 48 bytes
         type_names_count: 4,    // 4*4 = 16 bytes
@@ -83,17 +79,16 @@ fn compute_offsets_with_data() {
 
     let offsets = h.compute_offsets();
 
-    // New order: blobs first, then tables. All offsets 64-byte aligned.
+    // Blobs first, then tables. All offsets 64-byte aligned.
     assert_eq!(offsets.str_blob, 64); // header end
     assert_eq!(offsets.regex_blob, 192); // 64 + 100 = 164 → 192
     assert_eq!(offsets.str_table, 320); // 192 + 128 = 320 (aligned)
     assert_eq!(offsets.regex_table, 384); // 320 + 24 = 344 → 384
-    assert_eq!(offsets.node_types, 448); // 384 + 12 = 396 → 448
+    assert_eq!(offsets.node_types, 448); // 384 + 24 = 408 → 448
     assert_eq!(offsets.node_fields, 512); // 448 + 40 = 488 → 512
-    assert_eq!(offsets.trivia, 576); // 512 + 20 = 532 → 576
-    assert_eq!(offsets.type_defs, 640); // 576 + 6 = 582 → 640
-    assert_eq!(offsets.type_members, 704); // 640 + 32 = 672 → 704
-    assert_eq!(offsets.type_names, 768); // 704 + 48 = 752 → 768
-    assert_eq!(offsets.entrypoints, 832); // 768 + 16 = 784 → 832
-    assert_eq!(offsets.transitions, 896); // 832 + 16 = 848 → 896
+    assert_eq!(offsets.type_defs, 576); // 512 + 20 = 532 → 576
+    assert_eq!(offsets.type_members, 640); // 576 + 32 = 608 → 640
+    assert_eq!(offsets.type_names, 704); // 640 + 48 = 688 → 704
+    assert_eq!(offsets.entrypoints, 768); // 704 + 16 = 720 → 768
+    assert_eq!(offsets.transitions, 832); // 768 + 16 = 784 → 832
 }

@@ -72,20 +72,3 @@ struct FieldSymbol {
     name: u16,      // StringId
 }
 ```
-
-## 4. Trivia
-
-Node types considered "trivia" (whitespace, comments). The runtime skips these during navigation with `NextSkip`, `DownSkip`, etc.
-
-- **Section Offset**: Computed (follows NodeFields)
-- **Record Size**: 2 bytes
-- **Count**: `header.trivia_count`
-
-```rust
-#[repr(C)]
-struct TriviaEntry {
-    node_type: u16, // Tree-sitter node type ID
-}
-```
-
-Unsorted. Loaders should build a lookup structure (e.g., bitset indexed by node type) for O(1) trivia checks.

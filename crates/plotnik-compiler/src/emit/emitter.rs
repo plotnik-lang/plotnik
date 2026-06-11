@@ -8,7 +8,7 @@ use crate::analyze::type_check::TypeId;
 use crate::bytecode::{InstructionIR, Label, PredicateValueIR};
 use crate::compile::{CompileCtx, Compiler};
 use crate::query::LinkedQuery;
-use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN, TriviaEntry};
+use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN};
 
 use super::EmitError;
 use super::layout::CacheAligned;
@@ -94,9 +94,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
     }
 
-    // Trivia (empty for now)
-    let trivia_entries: Vec<TriviaEntry> = Vec::new();
-
     // Build regex table from predicates in compiled instructions
     let mut regexes = RegexTableBuilder::new();
     intern_regex_predicates(&compile_result.instructions, &strings, &mut regexes)?;
@@ -118,13 +115,12 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
     let node_types_bytes = emit_node_symbols(&node_symbols);
     let node_fields_bytes = emit_field_symbols(&field_symbols);
-    let trivia_bytes = emit_trivia(&trivia_entries);
     let entrypoints_bytes = emit_entrypoints(&entrypoints);
 
-    // Build output with sections in v2 order:
+    // Build output with sections in bytecode order:
     // Header → StringBlob → RegexBlob → StringTable → RegexTable →
-    // NodeTypes → NodeFields → Trivia → TypeDefs → TypeMembers →
-    // TypeNames → Entrypoints → Transitions
+    // NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
+    // Entrypoints → Transitions
     let mut output = vec![0u8; 64]; // Reserve header space
 
     emit_section(&mut output, &str_blob);
@@ -133,7 +129,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     emit_section(&mut output, &regex_table);
     emit_section(&mut output, &node_types_bytes);
     emit_section(&mut output, &node_fields_bytes);
-    emit_section(&mut output, &trivia_bytes);
     emit_section(&mut output, &type_defs_bytes);
     emit_section(&mut output, &type_members_bytes);
     emit_section(&mut output, &type_names_bytes);
@@ -148,7 +143,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         str_table_count: strings.len() as u16,
         node_types_count: node_symbols.len() as u16,
         node_fields_count: field_symbols.len() as u16,
-        trivia_count: trivia_entries.len() as u16,
         regex_table_count: regexes.len() as u16,
         type_defs_count: types.type_defs_count() as u16,
         type_members_count: types.type_members_count() as u16,
@@ -258,14 +252,6 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
         bytes.extend_from_slice(&sym.name.get().to_le_bytes());
-    }
-    bytes
-}
-
-fn emit_trivia(entries: &[TriviaEntry]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entries.len() * 2);
-    for entry in entries {
-        bytes.extend_from_slice(&entry.node_type.to_le_bytes());
     }
     bytes
 }

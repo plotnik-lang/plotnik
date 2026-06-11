@@ -55,17 +55,3 @@ impl FieldSymbol {
         Self { id, name }
     }
 }
-
-/// A node type ID that counts as trivia (whitespace, comments).
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct TriviaEntry {
-    pub node_type: u16,
-}
-
-impl TriviaEntry {
-    /// Create a new trivia entry.
-    pub fn new(node_type: u16) -> Self {
-        Self { node_type }
-    }
-}

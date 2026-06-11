@@ -11,7 +11,7 @@ use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
-use super::sections::{FieldSymbol, NodeSymbol, TriviaEntry};
+use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 use super::{Entrypoint, STEP_SIZE, VERSION};
 
@@ -288,16 +288,6 @@ impl Module {
         }
     }
 
-    /// Get a view into the trivia entries.
-    pub fn trivia(&self) -> TriviaView<'_> {
-        let offset = self.offsets.trivia as usize;
-        let count = self.header.trivia_count as usize;
-        TriviaView {
-            bytes: &self.storage[offset..offset + count * 2],
-            count,
-        }
-    }
-
     /// Get a view into the regex table.
     pub fn regexes(&self) -> RegexView<'_> {
         RegexView {
@@ -423,35 +413,6 @@ impl<'a> SymbolsView<'a, FieldSymbol> {
     /// Check if empty.
     pub fn is_empty(&self) -> bool {
         self.count == 0
-    }
-}
-
-/// View into trivia entries.
-pub struct TriviaView<'a> {
-    bytes: &'a [u8],
-    count: usize,
-}
-
-impl<'a> TriviaView<'a> {
-    /// Get a trivia entry by index.
-    pub fn get(&self, idx: usize) -> TriviaEntry {
-        assert!(idx < self.count, "trivia index out of bounds");
-        TriviaEntry::new(read_u16_le(self.bytes, idx * 2))
-    }
-
-    /// Number of entries.
-    pub fn len(&self) -> usize {
-        self.count
-    }
-
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-
-    /// Check if a node type is trivia.
-    pub fn contains(&self, node_type: u16) -> bool {
-        (0..self.count).any(|i| self.get(i).node_type == node_type)
     }
 }
 

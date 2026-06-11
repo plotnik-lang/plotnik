@@ -27,7 +27,7 @@ pub use ids::{StringId, TypeId};
 
 pub use header::{Header, SectionOffsets};
 
-pub use sections::{FieldSymbol, NodeSymbol, Slice, TriviaEntry};
+pub use sections::{FieldSymbol, NodeSymbol, Slice};
 
 pub use entrypoint::Entrypoint;
 
@@ -44,7 +44,7 @@ pub use instructions::{
 
 pub use module::{
     ByteStorage, EntrypointsView, Instruction, Module, ModuleError, RegexView, StringsView,
-    SymbolsView, TriviaView, TypesView,
+    SymbolsView, TypesView,
 };
 
 pub use dump::dump;
