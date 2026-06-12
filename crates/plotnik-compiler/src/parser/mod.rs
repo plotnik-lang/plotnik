@@ -46,6 +46,6 @@ pub use ast::{
     Root, SeqExpr, SeqItem, Type, is_truly_empty_scope, token_src,
 };
 
-pub use core::{ParseResult, Parser};
+pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseResult, Parser};
 
 pub use lexer::{Token, lex, token_text};

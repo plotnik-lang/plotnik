@@ -9,11 +9,13 @@ fn missing_capture_name() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @"
+    error: expected a capture name after `@`
       |
     1 | (identifier) @
       |              ^
+      |
+    help: captures attach to the pattern before them: `(node) @name`
     ");
 }
 
@@ -55,8 +57,8 @@ fn missing_type_name() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected type name
+    insta::assert_snapshot!(res, @"
+    error: expected a type name after `::`
       |
     1 | (identifier) @name ::
       |                      ^
@@ -73,8 +75,8 @@ fn missing_negated_field_name() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected field name
+    insta::assert_snapshot!(res, @"
+    error: expected a field name
       |
     1 | (call -)
       |        ^
@@ -91,8 +93,8 @@ fn missing_subtype() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected subtype name
+    insta::assert_snapshot!(res, @"
+    error: expected a subtype after `/`
       |
     1 | (expression/)
       |             ^
@@ -123,8 +125,8 @@ fn type_annotation_missing_name_at_eof() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected type name
+    insta::assert_snapshot!(res, @"
+    error: expected a type name after `::`
       |
     1 | (a) @x ::
       |          ^
@@ -139,8 +141,8 @@ fn type_annotation_missing_name_with_bracket() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected type name
+    insta::assert_snapshot!(res, @"
+    error: expected a type name after `::`
       |
     1 | [(a) @x :: ]
       |            ^
@@ -157,8 +159,8 @@ fn type_annotation_invalid_token_after() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: expected type name
+    insta::assert_snapshot!(res, @"
+    error: expected a type name after `::`
       |
     1 | (identifier) @name :: (
       |                       ^
@@ -191,11 +193,13 @@ fn capture_with_invalid_char() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @"
+    error: expected a capture name after `@`
       |
     1 | (identifier) @123
       |              ^
+      |
+    help: captures attach to the pattern before them: `(node) @name`
     ");
 }
 
@@ -205,11 +209,13 @@ fn bare_capture_at_eof_triggers_sync() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @"
+    error: expected a capture name after `@`
       |
     1 | @
       | ^
+      |
+    help: captures attach to the pattern before them: `(node) @name`
     ");
 }
 
@@ -257,11 +263,13 @@ fn mixed_valid_invalid_captures() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture has no target
+    insta::assert_snapshot!(res, @"
+    error: expected a capture name after `@`
       |
     1 | (a) @ok @ @name
       |         ^
+      |
+    help: captures attach to the pattern before them: `(node) @name`
     ");
 }
 
@@ -273,8 +281,8 @@ fn field_equals_typo_missing_value() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `:` instead of `=`: this isn't a definition
+    insta::assert_snapshot!(res, @"
+    error: fields use `:`, not `=`
       |
     1 | (call name = )
       |            ^
@@ -298,8 +306,8 @@ fn lowercase_branch_label_missing_expression() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch label must start with uppercase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [label:]
       |  ^^^^^
@@ -309,10 +317,59 @@ fn lowercase_branch_label_missing_expression() {
     1 - [label:]
     1 + [Label:]
       |
+    help: branch labels become enum variants in the output
 
     error: expected an expression
       |
     1 | [label:]
       |        ^
     ");
+}
+
+#[test]
+fn unterminated_string_in_node() {
+    let input = indoc! {r#"
+    (call "abc
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: missing closing quote
+      |
+    1 | (call "abc
+      |       ^^^^
+    "#);
+}
+
+#[test]
+fn unterminated_string_in_predicate() {
+    let input = indoc! {r#"
+    (name == "foo
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: missing closing quote
+      |
+    1 | (name == "foo
+      |          ^^^^
+    "#);
+}
+
+#[test]
+fn unterminated_string_swallows_closing_paren() {
+    let input = indoc! {r#"
+    Q = ("abc)
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: missing closing quote
+      |
+    1 | Q = ("abc)
+      |      ^^^^^
+    "#);
 }

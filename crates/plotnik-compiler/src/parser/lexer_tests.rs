@@ -267,18 +267,36 @@ fn error_coalescing() {
 }
 
 #[test]
-fn error_unexpected_xml_opening() {
-    insta::assert_snapshot!(snapshot("<div>"), @r#"XMLGarbage "<div>""#);
+fn unterminated_string_double_quote() {
+    insta::assert_snapshot!(snapshot(r#"(call "abc"#), @r#"
+    ParenOpen "("
+    Id "call"
+    UnterminatedString "\"abc"
+    "#);
 }
 
 #[test]
-fn error_unexpected_xml_closing() {
-    insta::assert_snapshot!(snapshot("</div>"), @r#"XMLGarbage "</div>""#);
+fn unterminated_string_single_quote() {
+    insta::assert_snapshot!(snapshot("(call 'abc"), @r#"
+    ParenOpen "("
+    Id "call"
+    UnterminatedString "'abc"
+    "#);
 }
 
 #[test]
-fn error_unexpected_xml_self_closing() {
-    insta::assert_snapshot!(snapshot("<br/>"), @r#"XMLGarbage "<br/>""#);
+fn unterminated_string_stops_at_newline() {
+    insta::assert_snapshot!(snapshot("\"abc\n(x)"), @r#"
+    UnterminatedString "\"abc"
+    ParenOpen "("
+    Id "x"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn unterminated_string_with_escaped_quote() {
+    insta::assert_snapshot!(snapshot(r#""ab\"cd"#), @r#"UnterminatedString "\"ab\\\"cd""#);
 }
 
 #[test]

@@ -12,25 +12,6 @@ fn test_token_set_contains() {
 }
 
 #[test]
-fn test_token_set_union() {
-    let a = TokenSet::new(&[ParenOpen, ParenClose]);
-    let b = TokenSet::new(&[Star, Plus]);
-    let c = a.union(b);
-    assert!(c.contains(ParenOpen));
-    assert!(c.contains(ParenClose));
-    assert!(c.contains(Star));
-    assert!(c.contains(Plus));
-    assert!(!c.contains(Colon));
-}
-
-#[test]
-fn test_token_set_single() {
-    let set = TokenSet::single(Colon);
-    assert!(set.contains(Colon));
-    assert!(!set.contains(ParenOpen));
-}
-
-#[test]
 fn test_is_trivia() {
     assert!(Whitespace.is_trivia());
     assert!(Newline.is_trivia());
@@ -52,7 +33,6 @@ fn test_syntax_kind_count_under_128() {
 #[test]
 fn test_is_error() {
     assert!(Error.is_error());
-    assert!(XMLGarbage.is_error());
     assert!(Garbage.is_error());
     assert!(TsPredicate.is_error());
     assert!(!ParenOpen.is_error());
@@ -67,13 +47,6 @@ fn test_token_set_debug() {
     assert!(debug_str.contains("ParenOpen"));
     assert!(debug_str.contains("Star"));
     assert!(debug_str.contains("Plus"));
-}
-
-#[test]
-fn test_token_set_empty_debug() {
-    let set = TokenSet::EMPTY;
-    let debug_str = format!("{:?}", set);
-    assert_eq!(debug_str, "{}");
 }
 
 #[test]

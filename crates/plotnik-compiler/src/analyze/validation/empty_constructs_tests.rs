@@ -6,8 +6,8 @@ fn empty_tree() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `()` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `()` matches nothing
       |
     1 | Q = ()
       |     ^^
@@ -22,8 +22,8 @@ fn empty_tree_with_whitespace() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `()` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `()` matches nothing
       |
     1 | Q = (   )
       |     ^^^^^
@@ -38,8 +38,8 @@ fn empty_tree_with_comment() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `()` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `()` matches nothing
       |
     1 | Q = ( /* comment */ )
       |     ^^^^^^^^^^^^^^^^^
@@ -54,8 +54,8 @@ fn empty_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `{}` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `{}` matches nothing
       |
     1 | Q = {}
       |     ^^
@@ -70,8 +70,8 @@ fn empty_sequence_with_whitespace() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `{}` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `{}` matches nothing
       |
     1 | Q = {   }
       |     ^^^^^
@@ -86,8 +86,8 @@ fn empty_sequence_with_comment() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `{}` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `{}` matches nothing
       |
     1 | Q = { /* comment */ }
       |     ^^^^^^^^^^^^^^^^^
@@ -102,8 +102,8 @@ fn empty_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `[]` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `[]` matches nothing
       |
     1 | Q = []
       |     ^^
@@ -118,8 +118,8 @@ fn empty_alternation_with_whitespace() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `[]` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `[]` matches nothing
       |
     1 | Q = [   ]
       |     ^^^^^
@@ -134,8 +134,8 @@ fn empty_alternation_with_comment() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `[]` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `[]` matches nothing
       |
     1 | Q = [ /* comment */ ]
       |     ^^^^^^^^^^^^^^^^^
@@ -150,8 +150,8 @@ fn nested_empty_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `{}` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `{}` matches nothing
       |
     1 | Q = (foo {})
       |          ^^
@@ -166,8 +166,8 @@ fn nested_empty_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `[]` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `[]` matches nothing
       |
     1 | Q = (foo [])
       |          ^^

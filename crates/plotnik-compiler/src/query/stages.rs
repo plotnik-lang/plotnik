@@ -14,10 +14,7 @@ use crate::analyze::validation::{
     validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
 };
 use crate::analyze::{dependencies, validate_recursion};
-use crate::parser::{Parser, Root, SyntaxNode, lex};
-
-const DEFAULT_QUERY_PARSE_FUEL: u32 = 1_000_000;
-const DEFAULT_QUERY_PARSE_MAX_DEPTH: u32 = 4096;
+use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, Parser, Root, SyntaxNode, lex};
 
 pub type AstMap = IndexMap<SourceId, Root>;
 
@@ -34,8 +31,8 @@ pub struct QueryBuilder {
 impl QueryBuilder {
     pub fn new(source_map: SourceMap) -> Self {
         let config = QueryConfig {
-            query_parse_fuel: DEFAULT_QUERY_PARSE_FUEL,
-            query_parse_max_depth: DEFAULT_QUERY_PARSE_MAX_DEPTH,
+            query_parse_fuel: DEFAULT_FUEL,
+            query_parse_max_depth: DEFAULT_MAX_DEPTH,
         };
 
         Self { source_map, config }

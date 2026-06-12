@@ -39,9 +39,7 @@ pub use plotnik_vm::engine;
 pub use plotnik_core::Colors;
 
 // Re-export key types from compiler
-pub use plotnik_compiler::{
-    Diagnostics, DiagnosticsPrinter, Error, PassResult, Result, Severity, Span,
-};
+pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
 pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
 // Re-export VM types

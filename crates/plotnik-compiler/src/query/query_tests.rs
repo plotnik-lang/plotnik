@@ -61,9 +61,9 @@ impl QueryAnalyzed {
                     | UnclosedSequence
                     | UnclosedAlternation
                     | UnclosedRegex
+                    | UnclosedString
                     | ExpectedExpression
                     | ExpectedTypeName
-                    | ExpectedCaptureName
                     | ExpectedFieldName
                     | ExpectedSubtype
                     | ExpectedPredicateValue
@@ -73,6 +73,8 @@ impl QueryAnalyzed {
                     | EmptyAlternation
                     | BareIdentifier
                     | InvalidSeparator
+                    | QuantifiedAnchor
+                    | CapturedAnchor
                     | UnexpectedToken
             )
         });
