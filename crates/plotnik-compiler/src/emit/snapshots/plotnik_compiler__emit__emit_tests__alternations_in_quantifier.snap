@@ -49,16 +49,16 @@ _ObjWrap:
 Test:
   06   !   (object)                         08
   07  ...  
-  08  -ε-  [Arr]                            26, 12
-  10                                        ▶
-  11  -ε-                                   32
-  12  -ε-  [EndArr Set(M5)]                 10
-  14  -ε-  [EndObj Push]                    30, 11
-  16   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum Set(M4)]  14
-  19   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum Set(M4)]  14
-  22  -ε-  [Obj]                            16, 19
-  24  ─‣─  _                                22, 24, 32
-  26  └‣─  _                                22, 24, 32
-  28  ─‣─  _                                22, 28, 32
-  30  ─‣─  _                                22, 28, 32
-  32  ─‣┘  [EndArr Set(M5)] _               10
+  08  -ε-  [Arr]                            28, 14
+  10  -ε-                                   11
+  11  ─‣┘  [EndArr Set(M5)] _               13
+  13                                        ▶
+  14  -ε-  [EndArr Set(M5)]                 13
+  16  -ε-  [EndObj Push]                    32, 10
+  18   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum Set(M4)]  16
+  21   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum Set(M4)]  16
+  24  -ε-  [Obj]                            18, 21
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  ─‣─  _                                24, 30
+  32  ─‣─  _                                24, 30

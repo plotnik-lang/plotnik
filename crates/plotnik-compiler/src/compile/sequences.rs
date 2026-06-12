@@ -16,10 +16,14 @@ use plotnik_bytecode::{EffectOpcode, Nav};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{
-    AnonymousClassifier, compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for,
+    AnonymousClassifier, compute_nav_modes, expr_owns_sibling_search, is_down_nav,
+    is_skippable_quantifier, repeat_nav_for,
 };
 
-fn alt_search_nav(first_nav: Option<Nav>) -> Option<Nav> {
+/// Extract the navigation if it's a resumable sibling search (`SkipPolicy::Any`).
+/// Bounded navs (anchored, exact) have deterministic candidates and need no
+/// search wrapper; Up navs don't search siblings at all.
+fn resumable_search_nav(first_nav: Option<Nav>) -> Option<Nav> {
     match first_nav {
         Some(nav @ (Nav::Down | Nav::Next | Nav::Stay)) => Some(nav),
         _ => None,
@@ -152,6 +156,7 @@ impl Compiler<'_> {
         // Split capture effects: pre goes to FIRST item, post goes to LAST item
         let mut current_exit = exit;
         let count = nav_modes.len();
+        let mut following_nav: Option<Nav> = None;
         for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
             let expr = items[expr_idx]
                 .as_expr()
@@ -173,7 +178,25 @@ impl Compiler<'_> {
                 },
             };
 
-            current_exit = self.compile_expr_inner(expr, current_exit, nav_override, item_capture);
+            // An anchored follower checks adjacency at its exact position, so this
+            // item must own a resumable search: the in-instruction candidate search
+            // commits to its first match without a checkpoint and could never retry
+            // at a later sibling when the anchored follower fails.
+            let followed_by_anchor = matches!(
+                following_nav,
+                Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
+            );
+            let search_nav = resumable_search_nav(nav_override)
+                .filter(|_| followed_by_anchor && !expr_owns_sibling_search(expr));
+
+            current_exit = if let Some(nav) = search_nav {
+                let body =
+                    self.compile_expr_inner(expr, current_exit, Some(Nav::StayExact), item_capture);
+                self.compile_search_retry_wrapper(nav, body)
+            } else {
+                self.compile_expr_inner(expr, current_exit, nav_override, item_capture)
+            };
+            following_nav = nav_override;
         }
         current_exit
     }
@@ -281,7 +304,7 @@ impl Compiler<'_> {
         // Branches match at the current candidate position. For resumable search
         // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
         // wrapper below; otherwise the branch performs the exact navigation.
-        let search_nav = alt_search_nav(first_nav);
+        let search_nav = resumable_search_nav(first_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
 
         // Compile each branch, collecting entry labels
@@ -370,22 +393,26 @@ impl Compiler<'_> {
         };
 
         if let Some(nav) = search_nav {
-            return self.compile_alt_search_wrapper(nav, alt_entry);
+            return self.compile_search_retry_wrapper(nav, alt_entry);
         }
 
         alt_entry
     }
 
-    /// Compile alternation search as: navigate to candidate, try all exact branches,
-    /// then advance and retry if the chosen branch or its continuation fails.
-    fn compile_alt_search_wrapper(&mut self, nav: Nav, alt_entry: Label) -> Label {
+    /// Compile a resumable sibling search around a body that matches exactly at
+    /// the current position: navigate to a candidate, try the body there, then
+    /// advance and retry if the body or its continuation fails.
+    ///
+    /// Used for alternations (whose branches use exact navs) and for items that
+    /// precede an interior anchor (whose follower can't search on its own).
+    fn compile_search_retry_wrapper(&mut self, nav: Nav, body: Label) -> Label {
         let try_label = self.fresh_label();
 
         let retry_nav = self.fresh_label();
         let next_nav = repeat_nav_for(Some(nav)).expect("search navs have repeat navs");
         self.emit_wildcard_nav(retry_nav, next_nav, try_label);
 
-        self.emit_branch_epsilon_at(try_label, alt_entry, retry_nav, true);
+        self.emit_branch_epsilon_at(try_label, body, retry_nav, true);
 
         let navigate = self.fresh_label();
         self.emit_wildcard_nav(navigate, nav, try_label);

@@ -53,17 +53,17 @@ _ObjWrap:
 Test:
   06   !   (object)                         08
   07  ...  
-  08  -ε-  [Arr]                            26, 12
-  10                                        ▶
-  11  -ε-                                   32
-  12  -ε-  [EndArr Set(M4)]                 10
-  14  -ε-  [EndObj Push]                    30, 11
-  16  ─‣─  (pair) [Node Set(M3)]            14
-  18  ─‣─  (pair) [Node Set(M2)]            16
-  20  ─‣─  (pair) [Node Set(M1)]            18
-  22   !   [Obj] (pair) [Node Set(M0)]      20
-  24  ─‣─  _                                22, 24, 32
-  26  └‣─  _                                22, 24, 32
-  28  ─‣─  _                                22, 28, 32
-  30  ─‣─  _                                22, 28, 32
-  32  ─‣┘  [EndArr Set(M4)] _               10
+  08  -ε-  [Arr]                            28, 14
+  10  -ε-                                   11
+  11  ─‣┘  [EndArr Set(M4)] _               13
+  13                                        ▶
+  14  -ε-  [EndArr Set(M4)]                 13
+  16  -ε-  [EndObj Push]                    32, 10
+  18  ─‣─  (pair) [Node Set(M3)]            16
+  20  ─‣─  (pair) [Node Set(M2)]            18
+  22  ─‣─  (pair) [Node Set(M1)]            20
+  24   !   [Obj] (pair) [Node Set(M0)]      22
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  ─‣─  _                                24, 30
+  32  ─‣─  _                                24, 30

@@ -34,7 +34,10 @@ _ObjWrap:
 Test:
   06   !   (binary_expression)              08
   07  ...  
-  08  └‣─  "+" [Node Set(M0)]               10
+  08  └‣─  _                                13, 16
   10  ─◦─  (identifier)                     11
   11  ─‣┘  _                                12
   12                                        ▶
+  13   !   "+" [Node Set(M0)]               10
+  15  ...  
+  16  ─‣─  _                                13, 16
