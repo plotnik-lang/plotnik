@@ -30,8 +30,11 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   !   (pair)                           07
-  07  └‣─  key: (property_identifier)       08
-  08  ─◦─  value: _                         09
-  09  ─‣┘  _                                10
-  10                                        ▶
+  06   !   (pair)                           08
+  07  ...  
+  08  └‣─  _                                13, 14
+  10  ─◦─  value: _                         11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   key: (property_identifier)       10
+  14  ─‣─  _                                13, 14

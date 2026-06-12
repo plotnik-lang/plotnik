@@ -193,6 +193,25 @@ pub fn compute_nav_modes(
     result
 }
 
+/// Check if an expression compiles to a structure that already owns a
+/// resumable sibling search: alternations emit a search-retry wrapper,
+/// refs compile to Call instructions with retry checkpoints, quantifiers
+/// run their own skip-retry loops. Everything else relies on the VM's
+/// in-instruction candidate search, which commits to its first match
+/// without leaving a checkpoint.
+pub fn expr_owns_sibling_search(expr: &Expr) -> bool {
+    match expr {
+        Expr::AltExpr(_) | Expr::Ref(_) => true,
+        Expr::QuantifiedExpr(q) => q.operator().is_some(),
+        Expr::CapturedExpr(cap) => cap.inner().as_ref().is_some_and(expr_owns_sibling_search),
+        Expr::FieldExpr(field) => field
+            .value()
+            .as_ref()
+            .is_some_and(|value| matches!(value, Expr::Ref(_))),
+        Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::SeqExpr(_) => false,
+    }
+}
+
 /// Compute navigation for repeat iterations in quantifiers.
 ///
 /// When a quantifier repeats, it needs to advance to the next sibling:
