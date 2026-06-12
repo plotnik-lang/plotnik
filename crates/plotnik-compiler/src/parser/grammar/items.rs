@@ -4,7 +4,6 @@ use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, ROOT_EXPR_FIRST_TOKENS};
-use crate::parser::lexer::token_text;
 
 impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {
@@ -69,7 +68,7 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Def);
 
         let span = self.current_span();
-        let name = token_text(self.source, &self.tokens[self.pos]);
+        let name = self.current_text();
         self.bump();
         self.validate_def_name(name, span);
 

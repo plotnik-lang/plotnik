@@ -110,12 +110,14 @@ fn bare_error_keyword() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: special node requires parentheses
+    insta::assert_snapshot!(res, @r#"
+    error: `ERROR` and `MISSING` must be parenthesized
       |
     1 | ERROR
       | ^^^^^
-    ");
+      |
+    help: write `(ERROR)` or `(MISSING ";")`
+    "#);
 }
 
 #[test]
@@ -126,12 +128,14 @@ fn bare_missing_keyword() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: special node requires parentheses
+    insta::assert_snapshot!(res, @r#"
+    error: `ERROR` and `MISSING` must be parenthesized
       |
     1 | MISSING
       | ^^^^^^^
-    ");
+      |
+    help: write `(ERROR)` or `(MISSING ";")`
+    "#);
 }
 
 #[test]
@@ -179,8 +183,8 @@ fn bare_upper_ident_not_followed_by_equals_is_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: references must be parenthesized
       |
     1 | Expr
       | ^^^^
@@ -201,8 +205,8 @@ fn named_def_missing_equals() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: references must be parenthesized
       |
     1 | Expr (identifier)
       | ^^^^
@@ -314,8 +318,8 @@ fn def_name_lowercase_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must start uppercase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | lowercase = (x)
       | ^^^^^^^^^
@@ -325,6 +329,7 @@ fn def_name_lowercase_error() {
     1 - lowercase = (x)
     1 + Lowercase = (x)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -336,8 +341,8 @@ fn def_name_snake_case_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must start uppercase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | my_expr = (identifier)
       | ^^^^^^^
@@ -347,6 +352,7 @@ fn def_name_snake_case_suggests_pascal() {
     1 - my_expr = (identifier)
     1 + MyExpr = (identifier)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -358,8 +364,8 @@ fn def_name_kebab_case_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must start uppercase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | my-expr = (identifier)
       | ^^^^^^^
@@ -369,6 +375,7 @@ fn def_name_kebab_case_suggests_pascal() {
     1 - my-expr = (identifier)
     1 + MyExpr = (identifier)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -380,8 +387,8 @@ fn def_name_dotted_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must start uppercase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | my.expr = (identifier)
       | ^^^^^^^
@@ -391,6 +398,7 @@ fn def_name_dotted_suggests_pascal() {
     1 - my.expr = (identifier)
     1 + MyExpr = (identifier)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -400,8 +408,8 @@ fn def_name_with_underscores_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must be PascalCase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | Some_Thing = (x)
       | ^^^^^^^^^^
@@ -411,6 +419,7 @@ fn def_name_with_underscores_error() {
     1 - Some_Thing = (x)
     1 + SomeThing = (x)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -420,8 +429,8 @@ fn def_name_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition names must be PascalCase: definitions map to types
+    insta::assert_snapshot!(res, @"
+    error: definition names must be PascalCase
       |
     1 | Some-Thing = (x)
       | ^^^^^^^^^^
@@ -431,6 +440,7 @@ fn def_name_with_hyphens_error() {
     1 - Some-Thing = (x)
     1 + SomeThing = (x)
       |
+    help: definitions become types in the output
     ");
 }
 
@@ -442,8 +452,8 @@ fn capture_name_pascal_case_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture names must be lowercase: captures become struct fields
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (a) @Name
       |     ^^^^^
@@ -451,8 +461,55 @@ fn capture_name_pascal_case_error() {
     help: use `@name`
       |
     1 - (a) @Name
-    1 + (a) name
+    1 + (a) @name
       |
+    help: captures become fields in the output
+    ");
+}
+
+#[test]
+fn capture_name_camel_case_error() {
+    let input = indoc! {r#"
+    (a) @fooBar
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
+      |
+    1 | (a) @fooBar
+      |     ^^^^^^^
+      |
+    help: use `@foo_bar`
+      |
+    1 - (a) @fooBar
+    1 + (a) @foo_bar
+      |
+    help: captures become fields in the output
+    ");
+}
+
+#[test]
+fn suppressive_capture_camel_case_error() {
+    let input = indoc! {r#"
+    (a) @_fooBar
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
+      |
+    1 | (a) @_fooBar
+      |     ^^^^^^^^
+      |
+    help: use `@_foo_bar`
+      |
+    1 - (a) @_fooBar
+    1 + (a) @_foo_bar
+      |
+    help: captures become fields in the output
     ");
 }
 
@@ -464,28 +521,18 @@ fn capture_name_pascal_case_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: capture names must be lowercase: captures become struct fields
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (a) @My-Name
-      |     ^^^
+      |     ^^^^^^^^
       |
-    help: use `@my`
-      |
-    1 - (a) @My-Name
-    1 + (a) my-Name
-      |
-
-    error: field names must be lowercase: field names become struct fields
-      |
-    1 | (a) @My-Name
-      |         ^^^^
-      |
-    help: use `name:`
+    help: use `@my_name`
       |
     1 - (a) @My-Name
-    1 + (a) @My-name:
+    1 + (a) @my_name
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -497,13 +544,18 @@ fn capture_name_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition must be named
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (a) @my-name
-      | ^^^^^^^
+      |     ^^^^^^^^
       |
-    help: give it a name like `Name = (a) @my`
+    help: use `@my_name`
+      |
+    1 - (a) @my-name
+    1 + (a) @my_name
+      |
+    help: captures become fields in the output
     ");
 }
 
@@ -515,17 +567,18 @@ fn capture_dotted_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (identifier) @foo.bar
-      |                   ^^^
+      |              ^^^^^^^^
       |
-    help: wrap in parentheses
+    help: use `@foo_bar`
       |
     1 - (identifier) @foo.bar
-    1 + (identifier) @foo.(bar)
+    1 + (identifier) @foo_bar
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -537,17 +590,18 @@ fn capture_dotted_multiple_parts() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (identifier) @foo.bar.baz
-      |                   ^^^^^^^
+      |              ^^^^^^^^^^^^
       |
-    help: wrap in parentheses
+    help: use `@foo_bar_baz`
       |
     1 - (identifier) @foo.bar.baz
-    1 + (identifier) @foo.(bar.baz)
+    1 + (identifier) @foo_bar_baz
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -559,17 +613,18 @@ fn capture_dotted_followed_by_field() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (node) @foo.bar name: (other)
-      |             ^^^
+      |        ^^^^^^^^
       |
-    help: wrap in parentheses
+    help: use `@foo_bar`
       |
     1 - (node) @foo.bar name: (other)
-    1 + (node) @foo.(bar) name: (other)
+    1 + (node) @foo_bar name: (other)
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -581,8 +636,8 @@ fn capture_space_after_dot_breaks_chain() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: node types must be parenthesized
       |
     1 | (identifier) @foo. bar
       |                    ^^^
@@ -603,13 +658,18 @@ fn capture_hyphenated_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: definition must be named
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (identifier) @foo-bar
-      | ^^^^^^^^^^^^^^^^^
+      |              ^^^^^^^^
       |
-    help: give it a name like `Name = (identifier) @foo`
+    help: use `@foo_bar`
+      |
+    1 - (identifier) @foo-bar
+    1 + (identifier) @foo_bar
+      |
+    help: captures become fields in the output
     ");
 }
 
@@ -621,17 +681,18 @@ fn capture_hyphenated_multiple() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: field names cannot contain `-`: field names become struct fields
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (identifier) @foo-bar-baz
-      |                   ^^^^^^^
+      |              ^^^^^^^^^^^^
       |
-    help: use `bar_baz:`
+    help: use `@foo_bar_baz`
       |
     1 - (identifier) @foo-bar-baz
-    1 + (identifier) @foo-bar_baz:
+    1 + (identifier) @foo_bar_baz
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -643,17 +704,18 @@ fn capture_mixed_dots_and_hyphens() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: bare identifier is not valid
+    insta::assert_snapshot!(res, @"
+    error: capture names must be snake_case
       |
     1 | (identifier) @foo.bar-baz
-      |                   ^^^^^^^
+      |              ^^^^^^^^^^^^
       |
-    help: wrap in parentheses
+    help: use `@foo_bar_baz`
       |
     1 - (identifier) @foo.bar-baz
-    1 + (identifier) @foo.(bar-baz)
+    1 + (identifier) @foo_bar_baz
       |
+    help: captures become fields in the output
     ");
 }
 
@@ -665,17 +727,18 @@ fn field_name_pascal_case_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: field names must be lowercase: field names become struct fields
+    insta::assert_snapshot!(res, @"
+    error: field names must be snake_case
       |
     1 | (call Name: (a))
       |       ^^^^
       |
-    help: use `name:`
+    help: use `name`
       |
     1 - (call Name: (a))
-    1 + (call name:: (a))
+    1 + (call name: (a))
       |
+    help: fields come from the grammar and are snake_case
     ");
 }
 
@@ -685,17 +748,18 @@ fn field_name_with_dots_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: field names cannot contain `.`: field names become struct fields
+    insta::assert_snapshot!(res, @"
+    error: field names must be snake_case
       |
     1 | (call foo.bar: (x))
       |       ^^^^^^^
       |
-    help: use `foo_bar:`
+    help: use `foo_bar`
       |
     1 - (call foo.bar: (x))
-    1 + (call foo_bar:: (x))
+    1 + (call foo_bar: (x))
       |
+    help: fields come from the grammar and are snake_case
     ");
 }
 
@@ -705,17 +769,18 @@ fn field_name_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: field names cannot contain `-`: field names become struct fields
+    insta::assert_snapshot!(res, @"
+    error: field names must be snake_case
       |
     1 | (call foo-bar: (x))
       |       ^^^^^^^
       |
-    help: use `foo_bar:`
+    help: use `foo_bar`
       |
     1 - (call foo-bar: (x))
-    1 + (call foo_bar:: (x))
+    1 + (call foo_bar: (x))
       |
+    help: fields come from the grammar and are snake_case
     ");
 }
 
@@ -727,17 +792,18 @@ fn negated_field_with_upper_ident_parses() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: field names must be lowercase: field names become struct fields
+    insta::assert_snapshot!(res, @"
+    error: field names must be snake_case
       |
     1 | (call -Arguments)
       |        ^^^^^^^^^
       |
-    help: use `arguments:`
+    help: use `arguments`
       |
     1 - (call -Arguments)
-    1 + (call -arguments:)
+    1 + (call -arguments)
       |
+    help: fields come from the grammar and are snake_case
     ");
 }
 
@@ -749,17 +815,18 @@ fn branch_label_snake_case_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch labels must be PascalCase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [My_branch: (a) Other: (b)]
       |  ^^^^^^^^^
       |
-    help: use `MyBranch:`
+    help: use `MyBranch`
       |
     1 - [My_branch: (a) Other: (b)]
-    1 + [MyBranch:: (a) Other: (b)]
+    1 + [MyBranch: (a) Other: (b)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -771,17 +838,18 @@ fn branch_label_kebab_case_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch labels must be PascalCase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [My-branch: (a) Other: (b)]
       |  ^^^^^^^^^
       |
-    help: use `MyBranch:`
+    help: use `MyBranch`
       |
     1 - [My-branch: (a) Other: (b)]
-    1 + [MyBranch:: (a) Other: (b)]
+    1 + [MyBranch: (a) Other: (b)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -793,17 +861,18 @@ fn branch_label_dotted_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch labels must be PascalCase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [My.branch: (a) Other: (b)]
       |  ^^^^^^^^^
       |
-    help: use `MyBranch:`
+    help: use `MyBranch`
       |
     1 - [My.branch: (a) Other: (b)]
-    1 + [MyBranch:: (a) Other: (b)]
+    1 + [MyBranch: (a) Other: (b)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -813,17 +882,18 @@ fn branch_label_with_underscores_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch labels must be PascalCase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [Some_Label: (x)]
       |  ^^^^^^^^^^
       |
-    help: use `SomeLabel:`
+    help: use `SomeLabel`
       |
     1 - [Some_Label: (x)]
-    1 + [SomeLabel:: (x)]
+    1 + [SomeLabel: (x)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -833,17 +903,18 @@ fn branch_label_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch labels must be PascalCase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [Some-Label: (x)]
       |  ^^^^^^^^^^
       |
-    help: use `SomeLabel:`
+    help: use `SomeLabel`
       |
     1 - [Some-Label: (x)]
-    1 + [SomeLabel:: (x)]
+    1 + [SomeLabel: (x)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -858,8 +929,8 @@ fn lowercase_branch_label() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch label must start with uppercase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     2 |   left: (a)
       |   ^^^^
@@ -869,8 +940,9 @@ fn lowercase_branch_label() {
     2 -   left: (a)
     2 +   Left: (a)
       |
+    help: branch labels become enum variants in the output
 
-    error: branch label must start with uppercase: branch labels map to enum variants
+    error: branch labels must be PascalCase
       |
     3 |   right: (b)
       |   ^^^^^
@@ -880,6 +952,7 @@ fn lowercase_branch_label() {
     3 -   right: (b)
     3 +   Right: (b)
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -891,8 +964,8 @@ fn lowercase_branch_label_suggests_capitalized() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch label must start with uppercase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [first: (a) Second: (b)]
       |  ^^^^^
@@ -902,6 +975,7 @@ fn lowercase_branch_label_suggests_capitalized() {
     1 - [first: (a) Second: (b)]
     1 + [First: (a) Second: (b)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -911,8 +985,8 @@ fn mixed_case_branch_labels() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: branch label must start with uppercase: branch labels map to enum variants
+    insta::assert_snapshot!(res, @"
+    error: branch labels must be PascalCase
       |
     1 | [foo: (a) Bar: (b)]
       |  ^^^
@@ -922,6 +996,7 @@ fn mixed_case_branch_labels() {
     1 - [foo: (a) Bar: (b)]
     1 + [Foo: (a) Bar: (b)]
       |
+    help: branch labels become enum variants in the output
     ");
 }
 
@@ -933,8 +1008,8 @@ fn type_annotation_dotted_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: type names cannot contain `.` or `-`: type annotations map to types
+    insta::assert_snapshot!(res, @"
+    error: type names cannot contain `.` or `-`
       |
     1 | (a) @x :: My.Type
       |           ^^^^^^^
@@ -942,7 +1017,7 @@ fn type_annotation_dotted_suggests_pascal() {
     help: use `::MyType`
       |
     1 - (a) @x :: My.Type
-    1 + (a) @x :: ::MyType
+    1 + (a) @x :: MyType
       |
     ");
 }
@@ -955,8 +1030,8 @@ fn type_annotation_kebab_suggests_pascal() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: type names cannot contain `.` or `-`: type annotations map to types
+    insta::assert_snapshot!(res, @"
+    error: type names cannot contain `.` or `-`
       |
     1 | (a) @x :: My-Type
       |           ^^^^^^^
@@ -964,7 +1039,7 @@ fn type_annotation_kebab_suggests_pascal() {
     help: use `::MyType`
       |
     1 - (a) @x :: My-Type
-    1 + (a) @x :: ::MyType
+    1 + (a) @x :: MyType
       |
     ");
 }
@@ -975,8 +1050,8 @@ fn type_name_with_dots_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: type names cannot contain `.` or `-`: type annotations map to types
+    insta::assert_snapshot!(res, @"
+    error: type names cannot contain `.` or `-`
       |
     1 | (x) @name :: Some.Type
       |              ^^^^^^^^^
@@ -984,7 +1059,7 @@ fn type_name_with_dots_error() {
     help: use `::SomeType`
       |
     1 - (x) @name :: Some.Type
-    1 + (x) @name :: ::SomeType
+    1 + (x) @name :: SomeType
       |
     ");
 }
@@ -995,8 +1070,8 @@ fn type_name_with_hyphens_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: type names cannot contain `.` or `-`: type annotations map to types
+    insta::assert_snapshot!(res, @"
+    error: type names cannot contain `.` or `-`
       |
     1 | (x) @name :: Some-Type
       |              ^^^^^^^^^
@@ -1004,7 +1079,7 @@ fn type_name_with_hyphens_error() {
     help: use `::SomeType`
       |
     1 - (x) @name :: Some-Type
-    1 + (x) @name :: ::SomeType
+    1 + (x) @name :: SomeType
       |
     ");
 }
@@ -1015,13 +1090,13 @@ fn comma_in_node_children() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `,`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | (node (a), (b))
       |          ^
       |
-    help: remove
+    help: remove the `,`
       |
     1 - (node (a), (b))
     1 + (node (a) (b))
@@ -1035,24 +1110,24 @@ fn comma_in_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `,`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | [(a), (b), (c)]
       |     ^
       |
-    help: remove
+    help: remove the `,`
       |
     1 - [(a), (b), (c)]
     1 + [(a) (b), (c)]
       |
 
-    error: unexpected separator: plotnik uses whitespace, not `,`
+    error: patterns are separated by whitespace
       |
     1 | [(a), (b), (c)]
       |          ^
       |
-    help: remove
+    help: remove the `,`
       |
     1 - [(a), (b), (c)]
     1 + [(a), (b) (c)]
@@ -1066,13 +1141,13 @@ fn comma_in_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `,`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | {(a), (b)}
       |     ^
       |
-    help: remove
+    help: remove the `,`
       |
     1 - {(a), (b)}
     1 + {(a) (b)}
@@ -1086,24 +1161,24 @@ fn pipe_in_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `|`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | [(a) | (b) | (c)]
       |      ^
       |
-    help: remove
+    help: remove the `|`
       |
     1 - [(a) | (b) | (c)]
     1 + [(a)  (b) | (c)]
       |
 
-    error: unexpected separator: plotnik uses whitespace, not `|`
+    error: patterns are separated by whitespace
       |
     1 | [(a) | (b) | (c)]
       |            ^
       |
-    help: remove
+    help: remove the `|`
       |
     1 - [(a) | (b) | (c)]
     1 + [(a) | (b)  (c)]
@@ -1119,13 +1194,13 @@ fn pipe_between_branches() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `|`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | [(a) | (b)]
       |      ^
       |
-    help: remove
+    help: remove the `|`
       |
     1 - [(a) | (b)]
     1 + [(a)  (b)]
@@ -1139,19 +1214,19 @@ fn pipe_in_tree() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `|`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | (a | b)
       |    ^
       |
-    help: remove
+    help: remove the `|`
       |
     1 - (a | b)
     1 + (a  b)
       |
 
-    error: bare identifier is not valid
+    error: node types must be parenthesized
       |
     1 | (a | b)
       |      ^
@@ -1170,13 +1245,13 @@ fn pipe_in_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected separator: plotnik uses whitespace, not `|`
+    insta::assert_snapshot!(res, @"
+    error: patterns are separated by whitespace
       |
     1 | {(a) | (b)}
       |      ^
       |
-    help: remove
+    help: remove the `|`
       |
     1 - {(a) | (b)}
     1 + {(a)  (b)}
@@ -1190,8 +1265,8 @@ fn field_equals_typo() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `:` instead of `=`: this isn't a definition
+    insta::assert_snapshot!(res, @"
+    error: fields use `:`, not `=`
       |
     1 | (node name = (identifier))
       |            ^
@@ -1210,8 +1285,8 @@ fn field_equals_typo_no_space() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `:` instead of `=`: this isn't a definition
+    insta::assert_snapshot!(res, @"
+    error: fields use `:`, not `=`
       |
     1 | (node name=(identifier))
       |           ^
@@ -1230,8 +1305,8 @@ fn field_equals_typo_no_expression() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `:` instead of `=`: this isn't a definition
+    insta::assert_snapshot!(res, @"
+    error: fields use `:`, not `=`
       |
     1 | (call name=)
       |           ^
@@ -1252,8 +1327,8 @@ fn field_equals_typo_in_tree() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `:` instead of `=`: this isn't a definition
+    insta::assert_snapshot!(res, @"
+    error: fields use `:`, not `=`
       |
     1 | (call name = (identifier))
       |            ^
@@ -1272,8 +1347,8 @@ fn single_colon_type_annotation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `::` for type annotations: single `:` looks like a field
+    insta::assert_snapshot!(res, @"
+    error: type annotations use `::`, not `:`
       |
     1 | (identifier) @name : Type
       |                    ^
@@ -1291,8 +1366,8 @@ fn single_colon_type_annotation_no_space() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `::` for type annotations: single `:` looks like a field
+    insta::assert_snapshot!(res, @"
+    error: type annotations use `::`, not `:`
       |
     1 | (identifier) @name:Type
       |                   ^
@@ -1312,8 +1387,8 @@ fn single_colon_type_annotation_with_space() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: use `::` for type annotations: single `:` looks like a field
+    insta::assert_snapshot!(res, @"
+    error: type annotations use `::`, not `:`
       |
     1 | (a) @x : Type
       |        ^
@@ -1339,7 +1414,7 @@ fn single_colon_primitive_type() {
       |
     help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
 
-    error: bare identifier is not valid
+    error: node types must be parenthesized
       |
     1 | @val : string
       |        ^^^^^^
@@ -1359,13 +1434,13 @@ fn treesitter_sequence_syntax_warning() {
 
     let res = Query::expect_warning(input);
 
-    insta::assert_snapshot!(res, @r"
-    warning: tree-sitter sequence syntax
+    insta::assert_snapshot!(res, @"
+    warning: parenthesized sequences are tree-sitter syntax
       |
     1 | Test = ((a) (b))
       |        ^
       |
-    help: use `{...}` for sequences
+    help: use `{(a) (b)}` to match a sequence of siblings
     ");
 }
 
@@ -1375,13 +1450,13 @@ fn treesitter_sequence_single_child_warning() {
 
     let res = Query::expect_warning(input);
 
-    insta::assert_snapshot!(res, @r"
-    warning: tree-sitter sequence syntax
+    insta::assert_snapshot!(res, @"
+    warning: parenthesized sequences are tree-sitter syntax
       |
     1 | Test = ((a))
       |        ^
       |
-    help: use `{...}` for sequences
+    help: use `{(a) (b)}` to match a sequence of siblings
     ");
 }
 
@@ -1398,11 +1473,16 @@ fn negation_syntax_deprecated_warning() {
 
     let res = Query::expect_warning(input);
 
-    insta::assert_snapshot!(res, @r"
-    warning: deprecated negation syntax
+    insta::assert_snapshot!(res, @"
+    warning: `!field` negation is deprecated
       |
     1 | Test = (call !name)
       |              ^
+      |
+    help: use `-`
+      |
+    1 - Test = (call !name)
+    1 + Test = (call -name)
       |
     help: use `-field` instead of `!field`
     ");
@@ -1415,12 +1495,12 @@ fn empty_anonymous_node_double_quotes() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: empty anonymous node
+    error: empty string matches nothing
       |
     1 | (node "")
       |       ^^
       |
-    help: use a valid anonymous node or remove it
+    help: anonymous nodes match literal tokens, like `"+"` or `";"`
     "#);
 }
 
@@ -1430,12 +1510,66 @@ fn empty_anonymous_node_single_quotes() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty anonymous node
+    insta::assert_snapshot!(res, @r#"
+    error: empty string matches nothing
       |
     1 | (node '')
       |       ^^
       |
-    help: use a valid anonymous node or remove it
+    help: anonymous nodes match literal tokens, like `"+"` or `";"`
+    "#);
+}
+
+#[test]
+fn quantified_anchor_error() {
+    let input = indoc! {r#"
+    (call (a) . * (b))
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: anchors cannot be quantified
+      |
+    1 | (call (a) . * (b))
+      |             ^
+      |
+    help: anchors constrain position and produce no value
+    ");
+}
+
+#[test]
+fn quantified_strict_anchor_error() {
+    let input = indoc! {r#"
+    (call (a) .! ? (b))
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: anchors cannot be quantified
+      |
+    1 | (call (a) .! ? (b))
+      |              ^
+      |
+    help: anchors constrain position and produce no value
+    ");
+}
+
+#[test]
+fn captured_anchor_error() {
+    let input = indoc! {r#"
+    (call (a) . @x (b))
+    "#};
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: anchors cannot be captured
+      |
+    1 | (call (a) . @x (b))
+      |             ^^
+      |
+    help: anchors constrain position and produce no value
     ");
 }

@@ -23,8 +23,16 @@ pub fn token_src<'q>(token: &SyntaxToken, source: &'q str) -> &'q str {
     &source[range.start().into()..range.end().into()]
 }
 
+/// First direct child token matching the predicate.
+fn find_token(node: &SyntaxNode, pred: impl Fn(SyntaxKind) -> bool) -> Option<SyntaxToken> {
+    node.children_with_tokens()
+        .filter_map(|it| it.into_token())
+        .find(|t| pred(t.kind()))
+}
+
 macro_rules! ast_node {
-    ($name:ident, $kind:ident) => {
+    ($(#[$meta:meta])* $name:ident, $($kind:ident)|+) => {
+        $(#[$meta])*
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(SyntaxNode);
 
@@ -34,7 +42,7 @@ macro_rules! ast_node {
             }
 
             pub fn can_cast(kind: SyntaxKind) -> bool {
-                kind == SyntaxKind::$kind
+                matches!(kind, $(SyntaxKind::$kind)|+)
             }
 
             pub fn as_cst(&self) -> &SyntaxNode {
@@ -107,10 +115,7 @@ ast_node!(RegexLiteral, Regex);
 
 impl Anchor {
     pub fn is_strict(&self) -> bool {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .any(|t| t.kind() == SyntaxKind::DotBang)
+        find_token(&self.0, |k| k == SyntaxKind::DotBang).is_some()
     }
 }
 
@@ -147,37 +152,20 @@ impl SeqItem {
     }
 }
 
-/// Anonymous node: string literal (`"+"`) or wildcard (`_`).
-/// Maps from CST `Str` or `Wildcard`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AnonymousNode(SyntaxNode);
+ast_node!(
+    /// Anonymous node: string literal (`"+"`) or wildcard (`_`).
+    /// Maps from CST `Str` or `Wildcard`.
+    AnonymousNode,
+    Str | Wildcard
+);
 
 impl AnonymousNode {
-    pub fn cast(node: SyntaxNode) -> Option<Self> {
-        Self::can_cast(node.kind()).then(|| Self(node))
-    }
-
-    pub fn can_cast(kind: SyntaxKind) -> bool {
-        matches!(kind, SyntaxKind::Str | SyntaxKind::Wildcard)
-    }
-
-    pub fn as_cst(&self) -> &SyntaxNode {
-        &self.0
-    }
-
-    pub fn text_range(&self) -> TextRange {
-        self.0.text_range()
-    }
-
     /// Returns the string value if this is a literal, `None` if wildcard.
     pub fn value(&self) -> Option<SyntaxToken> {
         if self.0.kind() == SyntaxKind::Wildcard {
             return None;
         }
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StrVal)
+        find_token(&self.0, |k| k == SyntaxKind::StrVal)
     }
 
     /// Returns true if this is the "any" wildcard (`_`).
@@ -201,7 +189,7 @@ pub enum AltKind {
 pub use plotnik_bytecode::PredicateOp;
 
 /// Convert SyntaxKind to PredicateOp.
-pub fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
+fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
     match kind {
         SyntaxKind::OpEq => Some(PredicateOp::Eq),
         SyntaxKind::OpNe => Some(PredicateOp::Ne),
@@ -246,10 +234,7 @@ impl Root {
 
 impl Def {
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
     pub fn body(&self) -> Option<Expr> {
@@ -259,18 +244,15 @@ impl Def {
 
 impl NamedNode {
     pub fn node_type(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| {
-                matches!(
-                    t.kind(),
-                    SyntaxKind::Id
-                        | SyntaxKind::Underscore
-                        | SyntaxKind::KwError
-                        | SyntaxKind::KwMissing
-                )
-            })
+        find_token(&self.0, |k| {
+            matches!(
+                k,
+                SyntaxKind::Id
+                    | SyntaxKind::Underscore
+                    | SyntaxKind::KwError
+                    | SyntaxKind::KwMissing
+            )
+        })
     }
 
     /// Returns true if the node type is wildcard (`_`), matching any named node.
@@ -296,20 +278,11 @@ impl NamedNode {
         if !self.is_missing() {
             return None;
         }
-        // After KwMissing, look for Id or StrVal token
-        let mut found_missing = false;
-        for child in self.0.children_with_tokens() {
-            if let Some(token) = child.into_token() {
-                if token.kind() == SyntaxKind::KwMissing {
-                    found_missing = true;
-                } else if found_missing
-                    && matches!(token.kind(), SyntaxKind::Id | SyntaxKind::StrVal)
-                {
-                    return Some(token);
-                }
-            }
-        }
-        None
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .skip_while(|t| t.kind() != SyntaxKind::KwMissing)
+            .find(|t| matches!(t.kind(), SyntaxKind::Id | SyntaxKind::StrVal))
     }
 
     pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
@@ -335,10 +308,7 @@ impl NamedNode {
 impl NodePredicate {
     /// Returns the operator token.
     pub fn operator_token(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| predicate_op_from_syntax_kind(t.kind()).is_some())
+        find_token(&self.0, |k| predicate_op_from_syntax_kind(k).is_some())
     }
 
     /// Returns the operator kind.
@@ -349,10 +319,7 @@ impl NodePredicate {
 
     /// Returns the string value if the predicate uses a string.
     pub fn string_value(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::StrVal)
+        find_token(&self.0, |k| k == SyntaxKind::StrVal)
     }
 
     /// Returns the regex literal if the predicate uses a regex.
@@ -387,10 +354,7 @@ impl RegexLiteral {
 
 impl Ref {
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 }
 
@@ -400,10 +364,7 @@ impl AltExpr {
         let mut untagged = false;
 
         for child in self.0.children().filter(|c| c.kind() == SyntaxKind::Branch) {
-            let has_label = child
-                .children_with_tokens()
-                .filter_map(|it| it.into_token())
-                .any(|t| t.kind() == SyntaxKind::Id);
+            let has_label = find_token(&child, |k| k == SyntaxKind::Id).is_some();
 
             if has_label {
                 tagged = true;
@@ -430,10 +391,7 @@ impl AltExpr {
 
 impl Branch {
     pub fn label(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
     pub fn body(&self) -> Option<Expr> {
@@ -461,24 +419,15 @@ impl CapturedExpr {
     /// Returns the capture token (@name or @_name).
     /// The token text includes the @ prefix.
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| {
-                matches!(
-                    t.kind(),
-                    SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
-                )
-            })
+        find_token(&self.0, |k| {
+            matches!(k, SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture)
+        })
     }
 
     /// Returns true if this is a suppressive capture (@_ or @_name).
     /// Suppressive captures match structurally but don't contribute to output.
     pub fn is_suppressive(&self) -> bool {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .any(|t| t.kind() == SyntaxKind::SuppressiveCapture)
+        find_token(&self.0, |k| k == SyntaxKind::SuppressiveCapture).is_some()
     }
 
     pub fn inner(&self) -> Option<Expr> {
@@ -498,10 +447,7 @@ impl CapturedExpr {
 
 impl Type {
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 }
 
@@ -511,20 +457,17 @@ impl QuantifiedExpr {
     }
 
     pub fn operator(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| {
-                matches!(
-                    t.kind(),
-                    SyntaxKind::Star
-                        | SyntaxKind::Plus
-                        | SyntaxKind::Question
-                        | SyntaxKind::StarQuestion
-                        | SyntaxKind::PlusQuestion
-                        | SyntaxKind::QuestionQuestion
-                )
-            })
+        find_token(&self.0, |k| {
+            matches!(
+                k,
+                SyntaxKind::Star
+                    | SyntaxKind::Plus
+                    | SyntaxKind::Question
+                    | SyntaxKind::StarQuestion
+                    | SyntaxKind::PlusQuestion
+                    | SyntaxKind::QuestionQuestion
+            )
+        })
     }
 
     /// Returns true if quantifier allows zero matches (?, *, ??, *?).
@@ -545,10 +488,7 @@ impl QuantifiedExpr {
 
 impl FieldExpr {
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
     pub fn value(&self) -> Option<Expr> {
@@ -558,10 +498,7 @@ impl FieldExpr {
 
 impl NegatedField {
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .find(|t| t.kind() == SyntaxKind::Id)
+        find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 }
 

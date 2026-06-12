@@ -29,7 +29,7 @@ pub mod test_utils;
 /// Fatal errors (like fuel exhaustion) use the outer `Result`.
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
 
-pub use diagnostics::{Diagnostics, DiagnosticsPrinter, Severity, Span};
+pub use diagnostics::{Diagnostics, Severity, Span};
 pub use query::{Query, QueryBuilder};
 pub use query::{SourceId, SourceMap};
 

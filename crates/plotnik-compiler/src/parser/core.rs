@@ -14,17 +14,18 @@ pub struct ParseResult {
     pub fuel_consumed: u32,
 }
 
+/// Span of the opening token of an unclosed-so-far delimiter pair.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OpenDelimiter {
-    #[allow(dead_code)] // for future mismatch detection
-    pub kind: SyntaxKind,
     pub span: TextRange,
 }
 
 /// Default parsing fuel limit.
-const DEFAULT_FUEL: u32 = 1_000_000;
+pub const DEFAULT_FUEL: u32 = 1_000_000;
 /// Default maximum recursion depth.
-const DEFAULT_MAX_DEPTH: u32 = 4096;
+pub const DEFAULT_MAX_DEPTH: u32 = 4096;
+/// Lookaheads allowed without consuming a token before the stuck-parser assertion fires.
+const DEBUG_FUEL: u32 = 256;
 
 /// Trivia tokens are buffered and flushed when starting a new node.
 pub struct Parser<'q, 'd> {
@@ -45,79 +46,7 @@ pub struct Parser<'q, 'd> {
     pub(crate) fatal_error: Option<Error>,
 }
 
-/// Builder for `Parser`.
-pub struct ParserBuilder<'q, 'd> {
-    source: &'q str,
-    source_id: SourceId,
-    tokens: Vec<Token>,
-    diagnostics: &'d mut Diagnostics,
-    fuel: u32,
-    max_depth: u32,
-}
-
-impl<'q, 'd> ParserBuilder<'q, 'd> {
-    /// Create a new builder with required parameters.
-    pub fn new(
-        source: &'q str,
-        source_id: SourceId,
-        tokens: Vec<Token>,
-        diagnostics: &'d mut Diagnostics,
-    ) -> Self {
-        Self {
-            source,
-            source_id,
-            tokens,
-            diagnostics,
-            fuel: DEFAULT_FUEL,
-            max_depth: DEFAULT_MAX_DEPTH,
-        }
-    }
-
-    /// Set the fuel limit.
-    pub fn fuel(mut self, fuel: u32) -> Self {
-        self.fuel = fuel;
-        self
-    }
-
-    /// Set the maximum recursion depth.
-    pub fn max_depth(mut self, depth: u32) -> Self {
-        self.max_depth = depth;
-        self
-    }
-
-    /// Build the Parser.
-    pub fn build(self) -> Parser<'q, 'd> {
-        Parser {
-            source: self.source,
-            source_id: self.source_id,
-            tokens: self.tokens,
-            pos: 0,
-            trivia_buffer: Vec::with_capacity(4),
-            builder: GreenNodeBuilder::new(),
-            diagnostics: self.diagnostics,
-            depth: 0,
-            last_diagnostic_pos: None,
-            delimiter_stack: Vec::with_capacity(8),
-            debug_fuel: std::cell::Cell::new(256),
-            fuel_initial: self.fuel,
-            fuel_remaining: self.fuel,
-            max_depth: self.max_depth,
-            fatal_error: None,
-        }
-    }
-}
-
 impl<'q, 'd> Parser<'q, 'd> {
-    /// Create a builder for Parser.
-    pub fn builder(
-        source: &'q str,
-        source_id: SourceId,
-        tokens: Vec<Token>,
-        diagnostics: &'d mut Diagnostics,
-    ) -> ParserBuilder<'q, 'd> {
-        ParserBuilder::new(source, source_id, tokens, diagnostics)
-    }
-
     /// Create a new parser with the specified parameters.
     pub fn new(
         source: &'q str,
@@ -127,10 +56,23 @@ impl<'q, 'd> Parser<'q, 'd> {
         fuel: u32,
         max_depth: u32,
     ) -> Self {
-        Parser::builder(source, source_id, tokens, diagnostics)
-            .fuel(fuel)
-            .max_depth(max_depth)
-            .build()
+        Parser {
+            source,
+            source_id,
+            tokens,
+            pos: 0,
+            trivia_buffer: Vec::with_capacity(4),
+            builder: GreenNodeBuilder::new(),
+            diagnostics,
+            depth: 0,
+            last_diagnostic_pos: None,
+            delimiter_stack: Vec::with_capacity(8),
+            debug_fuel: std::cell::Cell::new(DEBUG_FUEL),
+            fuel_initial: fuel,
+            fuel_remaining: fuel,
+            max_depth,
+            fatal_error: None,
+        }
     }
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
@@ -162,7 +104,7 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     fn reset_debug_fuel(&self) {
-        self.debug_fuel.set(256);
+        self.debug_fuel.set(DEBUG_FUEL);
     }
 
     pub(super) fn nth_raw(&self, lookahead: usize) -> SyntaxKind {
@@ -188,6 +130,14 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.tokens
             .get(self.pos)
             .map_or_else(|| TextRange::empty(self.eof_offset()), |t| t.span)
+    }
+
+    /// Text of the current token (empty at EOF). Borrows from the source, not the parser.
+    pub(super) fn current_text(&mut self) -> &'q str {
+        self.skip_trivia_to_buffer();
+        self.tokens
+            .get(self.pos)
+            .map_or("", |t| token_text(self.source, t))
     }
 
     pub(super) fn eof_offset(&self) -> TextSize {
@@ -282,13 +232,6 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.pos += 1;
     }
 
-    pub(super) fn skip_token(&mut self) {
-        assert!(!self.eof(), "skip_token called at EOF");
-        self.reset_debug_fuel();
-        self.consume_exec_fuel();
-        self.pos += 1;
-    }
-
     pub(super) fn eat_token(&mut self, kind: SyntaxKind) -> bool {
         if self.currently_is(kind) {
             self.bump();
@@ -311,10 +254,10 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn current_suppression_span(&mut self) -> TextRange {
-        self.delimiter_stack
-            .last()
-            .map(|d| TextRange::new(d.span.start(), TextSize::from(self.source.len() as u32)))
-            .unwrap_or_else(|| self.current_span())
+        match self.delimiter_stack.last() {
+            Some(d) => TextRange::new(d.span.start(), self.eof_offset()),
+            None => self.current_span(),
+        }
     }
 
     fn should_report(&mut self, pos: TextSize) -> bool {
@@ -388,32 +331,6 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.bump_as_error();
     }
 
-    #[allow(dead_code)]
-    pub(super) fn error_and_bump_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
-        self.error_msg(kind, message);
-        self.bump_as_error();
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn error_recover(
-        &mut self,
-        kind: DiagnosticKind,
-        message: &str,
-        recovery: TokenSet,
-    ) {
-        if self.currently_is_one_of(recovery) || self.should_stop() {
-            self.error_msg(kind, message);
-            return;
-        }
-
-        self.start_node(SyntaxKind::Error);
-        self.error_msg(kind, message);
-        while !self.currently_is_one_of(recovery) && !self.should_stop() {
-            self.bump();
-        }
-        self.finish_node();
-    }
-
     pub(super) fn enter_recursion(&mut self) -> bool {
         if self.depth < self.max_depth {
             self.depth += 1;
@@ -433,30 +350,37 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.reset_debug_fuel();
     }
 
-    pub(super) fn push_delimiter(&mut self, kind: SyntaxKind) {
+    pub(super) fn push_delimiter(&mut self) {
         let span = self.current_span();
-        self.delimiter_stack.push(OpenDelimiter { kind, span });
+        self.delimiter_stack.push(OpenDelimiter { span });
     }
 
     pub(super) fn pop_delimiter(&mut self) -> Option<OpenDelimiter> {
         self.delimiter_stack.pop()
     }
 
-    pub(super) fn error_unclosed_delimiter(
-        &mut self,
-        kind: DiagnosticKind,
-        related_msg: impl Into<String>,
-        open_range: TextRange,
-    ) {
+    /// Report an unclosed delimiter at EOF, pointing back at its opening token.
+    pub(super) fn error_unclosed_at_eof(&mut self, kind: DiagnosticKind, construct: &str) {
+        let open = self.delimiter_stack.last().copied().unwrap_or_else(|| {
+            panic!(
+                "unclosed {construct} at EOF but delimiter_stack is empty \
+                 (caller must push delimiter before parsing children)"
+            )
+        });
+
         let current = self.current_span();
         if !self.should_report(current.start()) {
             return;
         }
         // Use full range for easier downstream error suppression
-        let full_range = TextRange::new(open_range.start(), current.end());
+        let full_range = TextRange::new(open.span.start(), current.end());
         self.diagnostics
             .report(self.source_id, kind, full_range)
-            .related_to(self.source_id, open_range, related_msg)
+            .related_to(
+                self.source_id,
+                open.span,
+                format!("{construct} started here"),
+            )
             .emit();
     }
 
@@ -468,11 +392,12 @@ impl<'q, 'd> Parser<'q, 'd> {
             .map(|t| t.span.end())
     }
 
+    /// Report a diagnostic with a suggested replacement for `range`.
+    /// The replacement must be valid as a verbatim substitute for the range's text.
     pub(super) fn error_with_fix(
         &mut self,
         kind: DiagnosticKind,
         range: TextRange,
-        message: impl Into<String>,
         fix_description: impl Into<String>,
         fix_replacement: impl Into<String>,
     ) {
@@ -481,7 +406,6 @@ impl<'q, 'd> Parser<'q, 'd> {
         }
         self.diagnostics
             .report(self.source_id, kind, range)
-            .message(message)
             .fix(fix_description, fix_replacement)
             .emit();
     }

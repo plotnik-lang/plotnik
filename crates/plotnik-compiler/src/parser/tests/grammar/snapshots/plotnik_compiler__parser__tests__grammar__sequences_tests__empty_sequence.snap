@@ -3,7 +3,7 @@ source: crates/plotnik-compiler/src/parser/tests/grammar/sequences_tests.rs
 ---
 Q = {}
 ---
-error: empty `{}` is not allowed
+error: empty `{}` matches nothing
   |
 1 | Q = {}
   |     ^^

@@ -117,8 +117,8 @@ fn empty_parens() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `()` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `()` matches nothing
       |
     1 | ()
       | ^^
@@ -201,12 +201,10 @@ fn unclosed_double_quote_string() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing `)`
+    error: missing closing quote
       |
     1 | (call "foo)
-      | -^^^^^^^^^^
-      | |
-      | node started here
+      |       ^^^^^
     "#);
 }
 
@@ -216,12 +214,10 @@ fn unclosed_single_quote_string() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: missing closing `)`
+    insta::assert_snapshot!(res, @"
+    error: missing closing quote
       |
     1 | (call 'foo)
-      | -^^^^^^^^^^
-      | |
-      | node started here
+      |       ^^^^^
     ");
 }

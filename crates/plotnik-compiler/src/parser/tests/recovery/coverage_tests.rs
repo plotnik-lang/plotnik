@@ -143,7 +143,7 @@ fn named_def_missing_equals_with_garbage() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: bare identifier is not valid
+    error: references must be parenthesized
       |
     1 | Q = Expr ^^^ (identifier)
       |     ^^^^
@@ -173,7 +173,7 @@ fn named_def_missing_equals_recovers_to_next_def() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: bare identifier is not valid
+    error: references must be parenthesized
       |
     1 | Broken ^^^
       | ^^^^^^
