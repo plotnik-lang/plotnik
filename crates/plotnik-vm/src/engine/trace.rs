@@ -25,7 +25,7 @@ use arborium_tree_sitter::Node;
 
 use plotnik_bytecode::{
     EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, PredicateOp, Symbol,
-    cols, format_effect, trace, truncate_text, width_for_count,
+    cols, format_effect, nav_symbol, trace, truncate_text, width_for_count,
 };
 use plotnik_core::Colors;
 
@@ -620,15 +620,7 @@ impl Tracer for PrintTracer<'_> {
         }
 
         let kind = node.kind();
-        let symbol = match nav {
-            Nav::Epsilon => Symbol::EPSILON,
-            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => trace::NAV_DOWN,
-            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => trace::NAV_NEXT,
-            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpSkipExtras(_) | Nav::UpExact(_) => {
-                trace::NAV_UP
-            }
-            Nav::Stay | Nav::StayExact => Symbol::EMPTY,
-        };
+        let symbol = nav_symbol(nav);
 
         // Text only in VeryVerbose
         if self.verbosity == Verbosity::VeryVerbose {
@@ -647,15 +639,12 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        // Show the failed navigation direction
-        let nav_symbol = match nav {
-            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => "▽",
-            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => "▷",
-            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpSkipExtras(_) | Nav::UpExact(_) => "△",
-            Nav::Stay | Nav::StayExact | Nav::Epsilon => "·",
+        let failed_nav = match nav {
+            Nav::Stay | Nav::StayExact | Nav::Epsilon => "·".to_string(),
+            _ => nav_symbol(nav).format().trim().to_string(),
         };
 
-        self.add_subline(trace::MATCH_FAILURE, nav_symbol);
+        self.add_subline(trace::MATCH_FAILURE, &failed_nav);
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {

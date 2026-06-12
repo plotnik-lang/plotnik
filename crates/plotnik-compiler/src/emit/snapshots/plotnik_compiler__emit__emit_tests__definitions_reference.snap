@@ -37,18 +37,18 @@ Root       = 08 :: T2
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Expression:
-  06   ε                                    16, 19
+  06  -ε-                                   16, 19
 
 Root:
   08   !   (function_declaration)           09
-  09   ▽   name: (identifier) [Node Set(M2)]  11
-  11   △   _                                12
+  09  └‣─  name: (identifier) [Node Set(M2)]  11
+  11  ─‣┘  _                                12
   12                                        ▶
   13                                        ▶
   14  ...  

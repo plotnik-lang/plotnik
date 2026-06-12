@@ -33,16 +33,16 @@ Test = 06 :: T1
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
   06   !   (program)                        07
-  07   ▽   (expression_statement)           08
-  08   ▽   (binary_expression)              09
-  09   ▽   (identifier) [Node Set(M0)]      11
-  11  !▷   (identifier) [Node Set(M1)]      13
-  13   △³  _                                14
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (binary_expression)              09
+  09  └‣─  (identifier) [Node Set(M0)]      11
+  11  ─•─  (identifier) [Node Set(M1)]      13
+  13  ─‣┘³ _                                14
   14                                        ▶

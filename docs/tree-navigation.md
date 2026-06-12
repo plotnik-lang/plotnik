@@ -48,18 +48,19 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 | ----------------- | ----------- | ----------------------------- |
 | `Stay`            | (space)     | No movement                   |
 | `StayExact`       | `!`         | No movement, exact match only |
-| `Down`            | `▽`         | First child, skip any         |
-| `DownSkip`        | `!▽`        | First child, skip trivia only |
-| `DownSkipExtras`  | `e▽`        | First child, skip extras only |
-| `DownExact`       | `!!▽`       | First child, exact            |
-| `Next`            | `▷`         | Next sibling, skip any        |
-| `NextSkip`        | `!▷`        | Next sibling, skip trivia     |
-| `NextSkipExtras`  | `e▷`        | Next sibling, skip extras     |
-| `NextExact`       | `!!▷`       | Next sibling, exact           |
-| `Up(n)`           | `△ⁿ`        | Ascend n levels               |
-| `UpSkipTrivia(n)` | `!△ⁿ`       | Ascend n, last non-trivia     |
-| `UpSkipExtras(n)` | `e△ⁿ`       | Ascend n, last non-extra      |
-| `UpExact(n)`      | `!!△ⁿ`      | Ascend n, last child          |
+| `Down`            | `└‣─`       | First child, skip any         |
+| `DownSkip`        | `└•─`       | First child, skip trivia only |
+| `DownSkipExtras`  | `└◦─`       | First child, skip extras only |
+| `DownExact`       | `└─!`       | First child, exact            |
+| `Next`            | `─‣─`       | Next sibling, skip any        |
+| `NextSkip`        | `─•─`       | Next sibling, skip trivia     |
+| `NextSkipExtras`  | `─◦─`       | Next sibling, skip extras     |
+| `NextExact`       | `──!`       | Next sibling, exact           |
+| `Up(1)`           | `─‣┘`       | Ascend 1 level                |
+| `Up(2)`           | `─‣┘²`      | Ascend 2 levels               |
+| `UpSkipTrivia(2)` | `─•┘²`      | Ascend 2, last non-trivia     |
+| `UpSkipExtras(2)` | `─◦┘²`      | Ascend 2, last non-extra      |
+| `UpExact(2)`      | `!─┘²`      | Ascend 2, last child          |
 
 ## Search Loop
 
@@ -144,58 +145,58 @@ Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
 
 ```
   01       (function)                           02
-  02  ↓*   (identifier) [Node Set(M0)]          03
-  03 *↑¹                                        ◼
+  02  └‣─  (identifier) [Node Set(M0)]          03
+  03  ─‣┘                                       ◼
 ```
 
 **First child anchor**: `(function . (identifier))`
 
 ```
   01       (function)                           02
-  02  ↓~   (identifier)                         03
-  03 *↑¹                                        ◼
+  02  └•─  (identifier)                         03
+  03  ─‣┘                                       ◼
 ```
 
 **Strict first child anchor**: `(function .! (identifier))`
 
 ```
   01       (function)                           02
-  02  ↓.   (identifier)                         03
-  03 *↑¹                                        ◼
+  02  └─!  (identifier)                         03
+  03  ─‣┘                                       ◼
 ```
 
 **Last child anchor**: `(function (identifier) .)`
 
 ```
   01       (function)                           02
-  02  ↓*   (identifier)                         03
-  03 ~↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  ─•┘                                       ◼
 ```
 
 **Strict last child anchor**: `(function (identifier) .!)`
 
 ```
   01       (function)                           02
-  02  ↓*   (identifier)                         03
-  03 .↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  !─┘                                       ◼
 ```
 
 **Adjacent siblings**: `(block (a) . (b))`
 
 ```
   01       (block)                              02
-  02  ↓*   (a)                                  03
-  03   ~   (b)                                  04
-  04 *↑¹                                        ◼
+  02  └‣─  (a)                                  03
+  03  ─•─  (b)                                  04
+  04  ─‣┘                                       ◼
 ```
 
 **Soft adjacency with an anonymous operand**: `(call (identifier) . "(")`
 
 ```
   01       (call)                               02
-  02  ↓*   (identifier)                         03
-  03  e▷   "("                                  04
-  04 *↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  ─◦─  "("                                  04
+  04  ─‣┘                                       ◼
 ```
 
 Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when byte-adjacency matters.
@@ -204,19 +205,19 @@ Anonymous operands make `.` skip extras only. Comments can appear between the op
 
 ```
   01       (call)                               02
-  02  ↓*   (identifier)                         03
-  03   .   "("                                  04
-  04 *↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  ──!  "("                                  04
+  04  ─‣┘                                       ◼
 ```
 
 **Deep nesting**: `(a (b (c (d))))`
 
 ```
   01       (a)                                  02
-  02  ↓*   (b)                                  03
-  03  ↓*   (c)                                  04
-  04  ↓*   (d)                                  05
-  05 *↑³                                        ◼
+  02  └‣─  (b)                                  03
+  03  └‣─  (c)                                  04
+  04  └‣─  (d)                                  05
+  05  ─‣┘³                                      ◼
 ```
 
 Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet implemented — currently emits individual `Up(1)` steps.
@@ -225,9 +226,9 @@ Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet
 
 ```
   01       (a)                                  02
-  02  ↓*   (b)                                  03
-  03   ~   (c)                                  04
-  04 ~↑¹                                        ◼
+  02  └‣─  (b)                                  03
+  03  ─•─  (c)                                  04
+  04  ─•┘                                       ◼
 ```
 
 The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
@@ -236,14 +237,14 @@ The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
 
 ```
   02       (array)                              03
-  03  ↓*   (object)                             04
-  04  ↓*   (pair)                               05
-  05 ~↑¹                                        06
-  06  *    (number)                             07
-  07 *↑¹                                        ◼
+  03  └‣─  (object)                             04
+  04  └‣─  (pair)                               05
+  05  ─•┘                                       06
+  06  ─‣─  (number)                             07
+  07  ─‣┘                                       ◼
 ```
 
-The `.` after `(pair)` produces `~↑¹` (exit object, pair must be last non-trivia). Then `*` finds sibling `(number)`, and `*↑¹` exits array. Cannot combine steps 05+07 into `UpSkipTrivia(2)` because the constraint applies only at the object level.
+The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Cannot combine steps 05+07 into `UpSkipTrivia(2)` because the constraint applies only at the object level.
 
 ## Field Handling
 

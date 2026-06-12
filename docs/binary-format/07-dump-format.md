@@ -15,7 +15,7 @@ Run: `plotnik dump -q '<query>'`
 
 ## Bytecode Dump
 
-**Epsilon transitions** (`ε`) succeed unconditionally without cursor interaction.
+**Epsilon transitions** (`-ε-`) succeed unconditionally without cursor interaction.
 They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay).
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
@@ -58,21 +58,21 @@ Value = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07   !   (document)                       08
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   10                                        ▶
-  11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+  11  └─!  [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
   14  ...
   15  ...
-  16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
-  19   △   _                                10
+  16  └─!  [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+  19  ─‣┘  _                                10
 ```
 
 ### Sections Explained
@@ -108,49 +108,49 @@ Each line follows a fixed column layout:
 
 ```
 | 2 | step | 1 |   5   | 1 | content              | 1 | succ |
-|   | pad  |   | (ctr) |   |                      |   |      |
+|   | pad  |   | (sym) |   |                      |   |      |
 ```
 
-| Column  | Width    | Description                                        |
-| ------- | -------- | -------------------------------------------------- |
-| indent  | 2        | Leading spaces                                     |
-| step    | variable | Step number, zero-padded to max step width         |
-| gap     | 1        | Space separator                                    |
-| symbol  | 5        | Nav symbol centered (e.g., `  ε  `, `  ▽  `, `△¹`) |
-| gap     | 1        | Space separator                                    |
-| content | variable | Instruction content                                |
-| gap     | 1        | Space separator                                    |
-| succ    | variable | Successors/markers, right-aligned                  |
+| Column  | Width    | Description                                               |
+| ------- | -------- | --------------------------------------------------------- |
+| indent  | 2        | Leading spaces                                            |
+| step    | variable | Step number, zero-padded to max step width                |
+| gap     | 1        | Space separator                                           |
+| symbol  | 5+       | Nav symbol, usually 5 chars; multi-digit up counts extend |
+| gap     | 1        | Space separator                                           |
+| content | variable | Instruction content                                       |
+| gap     | 1        | Space separator                                           |
+| succ    | variable | Successors/markers, right-aligned                         |
 
 **Step padding**: Dynamic based on max step in graph. Steps 0–9 use 1 digit, 0–99 use 2 digits, etc.
 
-**Symbol column** (5 characters):
+**Symbol column**:
 
 ```
 | left | center | right |
-|  2   |   1    |   2   |
 ```
 
-- **Center**: Direction (ε, ▽, ▷, △)
-- **Left**: Mode modifier (`!` skip trivia, `e` skip extras only, `!!` exact)
-- **Right**: Level suffix (¹, ², ³... for Up)
+- **Center**: Skip policy or exact marker (`‣`, `•`, `◦`, `─`, `-ε-`)
+- **Left/right**: Movement shape (`└` for down, `─` for next, `┘` for up) and exact marker (`!`)
+- **Right suffix**: Real superscript digits for `Up(n)` when `n >= 2`
 
 Examples:
 
-- `  ε  ` — epsilon (no movement)
-- `  ▽  ` — down, skip any
-- `  ▷  ` — next, skip any
-- `  △  ` — up 1 level (no superscript)
-- `!▽ ` — down, skip trivia
-- `e▷ ` — next, skip extras only
-- `!!▷ ` — next, exact
+- `-ε-` — epsilon (no movement)
+- `└‣─` — down, skip any
+- `─‣─` — next, skip any
+- `─‣┘` — up 1 level (no superscript)
+- `└•─` — down, skip trivia
+- `─◦─` — next, skip extras only
+- `──!` — next, exact
+- ` ─‣┘¹²` — up 12 levels
 
 | Instruction      | Format                                          |
 | ---------------- | ----------------------------------------------- |
 | Match (terminal) | `step nav    [pre] (type) [post]      ◼`        |
 | Match            | `step nav    [pre] field: (type) [post] succ`   |
 | Match (branch)   | `step nav    [pre] (type) [post]      s1, s2`   |
-| Epsilon          | `step  ε     [effects]                succ`     |
+| Epsilon          | `step -ε-    [effects]                succ`     |
 | Call             | `step nav    field: (Name)        target : ret` |
 | Return           | `step                                 ▶`        |
 | Trampoline       | `step        Trampoline               succ`     |
@@ -161,26 +161,27 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol | Notes                              |
-| --------------- | :----: | ---------------------------------- |
-| Epsilon         |  ─ε─   | Pure control flow, no cursor check |
-| Stay            |        | No movement, fill with spaces      |
-| StayExact       |  >‼<   | No movement, exact match only      |
-| Down            |  ──┐   | First child, skip any              |
-| DownSkipTrivia  |  ∙─┐   | First child, skip trivia           |
-| DownSkipExtras  |  !─┐   | First child, skip extras only      |
-| DownExact       |  ‼─┐   | First child, exact                 |
-| Next            |  ───   | Next sibling, skip any             |
-| NextSkipTrivia  |  ∙──   | Next sibling, skip trivia          |
-| NextSkipExtras  |  !──   | Next sibling, skip extras only     |
-| NextExact       |  ‼──   | Next sibling, exact                |
-| Up(1)           |  ──┘   | Ascend 1 level (no superscript)    |
-| Up(n≥2)         |  ──┘ⁿ  | Ascend n levels, skip any          |
-| UpSkipTrivia(n) |  ∙─┘ⁿ  | Ascend n, must be last non-trivia  |
-| UpSkipExtras(n) |  !─┘ⁿ  | Ascend n, must be last non-extra   |
-| UpExact(n)      |  ‼─┘ⁿ  | Ascend n, must be last child       |
+| Nav             | Symbol | Notes                                        |
+| --------------- | :----: | -------------------------------------------- |
+| Epsilon         |  -ε-   | Pure control flow, no cursor check           |
+| Stay            |        | No movement, fill with spaces                |
+| StayExact       |   !    | No movement, exact match only                |
+| Down            |  └‣─   | First child, skip any                        |
+| DownSkipTrivia  |  └•─   | First child, skip trivia                     |
+| DownSkipExtras  |  └◦─   | First child, skip extras only                |
+| DownExact       |  └─!   | First child, exact                           |
+| Next            |  ─‣─   | Next sibling, skip any                       |
+| NextSkipTrivia  |  ─•─   | Next sibling, skip trivia                    |
+| NextSkipExtras  |  ─◦─   | Next sibling, skip extras only               |
+| NextExact       |  ──!   | Next sibling, exact                          |
+| Up(1)           |  ─‣┘   | Skip any and ascend 1 level (no superscript) |
+| Up(2)           |  ─‣┘²  | Skip any and ascend 2 levels                 |
+| Up(12)          | ─‣┘¹²  | Skip any and ascend 12 levels                |
+| UpSkipTrivia(2) |  ─•┘²  | If only trivia remains, ascend 2 levels      |
+| UpSkipExtras(2) |  ─◦┘²  | If only extras remain, ascend 2 levels       |
+| UpExact(2)      |  !─┘²  | If nothing remains, ascend 2 levels          |
 
-**Note**: `ε` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `ε`.
+**Note**: `-ε-` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `-ε-`.
 
 ## Effects
 

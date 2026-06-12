@@ -37,34 +37,34 @@ Outer = 12 :: T4
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Inner:
   06   !   (call_expression)                08
   07  ...  
-  08   ▽   (identifier) [Node Set(M0)]      10
-  10   △   _                                11
+  08  └‣─  (identifier) [Node Set(M0)]      10
+  10  ─‣┘  _                                11
   11                                        ▶
 
 Outer:
   12   !   (array)                          13
-  13   ε   [Arr]                            34, 17
+  13  -ε-  [Arr]                            34, 17
   15                                        ▶
-  16   ε                                    40
-  17   ε   [EndArr Set(M2)]                 15
-  19   ε   [EndObj Push]                    38, 16
-  21   ε   [Set(M1)]                        19
+  16  -ε-                                   40
+  17  -ε-  [EndArr Set(M2)]                 15
+  19  -ε-  [EndObj Push]                    38, 16
+  21  -ε-  [Set(M1)]                        19
   23  ...  
-  24   ε   [EndObj]                         21
+  24  -ε-  [EndObj]                         21
   26   !   (Inner)                          06 : 24
-  27   ε   [Obj]                            26
-  29   ε   [Obj]                            27
+  27  -ε-  [Obj]                            26
+  29  -ε-  [Obj]                            27
   31  ...  
-  32   ▷   _                                29, 32, 40
-  34   ▽   _                                29, 32, 40
-  36   ▷   _                                29, 36, 40
-  38   ▷   _                                29, 36, 40
-  40   △   [EndArr Set(M2)] _               15
+  32  ─‣─  _                                29, 32, 40
+  34  └‣─  _                                29, 32, 40
+  36  ─‣─  _                                29, 36, 40
+  38  ─‣─  _                                29, 36, 40
+  40  ─‣┘  [EndArr Set(M2)] _               15

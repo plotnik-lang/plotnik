@@ -60,9 +60,9 @@ Ident      = 06 :: T02
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Ident:
@@ -70,14 +70,14 @@ Ident:
   08                                        ▶
 
 Expression:
-  09   ε                                    20, 24
+  09  -ε-                                   20, 24
 
 Assignment:
   11   !   (assignment_expression)          12
-  12   ▽   left: (identifier) [Node Set(M6)]  14
-  14   ▷   right: (Expression)              09 : 16
+  12  └‣─  left: (identifier) [Node Set(M6)]  14
+  14  ─‣─  right: (Expression)              09 : 16
   15  ...  
-  16   △   [Set(M5)] _                      18
+  16  ─‣┘  [Set(M5)] _                      18
   18                                        ▶
   19                                        ▶
   20   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  19

@@ -96,38 +96,38 @@ Q = 08 :: T01
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
   06                                        ▶
   07  ...  
 
 Q:
-  08   ε                                    11, 21, 29, 37, 45, 53, 61, 69
-  11   ε   [Null Set(M1) Null Set(M2) Null Set(M3) Null]  16
+  08  -ε-                                   11, 21, 29, 37, 45, 53, 61, 69
+  11  -ε-  [Null Set(M1) Null Set(M2) Null Set(M3) Null]  16
   14  ...  
   15  ...  
-  16   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  19
+  16  -ε-  [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  19
   19   !   (identifier) [Node Set(M0)]      06
-  21   ε   [Null Set(M0) Null Set(M2) Null Set(M3) Null]  24
-  24   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  27
+  21  -ε-  [Null Set(M0) Null Set(M2) Null Set(M3) Null]  24
+  24  -ε-  [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  27
   27   !   (number) [Node Set(M1)]          06
-  29   ε   [Null Set(M0) Null Set(M1) Null Set(M3) Null]  32
-  32   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  35
+  29  -ε-  [Null Set(M0) Null Set(M1) Null Set(M3) Null]  32
+  32  -ε-  [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  35
   35   !   (string) [Node Set(M2)]          06
-  37   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  40
-  40   ε   [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  43
+  37  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  40
+  40  -ε-  [Set(M4) Null Set(M5) Null Set(M6) Null Set(M7)]  43
   43   !   (binary_expression) [Node Set(M3)]  06
-  45   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  48
-  48   ε   [Set(M3) Null Set(M5) Null Set(M6) Null Set(M7)]  51
+  45  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  48
+  48  -ε-  [Set(M3) Null Set(M5) Null Set(M6) Null Set(M7)]  51
   51   !   (call_expression) [Node Set(M4)]  06
-  53   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  56
-  56   ε   [Set(M3) Null Set(M4) Null Set(M6) Null Set(M7)]  59
+  53  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  56
+  56  -ε-  [Set(M3) Null Set(M4) Null Set(M6) Null Set(M7)]  59
   59   !   (member_expression) [Node Set(M5)]  06
-  61   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  64
-  64   ε   [Set(M3) Null Set(M4) Null Set(M5) Null Set(M7)]  67
+  61  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  64
+  64  -ε-  [Set(M3) Null Set(M4) Null Set(M5) Null Set(M7)]  67
   67   !   (array) [Node Set(M6)]           06
-  69   ε   [Null Set(M0) Null Set(M1) Null Set(M2) Null]  72
-  72   ε   [Set(M3) Null Set(M4) Null Set(M5) Null Set(M6)]  75
+  69  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  72
+  72  -ε-  [Set(M3) Null Set(M4) Null Set(M5) Null Set(M6)]  75
   75   !   (object) [Node Set(M7)]          06

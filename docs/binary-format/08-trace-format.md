@@ -59,16 +59,16 @@ Below each instruction, sub-lines show what happened during execution. Each sub-
 | Symbol  | Meaning                           |
 | ------- | --------------------------------- |
 | (blank) | Navigation: stayed at position    |
-| `  ▽  ` | Navigation: descended to child    |
-| `  ▷  ` | Navigation: moved to sibling      |
-| `  △  ` | Navigation: ascended to parent    |
+| `└‣─`   | Navigation: descended to child    |
+| `─‣─`   | Navigation: moved to sibling      |
+| `─‣┘`   | Navigation: ascended to parent    |
 | `  ●  ` | Match: success                    |
 | `  ○  ` | Match: failure                    |
 | `  ⬥  ` | Effect: data capture or structure |
 | `  ⬦  ` | Effect: suppressed (inside @\_)   |
 | `  ▶  ` | Call: entering definition         |
 
-Navigation symbols (`▽`, `▷`, `△`) appear only in sub-lines, not on instruction lines. Match sub-lines show success (`●`) or failure (`○`) for type/field checks.
+Navigation symbols use the same detailed notation as dump output, and appear only in sub-lines. Match sub-lines show success (`●`) or failure (`○`) for type/field checks.
 
 ### Return Line
 
@@ -90,12 +90,12 @@ Definition labels (`Name:`) appear at:
 
 ```
 A:
-  09   ε                                    10
+  09  -ε-                                  10
   ...
   13       (B)                              01 : 14
        ▶   (B)
 B:
-  01   ε                                    02
+  01  -ε-                                  02
   ...
   08   ◀   (B)
 A:
@@ -135,21 +135,21 @@ Value = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07   !   (document)                       08
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   10                                        ▶
-  11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
+  11  └─!  [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
   14  ...
   15  ...
-  16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
-  19   △   _                                10
+  16  └─!  [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
+  19  ─‣┘  _                                10
 ```
 
 ---
@@ -167,35 +167,35 @@ Value:
 
 ```
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
        ⬥   Obj
   02       Trampoline                       03
        ▶   (Value)
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07       (document)                       08
            document
        ●   document 42
   --------------------------------------------
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
        ⬥   Enum "Num"
-       ▽   number
+      └─!  number
        ●   number 42
        ⬥   Node
        ⬥   Set "n"
        ⬥   EndEnum
   --------------------------------------------
   19       _                                10
-       △   document
+      ─‣┘  document
        ●   document 42
   --------------------------------------------
   10   ◀   (Value)
 
 _ObjWrap:
   --------------------------------------------
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
        ⬥   EndObj
   05   ◀   _ObjWrap                         ◼
 ```
@@ -217,40 +217,40 @@ First branch (`Num`) matches — checkpoint at step 16 is never used.
 
 ```
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
        ⬥   Obj
   02       Trampoline                       03
        ▶   (Value)
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07       (document)                       08
            document
        ●   document "hello"
   --------------------------------------------
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
        ⬥   Enum "Num"
-       ▽   string
+      └─!  string
        ○   string "hello"
   08  ❮❮❮
   --------------------------------------------
   16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
        ⬥   Enum "Str"
-       ▽   string
+      └─!  string
        ●   string "hello"
        ⬥   Node
        ⬥   Set "s"
        ⬥   EndEnum
   19       _                                10
-       △   document
+      ─‣┘  document
        ●   document "hello"
   --------------------------------------------
   10   ◀   (Value)
 
 _ObjWrap:
   --------------------------------------------
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
        ⬥   EndObj
   05   ◀   _ObjWrap                         ◼
 ```
@@ -282,27 +282,27 @@ _ObjWrap:
 
 ```
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
        ⬥   Obj
   02       Trampoline                       03
        ▶   (Value)
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07       (document)                       08
            document
        ●   document true
   --------------------------------------------
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
        ⬥   Enum "Num"
-       ▽   true
+      └─!  true
        ○   true true
   08  ❮❮❮
   --------------------------------------------
   16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
        ⬥   Enum "Str"
-       ▽   true
+      └─!  true
        ○   true true
 ```
 
@@ -316,15 +316,15 @@ Same as Trace 2 but with default verbosity (no `-v` flag). Navigation and effect
 
 ```
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
        ▶   (Value)
 
 Value:
-  06   ε                                    07
+  06  -ε-                                  07
   07       (document)                       08
        ●   document
-  08   ε                                    11, 16
+  08  -ε-                                  11, 16
   11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
        ○   string
   08  ❮❮❮
@@ -335,7 +335,7 @@ Value:
   10   ◀   (Value)
 
 _ObjWrap:
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05   ◀   _ObjWrap                         ◼
 ```
 
@@ -347,7 +347,7 @@ Default shows:
 
 Hidden:
 
-- Navigation sub-lines (`▽`, `▷`, `△`)
+- Navigation sub-lines (`└‣─`, `──!`, `─‣┘`)
 - Effect sub-lines (`⬥`, `⬦`)
 
 ---
@@ -357,10 +357,10 @@ Hidden:
 | Symbol  | Format              | Example                      |
 | ------- | ------------------- | ---------------------------- |
 | (blank) | `     kind`         | `     identifier`            |
-| `  ▽  ` | `▽   kind`          | `▽   identifier`             |
-| `  ▽  ` | `▽   kind text`     | `▽   identifier foo`         |
-| `  ▷  ` | `▷   kind`          | `▷   return_statement`       |
-| `  △  ` | `△   kind`          | `△   assignment_expression`  |
+| `└‣─`   | `└‣─  kind`         | `└‣─  identifier`            |
+| `└─!`   | `└─!  kind text`    | `└─!  identifier foo`        |
+| `─‣─`   | `─‣─  kind`         | `─‣─  return_statement`      |
+| `─‣┘`   | `─‣┘  kind`         | `─‣┘  assignment_expression` |
 | `  ●  ` | `●   kind`          | `●   identifier`             |
 | `  ●  ` | `●   kind text`     | `●   identifier foo`         |
 | `  ●  ` | `●   field:`        | `●   left:`                  |
@@ -384,17 +384,18 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 
 ## Nav Symbols
 
-In trace output, navigation symbols are **simplified** — skip/exact variants are not distinguished:
+Trace output uses the same navigation symbols as dump output:
 
 | Nav                                        | Symbol  | Meaning                      |
 | ------------------------------------------ | ------- | ---------------------------- |
-| Epsilon                                    | ε       | Pure control flow, no cursor |
-| Stay, StayExact                            | (space) | No movement                  |
-| Down, DownSkip, DownSkipExtras, DownExact  | ▽       | Descended to child           |
-| Next, NextSkip, NextSkipExtras, NextExact  | ▷       | Moved to sibling             |
-| Up(n), UpSkipTrivia, UpSkipExtras, UpExact | △       | Ascended to parent           |
+| Epsilon                                    | -ε-     | Pure control flow, no cursor |
+| Stay                                       | (space) | No movement                  |
+| StayExact                                  | !       | Exact match without movement |
+| Down, DownSkip, DownSkipExtras, DownExact  | └‣─ etc | Descended to child           |
+| Next, NextSkip, NextSkipExtras, NextExact  | ─‣─ etc | Moved to sibling             |
+| Up(n), UpSkipTrivia, UpSkipExtras, UpExact | ─‣┘ etc | Ascended to parent           |
 
-> **Note**: For detailed nav symbols with mode modifiers (`!▽`, `!!▽`, etc.), see [07-dump-format.md](07-dump-format.md#nav-symbols). Trace format simplifies these for readability.
+For the complete table of connector symbols, see [07-dump-format.md](07-dump-format.md#nav-symbols).
 
 ## Effects
 

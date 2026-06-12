@@ -183,15 +183,15 @@ Q = 006 :: T31
 
 [transitions]
 _ObjWrap:
-  000   ε   [Obj]                           002
+  000  -ε-  [Obj]                           002
   002       Trampoline                      003
-  003   ε   [EndObj]                        005
+  003  -ε-  [EndObj]                        005
   005                                       ▶
 
 Q:
-  006   ε                                   008
+  006  -ε-                                  008
   007  ...  
-  008   ε                                   120, 123, 128
+  008  -ε-                                  120, 123, 128
   010                                       ▶
   011   !   [Enum(M30)] (identifier) [Node Set(M0) EndEnum]  010
   014  ...  

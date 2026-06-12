@@ -32,9 +32,9 @@ Test  = 09 :: T2
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Inner:
@@ -43,9 +43,9 @@ Inner:
 
 Test:
   09   !   (array) [Obj]                    11
-  11   ▽   (Inner)                          06 : 12
-  12   ε   [EndObj]                         14
-  14   ε                                    16
+  11  └‣─  (Inner)                          06 : 12
+  12  -ε-  [EndObj]                         14
+  14  -ε-                                   16
   15  ...  
-  16   △   [Set(M1)] _                      18
+  16  ─‣┘  [Set(M1)] _                      18
   18                                        ▶

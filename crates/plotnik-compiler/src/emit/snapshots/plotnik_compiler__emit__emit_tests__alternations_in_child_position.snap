@@ -25,16 +25,16 @@ Test = 06 :: T1
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
   06   !   (program)                        08
   07  ...  
-  08   ▽   _                                10, 14
+  08  └‣─  _                                10, 14
   10   !   (expression_statement) [Node Set(M0)]  12
-  12   △   _                                13
+  12  ─‣┘  _                                13
   13                                        ▶
-  14   ▷   _                                10, 14
+  14  ─‣─  _                                10, 14

@@ -55,22 +55,22 @@ Test = 08 :: T05
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Expr:
-  06   ε                                    17, 22
+  06  -ε-                                   17, 22
 
 Test:
   08   !   (program)                        09
-  09   ▽   (Expr)                           06 : 10
-  10   △   [Set(M5)] _                      12
+  09  └‣─  (Expr)                           06 : 10
+  10  ─‣┘  [Set(M5)] _                      12
   12                                        ▶
-  13   ▷   arguments: (Expr)                06 : 14
-  14   △   [Set(M2)] _ [EndEnum]            16
+  13  ─‣─  arguments: (Expr)                06 : 14
+  14  ─‣┘  [Set(M2)] _ [EndEnum]            16
   16                                        ▶
   17   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  16
-  20   ▽   function: (identifier) [Node Set(M1)]  13
+  20  └‣─  function: (identifier) [Node Set(M1)]  13
   22   !   [Enum(M4)] (call_expression)     20

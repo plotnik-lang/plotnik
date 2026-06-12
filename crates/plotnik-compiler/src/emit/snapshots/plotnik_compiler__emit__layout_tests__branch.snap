@@ -32,13 +32,13 @@ Test = 06 :: T1
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
-  06   ε                                    09, 12
+  06  -ε-                                   09, 12
   08                                        ▶
   09   !   [Null Set(M1)] (identifier) [Node Set(M0)]  08
   12   !   [Null Set(M0)] (number) [Node Set(M1)]  08

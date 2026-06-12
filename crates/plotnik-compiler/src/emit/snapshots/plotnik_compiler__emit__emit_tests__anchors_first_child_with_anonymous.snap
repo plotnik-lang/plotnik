@@ -22,13 +22,13 @@ Test = 6 :: T0
 
 [transitions]
 _ObjWrap:
-  0   ε   [Obj]                             2
+  0  -ε-  [Obj]                             2
   2       Trampoline                        3
-  3   ε   [EndObj]                          5
+  3  -ε-  [EndObj]                          5
   5                                         ▶
 
 Test:
   6   !   (array)                           7
-  7  e▽   "+"                               8
-  8   △   _                                 9
+  7  └◦─  "+"                               8
+  8  ─‣┘  _                                 9
   9                                         ▶

@@ -46,17 +46,17 @@ Expr = 06 :: T4
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Expr:
-  06   ε                                    12, 18
-  08   ▷   arguments: (Expr)                06 : 09
-  09   △   [Set(M2)] _ [EndEnum]            11
+  06  -ε-                                   12, 18
+  08  ─‣─  arguments: (Expr)                06 : 09
+  09  ─‣┘  [Set(M2)] _ [EndEnum]            11
   11                                        ▶
   12   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  11
   15  ...  
-  16   ▽   function: (identifier) [Node Set(M1)]  08
+  16  └‣─  function: (identifier) [Node Set(M1)]  08
   18   !   [Enum(M4)] (call_expression)     16
