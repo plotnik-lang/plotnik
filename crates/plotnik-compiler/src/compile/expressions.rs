@@ -54,15 +54,12 @@ impl Compiler<'_> {
         }
 
         // Determine Up navigation based on trailing anchor
-        let (has_trailing_anchor, trailing_strictness) = check_trailing_anchor(&items);
+        let (has_trailing_anchor, trailing_nav) =
+            check_trailing_anchor(&items, self.ctx.symbol_table);
 
         // Emit Up instruction with appropriate strictness
         let up_nav = if has_trailing_anchor {
-            if trailing_strictness {
-                Nav::UpExact(1)
-            } else {
-                Nav::UpSkipTrivia(1)
-            }
+            trailing_nav.unwrap_or(Nav::UpSkipTrivia(1))
         } else {
             Nav::Up(1)
         };

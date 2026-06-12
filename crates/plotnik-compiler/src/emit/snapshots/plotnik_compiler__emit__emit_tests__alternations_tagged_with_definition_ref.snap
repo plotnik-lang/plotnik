@@ -40,9 +40,9 @@ Test  = 09 :: T4
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Inner:
@@ -50,13 +50,13 @@ Inner:
   08                                        ▶
 
 Test:
-  09   ε                                    21, 24
+  09  -ε-                                   21, 24
   11                                        ▶
-  12   ε   [Set(M4)]                        11
-  14   ε   [EndEnum]                        12
-  16   ε   [EndObj]                         14
+  12  -ε-  [Set(M4)]                        11
+  14  -ε-  [EndEnum]                        12
+  16  -ε-  [EndObj]                         14
   18   !   (Inner)                          06 : 16
-  19   ε   [Obj]                            18
-  21   ε   [Enum(M2)]                       19
+  19  -ε-  [Obj]                            18
+  21  -ε-  [Enum(M2)]                       19
   23  ...  
   24   !   [Enum(M3)] (number) [Node Set(M1) EndEnum Set(M4)]  11

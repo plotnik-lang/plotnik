@@ -24,9 +24,9 @@ Foo = 6 :: T1
 
 [transitions]
 _ObjWrap:
-  0   ε   [Obj]                             2
+  0  -ε-  [Obj]                             2
   2       Trampoline                        3
-  3   ε   [EndObj]                          5
+  3  -ε-  [EndObj]                          5
   5                                         ▶
 
 Foo:

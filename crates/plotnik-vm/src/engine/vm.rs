@@ -13,10 +13,12 @@ fn continuation_nav(nav: Nav) -> Nav {
     match nav {
         Nav::Down | Nav::Next => Nav::Next,
         Nav::DownSkip | Nav::NextSkip => Nav::NextSkip,
+        Nav::DownSkipExtras | Nav::NextSkipExtras => Nav::NextSkipExtras,
         Nav::DownExact | Nav::NextExact => Nav::NextExact,
         Nav::Epsilon
         | Nav::Up(_)
         | Nav::UpSkipTrivia(_)
+        | Nav::UpSkipExtras(_)
         | Nav::UpExact(_)
         | Nav::Stay
         | Nav::StayExact => Nav::Next,
@@ -33,12 +35,14 @@ fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
     match nav {
         Nav::Down | Nav::Next => Some(SkipPolicy::Any),
         Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
+        Nav::DownSkipExtras | Nav::NextSkipExtras => Some(SkipPolicy::Extras),
         Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
         Nav::Epsilon
         | Nav::Stay
         | Nav::StayExact
         | Nav::Up(_)
         | Nav::UpSkipTrivia(_)
+        | Nav::UpSkipExtras(_)
         | Nav::UpExact(_) => None,
     }
 }
@@ -128,7 +132,6 @@ pub struct VM<'t> {
 pub struct VMBuilder<'t> {
     source: &'t str,
     tree: &'t Tree,
-    trivia_types: Vec<u16>,
     limits: FuelLimits,
 }
 
@@ -138,15 +141,8 @@ impl<'t> VMBuilder<'t> {
         Self {
             source,
             tree,
-            trivia_types: Vec::new(),
             limits: FuelLimits::default(),
         }
-    }
-
-    /// Set the trivia types to skip during navigation.
-    pub fn trivia_types(mut self, types: Vec<u16>) -> Self {
-        self.trivia_types = types;
-        self
     }
 
     /// Set the fuel limits.
@@ -170,7 +166,7 @@ impl<'t> VMBuilder<'t> {
     /// Build the VM.
     pub fn build(self) -> VM<'t> {
         VM {
-            cursor: CursorWrapper::new(self.tree.walk(), self.trivia_types),
+            cursor: CursorWrapper::new(self.tree.walk()),
             ip: 0,
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
@@ -194,17 +190,9 @@ impl<'t> VM<'t> {
     }
 
     /// Create a new VM for execution.
-    #[deprecated(note = "Use VM::builder(source, tree).trivia_types(...).build() instead")]
-    pub fn new(
-        source: &'t str,
-        tree: &'t Tree,
-        trivia_types: Vec<u16>,
-        limits: FuelLimits,
-    ) -> Self {
-        Self::builder(source, tree)
-            .trivia_types(trivia_types)
-            .limits(limits)
-            .build()
+    #[deprecated(note = "Use VM::builder(source, tree).build() instead")]
+    pub fn new(source: &'t str, tree: &'t Tree, limits: FuelLimits) -> Self {
+        Self::builder(source, tree).limits(limits).build()
     }
 
     /// Helper for internal checkpoint creation (eliminates duplication).

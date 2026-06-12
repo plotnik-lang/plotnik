@@ -33,21 +33,21 @@ Test = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
   06   !   (array)                          08
-  07   △   _                                10
-  08   ε   [Arr]                            24, 19
+  07  ─‣┘  _                                10
+  08  -ε-  [Arr]                            24, 19
   10                                        ▶
-  11   ▽   [EndArr Set(M0)] (number) [Node Set(M1)]  07
-  14   ▷   _                                20, 26, 16
-  16   ▷   [EndArr Set(M0)] (number) [Node Set(M1)]  07
-  19   ε                                    11
+  11  └‣─  [EndArr Set(M0)] (number) [Node Set(M1)]  07
+  14  ─‣─  _                                20, 26, 16
+  16  ─‣─  [EndArr Set(M0)] (number) [Node Set(M1)]  07
+  19  -ε-                                   11
   20   !   (identifier) [Node Push]         14, 16
-  22   ▷   _                                20, 22, 16
-  24   ▽   _                                20, 22, 16
-  26   ▷   _                                20, 26, 16
+  22  ─‣─  _                                20, 22, 16
+  24  └‣─  _                                20, 22, 16
+  26  ─‣─  _                                20, 26, 16

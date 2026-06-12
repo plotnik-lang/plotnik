@@ -108,6 +108,9 @@ pub enum SyntaxKind {
     #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]
     Id,
 
+    #[token(".!")]
+    DotBang,
+
     #[token(".")]
     Dot,
 
@@ -351,6 +354,7 @@ pub mod token_sets {
         Id,
         DoubleQuote,
         SingleQuote,
+        DotBang,
         Dot,
         Negation,
         Minus,
@@ -358,7 +362,7 @@ pub mod token_sets {
         KwMissing,
     ]);
 
-    /// FIRST set for root-level expressions. Excludes `Dot`/`Negation` (tree-internal).
+    /// FIRST set for root-level expressions. Excludes anchors/`Negation` (tree-internal).
     pub const ROOT_EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,

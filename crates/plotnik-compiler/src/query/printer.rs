@@ -338,7 +338,7 @@ impl<'q> QueryPrinter<'q> {
         use crate::parser::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
-                self.mark_anchor(depth, w)?;
+                self.mark_anchor(&ast::Anchor::cast(child).unwrap(), depth, w)?;
             } else if child.kind() == SyntaxKind::NegatedField {
                 self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), depth, w)?;
             } else if let Some(expr) = ast::Expr::cast(child) {
@@ -348,8 +348,14 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn mark_anchor(&self, depth: usize, w: &mut impl Write) -> std::fmt::Result {
-        writeln!(w, "{}.", indent(depth))
+    fn mark_anchor(
+        &self,
+        anchor: &ast::Anchor,
+        depth: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        let spelling = if anchor.is_strict() { ".!" } else { "." };
+        writeln!(w, "{}{}", indent(depth), spelling)
     }
 
     fn format_negated_field(

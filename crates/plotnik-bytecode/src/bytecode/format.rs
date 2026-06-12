@@ -6,6 +6,8 @@
 //! |   | pad  |   | (sym) |   |                      |   |      |
 //! ```
 
+use std::borrow::Cow;
+
 use super::EffectOp;
 use super::effects::EffectOpcode;
 use super::nav::Nav;
@@ -16,28 +18,24 @@ pub mod cols {
     pub const INDENT: usize = 2;
     /// Gap between columns (1 space).
     pub const GAP: usize = 1;
-    /// Symbol column width (5 chars: 2 left + 1 center + 2 right).
+    /// Symbol column width for fixed-width trace symbols.
     pub const SYMBOL: usize = 5;
     /// Total width before successors are right-aligned.
     pub const TOTAL_WIDTH: usize = 44;
 }
 
-/// Symbols for the 5-character symbol column.
+/// Symbols for the instruction and trace columns.
 ///
-/// Format: `| left(2) | center(1) | right(2) |`
-///
-/// Used in both dump (nav symbols) and trace (nav, match, effect symbols).
-#[derive(Clone, Copy, Debug)]
+/// Format: `| left | center | right |`. Dump symbols keep the connector
+/// shape in these three parts; multi-digit up counts may extend `right`.
+#[derive(Clone, Debug)]
 pub struct Symbol {
-    /// Left modifier (2 chars): mode indicator or spaces.
-    /// Examples: "  ", " !", "!!"
+    /// Left connector or padding.
     pub left: &'static str,
-    /// Center symbol (1 char): direction or status.
-    /// Examples: "ε", "▽", "▷", "△", "●", "○", "⬥", "▶", "◀"
+    /// Center connector, marker, or status.
     pub center: &'static str,
-    /// Right suffix (2 chars): level or spaces.
-    /// Examples: "  ", "¹ ", "¹²"
-    pub right: &'static str,
+    /// Right connector, suffix, or padding.
+    pub right: Cow<'static, str>,
 }
 
 impl Default for Symbol {
@@ -52,7 +50,16 @@ impl Symbol {
         Self {
             left,
             center,
-            right,
+            right: Cow::Borrowed(right),
+        }
+    }
+
+    /// Create a symbol with an owned right side.
+    pub fn with_right(left: &'static str, center: &'static str, right: String) -> Self {
+        Self {
+            left,
+            center,
+            right: Cow::Owned(right),
         }
     }
 
@@ -60,60 +67,60 @@ impl Symbol {
     pub const EMPTY: Symbol = Symbol::new("  ", " ", "  ");
 
     /// Epsilon symbol for unconditional transitions.
-    pub const EPSILON: Symbol = Symbol::new("  ", "ε", "  ");
+    pub const EPSILON: Symbol = Symbol::new(" ", "-ε-", " ");
 
     /// Padding indicator (centered "..." in 5-char column).
     pub const PADDING: Symbol = Symbol::new(" ", "...", " ");
 
-    /// Format as a 5-character string.
+    /// Format for display.
     pub fn format(&self) -> String {
         format!("{}{}{}", self.left, self.center, self.right)
     }
 }
 
-/// Format navigation command as a Symbol using the doc-specified triangles.
+/// Format navigation command as a dump symbol.
 ///
-/// | Nav             | Symbol  | Notes                               |
-/// | --------------- | ------- | ----------------------------------- |
-/// | Epsilon         | ε       | Pure control flow, no cursor check  |
-/// | Stay            | (blank) | No movement, 5 spaces               |
-/// | StayExact       | !       | Stay at position, exact match only  |
-/// | Down            | ▽       | First child, skip any               |
-/// | DownSkip        | !▽      | First child, skip trivia            |
-/// | DownExact       | !!▽     | First child, exact                  |
-/// | Next            | ▷       | Next sibling, skip any              |
-/// | NextSkip        | !▷      | Next sibling, skip trivia           |
-/// | NextExact       | !!▷     | Next sibling, exact                 |
-/// | Up(n)           | △ⁿ      | Ascend n levels, skip any           |
-/// | UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
-/// | UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
+/// | Nav             | Symbol examples | Notes                              |
+/// | --------------- | --------------- | ---------------------------------- |
+/// | Epsilon         | -ε-             | Pure control flow, no cursor check |
+/// | Stay            | (blank)         | No movement                        |
+/// | StayExact       | !               | Stay at position, exact match only |
+/// | Down            | └‣─             | First child, skip any              |
+/// | DownSkip        | └•─             | First child, skip trivia           |
+/// | DownSkipExtras  | └◦─             | First child, skip extras only      |
+/// | DownExact       | └─!             | First child, exact                 |
+/// | Next            | ─‣─             | Next sibling, skip any             |
+/// | NextSkip        | ─•─             | Next sibling, skip trivia          |
+/// | NextSkipExtras  | ─◦─             | Next sibling, skip extras only     |
+/// | NextExact       | ──!             | Next sibling, exact                |
+/// | Up(1)           | ─‣┘             | Ascend 1 level, skip any           |
+/// | Up(2), Up(10)   | ─‣┘², ─‣┘¹⁰    | Ascend n levels, skip any          |
+/// | UpSkipTrivia(n) | ─•┘², ─•┘¹⁰    | Ascend n, must be last non-trivia  |
+/// | UpSkipExtras(n) | ─◦┘², ─◦┘¹⁰    | Ascend n, must be last non-extra   |
+/// | UpExact(n)      | !─┘², !─┘¹⁰    | Ascend n, must be last child       |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Epsilon => Symbol::EPSILON,
         Nav::Stay => Symbol::EMPTY,
         Nav::StayExact => Symbol::new("  ", "!", "  "),
-        Nav::Down => Symbol::new("  ", "▽", "  "),
-        Nav::DownSkip => Symbol::new(" !", "▽", "  "),
-        Nav::DownExact => Symbol::new("!!", "▽", "  "),
-        Nav::Next => Symbol::new("  ", "▷", "  "),
-        Nav::NextSkip => Symbol::new(" !", "▷", "  "),
-        Nav::NextExact => Symbol::new("!!", "▷", "  "),
-        Nav::Up(n) => Symbol::new("  ", "△", superscript_suffix(n)),
-        Nav::UpSkipTrivia(n) => Symbol::new(" !", "△", superscript_suffix(n)),
-        Nav::UpExact(n) => Symbol::new("!!", "△", superscript_suffix(n)),
+        Nav::Down => Symbol::new(" └", "‣", "─ "),
+        Nav::DownSkip => Symbol::new(" └", "•", "─ "),
+        Nav::DownSkipExtras => Symbol::new(" └", "◦", "─ "),
+        Nav::DownExact => Symbol::new(" └", "─", "! "),
+        Nav::Next => Symbol::new(" ─", "‣", "─ "),
+        Nav::NextSkip => Symbol::new(" ─", "•", "─ "),
+        Nav::NextSkipExtras => Symbol::new(" ─", "◦", "─ "),
+        Nav::NextExact => Symbol::new(" ─", "─", "! "),
+        Nav::Up(n) => up_symbol(" ─", "‣", n),
+        Nav::UpSkipTrivia(n) => up_symbol(" ─", "•", n),
+        Nav::UpSkipExtras(n) => up_symbol(" ─", "◦", n),
+        Nav::UpExact(n) => up_symbol(" !", "─", n),
     }
 }
 
 /// Trace sub-line symbols.
 pub mod trace {
     use super::Symbol;
-
-    /// Navigation: descended to child.
-    pub const NAV_DOWN: Symbol = Symbol::new("  ", "▽", "  ");
-    /// Navigation: moved to sibling.
-    pub const NAV_NEXT: Symbol = Symbol::new("  ", "▷", "  ");
-    /// Navigation: ascended to parent.
-    pub const NAV_UP: Symbol = Symbol::new("  ", "△", "  ");
 
     /// Match: success.
     pub const MATCH_SUCCESS: Symbol = Symbol::new("  ", "●", "  ");
@@ -148,22 +155,12 @@ pub fn superscript(n: u8) -> String {
     }
 }
 
-/// Convert a number to a 2-char superscript suffix for the symbol right column.
-/// Level 1 shows no superscript (blank), levels 2+ show superscript.
-fn superscript_suffix(n: u8) -> &'static str {
-    match n {
-        1 => "  ",
-        2 => "² ",
-        3 => "³ ",
-        4 => "⁴ ",
-        5 => "⁵ ",
-        6 => "⁶ ",
-        7 => "⁷ ",
-        8 => "⁸ ",
-        9 => "⁹ ",
-        // For 10+, we'd need dynamic allocation. Rare in practice.
-        _ => "ⁿ ",
+fn up_symbol(left: &'static str, center: &'static str, n: u8) -> Symbol {
+    if n == 1 {
+        return Symbol::new(left, center, "┘ ");
     }
+
+    Symbol::with_right(left, center, format!("┘{}", superscript(n)))
 }
 
 /// Calculate minimum width needed to display numbers up to `count - 1`.

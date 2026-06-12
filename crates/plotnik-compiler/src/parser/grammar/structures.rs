@@ -361,7 +361,7 @@ impl Parser<'_, '_> {
                 continue;
             }
             // Anchors cannot appear directly in alternations - they create empty branches
-            if self.currently_is(SyntaxKind::Dot) {
+            if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
                 self.error(DiagnosticKind::AnchorInAlternation);
                 self.skip_token();
                 continue;

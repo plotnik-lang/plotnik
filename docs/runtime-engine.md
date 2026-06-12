@@ -62,20 +62,22 @@ Pop frame → `ip = return_addr`
 
 `Nav` byte encodes cursor movement, resolved at compile time.
 
-| Mode                | Behavior                          |
-| ------------------- | --------------------------------- |
-| Stay                | No movement                       |
-| Next/Down           | Skip any nodes until match        |
-| NextSkip/DownSkip   | Skip trivia only                  |
-| NextExact/DownExact | Immediate match required          |
-| Up(n)               | Ascend n levels                   |
-| UpSkipTrivia(n)     | Ascend n, must be last non-trivia |
-| UpExact(n)          | Ascend n, must be last child      |
+| Mode                          | Behavior                          |
+| ----------------------------- | --------------------------------- |
+| Stay                          | No movement                       |
+| Next/Down                     | Skip any nodes until match        |
+| NextSkip/DownSkip             | Skip trivia only                  |
+| NextSkipExtras/DownSkipExtras | Skip extras only                  |
+| NextExact/DownExact           | Immediate match required          |
+| Up(n)                         | Ascend n levels                   |
+| UpSkipTrivia(n)               | Ascend n, must be last non-trivia |
+| UpSkipExtras(n)               | Ascend n, must be last non-extra  |
+| UpExact(n)                    | Ascend n, must be last child      |
 
 ### Search Loop
 
 1. Move cursor → try match
-2. On fail: Exact → fail; Skip → fail if non-trivia, else retry; Any → retry
+2. On fail: Exact → fail; SkipTrivia → fail if non-trivia, SkipExtras → fail if non-extra, Any → retry
 3. On exhaustion: fail
 
 Example: `(foo (bar))` vs `(foo (foo) (foo) (bar))` with `Down` mode skips two `foo` children to find `bar`. With `DownExact`, first mismatch fails immediately.
@@ -204,4 +206,4 @@ Exhaustion returns `RuntimeError`, not panic.
 
 ## Trivia Handling
 
-Per-language trivia list used for `*Skip` navigation. A node is never skipped if it matches the current target — `(comment)` still matches comments.
+The VM reads tree-sitter's per-node `is_extra` bit at runtime. `*Skip` navigation skips trivia (`!node.is_named() || node.is_extra()`); `*SkipExtras` skips only extras. A node is never skipped if it matches the current target — `(comment)` still matches comments.

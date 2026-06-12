@@ -460,6 +460,33 @@ fn anchors_first_child() {
 }
 
 #[test]
+fn anchors_first_child_with_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array . "+")
+    "#
+    );
+}
+
+#[test]
+fn anchors_first_child_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array . "+" @op)
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_first_child() {
+    shot_bytecode!(
+        r#"
+        Test = (array .! (identifier))
+    "#
+    );
+}
+
+#[test]
 fn anchors_first_child_with_alternation() {
     shot_bytecode!(
         r#"
@@ -478,6 +505,33 @@ fn anchors_last_child() {
 }
 
 #[test]
+fn anchors_last_child_with_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array "+" .)
+    "#
+    );
+}
+
+#[test]
+fn anchors_last_child_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array "+" @op .)
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_last_child() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) .!)
+    "#
+    );
+}
+
+#[test]
 fn anchors_with_anonymous() {
     shot_bytecode!(
         r#"
@@ -487,10 +541,92 @@ fn anchors_with_anonymous() {
 }
 
 #[test]
+fn anchors_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression "+" @op . (identifier))
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_alternation_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression (identifier) . ["+"])
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_mixed_alternation_classifies_each_branch() {
+    shot_bytecode!(
+        r#"
+        Test = {(identifier) . [(number) "+"]}
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_ref_to_anonymous() {
+    shot_bytecode!(
+        r#"
+        Comma = ","
+        Test = (array (Comma) . (string) @next)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_quantified_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) . ","?)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_field_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (pair key: (property_identifier) . value: _)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_sequence_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) . {"," (string)})
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_between_siblings() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression "+" .! (identifier))
+    "#
+    );
+}
+
+#[test]
 fn anchors_no_anchor() {
     shot_bytecode!(
         r#"
         Test = (array (identifier) (number))
+    "#
+    );
+}
+
+#[test]
+fn anchors_explicit_comment_pattern_emits_match_before_skip_nav() {
+    shot_bytecode!(
+        r#"
+        Test = (program {(comment) @c . (function_declaration) @f})
     "#
     );
 }

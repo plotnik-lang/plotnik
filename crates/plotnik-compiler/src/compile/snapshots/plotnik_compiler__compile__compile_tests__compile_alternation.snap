@@ -22,13 +22,13 @@ Test = 06 :: T0
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
-  06   ε                                    09, 10
+  06  -ε-                                   09, 10
   08                                        ▶
   09   !   (identifier)                     08
   10   !   (number)                         08

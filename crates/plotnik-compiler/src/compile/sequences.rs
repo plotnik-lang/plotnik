@@ -15,7 +15,9 @@ use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
 use super::capture::CaptureEffects;
-use super::navigation::{compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for};
+use super::navigation::{
+    AnonymousClassifier, compute_nav_modes, is_down_nav, is_skippable_quantifier, repeat_nav_for,
+};
 
 fn alt_search_nav(first_nav: Option<Nav>) -> Option<Nav> {
     match first_nav {
@@ -31,10 +33,36 @@ fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: Option<Nav>) -> 
 
     let nav = match first_nav {
         None => Nav::StayExact,
-        Some(nav @ (Nav::DownSkip | Nav::NextSkip | Nav::UpSkipTrivia(_))) => nav,
+        Some(
+            nav @ (Nav::DownSkip
+            | Nav::DownSkipExtras
+            | Nav::NextSkip
+            | Nav::NextSkipExtras
+            | Nav::UpSkipTrivia(_)
+            | Nav::UpSkipExtras(_)),
+        ) => nav,
         Some(nav) => nav.to_exact(),
     };
     Some(nav)
+}
+
+fn nav_for_alt_branch(
+    first_nav: Option<Nav>,
+    search_nav: Option<Nav>,
+    body: &Expr,
+    classifier: &AnonymousClassifier<'_>,
+) -> Option<Nav> {
+    let nav = exact_nav_for_alt_branch(first_nav, search_nav)?;
+
+    if !classifier.expr_may_match_anonymous(Some(body)) {
+        return Some(nav);
+    }
+
+    Some(match nav {
+        Nav::DownSkip => Nav::DownSkipExtras,
+        Nav::NextSkip => Nav::NextSkipExtras,
+        nav => nav,
+    })
 }
 
 impl Compiler<'_> {
@@ -53,7 +81,10 @@ impl Compiler<'_> {
 
         // Determine if we're inside a node based on the navigation override
         // Down variants mean we're descending into a node's children
-        let is_inside_node = matches!(first_nav, Some(Nav::Down | Nav::DownSkip | Nav::DownExact));
+        let is_inside_node = matches!(
+            first_nav,
+            Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
+        );
 
         self.compile_seq_items_inner(&items, exit, is_inside_node, first_nav, capture, None)
     }
@@ -73,7 +104,7 @@ impl Compiler<'_> {
         skip_exit: Option<Label>,
     ) -> Label {
         // Compute navigation modes first (immutable borrow)
-        let mut nav_modes = compute_nav_modes(items, is_inside_node);
+        let mut nav_modes = compute_nav_modes(items, is_inside_node, self.ctx.symbol_table);
 
         if nav_modes.is_empty() {
             return exit;
@@ -251,7 +282,7 @@ impl Compiler<'_> {
         // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
         // wrapper below; otherwise the branch performs the exact navigation.
         let search_nav = alt_search_nav(first_nav);
-        let branch_nav = exact_nav_for_alt_branch(first_nav, search_nav);
+        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
 
         // Compile each branch, collecting entry labels
         let mut successors = Vec::new();
@@ -261,6 +292,8 @@ impl Compiler<'_> {
             };
 
             if is_enum {
+                let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
+
                 // Look up variant info by branch label (using BTreeMap order, not AST order)
                 let label = branch.label().expect("tagged branch must have label");
                 let label_text = label.text();
@@ -317,6 +350,7 @@ impl Compiler<'_> {
                 // Merge null injection with outer capture effects
                 let branch_capture = capture.clone().with_pre_values(null_effects);
 
+                let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
                 let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, branch_capture);
                 successors.push(branch_entry);
             }

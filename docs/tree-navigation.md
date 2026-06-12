@@ -48,15 +48,19 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 | ----------------- | ----------- | ----------------------------- |
 | `Stay`            | (space)     | No movement                   |
 | `StayExact`       | `!`         | No movement, exact match only |
-| `Down`            | `↓*`        | First child, skip any         |
-| `DownSkip`        | `↓~`        | First child, skip trivia only |
-| `DownExact`       | `↓.`        | First child, exact            |
-| `Next`            | `*`         | Next sibling, skip any        |
-| `NextSkip`        | `~`         | Next sibling, skip trivia     |
-| `NextExact`       | `.`         | Next sibling, exact           |
-| `Up(n)`           | `*↑ⁿ`       | Ascend n levels               |
-| `UpSkipTrivia(n)` | `~↑ⁿ`       | Ascend n, last non-trivia     |
-| `UpExact(n)`      | `.↑ⁿ`       | Ascend n, last child          |
+| `Down`            | `└‣─`       | First child, skip any         |
+| `DownSkip`        | `└•─`       | First child, skip trivia only |
+| `DownSkipExtras`  | `└◦─`       | First child, skip extras only |
+| `DownExact`       | `└─!`       | First child, exact            |
+| `Next`            | `─‣─`       | Next sibling, skip any        |
+| `NextSkip`        | `─•─`       | Next sibling, skip trivia     |
+| `NextSkipExtras`  | `─◦─`       | Next sibling, skip extras     |
+| `NextExact`       | `──!`       | Next sibling, exact           |
+| `Up(1)`           | `─‣┘`       | Ascend 1 level                |
+| `Up(2)`           | `─‣┘²`      | Ascend 2 levels               |
+| `UpSkipTrivia(2)` | `─•┘²`      | Ascend 2, last non-trivia     |
+| `UpSkipExtras(2)` | `─◦┘²`      | Ascend 2, last non-extra      |
+| `UpExact(2)`      | `!─┘²`      | Ascend 2, last child          |
 
 ## Search Loop
 
@@ -78,11 +82,12 @@ Each mode defines what happens when a match fails:
 
 **Down/Next variants** (search loop):
 
-| Mode        | On Match Fail                               |
-| ----------- | ------------------------------------------- |
-| `*` (any)   | Advance and retry until exhausted           |
-| `~` (skip)  | If current is non-trivia → fail; else retry |
-| `.` (exact) | Fail immediately                            |
+| Policy glyph | On Match Fail                               |
+| ------------ | ------------------------------------------- |
+| `‣` (any)    | Advance and retry until exhausted           |
+| `•` (trivia) | If current is non-trivia → fail; else retry |
+| `◦` (extras) | If current is non-extra → fail; else retry  |
+| `!` (exact)  | Fail immediately                            |
 
 **Up variants** (exit validation):
 
@@ -90,6 +95,7 @@ Each mode defines what happens when a match fails:
 | ----------------- | --------------------------------------------- |
 | `Up(n)`           | None — just ascend n levels                   |
 | `UpSkipTrivia(n)` | Must be at last non-trivia child, then ascend |
+| `UpSkipExtras(n)` | Must be at last non-extra child, then ascend  |
 | `UpExact(n)`      | Must be at last child, then ascend            |
 
 ### Example: `(foo (bar))` vs `(foo (foo) (foo) (bar))`
@@ -111,23 +117,29 @@ With `Nav::DownExact`:
 
 ## Trivia
 
-**Trivia** = anonymous nodes + language-specific extras (e.g., `comment`).
+**Trivia** = anonymous nodes + nodes tree-sitter marks as `extra` for that specific parse instance.
 
 The `*Skip` modes skip trivia automatically but fail if a non-trivia node must be skipped.
 
-**Skip invariant**: A node is never skipped if its kind matches the target. This ensures `(comment)` explicitly in a query still matches, even though comments are typically trivia.
+The VM reads the parser's `Node::is_extra()` bit at runtime; there is no bytecode trivia table.
 
-The trivia list is stored in the bytecode's Trivia section. See [03-symbols.md § 3](binary-format/03-symbols.md).
+**Skip invariant**: A node is never skipped if its kind matches the target. This ensures `(comment)` explicitly in a query still matches, even though comments are typically trivia.
 
 ## Anchor Lowering
 
-The anchor operator (`.`) compiles to `Nav` variants. Mode is determined by the **strictest operand**:
+Anchors compile to `Nav` variants by spelling and operand type:
 
-| Precedes `.`                     | Mode  |
-| -------------------------------- | ----- |
-| Named node `(foo)`, wildcard `_` | Skip  |
-| Anonymous node `"foo"`           | Exact |
-| Start of children (prefix `.`)   | Skip  |
+| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` strict anchor |
+| --------------------- | ----------------- | ---------------------- | ------------------ |
+| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`        |
+| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`        |
+| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`       |
+
+`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows literally nothing between operands.
+
+Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
+
+An anchor before an alternation is classified per branch: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. An anchor after an alternation is conservative: `[(b) ","] . (a)` uses `NextSkipExtras` because some branch may match an anonymous node.
 
 ### Compilation Examples
 
@@ -137,63 +149,90 @@ Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
 
 ```
   01       (function)                           02
-  02  ↓*   (identifier) [Node Set(M0)]          03
-  03 *↑¹                                        ◼
+  02  └‣─  (identifier) [Node Set(M0)]          03
+  03  ─‣┘                                       ◼
 ```
 
 **First child anchor**: `(function . (identifier))`
 
 ```
   01       (function)                           02
-  02  ↓~   (identifier)                         03
-  03 *↑¹                                        ◼
+  02  └•─  (identifier)                         03
+  03  ─‣┘                                       ◼
+```
+
+**Strict first child anchor**: `(function .! (identifier))`
+
+```
+  01       (function)                           02
+  02  └─!  (identifier)                         03
+  03  ─‣┘                                       ◼
 ```
 
 **Last child anchor**: `(function (identifier) .)`
 
 ```
   01       (function)                           02
-  02  ↓*   (identifier)                         03
-  03 ~↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  ─•┘                                       ◼
+```
+
+**Strict last child anchor**: `(function (identifier) .!)`
+
+```
+  01       (function)                           02
+  02  └‣─  (identifier)                         03
+  03  !─┘                                       ◼
 ```
 
 **Adjacent siblings**: `(block (a) . (b))`
 
 ```
   01       (block)                              02
-  02  ↓*   (a)                                  03
-  03   ~   (b)                                  04
-  04 *↑¹                                        ◼
+  02  └‣─  (a)                                  03
+  03  ─•─  (b)                                  04
+  04  ─‣┘                                       ◼
 ```
 
-**Strict adjacency**: `(call (identifier) . "(")`
+**Soft adjacency with an anonymous operand**: `(call (identifier) . "(")`
 
 ```
   01       (call)                               02
-  02  ↓*   (identifier)                         03
-  03   .   "("                                  04
-  04 *↑¹                                        ◼
+  02  └‣─  (identifier)                         03
+  03  ─◦─  "("                                  04
+  04  ─‣┘                                       ◼
+```
+
+Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when byte-adjacency matters.
+
+**Strict adjacency**: `(call (identifier) .! "(")`
+
+```
+  01       (call)                               02
+  02  └‣─  (identifier)                         03
+  03  ──!  "("                                  04
+  04  ─‣┘                                       ◼
 ```
 
 **Deep nesting**: `(a (b (c (d))))`
 
 ```
   01       (a)                                  02
-  02  ↓*   (b)                                  03
-  03  ↓*   (c)                                  04
-  04  ↓*   (d)                                  05
-  05 *↑³                                        ◼
+  02  └‣─  (b)                                  03
+  03  └‣─  (c)                                  04
+  04  └‣─  (d)                                  05
+  05  ─‣┘³                                      ◼
 ```
 
-Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet implemented — currently emits individual `Up(1)` steps.
+Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist: the compiler merges consecutive effectless `Up` steps of the same mode into a single instruction.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
 ```
   01       (a)                                  02
-  02  ↓*   (b)                                  03
-  03   ~   (c)                                  04
-  04 ~↑¹                                        ◼
+  02  └‣─  (b)                                  03
+  03  ─•─  (c)                                  04
+  04  ─•┘                                       ◼
 ```
 
 The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
@@ -202,14 +241,14 @@ The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
 
 ```
   02       (array)                              03
-  03  ↓*   (object)                             04
-  04  ↓*   (pair)                               05
-  05 ~↑¹                                        06
-  06  *    (number)                             07
-  07 *↑¹                                        ◼
+  03  └‣─  (object)                             04
+  04  └‣─  (pair)                               05
+  05  ─•┘                                       06
+  06  ─‣─  (number)                             07
+  07  ─‣┘                                       ◼
 ```
 
-The `.` after `(pair)` produces `~↑¹` (exit object, pair must be last non-trivia). Then `*` finds sibling `(number)`, and `*↑¹` exits array. Cannot combine steps 05+07 into `UpSkipTrivia(2)` because the constraint applies only at the object level.
+The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Cannot combine steps 05+07 into `UpSkipTrivia(2)` because the constraint applies only at the object level.
 
 ## Field Handling
 

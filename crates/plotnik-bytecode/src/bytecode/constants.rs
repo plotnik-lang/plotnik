@@ -6,7 +6,9 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// Current bytecode format version.
 /// v2: Removed explicit offsets (computed from counts), added regex section.
 /// v3: Removed flags field (unlinked mode).
-pub const VERSION: u32 = 3;
+/// v4: Removed the trivia section.
+/// v5: Added extras-only anchor navigation modes.
+pub const VERSION: u32 = 5;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

@@ -45,25 +45,25 @@ Test = 06 :: T03
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Test:
   06   !   (object)                         08
   07  ...  
-  08   ε   [Arr]                            26, 12
+  08  -ε-  [Arr]                            26, 12
   10                                        ▶
-  11   ε                                    32
-  12   ε   [EndArr Set(M4)]                 10
-  14   ε   [EndObj Push]                    30, 11
-  16   ▷   (pair) [Node Set(M3)]            14
-  18   ▷   (pair) [Node Set(M2)]            16
-  20   ▷   (pair) [Node Set(M1)]            18
+  11  -ε-                                   32
+  12  -ε-  [EndArr Set(M4)]                 10
+  14  -ε-  [EndObj Push]                    30, 11
+  16  ─‣─  (pair) [Node Set(M3)]            14
+  18  ─‣─  (pair) [Node Set(M2)]            16
+  20  ─‣─  (pair) [Node Set(M1)]            18
   22   !   [Obj] (pair) [Node Set(M0)]      20
-  24   ▷   _                                22, 24, 32
-  26   ▽   _                                22, 24, 32
-  28   ▷   _                                22, 28, 32
-  30   ▷   _                                22, 28, 32
-  32   △   [EndArr Set(M4)] _               10
+  24  ─‣─  _                                22, 24, 32
+  26  └‣─  _                                22, 24, 32
+  28  ─‣─  _                                22, 28, 32
+  30  ─‣─  _                                22, 28, 32
+  32  ─‣┘  [EndArr Set(M4)] _               10

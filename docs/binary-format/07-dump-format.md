@@ -11,11 +11,11 @@ Value = (document [
 ])
 ```
 
-Run: `plotnik dump -q '<query>'`
+Run: `plotnik dump -q '<query>' -l json`
 
 ## Bytecode Dump
 
-**Epsilon transitions** (`ε`) succeed unconditionally without cursor interaction.
+**Epsilon transitions** (`-ε-`) succeed unconditionally without cursor interaction.
 They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay).
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
@@ -24,9 +24,6 @@ effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) may appear in epsi
 consolidated into match instructions.
 
 ```
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "n"
@@ -58,27 +55,27 @@ Value = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00   ε   [Obj]                            02
+  00  -ε-  [Obj]                            02
   02       Trampoline                       03
-  03   ε   [EndObj]                         05
+  03  -ε-  [EndObj]                         05
   05                                        ▶
 
 Value:
-  06   ε                                    07
-  07   !   (document)                       08
-  08   ε                                    11, 16
+  06   !   (document)                       08
+  07  ...
+  08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11 !!▽   [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
-  14  ...
+  11   !   [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  14  ─‣┘  _                                10
   15  ...
-  16 !!▽   [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
-  19   △   _                                10
+  16   !   [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  19  ─‣─  _                                11, 16, 19
 ```
 
 ### Sections Explained
 
 - **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `Obj`/`EndObj` and dispatches via `Trampoline`.
-- **`Value`**: The compiled query definition. Step 08 branches to try `Num` (step 11) or `Str` (step 16).
+- **`Value`**: The compiled query definition. Step 08 searches the document children, tries `Num` (step 11) or `Str` (step 16), and uses step 19 to advance to the next candidate on backtracking.
 - **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
 ### Regex Section
@@ -99,8 +96,8 @@ Format: `R<id> /<pattern>/`
 
 ## Files
 
-- `crates/plotnik-lib/src/bytecode/dump.rs` — Dump formatting logic
-- `crates/plotnik-lib/src/bytecode/format.rs` — Shared formatting utilities
+- `crates/plotnik-bytecode/src/bytecode/dump.rs` — Dump formatting logic
+- `crates/plotnik-bytecode/src/bytecode/format.rs` — Shared formatting utilities
 
 ## Instruction Format
 
@@ -108,48 +105,54 @@ Each line follows a fixed column layout:
 
 ```
 | 2 | step | 1 |   5   | 1 | content              | 1 | succ |
-|   | pad  |   | (ctr) |   |                      |   |      |
+|   | pad  |   | (sym) |   |                      |   |      |
 ```
 
-| Column  | Width    | Description                                        |
-| ------- | -------- | -------------------------------------------------- |
-| indent  | 2        | Leading spaces                                     |
-| step    | variable | Step number, zero-padded to max step width         |
-| gap     | 1        | Space separator                                    |
-| symbol  | 5        | Nav symbol centered (e.g., `  ε  `, `  ▽  `, `△¹`) |
-| gap     | 1        | Space separator                                    |
-| content | variable | Instruction content                                |
-| gap     | 1        | Space separator                                    |
-| succ    | variable | Successors/markers, right-aligned                  |
+| Column  | Width    | Description                                               |
+| ------- | -------- | --------------------------------------------------------- |
+| indent  | 2        | Leading spaces                                            |
+| step    | variable | Step number, zero-padded to max step width                |
+| gap     | 1        | Space separator                                           |
+| symbol  | 5+       | Nav symbol, usually 5 chars; multi-digit up counts extend |
+| gap     | 1        | Space separator                                           |
+| content | variable | Instruction content                                       |
+| gap     | 1        | Space separator                                           |
+| succ    | variable | Successors/markers, right-aligned                         |
 
 **Step padding**: Dynamic based on max step in graph. Steps 0–9 use 1 digit, 0–99 use 2 digits, etc.
 
-**Symbol column** (5 characters):
+**Symbol column**:
 
 ```
-| left | center | right |
-|  2   |   1    |   2   |
+| entry | policy | exit |
 ```
 
-- **Center**: Direction (ε, ▽, ▷, △)
-- **Left**: Mode modifier (`!` skip trivia, `!!` exact)
-- **Right**: Level suffix (¹, ², ³... for Up)
+Navigation symbols have three slots:
+
+- **Entry**: `└` enters from a parent (down); `─` is lateral movement; `!` marks the pre-ascent exact check for `UpExact`.
+- **Policy**: `‣` skips any node, `•` skips trivia, `◦` skips extras only, and `─` means no skip policy.
+- **Exit**: `┘` exits to a parent (up); `!` marks exact adjacency at the destination for `DownExact` and `NextExact`.
+- **Superscript suffix**: Real superscript digits extend `Up(n)` symbols when `n >= 2`.
+
+`-ε-` is the whole symbol for epsilon, not a policy glyph. Exact navigation has no skip glyph: `└─!` and `──!` put `!` at the destination; `!─┘` puts `!` at the pre-ascent position.
 
 Examples:
 
-- `  ε  ` — epsilon (no movement)
-- `  ▽  ` — down, skip any
-- `  ▷  ` — next, skip any
-- `  △  ` — up 1 level (no superscript)
-- `!▽ ` — down, skip trivia
-- `!!▷ ` — next, exact
+- `-ε-` — epsilon (no movement)
+- `└‣─` — down, skip any
+- `─‣─` — next, skip any
+- `─‣┘` — up 1 level (no superscript)
+- `└•─` — down, skip trivia
+- `─◦─` — next, skip extras only
+- `──!` — next, exact
+- `─‣┘¹²` — up 12 levels
 
 | Instruction      | Format                                          |
 | ---------------- | ----------------------------------------------- |
 | Match (terminal) | `step nav    [pre] (type) [post]      ◼`        |
 | Match            | `step nav    [pre] field: (type) [post] succ`   |
 | Match (branch)   | `step nav    [pre] (type) [post]      s1, s2`   |
-| Epsilon          | `step  ε     [effects]                succ`     |
+| Epsilon          | `step -ε-    [effects]                succ`     |
 | Call             | `step nav    field: (Name)        target : ret` |
 | Return           | `step                                 ▶`        |
 | Trampoline       | `step        Trampoline               succ`     |
@@ -160,23 +163,27 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol  | Notes                              |
-| --------------- | ------- | ---------------------------------- |
-| Epsilon         | ε       | Pure control flow, no cursor check |
-| Stay            | (blank) | No movement, 5 spaces              |
-| StayExact       | !       | No movement, exact match only      |
-| Down            | ▽       | First child, skip any              |
-| DownSkip        | !▽      | First child, skip trivia           |
-| DownExact       | !!▽     | First child, exact                 |
-| Next            | ▷       | Next sibling, skip any             |
-| NextSkip        | !▷      | Next sibling, skip trivia          |
-| NextExact       | !!▷     | Next sibling, exact                |
-| Up(1)           | △       | Ascend 1 level (no superscript)    |
-| Up(n≥2)         | △ⁿ      | Ascend n levels, skip any          |
-| UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia  |
-| UpExact(n)      | !!△ⁿ    | Ascend n, must be last child       |
+| Nav             | Symbol | Notes                                        |
+| --------------- | :----: | -------------------------------------------- |
+| Epsilon         |  -ε-   | Pure control flow, no cursor check           |
+| Stay            |        | No movement, fill with spaces                |
+| StayExact       |   !    | No movement, exact match only                |
+| Down            |  └‣─   | First child, skip any                        |
+| DownSkip        |  └•─   | First child, skip trivia                     |
+| DownSkipExtras  |  └◦─   | First child, skip extras only                |
+| DownExact       |  └─!   | First child, exact                           |
+| Next            |  ─‣─   | Next sibling, skip any                       |
+| NextSkip        |  ─•─   | Next sibling, skip trivia                    |
+| NextSkipExtras  |  ─◦─   | Next sibling, skip extras only               |
+| NextExact       |  ──!   | Next sibling, exact                          |
+| Up(1)           |  ─‣┘   | Skip any and ascend 1 level (no superscript) |
+| Up(2)           |  ─‣┘²  | Skip any and ascend 2 levels                 |
+| Up(12)          | ─‣┘¹²  | Skip any and ascend 12 levels                |
+| UpSkipTrivia(2) |  ─•┘²  | If only trivia remains, ascend 2 levels      |
+| UpSkipExtras(2) |  ─◦┘²  | If only extras remain, ascend 2 levels       |
+| UpExact(2)      |  !─┘²  | If nothing remains, ascend 2 levels          |
 
-**Note**: `ε` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `ε`.
+**Note**: `-ε-` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `-ε-`.
 
 ## Effects
 

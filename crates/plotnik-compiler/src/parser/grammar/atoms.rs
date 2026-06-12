@@ -67,10 +67,14 @@ impl Parser<'_, '_> {
         self.bump();
     }
 
-    /// `.` anchor
+    /// `.` or `.!` anchor
     pub(crate) fn parse_anchor(&mut self) {
         self.start_node(SyntaxKind::Anchor);
-        self.expect(SyntaxKind::Dot, "'.' anchor");
+        if self.currently_is(SyntaxKind::DotBang) {
+            self.bump();
+        } else {
+            self.expect(SyntaxKind::Dot, "anchor");
+        }
         self.finish_node();
     }
 }
