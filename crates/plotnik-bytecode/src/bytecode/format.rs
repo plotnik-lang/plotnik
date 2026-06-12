@@ -122,13 +122,6 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
 pub mod trace {
     use super::Symbol;
 
-    /// Navigation: descended to child, skip any.
-    pub const NAV_DOWN: Symbol = Symbol::new(" └", "‣", "─ ");
-    /// Navigation: moved to sibling, skip any.
-    pub const NAV_NEXT: Symbol = Symbol::new(" ─", "‣", "─ ");
-    /// Navigation: ascended to parent, skip any.
-    pub const NAV_UP: Symbol = Symbol::new(" ─", "‣", "┘ ");
-
     /// Match: success.
     pub const MATCH_SUCCESS: Symbol = Symbol::new("  ", "●", "  ");
     /// Match: failure.

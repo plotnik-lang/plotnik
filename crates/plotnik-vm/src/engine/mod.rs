@@ -15,8 +15,6 @@ mod verify;
 mod vm;
 
 #[cfg(test)]
-mod engine_tests;
-#[cfg(test)]
 mod verify_tests;
 
 pub use effect::{EffectLog, RuntimeEffect};

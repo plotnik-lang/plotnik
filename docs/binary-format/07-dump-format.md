@@ -11,7 +11,7 @@ Value = (document [
 ])
 ```
 
-Run: `plotnik dump -q '<query>'`
+Run: `plotnik dump -q '<query>' -l json`
 
 ## Bytecode Dump
 
@@ -24,9 +24,6 @@ effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) may appear in epsi
 consolidated into match instructions.
 
 ```
-[flags]
-linked = false
-
 [strings]
 S0 "Beauty will save the world"
 S1 "n"
@@ -64,21 +61,21 @@ _ObjWrap:
   05                                        ▶
 
 Value:
-  06  -ε-                                  07
-  07   !   (document)                       08
-  08  -ε-                                  11, 16
+  06   !   (document)                       08
+  07  ...
+  08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11  └─!  [Enum(M2)] (number) [Node Set(M0) EndEnum]  19
-  14  ...
+  11   !   [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  14  ─‣┘  _                                10
   15  ...
-  16  └─!  [Enum(M3)] (string) [Node Set(M1) EndEnum]  19
-  19  ─‣┘  _                                10
+  16   !   [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  19  ─‣─  _                                11, 16, 19
 ```
 
 ### Sections Explained
 
 - **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `Obj`/`EndObj` and dispatches via `Trampoline`.
-- **`Value`**: The compiled query definition. Step 08 branches to try `Num` (step 11) or `Str` (step 16).
+- **`Value`**: The compiled query definition. Step 08 searches the document children, tries `Num` (step 11) or `Str` (step 16), and uses step 19 to advance to the next candidate on backtracking.
 - **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
 ### Regex Section
@@ -99,8 +96,8 @@ Format: `R<id> /<pattern>/`
 
 ## Files
 
-- `crates/plotnik-lib/src/bytecode/dump.rs` — Dump formatting logic
-- `crates/plotnik-lib/src/bytecode/format.rs` — Shared formatting utilities
+- `crates/plotnik-bytecode/src/bytecode/dump.rs` — Dump formatting logic
+- `crates/plotnik-bytecode/src/bytecode/format.rs` — Shared formatting utilities
 
 ## Instruction Format
 
@@ -127,12 +124,17 @@ Each line follows a fixed column layout:
 **Symbol column**:
 
 ```
-| left | center | right |
+| entry | policy | exit |
 ```
 
-- **Center**: Skip policy or exact marker (`‣`, `•`, `◦`, `─`, `-ε-`)
-- **Left/right**: Movement shape (`└` for down, `─` for next, `┘` for up) and exact marker (`!`)
-- **Right suffix**: Real superscript digits for `Up(n)` when `n >= 2`
+Navigation symbols have three slots:
+
+- **Entry**: `└` enters from a parent (down); `─` is lateral movement; `!` marks the pre-ascent exact check for `UpExact`.
+- **Policy**: `‣` skips any node, `•` skips trivia, `◦` skips extras only, and `─` means no skip policy.
+- **Exit**: `┘` exits to a parent (up); `!` marks exact adjacency at the destination for `DownExact` and `NextExact`.
+- **Superscript suffix**: Real superscript digits extend `Up(n)` symbols when `n >= 2`.
+
+`-ε-` is the whole symbol for epsilon, not a policy glyph. Exact navigation has no skip glyph: `└─!` and `──!` put `!` at the destination; `!─┘` puts `!` at the pre-ascent position.
 
 Examples:
 
@@ -143,7 +145,7 @@ Examples:
 - `└•─` — down, skip trivia
 - `─◦─` — next, skip extras only
 - `──!` — next, exact
-- ` ─‣┘¹²` — up 12 levels
+- `─‣┘¹²` — up 12 levels
 
 | Instruction      | Format                                          |
 | ---------------- | ----------------------------------------------- |
@@ -167,11 +169,11 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Stay            |        | No movement, fill with spaces                |
 | StayExact       |   !    | No movement, exact match only                |
 | Down            |  └‣─   | First child, skip any                        |
-| DownSkipTrivia  |  └•─   | First child, skip trivia                     |
+| DownSkip        |  └•─   | First child, skip trivia                     |
 | DownSkipExtras  |  └◦─   | First child, skip extras only                |
 | DownExact       |  └─!   | First child, exact                           |
 | Next            |  ─‣─   | Next sibling, skip any                       |
-| NextSkipTrivia  |  ─•─   | Next sibling, skip trivia                    |
+| NextSkip        |  ─•─   | Next sibling, skip trivia                    |
 | NextSkipExtras  |  ─◦─   | Next sibling, skip extras only               |
 | NextExact       |  ──!   | Next sibling, exact                          |
 | Up(1)           |  ─‣┘   | Skip any and ascend 1 level (no superscript) |

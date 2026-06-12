@@ -89,15 +89,10 @@ impl<'t> CursorWrapper<'t> {
     /// Check if a node is trivia.
     #[inline]
     pub fn is_trivia(&self, node: &Node<'_>) -> bool {
-        // D2/D3: anonymous-node skipping is documented anchor semantics;
-        // is_extra is per-instance parser truth.
+        // Anonymous skipping is documented anchor semantics; `is_extra` is the
+        // parser's per-instance bit, so the same kind can be extra in one
+        // position and structural in another.
         !node.is_named() || node.is_extra()
-    }
-
-    /// Check if a node is a tree-sitter extra for this parse instance.
-    #[inline]
-    pub fn is_extra(&self, node: &Node<'_>) -> bool {
-        node.is_extra()
     }
 
     /// Navigate according to Nav command, preparing for match attempt.
@@ -175,7 +170,7 @@ impl<'t> CursorWrapper<'t> {
                 let saved = self.cursor.descendant_index();
 
                 while self.cursor.goto_next_sibling() {
-                    if !self.is_extra(&self.cursor.node()) {
+                    if !self.cursor.node().is_extra() {
                         self.cursor.goto_descendant(saved);
                         return false;
                     }
@@ -214,7 +209,7 @@ impl<'t> CursorWrapper<'t> {
                 self.cursor.goto_next_sibling()
             }
             SkipPolicy::Extras => {
-                if !self.is_extra(&self.cursor.node()) {
+                if !self.cursor.node().is_extra() {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

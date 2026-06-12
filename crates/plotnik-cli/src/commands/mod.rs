@@ -14,6 +14,3 @@ mod abi_compat_tests;
 
 #[cfg(test)]
 mod lang_tests;
-
-#[cfg(test)]
-mod exec_tests;

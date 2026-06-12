@@ -54,7 +54,8 @@ impl Compiler<'_> {
         }
 
         // Determine Up navigation based on trailing anchor
-        let (has_trailing_anchor, trailing_nav) = check_trailing_anchor(&items);
+        let (has_trailing_anchor, trailing_nav) =
+            check_trailing_anchor(&items, self.ctx.symbol_table);
 
         // Emit Up instruction with appropriate strictness
         let up_nav = if has_trailing_anchor {

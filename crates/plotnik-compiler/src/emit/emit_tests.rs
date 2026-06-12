@@ -559,6 +559,52 @@ fn anchors_with_alternation_anonymous() {
 }
 
 #[test]
+fn anchors_with_mixed_alternation_classifies_each_branch() {
+    shot_bytecode!(
+        r#"
+        Test = {(identifier) . [(number) "+"]}
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_ref_to_anonymous() {
+    shot_bytecode!(
+        r#"
+        Comma = ","
+        Test = (array (Comma) . (string) @next)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_quantified_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) . ","?)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_field_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (pair key: (property_identifier) . value: _)
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_sequence_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) . {"," (string)})
+    "#
+    );
+}
+
+#[test]
 fn anchors_strict_between_siblings() {
     shot_bytecode!(
         r#"

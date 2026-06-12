@@ -18,13 +18,19 @@ NFA-based cursor walk with backtracking.
 
 ### Trivia Handling
 
-Soft anchors skip tree-sitter `extra` nodes, such as comments. When both sides of the anchor are named nodes, they also skip anonymous nodes, such as punctuation tokens.
+Plotnik has three sibling-navigation tiers:
+
+1. **Default navigation is permissive.** Without an anchor, sibling patterns advance until they find a match, skipping named nodes, anonymous tokens, and tree-sitter `extra` nodes such as comments.
+2. **`.` narrows navigation.** It always skips extras. When both sides are named, it also skips anonymous tokens such as punctuation. When either side is anonymous, it skips extras only.
+3. **`.!` is exact.** It allows nothing between operands.
+
+This unanchored query uses default navigation:
 
 ```
 (function_declaration (identifier) @name (block) @body)
 ```
 
-Matches even with comments between children:
+It matches even with intervening comments or punctuation:
 
 ```javascript
 function foo /* comment */() {
@@ -34,21 +40,23 @@ function foo /* comment */() {
 
 ### Anchor Behavior
 
-The `.` anchor is soft adjacency. It always skips extras, but it only skips anonymous tokens when both sides of the anchor are named nodes.
-
-**Soft adjacency**:
+The `.` anchor is soft adjacency.
 
 ```
 (dotted_name (identifier) @a . (identifier) @b)
 ```
 
-Matches `a.b` even if there's a comment like `a /* x */ .b`, but won't match if another named node appears between them.
+Because both operands are named, it matches `a.b` and `a /* x */ .b`, but it won't match if another named node appears between them.
 
 When either side is anonymous, `.` skips extras but not other anonymous tokens:
 
 ```
 (array "," . (string) @next)  ; comments tolerated, another token is not
 ```
+
+Bare `_` is anonymous, so `(a) . _` is extras-only. `(_)` is named, so `(a) . (_)` skips trivia.
+
+An anchor before an alternation applies per branch: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. An anchor after an alternation is conservative: `[(b) ","] . (a)` is extras-only because some branch may match an anonymous node.
 
 Use `.!` for exact adjacency:
 

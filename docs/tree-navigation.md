@@ -82,12 +82,12 @@ Each mode defines what happens when a match fails:
 
 **Down/Next variants** (search loop):
 
-| Mode         | On Match Fail                               |
+| Policy glyph | On Match Fail                               |
 | ------------ | ------------------------------------------- |
-| `*` (any)    | Advance and retry until exhausted           |
-| `!` (trivia) | If current is non-trivia → fail; else retry |
-| `e` (extras) | If current is non-extra → fail; else retry  |
-| `!!` (exact) | Fail immediately                            |
+| `‣` (any)    | Advance and retry until exhausted           |
+| `•` (trivia) | If current is non-trivia → fail; else retry |
+| `◦` (extras) | If current is non-extra → fail; else retry  |
+| `!` (exact)  | Fail immediately                            |
 
 **Up variants** (exit validation):
 
@@ -136,6 +136,10 @@ Anchors compile to `Nav` variants by spelling and operand type:
 | End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`       |
 
 `.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows literally nothing between operands.
+
+Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
+
+An anchor before an alternation is classified per branch: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. An anchor after an alternation is conservative: `[(b) ","] . (a)` uses `NextSkipExtras` because some branch may match an anonymous node.
 
 ### Compilation Examples
 
@@ -220,7 +224,7 @@ Anonymous operands make `.` skip extras only. Comments can appear between the op
   05  ─‣┘³                                      ◼
 ```
 
-Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist. Not yet implemented — currently emits individual `Up(1)` steps.
+Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist: the compiler merges consecutive effectless `Up` steps of the same mode into a single instruction.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
