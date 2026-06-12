@@ -189,6 +189,22 @@ fn anchor_in_alternation_error() {
 }
 
 #[test]
+fn strict_anchor_in_alternation_error() {
+    let input = "Q = [(a) .! (b)]";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: anchors cannot appear directly in alternations
+      |
+    1 | Q = [(a) .! (b)]
+      |          ^^
+      |
+    help: use `[{(a) . (b)} (c)]` to anchor within a branch
+    ");
+}
+
+#[test]
 fn multiple_anchors_in_alternation_error() {
     let input = "Q = [. (a) . (b) .]";
 

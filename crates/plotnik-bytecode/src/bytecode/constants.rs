@@ -7,7 +7,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v2: Removed explicit offsets (computed from counts), added regex section.
 /// v3: Removed flags field (unlinked mode).
 /// v4: Removed the trivia section.
-pub const VERSION: u32 = 4;
+/// v5: Added extras-only anchor navigation modes.
+pub const VERSION: u32 = 5;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

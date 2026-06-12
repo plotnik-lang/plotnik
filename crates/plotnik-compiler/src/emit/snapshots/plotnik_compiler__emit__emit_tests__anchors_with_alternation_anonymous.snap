@@ -1,14 +1,14 @@
 ---
 source: crates/plotnik-compiler/src/emit/emit_tests.rs
 ---
-Test = (binary_expression "+" . (identifier))
+Test = (binary_expression (identifier) . ["+"])
 ---
 [strings]
 S0 "Beauty will save the world"
 S1 "Test"
 S2 "binary_expression"
-S3 "+"
-S4 "identifier"
+S3 "identifier"
+S4 "+"
 
 [type_defs]
 T0 = <Void>
@@ -30,7 +30,7 @@ _ObjWrap:
 
 Test:
   06   !   (binary_expression)              07
-  07   ▽   "+"                              08
-  08  e▷   (identifier)                     09
+  07   ▽   (identifier)                     08
+  08  e▷   "+"                              09
   09   △   _                                10
   10                                        ▶

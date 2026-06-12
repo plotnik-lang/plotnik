@@ -15,20 +15,26 @@ pub enum Nav {
     StayExact,
     Next,
     NextSkip,
+    NextSkipExtras,
     NextExact,
     Down,
     DownSkip,
+    DownSkipExtras,
     DownExact,
     Up(u8),
     UpSkipTrivia(u8),
+    UpSkipExtras(u8),
     UpExact(u8),
 }
+
+const UP_SKIP_EXTRAS_BASE: u8 = 10;
+const MAX_UP_SKIP_EXTRAS_LEVEL: u8 = 63 - UP_SKIP_EXTRAS_BASE;
 
 impl Nav {
     /// Decode from bytecode byte.
     ///
     /// Byte layout:
-    /// - Bits 7-6: Mode (00=Standard, 01=Up, 10=UpSkipTrivia, 11=UpExact)
+    /// - Bits 7-6: Mode (00=Standard/UpSkipExtras, 01=Up, 10=UpSkipTrivia, 11=UpExact)
     /// - Bits 5-0: Payload (enum value for Standard, level count for Up variants)
     pub fn from_byte(b: u8) -> Self {
         let mode = b >> 6;
@@ -41,11 +47,13 @@ impl Nav {
                 2 => Self::StayExact,
                 3 => Self::Next,
                 4 => Self::NextSkip,
-                5 => Self::NextExact,
-                6 => Self::Down,
-                7 => Self::DownSkip,
-                8 => Self::DownExact,
-                _ => panic!("invalid nav standard: {payload}"),
+                5 => Self::NextSkipExtras,
+                6 => Self::NextExact,
+                7 => Self::Down,
+                8 => Self::DownSkip,
+                9 => Self::DownSkipExtras,
+                10 => Self::DownExact,
+                _ => Self::UpSkipExtras(payload - UP_SKIP_EXTRAS_BASE),
             },
             0b01 => {
                 assert!(payload >= 1, "invalid nav up level: {payload}");
@@ -71,10 +79,12 @@ impl Nav {
             Self::StayExact => 2,
             Self::Next => 3,
             Self::NextSkip => 4,
-            Self::NextExact => 5,
-            Self::Down => 6,
-            Self::DownSkip => 7,
-            Self::DownExact => 8,
+            Self::NextSkipExtras => 5,
+            Self::NextExact => 6,
+            Self::Down => 7,
+            Self::DownSkip => 8,
+            Self::DownSkipExtras => 9,
+            Self::DownExact => 10,
             Self::Up(n) => {
                 assert!((1..=63).contains(&n), "Up level overflow: {n} > 63");
                 0b01_000000 | n
@@ -85,6 +95,13 @@ impl Nav {
                     "UpSkipTrivia level overflow: {n} > 63"
                 );
                 0b10_000000 | n
+            }
+            Self::UpSkipExtras(n) => {
+                assert!(
+                    (1..=MAX_UP_SKIP_EXTRAS_LEVEL).contains(&n),
+                    "UpSkipExtras level overflow: {n} > {MAX_UP_SKIP_EXTRAS_LEVEL}"
+                );
+                UP_SKIP_EXTRAS_BASE + n
             }
             Self::UpExact(n) => {
                 assert!((1..=63).contains(&n), "UpExact level overflow: {n} > 63");
@@ -101,10 +118,10 @@ impl Nav {
     pub fn to_exact(self) -> Self {
         match self {
             Self::Epsilon => Self::Epsilon, // Epsilon stays epsilon
-            Self::Down | Self::DownSkip => Self::DownExact,
-            Self::Next | Self::NextSkip => Self::NextExact,
+            Self::Down | Self::DownSkip | Self::DownSkipExtras => Self::DownExact,
+            Self::Next | Self::NextSkip | Self::NextSkipExtras => Self::NextExact,
             Self::Stay => Self::StayExact,
-            Self::Up(n) | Self::UpSkipTrivia(n) => Self::UpExact(n),
+            Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) => Self::UpExact(n),
             // Already exact variants
             Self::DownExact | Self::NextExact | Self::StayExact | Self::UpExact(_) => self,
         }

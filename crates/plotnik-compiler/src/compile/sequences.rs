@@ -31,7 +31,14 @@ fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: Option<Nav>) -> 
 
     let nav = match first_nav {
         None => Nav::StayExact,
-        Some(nav @ (Nav::DownSkip | Nav::NextSkip | Nav::UpSkipTrivia(_))) => nav,
+        Some(
+            nav @ (Nav::DownSkip
+            | Nav::DownSkipExtras
+            | Nav::NextSkip
+            | Nav::NextSkipExtras
+            | Nav::UpSkipTrivia(_)
+            | Nav::UpSkipExtras(_)),
+        ) => nav,
         Some(nav) => nav.to_exact(),
     };
     Some(nav)
@@ -53,7 +60,10 @@ impl Compiler<'_> {
 
         // Determine if we're inside a node based on the navigation override
         // Down variants mean we're descending into a node's children
-        let is_inside_node = matches!(first_nav, Some(Nav::Down | Nav::DownSkip | Nav::DownExact));
+        let is_inside_node = matches!(
+            first_nav,
+            Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
+        );
 
         self.compile_seq_items_inner(&items, exit, is_inside_node, first_nav, capture, None)
     }

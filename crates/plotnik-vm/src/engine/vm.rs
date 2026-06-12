@@ -13,10 +13,12 @@ fn continuation_nav(nav: Nav) -> Nav {
     match nav {
         Nav::Down | Nav::Next => Nav::Next,
         Nav::DownSkip | Nav::NextSkip => Nav::NextSkip,
+        Nav::DownSkipExtras | Nav::NextSkipExtras => Nav::NextSkipExtras,
         Nav::DownExact | Nav::NextExact => Nav::NextExact,
         Nav::Epsilon
         | Nav::Up(_)
         | Nav::UpSkipTrivia(_)
+        | Nav::UpSkipExtras(_)
         | Nav::UpExact(_)
         | Nav::Stay
         | Nav::StayExact => Nav::Next,
@@ -33,12 +35,14 @@ fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
     match nav {
         Nav::Down | Nav::Next => Some(SkipPolicy::Any),
         Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
+        Nav::DownSkipExtras | Nav::NextSkipExtras => Some(SkipPolicy::Extras),
         Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
         Nav::Epsilon
         | Nav::Stay
         | Nav::StayExact
         | Nav::Up(_)
         | Nav::UpSkipTrivia(_)
+        | Nav::UpSkipExtras(_)
         | Nav::UpExact(_) => None,
     }
 }

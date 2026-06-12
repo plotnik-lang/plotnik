@@ -460,6 +460,33 @@ fn anchors_first_child() {
 }
 
 #[test]
+fn anchors_first_child_with_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array . "+")
+    "#
+    );
+}
+
+#[test]
+fn anchors_first_child_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array . "+" @op)
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_first_child() {
+    shot_bytecode!(
+        r#"
+        Test = (array .! (identifier))
+    "#
+    );
+}
+
+#[test]
 fn anchors_first_child_with_alternation() {
     shot_bytecode!(
         r#"
@@ -478,10 +505,64 @@ fn anchors_last_child() {
 }
 
 #[test]
+fn anchors_last_child_with_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array "+" .)
+    "#
+    );
+}
+
+#[test]
+fn anchors_last_child_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (array "+" @op .)
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_last_child() {
+    shot_bytecode!(
+        r#"
+        Test = (array (identifier) .!)
+    "#
+    );
+}
+
+#[test]
 fn anchors_with_anonymous() {
     shot_bytecode!(
         r#"
         Test = (binary_expression "+" . (identifier))
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_captured_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression "+" @op . (identifier))
+    "#
+    );
+}
+
+#[test]
+fn anchors_with_alternation_anonymous() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression (identifier) . ["+"])
+    "#
+    );
+}
+
+#[test]
+fn anchors_strict_between_siblings() {
+    shot_bytecode!(
+        r#"
+        Test = (binary_expression "+" .! (identifier))
     "#
     );
 }

@@ -80,12 +80,15 @@ impl Symbol {
 /// | StayExact       | !       | Stay at position, exact match only  |
 /// | Down            | ▽       | First child, skip any               |
 /// | DownSkip        | !▽      | First child, skip trivia            |
+/// | DownSkipExtras  | e▽      | First child, skip extras only       |
 /// | DownExact       | !!▽     | First child, exact                  |
 /// | Next            | ▷       | Next sibling, skip any              |
 /// | NextSkip        | !▷      | Next sibling, skip trivia           |
+/// | NextSkipExtras  | e▷      | Next sibling, skip extras only      |
 /// | NextExact       | !!▷     | Next sibling, exact                 |
 /// | Up(n)           | △ⁿ      | Ascend n levels, skip any           |
 /// | UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia   |
+/// | UpSkipExtras(n) | e△ⁿ     | Ascend n, must be last non-extra    |
 /// | UpExact(n)      | !!△ⁿ    | Ascend n, must be last child        |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
@@ -94,12 +97,15 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
         Nav::StayExact => Symbol::new("  ", "!", "  "),
         Nav::Down => Symbol::new("  ", "▽", "  "),
         Nav::DownSkip => Symbol::new(" !", "▽", "  "),
+        Nav::DownSkipExtras => Symbol::new(" e", "▽", "  "),
         Nav::DownExact => Symbol::new("!!", "▽", "  "),
         Nav::Next => Symbol::new("  ", "▷", "  "),
         Nav::NextSkip => Symbol::new(" !", "▷", "  "),
+        Nav::NextSkipExtras => Symbol::new(" e", "▷", "  "),
         Nav::NextExact => Symbol::new("!!", "▷", "  "),
         Nav::Up(n) => Symbol::new("  ", "△", superscript_suffix(n)),
         Nav::UpSkipTrivia(n) => Symbol::new(" !", "△", superscript_suffix(n)),
+        Nav::UpSkipExtras(n) => Symbol::new(" e", "△", superscript_suffix(n)),
         Nav::UpExact(n) => Symbol::new("!!", "△", superscript_suffix(n)),
     }
 }

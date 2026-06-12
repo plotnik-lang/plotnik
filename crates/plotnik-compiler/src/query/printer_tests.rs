@@ -162,6 +162,23 @@ fn printer_wildcard_and_anchor() {
 }
 
 #[test]
+fn printer_strict_anchor() {
+    let input = "Q = (call (fn) .! (arg))";
+    let q = Query::expect(input);
+
+    let res = q.printer().dump();
+
+    insta::assert_snapshot!(res, @r"
+    Root
+      Def Q
+        NamedNode call
+          NamedNode fn
+          .!
+          NamedNode arg
+    ");
+}
+
+#[test]
 fn printer_string_literal() {
     let input = r#"Q = (call "foo")"#;
     let q = Query::expect(input);

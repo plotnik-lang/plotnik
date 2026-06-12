@@ -67,12 +67,12 @@ type_id (u8)
 
 Bit-packed navigation command.
 
-| Bits 7-6 | Mode         | Bits 5-0 Payload       |
-| :------- | :----------- | :--------------------- |
-| `00`     | Standard     | Enum (see below)       |
-| `01`     | Up           | Level count `n` (1-63) |
-| `10`     | UpSkipTrivia | Level count `n` (1-63) |
-| `11`     | UpExact      | Level count `n` (1-63) |
+| Bits 7-6 | Mode                  | Bits 5-0 Payload       |
+| :------- | :-------------------- | :--------------------- |
+| `00`     | Standard/UpSkipExtras | Enum or level encoding |
+| `01`     | Up                    | Level count `n` (1-63) |
+| `10`     | UpSkipTrivia          | Level count `n` (1-63) |
+| `11`     | UpExact               | Level count `n` (1-63) |
 
 **Standard Modes**:
 
@@ -81,10 +81,13 @@ Bit-packed navigation command.
 - `2`: `StayExact` (No movement, exact match only)
 - `3`: `Next` (Sibling, skip any)
 - `4`: `NextSkip` (Sibling, skip trivia)
-- `5`: `NextExact` (Sibling, exact)
-- `6`: `Down` (Child, skip any)
-- `7`: `DownSkip` (Child, skip trivia)
-- `8`: `DownExact` (Child, exact)
+- `5`: `NextSkipExtras` (Sibling, skip extras only)
+- `6`: `NextExact` (Sibling, exact)
+- `7`: `Down` (Child, skip any)
+- `8`: `DownSkip` (Child, skip trivia)
+- `9`: `DownSkipExtras` (Child, skip extras only)
+- `10`: `DownExact` (Child, exact)
+- `11..63`: `UpSkipExtras(n)` where `n = payload - 10`
 
 ### 3.2. EffectOp (u16)
 

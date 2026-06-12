@@ -27,7 +27,7 @@ fn format_tokens(input: &str, include_trivia: bool) -> String {
 
 #[test]
 fn punctuation() {
-    insta::assert_snapshot!(snapshot("( ) [ ] { } : = ! ~ _ ."), @r#"
+    insta::assert_snapshot!(snapshot("( ) [ ] { } : = ! ~ _ . .!"), @r#"
     ParenOpen "("
     ParenClose ")"
     BracketOpen "["
@@ -40,6 +40,7 @@ fn punctuation() {
     Tilde "~"
     Underscore "_"
     Dot "."
+    DotBang ".!"
     "#);
 }
 

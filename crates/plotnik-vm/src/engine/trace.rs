@@ -622,9 +622,11 @@ impl Tracer for PrintTracer<'_> {
         let kind = node.kind();
         let symbol = match nav {
             Nav::Epsilon => Symbol::EPSILON,
-            Nav::Down | Nav::DownSkip | Nav::DownExact => trace::NAV_DOWN,
-            Nav::Next | Nav::NextSkip | Nav::NextExact => trace::NAV_NEXT,
-            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => trace::NAV_UP,
+            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => trace::NAV_DOWN,
+            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => trace::NAV_NEXT,
+            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpSkipExtras(_) | Nav::UpExact(_) => {
+                trace::NAV_UP
+            }
             Nav::Stay | Nav::StayExact => Symbol::EMPTY,
         };
 
@@ -647,9 +649,9 @@ impl Tracer for PrintTracer<'_> {
 
         // Show the failed navigation direction
         let nav_symbol = match nav {
-            Nav::Down | Nav::DownSkip | Nav::DownExact => "▽",
-            Nav::Next | Nav::NextSkip | Nav::NextExact => "▷",
-            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpExact(_) => "△",
+            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => "▽",
+            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => "▷",
+            Nav::Up(_) | Nav::UpSkipTrivia(_) | Nav::UpSkipExtras(_) | Nav::UpExact(_) => "△",
             Nav::Stay | Nav::StayExact | Nav::Epsilon => "·",
         };
 

@@ -105,6 +105,15 @@ ast_node!(Anchor, Anchor);
 ast_node!(NodePredicate, NodePredicate);
 ast_node!(RegexLiteral, Regex);
 
+impl Anchor {
+    pub fn is_strict(&self) -> bool {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .any(|t| t.kind() == SyntaxKind::DotBang)
+    }
+}
+
 /// Either an expression or an anchor in a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SeqItem {

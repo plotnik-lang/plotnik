@@ -202,6 +202,19 @@ fn anchor() {
 }
 
 #[test]
+fn strict_anchor() {
+    let res = Query::expect_valid_ast("Q = (block (first) .! (second))");
+    insta::assert_snapshot!(res, @r"
+    Root
+      Def Q
+        NamedNode block
+          NamedNode first
+          .!
+          NamedNode second
+    ");
+}
+
+#[test]
 fn negated_field() {
     let res = Query::expect_valid_ast("Q = (function -async)");
     insta::assert_snapshot!(res, @r"

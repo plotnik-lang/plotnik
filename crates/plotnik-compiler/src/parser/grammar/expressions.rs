@@ -65,7 +65,7 @@ impl Parser<'_, '_> {
             SyntaxKind::BraceOpen => self.parse_seq(),
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_str(),
-            SyntaxKind::Dot => self.parse_anchor(),
+            SyntaxKind::Dot | SyntaxKind::DotBang => self.parse_anchor(),
             SyntaxKind::Negation | SyntaxKind::Minus => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {

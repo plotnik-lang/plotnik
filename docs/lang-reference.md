@@ -18,7 +18,7 @@ NFA-based cursor walk with backtracking.
 
 ### Trivia Handling
 
-Comments and "extra" nodes (per tree-sitter grammar) are automatically skipped unless explicitly matched.
+Soft anchors skip tree-sitter `extra` nodes, such as comments. When both sides of the anchor are named nodes, they also skip anonymous nodes, such as punctuation tokens.
 
 ```
 (function_declaration (identifier) @name (block) @body)
@@ -34,26 +34,27 @@ function foo /* comment */() {
 
 ### Anchor Behavior
 
-The `.` anchor enforces adjacency, but its strictness depends on what's being anchored:
+The `.` anchor is soft adjacency. It always skips extras, but it only skips anonymous tokens when both sides of the anchor are named nodes.
 
-**Between named nodes** — skips trivia, disallows other named nodes:
+**Soft adjacency**:
 
 ```
 (dotted_name (identifier) @a . (identifier) @b)
 ```
 
-Matches `a.b` even if there's a comment like `a /* x */ .b` (trivia skipped), but won't match if another named node appears between them.
+Matches `a.b` even if there's a comment like `a /* x */ .b`, but won't match if another named node appears between them.
 
-**With anonymous nodes** — strict, nothing skipped:
+When either side is anonymous, `.` skips extras but not other anonymous tokens:
 
 ```
-(array "[" . (identifier) @first)   ; must be immediately after bracket
-(call_expression (identifier) @fn . "(")  ; no trivia between name and paren
+(array "," . (string) @next)  ; comments tolerated, another token is not
 ```
 
-When any side of the anchor is an anonymous node (literal token), the match is exact — no trivia allowed.
+Use `.!` for exact adjacency:
 
-**Rule**: The anchor is as strict as its strictest operand. Anonymous nodes demand precision; named nodes tolerate trivia.
+```
+(call_expression (identifier) @fn .! "(")  ; nothing between name and paren
+```
 
 ### Partial Matching
 
@@ -785,20 +786,27 @@ interface Target {
 
 ## Anchors
 
-The anchor `.` constrains sibling positions. Anchors don't affect types — they're structural constraints.
+Anchors constrain sibling positions. They don't affect types — they're structural constraints.
 
 ### Anchor Strictness
 
-Anchor behavior depends on the node types being anchored:
+`.` is soft adjacency: it skips extras and disallows other named nodes between operands. When both sides are named, it also skips anonymous tokens. `.!` is exact adjacency: it allows nothing between operands.
 
-| Pattern     | Trivia Between | Named Nodes Between |
-| ----------- | -------------- | ------------------- |
-| `(a) . (b)` | Allowed        | Disallowed          |
-| `"x" . (b)` | Disallowed     | Disallowed          |
-| `(a) . "x"` | Disallowed     | Disallowed          |
-| `"x" . "y"` | Disallowed     | Disallowed          |
+| Pattern      | Extras Between | Anonymous Nodes Between | Named Nodes Between |
+| ------------ | -------------- | ----------------------- | ------------------- |
+| `(a) . (b)`  | Allowed        | Allowed                 | Disallowed          |
+| `"x" . (b)`  | Allowed        | Disallowed              | Disallowed          |
+| `(a) . "x"`  | Allowed        | Disallowed              | Disallowed          |
+| `"x" . "y"`  | Allowed        | Disallowed              | Disallowed          |
+| `(a) .! (b)` | Disallowed     | Disallowed              | Disallowed          |
 
-When anchoring named nodes, trivia (comments, whitespace) is skipped but no other named nodes may appear between. When any operand is an anonymous node (literal token), the anchor enforces exact adjacency — nothing in between.
+Extras are nodes tree-sitter marks with the per-node `is_extra` bit; there is no bytecode extras or trivia table.
+
+Explicit patterns always win over skipping. For example, this matches a comment node and then softly anchors the function after it:
+
+```
+{(comment) @doc . (function_declaration) @fn}
+```
 
 ### Position Anchors
 
@@ -820,15 +828,21 @@ Last child:
 (dotted_name (identifier) @a . (identifier) @b)
 ```
 
-Without the anchor, `@a` and `@b` would match non-adjacent pairs too. With the anchor, only consecutive identifiers match (trivia like comments between them is tolerated).
+Without the anchor, `@a` and `@b` would match non-adjacent pairs too. With the anchor, only consecutive identifiers match. Comments and punctuation between them are tolerated because both sides are named.
+
+With an anonymous operand, comments are still tolerated but other anonymous tokens are not:
+
+```
+(array "," . (string) @next)
+```
 
 For strict token-level adjacency:
 
 ```
-(call_expression (identifier) @fn . "(")
+(call_expression (identifier) @fn .! "(")
 ```
 
-Here, no trivia is allowed between the function name and the opening parenthesis because `"("` is an anonymous node.
+Here, no trivia is allowed between the function name and the opening parenthesis because the anchor is explicit strict adjacency.
 
 ### Output Types
 
@@ -840,7 +854,7 @@ Anchors are structural constraints only — they don't affect output types:
 { a: Node, b: Node }
 ```
 
-Anchors ignore anonymous nodes.
+Anchors are not values and do not appear in output types.
 
 ### Anchor Placement Rules
 
@@ -851,7 +865,8 @@ Anchors require parent node context to be meaningful:
 ```
 (parent . (first))         ; first child anchor
 (parent (last) .)          ; last child anchor
-(parent (a) . (b))         ; adjacent siblings
+(parent (a) . (b))         ; soft adjacent siblings
+(parent (a) .! (b))        ; exact adjacent siblings
 (parent {. (a) (b) .})     ; anchors in sequence inside node
 {(a) . (b)}                ; interior anchor (between items)
 ```
@@ -995,7 +1010,7 @@ type Root = {
 | Sequence             | `((a) (b))`        | `{(a) (b)}`               |
 | Alternation          | `[a b]`            | `[a b]`                   |
 | Tagged alternation   |                    | `[A: (a) B: (b)]`         |
-| Anchor               | `.`                | `.`                       |
+| Anchor               | `.`                | `.` soft, `.!` exact      |
 | Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`         |
 | Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`           |
 | Named expression     |                    | `Name = pattern`          |

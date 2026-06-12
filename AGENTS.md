@@ -25,7 +25,8 @@
 | `-field`            | Negated field (assert absent)      |
 | `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)          |
 | `??` `*?` `+?`      | Non-greedy variants                |
-| `.`                 | Anchor (adjacency, see below)      |
+| `.`                 | Soft anchor (skips trivia)         |
+| `.!`                | Strict anchor (exact adjacency)    |
 | `{...}`             | Sequence (siblings in order)       |
 | `[...]`             | Alternation (first match wins)     |
 | `Name = ...`        | Named definition (entrypoint)      |
@@ -73,15 +74,16 @@ Nested = (call function: [(id) @name (Nested) @inner])
 
 ## Anchor Strictness
 
-The `.` anchor adapts to what it's anchoring:
+The `.` anchor is soft, `.!` is strict:
 
-| Pattern     | Behavior                                      |
-| ----------- | --------------------------------------------- |
-| `(a) . (b)` | Skip trivia, no named nodes between           |
-| `"x" . (b)` | Strict — nothing between (anonymous involved) |
-| `(a) . "x"` | Strict — nothing between (anonymous involved) |
+| Pattern      | Behavior                                              |
+| ------------ | ----------------------------------------------------- |
+| `(a) . (b)`  | Skip extras + anonymous nodes; no named nodes between |
+| `"x" . (b)`  | Skip extras only; no anonymous/named nodes between    |
+| `(a) . "x"`  | Skip extras only; no anonymous/named nodes between    |
+| `(a) .! (b)` | Strict, nothing between                               |
 
-Rule: anchor is as strict as its strictest operand.
+Rule: `.!` is exact. Soft `.` skips anonymous nodes only when both sides are named.
 
 **Placement**: Boundary anchors require parent node context:
 

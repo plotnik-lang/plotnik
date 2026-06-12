@@ -48,15 +48,18 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 | ----------------- | ----------- | ----------------------------- |
 | `Stay`            | (space)     | No movement                   |
 | `StayExact`       | `!`         | No movement, exact match only |
-| `Down`            | `↓*`        | First child, skip any         |
-| `DownSkip`        | `↓~`        | First child, skip trivia only |
-| `DownExact`       | `↓.`        | First child, exact            |
-| `Next`            | `*`         | Next sibling, skip any        |
-| `NextSkip`        | `~`         | Next sibling, skip trivia     |
-| `NextExact`       | `.`         | Next sibling, exact           |
-| `Up(n)`           | `*↑ⁿ`       | Ascend n levels               |
-| `UpSkipTrivia(n)` | `~↑ⁿ`       | Ascend n, last non-trivia     |
-| `UpExact(n)`      | `.↑ⁿ`       | Ascend n, last child          |
+| `Down`            | `▽`         | First child, skip any         |
+| `DownSkip`        | `!▽`        | First child, skip trivia only |
+| `DownSkipExtras`  | `e▽`        | First child, skip extras only |
+| `DownExact`       | `!!▽`       | First child, exact            |
+| `Next`            | `▷`         | Next sibling, skip any        |
+| `NextSkip`        | `!▷`        | Next sibling, skip trivia     |
+| `NextSkipExtras`  | `e▷`        | Next sibling, skip extras     |
+| `NextExact`       | `!!▷`       | Next sibling, exact           |
+| `Up(n)`           | `△ⁿ`        | Ascend n levels               |
+| `UpSkipTrivia(n)` | `!△ⁿ`       | Ascend n, last non-trivia     |
+| `UpSkipExtras(n)` | `e△ⁿ`       | Ascend n, last non-extra      |
+| `UpExact(n)`      | `!!△ⁿ`      | Ascend n, last child          |
 
 ## Search Loop
 
@@ -78,11 +81,12 @@ Each mode defines what happens when a match fails:
 
 **Down/Next variants** (search loop):
 
-| Mode        | On Match Fail                               |
-| ----------- | ------------------------------------------- |
-| `*` (any)   | Advance and retry until exhausted           |
-| `~` (skip)  | If current is non-trivia → fail; else retry |
-| `.` (exact) | Fail immediately                            |
+| Mode         | On Match Fail                               |
+| ------------ | ------------------------------------------- |
+| `*` (any)    | Advance and retry until exhausted           |
+| `!` (trivia) | If current is non-trivia → fail; else retry |
+| `e` (extras) | If current is non-extra → fail; else retry  |
+| `!!` (exact) | Fail immediately                            |
 
 **Up variants** (exit validation):
 
@@ -90,6 +94,7 @@ Each mode defines what happens when a match fails:
 | ----------------- | --------------------------------------------- |
 | `Up(n)`           | None — just ascend n levels                   |
 | `UpSkipTrivia(n)` | Must be at last non-trivia child, then ascend |
+| `UpSkipExtras(n)` | Must be at last non-extra child, then ascend  |
 | `UpExact(n)`      | Must be at last child, then ascend            |
 
 ### Example: `(foo (bar))` vs `(foo (foo) (foo) (bar))`
@@ -111,23 +116,25 @@ With `Nav::DownExact`:
 
 ## Trivia
 
-**Trivia** = anonymous nodes + language-specific extras (e.g., `comment`).
+**Trivia** = anonymous nodes + nodes tree-sitter marks as `extra` for that specific parse instance.
 
 The `*Skip` modes skip trivia automatically but fail if a non-trivia node must be skipped.
 
-**Skip invariant**: A node is never skipped if its kind matches the target. This ensures `(comment)` explicitly in a query still matches, even though comments are typically trivia.
+The VM reads the parser's `Node::is_extra()` bit at runtime; there is no bytecode trivia table.
 
-The trivia list is stored in the bytecode's Trivia section. See [03-symbols.md § 3](binary-format/03-symbols.md).
+**Skip invariant**: A node is never skipped if its kind matches the target. This ensures `(comment)` explicitly in a query still matches, even though comments are typically trivia.
 
 ## Anchor Lowering
 
-The anchor operator (`.`) compiles to `Nav` variants. Mode is determined by the **strictest operand**:
+Anchors compile to `Nav` variants by spelling and operand type:
 
-| Precedes `.`                     | Mode  |
-| -------------------------------- | ----- |
-| Named node `(foo)`, wildcard `_` | Skip  |
-| Anonymous node `"foo"`           | Exact |
-| Start of children (prefix `.`)   | Skip  |
+| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` strict anchor |
+| --------------------- | ----------------- | ---------------------- | ------------------ |
+| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`        |
+| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`        |
+| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`       |
+
+`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows literally nothing between operands.
 
 ### Compilation Examples
 
@@ -149,12 +156,28 @@ Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
   03 *↑¹                                        ◼
 ```
 
+**Strict first child anchor**: `(function .! (identifier))`
+
+```
+  01       (function)                           02
+  02  ↓.   (identifier)                         03
+  03 *↑¹                                        ◼
+```
+
 **Last child anchor**: `(function (identifier) .)`
 
 ```
   01       (function)                           02
   02  ↓*   (identifier)                         03
   03 ~↑¹                                        ◼
+```
+
+**Strict last child anchor**: `(function (identifier) .!)`
+
+```
+  01       (function)                           02
+  02  ↓*   (identifier)                         03
+  03 .↑¹                                        ◼
 ```
 
 **Adjacent siblings**: `(block (a) . (b))`
@@ -166,7 +189,18 @@ Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
   04 *↑¹                                        ◼
 ```
 
-**Strict adjacency**: `(call (identifier) . "(")`
+**Soft adjacency with an anonymous operand**: `(call (identifier) . "(")`
+
+```
+  01       (call)                               02
+  02  ↓*   (identifier)                         03
+  03  e▷   "("                                  04
+  04 *↑¹                                        ◼
+```
+
+Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when byte-adjacency matters.
+
+**Strict adjacency**: `(call (identifier) .! "(")`
 
 ```
   01       (call)                               02

@@ -3,7 +3,7 @@
 //! Transforms: Up(1) → Up(1) → Up(2) into Up(4)
 //!
 //! Constraints:
-//! - Same mode only (Up, UpSkipTrivia, UpExact can't mix)
+//! - Same mode only (Up, UpSkipTrivia, UpSkipExtras, UpExact can't mix)
 //! - Effectless only (no pre_effects, post_effects, neg_fields)
 //! - Max 63 (6-bit payload limit)
 //! - Single successor (can't merge branching instructions)
@@ -54,7 +54,7 @@ pub fn collapse_up(result: &mut CompileResult) {
         let mut final_successors = m.successors.clone();
 
         // Absorb chain of effectless Up instructions with same mode
-        while current_level < MAX_UP_LEVEL {
+        while current_level < max_up_level(current_nav) {
             let &[succ_label] = final_successors.as_slice() else {
                 break;
             };
@@ -85,8 +85,13 @@ pub fn collapse_up(result: &mut CompileResult) {
                 break;
             }
 
-            // Merge: add levels (capped at 63)
-            let new_level = current_level.saturating_add(succ_level).min(MAX_UP_LEVEL);
+            // Merge: add levels when the result remains encodable.
+            let max_level = max_up_level(current_nav);
+            let new_level = current_level.saturating_add(succ_level);
+            if new_level > max_level && matches!(current_nav, Nav::UpSkipExtras(_)) {
+                break;
+            }
+            let new_level = new_level.min(max_level);
             current_nav = set_up_level(current_nav, new_level);
             current_level = new_level;
             final_successors = succ.successors.clone();
@@ -109,10 +114,17 @@ pub fn collapse_up(result: &mut CompileResult) {
         .retain(|instr| !removed.contains(&instr.label()));
 }
 
+fn max_up_level(nav: Nav) -> u8 {
+    match nav {
+        Nav::UpSkipExtras(_) => 53,
+        _ => MAX_UP_LEVEL,
+    }
+}
+
 /// Extract Up level from Nav, if it's an Up variant.
 fn get_up_level(nav: Nav) -> Option<u8> {
     match nav {
-        Nav::Up(n) | Nav::UpSkipTrivia(n) | Nav::UpExact(n) => Some(n),
+        Nav::Up(n) | Nav::UpSkipTrivia(n) | Nav::UpSkipExtras(n) | Nav::UpExact(n) => Some(n),
         _ => None,
     }
 }
@@ -122,6 +134,7 @@ fn set_up_level(nav: Nav, level: u8) -> Nav {
     match nav {
         Nav::Up(_) => Nav::Up(level),
         Nav::UpSkipTrivia(_) => Nav::UpSkipTrivia(level),
+        Nav::UpSkipExtras(_) => Nav::UpSkipExtras(level),
         Nav::UpExact(_) => Nav::UpExact(level),
         _ => nav,
     }
@@ -133,6 +146,7 @@ fn same_up_mode(a: Nav, b: Nav) -> bool {
         (a, b),
         (Nav::Up(_), Nav::Up(_))
             | (Nav::UpSkipTrivia(_), Nav::UpSkipTrivia(_))
+            | (Nav::UpSkipExtras(_), Nav::UpSkipExtras(_))
             | (Nav::UpExact(_), Nav::UpExact(_))
     )
 }

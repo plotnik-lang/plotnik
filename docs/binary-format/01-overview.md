@@ -65,14 +65,14 @@ Section offsets are not stored in the header. Loaders compute them by:
    - Section size = count × record size (or explicit size for blobs)
 3. Blob sizes come from header: `str_blob_size` and `regex_blob_size`
 
-## Header (v4)
+## Header (v5)
 
 ```rust
 #[repr(C, align(64))]
 struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     magic: [u8; 4],          // b"PTKQ"
-    version: u32,            // 4
+    version: u32,            // 5
     checksum: u32,           // CRC32 of everything after header
     total_size: u32,
     str_blob_size: u32,

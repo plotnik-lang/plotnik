@@ -30,6 +30,15 @@ fn anchor_adjacency() {
 }
 
 #[test]
+fn strict_anchor_adjacency() {
+    shot_cst!(
+        r#"
+        Q = (dotted_name (identifier) @a .! (identifier) @b)
+    "#
+    );
+}
+
+#[test]
 fn anchor_both_ends() {
     shot_cst!(
         r#"

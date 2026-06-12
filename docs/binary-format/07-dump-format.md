@@ -132,7 +132,7 @@ Each line follows a fixed column layout:
 ```
 
 - **Center**: Direction (ε, ▽, ▷, △)
-- **Left**: Mode modifier (`!` skip trivia, `!!` exact)
+- **Left**: Mode modifier (`!` skip trivia, `e` skip extras only, `!!` exact)
 - **Right**: Level suffix (¹, ², ³... for Up)
 
 Examples:
@@ -142,6 +142,7 @@ Examples:
 - `  ▷  ` — next, skip any
 - `  △  ` — up 1 level (no superscript)
 - `!▽ ` — down, skip trivia
+- `e▷ ` — next, skip extras only
 - `!!▷ ` — next, exact
 
 | Instruction      | Format                                          |
@@ -160,21 +161,24 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol  | Notes                              |
-| --------------- | ------- | ---------------------------------- |
-| Epsilon         | ε       | Pure control flow, no cursor check |
-| Stay            | (blank) | No movement, 5 spaces              |
-| StayExact       | !       | No movement, exact match only      |
-| Down            | ▽       | First child, skip any              |
-| DownSkip        | !▽      | First child, skip trivia           |
-| DownExact       | !!▽     | First child, exact                 |
-| Next            | ▷       | Next sibling, skip any             |
-| NextSkip        | !▷      | Next sibling, skip trivia          |
-| NextExact       | !!▷     | Next sibling, exact                |
-| Up(1)           | △       | Ascend 1 level (no superscript)    |
-| Up(n≥2)         | △ⁿ      | Ascend n levels, skip any          |
-| UpSkipTrivia(n) | !△ⁿ     | Ascend n, must be last non-trivia  |
-| UpExact(n)      | !!△ⁿ    | Ascend n, must be last child       |
+| Nav             | Symbol | Notes                              |
+| --------------- | :----: | ---------------------------------- |
+| Epsilon         |  ─ε─   | Pure control flow, no cursor check |
+| Stay            |        | No movement, fill with spaces      |
+| StayExact       |  >‼<   | No movement, exact match only      |
+| Down            |  ──┐   | First child, skip any              |
+| DownSkipTrivia  |  ∙─┐   | First child, skip trivia           |
+| DownSkipExtras  |  !─┐   | First child, skip extras only      |
+| DownExact       |  ‼─┐   | First child, exact                 |
+| Next            |  ───   | Next sibling, skip any             |
+| NextSkipTrivia  |  ∙──   | Next sibling, skip trivia          |
+| NextSkipExtras  |  !──   | Next sibling, skip extras only     |
+| NextExact       |  ‼──   | Next sibling, exact                |
+| Up(1)           |  ──┘   | Ascend 1 level (no superscript)    |
+| Up(n≥2)         |  ──┘ⁿ  | Ascend n levels, skip any          |
+| UpSkipTrivia(n) |  ∙─┘ⁿ  | Ascend n, must be last non-trivia  |
+| UpSkipExtras(n) |  !─┘ⁿ  | Ascend n, must be last non-extra   |
+| UpExact(n)      |  ‼─┘ⁿ  | Ascend n, must be last child       |
 
 **Note**: `ε` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `ε`.
 

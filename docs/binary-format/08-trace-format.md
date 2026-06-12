@@ -386,13 +386,13 @@ Step number `NN` is the checkpoint we're restoring to. Appears as an instruction
 
 In trace output, navigation symbols are **simplified** — skip/exact variants are not distinguished:
 
-| Nav                          | Symbol  | Meaning                      |
-| ---------------------------- | ------- | ---------------------------- |
-| Epsilon                      | ε       | Pure control flow, no cursor |
-| Stay, StayExact              | (space) | No movement                  |
-| Down, DownSkip, DownExact    | ▽       | Descended to child           |
-| Next, NextSkip, NextExact    | ▷       | Moved to sibling             |
-| Up(n), UpSkipTrivia, UpExact | △       | Ascended to parent           |
+| Nav                                        | Symbol  | Meaning                      |
+| ------------------------------------------ | ------- | ---------------------------- |
+| Epsilon                                    | ε       | Pure control flow, no cursor |
+| Stay, StayExact                            | (space) | No movement                  |
+| Down, DownSkip, DownSkipExtras, DownExact  | ▽       | Descended to child           |
+| Next, NextSkip, NextSkipExtras, NextExact  | ▷       | Moved to sibling             |
+| Up(n), UpSkipTrivia, UpSkipExtras, UpExact | △       | Ascended to parent           |
 
 > **Note**: For detailed nav symbols with mode modifiers (`!▽`, `!!▽`, etc.), see [07-dump-format.md](07-dump-format.md#nav-symbols). Trace format simplifies these for readability.
 

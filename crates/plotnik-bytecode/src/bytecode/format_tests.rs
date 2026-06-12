@@ -7,13 +7,16 @@ fn test_symbol_format() {
     assert_eq!(nav_symbol(Nav::StayExact).format(), "  !  ");
     assert_eq!(nav_symbol(Nav::Down).format(), "  ▽  ");
     assert_eq!(nav_symbol(Nav::DownSkip).format(), " !▽  ");
+    assert_eq!(nav_symbol(Nav::DownSkipExtras).format(), " e▽  ");
     assert_eq!(nav_symbol(Nav::DownExact).format(), "!!▽  ");
     assert_eq!(nav_symbol(Nav::Next).format(), "  ▷  ");
     assert_eq!(nav_symbol(Nav::NextSkip).format(), " !▷  ");
+    assert_eq!(nav_symbol(Nav::NextSkipExtras).format(), " e▷  ");
     assert_eq!(nav_symbol(Nav::NextExact).format(), "!!▷  ");
     assert_eq!(nav_symbol(Nav::Up(1)).format(), "  △  ");
     assert_eq!(nav_symbol(Nav::Up(2)).format(), "  △² ");
     assert_eq!(nav_symbol(Nav::UpSkipTrivia(1)).format(), " !△  ");
+    assert_eq!(nav_symbol(Nav::UpSkipExtras(1)).format(), " e△  ");
     assert_eq!(nav_symbol(Nav::UpExact(1)).format(), "!!△  ");
 }
 

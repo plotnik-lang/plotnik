@@ -1,6 +1,6 @@
 //! Bytecode file header (64 bytes).
 //!
-//! v4 layout: Offsets are computed from counts + SECTION_ALIGN (64 bytes).
+//! v5 layout: Offsets are computed from counts + SECTION_ALIGN (64 bytes).
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
 //! NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Transitions
@@ -9,7 +9,7 @@ use super::{MAGIC, SECTION_ALIGN, VERSION};
 
 /// File header - first 64 bytes of the bytecode file.
 ///
-/// v4 layout (offsets computed from counts):
+/// v5 layout (offsets computed from counts):
 /// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
 /// - 24-41: counts (9 × u16) — order matches section order
 /// - 42-63: reserved
@@ -19,7 +19,7 @@ pub struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     /// Magic bytes: b"PTKQ"
     pub magic: [u8; 4],
-    /// Format version (currently 4)
+    /// Format version (currently 5)
     pub version: u32,
     /// CRC32 checksum of everything after the header
     pub checksum: u32,

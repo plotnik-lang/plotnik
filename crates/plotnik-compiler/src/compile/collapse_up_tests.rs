@@ -107,6 +107,57 @@ fn collapse_up_skip_trivia_same_mode() {
 }
 
 #[test]
+fn collapse_up_skip_extras_same_mode_within_encoding_limit() {
+    let mut result = CompileResult {
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::UpSkipExtras(52))
+                .next(Label(1))
+                .into(),
+            MatchIR::at(Label(1))
+                .nav(Nav::UpSkipExtras(1))
+                .next(Label(2))
+                .into(),
+            MatchIR::terminal(Label(2)).into(),
+        ],
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    collapse_up(&mut result);
+
+    assert_eq!(result.instructions.len(), 2);
+
+    let InstructionIR::Match(m) = &result.instructions[0] else {
+        panic!("expected Match");
+    };
+    assert_eq!(m.nav, Nav::UpSkipExtras(53));
+}
+
+#[test]
+fn collapse_up_skip_extras_does_not_exceed_encoding_limit() {
+    let mut result = CompileResult {
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::UpSkipExtras(52))
+                .next(Label(1))
+                .into(),
+            MatchIR::at(Label(1))
+                .nav(Nav::UpSkipExtras(2))
+                .next(Label(2))
+                .into(),
+            MatchIR::terminal(Label(2)).into(),
+        ],
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    collapse_up(&mut result);
+
+    assert_eq!(result.instructions.len(), 3);
+}
+
+#[test]
 fn collapse_up_exact_same_mode() {
     // UpExact(1) → UpExact(1) should merge
     let mut result = CompileResult {

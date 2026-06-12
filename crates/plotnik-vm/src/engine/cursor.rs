@@ -16,6 +16,8 @@ pub enum SkipPolicy {
     Any,
     /// Skip trivia only (fail if non-trivia must be skipped).
     Trivia,
+    /// Skip tree-sitter extras only (fail if a regular anonymous token must be skipped).
+    Extras,
     /// No skipping allowed (exact match required).
     Exact,
 }
@@ -27,6 +29,8 @@ pub enum UpMode {
     Any,
     /// Must be at last non-trivia child before ascending.
     SkipTrivia,
+    /// Must be at last non-extra child before ascending.
+    SkipExtras,
     /// Must be at last child before ascending.
     Exact,
 }
@@ -90,6 +94,12 @@ impl<'t> CursorWrapper<'t> {
         !node.is_named() || node.is_extra()
     }
 
+    /// Check if a node is a tree-sitter extra for this parse instance.
+    #[inline]
+    pub fn is_extra(&self, node: &Node<'_>) -> bool {
+        node.is_extra()
+    }
+
     /// Navigate according to Nav command, preparing for match attempt.
     ///
     /// Returns the skip policy to use for the subsequent match attempt,
@@ -108,12 +118,15 @@ impl<'t> CursorWrapper<'t> {
             Nav::StayExact => Some(SkipPolicy::Exact),
             Nav::Down => self.go_first_child().then_some(SkipPolicy::Any),
             Nav::DownSkip => self.go_first_child().then_some(SkipPolicy::Trivia),
+            Nav::DownSkipExtras => self.go_first_child().then_some(SkipPolicy::Extras),
             Nav::DownExact => self.go_first_child().then_some(SkipPolicy::Exact),
             Nav::Next => self.go_next_sibling().then_some(SkipPolicy::Any),
             Nav::NextSkip => self.go_next_sibling().then_some(SkipPolicy::Trivia),
+            Nav::NextSkipExtras => self.go_next_sibling().then_some(SkipPolicy::Extras),
             Nav::NextExact => self.go_next_sibling().then_some(SkipPolicy::Exact),
             Nav::Up(n) => self.go_up(n, UpMode::Any).then_some(SkipPolicy::Any),
             Nav::UpSkipTrivia(n) => self.go_up(n, UpMode::SkipTrivia).then_some(SkipPolicy::Any),
+            Nav::UpSkipExtras(n) => self.go_up(n, UpMode::SkipExtras).then_some(SkipPolicy::Any),
             Nav::UpExact(n) => self.go_up(n, UpMode::Exact).then_some(SkipPolicy::Any),
         }
     }
@@ -157,6 +170,19 @@ impl<'t> CursorWrapper<'t> {
                 // Restore position
                 self.cursor.goto_descendant(saved);
             }
+            UpMode::SkipExtras => {
+                // Must be at last non-extra child
+                let saved = self.cursor.descendant_index();
+
+                while self.cursor.goto_next_sibling() {
+                    if !self.is_extra(&self.cursor.node()) {
+                        self.cursor.goto_descendant(saved);
+                        return false;
+                    }
+                }
+
+                self.cursor.goto_descendant(saved);
+            }
         }
 
         // Ascend n levels
@@ -175,6 +201,7 @@ impl<'t> CursorWrapper<'t> {
     ///
     /// - `Exact`: Return false (no skipping allowed)
     /// - `Trivia`: Skip trivia siblings only, fail if non-trivia
+    /// - `Extras`: Skip tree-sitter extras only, fail otherwise
     /// - `Any`: Skip any siblings
     pub fn continue_search(&mut self, policy: SkipPolicy) -> bool {
         match policy {
@@ -182,6 +209,12 @@ impl<'t> CursorWrapper<'t> {
             SkipPolicy::Trivia => {
                 // Fail if current node is non-trivia (we'd have to skip it)
                 if !self.is_trivia(&self.cursor.node()) {
+                    return false;
+                }
+                self.cursor.goto_next_sibling()
+            }
+            SkipPolicy::Extras => {
+                if !self.is_extra(&self.cursor.node()) {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

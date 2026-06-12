@@ -9,16 +9,37 @@ use plotnik_bytecode::Nav;
 // Re-export from parser for compile module consumers
 pub use crate::parser::is_truly_empty_scope;
 
-/// Check if an expression is anonymous (string literal or wildcard).
-pub fn expr_is_anonymous(expr: Option<&Expr>) -> bool {
-    matches!(expr, Some(Expr::AnonymousNode(_)))
+/// Check if an expression may match an anonymous node after syntactic wrappers.
+pub fn expr_may_match_anonymous(expr: Option<&Expr>) -> bool {
+    expr.is_some_and(expr_may_match_anonymous_inner)
+}
+
+fn expr_may_match_anonymous_inner(expr: &Expr) -> bool {
+    match expr {
+        Expr::AnonymousNode(_) => true,
+        Expr::CapturedExpr(cap) => expr_may_match_anonymous(cap.inner().as_ref()),
+        Expr::QuantifiedExpr(q) => expr_may_match_anonymous(q.inner().as_ref()),
+        Expr::FieldExpr(field) => expr_may_match_anonymous(field.value().as_ref()),
+        Expr::AltExpr(alt) => alt
+            .branches()
+            .filter_map(|branch| branch.body())
+            .any(|body| expr_may_match_anonymous(Some(&body))),
+        Expr::SeqExpr(seq) => seq
+            .children()
+            .any(|child| expr_may_match_anonymous(Some(&child))),
+        Expr::NamedNode(_) | Expr::Ref(_) => false,
+    }
 }
 
 /// Check for trailing anchor in items, looking inside sequences if needed.
-/// Returns (has_trailing_anchor, is_strict).
-pub fn check_trailing_anchor(items: &[SeqItem]) -> (bool, bool) {
+/// Returns (has_trailing_anchor, nav mode).
+pub fn check_trailing_anchor(items: &[SeqItem]) -> (bool, Option<Nav>) {
     // Direct trailing anchor
-    if matches!(items.last(), Some(SeqItem::Anchor(_))) {
+    if let Some(SeqItem::Anchor(anchor)) = items.last() {
+        if anchor.is_strict() {
+            return (true, Some(Nav::UpExact(1)));
+        }
+
         let prev_expr = items.iter().rev().skip(1).find_map(|item| {
             if let SeqItem::Expr(e) = item {
                 Some(e)
@@ -26,7 +47,13 @@ pub fn check_trailing_anchor(items: &[SeqItem]) -> (bool, bool) {
                 None
             }
         });
-        return (true, expr_is_anonymous(prev_expr));
+
+        let nav = if expr_may_match_anonymous(prev_expr) {
+            Nav::UpSkipExtras(1)
+        } else {
+            Nav::UpSkipTrivia(1)
+        };
+        return (true, Some(nav));
     }
 
     // Check if only child is a sequence with trailing anchor
@@ -37,31 +64,32 @@ pub fn check_trailing_anchor(items: &[SeqItem]) -> (bool, bool) {
         return check_trailing_anchor(&seq_items);
     }
 
-    (false, false)
+    (false, None)
 }
 
 /// Compute navigation modes for each expression based on anchor context.
 /// Returns a vector of (expression index, nav mode) pairs.
 pub fn compute_nav_modes(items: &[SeqItem], is_inside_node: bool) -> Vec<(usize, Option<Nav>)> {
     let mut result = Vec::new();
-    let mut pending_anchor = false;
+    let mut pending_anchor_strict = None;
     let mut prev_is_anonymous = false;
     let mut is_first_expr = true;
 
     for (idx, item) in items.iter().enumerate() {
         match item {
-            SeqItem::Anchor(_) => {
-                pending_anchor = true;
+            SeqItem::Anchor(anchor) => {
+                pending_anchor_strict = Some(anchor.is_strict());
             }
             SeqItem::Expr(expr) => {
-                let current_is_anonymous = matches!(expr, Expr::AnonymousNode(_));
-                let nav = if pending_anchor {
+                let current_is_anonymous = expr_may_match_anonymous(Some(expr));
+                let nav = if let Some(is_exact) = pending_anchor_strict {
                     // Anchor between previous item and this one
-                    let is_exact = prev_is_anonymous || current_is_anonymous;
                     if is_first_expr && is_inside_node {
                         // First child with leading anchor
                         Some(if is_exact {
                             Nav::DownExact
+                        } else if current_is_anonymous {
+                            Nav::DownSkipExtras
                         } else {
                             Nav::DownSkip
                         })
@@ -69,6 +97,8 @@ pub fn compute_nav_modes(items: &[SeqItem], is_inside_node: bool) -> Vec<(usize,
                         // Sibling with anchor
                         Some(if is_exact {
                             Nav::NextExact
+                        } else if prev_is_anonymous || current_is_anonymous {
+                            Nav::NextSkipExtras
                         } else {
                             Nav::NextSkip
                         })
@@ -85,7 +115,7 @@ pub fn compute_nav_modes(items: &[SeqItem], is_inside_node: bool) -> Vec<(usize,
                 };
 
                 result.push((idx, nav));
-                pending_anchor = false;
+                pending_anchor_strict = None;
                 prev_is_anonymous = current_is_anonymous;
                 is_first_expr = false;
             }
@@ -104,8 +134,9 @@ pub fn repeat_nav_for(first_nav: Option<Nav>) -> Option<Nav> {
     match first_nav {
         Some(Nav::Down) => Some(Nav::Next),
         Some(Nav::DownSkip) => Some(Nav::NextSkip),
+        Some(Nav::DownSkipExtras) => Some(Nav::NextSkipExtras),
         Some(Nav::DownExact) => Some(Nav::NextExact),
-        Some(nav @ (Nav::Next | Nav::NextSkip | Nav::NextExact)) => Some(nav),
+        Some(nav @ (Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)) => Some(nav),
         None | Some(Nav::Stay) => Some(Nav::Next),
         _ => None,
     }
@@ -113,7 +144,10 @@ pub fn repeat_nav_for(first_nav: Option<Nav>) -> Option<Nav> {
 
 /// Check if navigation is a Down variant (descends into children).
 pub fn is_down_nav(nav: Option<Nav>) -> bool {
-    matches!(nav, Some(Nav::Down | Nav::DownSkip | Nav::DownExact))
+    matches!(
+        nav,
+        Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
+    )
 }
 
 /// Extract the operator kind from an expression if it's a quantifier.
