@@ -1,0 +1,14 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (debugger_statement "debugger" .))
+
+==== source ====
+debugger /* c */
+
+==== types ====
+export type Q = undefined;
+
+==== result ====
+null

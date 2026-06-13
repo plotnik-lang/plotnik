@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (statement)* @s)
+
+==== source ====
+let x;
+
+==== types ====
+export interface Q {
+  s: Node[];
+}
+
+==== result ====
+{"s":[]}
