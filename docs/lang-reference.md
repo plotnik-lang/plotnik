@@ -490,13 +490,18 @@ Output type:
 
 ### Supertypes
 
-Query abstract node types directly, or narrow with `/`:
+Query abstract node types directly. A `#subtype` refinement is accepted syntactically but
+not yet enforced — the node currently matches on its supertype alone, so `(expression)` and
+`(expression#binary_expression)` behave identically for now:
 
 ```
 (expression) @expr
-(expression/binary_expression) @binary
-(expression/"()") @empty_parens
+(expression#binary_expression) @binary
+(expression#"()") @empty_parens
 ```
+
+The separator is tight-binding — no whitespace around `#`. The tree-sitter spelling
+`expression/binary_expression` is also accepted but deprecated in favor of `#`.
 
 ---
 

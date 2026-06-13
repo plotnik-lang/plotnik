@@ -3,7 +3,7 @@ use rowan::{Checkpoint, TextRange, TextSize};
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use crate::parser::cst::token_sets::QUANTIFIERS;
 
 use super::utils::starts_uppercase;
 
@@ -126,11 +126,7 @@ impl Parser<'_, '_> {
             "':' to separate field name from its value",
         );
 
-        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            self.parse_expr_no_suffix();
-        } else {
-            self.error(DiagnosticKind::ExpectedExpression);
-        }
+        self.parse_required_expr_no_suffix();
 
         self.finish_node();
     }
@@ -144,11 +140,7 @@ impl Parser<'_, '_> {
         self.error_with_fix(DiagnosticKind::InvalidFieldEquals, span, "use `:`", ":");
         self.bump();
 
-        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            self.parse_expr_no_suffix();
-        } else {
-            self.error(DiagnosticKind::ExpectedExpression);
-        }
+        self.parse_required_expr_no_suffix();
 
         self.finish_node();
     }

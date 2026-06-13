@@ -81,13 +81,13 @@ fn garbage_inside_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: unexpected token
       |
     1 | [(a) ^^^ (b)]
       |      ^^^
       |
-    help: try `(node)` or close with `]`
+    help: expected a branch, or `]` to close
     ");
 }
 
@@ -99,20 +99,20 @@ fn garbage_inside_node() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: unexpected token
       |
     1 | (a (b) @@@ (c)) (d)
       |        ^
       |
-    help: try `(child)` or close with `)`
+    help: expected a child node, or `)` to close
 
     error: unexpected token
       |
     1 | (a (b) @@@ (c)) (d)
       |          ^
       |
-    help: try `(child)` or close with `)`
+    help: expected a child node, or `)` to close
     ");
 }
 
@@ -130,14 +130,7 @@ fn predicate_unsupported() {
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
       |
-    help: use a node predicate instead: `(identifier == "foo")`
-
-    error: unexpected token
-      |
-    1 | (a (#eq? @x "foo") b)
-      |          ^^
-      |
-    help: try `(child)` or close with `)`
+    help: use `(node == "x")`
 
     error: node types must be parenthesized
       |
@@ -166,7 +159,7 @@ fn predicate_match() {
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
       |
-    help: use a node predicate instead: `(identifier == "foo")`
+    help: use `(node =~ /re/)`
     "#);
 }
 
@@ -182,14 +175,14 @@ fn predicate_in_tree() {
     1 | (function #eq? @name "test")
       |           ^^^^
       |
-    help: use a node predicate instead: `(identifier == "foo")`
+    help: use `(node == "x")`
 
     error: unexpected token
       |
     1 | (function #eq? @name "test")
       |                ^^^^^
       |
-    help: try `(child)` or close with `)`
+    help: expected a child node, or `)` to close
     "#);
 }
 
@@ -201,14 +194,14 @@ fn predicate_in_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: unexpected token
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
       |
     1 | [(a) #eq? (b)]
       |      ^^^^
       |
-    help: try `(node)` or close with `]`
-    ");
+    help: use `(node == "x")`
+    "#);
 }
 
 #[test]
@@ -219,13 +212,106 @@ fn predicate_in_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r#"
+    insta::assert_snapshot!(res, @"
     error: tree-sitter predicates are not supported
       |
     1 | {(a) #set! (b)}
       |      ^^^^^
+    ");
+}
+
+#[test]
+fn predicate_as_def_body() {
+    let res = Query::expect_invalid("Q = #eq?");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
       |
-    help: use a node predicate instead: `(identifier == "foo")`
+    1 | Q = #eq?
+      |     ^^^^
+      |
+    help: use `(node == "x")`
+    "#);
+}
+
+#[test]
+fn predicate_as_field_value() {
+    let res = Query::expect_invalid("(call name: #eq?)");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | (call name: #eq?)
+      |             ^^^^
+      |
+    help: use `(node == "x")`
+    "#);
+}
+
+#[test]
+fn predicate_as_branch_value() {
+    let res = Query::expect_invalid("[A: #eq? B: (b)]");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | [A: #eq? B: (b)]
+      |     ^^^^
+      |
+    help: use `(node == "x")`
+    "#);
+}
+
+#[test]
+fn predicate_not_eq_suggests_inequality() {
+    let res = Query::expect_invalid("Q = #not-eq?");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | Q = #not-eq?
+      |     ^^^^^^^^
+      |
+    help: use `(node != "x")`
+    "#);
+}
+
+#[test]
+fn predicate_not_match_suggests_negated_regex() {
+    let res = Query::expect_invalid("Q = #not-match?");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | Q = #not-match?
+      |     ^^^^^^^^^^^
+      |
+    help: use `(node !~ /re/)`
+    "#);
+}
+
+#[test]
+fn predicate_parenthesized_no_arg_cascade() {
+    // The whole `(#eq? ...)` group is one error unit — its `@x "foo"` arguments do not
+    // cascade into spurious child diagnostics.
+    let res = Query::expect_invalid(r#"(call (#eq? @x "foo"))"#);
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | (call (#eq? @x "foo"))
+      |        ^^^^
+      |
+    help: use `(node == "x")`
+    "#);
+}
+
+#[test]
+fn predicate_with_node_arg_balanced() {
+    // The swallowed run tracks nested parens, so a node-pattern argument ends at the
+    // predicate's own `)` instead of the inner one, leaving no outer `)` to cascade.
+    let res = Query::expect_invalid("(call_expression (#eq? (identifier) @x))");
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
+      |
+    1 | (call_expression (#eq? (identifier) @x))
+      |                   ^^^^
+      |
+    help: use `(node == "x")`
     "#);
 }
 
@@ -245,7 +331,7 @@ fn multiline_garbage_recovery() {
     2 | ^^^
       | ^^^
       |
-    help: try `(child)` or close with `)`
+    help: expected a child node, or `)` to close
 
     error: node types must be parenthesized
       |
@@ -328,14 +414,14 @@ fn alternation_recovery_to_capture() {
     1 | [^^^ @name]
       |  ^^^
       |
-    help: try `(node)` or close with `]`
+    help: expected a branch, or `]` to close
 
     error: unexpected token
       |
     1 | [^^^ @name]
       |      ^^^^^
       |
-    help: try `(node)` or close with `]`
+    help: expected a branch, or `]` to close
     ");
 }
 
@@ -363,13 +449,13 @@ fn bare_colon_in_tree() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: unexpected token
       |
     1 | (a : (b))
       |    ^
       |
-    help: try `(child)` or close with `)`
+    help: expected a child node, or `)` to close
     ");
 }
 

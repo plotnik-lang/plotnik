@@ -34,8 +34,8 @@ fn test_syntax_kind_count_under_128() {
 fn test_is_error() {
     assert!(Error.is_error());
     assert!(Garbage.is_error());
-    assert!(TsPredicate.is_error());
     assert!(!ParenOpen.is_error());
+    assert!(!Hash.is_error());
     assert!(!Id.is_error());
     assert!(!Whitespace.is_error());
 }

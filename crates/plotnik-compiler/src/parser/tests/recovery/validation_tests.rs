@@ -67,6 +67,156 @@ fn reference_with_supertype_syntax_error() {
 }
 
 #[test]
+fn reference_with_category_syntax_error() {
+    let input = "(RefName#subtype)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @r"
+    error: references cannot have supertypes
+      |
+    1 | (RefName#subtype)
+      |         ^
+    ");
+}
+
+#[test]
+fn supertype_slash_deprecated_warning() {
+    // Tree-sitter `/` supertype syntax is kept for compatibility but nudges toward `#`.
+    let input = "Q = (expression/binary_expression)";
+
+    let res = Query::expect_warning(input);
+
+    insta::assert_snapshot!(res, @"
+    warning: `supertype/subtype` paths are tree-sitter syntax
+      |
+    1 | Q = (expression/binary_expression)
+      |                ^
+      |
+    help: use `#`
+      |
+    1 - Q = (expression/binary_expression)
+    1 + Q = (expression#binary_expression)
+      |
+    help: use `supertype#subtype` instead of `supertype/subtype`
+    ");
+}
+
+#[test]
+fn category_loose_slash_rejected() {
+    // Tree-sitter strictness: whitespace around `/` is a syntax error.
+    let input = "Q = (expression / binary_expression)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: unexpected token
+      |
+    1 | Q = (expression / binary_expression)
+      |                 ^
+      |
+    help: expected a child node, or `)` to close
+
+    error: node types must be parenthesized
+      |
+    1 | Q = (expression / binary_expression)
+      |                   ^^^^^^^^^^^^^^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - Q = (expression / binary_expression)
+    1 + Q = (expression / (binary_expression))
+      |
+    ");
+}
+
+#[test]
+fn category_subtype_rejects_predicate_suffix() {
+    // `#sub?` must not be silently accepted: the subtype is a plain `Id`, so the `?` is left
+    // over and errors — unlike the old predicate-split path which swallowed the `?`.
+    let input = "Q = (expression#binary_expression?)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: unexpected token
+      |
+    1 | Q = (expression#binary_expression?)
+      |                                  ^
+      |
+    help: expected a child node, or `)` to close
+    ");
+}
+
+#[test]
+fn category_subtype_rejects_leading_underscore() {
+    // `#_private` is rejected just like `/_private`: a leading `_` is not an `Id` start.
+    let input = "Q = (expression#_private)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: node types must be parenthesized
+      |
+    1 | Q = (expression#_private)
+      |                  ^^^^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - Q = (expression#_private)
+    1 + Q = (expression#_(private))
+      |
+    ");
+}
+
+#[test]
+fn category_loose_hash_rejected() {
+    // The native `#` is equally tight-binding: a space disqualifies it as a category.
+    let input = "Q = (expression # binary_expression)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: unexpected token
+      |
+    1 | Q = (expression # binary_expression)
+      |                 ^
+      |
+    help: expected a child node, or `)` to close
+
+    error: node types must be parenthesized
+      |
+    1 | Q = (expression # binary_expression)
+      |                   ^^^^^^^^^^^^^^^^^
+      |
+    help: wrap in parentheses
+      |
+    1 - Q = (expression # binary_expression)
+    1 + Q = (expression # (binary_expression))
+      |
+    ");
+}
+
+#[test]
+fn category_loose_hash_before_only_rejected() {
+    // A space before a tight `#binary_expression` is still a typo'd category, not a predicate:
+    // `#name` carries no `?`/`!`, so it isn't claimed by predicate recovery — the `#` is just
+    // an unexpected token (the bare-id error on the tight-following name is span-suppressed).
+    let input = "Q = (expression #binary_expression)";
+
+    let res = Query::expect_invalid(input);
+
+    insta::assert_snapshot!(res, @"
+    error: unexpected token
+      |
+    1 | Q = (expression #binary_expression)
+      |                 ^
+      |
+    help: expected a child node, or `)` to close
+    ");
+}
+
+#[test]
 fn mixed_tagged_and_untagged() {
     let input = indoc! {r#"
     [Tagged: (a) (b) Another: (c)]

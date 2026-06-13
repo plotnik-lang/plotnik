@@ -99,7 +99,7 @@ fn missing_subtype() {
     1 | (expression/)
       |             ^
       |
-    help: e.g., `expression/binary_expression`
+    help: e.g., `expression#binary_expression`
     ");
 }
 
@@ -245,13 +245,13 @@ fn capture_at_start_of_alternation() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: unexpected token
       |
     1 | [@x (a)]
       |  ^^
       |
-    help: try `(node)` or close with `]`
+    help: expected a branch, or `]` to close
     ");
 }
 

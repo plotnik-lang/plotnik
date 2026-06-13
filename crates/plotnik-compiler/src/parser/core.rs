@@ -317,6 +317,37 @@ impl<'q, 'd> Parser<'q, 'd> {
             .emit();
     }
 
+    /// Emit a diagnostic over an explicit range, deduped by start like `error`.
+    /// For diagnostics whose span covers a run already consumed by the caller.
+    pub(super) fn error_at(&mut self, kind: DiagnosticKind, range: TextRange) {
+        if !self.should_report(range.start()) {
+            return;
+        }
+        let suppression = self.current_suppression_span();
+        self.diagnostics
+            .report(self.source_id, kind, range)
+            .suppression_range(suppression)
+            .emit();
+    }
+
+    /// Like [`Self::error_at`], but with an explicit hint overriding the diagnostic default.
+    pub(super) fn error_at_with_hint(
+        &mut self,
+        kind: DiagnosticKind,
+        range: TextRange,
+        hint: impl Into<String>,
+    ) {
+        if !self.should_report(range.start()) {
+            return;
+        }
+        let suppression = self.current_suppression_span();
+        self.diagnostics
+            .report(self.source_id, kind, range)
+            .hint(hint)
+            .suppression_range(suppression)
+            .emit();
+    }
+
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
         self.error(kind);
         self.bump_as_error();

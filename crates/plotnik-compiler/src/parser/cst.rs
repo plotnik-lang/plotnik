@@ -73,9 +73,16 @@ pub enum SyntaxKind {
     #[token("??")]
     QuestionQuestion,
 
-    /// Slash for supertype paths: `(expression/binary_expression)`
+    /// Slash for tree-sitter supertype paths: `(expression/binary_expression)`
     #[token("/")]
     Slash,
+
+    /// Hash for native category syntax: `(expression#)` and `(expression#binary_expression)`.
+    /// Always a bare `#`; the subtype after it is a normal `Id`, so `#sub` and `/sub` share
+    /// one grammar. A misplaced `#` (e.g. a tree-sitter `#eq?` predicate) is diagnosed by the
+    /// parser, not the lexer.
+    #[token("#")]
+    Hash,
 
     /// Comma (invalid separator, for error recovery)
     #[token(",")]
@@ -189,9 +196,6 @@ pub enum SyntaxKind {
     /// Regex literal token (after splitting compound predicate)
     RegexLiteral,
 
-    /// Tree-sitter predicates (unsupported)
-    #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*[?!]?")]
-    TsPredicate,
     /// Coalesced unrecognized characters
     Garbage,
     Error,
@@ -254,7 +258,7 @@ impl SyntaxKind {
 
     #[inline]
     pub fn is_error(self) -> bool {
-        matches!(self, Error | Garbage | TsPredicate)
+        matches!(self, Error | Garbage)
     }
 }
 
