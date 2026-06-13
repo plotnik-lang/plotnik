@@ -1,12 +1,12 @@
 use std::collections::HashSet;
-use std::process::exit;
 
 use plotnik_core::grammar::raw::{RawGrammar, RawRule};
 
+use crate::error::CliResult;
 use plotnik::language_registry;
 
 /// List all supported languages with aliases.
-pub fn run_list() {
+pub fn run_list() -> CliResult {
     for lang in language_registry::all() {
         let aliases: Vec<_> = lang.aliases().iter().skip(1).copied().collect();
         if aliases.is_empty() {
@@ -15,19 +15,18 @@ pub fn run_list() {
             println!("{} ({})", lang.name(), aliases.join(", "));
         }
     }
+
+    Ok(())
 }
 
 /// Dump grammar for a language.
-pub fn run_dump(lang_name: &str) {
-    let Some(lang) = language_registry::from_name(lang_name) else {
-        eprintln!("error: unknown language '{lang_name}'");
-        eprintln!();
-        eprintln!("Run 'plotnik lang list' to see available languages.");
-        exit(1);
-    };
+pub fn run_dump(lang_name: &str) -> CliResult {
+    let lang = super::lang_resolver::resolve_named_lang(lang_name)?;
 
     let renderer = GrammarRenderer::new(lang.raw());
     print!("{}", renderer.render());
+
+    Ok(())
 }
 
 pub struct GrammarRenderer<'a> {

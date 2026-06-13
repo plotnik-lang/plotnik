@@ -155,7 +155,7 @@ crates/
       bytecode/        # Instruction set, modules, linking
       type_system/     # Shared type primitives
   plotnik-cli/         # CLI tool and language-feature registry
-    src/commands/      # Subcommands (ast, check, dump, exec, infer, trace, langs)
+    src/commands/      # Subcommands (run, check, ast, infer, dump, trace, lang)
   plotnik-compiler/    # Compilation pipeline
     src/
       analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)
@@ -178,16 +178,25 @@ docs/
 
 Run: `cargo run -p plotnik -- <command>`
 
-| Command     | Purpose                         |
-| ----------- | ------------------------------- |
-| `ast`       | Show AST of query and/or source |
-| `check`     | Validate query                  |
-| `dump`      | Show compiled bytecode          |
-| `infer`     | Generate TypeScript types       |
-| `exec`      | Execute query, output JSON      |
-| `trace`     | Trace execution for debugging   |
-| `lang list` | List supported languages        |
-| `lang dump` | Dump grammar for a language     |
+| Command       | Purpose                                                    |
+| ------------- | ---------------------------------------------------------- |
+| `run`         | Execute query, output JSON (`exec` is a hidden alias)      |
+| `check`       | Validate query (`--json` for machine-readable diagnostics) |
+| `ast`         | Show AST of query and/or source                            |
+| `infer`       | Generate TypeScript types                                  |
+| `dump`        | Show compiled bytecode                                     |
+| `trace`       | Trace execution for debugging                              |
+| `lang list`   | List supported languages                                   |
+| `lang dump`   | Dump grammar for a language                                |
+| `completions` | Generate shell completions                                 |
+
+Exit codes are uniform: `0` yes/success, `1` domain "no" (run: no match;
+check: invalid), `2` couldn't answer (usage/IO/internal).
+
+`.ptk` files may declare their language on line 1 via shebang
+(`#!/usr/bin/env -S plotnik run -l typescript`); all commands read it, and
+explicit `-l` must agree with it. `plotnik query.ptk app.ts` (no subcommand)
+routes to `run`.
 
 ## ast
 
@@ -232,25 +241,25 @@ cargo run -p plotnik -- infer -q '(identifier) @id' -l typescript
 
 Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
 
-## exec
+## run
 
 Execute a query against source code and output JSON.
 
 **Usage variants:**
 
 ```
-exec <QUERY> <SOURCE>           # two positional files
-exec -q <TEXT> <SOURCE>         # inline query + source file
-exec -q <TEXT> -s <TEXT> -l <LANG>  # all inline
+run <QUERY> <SOURCE>           # two positional files
+run -q <TEXT> <SOURCE>         # inline query + source file
+run -q <TEXT> -s <TEXT> -l <LANG>  # all inline
 ```
 
 ```sh
-cargo run -p plotnik -- exec query.ptk app.ts
-cargo run -p plotnik -- exec -q 'Q = (identifier) @id' app.ts
-cargo run -p plotnik -- exec -q 'Q = (identifier) @id' -s 'let x' -l javascript
+cargo run -p plotnik -- run query.ptk app.ts
+cargo run -p plotnik -- run -q 'Q = (identifier) @id' app.ts
+cargo run -p plotnik -- run -q 'Q = (identifier) @id' -s 'let x' -l javascript
 ```
 
-Options: `--compact`, `--verbose-nodes`, `--check`, `--entry <NAME>`
+Options: `--compact`, `--entry <NAME>`
 
 ## trace
 

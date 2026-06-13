@@ -1,7 +1,7 @@
 //! Tests for CLI dispatch logic.
 //!
 //! These tests verify:
-//! 1. Unified flags: dump/exec/trace accept each other's flags without error
+//! 1. Unified flags: dump/run/trace accept each other's flags without error
 //! 2. Help visibility: hidden flags don't appear in --help
 //! 3. Positional shifting: -q shifts first positional to source
 //! 4. Params extraction: correct fields are extracted from ArgMatches
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::cli::commands::{
-    ast_command, check_command, dump_command, exec_command, infer_command, trace_command,
+    ast_command, check_command, dump_command, infer_command, run_command, trace_command,
 };
 
 #[test]
@@ -32,20 +32,19 @@ fn dump_accepts_trace_flags() {
 }
 
 #[test]
-fn dump_accepts_exec_flags() {
+fn dump_accepts_run_flags() {
     let cmd = dump_command();
     let result = cmd.try_get_matches_from([
         "dump",
         "query.ptk",
         "--compact",
-        "--check",
         "--verbose-nodes",
         "--entry",
         "Foo",
     ]);
     assert!(
         result.is_ok(),
-        "dump should accept exec flags: {:?}",
+        "dump should accept run flags: {:?}",
         result.err()
     );
 
@@ -82,10 +81,10 @@ fn dump_accepts_source_flag() {
 }
 
 #[test]
-fn exec_accepts_trace_flags() {
-    let cmd = exec_command();
+fn run_accepts_trace_flags() {
+    let cmd = run_command();
     let result = cmd.try_get_matches_from([
-        "exec",
+        "run",
         "query.ptk",
         "app.js",
         "--fuel",
@@ -95,20 +94,20 @@ fn exec_accepts_trace_flags() {
     ]);
     assert!(
         result.is_ok(),
-        "exec should accept trace flags: {:?}",
+        "run should accept trace flags: {:?}",
         result.err()
     );
 
     let m = result.unwrap();
-    let params = ExecParams::from_matches(&m);
+    let params = RunParams::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
-    // fuel, verbose, no_result are parsed but not in ExecParams
+    // fuel, verbose, no_result are parsed but not in RunParams
 }
 
 #[test]
-fn trace_accepts_exec_flags() {
+fn trace_accepts_run_flags() {
     let cmd = trace_command();
     let result = cmd.try_get_matches_from([
         "trace",
@@ -116,11 +115,10 @@ fn trace_accepts_exec_flags() {
         "app.js",
         "--compact",
         "--verbose-nodes",
-        "--check",
     ]);
     assert!(
         result.is_ok(),
-        "trace should accept exec flags: {:?}",
+        "trace should accept run flags: {:?}",
         result.err()
     );
 
@@ -144,20 +142,19 @@ fn check_accepts_source_args() {
 }
 
 #[test]
-fn check_accepts_exec_flags() {
+fn check_accepts_run_flags() {
     let cmd = check_command();
     let result = cmd.try_get_matches_from([
         "check",
         "query.ptk",
         "--compact",
         "--verbose-nodes",
-        "--check",
         "--entry",
         "Foo",
     ]);
     assert!(
         result.is_ok(),
-        "check should accept exec flags: {:?}",
+        "check should accept run flags: {:?}",
         result.err()
     );
 }
@@ -186,19 +183,12 @@ fn infer_accepts_source_args() {
 }
 
 #[test]
-fn infer_accepts_exec_flags() {
+fn infer_accepts_run_flags() {
     let cmd = infer_command();
-    let result = cmd.try_get_matches_from([
-        "infer",
-        "query.ptk",
-        "--compact",
-        "--check",
-        "--entry",
-        "Foo",
-    ]);
+    let result = cmd.try_get_matches_from(["infer", "query.ptk", "--compact", "--entry", "Foo"]);
     assert!(
         result.is_ok(),
-        "infer should accept exec flags: {:?}",
+        "infer should accept run flags: {:?}",
         result.err()
     );
 }
@@ -232,7 +222,7 @@ fn dump_help_hides_trace_flags() {
 }
 
 #[test]
-fn dump_help_hides_exec_flags() {
+fn dump_help_hides_run_flags() {
     let mut cmd = dump_command();
     let help = cmd.render_help().to_string();
 
@@ -243,10 +233,6 @@ fn dump_help_hides_exec_flags() {
     assert!(
         !help.contains("--verbose-nodes"),
         "dump help should not show --verbose-nodes"
-    );
-    assert!(
-        !help.contains("--check"),
-        "dump help should not show --check"
     );
     assert!(
         !help.contains("--entry"),
@@ -272,19 +258,19 @@ fn dump_help_hides_source_args() {
 }
 
 #[test]
-fn exec_help_hides_trace_flags() {
-    let mut cmd = exec_command();
+fn run_help_hides_trace_flags() {
+    let mut cmd = run_command();
     let help = cmd.render_help().to_string();
 
-    assert!(!help.contains("--fuel"), "exec help should not show --fuel");
+    assert!(!help.contains("--fuel"), "run help should not show --fuel");
     assert!(
         !help.contains("--no-result"),
-        "exec help should not show --no-result"
+        "run help should not show --no-result"
     );
 }
 
 #[test]
-fn trace_help_hides_exec_output_flags() {
+fn trace_help_hides_run_output_flags() {
     let mut cmd = trace_command();
     let help = cmd.render_help().to_string();
 
@@ -295,10 +281,6 @@ fn trace_help_hides_exec_output_flags() {
     assert!(
         !help.contains("--verbose-nodes"),
         "trace help should not show --verbose-nodes"
-    );
-    assert!(
-        !help.contains("Validate output"),
-        "trace help should not show --check"
     );
 }
 
@@ -385,13 +367,13 @@ fn infer_help_hides_unified_flags() {
 }
 
 #[test]
-fn exec_shifts_positional_with_inline_query() {
-    let cmd = exec_command();
-    let result = cmd.try_get_matches_from(["exec", "-q", "(identifier) @id", "app.js"]);
+fn run_shifts_positional_with_inline_query() {
+    let cmd = run_command();
+    let result = cmd.try_get_matches_from(["run", "-q", "(identifier) @id", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = ExecParams::from_matches(&m);
+    let params = RunParams::from_matches(&m);
 
     // With -q, the single positional should become source_path, not query_path
     assert_eq!(params.query_path, None);
@@ -400,13 +382,13 @@ fn exec_shifts_positional_with_inline_query() {
 }
 
 #[test]
-fn exec_no_shift_with_both_positionals() {
-    let cmd = exec_command();
-    let result = cmd.try_get_matches_from(["exec", "query.ptk", "app.js"]);
+fn run_no_shift_with_both_positionals() {
+    let cmd = run_command();
+    let result = cmd.try_get_matches_from(["run", "query.ptk", "app.js"]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = ExecParams::from_matches(&m);
+    let params = RunParams::from_matches(&m);
 
     // Without -q, both positionals are used as-is
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
@@ -461,10 +443,10 @@ fn trace_params_extracts_all_fields() {
 }
 
 #[test]
-fn exec_params_extracts_all_fields() {
-    let cmd = exec_command();
+fn run_params_extracts_all_fields() {
+    let cmd = run_command();
     let result = cmd.try_get_matches_from([
-        "exec",
+        "run",
         "query.ptk",
         "app.js",
         "-l",
@@ -474,14 +456,13 @@ fn exec_params_extracts_all_fields() {
         "Query",
         "--color",
         "never",
-        // These are parsed but not extracted (visible but unimplemented flags)
+        // Hidden unified flag, parsed but not extracted
         "--verbose-nodes",
-        "--check",
     ]);
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = ExecParams::from_matches(&m);
+    let params = RunParams::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -489,7 +470,7 @@ fn exec_params_extracts_all_fields() {
     assert!(params.compact);
     assert_eq!(params.entry, Some("Query".to_string()));
     assert!(matches!(params.color, ColorChoice::Never));
-    // verbose_nodes and check are parsed but not in ExecParams (unimplemented)
+    // verbose_nodes is parsed but not in RunParams (hidden unified flag)
 }
 
 #[test]
@@ -522,21 +503,20 @@ fn dump_params_extracts_only_relevant_fields() {
 // AST command tests
 
 #[test]
-fn ast_accepts_exec_flags() {
+fn ast_accepts_run_flags() {
     let cmd = ast_command();
     let result = cmd.try_get_matches_from([
         "ast",
         "query.ptk",
         "app.js",
         "--compact",
-        "--check",
         "--verbose-nodes",
         "--entry",
         "Foo",
     ]);
     assert!(
         result.is_ok(),
-        "ast should accept exec flags: {:?}",
+        "ast should accept run flags: {:?}",
         result.err()
     );
 
@@ -622,10 +602,6 @@ fn ast_help_hides_unified_flags() {
         "ast help should not show --verbose-nodes"
     );
     assert!(
-        !help.contains("--check"),
-        "ast help should not show --check"
-    );
-    assert!(
         !help.contains("--entry"),
         "ast help should not show --entry"
     );
@@ -681,12 +657,12 @@ fn dump_accepts_raw_flag() {
 }
 
 #[test]
-fn exec_accepts_raw_flag() {
-    let cmd = exec_command();
-    let result = cmd.try_get_matches_from(["exec", "query.ptk", "app.js", "--raw"]);
+fn run_accepts_raw_flag() {
+    let cmd = run_command();
+    let result = cmd.try_get_matches_from(["run", "query.ptk", "app.js", "--raw"]);
     assert!(
         result.is_ok(),
-        "exec should accept --raw flag: {:?}",
+        "run should accept --raw flag: {:?}",
         result.err()
     );
 }
@@ -770,4 +746,78 @@ fn ast_no_extension_detection_with_inline_query() {
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(id) @x".to_string()));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+}
+
+// Bare default subcommand routing
+
+#[test]
+fn bare_ptk_file_routes_to_run() {
+    let args = vec!["plotnik".into(), "query.ptk".into(), "app.js".into()];
+
+    let routed = crate::cli::route_default_subcommand(args);
+
+    assert_eq!(routed[1], "run");
+    assert_eq!(routed[2], "query.ptk");
+}
+
+#[test]
+fn subcommand_is_not_rerouted() {
+    let args = vec!["plotnik".into(), "check".into(), "query.ptk".into()];
+
+    let routed = crate::cli::route_default_subcommand(args);
+
+    assert_eq!(routed[1], "check");
+}
+
+#[test]
+fn flags_are_not_rerouted() {
+    let args = vec!["plotnik".into(), "--version".into()];
+
+    let routed = crate::cli::route_default_subcommand(args);
+
+    assert_eq!(routed[1], "--version");
+}
+
+#[test]
+fn exec_is_a_hidden_alias_of_run() {
+    let cmd = crate::cli::build_cli();
+    let result = cmd.try_get_matches_from(["plotnik", "exec", "query.ptk", "app.js"]);
+
+    let m = result.unwrap();
+    assert_eq!(m.subcommand_name(), Some("run"));
+}
+
+#[test]
+fn version_flag_works() {
+    let cmd = crate::cli::build_cli();
+    let err = cmd
+        .try_get_matches_from(["plotnik", "--version"])
+        .unwrap_err();
+
+    assert_eq!(err.kind(), clap::error::ErrorKind::DisplayVersion);
+}
+
+#[test]
+fn check_help_shows_json_flag() {
+    let mut cmd = check_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(help.contains("--json"), "check help should show --json");
+}
+
+#[test]
+fn run_help_hides_json_flag() {
+    let mut cmd = run_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(!help.contains("--json"), "run help should hide --json");
+}
+
+#[test]
+fn flag_with_ptk_value_is_not_rerouted() {
+    let args = vec!["plotnik".into(), "--query=q.ptk".into(), "app.ts".into()];
+
+    let routed = crate::cli::route_default_subcommand(args);
+
+    assert_eq!(routed[1], "--query=q.ptk");
 }

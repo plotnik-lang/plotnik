@@ -14,7 +14,8 @@ use super::{SourceId, Span};
 /// - Naming validation errors are convention violations
 /// - Semantic errors assume valid syntax
 /// - Structural observations are often consequences of earlier errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
     // These cause cascading errors throughout the rest of the file.
     // A missing quote swallows closing delimiters, so it outranks them all.
@@ -360,7 +361,8 @@ impl DiagnosticKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     #[default]
     Error,

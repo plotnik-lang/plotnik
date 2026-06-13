@@ -25,16 +25,24 @@ plotnik lang dump typescript
 
 ## Commands
 
-| Command     | Input | Purpose                         | `-l` flag                             |
-| ----------- | ----- | ------------------------------- | ------------------------------------- |
-| `ast`       | both  | Show AST of query and/or source | Inferred from extension               |
-| `dump`      | query | Show bytecode                   | Optional (enables linking)            |
-| `check`     | query | Validate query                  | Optional (enables grammar validation) |
-| `infer`     | query | Generate type definitions       | Required                              |
-| `exec`      | both  | Run query, output JSON          | Inferred from extension               |
-| `trace`     | both  | Trace query execution           | Inferred from extension               |
-| `lang list` | —     | List supported languages        | —                                     |
-| `lang dump` | —     | Dump grammar for a language     | —                                     |
+| Command       | Input | Purpose                         | `-l` flag                             |
+| ------------- | ----- | ------------------------------- | ------------------------------------- |
+| `run`         | both  | Run query, output JSON          | Shebang or extension                  |
+| `check`       | query | Validate query                  | Optional (enables grammar validation) |
+| `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
+| `infer`       | query | Generate type definitions       | Required                              |
+| `dump`        | query | Show bytecode                   | Optional (enables linking)            |
+| `trace`       | both  | Trace query execution           | Shebang or extension                  |
+| `lang list`   | —     | List supported languages        | —                                     |
+| `lang dump`   | —     | Dump grammar for a language     | —                                     |
+| `completions` | —     | Generate shell completions      | —                                     |
+
+`exec` is kept as a hidden alias for `run`.
+
+**Bare invocation**: when the first argument is a `.ptk` file, the `run`
+subcommand is implied — `plotnik query.ptk app.js` works. Combined with a
+shebang line, query files become directly executable (see
+[Shebang](#shebang-language-declaration)).
 
 ---
 
@@ -98,13 +106,24 @@ With `-l`: also validates node kinds and field names exist in grammar.
 
 **Flags:**
 
-| Flag         | Purpose                   |
-| ------------ | ------------------------- |
-| `-l, --lang` | Enable grammar validation |
-| `--strict`   | Treat warnings as errors  |
+| Flag         | Purpose                    |
+| ------------ | -------------------------- |
+| `-l, --lang` | Enable grammar validation  |
+| `--strict`   | Treat warnings as errors   |
+| `--json`     | Output diagnostics as JSON |
 
 On success: silent, exits 0.
-On error: prints diagnostics, exits 1.
+On error: prints diagnostics to stderr, exits 1.
+
+With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
+when the query is clean), each with `code`, `severity`, `message`, `span`
+(file/line/column/offset), and optional `related`, `fix`, and `hints`.
+Exit 2 means the question couldn't be answered — the error goes to stderr
+as text and no JSON is emitted:
+
+```sh
+plotnik check query.ptk --json | jq '.[].code'
+```
 
 ---
 
@@ -180,38 +199,36 @@ The output uses a syntax similar to Plotnik queries:
 - `field: ...` — named field
 - `T :: supertype` — supertype declaration
 
-### exec
+### run
 
 Execute a query against source code and output JSON matches.
 
 ```sh
 # Two positional arguments: QUERY SOURCE
-plotnik exec query.ptk app.js
+plotnik run query.ptk app.js
+
+# Bare invocation (run is implied for .ptk files)
+plotnik query.ptk app.js
 
 # Inline query + positional source (most common)
-plotnik exec -q 'Q = (identifier) @id' app.js
+plotnik run -q 'Q = (identifier) @id' app.js
 
 # All inline (requires -l)
-plotnik exec -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
-
-# Include source positions in output
-plotnik exec -q 'Q = (identifier) @id' app.ts --verbose-nodes
+plotnik run -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
 
 # Start from a specific definition
-plotnik exec query.ptk app.js --entry FunctionDef
+plotnik run query.ptk app.js --entry FunctionDef
 ```
 
 **Flags:**
 
-| Flag              | Purpose                                |
-| ----------------- | -------------------------------------- |
-| `-q, --query`     | Inline query text                      |
-| `-s, --source`    | Inline source text                     |
-| `-l, --lang`      | Language (inferred from file ext)      |
-| `--compact`       | Output compact JSON                    |
-| `--verbose-nodes` | Include line/column in nodes           |
-| `--check`         | Validate output against inferred types |
-| `--entry NAME`    | Start from specific definition         |
+| Flag           | Purpose                           |
+| -------------- | --------------------------------- |
+| `-q, --query`  | Inline query text                 |
+| `-s, --source` | Inline source text                |
+| `-l, --lang`   | Language (inferred from file ext) |
+| `--compact`    | Output compact JSON               |
+| `--entry NAME` | Start from specific definition    |
 
 ---
 
@@ -258,25 +275,51 @@ These commands take a single input. Use either:
 - **Positional**: `plotnik dump query.ptk`
 - **Flag**: `plotnik dump -q 'Q = ...'`
 
-### Query+Source Commands (ast, exec, trace)
+### Query+Source Commands (ast, run, trace)
 
 These commands can take query, source, or both inputs. Use any combination:
 
-| Pattern                          | Query from     | Source from    |
-| -------------------------------- | -------------- | -------------- |
-| `exec QUERY SOURCE`              | 1st positional | 2nd positional |
-| `exec -q '...' SOURCE`           | `-q` flag      | positional     |
-| `exec -s '...' QUERY -l lang`    | positional     | `-s` flag      |
-| `exec -q '...' -s '...' -l lang` | `-q` flag      | `-s` flag      |
+| Pattern                         | Query from     | Source from    |
+| ------------------------------- | -------------- | -------------- |
+| `run QUERY SOURCE`              | 1st positional | 2nd positional |
+| `run -q '...' SOURCE`           | `-q` flag      | positional     |
+| `run -s '...' QUERY -l lang`    | positional     | `-s` flag      |
+| `run -q '...' -s '...' -l lang` | `-q` flag      | `-s` flag      |
 
 **Key rule**: When `-q` is provided with one positional, it becomes SOURCE.
 
 ### Language Detection
 
-| Input type    | Language             |
-| ------------- | -------------------- |
-| File          | Inferred from `.ext` |
-| Inline (`-s`) | Requires `-l`        |
+Priority: explicit `-l` (must agree with the shebang) > shebang declaration >
+source file extension.
+
+| Input type        | Language                   |
+| ----------------- | -------------------------- |
+| `.ptk` w/ shebang | Declared in shebang        |
+| Source file       | Inferred from `.ext`       |
+| Inline (`-s`)     | Requires `-l` (or shebang) |
+
+### Shebang (Language Declaration)
+
+Line 1 of a `.ptk` file may declare its language (and optionally an
+entrypoint) via a shebang:
+
+```
+#!/usr/bin/env -S plotnik run -l typescript
+Func = (function_declaration name: (identifier) @name)
+```
+
+All commands (`run`, `check`, `infer`, `ast`, `trace`, `dump`) read the
+declaration; presentation flags in the shebang are ignored unless executing.
+An explicit `-l` must agree with the declaration, otherwise the command errors.
+
+With `chmod +x`, the file becomes directly executable:
+
+```sh
+./functions.ptk app.ts
+```
+
+In a workspace directory, all shebangs must agree on the language.
 
 ---
 
@@ -291,8 +334,8 @@ echo 'Q = (identifier) @id' | plotnik dump -
 # Source from stdin
 cat app.ts | plotnik ast -
 
-# Exec: query from stdin, source from file
-echo 'Q = (identifier) @id' | plotnik exec - app.js
+# Run: query from stdin, source from file
+echo 'Q = (identifier) @id' | plotnik run - app.js
 ```
 
 ---
@@ -355,7 +398,7 @@ Color is auto-detected based on terminal capability.
 | `--color always` | Force colors         |
 | `--color never`  | Disable colors       |
 
-Respects `NO_COLOR` environment variable.
+Respects the `NO_COLOR`, `CLICOLOR_FORCE`, and `TERM=dumb` conventions.
 
 ---
 
@@ -386,10 +429,13 @@ Common errors:
 
 ## Exit Codes
 
-| Code | Meaning                           |
-| ---- | --------------------------------- |
-| 0    | Success                           |
-| 1    | Error (parse, validation, or I/O) |
+Uniform across all commands:
+
+| Code | Meaning                                         |
+| ---- | ----------------------------------------------- |
+| 0    | Yes/success (match found, query valid)          |
+| 1    | Domain "no" (`run`: no match; `check`: invalid) |
+| 2    | Couldn't answer (usage, IO, or internal error)  |
 
 ---
 
@@ -400,4 +446,4 @@ Common errors:
 3. **Run `check`** before `infer` to catch grammar errors early
 4. **Use `dump`** to debug query parsing or bytecode
 5. **Use query files** for anything beyond one-liners
-6. **Match `--verbose-nodes`** between `infer` and `exec` for consistent shapes
+6. **Declare the language in a shebang** so `-l` is never needed for that file

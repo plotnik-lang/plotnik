@@ -1,3 +1,4 @@
+mod json;
 mod message;
 mod printer;
 
@@ -6,6 +7,7 @@ mod diagnostics_tests;
 
 use rowan::TextRange;
 
+pub use json::{JsonDiagnostic, JsonFix, JsonPosition, JsonRelated, JsonSpan};
 pub use message::{DiagnosticKind, Severity};
 
 use printer::DiagnosticsPrinter;
@@ -185,6 +187,19 @@ impl Diagnostics {
     /// Render every recorded diagnostic, including suppressed cascades (debugging).
     pub fn render_unfiltered(&self, sources: &SourceMap) -> String {
         DiagnosticsPrinter::new(self.messages.clone(), sources).render()
+    }
+
+    /// Canonical serializable form: cascading errors are suppressed, same as `render`.
+    pub fn to_json(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
+        self.filtered()
+            .iter()
+            .map(|m| JsonDiagnostic::from_message(m, sources))
+            .collect()
+    }
+
+    /// Render as a compact JSON array, one object per diagnostic.
+    pub fn render_json(&self, sources: &SourceMap) -> String {
+        serde_json::to_string(&self.to_json(sources)).expect("diagnostics serialize to JSON")
     }
 
     pub fn extend(&mut self, other: Diagnostics) {
