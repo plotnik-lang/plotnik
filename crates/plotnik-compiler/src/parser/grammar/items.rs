@@ -3,7 +3,7 @@ use rowan::TextRange;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, ROOT_EXPR_FIRST_TOKENS};
+use crate::parser::cst::token_sets::ROOT_EXPR_FIRST_TOKENS;
 
 impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {
@@ -79,11 +79,7 @@ impl Parser<'_, '_> {
             self.current()
         );
 
-        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            self.parse_expr();
-        } else {
-            self.error(DiagnosticKind::ExpectedExpression);
-        }
+        self.parse_required_expr();
 
         self.finish_node();
     }

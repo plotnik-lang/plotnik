@@ -60,6 +60,7 @@ pub enum DiagnosticKind {
     TypeNameInvalid,
     TreeSitterSequenceSyntax,
     NegationSyntaxDeprecated,
+    SupertypeSlashDeprecated,
 
     // Valid syntax, invalid semantics
     DuplicateDefinition,
@@ -107,7 +108,8 @@ impl DiagnosticKind {
         match self {
             Self::UnusedBranchLabels
             | Self::TreeSitterSequenceSyntax
-            | Self::NegationSyntaxDeprecated => Severity::Warning,
+            | Self::NegationSyntaxDeprecated
+            | Self::SupertypeSlashDeprecated => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -156,7 +158,7 @@ impl DiagnosticKind {
     /// Call sites can add additional hints for context-specific information.
     pub fn default_hint(&self) -> Option<&'static str> {
         match self {
-            Self::ExpectedSubtype => Some("e.g., `expression/binary_expression`"),
+            Self::ExpectedSubtype => Some("e.g., `expression#binary_expression`"),
             Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
             Self::ExpectedFieldName => Some("e.g., `-value`"),
             Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
@@ -166,9 +168,6 @@ impl DiagnosticKind {
             Self::EmptySequence => Some("sequences must contain at least one expression"),
             Self::EmptyAlternation => Some("alternations must contain at least one branch"),
             Self::ErrorMissingOutsideParens => Some("write `(ERROR)` or `(MISSING \";\")`"),
-            Self::UnsupportedPredicate => {
-                Some("use a node predicate instead: `(identifier == \"foo\")`")
-            }
             Self::CaptureWithoutTarget => {
                 Some("captures attach to the pattern before them: `(node) @name`")
             }
@@ -180,6 +179,9 @@ impl DiagnosticKind {
                 Some("use `{(a) (b)}` to match a sequence of siblings")
             }
             Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
+            Self::SupertypeSlashDeprecated => {
+                Some("use `supertype#subtype` instead of `supertype/subtype`")
+            }
             Self::MixedAltBranches => {
                 Some("use all labels for a tagged union, or none for a merged struct")
             }
@@ -250,6 +252,7 @@ impl DiagnosticKind {
             Self::TypeNameInvalid => "type names cannot contain `.` or `-`",
             Self::TreeSitterSequenceSyntax => "parenthesized sequences are tree-sitter syntax",
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
+            Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
 
             // Semantic errors
             Self::DuplicateDefinition => "duplicate definition",

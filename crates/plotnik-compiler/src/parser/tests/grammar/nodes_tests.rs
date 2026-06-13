@@ -141,3 +141,78 @@ fn no_supertype_plain_node() {
     "#
     );
 }
+
+#[test]
+fn category_bare() {
+    shot_cst!(
+        r#"
+        Q = (value#)
+    "#
+    );
+}
+
+#[test]
+fn category_refinement() {
+    shot_cst!(
+        r#"
+        Q = (expression#binary_expression)
+    "#
+    );
+}
+
+#[test]
+fn category_with_string_subtype() {
+    shot_cst!(
+        r#"
+        Q = (expression#"()")
+    "#
+    );
+}
+
+#[test]
+fn category_with_capture() {
+    shot_cst!(
+        r#"
+        Q = (expression#binary_expression) @expr
+    "#
+    );
+}
+
+#[test]
+fn category_with_children() {
+    shot_cst!(
+        r#"
+        Q = (expression#binary_expression
+            left: (_) @left
+            right: (_) @right)
+    "#
+    );
+}
+
+#[test]
+fn category_bare_quantified() {
+    shot_cst!(
+        r#"
+        Q = (value#)*
+    "#
+    );
+}
+
+#[test]
+fn category_nested() {
+    shot_cst!(
+        r#"
+        Q = (statement#expression_statement
+            (expression#call_expression))
+    "#
+    );
+}
+
+#[test]
+fn category_in_alternation() {
+    shot_cst!(
+        r#"
+        Q = [(expression#identifier) (expression#number)]
+    "#
+    );
+}

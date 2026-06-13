@@ -17,8 +17,8 @@ impl Parser<'_, '_> {
             return false;
         }
 
-        if self.currently_is(SyntaxKind::TsPredicate) {
-            self.error_and_bump(DiagnosticKind::UnsupportedPredicate);
+        if self.at_ts_predicate() {
+            self.error_unsupported_predicate();
             return false;
         }
 
@@ -27,6 +27,40 @@ impl Parser<'_, '_> {
             "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
         );
         false
+    }
+
+    /// Parse an expression required after a prefix like `=`, `field:`, or a branch label.
+    ///
+    /// On a non-expression token this reports `ExpectedExpression` at the current position,
+    /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
+    /// instead of the generic one — these are exactly the spots a tree-sitter user pastes them.
+    pub(crate) fn parse_required_expr(&mut self) {
+        self.parse_required_expr_inner(true)
+    }
+
+    /// Like [`Self::parse_required_expr`], but without applying a quantifier/capture suffix —
+    /// for field values, so the suffix wraps the whole field constraint (see
+    /// [`Self::parse_expr_no_suffix`]).
+    pub(crate) fn parse_required_expr_no_suffix(&mut self) {
+        self.parse_required_expr_inner(false)
+    }
+
+    fn parse_required_expr_inner(&mut self, with_suffix: bool) {
+        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
+            if with_suffix {
+                self.parse_expr();
+            } else {
+                self.parse_expr_no_suffix();
+            }
+            return;
+        }
+
+        if self.at_ts_predicate() {
+            self.error_unsupported_predicate();
+            return;
+        }
+
+        self.error(DiagnosticKind::ExpectedExpression);
     }
 
     /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier/capture suffix.

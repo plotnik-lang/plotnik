@@ -278,6 +278,42 @@ fn supertype() {
 }
 
 #[test]
+fn category_refinement_ignored() {
+    // The `#subtype` refinement is parsed but carries no behavior yet: the node collapses
+    // to its supertype, exactly like the tree-sitter `/` form above.
+    let res = Query::expect_valid_ast("Q = (expression#binary_expression)");
+    insta::assert_snapshot!(res, @r"
+    Root
+      Def Q
+        NamedNode expression
+    ");
+}
+
+#[test]
+fn bare_category_ignored() {
+    let res = Query::expect_valid_ast("Q = (value#)");
+    insta::assert_snapshot!(res, @r"
+    Root
+      Def Q
+        NamedNode value
+    ");
+}
+
+#[test]
+fn category_subtype_shares_id_grammar_with_slash() {
+    // The subtype after `#` is a plain `Id`, so `.`/`-` are admitted exactly as the `/` form
+    // admits them — the two spellings parse identically (and both collapse to the supertype).
+    let hash = Query::expect_valid_ast("Q = (expression#member-expression)");
+    let slash = Query::expect_valid_ast("Q = (expression/member-expression)");
+    assert_eq!(hash, slash);
+    insta::assert_snapshot!(hash, @r"
+    Root
+      Def Q
+        NamedNode expression
+    ");
+}
+
+#[test]
 fn multiple_fields() {
     let input = indoc! {r#"
     Q = (binary_expression

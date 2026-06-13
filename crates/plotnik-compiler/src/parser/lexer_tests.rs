@@ -299,24 +299,32 @@ fn unterminated_string_with_escaped_quote() {
     insta::assert_snapshot!(snapshot(r#""ab\"cd"#), @r#"UnterminatedString "\"ab\\\"cd""#);
 }
 
+// Tree-sitter predicates lex as `#` + ident + optional `?`/`!`; the parser, which has the
+// positional context the lexer lacks, diagnoses them as unsupported (see predicate tests).
 #[test]
-fn error_predicate_eq() {
-    insta::assert_snapshot!(snapshot("#eq?"), @r##"TsPredicate "#eq?""##);
+fn predicate_eq() {
+    insta::assert_snapshot!(snapshot("#eq?"), @r##"
+    Hash "#"
+    Id "eq"
+    Question "?"
+    "##);
 }
 
 #[test]
-fn error_predicate_match() {
-    insta::assert_snapshot!(snapshot("#match?"), @r##"TsPredicate "#match?""##);
+fn predicate_set() {
+    insta::assert_snapshot!(snapshot("#set!"), @r##"
+    Hash "#"
+    Id "set"
+    Negation "!"
+    "##);
 }
 
 #[test]
-fn error_predicate_set() {
-    insta::assert_snapshot!(snapshot("#set!"), @r##"TsPredicate "#set!""##);
-}
-
-#[test]
-fn error_predicate_no_suffix() {
-    insta::assert_snapshot!(snapshot("#is_not"), @r##"TsPredicate "#is_not""##);
+fn predicate_no_suffix() {
+    insta::assert_snapshot!(snapshot("#is_not"), @r##"
+    Hash "#"
+    Id "is_not"
+    "##);
 }
 
 #[test]
@@ -488,6 +496,54 @@ fn supertype_path_expression() {
     Id "binary_expression"
     ParenClose ")"
     "#);
+}
+
+#[test]
+fn category_refinement() {
+    // The subtype after `#` is a plain `Id`, so `#sub` and `/sub` share one grammar.
+    insta::assert_snapshot!(snapshot("(expression#binary_expression)"), @r##"
+    ParenOpen "("
+    Id "expression"
+    Hash "#"
+    Id "binary_expression"
+    ParenClose ")"
+    "##);
+}
+
+#[test]
+fn category_subtype_allows_id_chars() {
+    // `Id` admits `-`/`.` (tree-sitter compat); the `#` subtype gets them too, unlike the
+    // old predicate-split path which stopped at the hyphen.
+    insta::assert_snapshot!(snapshot("(expression#member-expression)"), @r##"
+    ParenOpen "("
+    Id "expression"
+    Hash "#"
+    Id "member-expression"
+    ParenClose ")"
+    "##);
+}
+
+#[test]
+fn category_bare() {
+    insta::assert_snapshot!(snapshot("(value#)"), @r##"
+    ParenOpen "("
+    Id "value"
+    Hash "#"
+    ParenClose ")"
+    "##);
+}
+
+#[test]
+fn category_lexing_is_space_insensitive() {
+    // Lexing is identical with or without a space before `#`; tight-binding is enforced by
+    // the parser (here the space makes it a misplaced predicate, not a category).
+    insta::assert_snapshot!(snapshot("(expression #binary_expression)"), @r##"
+    ParenOpen "("
+    Id "expression"
+    Hash "#"
+    Id "binary_expression"
+    ParenClose ")"
+    "##);
 }
 
 #[test]
