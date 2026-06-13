@@ -3,9 +3,11 @@ name: Auto-ready unblocked issues
 # When an issue closes, any issue it was blocking whose blockers are now ALL
 # closed is promoted Backlog -> Ready on the Plotnik project board.
 #
-# There is no built-in Projects automation for dependency-driven status changes,
-# so this "blocker -> Ready" leg lives here. The complementary "issue closed -> Done"
-# leg is handled by the project's built-in "Item closed" workflow.
+# Projects has no built-in automation for dependency-driven status changes, so
+# this "blocker -> Ready" leg lives here. The "issue closed -> Done" leg is
+# handled by the project's built-in "Item closed" workflow.
+#
+# Logic lives in .github/scripts/auto_ready.py (GraphQL-only, stdlib-only).
 
 on:
   issues:
@@ -28,65 +30,15 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     env:
-      # PAT needs org Projects (read & write) + Issues (read). The default
+      # PAT needs org Projects (read & write) + repo Issues (read). The default
       # GITHUB_TOKEN cannot write an org-owned Projects v2 board.
       GH_TOKEN: ${{ secrets.PLOTNIK_PAT }}
-      REPO: ${{ github.repository }}
       OWNER: plotnik-lang
-      PROJECT_NUMBER: "1"
+      REPO_NAME: plotnik
       PROJECT_ID: PVT_kwDODsGSMc4BafFQ
       STATUS_FIELD_ID: PVTSSF_lADODsGSMc4BafFQzhVWXyw
       READY_OPTION: 61e4505c
       CLOSED_ISSUE: ${{ github.event.issue.number || github.event.inputs.issue_number }}
     steps:
-      - name: Promote dependents whose blockers are now all closed
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Trigger: issue #$CLOSED_ISSUE closed"
-
-          # Dependents = issues that were blocked by the closed issue.
-          mapfile -t deps < <(gh issue view "$CLOSED_ISSUE" -R "$REPO" --json blocking \
-            --jq '.blocking.nodes[].number')
-          if [ "${#deps[@]}" -eq 0 ]; then
-            echo "No issues were blocked by #$CLOSED_ISSUE — nothing to do."
-            exit 0
-          fi
-          echo "#$CLOSED_ISSUE was blocking: ${deps[*]}"
-
-          # One board snapshot. Explicit --limit: item-list defaults to a 30-item page.
-          board=$(gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --limit 200 --format json)
-
-          for m in "${deps[@]}"; do
-            echo "::group::#$m"
-
-            state=$(gh issue view "$m" -R "$REPO" --json state --jq '.state')
-            if [ "$state" != "OPEN" ]; then
-              echo "#$m is $state — skip"; echo "::endgroup::"; continue
-            fi
-
-            # Every blocker of #m must be closed before it can be Ready.
-            open_blockers=$(gh issue view "$m" -R "$REPO" --json blockedBy \
-              --jq '[.blockedBy.nodes[] | select(.state=="OPEN")] | length')
-            if [ "$open_blockers" -ne 0 ]; then
-              echo "#$m still has $open_blockers open blocker(s) — skip"; echo "::endgroup::"; continue
-            fi
-
-            row=$(jq -r --argjson n "$m" \
-              '.items[] | select(.content.number==$n) | "\(.status // "NONE")\t\(.id)"' <<<"$board")
-            if [ -z "$row" ]; then
-              echo "#$m is not on the board — skip"; echo "::endgroup::"; continue
-            fi
-            status=${row%%$'\t'*}
-            item_id=${row##*$'\t'}
-
-            # Only promote from Backlog. Never override In progress / Done / Ready.
-            if [ "$status" != "Backlog" ]; then
-              echo "#$m status is '$status' — leave it"; echo "::endgroup::"; continue
-            fi
-
-            echo "#$m is fully unblocked and in Backlog -> setting Ready"
-            gh project item-edit --project-id "$PROJECT_ID" --id "$item_id" \
-              --field-id "$STATUS_FIELD_ID" --single-select-option-id "$READY_OPTION"
-            echo "::endgroup::"
-          done
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - run: python3 .github/scripts/auto_ready.py
