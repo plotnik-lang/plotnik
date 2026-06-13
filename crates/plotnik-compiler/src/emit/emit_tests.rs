@@ -712,6 +712,30 @@ fn optional_first_child() {
 }
 
 #[test]
+fn optional_first_child_then_interior_anchor() {
+    // Regression for #415: the interior anchor must survive into both follower
+    // compilations. The match path (optional present) gets a NextSkip (`─•─`)
+    // and the skip path (optional absent) a DownSkip (`└•─`) — both bounded, not
+    // the unanchored Next/Down (`‣`) that silently searched past named nodes.
+    shot_bytecode!(
+        r#"
+        Test = (program {(lexical_declaration)? @a . (debugger_statement) @b})
+    "#
+    );
+}
+
+#[test]
+fn optional_first_child_then_strict_interior_anchor() {
+    // As above, but the strict anchor must degrade to NextExact / DownExact on the
+    // match and skip paths respectively.
+    shot_bytecode!(
+        r#"
+        Test = (program {(lexical_declaration)? @a .! (debugger_statement) @b})
+    "#
+    );
+}
+
+#[test]
 fn optional_null_injection() {
     shot_bytecode!(
         r#"

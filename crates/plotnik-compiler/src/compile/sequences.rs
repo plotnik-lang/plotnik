@@ -128,9 +128,11 @@ impl Compiler<'_> {
         // Check if first expression is skippable and uses Down navigation.
         // In this case, the skip path needs different navigation than the match path.
         // Also trigger when skip_exit is provided (for bypassing Up in parent node).
-        let first_is_skippable = items
+        // Use the first *expression* index from `nav_modes`, not `items.first()`, so a
+        // leading anchor (e.g. `{. (a)? ...}`) doesn't hide a skippable first item.
+        let first_is_skippable = nav_modes
             .first()
-            .and_then(|item| item.as_expr())
+            .and_then(|(idx, _)| items[*idx].as_expr())
             .is_some_and(is_skippable_quantifier);
         let first_uses_down = is_down_nav(first_expr_nav);
         let needs_skip_exit =
@@ -220,36 +222,45 @@ impl Compiler<'_> {
         capture: CaptureEffects,
         caller_skip_exit: Option<Label>,
     ) -> Label {
-        let first_expr = items[nav_modes[0].0]
+        let first_expr_idx = nav_modes[0].0;
+        let first_expr = items[first_expr_idx]
             .as_expr()
             .expect("first item must be expression");
 
-        // Build rest items once (shared between skip and match paths)
-        let rest_items: Vec<_> = nav_modes[1..]
-            .iter()
-            .filter_map(|(idx, _)| items.get(*idx).and_then(|i| i.as_expr()))
-            .map(|e| SeqItem::Expr(e.clone()))
-            .collect();
-
-        // Compile continuation with both navigations, or use exit if no continuation.
-        // When caller_skip_exit is provided and rest is empty, use it for skip path
-        // (this allows skip to bypass Up instruction in parent node).
-        let (skip_exit, match_exit) = if rest_items.is_empty() {
+        // Compile the continuation with both navigations, or use exit if there is none.
+        // When caller_skip_exit is provided and there is no follower, use it for the skip
+        // path (this allows skip to bypass the Up instruction in the parent node).
+        //
+        // The two paths must slice `items` differently so that any anchor between the
+        // optional first item and its follower survives into `compute_nav_modes`:
+        //
+        // - Skip path (first item absent): the anchor degrades to a leading anchor
+        //   relative to the parent. Slicing *after* the first expression keeps the
+        //   anchor, so it is re-derived as first-child (`Down*`) navigation.
+        // - Match path (first item present): the follower is the first item's sibling.
+        //   Slice *from* the follower (dropping the now-consumed leading anchor) and
+        //   reuse the sibling navigation `compute_nav_modes` already derived for it,
+        //   which carries the anchor's adjacency (`Next*`).
+        let (skip_exit, match_exit) = if nav_modes.len() < 2 {
             (caller_skip_exit.unwrap_or(exit), exit)
         } else {
+            let skip_rest = &items[first_expr_idx + 1..];
             let skip = self.compile_seq_items_inner(
-                &rest_items,
+                skip_rest,
                 exit,
                 is_inside_node,
-                first_nav, // Down variant for skip path
+                first_nav, // Down variant; overridden when a leading anchor is present
                 capture.clone(),
                 caller_skip_exit, // Propagate for nested skippables
             );
+
+            let follower_idx = nav_modes[1].0;
+            let match_rest = &items[follower_idx..];
             let mtch = self.compile_seq_items_inner(
-                &rest_items,
+                match_rest,
                 exit,
                 is_inside_node,
-                repeat_nav_for(first_nav), // Next variant for match path
+                nav_modes[1].1, // Follower's sibling nav (anchor-aware) for match path
                 capture.clone(),
                 None, // Match path doesn't need skip exit
             );

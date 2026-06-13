@@ -852,6 +852,19 @@ For strict token-level adjacency:
 
 Here, no trivia is allowed between the function name and the opening parenthesis because the anchor is explicit strict adjacency.
 
+### Anchors After Optional Items
+
+When the item before an anchor is optional (`?` or `*`), the anchor's meaning depends on whether that item matched:
+
+```
+(program {(lexical_declaration)? @a . (debugger_statement) @b})
+```
+
+- **When `@a` matches**, the anchor is enforced between the two siblings: `@b` must be the adjacent sibling, so `let x; debugger;` matches but `let x; foo; debugger;` does not.
+- **When `@a` is skipped**, the anchor degrades to a leading anchor relative to the parent — as if the query were `(program . (debugger_statement) @b)`. `@b` must be the first child (trivia aside): `debugger;` and `/* c */ debugger;` match, but `foo; debugger;` does not.
+
+Strictness carries through both paths: with `.!`, no trivia is tolerated on either the adjacency or the leading interpretation.
+
 ### Output Types
 
 Anchors are structural constraints only — they don't affect output types:
