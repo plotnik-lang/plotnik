@@ -428,7 +428,7 @@ When a capture appears in some branches but not others, the compiler injects `Nu
 
 ```
 Query: [ (a) @x  (b) ]
-Type:  { x?: Node }
+Type:  { x: Node | null }
 
 Branch 1 (a): [Node, Set(x)] → Exit
 Branch 2 (b): [Null, Set(x)] → Exit

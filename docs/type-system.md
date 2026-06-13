@@ -109,13 +109,22 @@ The `?` quantifier does **not** add dimensionality — it produces at most one v
 
 ```
 { (decorator) @dec }?
-→ { dec?: Node }   // Bubbles to parent as optional field
+→ { dec: Node | null }   // Bubbles to parent as a nullable field
 
 { (modifier) @mod (decorator) @dec }?
-→ { mod?: Node, dec?: Node }   // Both bubble as optional
+→ { mod: Node | null, dec: Node | null }   // Both bubble as nullable
 ```
 
 This lets optional fragments contribute fields directly to the parent struct without forcing an extra wrapper object.
+
+### Null, Not Absent
+
+Every declared field is **always present** in the output. An optional field
+renders as `T | null` and materializes as `null` when it doesn't match — never
+as a missing key. This keeps the object shape stable: consumers can index any
+declared field without guarding for `undefined`, and `strictNullChecks` stays
+satisfied. Missing **lists** are the empty array `[]`, never `null` (see
+[Array Captures in Alternations](#array-captures-in-alternations)).
 
 ## 2. Scope Model
 
@@ -159,7 +168,7 @@ Created by `{ ... } @name`:
 Created by `[ ... ]`:
 
 - **Tagged**: `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
-- **Untagged**: `[ (a) @a  (b) @b ]` → `{ a?: Node, b?: Node }` (merged 1-level deep)
+- **Untagged**: `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
 
 ### Enum Variants
 
@@ -189,7 +198,7 @@ Quantifiers determine whether a field is singular, optional, or an array:
 | Pattern   | Output Type      | Meaning      |
 | --------- | ---------------- | ------------ |
 | `(A) @a`  | `a: T`           | exactly one  |
-| `(A)? @a` | `a?: T`          | zero or one  |
+| `(A)? @a` | `a: T \| null`   | zero or one  |
 | `(A)* @a` | `a: T[]`         | zero or more |
 | `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
 
@@ -200,7 +209,7 @@ When using struct arrays, the outer quantifier determines cardinality:
 ```
 { (a) @a (b) @b }* @items   → items: { a: T, b: T }[]
 { (a) @a (b) @b }+ @items   → items: [{ a: T, b: T }, ...]
-{ (a) @a (b) @b }? @item    → item?: { a: T, b: T }
+{ (a) @a (b) @b }? @item    → item: { a: T, b: T } | null
 ```
 
 ### Nested Quantifiers
@@ -221,11 +230,11 @@ Each struct has its own `decs` array — no cross-struct mixing.
 
 Shallow unification across untagged branches:
 
-| Scenario                    | Result        |
-| --------------------------- | ------------- |
-| Same capture, all branches  | Required      |
-| Same capture, some branches | Optional      |
-| Type mismatch               | Compile error |
+| Scenario                    | Result               |
+| --------------------------- | -------------------- |
+| Same capture, all branches  | Required             |
+| Same capture, some branches | Nullable (`\| null`) |
+| Type mismatch               | Compile error        |
 
 ```
 [
@@ -236,7 +245,7 @@ Shallow unification across untagged branches:
 [
   (_ (a) @x (b) @y)
   (_ (a) @x)
-]  // x: Node, y?: Node
+]  // x: Node, y: Node | null
 
 [
   (a) @x ::string
@@ -280,14 +289,14 @@ When types start to conflict, use tagged alternations:
 Top-level fields merge with optionality; nested mismatches are errors:
 
 ```
-// OK: top-level merge (scalars become optional)
-{ x: Node, y: Node } ∪ { x: Node, z: String } → { x: Node, y?: Node, z?: String }
+// OK: top-level merge (absent scalars become nullable, always present)
+{ x: Node, y: Node } ∪ { x: Node, z: String } → { x: Node, y: Node | null, z: String | null }
 
 // OK: arrays emit [] when missing (not null)
 { items: Node[], x: Node } ∪ { x: Node } → { items: Node[], x: Node }
 
 // OK: identical nested
-{ data: { a: Node } } ∪ { data: { a: Node }, extra: Node } → { data: { a: Node }, extra?: Node }
+{ data: { a: Node } } ∪ { data: { a: Node }, extra: Node } → { data: { a: Node }, extra: Node | null }
 
 // ERROR: nested differ
 { data: { a: Node } } ∪ { data: { b: Node } } → incompatible struct types

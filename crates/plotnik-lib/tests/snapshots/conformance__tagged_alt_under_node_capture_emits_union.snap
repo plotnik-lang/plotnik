@@ -1,0 +1,28 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement [A: (identifier) @a  B: (number) @b] @e))
+
+==== source ====
+foo
+
+==== types ====
+export interface QeA {
+  $tag: "A";
+  $data: { a: Node };
+}
+
+export interface QeB {
+  $tag: "B";
+  $data: { b: Node };
+}
+
+export type Qe = QeA | QeB;
+
+export interface Q {
+  e: Qe;
+}
+
+==== result ====
+{"e":{"$tag":"A","$data":{"a":{"kind":"identifier","text":"foo","span":[0, 3]}}}}

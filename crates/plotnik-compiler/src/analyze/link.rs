@@ -260,11 +260,21 @@ impl<'a, 'q> Linker<'a, 'q> {
                 if !walk.in_progress.insert(name.to_string()) {
                     return;
                 }
-                let Some(body) = self.symbol_table.get(name).cloned() else {
+                let Some((ref_source, body)) = self
+                    .symbol_table
+                    .get_full(name)
+                    .map(|(s, b)| (s, b.clone()))
+                else {
                     walk.in_progress.remove(name);
                     return;
                 };
+                // The referenced definition may live in another workspace file.
+                // Validate its body under ITS source so token slicing and
+                // diagnostics resolve against the right content.
+                let saved_source = self.source_id;
+                self.source_id = ref_source;
                 self.validate_expr_structure(&body, ctx, walk);
+                self.source_id = saved_source;
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
             }
@@ -290,6 +300,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         Some(ValidationContext {
             parent_id,
             parent_range: type_token.text_range(),
+            parent_source: self.source_id,
         })
     }
 
@@ -318,6 +329,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 name_token.text(),
                 ctx.parent_id,
                 ctx.parent_range,
+                ctx.parent_source,
             );
             return;
         }
@@ -344,6 +356,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             field_name,
             ctx.parent_id,
             ctx.parent_range,
+            ctx.parent_source,
         );
     }
 
@@ -353,6 +366,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         field_name: &str,
         parent_id: NodeTypeId,
         parent_range: TextRange,
+        parent_source: SourceId,
     ) {
         let valid_fields = self.grammar.fields_for_node_type(parent_id);
         let parent_name = self
@@ -364,11 +378,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             .diagnostics
             .report(self.source_id, DiagnosticKind::FieldNotOnNodeType, range)
             .message(field_name)
-            .related_to(
-                self.source_id,
-                parent_range,
-                format!("on `{}`", parent_name),
-            );
+            .related_to(parent_source, parent_range, format!("on `{}`", parent_name));
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
@@ -418,6 +428,10 @@ struct ValidationContext {
     parent_id: NodeTypeId,
     /// The parent node type token range for related_to.
     parent_range: TextRange,
+    /// Source the parent node lives in. May differ from the source currently
+    /// being walked once validation crosses a reference into another workspace
+    /// file, so `parent_range` must be reported against this, not `self.source_id`.
+    parent_source: SourceId,
 }
 
 /// State for walking the reference graph during structural validation.

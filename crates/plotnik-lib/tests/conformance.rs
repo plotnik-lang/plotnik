@@ -115,6 +115,82 @@ macro_rules! shot_exec {
     }};
 }
 
+/// Render the diagnostics for a query that must be *rejected* at check time.
+///
+/// Some `#420` divergences are fixed by adding the missing validation: the query
+/// can no longer reach the VM, so it is pinned by its diagnostics instead of a
+/// materialized value.
+fn run_check(query_src: &str) -> String {
+    let mut source_map = SourceMap::new();
+    source_map.add_file("query.ptk", query_src);
+
+    let query = QueryBuilder::new(source_map)
+        .parse()
+        .expect("query parsing should not exhaust fuel")
+        .analyze()
+        .link(javascript());
+    assert!(
+        !query.is_valid(),
+        "query should be rejected at check time: {query_src}"
+    );
+
+    format!(
+        "==== query ====\n{}\n\n==== diagnostics ====\n{}",
+        query_src.trim(),
+        query.diagnostics().render(query.source_map()).trim_end(),
+    )
+}
+
+macro_rules! shot_check {
+    ($query:expr $(,)?) => {{
+        let output = run_check($query);
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(output);
+        });
+    }};
+}
+
+/// Render diagnostics for a multi-file workspace that must be *rejected*.
+///
+/// Pins the cross-file source attribution fix (#420 #8): a reference into
+/// another workspace file used to be walked under the *referrer's* source id,
+/// so a diagnostic raised inside the referenced file carried the wrong source
+/// and sliced foreign content out of bounds (panic at link, mis-attribution at
+/// render). Each file is `(display_name, content)`.
+fn run_workspace_check(files: &[(&str, &str)]) -> String {
+    let mut source_map = SourceMap::new();
+    for (name, content) in files {
+        source_map.add_file(name, content);
+    }
+
+    let query = QueryBuilder::new(source_map)
+        .parse()
+        .expect("query parsing should not exhaust fuel")
+        .analyze()
+        .link(javascript());
+    assert!(
+        !query.is_valid(),
+        "workspace should be rejected at check time"
+    );
+
+    let mut out = String::from("==== files ====\n");
+    for (name, content) in files {
+        out.push_str(&format!("# {name}\n{}\n", content.trim()));
+    }
+    out.push_str("\n==== diagnostics ====\n");
+    out.push_str(query.diagnostics().render(query.source_map()).trim_end());
+    out
+}
+
+macro_rules! shot_workspace_check {
+    ($files:expr $(,)?) => {{
+        let output = run_workspace_check($files);
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(output);
+        });
+    }};
+}
+
 // Alternation search in child / first-child / sibling positions (#407).
 
 #[test]
@@ -298,24 +374,104 @@ fn interior_strict_anchor_rejects_non_adjacent_pair() {
 
 // Capture value semantics: inference vs emission divergences (#420).
 
-/// BUG #420: duplicate capture names inside a named node are accepted and emit
-/// invalid JSON with two `x` keys; the sequence path correctly errors. The
-/// snapshot characterizes the duplicate-key output until validation lands.
+/// #420: duplicate capture names inside a named node are now rejected at check
+/// time. Previously the named-node path used `or_insert` (silent) while the
+/// sequence path errored, so this emitted invalid JSON with two `x` keys.
 #[test]
 fn duplicate_capture_names_in_node() {
-    shot_exec!(
-        r#"Q = (program (expression_statement (binary_expression (identifier) @x (identifier) @x)))"#,
-        "a + b"
+    shot_check!(
+        r#"Q = (program (expression_statement (binary_expression (identifier) @x (identifier) @x)))"#
     );
 }
 
+/// #420: duplicate tagged-alternation labels are now rejected at check time.
+/// Previously they collided in a `BTreeMap`, leaving the enum with one variant
+/// while the emitter produced a value the type verifier rejected.
 #[test]
-#[ignore = "#420: duplicate tagged-alternation labels collide; emitted value is not the inferred tagged union (verify_value rejects it)"]
 fn duplicate_tagged_alternation_labels() {
+    shot_check!(r#"Q = (program (expression_statement [A: (identifier) @x  A: (number) @y]))"#);
+}
+
+/// #420 #3: a captured tagged alternation now materializes the tagged union the
+/// types promise. Inference and emission both route through `capture_mechanism`,
+/// so `@e` yields `{ $tag, $data }` instead of a bare node.
+#[test]
+fn tagged_alt_under_node_capture_emits_union() {
     shot_exec!(
-        r#"Q = (program (expression_statement [A: (identifier) @x  A: (number) @y]))"#,
+        r#"Q = (program (expression_statement [A: (identifier) @a  B: (number) @b] @e))"#,
+        "foo"
+    );
+}
+
+/// #420 #4: an uncaptured recursive reference is an opaque boundary. Inference
+/// types it `Void`; the VM now suppresses the captures inside the recursion
+/// instead of bubbling them, so the outer `name` stays `null` and the value
+/// matches its declared type.
+#[test]
+fn uncaptured_recursive_ref_suppresses_captures() {
+    shot_exec!(
+        "Nested = (call_expression function: [(identifier) @name (Nested)])\nQ = (program (expression_statement (Nested) @c))",
+        "a()()"
+    );
+}
+
+/// #420 #5: a `:: string` annotation on an array capture preserves the array
+/// shape (it recurses into the element) instead of discarding it and panicking.
+#[test]
+fn string_annotation_on_array_capture() {
+    shot_exec!(
+        r#"Q = (program (lexical_declaration (variable_declarator (identifier))+ @ids :: string))"#,
+        "let a, b;"
+    );
+}
+
+/// #420 #6: `field: (Def) @cap` nests the referenced definition under the
+/// capture. Inference and emission agree on the nested `{ fn: Name }` shape
+/// rather than flattening `Name`'s fields into the parent.
+#[test]
+fn field_def_capture_nests() {
+    shot_exec!(
+        "Name = (identifier) @text\nQ = (program (function_declaration name: (Name) @fn))",
+        "function foo(){}"
+    );
+}
+
+/// #420 #7: an absent optional scalar materializes as `null` (declared
+/// `Node | null`, always present), never an absent key.
+#[test]
+fn optional_scalar_absent_is_null() {
+    shot_exec!(
+        r#"Q = (program (lexical_declaration)? @decl (expression_statement) @stmt)"#,
         "foo;"
     );
+}
+
+/// #420 #7: a list capture absent from the matched alternation branch
+/// materializes as `[]` (declared `Node[]`), never `null`.
+#[test]
+fn array_capture_absent_in_branch_is_empty() {
+    shot_exec!(
+        r#"Q = (program [(lexical_declaration (variable_declarator)+ @vs)  (expression_statement) @s])"#,
+        "foo;"
+    );
+}
+
+/// #420 #8: a reference into another workspace file is validated and inferred
+/// under its *own* source. The duplicate capture lives in `idents.ptk`, so the
+/// diagnostic points there — previously the referrer's source id was reused,
+/// slicing foreign content out of bounds (a panic).
+#[test]
+fn cross_file_ref_attributes_diagnostic_to_owning_file() {
+    shot_workspace_check!(&[
+        (
+            "main.ptk",
+            "Main = (program (expression_statement (Idents)))"
+        ),
+        (
+            "idents.ptk",
+            "Idents = (binary_expression (identifier) @x (identifier) @x)"
+        ),
+    ]);
 }
 
 // IR pass soundness (#421).

@@ -139,23 +139,21 @@ impl Emitter<'_> {
         ));
 
         // Collect fields and sort by name
-        let mut fields: Vec<(String, TypeId, bool)> = self
+        let mut fields: Vec<(String, TypeId)> = self
             .types
             .members_of(type_def)
-            .map(|member| {
-                let field_name = self.strings.get(member.name).to_string();
-                let (inner_type, optional) = self.types.unwrap_optional(member.type_id);
-                (field_name, inner_type, optional)
-            })
+            .map(|member| (self.strings.get(member.name).to_string(), member.type_id))
             .collect();
         fields.sort_by(|a, b| a.0.cmp(&b.0));
 
-        for (field_name, field_type, optional) in fields {
+        for (field_name, field_type) in fields {
+            // Every declared field is always present in the output. An optional
+            // field renders as `T | null` (the materializer emits null when it does
+            // not match), not `T?` which would wrongly permit an absent key.
             let ts_type = self.type_to_ts(field_type);
-            let opt_marker = if optional { "?" } else { "" };
             self.output.push_str(&format!(
-                "{}  {}{}{}{}: {}{}{};\n",
-                c.reset, field_name, c.dim, opt_marker, c.dim, c.reset, ts_type, c.dim
+                "{}  {}{}:{} {}{};\n",
+                c.reset, field_name, c.dim, c.reset, ts_type, c.dim
             ));
         }
 

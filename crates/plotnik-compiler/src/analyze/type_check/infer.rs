@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
+use super::capture_shape::{CaptureMechanism, capture_mechanism};
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{
@@ -104,10 +105,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             match &child_info.flow {
                 TypeFlow::Bubble(type_id) => {
-                    if let Some(fields) = self.ctx.get_struct_fields(*type_id) {
-                        for (name, info) in fields {
-                            merged_fields.entry(*name).or_insert(*info);
-                        }
+                    if let Some(fields) = self.ctx.get_struct_fields(*type_id).cloned() {
+                        self.merge_fields(&mut merged_fields, &fields, child.text_range());
                     }
                 }
                 TypeFlow::Scalar(type_id) => {
@@ -136,7 +135,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let name = name_tok.text();
         let name_sym = self.interner.intern(name);
 
-        let Some(body) = self.symbol_table.get(name) else {
+        let Some((ref_source, body)) = self.symbol_table.get_full(name) else {
             return TermInfo::void();
         };
 
@@ -153,8 +152,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return TermInfo::new(Arity::One, TypeFlow::Void);
         }
 
-        // Non-recursive refs are transparent
-        self.infer_expr(body)
+        // Non-recursive refs are transparent. The body may live in another
+        // workspace file, so expand it under its own source — otherwise any
+        // diagnostic emitted here carries this file's source id with a foreign
+        // text range (out-of-bounds when slicing the wrong content).
+        let saved_source = self.source_id;
+        self.source_id = ref_source;
+        let info = self.infer_expr(body);
+        self.source_id = saved_source;
+        info
     }
 
     /// Check if an expression body will produce an Enum type (Scalar flow).
@@ -191,7 +197,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             match &child_info.flow {
                 TypeFlow::Bubble(type_id) => {
                     if let Some(fields) = self.ctx.get_struct_fields(*type_id).cloned() {
-                        self.merge_seq_fields(&mut merged_fields, &fields, child.text_range());
+                        self.merge_fields(&mut merged_fields, &fields, child.text_range());
                     }
                 }
                 TypeFlow::Scalar(type_id) => {
@@ -207,7 +213,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(arity, flow)
     }
 
-    fn merge_seq_fields(
+    /// Merge `source` fields into `target`, reporting a diagnostic on any name
+    /// collision. Shared by sequences and named nodes so both paths reject
+    /// duplicate captures identically.
+    fn merge_fields(
         &mut self,
         target: &mut BTreeMap<Symbol, FieldInfo>,
         source: &BTreeMap<Symbol, FieldInfo>,
@@ -249,6 +258,24 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 continue;
             };
             let label_sym = self.interner.intern(label.text());
+
+            // A BTreeMap would silently collapse duplicate labels, leaving the enum
+            // with fewer variants than the emitter expects. Reject them instead.
+            if variants.contains_key(&label_sym) {
+                self.diag
+                    .report(
+                        self.source_id,
+                        DiagnosticKind::DuplicateAlternationLabel,
+                        label.text_range(),
+                    )
+                    .message(label.text())
+                    .emit();
+                if let Some(body) = branch.body() {
+                    let body_info = self.infer_expr(&body);
+                    combined_arity = combined_arity.combine(body_info.arity);
+                }
+                continue;
+            }
 
             let Some(body) = branch.body() else {
                 // Empty variant -> Void (no payload)
@@ -324,9 +351,14 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let capture_name = self.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
         let annotation = self.resolve_annotation(cap);
+        let ann_range = cap
+            .type_annotation()
+            .map(|t| t.text_range())
+            .unwrap_or_else(|| name_tok.text_range());
+
         let Some(inner) = cap.inner() else {
-            // Capture without inner -> creates a Node field with optional annotation
-            let type_id = self.annotation_to_alias(annotation, TYPE_NODE);
+            // Capture without inner -> a Node field (annotation may alias/stringify it).
+            let type_id = self.apply_annotation(TYPE_NODE, annotation, ann_range);
             let field = FieldInfo::required(type_id);
             return TermInfo::new(
                 Arity::One,
@@ -337,23 +369,31 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // Determine how inner flow relates to capture (e.g., ? makes field optional)
         let (inner_info, is_optional) = self.resolve_capture_inner(&inner);
 
-        // Determine if we need to merge bubbling fields with the capture.
-        // Only applies when inner has Bubble flow AND doesn't create a scope boundary.
-        // Sequences and alternations create scopes; named nodes/refs don't.
+        // Only the `Node` mechanism captures the matched node and lets the inner's
+        // fields bubble up alongside (e.g. `(named (child) @c) @cap`). Every other
+        // mechanism owns the inner's fields, so they must not also bubble. Sharing
+        // the classifier with emission keeps the declared type and the effects in
+        // lockstep.
+        let mechanism = capture_mechanism(&inner, self.ctx, self.interner);
         let should_merge_fields =
-            matches!(&inner_info.flow, TypeFlow::Bubble(_)) && !Self::inner_creates_scope(&inner);
+            mechanism == CaptureMechanism::Node && matches!(&inner_info.flow, TypeFlow::Bubble(_));
+
+        // The capture's base type, before its `:: …` annotation is applied.
+        let base = if should_merge_fields {
+            // Named node with bubbling children: the capture takes the matched node,
+            // and the children bubble up alongside it.
+            self.get_recursive_ref_type(&inner).unwrap_or(TYPE_NODE)
+        } else {
+            self.determine_captured_base_type(&inner, &inner_info)
+        };
+        let captured_type = self.apply_annotation(base, annotation, ann_range);
+        let field_info = if is_optional {
+            FieldInfo::optional(captured_type)
+        } else {
+            FieldInfo::required(captured_type)
+        };
 
         if should_merge_fields {
-            // Named node/ref/etc with bubbling fields: capture adds a field,
-            // inner fields bubble up alongside.
-            let captured_type = self.determine_non_scope_captured_type(&inner, annotation);
-            let field_info = if is_optional {
-                FieldInfo::optional(captured_type)
-            } else {
-                FieldInfo::required(captured_type)
-            };
-
-            // Merge capture field with inner's bubbling fields
             let TypeFlow::Bubble(type_id) = &inner_info.flow else {
                 unreachable!()
             };
@@ -369,14 +409,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 TypeFlow::Bubble(self.ctx.intern_struct(fields)),
             )
         } else {
-            // All other cases: scope-creating captures, scalar flows, void flows.
-            // Inner becomes the captured type (if applicable).
-            let captured_type = self.determine_captured_type(&inner, &inner_info, annotation);
-            let field_info = if is_optional {
-                FieldInfo::optional(captured_type)
-            } else {
-                FieldInfo::required(captured_type)
-            };
             TermInfo::new(
                 inner_info.arity,
                 TypeFlow::Bubble(self.ctx.intern_single_field(capture_name, field_info)),
@@ -384,38 +416,76 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Determines if an expression creates a scope boundary when captured.
+    /// Apply a `:: string` / `:: TypeName` annotation to a capture's base type.
     ///
-    /// When captured, these expressions produce structured values (not nodes):
-    /// - Sequences/alternations: produce structs/enums from their internal captures
-    /// - Refs: produce whatever the called definition returns (struct if it has captures)
-    ///
-    /// This only affects captured expressions. Uncaptured refs remain transparent
-    /// (their captures bubble up) because this check only runs in `infer_captured_expr`.
-    fn inner_creates_scope(inner: &Expr) -> bool {
-        match inner {
-            Expr::SeqExpr(_) | Expr::AltExpr(_) | Expr::Ref(_) => true,
-            Expr::QuantifiedExpr(q) => {
-                // Look through quantifier to the actual expression
-                q.inner()
-                    .map(|i| Self::inner_creates_scope(&i))
-                    .unwrap_or(false)
-            }
-            _ => false,
+    /// The single place that decides what each annotation means for each shape —
+    /// recursing through arrays and optionals so the annotation lands on the
+    /// element, and rejecting combinations that have no meaning.
+    fn apply_annotation(
+        &mut self,
+        base: TypeId,
+        annotation: Option<AnnotationKind>,
+        range: TextRange,
+    ) -> TypeId {
+        match annotation {
+            None => base,
+            Some(AnnotationKind::String) => self.annotate_string(base, range),
+            Some(AnnotationKind::TypeName(name)) => self.annotate_named(base, name),
         }
     }
 
-    /// Determines captured type for non-scope-creating expressions.
-    ///
-    /// For non-scope captures, fields bubble up alongside the capture field.
-    /// The annotation applies to the capture's type (usually Node or a recursive ref).
-    fn determine_non_scope_captured_type(
-        &mut self,
-        inner: &Expr,
-        annotation: Option<AnnotationKind>,
-    ) -> TypeId {
-        let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
-        self.annotation_to_alias(annotation, base_type)
+    /// `:: string` — project the matched node's text. Recurses into arrays and
+    /// optionals; structured captures (struct/enum) have no text form and are
+    /// rejected with a diagnostic.
+    fn annotate_string(&mut self, type_id: TypeId, range: TextRange) -> TypeId {
+        match self.ctx.get_type(type_id).cloned() {
+            Some(TypeShape::Node | TypeShape::String | TypeShape::Custom(_)) => TYPE_STRING,
+            Some(TypeShape::Array { element, non_empty }) => {
+                let element = self.annotate_string(element, range);
+                self.ctx
+                    .intern_type(TypeShape::Array { element, non_empty })
+            }
+            Some(TypeShape::Optional(inner)) => {
+                let inner = self.annotate_string(inner, range);
+                self.ctx.intern_type(TypeShape::Optional(inner))
+            }
+            _ => {
+                self.report_invalid_annotation(
+                    range,
+                    "`:: string` cannot extract text from a structured capture",
+                );
+                type_id
+            }
+        }
+    }
+
+    /// `:: TypeName` — name a structured capture (struct/enum) or alias a node.
+    /// Recurses into arrays and optionals so the name lands on the element.
+    fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
+        match self.ctx.get_type(type_id).cloned() {
+            Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
+                self.ctx.set_type_name(type_id, name);
+                type_id
+            }
+            Some(TypeShape::Array { element, non_empty }) => {
+                let element = self.annotate_named(element, name);
+                self.ctx
+                    .intern_type(TypeShape::Array { element, non_empty })
+            }
+            Some(TypeShape::Optional(inner)) => {
+                let inner = self.annotate_named(inner, name);
+                self.ctx.intern_type(TypeShape::Optional(inner))
+            }
+            // Node, recursive Ref, string, or void: a named alias to the value.
+            _ => self.ctx.intern_type(TypeShape::Custom(name)),
+        }
+    }
+
+    fn report_invalid_annotation(&mut self, range: TextRange, message: &str) {
+        self.diag
+            .report(self.source_id, DiagnosticKind::InvalidTypeAnnotation, range)
+            .message(message)
+            .emit();
     }
 
     /// Resolves explicit type annotation like `@foo :: string` or `@foo :: TypeName`.
@@ -433,17 +503,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 }
             })
         })
-    }
-
-    /// Converts annotation to a type, creating a Node alias for custom type names.
-    ///
-    /// Used for non-struct contexts where TypeName should create an alias to Node.
-    fn annotation_to_alias(&mut self, annotation: Option<AnnotationKind>, base: TypeId) -> TypeId {
-        match annotation {
-            Some(AnnotationKind::String) => TYPE_STRING,
-            Some(AnnotationKind::TypeName(name)) => self.ctx.intern_type(TypeShape::Custom(name)),
-            None => base,
-        }
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
@@ -464,76 +523,19 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Transforms the inner flow into a specific TypeId for the field.
-    ///
-    /// Handles type annotation semantics based on the flow:
-    /// - Void/Scalar + TypeName: creates a Node alias (current Custom behavior)
-    /// - Bubble + TypeName: names the struct type instead of replacing it
-    fn determine_captured_type(
-        &mut self,
-        inner: &Expr,
-        inner_info: &TermInfo,
-        annotation: Option<AnnotationKind>,
-    ) -> TypeId {
+    /// The capture's base type from the inner flow, before any annotation.
+    fn determine_captured_base_type(&mut self, inner: &Expr, inner_info: &TermInfo) -> TypeId {
         match &inner_info.flow {
+            // A truly empty scope (`{}`) captures an empty struct; any other void
+            // capture is the matched node (or a recursive reference's type).
             TypeFlow::Void => {
-                // Truly empty sequences/alternations produce empty struct.
-                // E.g., `{ } @x` has type `{ x: {} }`.
-                // Non-empty sequences with void flow (e.g., suppressed captures)
-                // still produce Node for the capture.
                 if is_truly_empty_scope(inner) {
-                    let empty_struct = self.ctx.intern_struct(BTreeMap::new());
-                    match annotation {
-                        Some(AnnotationKind::String) => TYPE_STRING,
-                        Some(AnnotationKind::TypeName(name)) => {
-                            self.ctx.set_type_name(empty_struct, name);
-                            empty_struct
-                        }
-                        None => empty_struct,
-                    }
+                    self.ctx.intern_struct(BTreeMap::new())
                 } else {
-                    let base_type = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
-                    self.annotation_to_alias(annotation, base_type)
+                    self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE)
                 }
             }
-            TypeFlow::Scalar(type_id) => {
-                // For array types with annotation, replace the element type
-                // e.g., `(identifier)* @names :: string` → string[] not string
-                if let Some(AnnotationKind::String) = annotation
-                    && let Some(TypeShape::Array { non_empty, .. }) = self.ctx.get_type(*type_id)
-                {
-                    return self.ctx.intern_type(TypeShape::Array {
-                        element: TYPE_STRING,
-                        non_empty: *non_empty,
-                    });
-                }
-                match annotation {
-                    Some(AnnotationKind::String) => TYPE_STRING,
-                    Some(AnnotationKind::TypeName(name)) => {
-                        // For enum types, name the enum instead of creating an alias
-                        if matches!(self.ctx.get_type(*type_id), Some(TypeShape::Enum(_))) {
-                            self.ctx.set_type_name(*type_id, name);
-                            *type_id
-                        } else {
-                            self.ctx.intern_type(TypeShape::Custom(name))
-                        }
-                    }
-                    None => *type_id,
-                }
-            }
-            TypeFlow::Bubble(type_id) => {
-                // Bubble flow means inner has struct fields (scope-creating capture).
-                // TypeName annotation should NAME the struct, not replace it with an alias.
-                match annotation {
-                    Some(AnnotationKind::String) => TYPE_STRING,
-                    Some(AnnotationKind::TypeName(name)) => {
-                        // Register the name for this struct type
-                        self.ctx.set_type_name(*type_id, name);
-                        *type_id
-                    }
-                    None => *type_id,
-                }
-            }
+            TypeFlow::Scalar(type_id) | TypeFlow::Bubble(type_id) => *type_id,
         }
     }
 

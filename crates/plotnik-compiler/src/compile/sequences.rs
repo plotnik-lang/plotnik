@@ -358,7 +358,9 @@ impl Compiler<'_> {
 
                 successors.push(body_entry);
             } else {
-                // Untagged branch: compile body with null injection for missing captures
+                // Untagged branch: inject a default value for every capture missing
+                // from this branch so the output shape stays stable. A missing list
+                // becomes an empty array (`Arr`/`EndArr`); everything else becomes null.
                 let null_effects: Vec<_> =
                     if let (Some(fields), Some(alt_type)) = (merged_fields, alt_type_id) {
                         let branch_captures = Self::collect_captures(&body);
@@ -368,14 +370,19 @@ impl Compiler<'_> {
                             .filter(|(_, (sym, _))| {
                                 !branch_captures.contains(self.ctx.interner.resolve(**sym))
                             })
-                            .flat_map(|(idx, _)| {
-                                [
-                                    EffectIR::null(),
-                                    EffectIR::with_member(
-                                        EffectOpcode::Set,
-                                        MemberRef::deferred_by_index(alt_type, idx as u16),
-                                    ),
-                                ]
+                            .flat_map(|(idx, (_, field_info))| {
+                                let set = EffectIR::with_member(
+                                    EffectOpcode::Set,
+                                    MemberRef::deferred_by_index(alt_type, idx as u16),
+                                );
+                                if matches!(
+                                    self.ctx.type_ctx.get_type(field_info.type_id),
+                                    Some(TypeShape::Array { .. })
+                                ) {
+                                    vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                                } else {
+                                    vec![EffectIR::null(), set]
+                                }
                             })
                             .collect()
                     } else {

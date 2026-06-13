@@ -1,0 +1,21 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Nested = (call_expression function: [(identifier) @name (Nested)])
+Q = (program (expression_statement (Nested) @c))
+
+==== source ====
+a()()
+
+==== types ====
+export interface Nested {
+  name: Node | null;
+}
+
+export interface Q {
+  c: Nested;
+}
+
+==== result ====
+{"c":{"name":null}}
