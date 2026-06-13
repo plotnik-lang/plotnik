@@ -1,10 +1,11 @@
-use rowan::Checkpoint;
+use rowan::{Checkpoint, TextRange, TextSize};
 
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
-use crate::parser::lexer::token_text;
+
+use super::utils::starts_uppercase;
 
 impl Parser<'_, '_> {
     /// Type annotation: `::Type` (PascalCase) or `::string` (primitive)
@@ -14,7 +15,7 @@ impl Parser<'_, '_> {
 
         if self.currently_is(SyntaxKind::Id) {
             let span = self.current_span();
-            let text = token_text(self.source, &self.tokens[self.pos]);
+            let text = self.current_text();
             self.bump();
             self.validate_type_name(text, span);
         } else {
@@ -36,14 +37,13 @@ impl Parser<'_, '_> {
         self.error_with_fix(
             DiagnosticKind::InvalidTypeAnnotationSyntax,
             span,
-            "single `:` looks like a field",
             "use `::`",
             "::",
         );
 
         self.bump(); // colon
 
-        // peek() skips whitespace, so this handles `@x : Type` with space
+        // `currently_is` skips trivia, so this handles `@x : Type` with space
         if self.currently_is(SyntaxKind::Id) {
             self.bump();
         }
@@ -60,13 +60,12 @@ impl Parser<'_, '_> {
         // Accept both `-` (preferred) and `!` (deprecated)
         if self.currently_is(SyntaxKind::Negation) {
             let span = self.current_span();
-            self.diagnostics
-                .report(
-                    self.source_id,
-                    DiagnosticKind::NegationSyntaxDeprecated,
-                    span,
-                )
-                .emit();
+            self.error_with_fix(
+                DiagnosticKind::NegationSyntaxDeprecated,
+                span,
+                "use `-`",
+                "-",
+            );
             self.bump();
         } else {
             self.expect(SyntaxKind::Minus, "'-' for negated field");
@@ -79,7 +78,7 @@ impl Parser<'_, '_> {
         }
 
         let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
+        let text = self.current_text();
         self.bump();
         self.validate_field_name(text, span);
         self.finish_node();
@@ -98,13 +97,17 @@ impl Parser<'_, '_> {
             return;
         }
 
-        // Bare identifiers are not valid expressions; trees require parentheses
+        // Bare identifiers are not valid expressions; patterns require parentheses
         let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
-        self.diagnostics
+        let text = self.current_text();
+        let mut report = self
+            .diagnostics
             .report(self.source_id, DiagnosticKind::BareIdentifier, span)
-            .fix("wrap in parentheses", format!("({})", text))
-            .emit();
+            .fix("wrap in parentheses", format!("({})", text));
+        if starts_uppercase(text) {
+            report = report.message("references must be parenthesized");
+        }
+        report.emit();
         self.bump_as_error();
     }
 
@@ -114,7 +117,7 @@ impl Parser<'_, '_> {
 
         self.assert_current(SyntaxKind::Id);
         let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
+        let text = self.current_text();
         self.bump();
         self.validate_field_name(text, span);
 
@@ -138,17 +141,11 @@ impl Parser<'_, '_> {
 
         self.bump();
         let span = self.current_span();
-        self.error_with_fix(
-            DiagnosticKind::InvalidFieldEquals,
-            span,
-            "this isn't a definition",
-            "use `:`",
-            ":",
-        );
+        self.error_with_fix(DiagnosticKind::InvalidFieldEquals, span, "use `:`", ":");
         self.bump();
 
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            self.parse_expr();
+            self.parse_expr_no_suffix();
         } else {
             self.error(DiagnosticKind::ExpectedExpression);
         }
@@ -177,13 +174,14 @@ impl Parser<'_, '_> {
         self.start_node_at(checkpoint, SyntaxKind::Capture);
         self.drain_trivia();
 
-        // Validate capture name (strip @ prefix first)
+        let source = self.source;
         let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
-        let name = &text[1..]; // Strip @ prefix
-        self.validate_capture_name(name, span);
-
         self.bump(); // consume CaptureToken or SuppressiveCapture
+
+        let end = self.consume_dotted_capture_tail(span.end());
+        let full_span = TextRange::new(span.start(), end);
+        let name = &source[usize::from(span.start()) + 1..usize::from(end)]; // strip @ prefix
+        self.validate_capture_name(name, full_span);
 
         // Type annotation only on regular captures
         if is_capture {
@@ -195,5 +193,39 @@ impl Parser<'_, '_> {
         }
 
         self.finish_node();
+    }
+
+    /// Tree-sitter style captures (`@foo.bar`, `@foo-bar`) lex as `@foo` `.`/`-` `bar`.
+    /// Consume directly adjacent `.ident`/`-ident` runs into an Error node so the
+    /// whole thing is diagnosed as one malformed capture name, not as an anchor or
+    /// negated field followed by a bare identifier. Returns the capture's end offset.
+    fn consume_dotted_capture_tail(&mut self, mut end: TextSize) -> TextSize {
+        let dotted_segment = |p: &Self, end: TextSize| {
+            let sep = p
+                .tokens
+                .get(p.pos)
+                .filter(|t| matches!(t.kind, SyntaxKind::Dot | SyntaxKind::Minus))?;
+            if sep.span.start() != end {
+                return None;
+            }
+            let id = p
+                .tokens
+                .get(p.pos + 1)
+                .filter(|t| t.kind == SyntaxKind::Id)?;
+            (id.span.start() == sep.span.end()).then_some(id.span.end())
+        };
+
+        if dotted_segment(self, end).is_none() {
+            return end;
+        }
+
+        self.start_node(SyntaxKind::Error);
+        while let Some(segment_end) = dotted_segment(self, end) {
+            self.bump(); // separator
+            self.bump(); // identifier
+            end = segment_end;
+        }
+        self.finish_node();
+        end
     }
 }

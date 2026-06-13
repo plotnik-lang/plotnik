@@ -62,9 +62,9 @@ fn builder_with_related() {
         .emit();
 
     assert_eq!(diagnostics.len(), 1);
-    let result = diagnostics.printer(&map).render();
-    insta::assert_snapshot!(result, @r"
-    error: missing closing `)`; primary
+    let result = diagnostics.render_unfiltered(&map);
+    insta::assert_snapshot!(result, @"
+    error: missing closing `)`: primary
       |
     1 | hello world!
       | ^^^^^ ---- related info
@@ -87,9 +87,9 @@ fn builder_with_fix() {
         .fix("apply this fix", "fixed")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
-    insta::assert_snapshot!(result, @r"
-    error: use `:` instead of `=`: fixable
+    let result = diagnostics.render_unfiltered(&map);
+    insta::assert_snapshot!(result, @"
+    error: fields use `:`, not `=`: fixable
       |
     1 | hello world
       | ^^^^^
@@ -120,9 +120,9 @@ fn builder_with_all_options() {
         .fix("try this", "HELLO")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
-    insta::assert_snapshot!(result, @r"
-    error: missing closing `)`; main error
+    let result = diagnostics.render_unfiltered(&map);
+    insta::assert_snapshot!(result, @"
+    error: missing closing `)`: main error
       |
     1 | hello world stuff!
       | ^^^^^ ----- ----- and here
@@ -152,7 +152,7 @@ fn printer_colored() {
         .message("test")
         .emit();
 
-    let result = diagnostics.printer(&map).colored(true).render();
+    let result = diagnostics.render_colored(&map, true);
     assert!(result.contains("test"));
     assert!(result.contains('\x1b'));
 }
@@ -161,7 +161,7 @@ fn printer_colored() {
 fn printer_empty_diagnostics() {
     let map = SourceMap::one_liner("source");
     let diagnostics = Diagnostics::new();
-    let result = diagnostics.printer(&map).render();
+    let result = diagnostics.render_unfiltered(&map);
     assert!(result.is_empty());
 }
 
@@ -180,7 +180,7 @@ fn printer_with_custom_path() {
         .message("test error")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
+    let result = diagnostics.render_unfiltered(&map);
     insta::assert_snapshot!(result, @r"
     error: `test error` is not defined
      --> test.pql:1:1
@@ -205,7 +205,7 @@ fn printer_zero_width_span() {
         .message("zero width error")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
+    let result = diagnostics.render_unfiltered(&map);
     insta::assert_snapshot!(result, @r"
     error: expected an expression: zero width error
       |
@@ -230,9 +230,9 @@ fn printer_related_zero_width() {
         .related_to(id, TextRange::empty(6.into()), "zero width related")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
-    insta::assert_snapshot!(result, @r"
-    error: missing closing `)`; primary
+    let result = diagnostics.render_unfiltered(&map);
+    insta::assert_snapshot!(result, @"
+    error: missing closing `)`: primary
       |
     1 | hello world!
       | ^^^^^ - zero width related
@@ -262,9 +262,9 @@ fn printer_multiple_diagnostics() {
         .message("second error")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
-    insta::assert_snapshot!(result, @r"
-    error: missing closing `)`; first error
+    let result = diagnostics.render_unfiltered(&map);
+    insta::assert_snapshot!(result, @"
+    error: missing closing `)`: first error
       |
     1 | hello world!
       | ^^^^^
@@ -347,13 +347,17 @@ fn diagnostic_kind_fallback_messages() {
 
 #[test]
 fn diagnostic_kind_custom_messages() {
-    assert_eq!(
-        DiagnosticKind::UnclosedTree.custom_message(),
-        "missing closing `)`; {}"
-    );
+    // Detail replaces the whole message
+    assert_eq!(DiagnosticKind::UnexpectedToken.custom_message(), "{}");
+    // Detail is interpolated into a template
     assert_eq!(
         DiagnosticKind::UndefinedReference.custom_message(),
         "`{}` is not defined"
+    );
+    // Default: fallback message plus detail
+    assert_eq!(
+        DiagnosticKind::DuplicateCaptureInScope.custom_message(),
+        "capture `@{}` already defined in this scope"
     );
 }
 
@@ -366,8 +370,8 @@ fn diagnostic_kind_message_rendering() {
     );
     // With custom message → template applied
     assert_eq!(
-        DiagnosticKind::UnclosedTree.message(Some("expected `)`")),
-        "missing closing `)`; expected `)`"
+        DiagnosticKind::UnexpectedToken.message(Some("expected `)`")),
+        "expected `)`"
     );
     assert_eq!(
         DiagnosticKind::UndefinedReference.message(Some("Foo")),
@@ -514,7 +518,7 @@ fn render_filtered() {
         .message("unnamed def")
         .emit();
 
-    let result = diagnostics.render_filtered(&map);
+    let result = diagnostics.render(&map);
     // Should only show the unclosed tree error
     assert!(result.contains("unclosed tree"));
     assert!(!result.contains("unnamed def"));
@@ -539,7 +543,7 @@ fn multi_file_cross_file_related() {
         .related_to(file_a, TextRange::new(0.into(), 3.into()), "defined here")
         .emit();
 
-    let result = diagnostics.printer(&map).render();
+    let result = diagnostics.render_unfiltered(&map);
     insta::assert_snapshot!(result, @r"
     error: `Foo` is not defined
      --> b.ptk:1:2
@@ -574,7 +578,7 @@ fn multi_file_same_file_related() {
         )
         .emit();
 
-    let result = diagnostics.printer(&map).render();
+    let result = diagnostics.render_unfiltered(&map);
     insta::assert_snapshot!(result, @r"
     error: `Foo` is already defined
      --> main.ptk:1:13
@@ -608,4 +612,113 @@ fn span_new() {
     let span = Span::new(id, range);
     assert_eq!(span.source, id);
     assert_eq!(span.range, range);
+}
+
+#[test]
+fn render_json_full_shape() {
+    let mut map = SourceMap::new();
+    let id = map.add_file("query.ptk", "(foo)\n(bar)");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            id,
+            DiagnosticKind::UnknownNodeType,
+            TextRange::new(7.into(), 10.into()),
+        )
+        .message("bar")
+        .related_to(id, TextRange::new(1.into(), 4.into()), "first seen here")
+        .fix("replace with `baz`", "baz")
+        .hint("check the grammar")
+        .emit();
+
+    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
+
+    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
+    [
+      {
+        "code": "unknown_node_type",
+        "fix": {
+          "description": "replace with `baz`",
+          "replacement": "baz"
+        },
+        "hints": [
+          "check the grammar"
+        ],
+        "message": "`bar` is not a valid node type",
+        "related": [
+          {
+            "message": "first seen here",
+            "span": {
+              "end": {
+                "column": 5,
+                "line": 1,
+                "offset": 4
+              },
+              "file": "query.ptk",
+              "start": {
+                "column": 2,
+                "line": 1,
+                "offset": 1
+              }
+            }
+          }
+        ],
+        "severity": "error",
+        "span": {
+          "end": {
+            "column": 5,
+            "line": 2,
+            "offset": 10
+          },
+          "file": "query.ptk",
+          "start": {
+            "column": 2,
+            "line": 2,
+            "offset": 7
+          }
+        }
+      }
+    ]
+    "#);
+}
+
+#[test]
+fn render_json_minimal_omits_empty_fields() {
+    let mut map = SourceMap::new();
+    let id = map.add_one_liner("(foo");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            id,
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 4.into()),
+        )
+        .emit();
+
+    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
+
+    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
+    [
+      {
+        "code": "unclosed_tree",
+        "message": "missing closing `)`",
+        "severity": "error",
+        "span": {
+          "end": {
+            "column": 5,
+            "line": 1,
+            "offset": 4
+          },
+          "file": "<query>",
+          "start": {
+            "column": 1,
+            "line": 1,
+            "offset": 0
+          }
+        }
+      }
+    ]
+    "#);
 }

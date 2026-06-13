@@ -3,139 +3,71 @@ use rowan::TextRange;
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 
-use super::utils::{to_pascal_case, to_snake_case};
+use super::utils::{starts_uppercase, to_pascal_case, to_snake_case};
 
 impl Parser<'_, '_> {
-    /// Validate capture name follows plotnik convention (snake_case).
+    /// Capture names are strictly snake_case: they become Rust struct fields.
     pub(crate) fn validate_capture_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') {
-            let suggested = name.replace(['.', '-'], "_");
-            let suggested = to_snake_case(&suggested);
+        if name.contains(['.', '-']) || name.chars().any(|c| c.is_ascii_uppercase()) {
+            let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
             self.error_with_fix(
-                DiagnosticKind::CaptureNameHasDots,
+                DiagnosticKind::CaptureNameInvalid,
                 span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.contains('-') {
-            let suggested = name.replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameHasHyphens,
-                span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-            let suggested = to_snake_case(name);
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameUppercase,
-                span,
-                "captures become struct fields",
-                format!("use `@{}`", suggested),
-                suggested,
+                format!("use `@{suggested}`"),
+                format!("@{suggested}"),
             );
         }
     }
 
-    /// Validate definition name follows PascalCase convention.
+    /// Definition names are PascalCase (they become types in the output).
     pub(crate) fn validate_def_name(&mut self, name: &str, span: TextRange) {
-        if !name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        if !starts_uppercase(name) || name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
-                DiagnosticKind::DefNameLowercase,
+                DiagnosticKind::DefNameInvalid,
                 span,
-                "definitions map to types",
-                format!("use `{}`", suggested),
-                suggested,
-            );
-            return;
-        }
-
-        if name.contains('_') || name.contains('-') || name.contains('.') {
-            let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::DefNameHasSeparators,
-                span,
-                "definitions map to types",
-                format!("use `{}`", suggested),
+                format!("use `{suggested}`"),
                 suggested,
             );
         }
     }
 
-    /// Validate branch label follows PascalCase convention.
+    /// Branch labels are PascalCase (they become enum variants).
+    /// Lowercase labels take a separate parse path; this only checks separators.
     pub(crate) fn validate_branch_label(&mut self, name: &str, span: TextRange) {
-        if name.contains('_') || name.contains('-') || name.contains('.') {
+        if name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
-                DiagnosticKind::BranchLabelHasSeparators,
+                DiagnosticKind::BranchLabelInvalid,
                 span,
-                "branch labels map to enum variants",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
+                format!("use `{suggested}`"),
+                suggested,
             );
         }
     }
 
-    /// Validate field name follows snake_case convention.
+    /// Field names are snake_case (tree-sitter grammar convention).
     pub(crate) fn validate_field_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') {
-            let suggested = name.replace(['.', '-'], "_");
-            let suggested = to_snake_case(&suggested);
+        if name.contains(['.', '-']) || starts_uppercase(name) {
+            let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
             self.error_with_fix(
-                DiagnosticKind::FieldNameHasDots,
+                DiagnosticKind::FieldNameInvalid,
                 span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-            return;
-        }
-
-        if name.contains('-') {
-            let suggested = name.replace('-', "_");
-            let suggested = to_snake_case(&suggested);
-            self.error_with_fix(
-                DiagnosticKind::FieldNameHasHyphens,
-                span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
-            );
-            return;
-        }
-
-        if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-            let suggested = to_snake_case(name);
-            self.error_with_fix(
-                DiagnosticKind::FieldNameUppercase,
-                span,
-                "field names become struct fields",
-                format!("use `{}:`", suggested),
-                format!("{}:", suggested),
+                format!("use `{suggested}`"),
+                suggested,
             );
         }
     }
 
-    /// Validate type annotation name (PascalCase for user types, snake_case for primitives allowed).
+    /// Type names: PascalCase user types or lowercase primitives; never `.` or `-`.
     pub(crate) fn validate_type_name(&mut self, name: &str, span: TextRange) {
-        if name.contains('.') || name.contains('-') {
+        if name.contains(['.', '-']) {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
-                DiagnosticKind::TypeNameInvalidChars,
+                DiagnosticKind::TypeNameInvalid,
                 span,
-                "type annotations map to types",
-                format!("use `::{}`", suggested),
-                format!("::{}", suggested),
+                format!("use `::{suggested}`"),
+                suggested,
             );
         }
     }

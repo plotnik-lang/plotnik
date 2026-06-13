@@ -1,3 +1,4 @@
+mod json;
 mod message;
 mod printer;
 
@@ -6,8 +7,10 @@ mod diagnostics_tests;
 
 use rowan::TextRange;
 
+pub use json::{JsonDiagnostic, JsonFix, JsonPosition, JsonRelated, JsonSpan};
 pub use message::{DiagnosticKind, Severity};
-pub use printer::DiagnosticsPrinter;
+
+use printer::DiagnosticsPrinter;
 
 use message::{DiagnosticMessage, Fix, RelatedInfo};
 
@@ -56,7 +59,7 @@ impl Diagnostics {
     ) -> DiagnosticBuilder<'_> {
         DiagnosticBuilder {
             diagnostics: self,
-            message: DiagnosticMessage::with_default_message(source, kind, range),
+            message: DiagnosticMessage::new(source, kind, range),
         }
     }
 
@@ -78,10 +81,6 @@ impl Diagnostics {
 
     pub fn error_count(&self) -> usize {
         self.messages.iter().filter(|d| d.is_error()).count()
-    }
-
-    pub fn warning_count(&self) -> usize {
-        self.messages.iter().filter(|d| d.is_warning()).count()
     }
 
     /// Returns diagnostics with cascading errors suppressed.
@@ -113,6 +112,11 @@ impl Diagnostics {
         for (i, a) in self.messages.iter().enumerate() {
             for (j, b) in self.messages.iter().enumerate() {
                 if i == j || suppressed[i] || suppressed[j] {
+                    continue;
+                }
+
+                // A warning never outranks an error
+                if a.is_warning() && b.is_error() {
                     continue;
                 }
 
@@ -168,34 +172,34 @@ impl Diagnostics {
         &self.messages
     }
 
-    /// Create a printer with a source map (multi-file support).
-    pub fn printer<'q>(&self, sources: &'q SourceMap) -> DiagnosticsPrinter<'q> {
-        DiagnosticsPrinter::new(self.messages.clone(), sources)
-    }
-
-    /// Filtered printer with source map (cascading errors suppressed).
-    pub fn filtered_printer<'q>(&self, sources: &'q SourceMap) -> DiagnosticsPrinter<'q> {
-        DiagnosticsPrinter::new(self.filtered(), sources)
-    }
-
-    /// Render with source map.
+    /// Render for users: cascading errors are suppressed.
     pub fn render(&self, sources: &SourceMap) -> String {
-        self.printer(sources).render()
+        DiagnosticsPrinter::new(self.filtered(), sources).render()
     }
 
-    /// Render with source map, colored output.
+    /// Render for users with optional colors: cascading errors are suppressed.
     pub fn render_colored(&self, sources: &SourceMap, colored: bool) -> String {
-        self.printer(sources).colored(colored).render()
+        DiagnosticsPrinter::new(self.filtered(), sources)
+            .colored(colored)
+            .render()
     }
 
-    /// Render filtered with source map.
-    pub fn render_filtered(&self, sources: &SourceMap) -> String {
-        self.filtered_printer(sources).render()
+    /// Render every recorded diagnostic, including suppressed cascades (debugging).
+    pub fn render_unfiltered(&self, sources: &SourceMap) -> String {
+        DiagnosticsPrinter::new(self.messages.clone(), sources).render()
     }
 
-    /// Render filtered with source map, colored output.
-    pub fn render_filtered_colored(&self, sources: &SourceMap, colored: bool) -> String {
-        self.filtered_printer(sources).colored(colored).render()
+    /// Canonical serializable form: cascading errors are suppressed, same as `render`.
+    pub fn to_json(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
+        self.filtered()
+            .iter()
+            .map(|m| JsonDiagnostic::from_message(m, sources))
+            .collect()
+    }
+
+    /// Render as a compact JSON array, one object per diagnostic.
+    pub fn render_json(&self, sources: &SourceMap) -> String {
+        serde_json::to_string(&self.to_json(sources)).expect("diagnostics serialize to JSON")
     }
 
     pub fn extend(&mut self, other: Diagnostics) {

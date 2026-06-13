@@ -1,7 +1,7 @@
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
-use crate::parser::cst::token_sets::EXPR_FIRST_TOKENS;
+use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
 
 impl Parser<'_, '_> {
     /// Parse an expression, or emit an error if current token can't start one.
@@ -59,12 +59,16 @@ impl Parser<'_, '_> {
 
         let checkpoint = self.checkpoint();
 
-        match self.current() {
+        let kind = self.current();
+        match kind {
             SyntaxKind::ParenOpen => self.parse_tree(),
             SyntaxKind::BracketOpen => self.parse_alt(),
             SyntaxKind::BraceOpen => self.parse_seq(),
             SyntaxKind::Underscore => self.parse_wildcard(),
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_str(),
+            SyntaxKind::UnterminatedString => {
+                self.error_and_bump(DiagnosticKind::UnclosedString);
+            }
             SyntaxKind::Dot | SyntaxKind::DotBang => self.parse_anchor(),
             SyntaxKind::Negation | SyntaxKind::Minus => self.parse_negated_field(),
             SyntaxKind::Id => self.parse_tree_or_field(),
@@ -76,11 +80,30 @@ impl Parser<'_, '_> {
             }
         }
 
-        if with_suffix {
+        if matches!(kind, SyntaxKind::Dot | SyntaxKind::DotBang) {
+            // Anchors constrain position and produce no value: `*` or `@x` after
+            // one is always a mistake, never a suffix to wrap.
+            self.reject_anchor_suffixes();
+        } else if with_suffix {
             self.try_parse_quantifier(checkpoint);
             self.try_parse_capture(checkpoint);
         }
 
         self.exit_recursion();
+    }
+
+    fn reject_anchor_suffixes(&mut self) {
+        loop {
+            if self.currently_is_one_of(QUANTIFIERS) {
+                self.error_and_bump(DiagnosticKind::QuantifiedAnchor);
+            } else if matches!(
+                self.current(),
+                SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
+            ) {
+                self.error_and_bump(DiagnosticKind::CapturedAnchor);
+            } else {
+                return;
+            }
+        }
     }
 }

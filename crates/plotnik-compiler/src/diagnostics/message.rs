@@ -14,9 +14,12 @@ use super::{SourceId, Span};
 /// - Naming validation errors are convention violations
 /// - Semantic errors assume valid syntax
 /// - Structural observations are often consequences of earlier errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
-    // These cause cascading errors throughout the rest of the file
+    // These cause cascading errors throughout the rest of the file.
+    // A missing quote swallows closing delimiters, so it outranks them all.
+    UnclosedString,
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
@@ -25,7 +28,6 @@ pub enum DiagnosticKind {
     // User omitted something required - root cause errors
     ExpectedExpression,
     ExpectedTypeName,
-    ExpectedCaptureName,
     ExpectedFieldName,
     ExpectedSubtype,
     ExpectedPredicateValue,
@@ -38,6 +40,8 @@ pub enum DiagnosticKind {
     BareIdentifier,
     InvalidSeparator,
     AnchorInAlternation,
+    QuantifiedAnchor,
+    CapturedAnchor,
     InvalidFieldEquals,
     InvalidSupertypeSyntax,
     InvalidTypeAnnotationSyntax,
@@ -47,19 +51,13 @@ pub enum DiagnosticKind {
     UnsupportedPredicate,
     UnexpectedToken,
     CaptureWithoutTarget,
-    LowercaseBranchLabel,
 
     // Convention violations - fixable with suggestions
-    CaptureNameHasDots,
-    CaptureNameHasHyphens,
-    CaptureNameUppercase,
-    DefNameLowercase,
-    DefNameHasSeparators,
-    BranchLabelHasSeparators,
-    FieldNameHasDots,
-    FieldNameHasHyphens,
-    FieldNameUppercase,
-    TypeNameInvalidChars,
+    CaptureNameInvalid,
+    DefNameInvalid,
+    BranchLabelInvalid,
+    FieldNameInvalid,
+    TypeNameInvalid,
     TreeSitterSequenceSyntax,
     NegationSyntaxDeprecated,
 
@@ -104,7 +102,7 @@ pub enum DiagnosticKind {
 }
 
 impl DiagnosticKind {
-    /// Default severity for this kind. Can be overridden by policy.
+    /// Severity for this kind.
     pub fn default_severity(&self) -> Severity {
         match self {
             Self::UnusedBranchLabels
@@ -131,6 +129,7 @@ impl DiagnosticKind {
                 | Self::UnclosedSequence
                 | Self::UnclosedAlternation
                 | Self::UnclosedRegex
+                | Self::UnclosedString
         )
     }
 
@@ -141,7 +140,6 @@ impl DiagnosticKind {
             self,
             Self::ExpectedExpression
                 | Self::ExpectedTypeName
-                | Self::ExpectedCaptureName
                 | Self::ExpectedFieldName
                 | Self::ExpectedSubtype
                 | Self::ExpectedPredicateValue
@@ -162,10 +160,25 @@ impl DiagnosticKind {
             Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
             Self::ExpectedFieldName => Some("e.g., `-value`"),
             Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
-            Self::EmptyAnonymousNode => Some("use a valid anonymous node or remove it"),
+            Self::EmptyAnonymousNode => {
+                Some("anonymous nodes match literal tokens, like `\"+\"` or `\";\"`")
+            }
             Self::EmptySequence => Some("sequences must contain at least one expression"),
             Self::EmptyAlternation => Some("alternations must contain at least one branch"),
-            Self::TreeSitterSequenceSyntax => Some("use `{...}` for sequences"),
+            Self::ErrorMissingOutsideParens => Some("write `(ERROR)` or `(MISSING \";\")`"),
+            Self::UnsupportedPredicate => {
+                Some("use a node predicate instead: `(identifier == \"foo\")`")
+            }
+            Self::CaptureWithoutTarget => {
+                Some("captures attach to the pattern before them: `(node) @name`")
+            }
+            Self::CaptureNameInvalid => Some("captures become fields in the output"),
+            Self::DefNameInvalid => Some("definitions become types in the output"),
+            Self::BranchLabelInvalid => Some("branch labels become enum variants in the output"),
+            Self::FieldNameInvalid => Some("fields come from the grammar and are snake_case"),
+            Self::TreeSitterSequenceSyntax => {
+                Some("use `{(a) (b)}` to match a sequence of siblings")
+            }
             Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
             Self::MixedAltBranches => {
                 Some("use all labels for a tagged union, or none for a merged struct")
@@ -178,6 +191,9 @@ impl DiagnosticKind {
             }
             Self::AnchorWithoutContext => Some("wrap in a named node: `(parent . (child))`"),
             Self::AnchorInAlternation => Some("use `[{(a) . (b)} (c)]` to anchor within a branch"),
+            Self::QuantifiedAnchor | Self::CapturedAnchor => {
+                Some("anchors constrain position and produce no value")
+            }
             Self::UncapturedOutputWithCaptures => Some("add `@name` to capture the output"),
             Self::AmbiguousUncapturedOutputs => {
                 Some("capture each expression explicitly: `(X) @x (Y) @y`")
@@ -197,47 +213,43 @@ impl DiagnosticKind {
             Self::UnclosedSequence => "missing closing `}`",
             Self::UnclosedAlternation => "missing closing `]`",
             Self::UnclosedRegex => "missing closing `/` for regex",
+            Self::UnclosedString => "missing closing quote",
 
             // Expected token errors
             Self::ExpectedExpression => "expected an expression",
-            Self::ExpectedTypeName => "expected type name",
-            Self::ExpectedCaptureName => "expected capture name",
-            Self::ExpectedFieldName => "expected field name",
-            Self::ExpectedSubtype => "expected subtype name",
-            Self::ExpectedPredicateValue => "expected string or regex after predicate operator",
+            Self::ExpectedTypeName => "expected a type name after `::`",
+            Self::ExpectedFieldName => "expected a field name",
+            Self::ExpectedSubtype => "expected a subtype after `/`",
+            Self::ExpectedPredicateValue => "expected a string or regex after the operator",
 
             // Invalid syntax
-            Self::EmptyTree => "empty `()` is not allowed",
-            Self::EmptyAnonymousNode => "empty anonymous node",
-            Self::EmptySequence => "empty `{}` is not allowed",
-            Self::EmptyAlternation => "empty `[]` is not allowed",
-            Self::BareIdentifier => "bare identifier is not valid",
-            Self::InvalidSeparator => "unexpected separator",
+            Self::EmptyTree => "empty `()` matches nothing",
+            Self::EmptyAnonymousNode => "empty string matches nothing",
+            Self::EmptySequence => "empty `{}` matches nothing",
+            Self::EmptyAlternation => "empty `[]` matches nothing",
+            Self::BareIdentifier => "node types must be parenthesized",
+            Self::InvalidSeparator => "patterns are separated by whitespace",
             Self::AnchorInAlternation => "anchors cannot appear directly in alternations",
-            Self::InvalidFieldEquals => "use `:` instead of `=`",
+            Self::QuantifiedAnchor => "anchors cannot be quantified",
+            Self::CapturedAnchor => "anchors cannot be captured",
+            Self::InvalidFieldEquals => "fields use `:`, not `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
-            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations",
+            Self::InvalidTypeAnnotationSyntax => "type annotations use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
             Self::RefCannotHaveChildren => "references cannot have children",
-            Self::ErrorMissingOutsideParens => "special node requires parentheses",
-            Self::UnsupportedPredicate => "predicates are not supported",
+            Self::ErrorMissingOutsideParens => "`ERROR` and `MISSING` must be parenthesized",
+            Self::UnsupportedPredicate => "tree-sitter predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
-            Self::CaptureWithoutTarget => "capture has no target",
-            Self::LowercaseBranchLabel => "branch label must start with uppercase",
+            Self::CaptureWithoutTarget => "expected a capture name after `@`",
 
             // Naming convention violations
-            Self::CaptureNameHasDots => "capture names cannot contain `.`",
-            Self::CaptureNameHasHyphens => "capture names cannot contain `-`",
-            Self::CaptureNameUppercase => "capture names must be lowercase",
-            Self::DefNameLowercase => "definition names must start uppercase",
-            Self::DefNameHasSeparators => "definition names must be PascalCase",
-            Self::BranchLabelHasSeparators => "branch labels must be PascalCase",
-            Self::FieldNameHasDots => "field names cannot contain `.`",
-            Self::FieldNameHasHyphens => "field names cannot contain `-`",
-            Self::FieldNameUppercase => "field names must be lowercase",
-            Self::TypeNameInvalidChars => "type names cannot contain `.` or `-`",
-            Self::TreeSitterSequenceSyntax => "tree-sitter sequence syntax",
-            Self::NegationSyntaxDeprecated => "deprecated negation syntax",
+            Self::CaptureNameInvalid => "capture names must be snake_case",
+            Self::DefNameInvalid => "definition names must be PascalCase",
+            Self::BranchLabelInvalid => "branch labels must be PascalCase",
+            Self::FieldNameInvalid => "field names must be snake_case",
+            Self::TypeNameInvalid => "type names cannot contain `.` or `-`",
+            Self::TreeSitterSequenceSyntax => "parenthesized sequences are tree-sitter syntax",
+            Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
 
             // Semantic errors
             Self::DuplicateDefinition => "duplicate definition",
@@ -295,6 +307,9 @@ impl DiagnosticKind {
     /// Template for custom messages. Contains `{}` placeholder for caller-provided detail.
     pub fn custom_message(&self) -> String {
         match self {
+            // The detail is a full message: "expected closing `)` for tree"
+            Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
+
             // Special formatting for references
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
@@ -329,17 +344,6 @@ impl DiagnosticKind {
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
 
-            // Unclosed with context
-            Self::UnclosedTree | Self::UnclosedSequence | Self::UnclosedAlternation => {
-                format!("{}; {{}}", self.fallback_message())
-            }
-
-            // Type annotation specifics
-            Self::InvalidTypeAnnotationSyntax => "use `::` for type annotations: {}".to_string(),
-
-            // Named def (no custom message needed; suggestion goes in hint)
-            Self::UnnamedDef => self.fallback_message().to_string(),
-
             // Standard pattern: fallback + context
             _ => format!("{}: {{}}", self.fallback_message()),
         }
@@ -357,7 +361,8 @@ impl DiagnosticKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     #[default]
     Error,
@@ -422,30 +427,18 @@ pub(crate) struct DiagnosticMessage {
 }
 
 impl DiagnosticMessage {
-    pub(crate) fn new(
-        source: SourceId,
-        kind: DiagnosticKind,
-        range: TextRange,
-        message: impl Into<String>,
-    ) -> Self {
+    /// New message with the kind's fallback text; `DiagnosticBuilder::message` overrides it.
+    pub(crate) fn new(source: SourceId, kind: DiagnosticKind, range: TextRange) -> Self {
         Self {
             kind,
             source,
             range,
             suppression_range: range,
-            message: message.into(),
+            message: kind.fallback_message().to_string(),
             fix: None,
             related: Vec::new(),
             hints: Vec::new(),
         }
-    }
-
-    pub(crate) fn with_default_message(
-        source: SourceId,
-        kind: DiagnosticKind,
-        range: TextRange,
-    ) -> Self {
-        Self::new(source, kind, range, kind.fallback_message())
     }
 
     pub(crate) fn severity(&self) -> Severity {

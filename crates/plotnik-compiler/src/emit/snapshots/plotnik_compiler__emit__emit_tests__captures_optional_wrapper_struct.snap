@@ -45,5 +45,5 @@ Test:
   09  -ε-  [EndObj Set(M2)]                 08
   11   !   [Obj] (identifier) [Node Set(M0) EndObj Set(M1) EndObj Set(M2)]  08
   14  -ε-  [Null Set(M1)]                   09
-  16  ─‣─  _                                11, 16, 14
-  18   !   _                                11, 16, 14
+  16  ─‣─  _                                11, 16
+  18   !   _                                11, 16

@@ -8,6 +8,7 @@ use plotnik_lib::engine::{
 };
 
 use super::run_common::{self, PreparedQuery, QueryInput};
+use crate::error::{CliError, CliResult};
 
 pub struct TraceArgs {
     pub query_path: Option<PathBuf>,
@@ -22,7 +23,7 @@ pub struct TraceArgs {
     pub color: bool,
 }
 
-pub fn run(args: TraceArgs) {
+pub fn run(args: TraceArgs) -> CliResult {
     let PreparedQuery {
         module,
         entrypoint,
@@ -36,7 +37,7 @@ pub fn run(args: TraceArgs) {
         lang: args.lang.as_deref(),
         entry: args.entry.as_deref(),
         color: args.color,
-    });
+    })?;
 
     let vm = VM::builder(&source_code, &tree)
         .exec_fuel(args.fuel)
@@ -54,17 +55,17 @@ pub fn run(args: TraceArgs) {
         }
         Err(RuntimeError::NoMatch) => {
             tracer.print();
-            std::process::exit(1);
+            eprintln!("no match");
+            return Err(CliError::No);
         }
         Err(e) => {
             tracer.print();
-            eprintln!("runtime error: {}", e);
-            std::process::exit(2);
+            return Err(CliError::fatal(format!("runtime error: {}", e)));
         }
     };
 
     if args.no_result {
-        return;
+        return Ok(());
     }
 
     println!("{}---{}", colors.dim, colors.reset);
@@ -76,4 +77,6 @@ pub fn run(args: TraceArgs) {
 
     let output = value.format(true, colors);
     println!("{}", output);
+
+    Ok(())
 }

@@ -44,15 +44,15 @@ _ObjWrap:
 Test:
   06   !   (array)                          08
   07  ...  
-  08  -ε-  [Arr]                            22, 12
-  10                                        ▶
-  11  -ε-                                   28
-  12  -ε-  [EndArr Set(M2)]                 10
-  14  -ε-  [EndObj Push]                    26, 11
-  16  ─‣─  (number) [Node Set(M1)]          14
-  18   !   [Obj] (identifier) [Node Set(M0)]  16
-  20  ─‣─  _                                18, 20, 28
-  22  └‣─  _                                18, 20, 28
-  24  ─‣─  _                                18, 24, 28
-  26  ─‣─  _                                18, 24, 28
-  28  ─‣┘  [EndArr Set(M2)] _               10
+  08  -ε-  [Arr]                            24, 14
+  10  -ε-                                   11
+  11  ─‣┘  [EndArr Set(M2)] _               13
+  13                                        ▶
+  14  -ε-  [EndArr Set(M2)]                 13
+  16  -ε-  [EndObj Push]                    28, 10
+  18  ─‣─  (number) [Node Set(M1)]          16
+  20   !   [Obj] (identifier) [Node Set(M0)]  18
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣─  _                                20, 26
+  28  ─‣─  _                                20, 26

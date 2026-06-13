@@ -4,8 +4,6 @@
 //! Logos derives token recognition; node kinds lack token/regex attributes.
 //! `QLang` implements Rowan's `Language` trait for tree construction.
 
-#![allow(dead_code)] // Some items are for future use
-
 use logos::Logos;
 use rowan::Language;
 
@@ -32,7 +30,7 @@ pub enum SyntaxKind {
     #[token("}")]
     BraceClose,
 
-    /// `::` for type annotations. Defined before `Colon` for correct precedence.
+    /// `::` for type annotations. Longest match wins over `Colon`.
     #[token("::")]
     DoubleColon,
 
@@ -92,6 +90,12 @@ pub enum SyntaxKind {
     #[doc(hidden)]
     StringLiteral, // Lexer-internal only
 
+    /// String with no closing quote before end of line. Closed strings always
+    /// match longer, so this only wins when no closing quote exists.
+    #[regex(r#""(?:[^"\\\n]|\\[^\n])*"#)]
+    #[regex(r"'(?:[^'\\\n]|\\[^\n])*")]
+    UnterminatedString,
+
     DoubleQuote,
     SingleQuote,
     /// String content between quotes
@@ -104,7 +108,7 @@ pub enum SyntaxKind {
     KwMissing,
 
     /// Identifier. Accepts dots/hyphens for tree-sitter compat; parser validates per context.
-    /// Defined after keywords so they take precedence.
+    /// Keywords win over this regex via logos's higher literal-token priority.
     #[regex(r"[a-zA-Z][a-zA-Z0-9_.\-]*")]
     Id,
 
@@ -114,11 +118,11 @@ pub enum SyntaxKind {
     #[token(".")]
     Dot,
 
-    /// Regular capture: @name (matches before `At`)
+    /// Regular capture: @name
     #[regex(r"@[a-zA-Z][a-zA-Z0-9_]*")]
     CaptureToken,
 
-    /// Suppressive capture: @_ or @_name (matches before `At`)
+    /// Suppressive capture: @_ or @_name
     #[regex(r"@_[a-zA-Z0-9_]*")]
     SuppressiveCapture,
 
@@ -140,6 +144,11 @@ pub enum SyntaxKind {
     #[regex(r"/\*(?:[^*]|\*[^/])*\*/")]
     BlockComment,
 
+    /// Shebang line: `#!/usr/bin/env -S plotnik run -l typescript`.
+    /// Trivia only at offset 0; the lexer downgrades mid-file matches to `Garbage`.
+    #[regex(r"#![^\n]*", allow_greedy = true)]
+    Shebang,
+
     /// `==` for predicate equals
     #[token("==")]
     OpEq,
@@ -156,7 +165,7 @@ pub enum SyntaxKind {
     #[token("$=")]
     OpEndsWith,
 
-    /// `*=` for predicate contains (defined after `Star` for correct precedence)
+    /// `*=` for predicate contains. Longest match wins over `Star`.
     #[token("*=")]
     OpContains,
 
@@ -180,14 +189,6 @@ pub enum SyntaxKind {
     /// Regex literal token (after splitting compound predicate)
     RegexLiteral,
 
-    /// Regex pattern content (between slashes, set by parser)
-    RegexContent,
-
-    /// XML-like tags matched as errors (common LLM output)
-    #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*(?:\s+[^>]*)?>")]
-    #[regex(r"</[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*>")]
-    #[regex(r"<[a-zA-Z_:][a-zA-Z0-9_:\.\-]*\s*/\s*>")]
-    XMLGarbage,
     /// Tree-sitter predicates (unsupported)
     #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*[?!]?")]
     TsPredicate,
@@ -245,12 +246,15 @@ fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
 impl SyntaxKind {
     #[inline]
     pub fn is_trivia(self) -> bool {
-        matches!(self, Whitespace | Newline | LineComment | BlockComment)
+        matches!(
+            self,
+            Whitespace | Newline | LineComment | BlockComment | Shebang
+        )
     }
 
     #[inline]
     pub fn is_error(self) -> bool {
-        matches!(self, Error | XMLGarbage | Garbage | TsPredicate)
+        matches!(self, Error | Garbage | TsPredicate)
     }
 }
 
@@ -282,16 +286,12 @@ impl Language for QLang {
 /// Type aliases for Rowan types parameterized by our language.
 pub type SyntaxNode = rowan::SyntaxNode<QLang>;
 pub type SyntaxToken = rowan::SyntaxToken<QLang>;
-pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 
 /// 128-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TokenSet(u128);
 
 impl TokenSet {
-    /// Creates an empty token set.
-    pub const EMPTY: TokenSet = TokenSet(0);
-
     /// Panics at compile time if any kind's discriminant >= 128.
     #[inline]
     pub const fn new(kinds: &[SyntaxKind]) -> Self {
@@ -307,24 +307,12 @@ impl TokenSet {
     }
 
     #[inline]
-    pub const fn single(kind: SyntaxKind) -> Self {
-        let kind = kind as u16;
-        assert!(kind < 128, "SyntaxKind value exceeds TokenSet capacity");
-        TokenSet(1 << kind)
-    }
-
-    #[inline]
     pub const fn contains(&self, kind: SyntaxKind) -> bool {
         let kind = kind as u16;
         if kind >= 128 {
             return false;
         }
         self.0 & (1 << kind) != 0
-    }
-
-    #[inline]
-    pub const fn union(self, other: TokenSet) -> TokenSet {
-        TokenSet(self.0 | other.0)
     }
 }
 
@@ -333,8 +321,7 @@ impl std::fmt::Debug for TokenSet {
         let mut list = f.debug_set();
         for i in 0..128u16 {
             if self.0 & (1 << i) != 0 && i < __LAST as u16 {
-                let kind: SyntaxKind = unsafe { std::mem::transmute(i) };
-                list.entry(&kind);
+                list.entry(&QLang::kind_from_raw(rowan::SyntaxKind(i)));
             }
         }
         list.finish()
@@ -346,6 +333,8 @@ pub mod token_sets {
     use super::*;
 
     /// FIRST set of expr. `At` excluded (captures wrap, not start).
+    /// `UnterminatedString` included so every expression position reports
+    /// it as an unclosed string instead of a generic unexpected token.
     pub const EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
         ParenOpen,
         BracketOpen,
@@ -354,6 +343,7 @@ pub mod token_sets {
         Id,
         DoubleQuote,
         SingleQuote,
+        UnterminatedString,
         DotBang,
         Dot,
         Negation,
@@ -384,27 +374,11 @@ pub mod token_sets {
         QuestionQuestion,
     ]);
 
-    pub const TRIVIA: TokenSet = TokenSet::new(&[Whitespace, Newline, LineComment, BlockComment]);
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
     pub const TREE_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
 
     pub const ALT_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenClose]);
-
-    pub const FIELD_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[
-        ParenClose,
-        BracketClose,
-        BraceClose,
-        CaptureToken,
-        SuppressiveCapture,
-        Colon,
-    ]);
-
-    pub const ROOT_RECOVERY_TOKENS: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id]);
-
-    pub const DEF_RECOVERY_TOKENS: TokenSet =
-        TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen, Id, Equals]);
 
     pub const SEQ_RECOVERY_TOKENS: TokenSet =
         TokenSet::new(&[BraceClose, ParenClose, BracketClose]);

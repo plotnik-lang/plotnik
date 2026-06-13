@@ -6,8 +6,9 @@ use plotnik_lib::Colors;
 use plotnik_lib::engine::{Materializer, RuntimeError, VM, ValueMaterializer, debug_verify_type};
 
 use super::run_common::{self, PreparedQuery, QueryInput};
+use crate::error::{CliError, CliResult};
 
-pub struct ExecArgs {
+pub struct RunArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
@@ -18,7 +19,7 @@ pub struct ExecArgs {
     pub color: bool,
 }
 
-pub fn run(args: ExecArgs) {
+pub fn run(args: RunArgs) -> CliResult {
     let PreparedQuery {
         module,
         entrypoint,
@@ -32,18 +33,17 @@ pub fn run(args: ExecArgs) {
         lang: args.lang.as_deref(),
         entry: args.entry.as_deref(),
         color: args.color,
-    });
+    })?;
 
     let vm = VM::builder(&source_code, &tree).build();
     let effects = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
-            std::process::exit(1);
+            // Zero matches must never be silent
+            eprintln!("no match");
+            return Err(CliError::No);
         }
-        Err(e) => {
-            eprintln!("runtime error: {}", e);
-            std::process::exit(2);
-        }
+        Err(e) => return Err(CliError::fatal(format!("runtime error: {}", e))),
     };
 
     let materializer = ValueMaterializer::new(&source_code, module.types(), module.strings());
@@ -56,4 +56,6 @@ pub fn run(args: ExecArgs) {
 
     let output = value.format(args.pretty, colors);
     println!("{}", output);
+
+    Ok(())
 }

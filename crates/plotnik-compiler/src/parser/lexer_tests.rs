@@ -267,18 +267,36 @@ fn error_coalescing() {
 }
 
 #[test]
-fn error_unexpected_xml_opening() {
-    insta::assert_snapshot!(snapshot("<div>"), @r#"XMLGarbage "<div>""#);
+fn unterminated_string_double_quote() {
+    insta::assert_snapshot!(snapshot(r#"(call "abc"#), @r#"
+    ParenOpen "("
+    Id "call"
+    UnterminatedString "\"abc"
+    "#);
 }
 
 #[test]
-fn error_unexpected_xml_closing() {
-    insta::assert_snapshot!(snapshot("</div>"), @r#"XMLGarbage "</div>""#);
+fn unterminated_string_single_quote() {
+    insta::assert_snapshot!(snapshot("(call 'abc"), @r#"
+    ParenOpen "("
+    Id "call"
+    UnterminatedString "'abc"
+    "#);
 }
 
 #[test]
-fn error_unexpected_xml_self_closing() {
-    insta::assert_snapshot!(snapshot("<br/>"), @r#"XMLGarbage "<br/>""#);
+fn unterminated_string_stops_at_newline() {
+    insta::assert_snapshot!(snapshot("\"abc\n(x)"), @r#"
+    UnterminatedString "\"abc"
+    ParenOpen "("
+    Id "x"
+    ParenClose ")"
+    "#);
+}
+
+#[test]
+fn unterminated_string_with_escaped_quote() {
+    insta::assert_snapshot!(snapshot(r#""ab\"cd"#), @r#"UnterminatedString "\"ab\\\"cd""#);
 }
 
 #[test]
@@ -681,4 +699,33 @@ fn suppressive_vs_regular_capture() {
     SuppressiveCapture "@_name"
     CaptureToken "@name"
     "#);
+}
+
+#[test]
+fn shebang_on_first_line_is_trivia() {
+    let input = indoc::indoc! {"
+        #!/usr/bin/env -S plotnik run -l typescript
+        (identifier)"};
+
+    insta::assert_snapshot!(snapshot_raw(input), @r##"
+    Shebang "#!/usr/bin/env -S plotnik run -l typescript"
+    Newline "\n"
+    ParenOpen "("
+    Id "identifier"
+    ParenClose ")"
+    "##);
+}
+
+#[test]
+fn shebang_mid_file_is_garbage() {
+    let input = indoc::indoc! {"
+        (a)
+        #!/usr/bin/env plotnik"};
+
+    insta::assert_snapshot!(snapshot(input), @r##"
+    ParenOpen "("
+    Id "a"
+    ParenClose ")"
+    Garbage "#!/usr/bin/env plotnik"
+    "##);
 }

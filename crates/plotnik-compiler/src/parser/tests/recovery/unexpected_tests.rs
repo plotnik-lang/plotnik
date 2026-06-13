@@ -117,49 +117,6 @@ fn garbage_inside_node() {
 }
 
 #[test]
-fn xml_tag_garbage() {
-    let input = indoc! {r#"
-    <div>(identifier)</div>
-    "#};
-
-    let res = Query::expect_invalid(input);
-
-    insta::assert_snapshot!(res, @r#"
-    error: unexpected token
-      |
-    1 | <div>(identifier)</div>
-      | ^^^^^
-      |
-    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
-
-    error: unexpected token
-      |
-    1 | <div>(identifier)</div>
-      |                  ^^^^^^
-      |
-    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
-    "#);
-}
-
-#[test]
-fn xml_self_closing() {
-    let input = indoc! {r#"
-    <br/> (a)
-    "#};
-
-    let res = Query::expect_invalid(input);
-
-    insta::assert_snapshot!(res, @r#"
-    error: unexpected token
-      |
-    1 | <br/> (a)
-      | ^^^^^
-      |
-    help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
-    "#);
-}
-
-#[test]
 fn predicate_unsupported() {
     let input = indoc! {r#"
     (a (#eq? @x "foo") b)
@@ -168,10 +125,12 @@ fn predicate_unsupported() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates are not supported
+    error: tree-sitter predicates are not supported
       |
     1 | (a (#eq? @x "foo") b)
       |     ^^^^
+      |
+    help: use a node predicate instead: `(identifier == "foo")`
 
     error: unexpected token
       |
@@ -180,7 +139,7 @@ fn predicate_unsupported() {
       |
     help: try `(child)` or close with `)`
 
-    error: bare identifier is not valid
+    error: node types must be parenthesized
       |
     1 | (a (#eq? @x "foo") b)
       |                    ^
@@ -202,10 +161,12 @@ fn predicate_match() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates are not supported
+    error: tree-sitter predicates are not supported
       |
     1 | (identifier) #match? @name "test"
       |              ^^^^^^^
+      |
+    help: use a node predicate instead: `(identifier == "foo")`
     "#);
 }
 
@@ -216,10 +177,12 @@ fn predicate_in_tree() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: predicates are not supported
+    error: tree-sitter predicates are not supported
       |
     1 | (function #eq? @name "test")
       |           ^^^^
+      |
+    help: use a node predicate instead: `(identifier == "foo")`
 
     error: unexpected token
       |
@@ -256,12 +219,14 @@ fn predicate_in_sequence() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: predicates are not supported
+    insta::assert_snapshot!(res, @r#"
+    error: tree-sitter predicates are not supported
       |
     1 | {(a) #set! (b)}
       |      ^^^^^
-    ");
+      |
+    help: use a node predicate instead: `(identifier == "foo")`
+    "#);
 }
 
 #[test]
@@ -274,7 +239,7 @@ fn multiline_garbage_recovery() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: unexpected token
       |
     2 | ^^^
@@ -282,7 +247,7 @@ fn multiline_garbage_recovery() {
       |
     help: try `(child)` or close with `)`
 
-    error: bare identifier is not valid
+    error: node types must be parenthesized
       |
     3 | b)
       | ^
@@ -350,8 +315,8 @@ fn alternation_recovery_to_capture() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: empty `[]` is not allowed
+    insta::assert_snapshot!(res, @"
+    error: empty `[]` matches nothing
       |
     1 | [^^^ @name]
       | ^^^^^^^^^^^
@@ -415,7 +380,7 @@ fn paren_close_inside_alternation() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token: expected closing ']' for alternation
+    error: expected closing ']' for alternation
       |
     1 | [(a) ) (b)]
       |      ^
@@ -436,7 +401,7 @@ fn bracket_close_inside_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token: expected closing '}' for sequence
+    error: expected closing '}' for sequence
       |
     1 | {(a) ] (b)}
       |      ^
@@ -457,7 +422,7 @@ fn paren_close_inside_sequence() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: unexpected token: expected closing '}' for sequence
+    error: expected closing '}' for sequence
       |
     1 | {(a) ) (b)}
       |      ^

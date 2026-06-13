@@ -2,16 +2,59 @@ use std::path::Path;
 
 use plotnik::language_registry::{self, Lang};
 
-/// Resolve language from explicit flag or infer from workspace directory name.
-///
-/// Directory inference: `queries.ts/` → typescript, `queries.javascript/` → javascript
-pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option<&'static Lang> {
-    // Explicit flag takes precedence
-    if let Some(name) = explicit {
-        return language_registry::from_name(name);
-    }
+use crate::error::CliError;
 
-    // Infer from directory name extension: "queries.ts" → "ts"
+/// Resolve a language name or alias, with typo suggestions on failure.
+pub fn resolve_named_lang(name: &str) -> Result<&'static Lang, CliError> {
+    language_registry::from_name(name).ok_or_else(|| {
+        let mut msg = format!("unknown language: '{}'", name);
+        if let Some(suggestion) = suggest_language(name) {
+            msg.push_str(&format!("\n\nDid you mean '{}'?", suggestion));
+        }
+        msg.push_str("\n\nRun 'plotnik lang list' for the full list.");
+        CliError::Fatal(msg)
+    })
+}
+
+/// Combine the explicit `-l` flag with the shebang declaration.
+///
+/// The shebang is the in-file language declaration; an explicit flag is
+/// allowed but must agree with it.
+pub fn merge_lang(
+    explicit: Option<&str>,
+    declared: Option<&str>,
+) -> Result<Option<&'static Lang>, CliError> {
+    match (explicit, declared) {
+        (None, None) => Ok(None),
+        (Some(name), None) => resolve_named_lang(name).map(Some),
+        (None, Some(name)) => resolve_named_lang(name)
+            .map_err(prefix_shebang_context)
+            .map(Some),
+        (Some(explicit_name), Some(declared_name)) => {
+            let explicit_lang = resolve_named_lang(explicit_name)?;
+            let declared_lang =
+                resolve_named_lang(declared_name).map_err(prefix_shebang_context)?;
+            if !std::ptr::eq(explicit_lang, declared_lang) {
+                return Err(CliError::fatal(format!(
+                    "-l {} conflicts with the shebang declaration '{}'",
+                    explicit_name, declared_name
+                )));
+            }
+            Ok(Some(explicit_lang))
+        }
+    }
+}
+
+fn prefix_shebang_context(err: CliError) -> CliError {
+    match err {
+        CliError::Fatal(msg) => CliError::Fatal(format!("in shebang declaration: {}", msg)),
+        other => other,
+    }
+}
+
+/// Legacy directory-name inference: `queries.ts/` → typescript.
+/// Slated for retirement once shebang declarations are the norm.
+pub fn infer_lang_from_dir(query_path: Option<&Path>) -> Option<&'static Lang> {
     if let Some(path) = query_path
         && path.is_dir()
         && let Some(name) = path.file_name().and_then(|n| n.to_str())
@@ -23,44 +66,26 @@ pub fn resolve_lang(explicit: Option<&str>, query_path: Option<&Path>) -> Option
     None
 }
 
-/// Resolve language, returning an error message if unknown.
-pub fn resolve_lang_required(lang_name: &str) -> Result<&'static Lang, String> {
-    language_registry::from_name(lang_name)
-        .ok_or_else(|| format!("unknown language: '{}'", lang_name))
-}
-
-/// Resolve language with user-friendly error handling.
-/// Tries explicit flag first, then infers from query path.
-/// Exits with error message if language cannot be determined.
+/// Resolve the language for commands that require one (dump, infer).
+/// Priority: explicit `-l` (must agree with shebang) > shebang > dir inference.
 pub fn require_lang(
     explicit: Option<&str>,
-    query_path: Option<&std::path::Path>,
+    declared: Option<&str>,
+    query_path: Option<&Path>,
     command: &str,
-) -> &'static Lang {
-    if let Some(lang_name) = explicit {
-        match resolve_lang_required(lang_name) {
-            Ok(l) => return l,
-            Err(msg) => {
-                eprintln!("error: {}", msg);
-                if let Some(suggestion) = suggest_language(lang_name) {
-                    eprintln!();
-                    eprintln!("Did you mean '{}'?", suggestion);
-                }
-                eprintln!();
-                eprintln!("Run 'plotnik langs' for the full list.");
-                std::process::exit(1);
-            }
-        }
+) -> Result<&'static Lang, CliError> {
+    if let Some(lang) = merge_lang(explicit, declared)? {
+        return Ok(lang);
     }
 
-    if let Some(l) = resolve_lang(None, query_path) {
-        return l;
+    if let Some(lang) = infer_lang_from_dir(query_path) {
+        return Ok(lang);
     }
 
-    eprintln!("error: language is required for {}", command);
-    eprintln!();
-    eprintln!("hint: use -l <language> to specify the target language");
-    std::process::exit(1);
+    Err(CliError::fatal(format!(
+        "language is required for {}\n\nhint: use -l <language> or declare it in the query shebang:\n  #!/usr/bin/env -S plotnik run -l <language>",
+        command
+    )))
 }
 
 /// Suggest similar language names for typos.

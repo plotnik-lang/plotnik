@@ -19,14 +19,12 @@ fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
         .arg(verbose_nodes_arg().hide(true))
-        .arg(check_arg().hide(true))
 }
 
 /// Add hidden exec output args, excluding --verbose-nodes (for infer which has it visible).
 fn with_hidden_exec_args_partial(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
-        .arg(check_arg().hide(true))
 }
 
 /// Add hidden trace args (for commands that don't trace).
@@ -41,19 +39,40 @@ fn with_hidden_ast_args(cmd: Command) -> Command {
     cmd.arg(raw_arg().hide(true))
 }
 
+/// Add hidden --json arg (for commands without JSON diagnostics yet).
+fn with_hidden_json_arg(cmd: Command) -> Command {
+    cmd.arg(json_arg().hide(true))
+}
+
 /// Build the complete CLI with all subcommands.
 pub fn build_cli() -> Command {
     Command::new("plotnik")
         .about("Query language for tree-sitter AST with type inference")
+        .version(env!("CARGO_PKG_VERSION"))
+        .long_version(format!(
+            "{} ({} bundled languages)",
+            env!("CARGO_PKG_VERSION"),
+            plotnik::language_registry::all().len()
+        ))
+        .propagate_version(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(ast_command())
+        .after_help(
+            r#"EXIT CODES:
+  0  yes/success (match found, query valid)
+  1  no (run: no match; check: invalid)
+  2  couldn't answer (usage, IO, or internal error)
+
+Run 'plotnik <command> --help' for examples."#,
+        )
+        .subcommand(run_command())
         .subcommand(check_command())
-        .subcommand(dump_command())
+        .subcommand(ast_command())
         .subcommand(infer_command())
-        .subcommand(exec_command())
+        .subcommand(dump_command())
         .subcommand(trace_command())
         .subcommand(lang_command())
+        .subcommand(completions_command())
 }
 
 /// Show AST of query and/or source file.
@@ -82,14 +101,17 @@ pub fn ast_command() -> Command {
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
+        .next_help_heading("Output options")
         .arg(raw_arg())
+        .next_help_heading("Global options")
         .arg(color_arg());
 
     // Hidden unified flags
-    with_hidden_trace_args(with_hidden_exec_args(cmd))
+    with_hidden_json_arg(with_hidden_trace_args(with_hidden_exec_args(cmd)))
 }
 
 /// Validate a query.
@@ -110,12 +132,17 @@ pub fn check_command() -> Command {
   plotnik check query.ptk             # validate syntax only
   plotnik check query.ptk -l ts       # also check against grammar
   plotnik check queries.ts/           # workspace directory
-  plotnik check -q 'Q = ...' -l js    # inline query"#,
+  plotnik check -q 'Q = ...' -l js    # inline query
+  plotnik check query.ptk --json      # diagnostics as JSON"#,
         )
         .arg(query_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(lang_arg())
+        .next_help_heading("Check options")
         .arg(strict_arg())
+        .arg(json_arg())
+        .next_help_heading("Global options")
         .arg(color_arg());
 
     // Hidden unified flags
@@ -144,13 +171,15 @@ pub fn dump_command() -> Command {
   plotnik dump -q 'Q = ...'          # inline query"#,
         )
         .arg(query_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(lang_arg())
+        .next_help_heading("Global options")
         .arg(color_arg());
 
     // Hidden unified flags
-    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args(
-        with_hidden_source_args(cmd),
+    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
+        with_hidden_exec_args(with_hidden_source_args(cmd)),
     )))
 }
 
@@ -170,58 +199,62 @@ pub fn infer_command() -> Command {
             r#"EXAMPLES:
   plotnik infer query.ptk -l js       # from file
   plotnik infer -q 'Q = ...' -l ts    # inline query
-  plotnik infer query.ptk -l js -o types.d.ts  # write to file
-
-NOTE: Use --verbose-nodes to match `exec --verbose-nodes` output shape."#,
+  plotnik infer query.ptk -l js -o types.d.ts  # write to file"#,
         )
         .arg(query_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(lang_arg())
+        .next_help_heading("Output options")
         .arg(format_arg())
         .arg(verbose_nodes_arg())
         .arg(no_node_type_arg())
         .arg(no_export_arg())
         .arg(void_type_arg())
         .arg(output_file_arg())
+        .next_help_heading("Global options")
         .arg(color_arg());
 
     // Hidden unified flags (use partial exec args since --verbose-nodes is visible)
-    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args_partial(
-        with_hidden_source_args(cmd),
+    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
+        with_hidden_exec_args_partial(with_hidden_source_args(cmd)),
     )))
 }
 
 /// Execute a query against source code and output JSON.
 ///
 /// Accepts trace flags for unified CLI experience, but ignores them.
-pub fn exec_command() -> Command {
-    let cmd = Command::new("exec")
+pub fn run_command() -> Command {
+    let cmd = Command::new("run")
+        .alias("exec")
         .about("Execute a query against source code and output JSON")
         .override_usage(
             "\
-  plotnik exec <QUERY> <SOURCE>
-  plotnik exec -q <TEXT> <SOURCE>
-  plotnik exec -q <TEXT> -s <TEXT> -l <LANG>",
+  plotnik run <QUERY> <SOURCE>
+  plotnik run -q <TEXT> <SOURCE>
+  plotnik run -q <TEXT> -s <TEXT> -l <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik exec query.ptk app.js           # two positional files
-  plotnik exec -q 'Q = ...' app.js        # inline query + source file
-  plotnik exec -q 'Q = ...' -s 'let x' -l js  # all inline"#,
+  plotnik run query.ptk app.js           # two positional files
+  plotnik run -q 'Q = ...' app.js        # inline query + source file
+  plotnik run -q 'Q = ...' -s 'let x' -l js  # all inline"#,
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
-        .arg(color_arg())
+        .arg(entry_arg())
+        .next_help_heading("Output options")
         .arg(compact_arg())
-        .arg(verbose_nodes_arg())
-        .arg(check_arg())
-        .arg(entry_arg());
+        .arg(verbose_nodes_arg().hide(true))
+        .next_help_heading("Global options")
+        .arg(color_arg());
 
     // Hidden unified flags
-    with_hidden_ast_args(with_hidden_trace_args(cmd))
+    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(cmd)))
 }
 
 /// Trace query execution for debugging.
@@ -244,21 +277,23 @@ pub fn trace_command() -> Command {
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
+        .next_help_heading("Input options")
         .arg(query_text_arg())
         .arg(source_text_arg())
         .arg(lang_arg())
-        .arg(color_arg())
         .arg(entry_arg())
+        .next_help_heading("Trace options")
         .arg(verbose_arg())
         .arg(no_result_arg())
-        .arg(fuel_arg());
+        .arg(fuel_arg())
+        .next_help_heading("Global options")
+        .arg(color_arg());
 
     // Hidden unified flags (exec output flags only - entry is visible for trace)
-    with_hidden_ast_args(
+    with_hidden_json_arg(with_hidden_ast_args(
         cmd.arg(compact_arg().hide(true))
-            .arg(verbose_nodes_arg().hide(true))
-            .arg(check_arg().hide(true)),
-    )
+            .arg(verbose_nodes_arg().hide(true)),
+    ))
 }
 
 /// Language information commands.
@@ -267,6 +302,7 @@ pub fn lang_command() -> Command {
         .about("Language information and grammar dump")
         .subcommand_required(true)
         .arg_required_else_help(true)
+        .flatten_help(true)
         .subcommand(lang_list_command())
         .subcommand(lang_dump_command())
 }
@@ -274,6 +310,23 @@ pub fn lang_command() -> Command {
 /// List supported languages.
 fn lang_list_command() -> Command {
     Command::new("list").about("List supported languages with aliases")
+}
+
+/// Generate shell completions.
+pub fn completions_command() -> Command {
+    Command::new("completions")
+        .about("Generate shell completions")
+        .after_help(
+            r#"EXAMPLES:
+  plotnik completions zsh > ~/.zfunc/_plotnik
+  plotnik completions bash > /etc/bash_completion.d/plotnik"#,
+        )
+        .arg(
+            clap::Arg::new("shell")
+                .help("Shell to generate completions for")
+                .required(true)
+                .value_parser(clap::value_parser!(clap_complete::Shell)),
+        )
 }
 
 /// Dump grammar for a language.

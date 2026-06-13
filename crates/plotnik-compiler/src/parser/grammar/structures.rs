@@ -7,36 +7,38 @@ use crate::parser::cst::token_sets::{
     TREE_RECOVERY_TOKENS,
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
-use crate::parser::lexer::token_text;
 
-use super::utils::capitalize_first;
+use super::utils::{capitalize_first, starts_uppercase};
 
-impl Parser<'_, '_> {
+/// What the identifier after `(` turned out to be.
+enum TreeHead<'q> {
+    /// Concrete node type: `(identifier ...)`.
+    Node,
+    /// PascalCase reference to a named definition: `(Name)`.
+    Ref(&'q str),
+}
+
+impl<'q> Parser<'q, '_> {
     /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)` | `(expr/subtype)`
     /// PascalCase without children → Ref; with children → error but parses as Tree.
     pub(crate) fn parse_tree(&mut self) {
         let checkpoint = self.checkpoint();
-        self.push_delimiter(SyntaxKind::ParenOpen);
+        self.push_delimiter();
         let open_paren_span = self.current_span(); // save span before bump
         self.bump(); // consume '('
 
-        let mut is_ref = false;
-        let mut ref_name: Option<String> = None;
-
-        match self.current() {
+        let head = match self.current() {
             SyntaxKind::ParenClose => {
                 // Empty tree `()` - validation phase will report EmptyTree error
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
+                TreeHead::Node
             }
             SyntaxKind::Underscore => {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.bump();
+                TreeHead::Node
             }
-            SyntaxKind::Id => {
-                let (r, n) = self.parse_tree_ref_or_node(checkpoint);
-                is_ref = r;
-                ref_name = n;
-            }
+            SyntaxKind::Id => self.parse_tree_ref_or_node(checkpoint),
             SyntaxKind::KwError => {
                 self.parse_tree_error(checkpoint);
                 return;
@@ -60,32 +62,29 @@ impl Parser<'_, '_> {
                 } else {
                     self.start_node_at(checkpoint, SyntaxKind::Tree);
                 }
+                TreeHead::Node
             }
-        }
+        };
 
-        self.finish_tree_parsing(checkpoint, is_ref, ref_name);
+        self.finish_tree_parsing(checkpoint, head);
     }
 
-    fn parse_tree_ref_or_node(&mut self, checkpoint: Checkpoint) -> (bool, Option<String>) {
-        let name = token_text(self.source, &self.tokens[self.pos]).to_string();
-        let is_pascal_case = name.chars().next().is_some_and(|c| c.is_ascii_uppercase());
+    fn parse_tree_ref_or_node(&mut self, checkpoint: Checkpoint) -> TreeHead<'q> {
+        let name = self.current_text();
         self.bump();
 
-        let mut is_ref = false;
-        let mut ref_name = None;
-
-        if is_pascal_case {
-            is_ref = true;
-            ref_name = Some(name);
+        let mut head = if starts_uppercase(name) {
+            TreeHead::Ref(name)
         } else {
             self.start_node_at(checkpoint, SyntaxKind::Tree);
-        }
+            TreeHead::Node
+        };
 
         if self.currently_is(SyntaxKind::Slash) {
-            if is_ref {
+            if matches!(head, TreeHead::Ref(_)) {
                 self.start_node_at(checkpoint, SyntaxKind::Tree);
                 self.error(DiagnosticKind::InvalidSupertypeSyntax);
-                is_ref = false;
+                head = TreeHead::Node;
             }
             self.bump();
             match self.current() {
@@ -102,11 +101,11 @@ impl Parser<'_, '_> {
         }
 
         // Parse optional predicate: `(identifier == "foo")` or `(identifier =~ /pattern/)`
-        if !is_ref && self.currently_is_one_of(PREDICATE_OPS) {
+        if matches!(head, TreeHead::Node) && self.currently_is_one_of(PREDICATE_OPS) {
             self.parse_node_predicate();
         }
 
-        (is_ref, ref_name)
+        head
     }
 
     /// Parse a node predicate: `== "value"`, `=~ /pattern/`, etc.
@@ -120,6 +119,9 @@ impl Parser<'_, '_> {
         match self.current() {
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
                 self.bump_string_tokens();
+            }
+            SyntaxKind::UnterminatedString => {
+                self.error_and_bump(DiagnosticKind::UnclosedString);
             }
             SyntaxKind::RegexLiteral => {
                 // Regex literal from compound token - wrap in Regex node
@@ -217,22 +219,17 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    fn finish_tree_parsing(
-        &mut self,
-        checkpoint: Checkpoint,
-        is_ref: bool,
-        ref_name: Option<String>,
-    ) {
+    fn finish_tree_parsing(&mut self, checkpoint: Checkpoint, head: TreeHead<'q>) {
         let has_children = !self.currently_is(SyntaxKind::ParenClose);
 
-        if is_ref && has_children {
-            self.start_node_at(checkpoint, SyntaxKind::Tree);
-            let children_start = self.current_span().start();
-            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
-            let children_end = self.last_non_trivia_end().unwrap_or(children_start);
-            let children_span = TextRange::new(children_start, children_end);
+        let what = match head {
+            TreeHead::Ref(name) if has_children => {
+                self.start_node_at(checkpoint, SyntaxKind::Tree);
+                let children_start = self.current_span().start();
+                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
+                let children_end = self.last_non_trivia_end().unwrap_or(children_start);
+                let children_span = TextRange::new(children_start, children_end);
 
-            if let Some(name) = &ref_name {
                 self.diagnostics
                     .report(
                         self.source_id,
@@ -241,22 +238,20 @@ impl Parser<'_, '_> {
                     )
                     .message(name)
                     .emit();
+                "closing ')' for tree"
             }
-        } else if is_ref {
-            self.start_node_at(checkpoint, SyntaxKind::Ref);
-        } else {
-            self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
-        }
+            TreeHead::Ref(_) => {
+                self.start_node_at(checkpoint, SyntaxKind::Ref);
+                "closing ')' for reference"
+            }
+            TreeHead::Node => {
+                self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
+                "closing ')' for tree"
+            }
+        };
 
         self.pop_delimiter();
-        self.expect(
-            SyntaxKind::ParenClose,
-            if is_ref && !has_children {
-                "closing ')' for reference"
-            } else {
-                "closing ')' for tree"
-            },
-        );
+        self.expect(SyntaxKind::ParenClose, what);
         self.finish_node();
     }
 
@@ -271,13 +266,7 @@ impl Parser<'_, '_> {
                         until
                     ),
                 };
-                let open = self.delimiter_stack.last().unwrap_or_else(|| {
-                    panic!(
-                        "parse_children: unclosed {construct} at EOF but delimiter_stack is empty \
-                         (caller must push delimiter before calling)"
-                    )
-                });
-                self.error_unclosed_delimiter(kind, format!("{construct} started here"), open.span);
+                self.error_unclosed_at_eof(kind, construct);
                 break;
             }
             if self.has_fatal_error() {
@@ -311,8 +300,9 @@ impl Parser<'_, '_> {
     /// Alternation/choice: `[expr1 expr2 ...]` or `[Label: expr ...]`
     pub(crate) fn parse_alt(&mut self) {
         self.start_node(SyntaxKind::Alt);
-        self.push_delimiter(SyntaxKind::BracketOpen);
-        self.expect(SyntaxKind::BracketOpen, "opening '[' for alternation");
+        self.push_delimiter();
+        self.assert_current(SyntaxKind::BracketOpen);
+        self.bump(); // consume '['
 
         self.parse_alt_children();
 
@@ -325,17 +315,7 @@ impl Parser<'_, '_> {
     fn parse_alt_children(&mut self) {
         loop {
             if self.eof() {
-                let open = self.delimiter_stack.last().unwrap_or_else(|| {
-                    panic!(
-                        "parse_alt_children: unclosed alternation at EOF but delimiter_stack is empty \
-                         (caller must push delimiter before calling)"
-                    )
-                });
-                self.error_unclosed_delimiter(
-                    DiagnosticKind::UnclosedAlternation,
-                    "alternation started here",
-                    open.span,
-                );
+                self.error_unclosed_at_eof(DiagnosticKind::UnclosedAlternation, "alternation");
                 break;
             }
             if self.has_fatal_error() {
@@ -351,9 +331,7 @@ impl Parser<'_, '_> {
 
             // LL(2): Id followed by Colon → branch label or field (check casing)
             if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Colon) {
-                let text = token_text(self.source, &self.tokens[self.pos]);
-                let first_char = text.chars().next().unwrap_or('a');
-                if first_char.is_ascii_uppercase() {
+                if starts_uppercase(self.current_text()) {
                     self.parse_branch();
                 } else {
                     self.parse_branch_lowercase_label();
@@ -362,8 +340,7 @@ impl Parser<'_, '_> {
             }
             // Anchors cannot appear directly in alternations - they create empty branches
             if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
-                self.error(DiagnosticKind::AnchorInAlternation);
-                self.skip_token();
+                self.error_and_bump(DiagnosticKind::AnchorInAlternation);
                 continue;
             }
             if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
@@ -387,7 +364,7 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Branch);
 
         let span = self.current_span();
-        let text = token_text(self.source, &self.tokens[self.pos]);
+        let text = self.current_text();
         self.bump();
         self.validate_branch_label(text, span);
 
@@ -407,13 +384,12 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Branch);
 
         let span = self.current_span();
-        let label_text = token_text(self.source, &self.tokens[self.pos]);
+        let label_text = self.current_text();
         let capitalized = capitalize_first(label_text);
 
         self.error_with_fix(
-            DiagnosticKind::LowercaseBranchLabel,
+            DiagnosticKind::BranchLabelInvalid,
             span,
-            "branch labels map to enum variants",
             format!("use `{}`", capitalized),
             capitalized,
         );
@@ -433,8 +409,9 @@ impl Parser<'_, '_> {
     /// Sibling sequence: `{expr1 expr2 ...}`
     pub(crate) fn parse_seq(&mut self) {
         self.start_node(SyntaxKind::Seq);
-        self.push_delimiter(SyntaxKind::BraceOpen);
-        self.expect(SyntaxKind::BraceOpen, "opening '{' for sequence");
+        self.push_delimiter();
+        self.assert_current(SyntaxKind::BraceOpen);
+        self.bump(); // consume '{'
 
         self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY_TOKENS);
 
@@ -443,7 +420,7 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Skip a separator token (comma or pipe) and emit helpful error.
+    /// Consume a separator token (comma or pipe) into an Error node and emit a helpful error.
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
@@ -459,10 +436,9 @@ impl Parser<'_, '_> {
         self.error_with_fix(
             DiagnosticKind::InvalidSeparator,
             span,
-            format!("plotnik uses whitespace, not `{}`", char_name),
-            "remove",
+            format!("remove the `{}`", char_name),
             "",
         );
-        self.skip_token();
+        self.bump_as_error();
     }
 }

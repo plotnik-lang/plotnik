@@ -1,50 +1,79 @@
 mod cli;
 mod commands;
+mod error;
+
+use std::io;
+use std::process::ExitCode;
+
+use clap::ArgMatches;
 
 use cli::{
-    AstParams, CheckParams, DumpParams, ExecParams, InferParams, LangDumpParams, LangListParams,
-    TraceParams, build_cli,
+    AstParams, CheckParams, DumpParams, InferParams, LangDumpParams, LangListParams, RunParams,
+    TraceParams, build_cli, route_default_subcommand,
 };
+use error::CliResult;
 
-fn main() {
-    let matches = build_cli().get_matches();
+fn main() -> ExitCode {
+    // Die silently on closed pipes (`plotnik run … | head`) like standard Unix
+    // tools, instead of panicking with exit 101 when println! hits EPIPE.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
 
+    let args = route_default_subcommand(std::env::args_os().collect());
+    let matches = build_cli().get_matches_from(args);
+
+    match dispatch(&matches) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => e.report(),
+    }
+}
+
+fn dispatch(matches: &ArgMatches) -> CliResult {
     match matches.subcommand() {
         Some(("ast", m)) => {
             let params = AstParams::from_matches(m);
-            commands::ast::run(params.into());
+            commands::ast::run(params.into())
         }
         Some(("check", m)) => {
             let params = CheckParams::from_matches(m);
-            commands::check::run(params.into());
+            commands::check::run(params.into())
         }
         Some(("dump", m)) => {
             let params = DumpParams::from_matches(m);
-            commands::dump::run(params.into());
+            commands::dump::run(params.into())
         }
         Some(("infer", m)) => {
             let params = InferParams::from_matches(m);
-            commands::infer::run(params.into());
+            commands::infer::run(params.into())
         }
-        Some(("exec", m)) => {
-            let params = ExecParams::from_matches(m);
-            commands::exec::run(params.into());
+        Some(("run", m)) => {
+            let params = RunParams::from_matches(m);
+            commands::run::run(params.into())
         }
         Some(("trace", m)) => {
             let params = TraceParams::from_matches(m);
-            commands::trace::run(params.into());
+            commands::trace::run(params.into())
         }
         Some(("lang", m)) => match m.subcommand() {
             Some(("list", sub_m)) => {
                 let _params = LangListParams::from_matches(sub_m);
-                commands::lang::run_list();
+                commands::lang::run_list()
             }
             Some(("dump", sub_m)) => {
                 let params = LangDumpParams::from_matches(sub_m);
-                commands::lang::run_dump(&params.lang);
+                commands::lang::run_dump(&params.lang)
             }
             _ => unreachable!("clap should have caught this"),
         },
+        Some(("completions", m)) => {
+            let shell = *m
+                .get_one::<clap_complete::Shell>("shell")
+                .expect("shell is required");
+            clap_complete::generate(shell, &mut build_cli(), "plotnik", &mut io::stdout());
+            Ok(())
+        }
         _ => unreachable!("clap should have caught this"),
     }
 }
