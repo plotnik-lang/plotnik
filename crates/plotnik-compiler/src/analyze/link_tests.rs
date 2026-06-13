@@ -467,3 +467,45 @@ fn ref_followed_valid_case() {
 
     Query::expect_valid_linking(input);
 }
+
+#[test]
+fn diamond_reference_graph_links() {
+    // Each definition references the next one twice, so the reference graph is
+    // diamond-shaped. Without memoization, structural validation walks it
+    // 2^depth times — intractable by this depth (issue #416); with it, instant.
+    let depth = 30;
+    let mut input = String::new();
+    for i in 0..depth {
+        input.push_str(&format!(
+            "D{i} = (statement_block (D{next}) (D{next}))\n",
+            next = i + 1
+        ));
+    }
+    input.push_str(&format!("D{depth} = (identifier) @x\n"));
+
+    Query::expect_valid_linking(&input);
+}
+
+#[test]
+fn shared_definition_validated_per_context() {
+    // A definition whose body is a bare field is validated against each
+    // referencing parent, so memoization must key on context, not name alone:
+    // `arguments` is valid on `call_expression` but not on `binary_expression`.
+    let input = indoc! {r#"
+        Args = arguments: (identifier)
+        Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+    "#};
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: field `arguments` is not valid on this node type
+      |
+    1 | Args = arguments: (identifier)
+      |        ^^^^^^^^^
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |                                                ----------------- on `binary_expression`
+      |
+    help: valid fields for `binary_expression`: `left`, `operator`, `right`
+    ");
+}
