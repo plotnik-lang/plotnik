@@ -8,6 +8,7 @@ use plotnik_lib::typegen::typescript;
 
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query_source;
+use crate::error::{CliError, CliResult};
 
 pub struct InferArgs {
     pub query_path: Option<PathBuf>,
@@ -22,38 +23,31 @@ pub struct InferArgs {
     pub void_type: Option<String>,
 }
 
-pub fn run(args: InferArgs) {
+pub fn run(args: InferArgs) -> CliResult {
     // Validate format
     let fmt = args.format.to_lowercase();
     if fmt != "typescript" && fmt != "ts" {
-        eprintln!("error: --format must be 'typescript' or 'ts'");
-        std::process::exit(1);
+        return Err(CliError::fatal("--format must be 'typescript' or 'ts'"));
     }
 
-    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
-    {
-        Ok(map) => map,
-        Err(msg) => {
-            eprintln!("error: {}", msg);
-            std::process::exit(1);
-        }
-    };
+    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
 
-    if source_map.is_empty() {
-        eprintln!("error: query cannot be empty");
-        std::process::exit(1);
+    if loaded.sources.is_empty() {
+        return Err(CliError::fatal("query cannot be empty"));
     }
 
     // Parse and analyze
-    let query = match QueryBuilder::new(source_map).parse() {
-        Ok(parsed) => parsed.analyze(),
-        Err(e) => {
-            eprintln!("error: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let query = QueryBuilder::new(loaded.sources)
+        .parse()
+        .map_err(|e| CliError::fatal(e.to_string()))?
+        .analyze();
 
-    let lang = require_lang(args.lang.as_deref(), args.query_path.as_deref(), "infer");
+    let lang = require_lang(
+        args.lang.as_deref(),
+        loaded.shebang.lang.as_deref(),
+        args.query_path.as_deref(),
+        "infer",
+    )?;
 
     let linked = query.link(lang.grammar());
     if !linked.is_valid() {
@@ -63,7 +57,7 @@ pub fn run(args: InferArgs) {
                 .diagnostics()
                 .render_colored(linked.source_map(), args.color)
         );
-        std::process::exit(1);
+        return Err(CliError::FatalRendered);
     }
     let bytecode = linked.emit().expect("bytecode emission failed");
     let module = Module::load(&bytecode).expect("module loading failed");
@@ -85,16 +79,16 @@ pub fn run(args: InferArgs) {
 
     // Write output
     if let Some(ref path) = args.output {
-        fs::write(path, &output).unwrap_or_else(|e| {
-            eprintln!("error: failed to write '{}': {}", path.display(), e);
-            std::process::exit(1);
-        });
+        fs::write(path, &output)
+            .map_err(|e| CliError::fatal(format!("failed to write '{}': {}", path.display(), e)))?;
         // Success message
         let type_count = count_types(&output);
         eprintln!("Wrote {} types to {}", type_count, path.display());
     } else {
         io::stdout().write_all(output.as_bytes()).unwrap();
     }
+
+    Ok(())
 }
 
 fn count_types(output: &str) -> usize {

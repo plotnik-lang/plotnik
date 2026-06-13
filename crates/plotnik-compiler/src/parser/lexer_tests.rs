@@ -700,3 +700,32 @@ fn suppressive_vs_regular_capture() {
     CaptureToken "@name"
     "#);
 }
+
+#[test]
+fn shebang_on_first_line_is_trivia() {
+    let input = indoc::indoc! {"
+        #!/usr/bin/env -S plotnik run -l typescript
+        (identifier)"};
+
+    insta::assert_snapshot!(snapshot_raw(input), @r##"
+    Shebang "#!/usr/bin/env -S plotnik run -l typescript"
+    Newline "\n"
+    ParenOpen "("
+    Id "identifier"
+    ParenClose ")"
+    "##);
+}
+
+#[test]
+fn shebang_mid_file_is_garbage() {
+    let input = indoc::indoc! {"
+        (a)
+        #!/usr/bin/env plotnik"};
+
+    insta::assert_snapshot!(snapshot(input), @r##"
+    ParenOpen "("
+    Id "a"
+    ParenClose ")"
+    Garbage "#!/usr/bin/env plotnik"
+    "##);
+}

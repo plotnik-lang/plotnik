@@ -5,8 +5,10 @@ use std::path::PathBuf;
 use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::QueryBuilder;
 
+use super::lang_resolver::merge_lang;
 use super::query_loader::load_query_source;
 use super::run_common;
+use crate::error::{CliError, CliResult};
 
 pub struct AstArgs {
     pub query_path: Option<PathBuf>,
@@ -18,23 +20,23 @@ pub struct AstArgs {
     pub color: bool,
 }
 
-pub fn run(args: AstArgs) {
+pub fn run(args: AstArgs) -> CliResult {
     let has_query = args.query_path.is_some() || args.query_text.is_some();
     let has_source = args.source_path.is_some() || args.source_text.is_some();
 
     if !has_query && !has_source {
-        eprintln!("error: query or source required");
-        std::process::exit(1);
+        return Err(CliError::fatal("query or source required"));
     }
 
     let show_headers = has_query && has_source;
 
     // Show Query AST if query provided
+    let mut declared_lang = None;
     if has_query {
         if show_headers {
             println!("# Query AST");
         }
-        print_query_ast(&args);
+        declared_lang = print_query_ast(&args)?;
     }
 
     // Show Source AST if source provided
@@ -42,32 +44,27 @@ pub fn run(args: AstArgs) {
         if show_headers {
             println!("\n# Source AST");
         }
-        print_source_ast(&args);
+        print_source_ast(&args, declared_lang.as_deref())?;
     }
+
+    Ok(())
 }
 
-fn print_query_ast(args: &AstArgs) {
-    let source_map = match load_query_source(args.query_path.as_deref(), args.query_text.as_deref())
-    {
-        Ok(map) => map,
-        Err(msg) => {
-            eprintln!("error: {}", msg);
-            std::process::exit(1);
-        }
-    };
+/// Prints the query AST; returns the shebang-declared language, if any.
+fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
+    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
 
-    if source_map.is_empty() {
-        eprintln!("error: query cannot be empty");
-        std::process::exit(1);
+    if loaded.sources.is_empty() {
+        return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let query = match QueryBuilder::new(source_map).parse() {
-        Ok(parsed) => parsed.analyze(),
-        Err(e) => {
-            eprintln!("error: {}", e);
-            std::process::exit(1);
-        }
-    };
+    // Enforce -l/shebang agreement even when no source AST follows
+    merge_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
+
+    let query = QueryBuilder::new(loaded.sources)
+        .parse()
+        .map_err(|e| CliError::fatal(e.to_string()))?
+        .analyze();
 
     // Show diagnostics if any (warnings)
     if query.diagnostics().has_errors() || query.diagnostics().has_warnings() {
@@ -82,17 +79,25 @@ fn print_query_ast(args: &AstArgs) {
     // Print AST (or CST if --raw)
     let output = query.printer().raw(args.raw).with_trivia(args.raw).dump();
     print!("{}", output);
+
+    Ok(loaded.shebang.lang)
 }
 
-fn print_source_ast(args: &AstArgs) {
+fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
     let source = run_common::load_source(
         args.source_text.as_deref(),
         args.source_path.as_deref(),
         args.query_path.as_deref(),
-    );
-    let lang = run_common::resolve_lang(args.lang.as_deref(), args.source_path.as_deref());
+    )?;
+    let lang = run_common::resolve_lang(
+        args.lang.as_deref(),
+        declared_lang,
+        args.source_path.as_deref(),
+    )?;
     let tree = lang.parse(&source);
     print!("{}", dump_tree(&tree, &source, args.raw));
+
+    Ok(())
 }
 
 fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool) -> String {

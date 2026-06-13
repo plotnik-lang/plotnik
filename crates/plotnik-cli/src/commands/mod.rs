@@ -1,11 +1,11 @@
 pub mod ast;
 pub mod check;
 pub mod dump;
-pub mod exec;
 pub mod infer;
 pub mod lang;
 pub mod lang_resolver;
 pub mod query_loader;
+pub mod run;
 pub mod run_common;
 pub mod trace;
 

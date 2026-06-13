@@ -613,3 +613,112 @@ fn span_new() {
     assert_eq!(span.source, id);
     assert_eq!(span.range, range);
 }
+
+#[test]
+fn render_json_full_shape() {
+    let mut map = SourceMap::new();
+    let id = map.add_file("query.ptk", "(foo)\n(bar)");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            id,
+            DiagnosticKind::UnknownNodeType,
+            TextRange::new(7.into(), 10.into()),
+        )
+        .message("bar")
+        .related_to(id, TextRange::new(1.into(), 4.into()), "first seen here")
+        .fix("replace with `baz`", "baz")
+        .hint("check the grammar")
+        .emit();
+
+    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
+
+    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
+    [
+      {
+        "code": "unknown_node_type",
+        "fix": {
+          "description": "replace with `baz`",
+          "replacement": "baz"
+        },
+        "hints": [
+          "check the grammar"
+        ],
+        "message": "`bar` is not a valid node type",
+        "related": [
+          {
+            "message": "first seen here",
+            "span": {
+              "end": {
+                "column": 5,
+                "line": 1,
+                "offset": 4
+              },
+              "file": "query.ptk",
+              "start": {
+                "column": 2,
+                "line": 1,
+                "offset": 1
+              }
+            }
+          }
+        ],
+        "severity": "error",
+        "span": {
+          "end": {
+            "column": 5,
+            "line": 2,
+            "offset": 10
+          },
+          "file": "query.ptk",
+          "start": {
+            "column": 2,
+            "line": 2,
+            "offset": 7
+          }
+        }
+      }
+    ]
+    "#);
+}
+
+#[test]
+fn render_json_minimal_omits_empty_fields() {
+    let mut map = SourceMap::new();
+    let id = map.add_one_liner("(foo");
+
+    let mut diagnostics = Diagnostics::new();
+    diagnostics
+        .report(
+            id,
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 4.into()),
+        )
+        .emit();
+
+    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
+
+    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
+    [
+      {
+        "code": "unclosed_tree",
+        "message": "missing closing `)`",
+        "severity": "error",
+        "span": {
+          "end": {
+            "column": 5,
+            "line": 1,
+            "offset": 4
+          },
+          "file": "<query>",
+          "start": {
+            "column": 1,
+            "line": 1,
+            "offset": 0
+          }
+        }
+      }
+    ]
+    "#);
+}

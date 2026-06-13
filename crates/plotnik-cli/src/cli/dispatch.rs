@@ -14,8 +14,8 @@ use super::ColorChoice;
 use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
-use crate::commands::exec::ExecArgs;
 use crate::commands::infer::InferArgs;
+use crate::commands::run::RunArgs;
 use crate::commands::trace::TraceArgs;
 
 pub struct AstParams {
@@ -75,6 +75,7 @@ pub struct CheckParams {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub strict: bool,
+    pub json: bool,
     pub color: ColorChoice,
 }
 
@@ -85,6 +86,7 @@ impl CheckParams {
             query_text: m.get_one::<String>("query_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
             strict: m.get_flag("strict"),
+            json: m.get_flag("json"),
             color: parse_color(m),
         }
     }
@@ -97,6 +99,7 @@ impl From<CheckParams> for CheckArgs {
             query_text: p.query_text,
             lang: p.lang,
             strict: p.strict,
+            json: p.json,
             color: p.color.should_colorize(),
         }
     }
@@ -107,7 +110,7 @@ pub struct DumpParams {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub color: ColorChoice,
-    // Note: source_path, source_text, entry, compact, verbose_nodes, check,
+    // Note: source_path, source_text, entry, compact, verbose_nodes,
     // verbose, no_result, fuel are parsed but not extracted (unified flags)
 }
 
@@ -188,7 +191,7 @@ impl From<InferParams> for InferArgs {
     }
 }
 
-pub struct ExecParams {
+pub struct RunParams {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
@@ -197,12 +200,11 @@ pub struct ExecParams {
     pub compact: bool,
     pub entry: Option<String>,
     pub color: ColorChoice,
-    // Note: verbose_nodes, check, verbose, no_result, fuel are parsed but not
-    // extracted. verbose_nodes and check are visible exec flags that aren't
-    // implemented yet. The others are unified flags from trace.
+    // Note: verbose_nodes, verbose, no_result, fuel are hidden unified flags,
+    // parsed but not extracted.
 }
 
-impl ExecParams {
+impl RunParams {
     pub fn from_matches(m: &ArgMatches) -> Self {
         let query_path = m.get_one::<PathBuf>("query_path").cloned();
         let query_text = m.get_one::<String>("query_text").cloned();
@@ -229,8 +231,8 @@ impl ExecParams {
     }
 }
 
-impl From<ExecParams> for ExecArgs {
-    fn from(p: ExecParams) -> Self {
+impl From<RunParams> for RunArgs {
+    fn from(p: RunParams) -> Self {
         // Pretty by default when stdout is a TTY, unless --compact is passed
         let pretty = !p.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
 
@@ -258,7 +260,7 @@ pub struct TraceParams {
     pub no_result: bool,
     pub fuel: u32,
     pub color: ColorChoice,
-    // Note: compact, verbose_nodes, check are parsed but not extracted (unified flags)
+    // Note: compact, verbose_nodes are parsed but not extracted (unified flags)
 }
 
 impl TraceParams {

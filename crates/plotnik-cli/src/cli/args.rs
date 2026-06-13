@@ -61,6 +61,14 @@ pub fn color_arg() -> Arg {
         .help("Colorize output")
 }
 
+/// Output diagnostics as JSON (--json).
+pub fn json_arg() -> Arg {
+    Arg::new("json")
+        .long("json")
+        .action(ArgAction::SetTrue)
+        .help("Output diagnostics as JSON")
+}
+
 /// Include anonymous nodes (--raw).
 pub fn raw_arg() -> Arg {
     Arg::new("raw")
@@ -135,14 +143,6 @@ pub fn compact_arg() -> Arg {
         .long("compact")
         .action(ArgAction::SetTrue)
         .help("Output compact JSON (default: pretty when stdout is a TTY)")
-}
-
-/// Validate output against inferred types (--check).
-pub fn check_arg() -> Arg {
-    Arg::new("check")
-        .long("check")
-        .action(ArgAction::SetTrue)
-        .help("Validate output against inferred types")
 }
 
 /// Entry point name (--entry).
