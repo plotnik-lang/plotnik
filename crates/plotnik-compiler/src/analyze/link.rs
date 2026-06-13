@@ -4,9 +4,9 @@
 //! 1. Resolve all symbols (node types and fields) against grammar
 //! 2. Validate structural constraints (field on node type, child type for field)
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 use rowan::TextRange;
@@ -176,8 +176,8 @@ impl<'a, 'q> Linker<'a, 'q> {
         let defs: Vec<_> = root.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
-            let mut visited = IndexSet::new();
-            self.validate_expr_structure(&body, None, &mut visited);
+            let mut walk = RefWalk::default();
+            self.validate_expr_structure(&body, None, &mut walk);
         }
     }
 
@@ -185,7 +185,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         expr: &Expr,
         ctx: Option<ValidationContext>,
-        visited: &mut IndexSet<String>,
+        walk: &mut RefWalk,
     ) {
         match expr {
             Expr::NamedNode(node) => {
@@ -208,9 +208,9 @@ impl<'a, 'q> Linker<'a, 'q> {
 
                 for child in node.children() {
                     if let Expr::FieldExpr(f) = &child {
-                        self.validate_field_expr(f, child_ctx.as_ref(), visited);
+                        self.validate_field_expr(f, child_ctx.as_ref(), walk);
                     } else {
-                        self.validate_expr_structure(&child, child_ctx, visited);
+                        self.validate_expr_structure(&child, child_ctx, walk);
                     }
                 }
 
@@ -225,39 +225,48 @@ impl<'a, 'q> Linker<'a, 'q> {
             Expr::AnonymousNode(_) => {}
             Expr::FieldExpr(f) => {
                 // Should be handled by parent NamedNode, but handle gracefully
-                self.validate_field_expr(f, ctx.as_ref(), visited);
+                self.validate_field_expr(f, ctx.as_ref(), walk);
             }
             Expr::AltExpr(alt) => {
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx, visited);
+                    self.validate_expr_structure(&body, ctx, walk);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx, visited);
+                    self.validate_expr_structure(&child, ctx, walk);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, visited);
+                self.validate_expr_structure(&inner, ctx, walk);
             }
             Expr::QuantifiedExpr(q) => {
                 let Some(inner) = q.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, visited);
+                self.validate_expr_structure(&inner, ctx, walk);
             }
             Expr::Ref(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
-                if !visited.insert(name.to_string()) {
+                // Validation is a pure function of `(name, ctx)`, so caching it
+                // collapses diamond-shaped reference graphs that would otherwise
+                // be re-walked 2^depth times. Cut cycles are never cached: they
+                // return below without reaching the `validated.insert`.
+                let key = (name.to_string(), ctx);
+                if walk.validated.contains(&key) {
+                    return;
+                }
+                if !walk.in_progress.insert(name.to_string()) {
                     return;
                 }
                 let Some(body) = self.symbol_table.get(name).cloned() else {
-                    visited.swap_remove(name);
+                    walk.in_progress.remove(name);
                     return;
                 };
-                self.validate_expr_structure(&body, ctx, visited);
-                visited.swap_remove(name);
+                self.validate_expr_structure(&body, ctx, walk);
+                walk.in_progress.remove(name);
+                walk.validated.insert(key);
             }
         }
     }
@@ -288,7 +297,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         field: &ast::FieldExpr,
         ctx: Option<&ValidationContext>,
-        visited: &mut IndexSet<String>,
+        walk: &mut RefWalk,
     ) {
         let Some(name_token) = field.name() else {
             return;
@@ -314,7 +323,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
 
         let Some(value) = field.value() else { return };
-        self.validate_expr_structure(&value, Some(*ctx), visited);
+        self.validate_expr_structure(&value, Some(*ctx), walk);
     }
 
     fn validate_negated_field(&mut self, neg: &ast::NegatedField, ctx: &ValidationContext) {
@@ -403,12 +412,23 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 }
 
 /// Context for validating child types.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ValidationContext {
     /// The parent node type being validated against.
     parent_id: NodeTypeId,
     /// The parent node type token range for related_to.
     parent_range: TextRange,
+}
+
+/// State for walking the reference graph during structural validation.
+#[derive(Default)]
+struct RefWalk {
+    /// Definitions currently on the recursion stack — guards against cycles.
+    in_progress: HashSet<String>,
+    /// Definitions already validated under a given context. A definition's
+    /// validation depends only on `(name, ctx)`, so caching it keeps shared
+    /// references (e.g. diamond graphs) from being re-walked exponentially.
+    validated: HashSet<(String, Option<ValidationContext>)>,
 }
 
 /// Combined symbol resolver for node types and fields.
