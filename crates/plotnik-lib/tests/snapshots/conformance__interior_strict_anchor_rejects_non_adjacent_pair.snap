@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program {(lexical_declaration) @a .! (expression_statement) @b})
+
+==== source ====
+let x; /* c */ foo;
+
+==== types ====
+export interface Q {
+  a: Node;
+  b: Node;
+}
+
+==== result ====
+<no match>

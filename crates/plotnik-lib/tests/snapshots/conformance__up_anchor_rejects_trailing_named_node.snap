@@ -1,0 +1,14 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement (identifier == "a")) .)
+
+==== source ====
+a; b;
+
+==== types ====
+export type Q = undefined;
+
+==== result ====
+<no match>

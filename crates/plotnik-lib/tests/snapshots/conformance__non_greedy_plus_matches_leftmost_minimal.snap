@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program {(lexical_declaration)+? @d})
+
+==== source ====
+let a; let b;
+
+==== types ====
+export interface Q {
+  d: [Node, ...Node[]];
+}
+
+==== result ====
+{"d":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]}]}

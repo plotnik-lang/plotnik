@@ -18,6 +18,7 @@
 
 // Re-export modules from plotnik-core
 pub use plotnik_core::colors;
+pub use plotnik_core::grammar;
 
 // Re-export modules from plotnik-bytecode
 pub use plotnik_bytecode as bytecode;
