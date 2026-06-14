@@ -1924,8 +1924,10 @@ dependencies = [
 name = "plotnik-bytecode"
 version = "0.3.3"
 dependencies = [
+ "cargo_metadata",
  "crc32fast",
  "insta",
+ "plotnik-compiler",
  "plotnik-core",
  "proptest",
  "regex-automata",

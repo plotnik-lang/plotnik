@@ -5,6 +5,7 @@
 mod aligned_vec;
 mod constants;
 mod dump;
+mod effect_stack;
 mod effects;
 mod entrypoint;
 mod format;
@@ -62,6 +63,8 @@ mod aligned_vec_tests;
 mod effects_tests;
 #[cfg(test)]
 mod entrypoint_tests;
+#[cfg(test)]
+mod forged_tests;
 #[cfg(test)]
 mod format_tests;
 #[cfg(test)]

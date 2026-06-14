@@ -4,6 +4,15 @@
 - Resilient parser with user-friendly error messages called "diagnostics" (see `diagnostics/`)
 - Stability via invariants: `panic!`/`assert!`/`.expect()` for simple cases, `invariants.rs` otherwise
 
+# Invariant Discipline
+
+One rule, two sides of a trust boundary — where untrusted input becomes trusted state (the compiler admitting a query, the loader admitting bytecode):
+
+- **Outside** (query source, external bytecode): never panic — answer with a diagnostic or a `Result` error.
+- **Inside** (after a successful parse or load): trust completely; state invariants loudly (`panic!`/`.expect()`/`invariants.rs`). A violation is _our_ bug.
+
+Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hold fact (`unwrap_or`, `.ok()`) → make it loud; a `panic!` on untrusted input → make it a clean error.
+
 # Documentation
 
 [docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Tree Navigation](docs/tree-navigation.md) | [Binary Format](docs/binary-format/01-overview.md)

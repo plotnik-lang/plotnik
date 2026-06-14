@@ -55,7 +55,7 @@ fn nav_up_skip_extras_overflow_panics() {
 }
 
 #[test]
-#[should_panic(expected = "invalid nav up level")]
+#[should_panic(expected = "invalid nav byte")]
 fn nav_invalid_up_zero_panics() {
     Nav::from_byte(0b01_000000);
 }

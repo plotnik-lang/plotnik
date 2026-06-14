@@ -113,6 +113,18 @@ impl TypeContext {
         }
     }
 
+    /// Fields of the struct a `Bubble` flow points to.
+    ///
+    /// Every `TypeFlow::Bubble` is constructed by interning a `Struct` (see the
+    /// `intern_struct`/`intern_single_field` calls at every `Bubble` construction
+    /// site), so a non-`Struct` id here is a broken type-system invariant, not a
+    /// runtime condition the query can trigger. We surface it loudly instead of
+    /// fabricating an empty struct that would silently mistype the output.
+    pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+        self.get_struct_fields(id)
+            .expect("Bubble flow must point to a Struct type")
+    }
+
     /// Cache term info for an expression.
     pub fn set_term_info(&mut self, expr: Expr, info: TermInfo) {
         self.term_info.insert(expr, info);

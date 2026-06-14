@@ -64,14 +64,14 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
 
         // Void ∪ Bubble -> Bubble (every field is absent in the Void branch)
         (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
-            let fields = ctx.get_struct_fields(id).cloned().unwrap_or_default();
+            let fields = ctx.expect_struct_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
             Ok(TypeFlow::Bubble(ctx.intern_struct(relaxed)))
         }
 
         (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
-            let a_fields = ctx.get_struct_fields(a_id).cloned().unwrap_or_default();
-            let b_fields = ctx.get_struct_fields(b_id).cloned().unwrap_or_default();
+            let a_fields = ctx.expect_struct_fields(a_id).clone();
+            let b_fields = ctx.expect_struct_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
             Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))

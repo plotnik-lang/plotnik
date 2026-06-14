@@ -37,10 +37,18 @@ impl Nav {
     /// - Bits 7-6: Mode (00=Standard/UpSkipExtras, 01=Up, 10=UpSkipTrivia, 11=UpExact)
     /// - Bits 5-0: Payload (enum value for Standard, level count for Up variants)
     pub fn from_byte(b: u8) -> Self {
+        Self::try_from_byte(b).unwrap_or_else(|| panic!("invalid nav byte: {b:#04x}"))
+    }
+
+    /// Non-panicking nav decode, for validating an untrusted instruction stream
+    /// at load time before the VM decodes it. The only invalid encodings are the
+    /// `Up*` modes (`01`/`10`/`11`) with a zero level — every mode-`00` payload is
+    /// a valid Standard or `UpSkipExtras` command.
+    pub fn try_from_byte(b: u8) -> Option<Self> {
         let mode = b >> 6;
         let payload = b & 0x3F;
 
-        match mode {
+        let nav = match mode {
             0b00 => match payload {
                 0 => Self::Epsilon,
                 1 => Self::Stay,
@@ -55,20 +63,12 @@ impl Nav {
                 10 => Self::DownExact,
                 _ => Self::UpSkipExtras(payload - UP_SKIP_EXTRAS_BASE),
             },
-            0b01 => {
-                assert!(payload >= 1, "invalid nav up level: {payload}");
-                Self::Up(payload)
-            }
-            0b10 => {
-                assert!(payload >= 1, "invalid nav up_skip_trivia level: {payload}");
-                Self::UpSkipTrivia(payload)
-            }
-            0b11 => {
-                assert!(payload >= 1, "invalid nav up_exact level: {payload}");
-                Self::UpExact(payload)
-            }
-            _ => unreachable!(),
-        }
+            0b01 if payload >= 1 => Self::Up(payload),
+            0b10 if payload >= 1 => Self::UpSkipTrivia(payload),
+            0b11 if payload >= 1 => Self::UpExact(payload),
+            _ => return None,
+        };
+        Some(nav)
     }
 
     /// Encode to bytecode byte.

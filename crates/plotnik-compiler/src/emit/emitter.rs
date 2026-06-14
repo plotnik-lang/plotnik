@@ -164,6 +164,18 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     header.checksum = crc32fast::hash(&output[64..]);
     output[..64].copy_from_slice(&header.to_bytes());
 
+    // In debug/test builds, prove the emitter only ever produces bytecode the
+    // loader accepts: every emission is gated through the full structural
+    // validator. This makes "the compiler never emits invalid bytecode" an
+    // enforced invariant across the whole test suite — and the load-time
+    // checks (including the effect-stack verifier) the trust gate relies on
+    // double as an emit-correctness oracle. Compiled out in release, where the
+    // CLI's own `Module::load(...).expect(...)` is the boundary instead.
+    #[cfg(debug_assertions)]
+    if let Err(err) = plotnik_bytecode::Module::load(&output) {
+        panic!("compiler emitted bytecode rejected by Module::load: {err:?}");
+    }
+
     Ok(output)
 }
 

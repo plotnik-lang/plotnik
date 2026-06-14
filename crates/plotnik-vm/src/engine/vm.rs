@@ -356,6 +356,9 @@ impl<'t> VM<'t> {
         let op = PredicateOp::from_byte(op);
 
         if is_regex {
+            // Non-empty, deserializable DFA bytes are an invariant established at
+            // load by `Module::validate_regex_dfas`; these are unreachable on any
+            // module that passed `Module::load`.
             let regex_bytes = module.regexes().get_by_index(value_ref as usize);
             assert!(
                 !regex_bytes.is_empty(),
