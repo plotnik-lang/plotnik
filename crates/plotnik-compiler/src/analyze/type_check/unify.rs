@@ -82,22 +82,27 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
     }
 }
 
-/// Relax a field that is absent from some branch.
+/// Relax a field that is absent from some branch, keeping the output shape stable
+/// (every key present).
 ///
-/// A list stays present as a (possibly empty) array — the missing branch emits
-/// `[]`, never null — so it becomes zero-or-more rather than optional. Every other
-/// shape becomes nullable. This keeps the output shape stable (every key present).
+/// A *required* list stays present as a (possibly empty) array — the absent branch
+/// emits `[]`, never null — so it relaxes to zero-or-more. Everything else becomes
+/// nullable, including an already-optional list: `((x)+ @a)?` emits null when its
+/// `?` is skipped, so forcing it to a non-null `[]` here would make the declared
+/// type lie. Nullability (`optional`), not the array shape, decides the default,
+/// which keeps inference in lockstep with what the emitter writes.
 fn relax_for_absence(ctx: &mut TypeContext, info: FieldInfo) -> FieldInfo {
-    if let Some(TypeShape::Array { element, .. }) = ctx.get_type(info.type_id) {
+    if !info.optional
+        && let Some(TypeShape::Array { element, .. }) = ctx.get_type(info.type_id)
+    {
         let element = *element;
         let array = ctx.intern_type(TypeShape::Array {
             element,
             non_empty: false,
         });
-        FieldInfo::required(array)
-    } else {
-        info.make_optional()
+        return FieldInfo::required(array);
     }
+    info.make_optional()
 }
 
 /// Relax every field in a map for absence (see [`relax_for_absence`]).

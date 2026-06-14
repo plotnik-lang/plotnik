@@ -456,6 +456,31 @@ fn array_capture_absent_in_branch_is_empty() {
     );
 }
 
+/// #420 #7: an *optional* list (`((x)+ @a)?`) stays nullable across branches. The
+/// absent `?` emits `null`, so relaxing the field by its array *shape* — instead
+/// of its nullability — would force a non-null `[]` and make the type lie. On `f()`
+/// the empty argument list skips the `?`, so `args` is `null`, matching the
+/// declared `[Node, ...Node[]] | null`.
+#[test]
+fn optional_array_field_stays_nullable_across_branches() {
+    shot_exec!(
+        r#"Q = (program (expression_statement [(call_expression (arguments (identifier)+ @args)?)  (identifier) @id]))"#,
+        "f()"
+    );
+}
+
+/// #420 #7: an untagged branch contributes only its *top-level* fields. Branch two
+/// supplies `row`; its nested `@x` belongs to that scope, so the top-level `x`
+/// (from branch one) must still materialize as `null`. The default is injected on
+/// the parent object and has to survive the `Obj` the branch body opens for `row`.
+#[test]
+fn alt_branch_nested_scope_capture_keeps_top_level_null() {
+    shot_exec!(
+        r#"Q = (program (expression_statement [(number) @x  {(identifier) @x} @row]))"#,
+        "foo"
+    );
+}
+
 /// #420 #8: a reference into another workspace file is validated and inferred
 /// under its *own* source. The duplicate capture lives in `idents.ptk`, so the
 /// diagnostic points there — previously the referrer's source id was reused,
