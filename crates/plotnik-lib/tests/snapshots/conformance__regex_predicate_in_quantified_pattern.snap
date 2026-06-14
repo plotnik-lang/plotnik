@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
+
+==== source ====
+x1; ax; x3;
+
+==== types ====
+export interface QRows {
+  id: Node;
+}
+
+export interface Q {
+  rows: QRows[];
+}
+
+==== result ====
+{"rows":[{"id":{"kind":"identifier","text":"x1","span":[0, 2]}},{"id":{"kind":"identifier","text":"x3","span":[8, 10]}}]}

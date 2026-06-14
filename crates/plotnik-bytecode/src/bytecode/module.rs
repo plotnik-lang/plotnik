@@ -17,6 +17,7 @@ use super::node_type_ir::NodeTypeIR;
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
+use crate::dfa::RegexDfas;
 
 /// Read a little-endian u16 from bytes at the given offset.
 #[inline]
@@ -192,6 +193,10 @@ pub struct Module {
     header: Header,
     /// Cached section offsets (computed from header counts).
     offsets: SectionOffsets,
+    /// Regex-predicate DFAs, deserialized once here at load and reused by the
+    /// VM on every evaluation instead of being rebuilt from the blob each time
+    /// (issue #426).
+    regex_dfas: RegexDfas,
 }
 
 impl Module {
@@ -270,12 +275,16 @@ impl Module {
         // Section bounds held, so the u32 offset arithmetic cannot wrap.
         let offsets = header.compute_offsets();
 
-        let module = Self {
+        let mut module = Self {
             storage,
             header,
             offsets,
+            regex_dfas: RegexDfas::default(),
         };
-        module.validate()?;
+        // Validation deserializes every regex DFA to prove it well-formed; it
+        // hands those owned automata back so the VM reuses them instead of
+        // re-deserializing per evaluation (issue #426).
+        module.regex_dfas = module.validate()?;
         Ok(module)
     }
 
@@ -299,7 +308,7 @@ impl Module {
     /// proves no path can panic the materializer's builder stack or the VM's
     /// suppression counter — so a loaded module never panics on view/decode/VM
     /// access regardless of how it was crafted.
-    fn validate(&self) -> Result<(), ModuleError> {
+    fn validate(&self) -> Result<RegexDfas, ModuleError> {
         // Reserved header bytes are not covered by the CRC; v5 fixes them at zero.
         if self.header._reserved != [0u8; 22] {
             return Err(ModuleError::MalformedHeader);
@@ -315,7 +324,7 @@ impl Module {
 
         self.validate_string_table()?;
         self.validate_regex_table()?;
-        self.validate_regex_dfas()?;
+        let regex_dfas = self.load_regex_dfas()?;
         self.validate_type_defs()?;
         // Bound every embedded `StringId` before any later check constructs a
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
@@ -328,7 +337,7 @@ impl Module {
         // instruction API. This closes the last forged-module panic class: the
         // materializer's builder-stack panics and the VM's suppression underflow.
         super::effect_stack::validate_effect_stack(self)?;
-        Ok(())
+        Ok(regex_dfas)
     }
 
     /// Recompute the section layout in `u64` (no overflow) and ensure every
@@ -412,22 +421,33 @@ impl Module {
         Ok(())
     }
 
-    /// Every regex entry's serialized sparse DFA must deserialize, so the VM's
-    /// per-evaluation [`deserialize_dfa`](crate::deserialize_dfa) (which the hot
-    /// predicate path `.expect()`s) and the `!is_empty()` assertion are sound
-    /// invariants, not reachable panics on a forged blob. Index 0 is the reserved
-    /// sentinel — never evaluated — so the scan starts at 1. The offset table is
-    /// already bounded by [`Self::validate_regex_table`], so `get_by_index` here
-    /// cannot slice out of range.
-    fn validate_regex_dfas(&self) -> Result<(), ModuleError> {
+    /// Deserialize every regex DFA once, validating each and caching the owned
+    /// automaton for the VM to reuse on every evaluation (issue #426).
+    ///
+    /// [`deserialize_dfa`](crate::deserialize_dfa) (`DFA::from_bytes`) validates
+    /// the whole serialized automaton — rejecting empty or corrupt bytes — so
+    /// this single pass *is* the validation: a deserializable DFA for every real
+    /// entry is the invariant the VM's hot predicate path relies on, after which
+    /// `RegexDfas::is_match` searches the cached automaton with no further
+    /// deserialization. The owned copy detaches the DFA from `self.storage`, so
+    /// the cache lives in `Module` without a self-referential borrow. Index 0 is
+    /// the reserved sentinel — never evaluated — so it stays `None` and the scan
+    /// starts at 1. The offset table is already bounded by
+    /// [`Self::validate_regex_table`], so `get_by_index` here cannot slice out of
+    /// range.
+    fn load_regex_dfas(&self) -> Result<RegexDfas, ModuleError> {
         let regexes = self.regexes();
-        for i in 1..self.header.regex_table_count as usize {
+        let count = self.header.regex_table_count as usize;
+        let mut dfas = Vec::with_capacity(count);
+        dfas.push(None); // index 0: reserved sentinel, never evaluated
+        for i in 1..count {
             let bytes = regexes.get_by_index(i);
-            if bytes.is_empty() || crate::deserialize_dfa(bytes).is_err() {
-                return Err(ModuleError::InvalidRegexDfa(i));
-            }
+            let dfa = crate::deserialize_dfa(bytes)
+                .map_err(|_| ModuleError::InvalidRegexDfa(i))?
+                .to_owned();
+            dfas.push(Some(dfa));
         }
-        Ok(())
+        Ok(RegexDfas::new(dfas))
     }
 
     /// Every TypeDef must have a known kind, and Struct/Enum member ranges must
@@ -760,9 +780,9 @@ impl Module {
             // the VM's op/flag `unreachable!` would panic when this predicate is
             // evaluated or dumped. The regex operand must be a *real* entry
             // (`1..count`): index 0 is the reserved sentinel that
-            // `validate_regex_dfas` skips, so its DFA bytes are unvalidated and
-            // empty, and the VM `.expect()`s non-empty regex bytes. A string
-            // operand of 0 is benign — the validated easter-egg entry, never
+            // `load_regex_dfas` leaves empty, so its DFA slot is `None`, and the
+            // VM `.expect()`s a populated slot. A string operand of 0 is benign —
+            // the validated easter-egg entry, never
             // asserted non-empty.
             let op_is_regex = matches!(op, 5 | 6); // RegexMatch | RegexNoMatch
             let operand_ok = if is_regex {
@@ -846,6 +866,14 @@ impl Module {
             blob: &self.storage[self.offsets.regex_blob as usize..],
             table: self.regex_table_slice(),
         }
+    }
+
+    /// Regex-predicate DFAs, deserialized once at load (issue #426).
+    ///
+    /// The VM evaluates `=~`/`!~` against these cached automata; rebuilding them
+    /// from [`regexes`](Self::regexes)'s raw blob per call is what this avoids.
+    pub fn regex_dfas(&self) -> &RegexDfas {
+        &self.regex_dfas
     }
 
     /// Get a view into the type metadata.
