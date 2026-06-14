@@ -152,6 +152,92 @@ fn lower_successors_overflow() {
 }
 
 #[test]
+fn lower_successors_overflow_preserves_all_successors() {
+    let succs: Vec<_> = (1..=35).map(Label).collect();
+    let mut result = CompileResult {
+        instructions: vec![MatchIR::at(Label(0)).next_many(succs.clone()).into()],
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    lower(&mut result);
+
+    // The cascade must append, not replace: every original successor stays reachable
+    // from the entry, and in priority order.
+    let by_label: std::collections::HashMap<Label, &InstructionIR> =
+        result.instructions.iter().map(|i| (i.label(), i)).collect();
+    let mut seen = std::collections::HashSet::new();
+    let mut stack = vec![Label(0)];
+    while let Some(l) = stack.pop() {
+        if !seen.insert(l) {
+            continue;
+        }
+        if let Some(instr) = by_label.get(&l) {
+            stack.extend(instr.successors());
+        }
+    }
+
+    for s in succs {
+        assert!(seen.contains(&s), "successor {s:?} was dropped by lowering");
+    }
+}
+
+#[test]
+fn lower_successors_with_payload_respect_combined_limit() {
+    // Successors share the 28-slot Match64 payload with post-effects (and pre/neg/
+    // predicate). Here neither overflows its own sub-limit — 27 successors (≤ 28) and
+    // 5 post-effects (≤ 7) — but together they are 32 slots. Lowering must still keep
+    // every instruction within the combined limit, or `MatchIR::resolve` later panics
+    // with "instruction too large". Regression for #421.
+    let succs: Vec<_> = (1..=27).map(Label).collect();
+    let mut result = CompileResult {
+        instructions: vec![
+            MatchIR::at(Label(0))
+                .nav(Nav::Down)
+                .post_effects((0..5).map(make_effect))
+                .next_many(succs.clone())
+                .into(),
+        ],
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    lower(&mut result);
+
+    for instr in &result.instructions {
+        if let InstructionIR::Match(m) = instr {
+            let predicate_slots = usize::from(m.predicate.is_some()) * 2;
+            let slots = m.pre_effects.len()
+                + m.neg_fields.len()
+                + m.post_effects.len()
+                + predicate_slots
+                + m.successors.len();
+            assert!(
+                slots <= MAX_MATCH_PAYLOAD_SLOTS,
+                "combined payload {slots} > {MAX_MATCH_PAYLOAD_SLOTS}"
+            );
+        }
+    }
+
+    // And no successor is dropped by the budgeting/cascade.
+    let by_label: std::collections::HashMap<Label, &InstructionIR> =
+        result.instructions.iter().map(|i| (i.label(), i)).collect();
+    let mut seen = std::collections::HashSet::new();
+    let mut stack = vec![Label(0)];
+    while let Some(l) = stack.pop() {
+        if !seen.insert(l) {
+            continue;
+        }
+        if let Some(instr) = by_label.get(&l) {
+            stack.extend(instr.successors());
+        }
+    }
+    for s in succs {
+        assert!(seen.contains(&s), "successor {s:?} was dropped by lowering");
+    }
+}
+
+#[test]
 fn lower_combined_overflow() {
     let mut result = CompileResult {
         instructions: vec![

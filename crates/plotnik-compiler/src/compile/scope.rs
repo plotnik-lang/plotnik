@@ -321,6 +321,10 @@ impl Compiler<'_> {
     }
 
     /// Emit an epsilon with combined effects.
+    ///
+    /// Note: this consumes only `outer.post`. Callers whose capture owns no
+    /// scope-opening step (`SetAfter`, suppressive) must route `outer.pre`
+    /// separately via [`wrap_entry_pre`](Self::wrap_entry_pre).
     pub(super) fn emit_effects_epsilon(
         &mut self,
         exit: Label,
@@ -335,6 +339,26 @@ impl Compiler<'_> {
                 .into(),
         );
         entry
+    }
+
+    /// Emit `pre` effects on an epsilon that runs immediately before `entry`, in
+    /// the enclosing scope. Returns the new entry, or `entry` unchanged when
+    /// `pre` is empty.
+    ///
+    /// Scope-opening captures (`compile_struct_scope`, `compile_array_scope`)
+    /// fold `outer_capture.pre` onto their own `Obj`/`Arr` step. Captures that
+    /// own no such step — `SetAfter` and suppressive — have nowhere to fold it,
+    /// so they call this. Dropping it loses a tagged variant's `Enum`-open (or an
+    /// untagged branch's null-injected defaults), and the path then closes a
+    /// scope it never opened.
+    pub(super) fn wrap_entry_pre(&mut self, entry: Label, pre: Vec<EffectIR>) -> Label {
+        if pre.is_empty() {
+            return entry;
+        }
+        let pre_step = self.fresh_label();
+        self.instructions
+            .push(MatchIR::epsilon(pre_step, entry).pre_effects(pre).into());
+        pre_step
     }
 
     /// Emit null effects for a skip path in optional/star quantifiers.

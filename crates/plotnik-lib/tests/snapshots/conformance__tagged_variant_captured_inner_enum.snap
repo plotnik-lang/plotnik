@@ -1,0 +1,26 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program [Tag: [In: (expression_statement) @a] @y])
+
+==== source ====
+a;
+
+==== types ====
+export interface QTag {
+  $tag: "Tag";
+  $data: { y: Enum };
+}
+
+export type Q = QTag;
+
+export interface EnumIn {
+  $tag: "In";
+  $data: { a: Node };
+}
+
+export type Enum = EnumIn;
+
+==== result ====
+{"$tag":"Tag","$data":{"y":{"$tag":"In","$data":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}}

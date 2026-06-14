@@ -85,13 +85,14 @@ pub fn collapse_up(result: &mut CompileResult) {
                 break;
             }
 
-            // Merge: add levels when the result remains encodable.
+            // Merge: add levels, but only when the sum is still encodable. If it would
+            // overflow the level field, refuse the merge — capping to the max would
+            // silently drop upward movement while still absorbing the successor.
             let max_level = max_up_level(current_nav);
             let new_level = current_level.saturating_add(succ_level);
-            if new_level > max_level && matches!(current_nav, Nav::UpSkipExtras(_)) {
+            if new_level > max_level {
                 break;
             }
-            let new_level = new_level.min(max_level);
             current_nav = set_up_level(current_nav, new_level);
             current_level = new_level;
             final_successors = succ.successors.clone();

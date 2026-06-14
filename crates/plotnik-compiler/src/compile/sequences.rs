@@ -69,6 +69,27 @@ fn nav_for_alt_branch(
     })
 }
 
+/// A scope-closing effect (`EndArr`/`EndObj`/`EndEnum`/`SuppressEnd`).
+///
+/// Used to split a sequence's post-effects when its last item is skippable. The list
+/// is `[value effects…, scope close, consumers of the scope value…]` — e.g.
+/// `[Node, Set]`, `[EndEnum]`, or `[EndEnum, Push]`. From the *first* scope close
+/// onward, the effects belong to the whole sequence (they close its scope and consume
+/// the produced value) and must run on every path, so that contiguous suffix rides a
+/// dominating epsilon. The prefix before it is the item's own value capture — it needs
+/// the item's `matched_node` and skip-path null injection, so it stays on the item.
+/// Splitting positionally (not by effect kind) keeps a close and its consumer together
+/// and in order.
+fn is_scope_close_effect(e: &EffectIR) -> bool {
+    matches!(
+        e.opcode,
+        EffectOpcode::EndArr
+            | EffectOpcode::EndObj
+            | EffectOpcode::EndEnum
+            | EffectOpcode::SuppressEnd
+    )
+}
+
 impl Compiler<'_> {
     /// Compile a sequence with capture effects (passed to last item).
     pub(super) fn compile_seq_inner(
@@ -134,15 +155,21 @@ impl Compiler<'_> {
             .first()
             .and_then(|(idx, _)| items[*idx].as_expr())
             .is_some_and(is_skippable_quantifier);
-        let first_uses_down = is_down_nav(first_expr_nav);
+        // The skip path makes the follower the new "first" item, so it must re-derive
+        // first-position navigation rather than the sibling `Next` the match path uses.
+        // This is required whenever the first item navigates to a position (`Down*` into
+        // a child, `Stay*` at an alternation branch's search candidate) instead of
+        // advancing to a sibling — otherwise the skip path over-advances and never binds.
+        let first_positions = is_down_nav(first_expr_nav)
+            || matches!(first_expr_nav, Some(Nav::Stay | Nav::StayExact));
         let needs_skip_exit =
-            first_is_skippable && first_uses_down && (nav_modes.len() > 1 || skip_exit.is_some());
+            first_is_skippable && first_positions && (nav_modes.len() > 1 || skip_exit.is_some());
 
         if needs_skip_exit {
-            // Special handling: first item can skip and uses Down navigation.
             // The continuation needs two versions:
-            // - skip_exit: uses Down nav (skipping means next item becomes "first")
-            // - match_exit: uses Next nav (after matching, advance to sibling)
+            // - skip_exit: skipping makes the next item "first", so it re-derives
+            //   first-position nav (`Down*`/`Stay*`)
+            // - match_exit: after matching, advance to the sibling (`Next`)
             return self.compile_seq_items_with_skip_exit(
                 items,
                 &nav_modes,
@@ -154,9 +181,34 @@ impl Compiler<'_> {
             );
         }
 
+        // Scope open/close effects merge onto the boundary items to avoid extra epsilons.
+        // That merge is unsound when the boundary item is skippable: its skip path drops
+        // the merged effect, unbalancing the path (e.g. EndEnum with no Enum). So a
+        // skippable boundary's *scope* effects move to a dominating epsilon every path
+        // crosses. Value effects (Node/Set/…) stay on the matched item — they need its
+        // matched_node and its skip-path null injection — so only scope effects move.
+        let last_is_skippable = nav_modes
+            .last()
+            .and_then(|(idx, _)| items[*idx].as_expr())
+            .is_some_and(is_skippable_quantifier);
+
         // Build chain in reverse: last expression exits to `exit`, each prior exits to next
         // Split capture effects: pre goes to FIRST item, post goes to LAST item
         let mut current_exit = exit;
+        let last_post = match last_is_skippable
+            .then(|| capture.post.iter().position(is_scope_close_effect))
+            .flatten()
+        {
+            Some(split) => {
+                current_exit = self.emit_effects_epsilon(
+                    current_exit,
+                    capture.post[split..].to_vec(),
+                    CaptureEffects::default(),
+                );
+                capture.post[..split].to_vec()
+            }
+            None => capture.post.clone(),
+        };
         let count = nav_modes.len();
         let mut following_nav: Option<Nav> = None;
         for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
@@ -168,13 +220,13 @@ impl Compiler<'_> {
             let is_first_expr = i == count - 1; // Last in reversed loop = first in sequence
 
             let item_capture = CaptureEffects {
-                pre: if is_first_expr {
+                pre: if is_first_expr && !first_is_skippable {
                     capture.pre.clone()
                 } else {
                     vec![]
                 },
                 post: if is_last_expr {
-                    capture.post.clone()
+                    last_post.clone()
                 } else {
                     vec![]
                 },
@@ -201,14 +253,24 @@ impl Compiler<'_> {
             };
             following_nav = nav_override;
         }
+        if first_is_skippable {
+            current_exit = self.wrap_entry_pre(current_exit, capture.pre.clone());
+        }
         current_exit
     }
 
-    /// Compile sequence items where first item is skippable and uses Down navigation.
+    /// Compile sequence items where the first item is skippable and navigates to a
+    /// position (`Down*` into a child, or `Stay*` at an alternation branch's candidate).
     ///
     /// When the first item (optional/star) is skipped, the next item becomes the "first"
-    /// and needs to use Down navigation instead of Next. This requires compiling the
-    /// continuation twice with different navigation.
+    /// and must re-derive first-position navigation instead of the sibling `Next` the
+    /// match path uses. This requires compiling the continuation twice.
+    ///
+    /// Sequence-level scope effects (`capture`: e.g. `Enum`/`EndEnum` for a tagged
+    /// variant) wrap the whole body on single dominating epsilons — open before the
+    /// skippable item, close after the continuation — so they execute exactly once on
+    /// both the skip and match paths. Merging them onto items instead would drop the
+    /// open on the skip path (skippable first item) and leave the path unbalanced.
     ///
     /// When `caller_skip_exit` is provided and there are no remaining items, the skip
     /// path uses this exit (to bypass Up in parent node) while match path uses `exit`.
@@ -228,6 +290,26 @@ impl Compiler<'_> {
             .as_expr()
             .expect("first item must be expression");
 
+        // Close the *scope* on a single exit epsilon every continuation converges to.
+        // From the first scope close onward the suffix runs on every path; the value
+        // prefix (`post_keep`) instead rides the sequence's last matched item — it needs
+        // matched_node and the item's skip null injection, so an epsilon would capture
+        // the wrong node or miss matched_node on the skip path. Split positionally so a
+        // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
+        let (post_keep, post_close): (Vec<_>, Vec<_>) =
+            match capture.post.iter().position(is_scope_close_effect) {
+                Some(split) => (
+                    capture.post[..split].to_vec(),
+                    capture.post[split..].to_vec(),
+                ),
+                None => (capture.post.clone(), vec![]),
+            };
+        let exit = if post_close.is_empty() {
+            exit
+        } else {
+            self.emit_effects_epsilon(exit, post_close, CaptureEffects::default())
+        };
+
         // Compile the continuation with both navigations, or use exit if there is none.
         // When caller_skip_exit is provided and there is no follower, use it for the skip
         // path (this allows skip to bypass the Up instruction in the parent node).
@@ -242,16 +324,23 @@ impl Compiler<'_> {
         //   Slice *from* the follower (dropping the now-consumed leading anchor) and
         //   reuse the sibling navigation `compute_nav_modes` already derived for it,
         //   which carries the anchor's adjacency (`Next*`).
-        let (skip_exit, match_exit) = if nav_modes.len() < 2 {
-            (caller_skip_exit.unwrap_or(exit), exit)
+        let (skip_exit, match_exit, first_post) = if nav_modes.len() < 2 {
+            // The skippable item is the only (and last) item, so it carries `post_keep`.
+            (
+                caller_skip_exit.unwrap_or(exit),
+                exit,
+                CaptureEffects::new_post(post_keep),
+            )
         } else {
+            // The follower is the last item; `post_keep` rides its continuation.
+            let cont = CaptureEffects::new_post(post_keep);
             let skip_rest = &items[first_expr_idx + 1..];
             let skip = self.compile_seq_items_inner(
                 skip_rest,
                 exit,
                 is_inside_node,
-                first_nav, // Down variant; overridden when a leading anchor is present
-                capture.clone(),
+                first_nav, // Position variant; overridden when a leading anchor is present
+                cont.clone(),
                 caller_skip_exit, // Propagate for nested skippables
             );
 
@@ -262,13 +351,17 @@ impl Compiler<'_> {
                 exit,
                 is_inside_node,
                 nav_modes[1].1, // Follower's sibling nav (anchor-aware) for match path
-                capture.clone(),
+                cont,
                 None, // Match path doesn't need skip exit
             );
-            (skip, mtch)
+            (skip, mtch, CaptureEffects::default())
         };
 
-        self.compile_skippable_with_exits(first_expr, match_exit, skip_exit, first_nav, capture)
+        let entry = self
+            .compile_skippable_with_exits(first_expr, match_exit, skip_exit, first_nav, first_post);
+
+        // Open the scope on a single entry epsilon every path crosses first.
+        self.wrap_entry_pre(entry, capture.pre.clone())
     }
 
     /// Compile an alternation with capture effects (passed to each branch).

@@ -13,14 +13,13 @@ use crate::parser::Expr;
 use plotnik_bytecode::Nav;
 
 use super::capture::CaptureEffects;
-use super::collapse_prefix::collapse_prefix;
 use super::collapse_up::collapse_up;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
 use super::error::{CompileError, CompileResult};
 use super::lower::lower;
 use super::scope::StructScope;
-use super::verify::debug_verify_ir_fingerprint;
+use super::verify::{run_verified, verify_constructed};
 
 /// Compilation context bundling all shared compilation state.
 ///
@@ -83,20 +82,14 @@ impl<'a> Compiler<'a> {
             preamble_entry,
         };
 
-        // Eliminate epsilon transitions (with semantic verification in debug builds)
-        eliminate_epsilons(&mut result, ctx);
-
-        // Remove unreachable instructions (bypassed epsilons, etc.)
-        remove_unreachable(&mut result);
-
-        // Collapse structurally identical successor instructions
-        collapse_prefix(&mut result);
-
-        // Collapse consecutive Up instructions of the same mode
-        collapse_up(&mut result);
-
-        // Lower to bytecode-compatible form (cascade overflows)
-        lower(&mut result);
+        // Each pass is wrapped so debug builds assert it preserved the IR's
+        // order-sensitive semantic fingerprint and structural invariants. The
+        // wrapping compiles to a direct call in release builds.
+        verify_constructed(&result, ctx);
+        run_verified("eliminate_epsilons", &mut result, ctx, eliminate_epsilons);
+        run_verified("remove_unreachable", &mut result, ctx, remove_unreachable);
+        run_verified("collapse_up", &mut result, ctx, collapse_up);
+        run_verified("lower", &mut result, ctx, lower);
 
         Ok(result)
     }
@@ -165,15 +158,6 @@ impl<'a> Compiler<'a> {
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
-
-        // Debug-only: verify IR semantic fingerprint
-        debug_verify_ir_fingerprint(
-            &self.instructions,
-            entry_label,
-            &self.def_entries,
-            name,
-            self.ctx,
-        );
 
         Ok(())
     }
