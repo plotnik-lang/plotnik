@@ -10,6 +10,7 @@ use crate::{Cardinality, NodeFieldId, NodeType, NodeTypeId};
 
 use super::json::GrammarError;
 use super::raw::RawGrammar;
+use super::structure::StructureTable;
 
 pub(super) struct GrammarMetadata {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -59,6 +60,7 @@ pub struct Grammar {
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
+    structure: StructureTable,
 }
 
 impl Grammar {
@@ -160,7 +162,11 @@ impl Grammar {
             fields: derive_fields(&syntax_grammar, &inlines, &variable_info),
         };
 
-        Self::from_metadata(raw.name.clone(), metadata).map_err(GrammarError::Analysis)
+        let mut grammar =
+            Self::from_metadata(raw.name.clone(), metadata).map_err(GrammarError::Analysis)?;
+        let structure = StructureTable::build(grammar_ctx, &grammar);
+        grammar.structure = structure;
+        Ok(grammar)
     }
 
     pub(super) fn from_metadata(name: String, metadata: GrammarMetadata) -> Result<Self, String> {
@@ -301,12 +307,24 @@ impl Grammar {
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
+            // Populated only on the `from_raw` path: `GrammarMetadata` has already
+            // discarded the flattened productions the table distills.
+            structure: StructureTable::default(),
         })
     }
 
     /// Grammar name (e.g., "javascript", "rust").
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Distilled structural skeleton of the grammar's productions — ordered,
+    /// visibility-classified step sequences retained from the flattened grammar
+    /// before it is discarded. Empty for grammars built directly from metadata:
+    /// the flattened productions it distills do not survive into `GrammarMetadata`,
+    /// so only the `from_raw` path can populate it.
+    pub fn structure(&self) -> &StructureTable {
+        &self.structure
     }
 
     /// Resolve a named node kind to its tree-sitter ABI id.

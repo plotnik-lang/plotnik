@@ -687,7 +687,7 @@ fn get_aliases_by_symbol(
     aliases_by_symbol
 }
 
-fn effective_step_alias<'a>(
+pub(super) fn effective_step_alias<'a>(
     step: &'a ProductionStep,
     default_aliases: &'a AliasMap,
 ) -> Option<&'a Alias> {
@@ -841,7 +841,7 @@ fn add_token_node_shape(
     }
 }
 
-fn symbol_node_metadata<'a>(
+pub(super) fn symbol_node_metadata<'a>(
     symbol: Symbol,
     syntax_grammar: &'a SyntaxGrammar,
     lexical_grammar: &'a LexicalGrammar,
@@ -906,7 +906,7 @@ fn process_supertypes(info: &mut FieldInfoJSON, subtype_map: &[(NodeTypeJSON, Ve
     }
 }
 
-fn variable_type_for_child_type(
+pub(super) fn variable_type_for_child_type(
     child_type: &ChildType,
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,

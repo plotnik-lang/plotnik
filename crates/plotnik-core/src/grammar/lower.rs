@@ -346,7 +346,7 @@ pub(super) fn derive_symbols(
     symbols
 }
 
-fn public_node_type_name(name: &str) -> String {
+pub(super) fn public_node_type_name(name: &str) -> String {
     // Tree-sitter appends private disambiguators after NUL; public node names stop before it.
     name.split(TREE_SITTER_PUBLIC_NAME_SEPARATOR)
         .next()
