@@ -129,12 +129,20 @@ impl Parser<'_, '_> {
     fn reject_anchor_suffixes(&mut self) {
         loop {
             if self.currently_is_one_of(QUANTIFIERS) {
-                self.error_and_bump(DiagnosticKind::QuantifiedAnchor);
+                self.error_and_bump_with_fix(
+                    DiagnosticKind::QuantifiedAnchor,
+                    "remove the quantifier",
+                    "",
+                );
             } else if matches!(
                 self.current(),
                 SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
             ) {
-                self.error_and_bump(DiagnosticKind::CapturedAnchor);
+                self.error_and_bump_with_fix(
+                    DiagnosticKind::CapturedAnchor,
+                    "remove the capture",
+                    "",
+                );
             } else {
                 return;
             }

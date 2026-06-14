@@ -68,6 +68,8 @@ fn builder_with_related() {
       |
     1 | hello world!
       | ^^^^^ ---- related info
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -134,6 +136,7 @@ fn builder_with_all_options() {
     1 - hello world stuff!
     1 + HELLO world stuff!
       |
+    help: add `)` to close the node
     ");
 }
 
@@ -181,12 +184,14 @@ fn printer_with_custom_path() {
         .emit();
 
     let result = diagnostics.render_unfiltered(&map);
-    insta::assert_snapshot!(result, @r"
+    insta::assert_snapshot!(result, @"
     error: `test error` is not defined
      --> test.pql:1:1
       |
     1 | hello world
       | ^^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -206,12 +211,14 @@ fn printer_zero_width_span() {
         .emit();
 
     let result = diagnostics.render_unfiltered(&map);
-    insta::assert_snapshot!(result, @r"
+    insta::assert_snapshot!(result, @r#"
     error: expected an expression: zero width error
       |
     1 | hello
       | ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -236,6 +243,8 @@ fn printer_related_zero_width() {
       |
     1 | hello world!
       | ^^^^^ - zero width related
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -268,11 +277,15 @@ fn printer_multiple_diagnostics() {
       |
     1 | hello world!
       | ^^^^^
+      |
+    help: add `)` to close the node
 
     error: `second error` is not defined
       |
     1 | hello world!
       |       ^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -544,7 +557,7 @@ fn multi_file_cross_file_related() {
         .emit();
 
     let result = diagnostics.render_unfiltered(&map);
-    insta::assert_snapshot!(result, @r"
+    insta::assert_snapshot!(result, @"
     error: `Foo` is not defined
      --> b.ptk:1:2
       |
@@ -555,6 +568,8 @@ fn multi_file_cross_file_related() {
       |
     1 | Foo = (bar)
       | --- defined here
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -703,6 +718,9 @@ fn render_json_minimal_omits_empty_fields() {
     [
       {
         "code": "unclosed_tree",
+        "hints": [
+          "add `)` to close the node"
+        ],
         "message": "missing closing `)`",
         "severity": "error",
         "span": {

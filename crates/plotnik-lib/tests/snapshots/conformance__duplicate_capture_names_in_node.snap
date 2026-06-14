@@ -10,3 +10,5 @@ error: capture `@x` already defined in this scope
   |
 1 | Q = (program (expression_statement (binary_expression (identifier) @x (identifier) @x)))
   |                                                                       ^^^^^^^^^^^^^^^
+  |
+help: rename one capture, or use a labeled alternation if they are mutually exclusive branches

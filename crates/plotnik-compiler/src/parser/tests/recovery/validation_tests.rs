@@ -10,11 +10,18 @@ fn ref_with_children_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Expr` is a reference and cannot have children
       |
     2 | (Expr (child))
       |       ^^^^^^^
+      |
+    help: remove the children
+      |
+    2 - (Expr (child))
+    2 + (Expr )
+      |
+    help: a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children
     ");
 }
 
@@ -27,11 +34,18 @@ fn ref_with_multiple_children_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Expr` is a reference and cannot have children
       |
     2 | (Expr (a) (b) @cap)
       |       ^^^^^^^^^^^^
+      |
+    help: remove the children
+      |
+    2 - (Expr (a) (b) @cap)
+    2 + (Expr )
+      |
+    help: a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children
     ");
 }
 
@@ -44,11 +58,18 @@ fn ref_with_field_children_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Expr` is a reference and cannot have children
       |
     2 | (Expr name: (identifier))
       |       ^^^^^^^^^^^^^^^^^^
+      |
+    help: remove the children
+      |
+    2 - (Expr name: (identifier))
+    2 + (Expr )
+      |
+    help: a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children
     ");
 }
 
@@ -58,11 +79,13 @@ fn reference_with_supertype_syntax_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: references cannot have supertypes
       |
     1 | (RefName/subtype)
       |         ^
+      |
+    help: supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`
     ");
 }
 
@@ -72,11 +95,13 @@ fn reference_with_category_syntax_error() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: references cannot have supertypes
       |
     1 | (RefName#subtype)
       |         ^
+      |
+    help: supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`
     ");
 }
 
@@ -244,12 +269,19 @@ fn error_with_unexpected_content() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: `(ERROR)` cannot have children
       |
     1 | (ERROR (something))
-      |        ^
-    ");
+      |        ^^^^^^^^^^^
+      |
+    help: remove the children
+      |
+    1 - (ERROR (something))
+    1 + (ERROR )
+      |
+    help: `(ERROR)` matches any error node as a leaf; use `(MISSING "x")` to match a missing token
+    "#);
 }
 
 #[test]
@@ -296,16 +328,20 @@ fn upper_ident_in_alternation_not_followed_by_colon() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Expr` is not defined
       |
     1 | [(Expr) (Statement)]
       |   ^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
     error: `Statement` is not defined
       |
     1 | [(Expr) (Statement)]
       |          ^^^^^^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -317,11 +353,13 @@ fn upper_ident_not_followed_by_equals_is_expression() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Expr` is not defined
       |
     1 | (Expr)
       |  ^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -976,7 +1014,7 @@ fn branch_label_snake_case_suggests_pascal() {
     1 - [My_branch: (a) Other: (b)]
     1 + [MyBranch: (a) Other: (b)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -999,7 +1037,7 @@ fn branch_label_kebab_case_suggests_pascal() {
     1 - [My-branch: (a) Other: (b)]
     1 + [MyBranch: (a) Other: (b)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1022,7 +1060,7 @@ fn branch_label_dotted_suggests_pascal() {
     1 - [My.branch: (a) Other: (b)]
     1 + [MyBranch: (a) Other: (b)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1043,7 +1081,7 @@ fn branch_label_with_underscores_error() {
     1 - [Some_Label: (x)]
     1 + [SomeLabel: (x)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1064,7 +1102,7 @@ fn branch_label_with_hyphens_error() {
     1 - [Some-Label: (x)]
     1 + [SomeLabel: (x)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1090,7 +1128,7 @@ fn lowercase_branch_label() {
     2 -   left: (a)
     2 +   Left: (a)
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
 
     error: branch labels must be PascalCase
       |
@@ -1102,7 +1140,7 @@ fn lowercase_branch_label() {
     3 -   right: (b)
     3 +   Right: (b)
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1125,7 +1163,7 @@ fn lowercase_branch_label_suggests_capitalized() {
     1 - [first: (a) Second: (b)]
     1 + [First: (a) Second: (b)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1146,7 +1184,7 @@ fn mixed_case_branch_labels() {
     1 - [foo: (a) Bar: (b)]
     1 + [Foo: (a) Bar: (b)]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
     ");
 }
 
@@ -1684,6 +1722,11 @@ fn quantified_anchor_error() {
     1 | (call (a) . * (b))
       |             ^
       |
+    help: remove the quantifier
+      |
+    1 - (call (a) . * (b))
+    1 + (call (a) .  (b))
+      |
     help: anchors constrain position and produce no value
     ");
 }
@@ -1702,6 +1745,11 @@ fn quantified_strict_anchor_error() {
     1 | (call (a) .! ? (b))
       |              ^
       |
+    help: remove the quantifier
+      |
+    1 - (call (a) .! ? (b))
+    1 + (call (a) .!  (b))
+      |
     help: anchors constrain position and produce no value
     ");
 }
@@ -1719,6 +1767,11 @@ fn captured_anchor_error() {
       |
     1 | (call (a) . @x (b))
       |             ^^
+      |
+    help: remove the capture
+      |
+    1 - (call (a) . @x (b))
+    1 + (call (a) .  (b))
       |
     help: anchors constrain position and produce no value
     ");

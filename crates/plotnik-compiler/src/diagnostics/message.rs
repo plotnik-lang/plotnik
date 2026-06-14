@@ -74,7 +74,6 @@ pub enum DiagnosticKind {
 
     // Type inference errors
     IncompatibleTypes,
-    MultiCaptureQuantifierNoName,
     UnusedBranchLabels,
     StrictDimensionalityViolation,
     MultiElementScalarCapture,
@@ -178,7 +177,9 @@ impl DiagnosticKind {
             }
             Self::CaptureNameInvalid => Some("captures become fields in the output"),
             Self::DefNameInvalid => Some("definitions become types in the output"),
-            Self::BranchLabelInvalid => Some("branch labels become enum variants in the output"),
+            Self::BranchLabelInvalid => {
+                Some("branch labels become variants of a tagged union in the output")
+            }
             Self::FieldNameInvalid => Some("fields come from the grammar and are snake_case"),
             Self::TreeSitterSequenceSyntax => {
                 Some("use `{(a) (b)}` to match a sequence of siblings")
@@ -211,6 +212,51 @@ impl DiagnosticKind {
             Self::MultiElementScalarCapture => {
                 Some("add internal captures: `{(a) @a (b) @b}* @items`")
             }
+            Self::UnclosedTree => Some("add `)` to close the node"),
+            Self::UnclosedSequence => Some("add `}` to close the sequence"),
+            Self::UnclosedAlternation => Some("add `]` to close the alternation"),
+            Self::UnclosedString => {
+                Some("anonymous nodes match literal tokens; close the quote: `\"foo\"`")
+            }
+            Self::ExpectedExpression => Some(
+                "an expression is a node `(kind)`, anonymous node `\"text\"`, sequence `{...}`, or alternation `[...]`",
+            ),
+            Self::ExpectedPredicateValue => {
+                Some("e.g., `(identifier == \"foo\")` or `(identifier =~ /foo/)`")
+            }
+            Self::FieldSequenceValue => Some(
+                "a field holds a single child node; match one pattern, or move the sequence outside the field",
+            ),
+            Self::UndefinedReference => {
+                Some("`(Name)` uses a definition; define `Name = ...` or check the spelling")
+            }
+            Self::DuplicateCaptureInScope => Some(
+                "rename one capture, or use a labeled alternation if they are mutually exclusive branches",
+            ),
+            Self::PredicateOnNonLeaf => Some(
+                "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`",
+            ),
+            Self::EmptyRegex => Some(
+                "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`",
+            ),
+            Self::RegexBackreference => Some(
+                "the regex engine is linear-time and cannot match backreferences; rewrite without `\\1`",
+            ),
+            Self::RegexLookaround => Some(
+                "the regex engine cannot match lookaround; match the surrounding context with the query pattern instead",
+            ),
+            Self::RegexNamedCapture => Some(
+                "regex captures are inert in plotnik; capture nodes with `@name` outside the regex",
+            ),
+            Self::InvalidSupertypeSyntax => Some(
+                "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`",
+            ),
+            Self::ErrorTakesNoArguments => Some(
+                "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token",
+            ),
+            Self::RefCannotHaveChildren => Some(
+                "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children",
+            ),
             _ => None,
         }
     }
@@ -223,7 +269,7 @@ impl DiagnosticKind {
             Self::UnclosedSequence => "missing closing `}`",
             Self::UnclosedAlternation => "missing closing `]`",
             Self::UnclosedRegex => "missing closing `/` for regex",
-            Self::UnclosedString => "missing closing quote",
+            Self::UnclosedString => "unterminated string",
 
             // Expected token errors
             Self::ExpectedExpression => "expected an expression",
@@ -274,9 +320,6 @@ impl DiagnosticKind {
 
             // Type inference
             Self::IncompatibleTypes => "incompatible types",
-            Self::MultiCaptureQuantifierNoName => {
-                "quantified expression with multiple captures requires a struct capture"
-            }
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
             Self::StrictDimensionalityViolation => {
                 "quantifier with captures requires a struct capture"
@@ -340,6 +383,8 @@ impl DiagnosticKind {
             // Type inference errors with context
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
+            // The detail is the full message; the fallback would double it.
+            Self::AmbiguousUncapturedOutputs => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }
