@@ -133,6 +133,22 @@ impl TypeDef {
         bytes
     }
 
+    /// Raw kind discriminant byte, without interpreting it.
+    ///
+    /// Use this for validation: unlike [`classify`](Self::classify) it never
+    /// panics on an unknown kind.
+    pub fn kind_byte(&self) -> u8 {
+        self.kind
+    }
+
+    /// Member range `(start, count)` as stored, regardless of kind.
+    ///
+    /// Meaningful only for Struct/Enum, where `start` indexes TypeMembers and
+    /// `count` is the field/variant count.
+    pub fn member_range(&self) -> (u16, u8) {
+        (self.data, self.count)
+    }
+
     /// Classify this type definition into a structured enum.
     ///
     /// # Panics

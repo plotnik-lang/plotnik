@@ -38,8 +38,8 @@ pub use nav::Nav;
 pub use effects::{EffectOp, EffectOpcode};
 
 pub use instructions::{
-    Call, Match, Opcode, Return, StepAddr, StepId, Trampoline, align_to_section,
-    select_match_opcode,
+    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepAddr, StepId,
+    Trampoline, align_to_section, select_match_opcode,
 };
 
 pub use module::{
