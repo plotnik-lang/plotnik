@@ -31,16 +31,16 @@ fn derives_root_fields_children_and_extras() {
     let statement = grammar.resolve_named_node("statement").unwrap();
     assert_eq!(grammar.root(), Some(program));
     let children = grammar.children_cardinality(program).unwrap();
-    assert!(children.required);
-    assert!(children.multiple);
+    assert!(children.is_required());
+    assert!(children.is_multiple());
     assert!(grammar.is_valid_child_type(program, statement));
 
     let function = grammar.resolve_named_node("function").unwrap();
     let identifier = grammar.resolve_named_node("identifier").unwrap();
     let name_field = grammar.resolve_field("name").unwrap();
     let name = grammar.field_cardinality(function, name_field).unwrap();
-    assert!(name.required);
-    assert!(!name.multiple);
+    assert!(name.is_required());
+    assert!(!name.is_multiple());
     assert!(grammar.is_valid_field_type(function, name_field, identifier));
 
     let block = grammar.resolve_named_node("block").unwrap();

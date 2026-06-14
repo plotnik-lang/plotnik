@@ -27,7 +27,7 @@ pub fn validate_recursion(
         symbol_table,
         diag,
     };
-    validator.validate(&analysis.sccs);
+    validator.validate(analysis.sccs());
 }
 
 struct RecursionValidator<'a, 'd> {

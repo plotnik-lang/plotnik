@@ -8,11 +8,11 @@ use super::{StringId, TypeId};
 #[repr(C)]
 pub struct Entrypoint {
     /// Definition name.
-    pub name: StringId,
+    name: StringId,
     /// Starting instruction address.
-    pub target: StepAddr,
+    target: StepAddr,
     /// Result type.
-    pub result_type: TypeId,
+    result_type: TypeId,
     _pad: u16,
 }
 

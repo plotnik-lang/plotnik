@@ -105,7 +105,7 @@ fn see_through(
 fn reads_matched_node(effects: &[EffectIR]) -> bool {
     effects
         .iter()
-        .any(|e| matches!(e.opcode, EffectOpcode::Node | EffectOpcode::Text))
+        .any(|e| matches!(e.opcode(), EffectOpcode::Node | EffectOpcode::Text))
 }
 
 /// Phase A: Forward migration.

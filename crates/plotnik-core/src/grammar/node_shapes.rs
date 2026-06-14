@@ -15,6 +15,15 @@ use super::{
 
 const START_RULE_INDEX: usize = 0;
 
+/// Borrowed view of the grammar tables that node-shape derivation threads
+/// together: the syntax grammar, the lexical grammar, and the default aliases.
+#[derive(Clone, Copy)]
+pub struct GrammarContext<'a> {
+    pub syntax: &'a SyntaxGrammar,
+    pub lexical: &'a LexicalGrammar,
+    pub aliases: &'a AliasMap,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ChildType {
     Normal(Symbol),
@@ -209,11 +218,13 @@ pub enum VariableInfoError {
 ///    *appear* to be direct children of `N`.
 /// 2. aliases. If a parent node type `M` is aliased as some other type `N`, then nodes which
 ///    *appear* to have type `N` may have internal structure based on `M`.
-pub fn get_variable_info(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    default_aliases: &AliasMap,
-) -> VariableInfoResult<Vec<VariableInfo>> {
+pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<VariableInfo>> {
+    let GrammarContext {
+        syntax: syntax_grammar,
+        lexical: lexical_grammar,
+        aliases: default_aliases,
+    } = ctx;
+
     let child_type_is_visible = |t: &ChildType| {
         variable_type_for_child_type(t, syntax_grammar, lexical_grammar).is_visible()
     };
@@ -453,11 +464,15 @@ impl std::fmt::Display for SuperTypeCycleError {
 }
 
 pub fn generate_node_shapes_json(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    default_aliases: &AliasMap,
+    ctx: GrammarContext<'_>,
     variable_info: &[VariableInfo],
 ) -> SuperTypeCycleResult<Vec<NodeShapeJSON>> {
+    let GrammarContext {
+        syntax: syntax_grammar,
+        lexical: lexical_grammar,
+        aliases: default_aliases,
+    } = ctx;
+
     let mut node_shapes_json = BTreeMap::new();
 
     let populate_field_info_json = |json: &mut FieldInfoJSON, info: &FieldInfo| {
@@ -466,14 +481,11 @@ pub fn generate_node_shapes_json(
         } else {
             json.multiple |= info.quantity.multiple;
             json.required &= info.quantity.required;
-            json.types.extend(info.types.iter().map(|child_type| {
-                child_type_to_node_type(
-                    child_type,
-                    syntax_grammar,
-                    lexical_grammar,
-                    default_aliases,
-                )
-            }));
+            json.types.extend(
+                info.types
+                    .iter()
+                    .map(|child_type| child_type_to_node_type(child_type, ctx)),
+            );
             json.types.sort_unstable();
             json.types.dedup();
         }
@@ -503,14 +515,7 @@ pub fn generate_node_shapes_json(
                 .children
                 .types
                 .iter()
-                .map(|child_type| {
-                    child_type_to_node_type(
-                        child_type,
-                        syntax_grammar,
-                        lexical_grammar,
-                        default_aliases,
-                    )
-                })
+                .map(|child_type| child_type_to_node_type(child_type, ctx))
                 .collect::<Vec<_>>();
             subtypes.sort_unstable();
             subtypes.dedup();
@@ -638,18 +643,11 @@ pub fn generate_node_shapes_json(
 }
 
 pub fn generate_node_shapes(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    default_aliases: &AliasMap,
+    ctx: GrammarContext<'_>,
     variable_info: &[VariableInfo],
 ) -> SuperTypeCycleResult<Vec<NodeShape>> {
-    generate_node_shapes_json(
-        syntax_grammar,
-        lexical_grammar,
-        default_aliases,
-        variable_info,
-    )
-    .map(|shapes| shapes.into_iter().map(Into::into).collect())
+    generate_node_shapes_json(ctx, variable_info)
+        .map(|shapes| shapes.into_iter().map(Into::into).collect())
 }
 
 fn get_aliases_by_symbol(
@@ -698,16 +696,11 @@ fn effective_step_alias<'a>(
         .or_else(|| default_aliases.get(&step.symbol))
 }
 
-fn child_type_to_node_type(
-    child_type: &ChildType,
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    default_aliases: &AliasMap,
-) -> NodeTypeJSON {
+fn child_type_to_node_type(child_type: &ChildType, ctx: GrammarContext<'_>) -> NodeTypeJSON {
     match child_type {
         ChildType::Aliased(alias) => alias_to_node_type(alias),
-        ChildType::Normal(symbol) => default_aliases.get(symbol).map_or_else(
-            || symbol_to_node_type(*symbol, syntax_grammar, lexical_grammar),
+        ChildType::Normal(symbol) => ctx.aliases.get(symbol).map_or_else(
+            || symbol_to_node_type(*symbol, ctx.syntax, ctx.lexical),
             alias_to_node_type,
         ),
     }

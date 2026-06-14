@@ -112,7 +112,7 @@ impl<'q> QueryPrinter<'q> {
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
-        let symbols = &self.query.symbol_table;
+        let symbols = self.query.symbol_table();
         if symbols.is_empty() {
             return Ok(());
         }
@@ -165,7 +165,7 @@ impl<'q> QueryPrinter<'q> {
         writeln!(w, "{}{}{}", prefix, name, card)?;
         visited.insert(name.to_string());
 
-        if let Some(body) = self.query.symbol_table.get(name) {
+        if let Some(body) = self.query.symbol_table().get(name) {
             let refs_set = crate::analyze::refs::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();

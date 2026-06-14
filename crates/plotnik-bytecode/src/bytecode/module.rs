@@ -119,7 +119,7 @@ impl<'a> Instruction<'a> {
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(bytes.len() >= 8, "instruction too short");
 
-        let opcode = Opcode::from_u8(bytes[0] & 0xF);
+        let opcode = Opcode::from_u8(bytes[0] & 0xF).expect("invalid opcode");
         match opcode {
             Opcode::Call => {
                 let arr: [u8; 8] = bytes[..8].try_into().unwrap();
@@ -163,6 +163,8 @@ pub enum ModuleError {
     InvalidTypeDef(usize),
     #[error("invalid entrypoint at index {0}")]
     InvalidEntrypoint(usize),
+    #[error("invalid opcode {opcode:#x} at step {step}")]
+    InvalidOpcode { step: u16, opcode: u8 },
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -298,6 +300,31 @@ impl Module {
         self.validate_regex_table()?;
         self.validate_type_defs()?;
         self.validate_entrypoints()?;
+        self.validate_opcodes()?;
+        Ok(())
+    }
+
+    /// Every instruction in the Transitions section must carry a known opcode so
+    /// the lazy [`decode_step`](Self::decode_step) path cannot hit an unknown
+    /// nibble and panic on untrusted bytecode. Walks the section by instruction
+    /// size, which `validate_section_bounds` already proved fits the file.
+    fn validate_opcodes(&self) -> Result<(), ModuleError> {
+        let count = self.header.transitions_count as u32;
+        let base = self.offsets.transitions as usize;
+        // Walk in u32 so a large trailing opcode near the count boundary cannot
+        // overflow the cursor (a crafted header would otherwise debug-panic).
+        let mut step = 0u32;
+        while step < count {
+            let byte = self.storage[base + step as usize * STEP_SIZE];
+            let nibble = byte & 0xF;
+            let Some(opcode) = Opcode::from_u8(nibble) else {
+                return Err(ModuleError::InvalidOpcode {
+                    step: step as u16,
+                    opcode: nibble,
+                });
+            };
+            step += opcode.step_count() as u32;
+        }
         Ok(())
     }
 

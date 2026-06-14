@@ -4,7 +4,9 @@ use std::num::NonZeroU16;
 use plotnik_bytecode::{EffectOpcode, Nav};
 use plotnik_core::Symbol;
 
-use super::ir::{CallIR, EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, ReturnIR};
+use super::ir::{
+    CallIR, EffectIR, EmitContext, InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, ReturnIR,
+};
 use crate::analyze::type_check::TypeId;
 
 #[test]
@@ -57,9 +59,8 @@ fn resolve_match_terminal() {
     let mut map = BTreeMap::new();
     map.insert(Label(0), 1u16);
 
-    let bytes = m
-        .resolve(&map, |_, _| None, |_| None, |_| None)
-        .expect("terminal match encodes");
+    let ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
+    let bytes = m.resolve(&map, &ctx).expect("terminal match encodes");
     assert_eq!(bytes.len(), 8);
 
     // Verify opcode is Match8 (0x0)
@@ -77,31 +78,27 @@ fn member_ref_resolution() {
 
     // Test absolute reference
     let abs = MemberRef::absolute(42);
-    assert_eq!(abs.resolve(|_, _| None, |_| None), 42);
+    let abs_ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
+    assert_eq!(abs.resolve(&abs_ctx), 42);
 
     // Test deferred reference with lookup (struct field)
     let deferred = MemberRef::deferred(field_name, field_type);
-    assert_eq!(
-        deferred.resolve(
-            |name, ty| {
-                if name == field_name && ty == field_type {
-                    Some(77)
-                } else {
-                    None
-                }
-            },
-            |_| None
-        ),
-        77
-    );
+    let lookup_member = |name, ty| {
+        if name == field_name && ty == field_type {
+            Some(77)
+        } else {
+            None
+        }
+    };
+    let deferred_ctx = EmitContext::new(&lookup_member, &|_| None, &|_| None);
+    assert_eq!(deferred.resolve(&deferred_ctx), 77);
 
     // Test deferred by index reference (enum variant)
     let by_index = MemberRef::deferred_by_index(parent_type, 3);
+    let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
+    let by_index_ctx = EmitContext::new(&|_, _| None, &get_member_base, &|_| None);
     assert_eq!(
-        by_index.resolve(
-            |_, _| None,
-            |ty| if ty == parent_type { Some(50) } else { None }
-        ),
+        by_index.resolve(&by_index_ctx),
         53 // base 50 + relative 3
     );
 }
@@ -113,7 +110,8 @@ fn effect_ir_resolution() {
 
     // Simple effect without member ref
     let simple = EffectIR::simple(EffectOpcode::Node, 5);
-    let resolved = simple.resolve(|_, _| None, |_| None);
+    let simple_ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
+    let resolved = simple.resolve(&simple_ctx);
     assert_eq!(resolved.opcode, EffectOpcode::Node);
     assert_eq!(resolved.payload, 5);
 
@@ -122,16 +120,15 @@ fn effect_ir_resolution() {
         EffectOpcode::Set,
         MemberRef::deferred(field_name, field_type),
     );
-    let resolved = set_effect.resolve(
-        |name, ty| {
-            if name == field_name && ty == field_type {
-                Some(51)
-            } else {
-                None
-            }
-        },
-        |_| None,
-    );
+    let lookup_member = |name, ty| {
+        if name == field_name && ty == field_type {
+            Some(51)
+        } else {
+            None
+        }
+    };
+    let set_ctx = EmitContext::new(&lookup_member, &|_| None, &|_| None);
+    let resolved = set_effect.resolve(&set_ctx);
     assert_eq!(resolved.opcode, EffectOpcode::Set);
     assert_eq!(resolved.payload, 51);
 }

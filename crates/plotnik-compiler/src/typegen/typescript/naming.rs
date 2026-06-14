@@ -21,7 +21,7 @@ impl Emitter<'_> {
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let def_name = self.strings.get(ep.name);
+            let def_name = self.strings.get(ep.name());
             self.collect_naming_contexts(
                 ep.result_type(),
                 &NamingContext {

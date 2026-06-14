@@ -24,9 +24,11 @@ pub struct CallResume {
     pub(crate) policy: SkipPolicy,
 }
 
-/// Checkpoint for backtracking.
+/// The VM state a checkpoint snapshots and later restores: everything shared
+/// by both branch and Call-retry checkpoints. Bundling these fields keeps the
+/// snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
-pub struct Checkpoint {
+pub(crate) struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index).
     pub(crate) descendant_index: u32,
     /// Effect stream length at checkpoint.
@@ -35,77 +37,66 @@ pub struct Checkpoint {
     pub(crate) frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
     pub(crate) recursion_depth: u32,
+    /// Suppression depth at checkpoint.
+    pub(crate) suppress_depth: u16,
+}
+
+/// Checkpoint for backtracking.
+#[derive(Clone, Copy, Debug)]
+pub struct Checkpoint {
+    /// VM state to restore on backtrack.
+    pub(crate) state: CheckpointState,
     /// Resume point for a plain (branch) checkpoint (raw step index).
     pub(crate) ip: u16,
     /// If set, this is a Call retry: advance the cursor and re-enter the
     /// callee instead of resuming at `ip`.
     pub(crate) call_resume: Option<CallResume>,
-    /// Suppression depth at checkpoint.
-    pub(crate) suppress_depth: u16,
 }
 
 #[allow(dead_code)] // Getters useful for debugging/tracing
 impl Checkpoint {
     /// Create a plain (branch alternative) checkpoint that resumes at `ip`.
-    pub fn branch(
-        descendant_index: u32,
-        effect_watermark: usize,
-        frame_index: Option<u32>,
-        recursion_depth: u32,
-        ip: u16,
-        suppress_depth: u16,
-    ) -> Self {
+    pub fn branch(state: CheckpointState, ip: u16) -> Self {
         Self {
-            descendant_index,
-            effect_watermark,
-            frame_index,
-            recursion_depth,
+            state,
             ip,
             call_resume: None,
-            suppress_depth,
         }
     }
 
     /// Create a Call retry checkpoint that advances and re-enters the callee.
     /// `call_ip` is the Call's own address, retained only for trace rendering;
     /// re-entry is driven entirely by `call_resume`.
-    pub fn call_retry(
-        descendant_index: u32,
-        effect_watermark: usize,
-        frame_index: Option<u32>,
-        recursion_depth: u32,
-        call_ip: u16,
-        suppress_depth: u16,
-        call_resume: CallResume,
-    ) -> Self {
+    pub fn call_retry(state: CheckpointState, call_ip: u16, call_resume: CallResume) -> Self {
         Self {
-            descendant_index,
-            effect_watermark,
-            frame_index,
-            recursion_depth,
+            state,
             ip: call_ip,
             call_resume: Some(call_resume),
-            suppress_depth,
         }
     }
 
+    /// The VM state this checkpoint restores.
+    pub fn state(&self) -> CheckpointState {
+        self.state
+    }
+
     pub fn descendant_index(&self) -> u32 {
-        self.descendant_index
+        self.state.descendant_index
     }
     pub fn effect_watermark(&self) -> usize {
-        self.effect_watermark
+        self.state.effect_watermark
     }
     pub fn frame_index(&self) -> Option<u32> {
-        self.frame_index
+        self.state.frame_index
     }
     pub fn recursion_depth(&self) -> u32 {
-        self.recursion_depth
+        self.state.recursion_depth
     }
     pub fn ip(&self) -> u16 {
         self.ip
     }
     pub fn suppress_depth(&self) -> u16 {
-        self.suppress_depth
+        self.state.suppress_depth
     }
 }
 
@@ -133,7 +124,7 @@ impl CheckpointStack {
     /// Push a checkpoint.
     pub fn push(&mut self, checkpoint: Checkpoint) {
         // Update max_frame_ref (O(1))
-        if let Some(frame_idx) = checkpoint.frame_index {
+        if let Some(frame_idx) = checkpoint.state.frame_index {
             self.max_frame_ref = Some(match self.max_frame_ref {
                 Some(max) => max.max(frame_idx),
                 None => frame_idx,
@@ -149,8 +140,8 @@ impl CheckpointStack {
         // Recompute max_frame_ref only if we removed the max holder
         // This is O(1) amortized: each checkpoint contributes to at most
         // one recomputation over its lifetime.
-        if cp.frame_index == self.max_frame_ref && !self.stack.is_empty() {
-            self.max_frame_ref = self.stack.iter().filter_map(|c| c.frame_index).max();
+        if cp.state.frame_index == self.max_frame_ref && !self.stack.is_empty() {
+            self.max_frame_ref = self.stack.iter().filter_map(|c| c.state.frame_index).max();
         } else if self.stack.is_empty() {
             self.max_frame_ref = None;
         }

@@ -55,18 +55,20 @@ pub enum Opcode {
 }
 
 impl Opcode {
-    pub fn from_u8(v: u8) -> Self {
+    /// Decode an opcode nibble, returning `None` for an unknown value so that
+    /// untrusted bytecode is rejected with a clean error instead of panicking.
+    pub fn from_u8(v: u8) -> Option<Self> {
         match v {
-            0x0 => Self::Match8,
-            0x1 => Self::Match16,
-            0x2 => Self::Match24,
-            0x3 => Self::Match32,
-            0x4 => Self::Match48,
-            0x5 => Self::Match64,
-            0x6 => Self::Call,
-            0x7 => Self::Return,
-            0x8 => Self::Trampoline,
-            _ => panic!("invalid opcode: {v}"),
+            0x0 => Some(Self::Match8),
+            0x1 => Some(Self::Match16),
+            0x2 => Some(Self::Match24),
+            0x3 => Some(Self::Match32),
+            0x4 => Some(Self::Match48),
+            0x5 => Some(Self::Match64),
+            0x6 => Some(Self::Call),
+            0x7 => Some(Self::Return),
+            0x8 => Some(Self::Trampoline),
+            _ => None,
         }
     }
 
@@ -166,7 +168,7 @@ impl<'a> Match<'a> {
         // Header byte: segment(2) | node_kind(2) | opcode(4)
         let segment = (type_id_byte >> 6) & 0x3;
         let node_kind = (type_id_byte >> 4) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
         debug_assert!(segment == 0, "non-zero segment not yet supported");
         debug_assert!(opcode.is_match(), "expected Match opcode");
 
@@ -544,7 +546,7 @@ impl Call {
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -608,7 +610,7 @@ impl Return {
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -662,7 +664,7 @@ impl Trampoline {
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
         let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF);
+        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"

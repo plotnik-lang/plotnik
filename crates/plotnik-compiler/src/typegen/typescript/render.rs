@@ -11,7 +11,7 @@ impl Emitter<'_> {
         // Reserve entrypoint names to avoid collisions
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let name = self.strings.get(ep.name);
+            let name = self.strings.get(ep.name());
             self.used_names.insert(to_pascal_case(name));
         }
 

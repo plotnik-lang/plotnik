@@ -169,8 +169,8 @@ mod debug_impl {
 
         for e in &m.pre_effects {
             ops.push(SemanticOp::Effect(
-                e.opcode as u8,
-                resolve_member_name(&e.member_ref, ctx.interner),
+                e.opcode() as u8,
+                resolve_member_name(&e.member_ref(), ctx.interner),
             ));
         }
 
@@ -217,8 +217,8 @@ mod debug_impl {
 
         for e in &m.post_effects {
             ops.push(SemanticOp::Effect(
-                e.opcode as u8,
-                resolve_member_name(&e.member_ref, ctx.interner),
+                e.opcode() as u8,
+                resolve_member_name(&e.member_ref(), ctx.interner),
             ));
         }
 

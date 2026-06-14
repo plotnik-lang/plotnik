@@ -145,16 +145,15 @@ impl Grammar {
         let inlines = process_inlines(&syntax_grammar, &lexical_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
 
-        let variable_info =
-            node_shapes::get_variable_info(&syntax_grammar, &lexical_grammar, &aliases)
-                .map_err(|error| GrammarError::Analysis(error.to_string()))?;
-        let node_shapes = node_shapes::generate_node_shapes(
-            &syntax_grammar,
-            &lexical_grammar,
-            &aliases,
-            &variable_info,
-        )
-        .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let grammar_ctx = node_shapes::GrammarContext {
+            syntax: &syntax_grammar,
+            lexical: &lexical_grammar,
+            aliases: &aliases,
+        };
+        let variable_info = node_shapes::get_variable_info(grammar_ctx)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        let node_shapes = node_shapes::generate_node_shapes(grammar_ctx, &variable_info)
+            .map_err(|error| GrammarError::Analysis(error.to_string()))?;
         let metadata = GrammarMetadata {
             node_shapes,
             symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
@@ -695,10 +694,7 @@ where
         fields.insert(
             field_id,
             FieldConstraints {
-                cardinality: Cardinality {
-                    multiple: slot.multiple,
-                    required: slot.required,
-                },
+                cardinality: Cardinality::from_flags(slot.multiple, slot.required),
                 valid_types,
             },
         );
@@ -729,10 +725,7 @@ where
                 })?;
 
             Ok(ChildrenConstraints {
-                cardinality: Cardinality {
-                    multiple: slot.multiple,
-                    required: slot.required,
-                },
+                cardinality: Cardinality::from_flags(slot.multiple, slot.required),
                 valid_types,
             })
         })

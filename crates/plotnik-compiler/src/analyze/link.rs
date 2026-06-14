@@ -15,9 +15,29 @@ use rowan::TextRange;
 #[derive(Default)]
 pub struct LinkOutput {
     /// Interned named/anonymous node type → NodeTypeId (for binary: StringId → NodeTypeId)
-    pub node_type_ids: IndexMap<NodeType<Symbol>, NodeTypeId>,
+    node_type_ids: IndexMap<NodeType<Symbol>, NodeTypeId>,
     /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
-    pub node_field_ids: IndexMap<Symbol, NodeFieldId>,
+    node_field_ids: IndexMap<Symbol, NodeFieldId>,
+}
+
+impl LinkOutput {
+    pub fn node_type_ids(&self) -> &IndexMap<NodeType<Symbol>, NodeTypeId> {
+        &self.node_type_ids
+    }
+
+    pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
+        &self.node_field_ids
+    }
+
+    /// Record the first NodeTypeId seen for a node type, keeping the existing entry.
+    pub(crate) fn insert_node_type_id(&mut self, key: NodeType<Symbol>, id: NodeTypeId) {
+        self.node_type_ids.entry(key).or_insert(id);
+    }
+
+    /// Record the first NodeFieldId seen for a field, keeping the existing entry.
+    pub(crate) fn insert_node_field_id(&mut self, sym: Symbol, id: NodeFieldId) {
+        self.node_field_ids.entry(sym).or_insert(id);
+    }
 }
 
 use super::symbol_table::SymbolTable;
@@ -51,14 +71,25 @@ pub fn link<'q>(
             grammar,
             source_map,
             symbol_table,
-            source_id,
             node_type_ids: &mut node_type_ids,
             node_field_ids: &mut node_field_ids,
             output,
-            diagnostics,
+            state: ValidationState {
+                source_id,
+                diag: diagnostics,
+            },
         };
         linker.link(root);
     }
+}
+
+/// The source currently being walked and the diagnostics sink it reports to.
+///
+/// `source_id` tracks the active file; it is swapped while validation descends
+/// through a reference into another workspace file, then restored.
+struct ValidationState<'a> {
+    source_id: SourceId,
+    diag: &'a mut Diagnostics,
 }
 
 struct Linker<'a, 'q> {
@@ -67,16 +98,15 @@ struct Linker<'a, 'q> {
     grammar: &'a Grammar,
     source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
-    source_id: SourceId,
     node_type_ids: &'a mut HashMap<NodeType<&'q str>, Option<NodeTypeId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
     output: &'a mut LinkOutput,
-    diagnostics: &'a mut Diagnostics,
+    state: ValidationState<'a>,
 }
 
 impl<'a, 'q> Linker<'a, 'q> {
     fn source(&self) -> &'q str {
-        self.source_map.content(self.source_id)
+        self.source_map.content(self.state.source_id)
     }
 
     fn link(&mut self, root: &ast::Root) {
@@ -111,10 +141,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         self.node_type_ids.insert(key, resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(type_name);
-            self.output
-                .node_type_ids
-                .entry(NodeType::Named(sym))
-                .or_insert(id);
+            self.output.insert_node_type_id(NodeType::Named(sym), id);
         }
         if resolved.is_none() {
             let all_types = self.grammar.all_named_node_kinds();
@@ -122,9 +149,10 @@ impl<'a, 'q> Linker<'a, 'q> {
             let suggestion = find_similar(type_name, &all_types, max_dist);
 
             let mut builder = self
-                .diagnostics
+                .state
+                .diag
                 .report(
-                    self.source_id,
+                    self.state.source_id,
                     DiagnosticKind::UnknownNodeType,
                     type_token.text_range(),
                 )
@@ -150,7 +178,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             .insert(token_src(&name_token, self.source()), resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(field_name);
-            self.output.node_field_ids.entry(sym).or_insert(id);
+            self.output.insert_node_field_id(sym, id);
             return;
         }
         let all_fields = self.grammar.all_field_names();
@@ -158,9 +186,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         let suggestion = find_similar(field_name, &all_fields, max_dist);
 
         let mut builder = self
-            .diagnostics
+            .state
+            .diag
             .report(
-                self.source_id,
+                self.state.source_id,
                 DiagnosticKind::UnknownField,
                 name_token.text_range(),
             )
@@ -210,9 +239,10 @@ impl<'a, 'q> Linker<'a, 'q> {
                     && (!self.grammar.valid_child_types(ctx.parent_id).is_empty()
                         || !self.grammar.fields_for_node_type(ctx.parent_id).is_empty())
                 {
-                    self.diagnostics
+                    self.state
+                        .diag
                         .report(
-                            self.source_id,
+                            self.state.source_id,
                             DiagnosticKind::PredicateOnNonLeaf,
                             pred.as_cst().text_range(),
                         )
@@ -303,10 +333,10 @@ impl<'a, 'q> Linker<'a, 'q> {
                 // The referenced definition may live in another workspace file.
                 // Validate its body under ITS source so token slicing and
                 // diagnostics resolve against the right content.
-                let saved_source = self.source_id;
-                self.source_id = ref_source;
+                let saved_source = self.state.source_id;
+                self.state.source_id = ref_source;
                 self.validate_expr_structure(&body, ctx, deferred, walk);
-                self.source_id = saved_source;
+                self.state.source_id = saved_source;
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
             }
@@ -332,7 +362,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         Some(ValidationContext {
             parent_id,
             parent_range: type_token.text_range(),
-            parent_source: self.source_id,
+            parent_source: self.state.source_id,
         })
     }
 
@@ -360,13 +390,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
             if !deferred {
-                self.emit_field_not_on_node(
-                    name_token.text_range(),
-                    name_token.text(),
-                    ctx.parent_id,
-                    ctx.parent_range,
-                    ctx.parent_source,
-                );
+                self.emit_field_not_on_node(name_token.text_range(), name_token.text(), ctx);
             }
             return;
         }
@@ -403,13 +427,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         if !self.grammar.has_field(ctx.parent_id, field_id) {
             if !deferred {
-                self.emit_field_not_on_node(
-                    name_token.text_range(),
-                    field_name,
-                    ctx.parent_id,
-                    ctx.parent_range,
-                    ctx.parent_source,
-                );
+                self.emit_field_not_on_node(name_token.text_range(), field_name, ctx);
             }
             return;
         }
@@ -420,15 +438,16 @@ impl<'a, 'q> Linker<'a, 'q> {
             && self
                 .grammar
                 .field_cardinality(ctx.parent_id, field_id)
-                .is_some_and(|cardinality| cardinality.required)
+                .is_some_and(|cardinality| cardinality.is_required())
         {
             let parent_name = self
                 .grammar
                 .node_type_name(ctx.parent_id)
                 .expect("validated parent_id must have a name");
-            self.diagnostics
+            self.state
+                .diag
                 .report(
-                    self.source_id,
+                    self.state.source_id,
                     DiagnosticKind::NegatedRequiredField,
                     name_token.text_range(),
                 )
@@ -450,21 +469,28 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         range: TextRange,
         field_name: &str,
-        parent_id: NodeTypeId,
-        parent_range: TextRange,
-        parent_source: SourceId,
+        ctx: &ValidationContext,
     ) {
-        let valid_fields = self.grammar.fields_for_node_type(parent_id);
+        let valid_fields = self.grammar.fields_for_node_type(ctx.parent_id);
         let parent_name = self
             .grammar
-            .node_type_name(parent_id)
+            .node_type_name(ctx.parent_id)
             .expect("validated parent_id must have a name");
 
         let mut builder = self
-            .diagnostics
-            .report(self.source_id, DiagnosticKind::FieldNotOnNodeType, range)
+            .state
+            .diag
+            .report(
+                self.state.source_id,
+                DiagnosticKind::FieldNotOnNodeType,
+                range,
+            )
             .message(field_name)
-            .related_to(parent_source, parent_range, format!("on `{}`", parent_name));
+            .related_to(
+                ctx.parent_source,
+                ctx.parent_range,
+                format!("on `{}`", parent_name),
+            );
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
@@ -578,12 +604,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         // `(_)` matches any named node, so it is impossible only beneath a leaf token.
         if node.is_any() {
             if parent_is_token {
-                self.emit_child_under_leaf_token(
-                    node.text_range(),
-                    ctx.parent_id,
-                    ctx.parent_range,
-                    ctx.parent_source,
-                );
+                self.emit_child_under_leaf_token(node.text_range(), ctx);
             }
             return;
         }
@@ -597,24 +618,13 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         if parent_is_token {
             // A leaf token has no child nodes, so any named child is impossible.
-            self.emit_child_under_leaf_token(
-                type_token.text_range(),
-                ctx.parent_id,
-                ctx.parent_range,
-                ctx.parent_source,
-            );
+            self.emit_child_under_leaf_token(type_token.text_range(), ctx);
             return;
         }
 
         // The kind is not among the parent's admissible children.
         if !self.admissible_child(child_id, adm) {
-            self.emit_invalid_child(
-                type_token.text_range(),
-                child_id,
-                ctx.parent_id,
-                ctx.parent_range,
-                ctx.parent_source,
-            );
+            self.emit_invalid_child(type_token.text_range(), child_id, ctx);
         }
     }
 
@@ -667,7 +677,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 self.emit_invalid_field_value(
                     node.text_range(),
                     message,
-                    ctx.parent_id,
+                    ctx,
                     field_id,
                     field_name,
                     field_range,
@@ -695,7 +705,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         self.emit_invalid_field_value(
             type_token.text_range(),
             message,
-            ctx.parent_id,
+            ctx,
             field_id,
             field_name,
             field_range,
@@ -734,7 +744,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         self.emit_invalid_field_value(
             value_token.text_range(),
             message,
-            ctx.parent_id,
+            ctx,
             field_id,
             field_name,
             field_range,
@@ -821,9 +831,10 @@ impl<'a, 'q> Linker<'a, 'q> {
             let max_dist = (sub_name.len() / 3).clamp(2, 4);
             let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
             let mut builder = self
-                .diagnostics
+                .state
+                .diag
                 .report(
-                    self.source_id,
+                    self.state.source_id,
                     DiagnosticKind::UnknownNodeType,
                     sub_token.text_range(),
                 )
@@ -864,9 +875,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         });
 
         let mut builder = self
-            .diagnostics
+            .state
+            .diag
             .report(
-                self.source_id,
+                self.state.source_id,
                 DiagnosticKind::InvalidSubtype,
                 sub_token.text_range(),
             )
@@ -875,7 +887,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 sub_name, super_name
             ))
             .related_to(
-                self.source_id,
+                self.state.source_id,
                 super_token.text_range(),
                 format!("base type `{}`", super_name),
             );
@@ -890,9 +902,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         range: TextRange,
         child_id: NodeTypeId,
-        parent_id: NodeTypeId,
-        parent_range: TextRange,
-        parent_source: SourceId,
+        ctx: &ValidationContext,
     ) {
         let child_name = self
             .grammar
@@ -901,37 +911,44 @@ impl<'a, 'q> Linker<'a, 'q> {
             .to_string();
         let parent_name = self
             .grammar
-            .node_type_name(parent_id)
+            .node_type_name(ctx.parent_id)
             .expect("validated parent_id must have a name")
             .to_string();
-        let hint = self.child_hint(parent_id, &parent_name);
+        let hint = self.child_hint(ctx.parent_id, &parent_name);
 
-        self.diagnostics
-            .report(self.source_id, DiagnosticKind::InvalidChildType, range)
+        self.state
+            .diag
+            .report(
+                self.state.source_id,
+                DiagnosticKind::InvalidChildType,
+                range,
+            )
             .message(child_name)
-            .related_to(parent_source, parent_range, format!("on `{}`", parent_name))
+            .related_to(
+                ctx.parent_source,
+                ctx.parent_range,
+                format!("on `{}`", parent_name),
+            )
             .hint(hint)
             .emit();
     }
 
     /// Emit a child-under-leaf-token diagnostic.
-    fn emit_child_under_leaf_token(
-        &mut self,
-        range: TextRange,
-        parent_id: NodeTypeId,
-        parent_range: TextRange,
-        parent_source: SourceId,
-    ) {
+    fn emit_child_under_leaf_token(&mut self, range: TextRange, ctx: &ValidationContext) {
         let parent_name = self
             .grammar
-            .node_type_name(parent_id)
+            .node_type_name(ctx.parent_id)
             .expect("validated parent_id must have a name")
             .to_string();
 
-        self.diagnostics
-            .report(self.source_id, DiagnosticKind::ChildUnderLeafToken, range)
+        self.state.diag
+            .report(self.state.source_id, DiagnosticKind::ChildUnderLeafToken, range)
             .message(&parent_name)
-            .related_to(parent_source, parent_range, format!("`{}`", parent_name))
+            .related_to(
+                ctx.parent_source,
+                ctx.parent_range,
+                format!("`{}`", parent_name),
+            )
             .hint(format!(
                 "a leaf token's content is its text — match it directly `({0})` or by value `({0} == \"foo\")`",
                 parent_name
@@ -989,17 +1006,22 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         range: TextRange,
         message: String,
-        parent_id: NodeTypeId,
+        ctx: &ValidationContext,
         field_id: NodeFieldId,
         field_name: &str,
         field_range: TextRange,
     ) {
-        let hint = self.field_value_hint(parent_id, field_id, field_name);
-        self.diagnostics
-            .report(self.source_id, DiagnosticKind::InvalidFieldChildType, range)
+        let hint = self.field_value_hint(ctx.parent_id, field_id, field_name);
+        self.state
+            .diag
+            .report(
+                self.state.source_id,
+                DiagnosticKind::InvalidFieldChildType,
+                range,
+            )
             .message(message)
             .related_to(
-                self.source_id,
+                self.state.source_id,
                 field_range,
                 format!("field `{}`", field_name),
             )
@@ -1069,7 +1091,7 @@ struct ValidationContext {
     parent_range: TextRange,
     /// Source the parent node lives in. May differ from the source currently
     /// being walked once validation crosses a reference into another workspace
-    /// file, so `parent_range` must be reported against this, not `self.source_id`.
+    /// file, so `parent_range` must be reported against this, not `self.state.source_id`.
     parent_source: SourceId,
 }
 
@@ -1124,16 +1146,15 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
             let sym = self.linker.interner.intern(value);
             self.linker
                 .output
-                .node_type_ids
-                .entry(NodeType::Anonymous(sym))
-                .or_insert(id);
+                .insert_node_type_id(NodeType::Anonymous(sym), id);
             return;
         }
 
         self.linker
-            .diagnostics
+            .state
+            .diag
             .report(
-                self.linker.source_id,
+                self.linker.state.source_id,
                 DiagnosticKind::UnknownNodeType,
                 value_token.text_range(),
             )

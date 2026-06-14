@@ -82,12 +82,25 @@ fn nav_for_alt_branch(
 /// and in order.
 fn is_scope_close_effect(e: &EffectIR) -> bool {
     matches!(
-        e.opcode,
+        e.opcode(),
         EffectOpcode::EndArr
             | EffectOpcode::EndObj
             | EffectOpcode::EndEnum
             | EffectOpcode::SuppressEnd
     )
+}
+
+/// Parameters threaded through sequence-item compilation.
+///
+/// `skip_exit`, when present, redirects the skip path of a skippable first item
+/// past the parent node's `Up` instruction (childless-node bypass).
+pub(super) struct SeqItemsCtx<'a> {
+    pub(super) items: &'a [SeqItem],
+    pub(super) exit: Label,
+    pub(super) is_inside_node: bool,
+    pub(super) first_nav: Option<Nav>,
+    pub(super) capture: CaptureEffects,
+    pub(super) skip_exit: Option<Label>,
 }
 
 impl Compiler<'_> {
@@ -111,7 +124,14 @@ impl Compiler<'_> {
             Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
         );
 
-        self.compile_seq_items_inner(&items, exit, is_inside_node, first_nav, capture, None)
+        self.compile_seq_items_inner(SeqItemsCtx {
+            items: &items,
+            exit,
+            is_inside_node,
+            first_nav,
+            capture,
+            skip_exit: None,
+        })
     }
 
     /// Compile sequence items with capture effects (passed to last item).
@@ -119,15 +139,16 @@ impl Compiler<'_> {
     /// When `skip_exit` is provided, the skip path of the first skippable item
     /// will use this exit instead of `exit`. This is used when inside a node
     /// where skip paths should bypass the Up instruction.
-    pub(super) fn compile_seq_items_inner(
-        &mut self,
-        items: &[SeqItem],
-        exit: Label,
-        is_inside_node: bool,
-        first_nav: Option<Nav>,
-        capture: CaptureEffects,
-        skip_exit: Option<Label>,
-    ) -> Label {
+    pub(super) fn compile_seq_items_inner(&mut self, ctx: SeqItemsCtx<'_>) -> Label {
+        let SeqItemsCtx {
+            items,
+            exit,
+            is_inside_node,
+            first_nav,
+            capture,
+            skip_exit,
+        } = ctx;
+
         // Compute navigation modes first (immutable borrow)
         let mut nav_modes = compute_nav_modes(items, is_inside_node, self.ctx.symbol_table);
 
@@ -335,25 +356,25 @@ impl Compiler<'_> {
             // The follower is the last item; `post_keep` rides its continuation.
             let cont = CaptureEffects::new_post(post_keep);
             let skip_rest = &items[first_expr_idx + 1..];
-            let skip = self.compile_seq_items_inner(
-                skip_rest,
+            let skip = self.compile_seq_items_inner(SeqItemsCtx {
+                items: skip_rest,
                 exit,
                 is_inside_node,
                 first_nav, // Position variant; overridden when a leading anchor is present
-                cont.clone(),
-                caller_skip_exit, // Propagate for nested skippables
-            );
+                capture: cont.clone(),
+                skip_exit: caller_skip_exit, // Propagate for nested skippables
+            });
 
             let follower_idx = nav_modes[1].0;
             let match_rest = &items[follower_idx..];
-            let mtch = self.compile_seq_items_inner(
-                match_rest,
+            let mtch = self.compile_seq_items_inner(SeqItemsCtx {
+                items: match_rest,
                 exit,
                 is_inside_node,
-                nav_modes[1].1, // Follower's sibling nav (anchor-aware) for match path
-                cont,
-                None, // Match path doesn't need skip exit
-            );
+                first_nav: nav_modes[1].1, // Follower's sibling nav (anchor-aware) for match path
+                capture: cont,
+                skip_exit: None, // Match path doesn't need skip exit
+            });
             (skip, mtch, CaptureEffects::default())
         };
 

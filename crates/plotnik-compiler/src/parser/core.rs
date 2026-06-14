@@ -10,20 +10,41 @@ use crate::diagnostics::{DiagnosticKind, Diagnostics, SourceId};
 
 #[derive(Debug)]
 pub struct ParseResult {
-    pub ast: Root,
-    pub fuel_consumed: u32,
+    ast: Root,
+    fuel_consumed: u32,
+}
+
+impl ParseResult {
+    pub fn ast(&self) -> &Root {
+        &self.ast
+    }
+
+    pub fn into_ast(self) -> Root {
+        self.ast
+    }
+
+    pub fn fuel_consumed(&self) -> u32 {
+        self.fuel_consumed
+    }
 }
 
 /// Span of the opening token of an unclosed-so-far delimiter pair.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct OpenDelimiter {
-    pub span: TextRange,
+struct OpenDelimiter {
+    span: TextRange,
 }
 
 /// Default parsing fuel limit.
 pub const DEFAULT_FUEL: u32 = 1_000_000;
 /// Default maximum recursion depth.
 pub const DEFAULT_MAX_DEPTH: u32 = 4096;
+
+/// Resource limits for a parse run.
+#[derive(Debug, Clone, Copy)]
+pub struct ParseConfig {
+    pub fuel: u32,
+    pub max_depth: u32,
+}
 /// Lookaheads allowed without consuming a token before the stuck-parser assertion fires.
 const DEBUG_FUEL: u32 = 256;
 
@@ -38,7 +59,7 @@ pub struct Parser<'q, 'd> {
     pub(super) diagnostics: &'d mut Diagnostics,
     pub(super) depth: u32,
     pub(super) last_diagnostic_pos: Option<TextSize>,
-    pub(super) delimiter_stack: Vec<OpenDelimiter>,
+    delimiter_stack: Vec<OpenDelimiter>,
     pub(super) debug_fuel: std::cell::Cell<u32>,
     pub(crate) fuel_initial: u32,
     pub(crate) fuel_remaining: u32,
@@ -53,8 +74,7 @@ impl<'q, 'd> Parser<'q, 'd> {
         source_id: SourceId,
         tokens: Vec<Token>,
         diagnostics: &'d mut Diagnostics,
-        fuel: u32,
-        max_depth: u32,
+        config: ParseConfig,
     ) -> Self {
         Parser {
             source,
@@ -68,9 +88,9 @@ impl<'q, 'd> Parser<'q, 'd> {
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             debug_fuel: std::cell::Cell::new(DEBUG_FUEL),
-            fuel_initial: fuel,
-            fuel_remaining: fuel,
-            max_depth,
+            fuel_initial: config.fuel,
+            fuel_remaining: config.fuel,
+            max_depth: config.max_depth,
             fatal_error: None,
         }
     }
@@ -404,8 +424,8 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.delimiter_stack.push(OpenDelimiter { span });
     }
 
-    pub(super) fn pop_delimiter(&mut self) -> Option<OpenDelimiter> {
-        self.delimiter_stack.pop()
+    pub(super) fn pop_delimiter(&mut self) {
+        self.delimiter_stack.pop();
     }
 
     /// Report an unclosed delimiter at EOF, pointing back at its opening token.

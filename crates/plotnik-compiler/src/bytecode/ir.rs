@@ -14,6 +14,50 @@ use plotnik_bytecode::{
     StepId, Trampoline, select_match_opcode,
 };
 
+/// Resolver bundle for bytecode emission.
+///
+/// Bundles the three deferred-reference resolvers (`lookup_member` for struct
+/// fields, `get_member_base` for enum variants, `lookup_regex` for predicate
+/// patterns) into one value so `resolve` signatures stay flat. The resolvers
+/// borrow the emission tables; build via [`EmitContext::from_tables`].
+pub struct EmitContext<'a> {
+    lookup_member: &'a dyn Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+    get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
+    lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
+}
+
+impl<'a> EmitContext<'a> {
+    /// Build a resolver context from explicit resolver functions.
+    pub fn new(
+        lookup_member: &'a dyn Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
+        get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
+        lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
+    ) -> Self {
+        Self {
+            lookup_member,
+            get_member_base,
+            lookup_regex,
+        }
+    }
+
+    /// Resolve a struct field reference to its member index.
+    ///
+    /// Members are deduplicated globally by field identity (name, type).
+    fn lookup_member(&self, field_name: plotnik_core::Symbol, field_type: TypeId) -> Option<u16> {
+        (self.lookup_member)(field_name, field_type)
+    }
+
+    /// Resolve an enum's parent type to its member base index.
+    fn get_member_base(&self, parent_type: TypeId) -> Option<u16> {
+        (self.get_member_base)(parent_type)
+    }
+
+    /// Resolve a regex predicate pattern to its RegexTable index.
+    fn lookup_regex(&self, string_id: plotnik_bytecode::StringId) -> Option<u16> {
+        (self.lookup_regex)(string_id)
+    }
+}
+
 /// Node type constraint for Match instructions.
 ///
 /// The bytecode crate owns this type; re-exported here so existing
@@ -85,27 +129,22 @@ impl MemberRef {
         }
     }
 
-    /// Resolve this reference using lookup functions.
-    ///
-    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
-    /// - `get_member_base`: maps parent TypeId to member base index
-    pub fn resolve<F, G>(self, lookup_member: F, get_member_base: G) -> u16
-    where
-        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
-        G: Fn(TypeId) -> Option<u16>,
-    {
+    /// Resolve this reference using the emission context's lookup tables.
+    pub fn resolve(self, ctx: &EmitContext) -> u16 {
         match self {
             Self::Absolute(n) => n,
             Self::Deferred {
                 field_name,
                 field_type,
-            } => lookup_member(field_name, field_type)
+            } => ctx
+                .lookup_member(field_name, field_type)
                 .expect("deferred member reference must resolve"),
             Self::DeferredByIndex {
                 parent_type,
                 relative_index,
             } => {
-                get_member_base(parent_type).expect("deferred member base must resolve")
+                ctx.get_member_base(parent_type)
+                    .expect("deferred member base must resolve")
                     + relative_index
             }
         }
@@ -116,14 +155,32 @@ impl MemberRef {
 /// Used during compilation; resolved to EffectOp during emission.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectIR {
-    pub opcode: EffectOpcode,
+    opcode: EffectOpcode,
     /// Payload for effects that don't use member indices.
-    pub payload: usize,
+    payload: usize,
     /// Member reference for Set/E effects (None for other effects).
-    pub member_ref: Option<MemberRef>,
+    member_ref: Option<MemberRef>,
 }
 
 impl EffectIR {
+    /// The effect's opcode.
+    #[inline]
+    pub fn opcode(&self) -> EffectOpcode {
+        self.opcode
+    }
+
+    /// The raw payload for effects that don't use member indices.
+    #[inline]
+    pub fn payload(&self) -> usize {
+        self.payload
+    }
+
+    /// The member reference for Set/Enum effects (None for other effects).
+    #[inline]
+    pub fn member_ref(&self) -> Option<MemberRef> {
+        self.member_ref
+    }
+
     /// Create a simple effect without member reference.
     pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
         Self {
@@ -203,16 +260,9 @@ impl EffectIR {
     }
 
     /// Resolve this IR effect to a concrete EffectOp.
-    ///
-    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
-    /// - `get_member_base`: maps parent TypeId to member base index
-    pub fn resolve<F, G>(&self, lookup_member: F, get_member_base: G) -> EffectOp
-    where
-        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
-        G: Fn(TypeId) -> Option<u16>,
-    {
+    pub fn resolve(&self, ctx: &EmitContext) -> EffectOp {
         let payload = if let Some(member_ref) = self.member_ref {
-            member_ref.resolve(&lookup_member, &get_member_base) as usize
+            member_ref.resolve(ctx) as usize
         } else {
             self.payload
         };
@@ -305,24 +355,13 @@ impl InstructionIR {
     }
 
     /// Resolve labels and serialize to bytecode bytes.
-    ///
-    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
-    /// - `get_member_base`: maps parent TypeId to member base index
-    /// - `lookup_regex`: maps pattern to RegexTable index (for predicate regexes)
-    pub fn resolve<F, G, R>(
+    pub fn resolve(
         &self,
         map: &BTreeMap<Label, StepAddr>,
-        lookup_member: F,
-        get_member_base: G,
-        lookup_regex: R,
-    ) -> Result<Vec<u8>, EmitError>
-    where
-        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
-        G: Fn(TypeId) -> Option<u16>,
-        R: Fn(plotnik_bytecode::StringId) -> Option<u16>,
-    {
+        ctx: &EmitContext,
+    ) -> Result<Vec<u8>, EmitError> {
         match self {
-            Self::Match(m) => m.resolve(map, lookup_member, get_member_base, lookup_regex),
+            Self::Match(m) => m.resolve(map, ctx),
             Self::Call(c) => Ok(c.resolve(map).to_vec()),
             Self::Return(r) => Ok(r.resolve().to_vec()),
             Self::Trampoline(t) => Ok(t.resolve(map).to_vec()),
@@ -334,23 +373,23 @@ impl InstructionIR {
 #[derive(Clone, Debug)]
 pub struct MatchIR {
     /// Where this instruction lives.
-    pub label: Label,
+    pub(crate) label: Label,
     /// Navigation command. `Epsilon` means pure control flow (no node check).
-    pub nav: Nav,
+    pub(crate) nav: Nav,
     /// Node type constraint (Any = wildcard, Named/Anonymous for specific checks).
-    pub node_type: NodeTypeIR,
+    pub(crate) node_type: NodeTypeIR,
     /// Field constraint (None = wildcard).
-    pub node_field: Option<NonZeroU16>,
+    pub(crate) node_field: Option<NonZeroU16>,
     /// Effects to execute before match attempt.
-    pub pre_effects: Vec<EffectIR>,
+    pub(crate) pre_effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
-    pub neg_fields: Vec<u16>,
+    pub(crate) neg_fields: Vec<u16>,
     /// Effects to execute after successful match.
-    pub post_effects: Vec<EffectIR>,
+    pub(crate) post_effects: Vec<EffectIR>,
     /// Predicate for node text filtering (None = no text check).
-    pub predicate: Option<PredicateIR>,
+    pub(crate) predicate: Option<PredicateIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
-    pub successors: Vec<Label>,
+    pub(crate) successors: Vec<Label>,
 }
 
 impl MatchIR {
@@ -481,39 +520,20 @@ impl MatchIR {
     /// Builds the owned [`MatchInstr`] the bytecode crate knows how to encode,
     /// so encode and decode live together and capacity overflows surface as
     /// [`EmitError`] instead of panicking.
-    ///
-    /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
-    /// - `get_member_base`: maps parent TypeId to member base index
-    /// - `lookup_regex`: maps pattern to RegexTable index (for predicate regexes)
-    pub fn resolve<F, G, R>(
+    pub fn resolve(
         &self,
         map: &BTreeMap<Label, StepAddr>,
-        lookup_member: F,
-        get_member_base: G,
-        lookup_regex: R,
-    ) -> Result<Vec<u8>, EmitError>
-    where
-        F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
-        G: Fn(TypeId) -> Option<u16>,
-        R: Fn(plotnik_bytecode::StringId) -> Option<u16>,
-    {
-        let pre_effects = self
-            .pre_effects
-            .iter()
-            .map(|e| e.resolve(&lookup_member, &get_member_base))
-            .collect();
-        let post_effects = self
-            .post_effects
-            .iter()
-            .map(|e| e.resolve(&lookup_member, &get_member_base))
-            .collect();
+        ctx: &EmitContext,
+    ) -> Result<Vec<u8>, EmitError> {
+        let pre_effects = self.pre_effects.iter().map(|e| e.resolve(ctx)).collect();
+        let post_effects = self.post_effects.iter().map(|e| e.resolve(ctx)).collect();
         let predicate = self.predicate.as_ref().map(|pred| {
             let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
             let value_ref = match &pred.value {
                 PredicateValueIR::String(string_id) => string_id.get(),
-                PredicateValueIR::Regex(string_id) => {
-                    lookup_regex(*string_id).expect("regex predicate must be interned")
-                }
+                PredicateValueIR::Regex(string_id) => ctx
+                    .lookup_regex(*string_id)
+                    .expect("regex predicate must be interned"),
             };
             MatchPredicate {
                 op: pred.op_byte(),
@@ -669,11 +689,11 @@ impl From<TrampolineIR> for InstructionIR {
 #[derive(Clone, Debug)]
 pub struct LayoutResult {
     /// Mapping from symbolic labels to concrete step addresses (raw u16).
-    pub(crate) label_to_step: BTreeMap<Label, StepAddr>,
+    label_to_step: BTreeMap<Label, StepAddr>,
     /// Total number of steps. Held as `u32` so a query whose layout overflows
     /// the `u16` step-address space is detectable at emit time instead of
     /// wrapping silently; `emit` rejects it before any address is used.
-    pub(crate) total_steps: u32,
+    total_steps: u32,
 }
 
 impl LayoutResult {

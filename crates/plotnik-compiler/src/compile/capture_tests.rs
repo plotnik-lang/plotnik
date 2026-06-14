@@ -9,12 +9,12 @@ fn nest_scope_preserves_outer_and_nests_inner() {
     let result = outer.nest_scope(EffectIR::start_enum(), EffectIR::end_enum());
 
     assert_eq!(result.pre.len(), 2);
-    assert_eq!(result.pre[0].opcode, EffectOpcode::Obj);
-    assert_eq!(result.pre[1].opcode, EffectOpcode::Enum);
+    assert_eq!(result.pre[0].opcode(), EffectOpcode::Obj);
+    assert_eq!(result.pre[1].opcode(), EffectOpcode::Enum);
 
     assert_eq!(result.post.len(), 2);
-    assert_eq!(result.post[0].opcode, EffectOpcode::EndEnum);
-    assert_eq!(result.post[1].opcode, EffectOpcode::EndObj);
+    assert_eq!(result.post[0].opcode(), EffectOpcode::EndEnum);
+    assert_eq!(result.post[1].opcode(), EffectOpcode::EndObj);
 }
 
 #[test]
@@ -27,9 +27,9 @@ fn with_pre_values_appends_after_scope_opens() {
     ]);
 
     assert_eq!(result.pre.len(), 3);
-    assert_eq!(result.pre[0].opcode, EffectOpcode::Obj);
-    assert_eq!(result.pre[1].opcode, EffectOpcode::Null);
-    assert_eq!(result.pre[2].opcode, EffectOpcode::Set);
+    assert_eq!(result.pre[0].opcode(), EffectOpcode::Obj);
+    assert_eq!(result.pre[1].opcode(), EffectOpcode::Null);
+    assert_eq!(result.pre[2].opcode(), EffectOpcode::Set);
 }
 
 #[test]
@@ -42,9 +42,9 @@ fn with_post_values_prepends_before_scope_closes() {
     ]);
 
     assert_eq!(result.post.len(), 3);
-    assert_eq!(result.post[0].opcode, EffectOpcode::Node);
-    assert_eq!(result.post[1].opcode, EffectOpcode::Set);
-    assert_eq!(result.post[2].opcode, EffectOpcode::EndObj);
+    assert_eq!(result.post[0].opcode(), EffectOpcode::Node);
+    assert_eq!(result.post[1].opcode(), EffectOpcode::Set);
+    assert_eq!(result.post[2].opcode(), EffectOpcode::EndObj);
 }
 
 #[test]
