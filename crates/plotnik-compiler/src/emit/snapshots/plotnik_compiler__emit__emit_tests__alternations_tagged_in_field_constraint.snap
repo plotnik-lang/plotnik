@@ -43,8 +43,9 @@ _ObjWrap:
 
 Test:
   06   !   (pair)                           08
-  07  ─‣┘  _                                10
+  07  ...  
   08  └‣─  key: _                           11, 14
   10                                        ▶
-  11   !   [Enum(M1)] (identifier) [Node Set(M0) EndEnum Set(M3)]  07
-  14   !   [Enum(M2)] (number) [EndEnum Set(M3)]  07
+  11   !   [Enum(M1)] (identifier) [Node Set(M0) EndEnum]  16
+  14   !   [Enum(M2)] (number) [EndEnum]    16
+  16  ─‣┘  [Set(M3)] _                      10

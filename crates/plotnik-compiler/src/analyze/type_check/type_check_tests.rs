@@ -334,7 +334,7 @@ fn optional_single_capture() {
 
     let res = Query::expect_valid_types(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     export interface Node {
       kind: string;
       text: string;
@@ -342,7 +342,7 @@ fn optional_single_capture() {
     }
 
     export interface Q {
-      dec?: Node;
+      dec: Node | null;
     }
     ");
 }
@@ -354,7 +354,7 @@ fn optional_group_bubbles_fields() {
     "#};
 
     let res = Query::expect_valid_types(input);
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     export interface Node {
       kind: string;
       text: string;
@@ -362,8 +362,8 @@ fn optional_group_bubbles_fields() {
     }
 
     export interface Q {
-      dec?: Node;
-      mod?: Node;
+      dec: Node | null;
+      mod: Node | null;
     }
     ");
 }
@@ -441,7 +441,7 @@ fn untagged_alt_different_captures() {
 
     let res = Query::expect_valid_types(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     export interface Node {
       kind: string;
       text: string;
@@ -449,8 +449,8 @@ fn untagged_alt_different_captures() {
     }
 
     export interface Q {
-      a?: Node;
-      b?: Node;
+      a: Node | null;
+      b: Node | null;
     }
     ");
 }
@@ -466,7 +466,7 @@ fn untagged_alt_partial_overlap() {
 
     let res = Query::expect_valid_types(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     export interface Node {
       kind: string;
       text: string;
@@ -475,7 +475,7 @@ fn untagged_alt_partial_overlap() {
 
     export interface Q {
       x: Node;
-      y?: Node;
+      y: Node | null;
     }
     ");
 }
@@ -738,7 +738,7 @@ fn recursive_type_optional_self_ref() {
 
     let res = Query::expect_valid_types(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     export interface Node {
       kind: string;
       text: string;
@@ -746,8 +746,8 @@ fn recursive_type_optional_self_ref() {
     }
 
     export interface NestedCall {
-      inner?: NestedCall;
-      name?: Node;
+      inner: NestedCall | null;
+      name: Node | null;
     }
     ");
 }

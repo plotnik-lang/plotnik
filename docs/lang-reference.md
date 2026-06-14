@@ -237,9 +237,13 @@ Quantifiers determine whether a field is singular, optional, or an array:
 | Pattern   | Output Type      | Meaning                    |
 | --------- | ---------------- | -------------------------- |
 | `(x) @a`  | `a: T`           | exactly one                |
-| `(x)? @a` | `a?: T`          | zero or one                |
+| `(x)? @a` | `a: T \| null`   | zero or one                |
 | `(x)* @a` | `a: T[]`         | zero or more (scalar list) |
 | `(x)+ @a` | `a: [T, ...T[]]` | one or more (scalar list)  |
+
+Every declared field is **always present** in the output: an optional field is
+`T | null` and materializes as `null` when it doesn't match (never an absent
+key), and a missing list is `[]` (never `null`). The output shape is stable.
 
 Node arrays work when the quantified pattern has **no internal captures**. For patterns with internal captures, use struct arrays:
 
@@ -247,7 +251,7 @@ Node arrays work when the quantified pattern has **no internal captures**. For p
 | --------------- | ----------------- | --------------------------------------- |
 | `{...}* @items` | `items: T[]`      | zero or more structs                    |
 | `{...}+ @items` | `items: [T, ...]` | one or more structs                     |
-| `{...}? @item`  | `item?: T`        | optional struct (bubbles if uncaptured) |
+| `{...}? @item`  | `item: T \| null` | nullable struct (bubbles if uncaptured) |
 
 ### Creating Nested Structure
 
@@ -581,7 +585,7 @@ Negated fields don't affect the output type — they're purely structural constr
 Output types:
 
 ```typescript
-{ decorator?: Node }
+{ decorator: Node | null }
 { decorators: Node[] }
 { decorators: [Node, ...Node[]] }
 ```
@@ -676,7 +680,7 @@ Match alternatives with `[...]`:
 
 ### Merge Style (Unlabeled)
 
-Captures merge: present in all branches → required; some branches → optional. Same-name captures must have compatible types.
+Captures merge: present in all branches → required; some branches → nullable (`T | null`, always present). Same-name captures must have compatible types.
 
 Branches must be type-compatible. Bare nodes are auto-promoted to single-field structs when mixed with structured branches.
 
@@ -691,7 +695,7 @@ Branches must be type-compatible. Bare nodes are auto-promoted to single-field s
 Output type:
 
 ```typescript
-{ left?: Node, func?: Node }  // each appears in one branch only
+{ left: Node | null, func: Node | null }  // each appears in one branch only
 ```
 
 When the same capture appears in all branches:
@@ -727,7 +731,7 @@ The second branch `(identifier) @x` is auto-promoted to a structure `{ x: Node }
 Output type:
 
 ```typescript
-{ x: Node, y?: Node }  // x in all branches (required), y in one (optional)
+{ x: Node, y: Node | null }  // x in all branches (required), y in one (nullable)
 ```
 
 Type mismatch is an error:
@@ -786,8 +790,8 @@ Output type:
 
 ```typescript
 interface Target {
-  fn?: Node;
-  method?: Node;
+  fn: Node | null;
+  method: Node | null;
 }
 
 {
@@ -959,7 +963,7 @@ NestedCall =
     arguments: (arguments))
 ```
 
-Matches `a()`, `a()()`, `a()()()`, etc. → `{ name?: Node, inner?: NestedCall }`
+Matches `a()`, `a()()`, `a()()()`, etc. → `{ name: Node | null, inner: NestedCall | null }`
 
 Tagged recursive example:
 
@@ -1003,7 +1007,7 @@ Output types:
 type Statement =
   | { $tag: "Assign"; $data: { target: string; value: Expression } }
   | { $tag: "Call"; $data: { func: string; args: Expression[] } }
-  | { $tag: "Return"; $data: { value?: Expression } };
+  | { $tag: "Return"; $data: { value: Expression | null } };
 
 type Expression =
   | { $tag: "Ident"; $data: { name: string } }

@@ -4,13 +4,9 @@ source: crates/plotnik-lib/tests/conformance.rs
 ==== query ====
 Q = (program (expression_statement (binary_expression (identifier) @x (identifier) @x)))
 
-==== source ====
-a + b
-
-==== types ====
-export interface Q {
-  x: Node;
-}
-
-==== result ====
-{"x":{"kind":"identifier","text":"a","span":[0, 1]},"x":{"kind":"identifier","text":"b","span":[4, 5]}}
+==== diagnostics ====
+error: capture `@x` already defined in this scope
+ --> query.ptk:1:71
+  |
+1 | Q = (program (expression_statement (binary_expression (identifier) @x (identifier) @x)))
+  |                                                                       ^^^^^^^^^^^^^^^

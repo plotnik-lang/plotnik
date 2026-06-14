@@ -4,7 +4,7 @@
 //! - Sequences: `{a b c}` - siblings matched in order
 //! - Alternations: `[a b c]` - first matching branch wins
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use plotnik_core::Symbol;
 
@@ -358,24 +358,46 @@ impl Compiler<'_> {
 
                 successors.push(body_entry);
             } else {
-                // Untagged branch: compile body with null injection for missing captures
+                // Untagged branch: inject a default value for every merged field this
+                // branch does not itself produce, so the output shape stays stable.
+                // "Produces" means a top-level (bubbling) field — a capture nested in a
+                // child scope (`{...} @row`) belongs to that scope, not here. The
+                // branch's inferred bubble is the single source of truth; a syntactic
+                // capture walk would miscount nested names and drop a needed default.
                 let null_effects: Vec<_> =
                     if let (Some(fields), Some(alt_type)) = (merged_fields, alt_type_id) {
-                        let branch_captures = Self::collect_captures(&body);
+                        let provided: HashSet<Symbol> = self
+                            .ctx
+                            .type_ctx
+                            .get_term_info(&body)
+                            .and_then(|info| info.flow.type_id())
+                            .and_then(|id| self.ctx.type_ctx.get_struct_fields(id))
+                            .map(|f| f.keys().copied().collect())
+                            .unwrap_or_default();
                         fields
                             .iter()
                             .enumerate()
-                            .filter(|(_, (sym, _))| {
-                                !branch_captures.contains(self.ctx.interner.resolve(**sym))
-                            })
-                            .flat_map(|(idx, _)| {
-                                [
-                                    EffectIR::null(),
-                                    EffectIR::with_member(
-                                        EffectOpcode::Set,
-                                        MemberRef::deferred_by_index(alt_type, idx as u16),
-                                    ),
-                                ]
+                            .filter(|(_, (sym, _))| !provided.contains(*sym))
+                            .flat_map(|(idx, (_, field_info))| {
+                                let set = EffectIR::with_member(
+                                    EffectOpcode::Set,
+                                    MemberRef::deferred_by_index(alt_type, idx as u16),
+                                );
+                                // A non-optional list defaults to `[]`; everything else
+                                // — scalars, and optional lists like `((x)+ @a)?` —
+                                // defaults to null. The `optional` flag, not the array
+                                // shape, is the source of truth, matching the relaxed
+                                // type from `relax_for_absence`.
+                                let is_required_list = !field_info.optional
+                                    && matches!(
+                                        self.ctx.type_ctx.get_type(field_info.type_id),
+                                        Some(TypeShape::Array { .. })
+                                    );
+                                if is_required_list {
+                                    vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                                } else {
+                                    vec![EffectIR::null(), set]
+                                }
                             })
                             .collect()
                     } else {

@@ -66,6 +66,7 @@ pub enum DiagnosticKind {
     DuplicateDefinition,
     UndefinedReference,
     MixedAltBranches,
+    DuplicateAlternationLabel,
     RecursionNoEscape,
     DirectRecursion,
     FieldSequenceValue,
@@ -82,6 +83,7 @@ pub enum DiagnosticKind {
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
+    InvalidTypeAnnotation,
 
     // Predicate validation
     PredicateOnNonLeaf,
@@ -188,6 +190,9 @@ impl DiagnosticKind {
             Self::MixedAltBranches => {
                 Some("use all labels for a tagged union, or none for a merged struct")
             }
+            Self::DuplicateAlternationLabel => {
+                Some("each branch label must be unique within an alternation")
+            }
             Self::RecursionNoEscape => {
                 Some("add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`")
             }
@@ -261,6 +266,7 @@ impl DiagnosticKind {
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
+            Self::DuplicateAlternationLabel => "duplicate branch label",
             Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field cannot match a sequence",
@@ -287,6 +293,7 @@ impl DiagnosticKind {
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
+            Self::InvalidTypeAnnotation => "invalid type annotation",
 
             // Predicate validation
             Self::PredicateOnNonLeaf => {
@@ -342,6 +349,7 @@ impl DiagnosticKind {
             Self::IncompatibleStructShapes => {
                 "capture `@{}` has incompatible struct fields across branches".to_string()
             }
+            Self::InvalidTypeAnnotation => "{}".to_string(),
 
             // Link pass errors with context
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
@@ -357,6 +365,9 @@ impl DiagnosticKind {
 
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
+            Self::DuplicateAlternationLabel => {
+                "branch label `{}` is already used in this alternation".to_string()
+            }
 
             // Standard pattern: fallback + context
             _ => format!("{}: {{}}", self.fallback_message()),

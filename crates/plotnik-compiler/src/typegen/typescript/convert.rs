@@ -83,27 +83,20 @@ impl Emitter<'_> {
             return format!("{}{{}}{}", c.dim, c.reset);
         }
 
-        let mut fields: Vec<(String, TypeId, bool)> = self
+        let mut fields: Vec<(String, TypeId)> = self
             .types
             .members_of(type_def)
-            .map(|member| {
-                let field_name = self.strings.get(member.name).to_string();
-                let (inner_type, optional) = self.types.unwrap_optional(member.type_id);
-                (field_name, inner_type, optional)
-            })
+            .map(|member| (self.strings.get(member.name).to_string(), member.type_id))
             .collect();
         fields.sort_by(|a, b| a.0.cmp(&b.0));
 
+        // Optional fields render as `T | null` (always present), matching the
+        // materializer — see `emit_interface`.
         let field_strs: Vec<String> = fields
             .iter()
-            .map(|(name, ty, opt)| {
+            .map(|(name, ty)| {
                 let ts_type = self.type_to_ts(*ty);
-                let opt_marker = if *opt {
-                    format!("{}?{}", c.dim, c.reset)
-                } else {
-                    String::new()
-                };
-                format!("{}{}{}:{} {}", name, opt_marker, c.dim, c.reset, ts_type)
+                format!("{}{}:{} {}", name, c.dim, c.reset, ts_type)
             })
             .collect();
 

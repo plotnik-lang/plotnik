@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement [(call_expression (arguments (identifier)+ @args)?)  (identifier) @id]))
+
+==== source ====
+f()
+
+==== types ====
+export interface Q {
+  args: [Node, ...Node[]] | null;
+  id: Node | null;
+}
+
+==== result ====
+{"id":null,"args":null}

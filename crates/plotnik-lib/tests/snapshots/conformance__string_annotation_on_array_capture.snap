@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (lexical_declaration (variable_declarator (identifier))+ @ids :: string))
+
+==== source ====
+let a, b;
+
+==== types ====
+export interface Q {
+  ids: [string, ...string[]];
+}
+
+==== result ====
+{"ids":["a","b"]}

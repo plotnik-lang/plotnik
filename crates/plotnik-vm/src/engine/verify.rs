@@ -168,12 +168,13 @@ fn verify_type(
                                 path.truncate(prev_len);
                             }
                             None => {
-                                if !is_optional {
-                                    errors.push(format!(
-                                        "{}: required field missing",
-                                        append_path(path, field_name)
-                                    ));
-                                }
+                                // Policy: every declared field is always present in
+                                // the output — optional fields materialize as null,
+                                // never as an absent key. A missing key is always a bug.
+                                errors.push(format!(
+                                    "{}: field missing (declared fields are always present; optionals as null)",
+                                    append_path(path, field_name)
+                                ));
                             }
                         }
                     }

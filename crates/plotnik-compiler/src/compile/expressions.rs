@@ -15,11 +15,11 @@ use crate::parser::ast::{self, Expr};
 use plotnik_bytecode::Nav;
 use plotnik_core::NodeType;
 
+use crate::analyze::type_check::{CaptureMechanism, capture_mechanism};
+
 use super::Compiler;
 use super::capture::CaptureEffects;
-use super::navigation::{
-    check_trailing_anchor, inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope,
-};
+use super::navigation::check_trailing_anchor;
 
 impl Compiler<'_> {
     /// Compile a named node with capture effects.
@@ -272,6 +272,16 @@ impl Compiler<'_> {
         let is_captured = !capture.post.is_empty();
         let needs_scope = is_captured && ref_returns_struct;
 
+        // An uncaptured recursive reference is opaque: inference types it Void, so
+        // its captures must not bubble into the parent scope. Tagged-union recursion
+        // is the exception — inference forwards its enum value — so only the rest is
+        // suppressed.
+        let ref_returns_enum = def_type_id
+            .and_then(|tid| self.ctx.type_ctx.get_type(tid))
+            .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+        let suppress_opaque_recursion =
+            !is_captured && self.ctx.type_ctx.is_recursive(def_id) && !ref_returns_enum;
+
         let nav = nav_override.unwrap_or(Nav::Stay);
 
         // Call instructions don't have pre_effects, so emit epsilon if needed
@@ -287,6 +297,21 @@ impl Compiler<'_> {
             let return_addr =
                 self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
             self.emit_call(nav, field_override, return_addr, target)
+        } else if suppress_opaque_recursion {
+            // Uncaptured opaque recursion: SuppressBegin → Call → SuppressEnd → exit.
+            // The recursion still matches structurally but contributes no effects,
+            // matching its inferred Void type.
+            let suppress_end = self.emit_effects_epsilon(
+                exit,
+                vec![EffectIR::suppress_end()],
+                CaptureEffects::default(),
+            );
+            let call_label = self.emit_call(nav, field_override, suppress_end, target);
+            self.emit_effects_epsilon(
+                call_label,
+                vec![EffectIR::suppress_begin()],
+                CaptureEffects::default(),
+            )
         } else {
             // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
             self.emit_call(nav, field_override, exit, target)
@@ -403,20 +428,8 @@ impl Compiler<'_> {
         let inner_is_bubble = inner_info
             .as_ref()
             .is_some_and(|info| info.flow.is_bubble());
-        let inner_creates_scope = inner.as_ref().is_some_and(inner_creates_scope);
 
-        // Scope type for inner compilation:
-        // - Scope-creating expressions (sequences, alternations) push their own scope
-        //   so inner captures reference the sequence's struct type.
-        // - Non-scope-creating bubbles (named nodes) don't push a scope - their fields
-        //   bubble up to the parent scope, so inner captures should reference that.
-        let scope_type_id = if inner_creates_scope {
-            inner_info.as_ref().and_then(|info| info.flow.type_id())
-        } else {
-            None // Bubbles don't create new scopes
-        };
-
-        // Build capture effects: [Node/Text] followed by Set(member_ref)
+        // Build capture effects: [Node/Text] (only for the Node mechanism) + Set.
         let capture_effects = self.build_capture_effects(cap, inner.as_ref());
 
         // Bare capture: just emit effects at current position
@@ -424,14 +437,22 @@ impl Compiler<'_> {
             return self.emit_effects_epsilon(exit, capture_effects, outer_capture);
         };
 
-        // Struct scope: Obj → inner → EndObj+capture → exit
-        // Also handle truly empty scopes (e.g., `{ } @x` produces empty struct)
-        let inner_is_truly_empty_scope = is_truly_empty_scope(&inner);
-        let needs_struct_scope = inner_is_bubble || inner_is_truly_empty_scope;
+        // The classifier is the single source of truth shared with inference, so
+        // the effects we emit here always match the type that was declared.
+        match capture_mechanism(&inner, self.ctx.type_ctx, self.ctx.interner) {
+            // Array: Arr → quantifier (with Push) → EndArr+capture → exit
+            CaptureMechanism::Array => self.compile_array_scope(
+                &inner,
+                exit,
+                nav_override,
+                capture_effects,
+                outer_capture,
+                cap.has_string_annotation(),
+            ),
 
-        if needs_struct_scope {
-            return if inner_creates_scope {
-                // Sequence/alternation: capture effects after EndObj (value is the struct)
+            // Struct scope: Obj → inner → EndObj+capture → exit (also empty `{}`).
+            CaptureMechanism::StructScope => {
+                let scope_type_id = inner_info.as_ref().and_then(|info| info.flow.type_id());
                 self.compile_struct_scope(
                     &inner,
                     exit,
@@ -440,57 +461,42 @@ impl Compiler<'_> {
                     capture_effects,
                     outer_capture,
                 )
-            } else {
-                // Node with bubbles: scope wrapper for inner captures, but capture on inner match
-                self.compile_bubble_with_node_capture(
-                    &inner,
-                    exit,
-                    nav_override,
-                    scope_type_id,
-                    capture_effects,
-                    outer_capture,
-                )
-            };
+            }
+
+            // Set-after: the inner leaves the value pending (tagged alternation or a
+            // named node forwarding a structured child). Emit the inner, then a
+            // trailing Set; no Node, no wrapper.
+            CaptureMechanism::SetAfter => {
+                let set_step = self.emit_effects_epsilon(exit, capture_effects, outer_capture);
+                self.compile_expr_inner(&inner, set_step, nav_override, CaptureEffects::default())
+            }
+
+            // Ref: hand the capture to the call site, which wraps Call/Return (and
+            // Obj/EndObj for struct-returning definitions) to isolate the
+            // definition's internal captures before the Set.
+            CaptureMechanism::Ref => {
+                let combined = outer_capture.with_post_values(capture_effects);
+                self.compile_expr_inner(&inner, exit, nav_override, combined)
+            }
+
+            // Node: capture the matched node. Bubbling children, if any, set into
+            // the current scope alongside the capture.
+            CaptureMechanism::Node => {
+                if inner_is_bubble {
+                    self.compile_bubble_with_node_capture(
+                        &inner,
+                        exit,
+                        nav_override,
+                        None,
+                        capture_effects,
+                        outer_capture,
+                    )
+                } else {
+                    let combined = outer_capture.with_post_values(capture_effects);
+                    self.compile_expr_inner(&inner, exit, nav_override, combined)
+                }
+            }
         }
-
-        // Handle scope-creating scalar expressions (tagged enums)
-        // Enum produces its own value via EndEnum - capture effects go AFTER, not inside
-        let inner_is_scope_creating_scalar = !inner_is_bubble
-            && inner_creates_scope
-            && inner_info
-                .as_ref()
-                .and_then(|info| info.flow.type_id())
-                .and_then(|id| self.ctx.type_ctx.get_type(id))
-                .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
-
-        if inner_is_scope_creating_scalar {
-            let set_step = self.emit_effects_epsilon(exit, capture_effects, outer_capture);
-            return self.compile_expr_inner(
-                &inner,
-                set_step,
-                nav_override,
-                CaptureEffects::default(),
-            );
-        }
-
-        // Array: Arr → quantifier (with Push) → EndArr+capture → exit
-        // Check if inner is a * or + quantifier - these produce arrays regardless of arity
-        let inner_is_array = is_star_or_plus_quantifier(Some(&inner));
-
-        if inner_is_array {
-            return self.compile_array_scope(
-                &inner,
-                exit,
-                nav_override,
-                capture_effects,
-                outer_capture,
-                cap.has_string_annotation(),
-            );
-        }
-
-        // Scalar: capture effects go directly on the match instruction
-        let combined = outer_capture.with_post_values(capture_effects);
-        self.compile_expr_inner(&inner, exit, nav_override, combined)
     }
 
     /// Compile a suppressive capture (@_ or @_name).
