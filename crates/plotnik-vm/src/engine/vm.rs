@@ -25,27 +25,8 @@ fn continuation_nav(nav: Nav) -> Nav {
     }
 }
 
-use super::checkpoint::{Checkpoint, CheckpointStack};
+use super::checkpoint::{CallResume, Checkpoint, CheckpointStack};
 use super::cursor::{CursorWrapper, SkipPolicy};
-
-/// Derive skip policy from navigation mode without navigating.
-/// Used when retrying a Call to determine the policy for the next checkpoint.
-/// Epsilon/Stay/Up variants return None since they don't retry among siblings.
-fn skip_policy_for_nav(nav: Nav) -> Option<SkipPolicy> {
-    match nav {
-        Nav::Down | Nav::Next => Some(SkipPolicy::Any),
-        Nav::DownSkip | Nav::NextSkip => Some(SkipPolicy::Trivia),
-        Nav::DownSkipExtras | Nav::NextSkipExtras => Some(SkipPolicy::Extras),
-        Nav::DownExact | Nav::NextExact => Some(SkipPolicy::Exact),
-        Nav::Epsilon
-        | Nav::Stay
-        | Nav::StayExact
-        | Nav::Up(_)
-        | Nav::UpSkipTrivia(_)
-        | Nav::UpSkipExtras(_)
-        | Nav::UpExact(_) => None,
-    }
-}
 use super::effect::{EffectLog, RuntimeEffect};
 use super::error::RuntimeError;
 use super::frame::FrameArena;
@@ -110,12 +91,6 @@ pub struct VM<'t> {
     pub(crate) recursion_depth: u32,
     pub(crate) limits: FuelLimits,
 
-    /// When true, the next Call instruction should skip navigation (use Stay).
-    /// This is set when backtracking to a Call retry checkpoint after advancing
-    /// the cursor to a new sibling. The Call's navigation was already done, and
-    /// we're now at the correct position for the callee to match.
-    pub(crate) skip_call_nav: bool,
-
     /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
     /// Incremented by SuppressBegin, decremented by SuppressEnd.
     pub(crate) suppress_depth: u16,
@@ -175,7 +150,6 @@ impl<'t> VMBuilder<'t> {
             exec_fuel: self.limits.get_exec_fuel(),
             recursion_depth: 0,
             limits: self.limits,
-            skip_call_nav: false,
             suppress_depth: 0,
             entrypoint_target: 0,
             source: self.source,
@@ -195,16 +169,29 @@ impl<'t> VM<'t> {
         Self::builder(source, tree).limits(limits).build()
     }
 
-    /// Helper for internal checkpoint creation (eliminates duplication).
-    fn create_checkpoint(&self, ip: u16, skip_policy: Option<SkipPolicy>) -> Checkpoint {
-        Checkpoint::new(
+    /// Checkpoint that resumes a branch alternative at `ip`.
+    fn branch_checkpoint(&self, ip: u16) -> Checkpoint {
+        Checkpoint::branch(
             self.cursor.descendant_index(),
             self.effects.len(),
             self.frames.current(),
             self.recursion_depth,
             ip,
-            skip_policy,
             self.suppress_depth,
+        )
+    }
+
+    /// Checkpoint that, on backtrack, advances the cursor and re-enters the
+    /// callee. `call_ip` is the Call's address (for trace rendering only).
+    fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
+        Checkpoint::call_retry(
+            self.cursor.descendant_index(),
+            self.effects.len(),
+            self.frames.current(),
+            self.recursion_depth,
+            call_ip,
+            self.suppress_depth,
+            resume,
         )
     }
 
@@ -280,11 +267,11 @@ impl<'t> VM<'t> {
         }
 
         for effect_op in m.pre_effects() {
-            self.emit_effect(effect_op, tracer);
+            self.emit_effect(effect_op, tracer)?;
         }
 
         for effect_op in m.post_effects() {
-            self.emit_effect(effect_op, tracer);
+            self.emit_effect(effect_op, tracer)?;
         }
 
         self.branch_to_successors(m, tracer)
@@ -431,7 +418,7 @@ impl<'t> VM<'t> {
         // Push checkpoints for alternate branches (in reverse order)
         for i in (1..m.succ_count()).rev() {
             self.checkpoints
-                .push(self.create_checkpoint(m.successor(i).get(), None));
+                .push(self.branch_checkpoint(m.successor(i).get()));
             tracer.trace_checkpoint_created(self.ip);
         }
 
@@ -444,33 +431,42 @@ impl<'t> VM<'t> {
             return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth));
         }
 
-        // Get skip policy: from navigation (normal) or from nav mode (retry)
-        let skip_policy = if self.skip_call_nav {
-            // Retry: skip navigation, just check field, derive policy from nav mode
-            self.skip_call_nav = false;
-            self.check_field(c.node_field, tracer)?;
-            skip_policy_for_nav(c.nav)
-        } else {
-            // Normal: navigate and capture skip policy
-            self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?
-        };
+        // Navigate to the candidate node (and its field, if constrained).
+        let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
 
-        // Push checkpoint for retry (both normal and retry paths need this)
+        // A searchable nav leaves a retry checkpoint so the callee can be
+        // re-tried at later siblings if it fails. Exact/Stay navs have a fixed
+        // candidate and need no retry.
         if let Some(policy) = skip_policy
             && policy != SkipPolicy::Exact
         {
+            let resume = CallResume {
+                target: c.target.get(),
+                next: c.next.get(),
+                field: c.node_field,
+                policy,
+            };
             self.checkpoints
-                .push(self.create_checkpoint(self.ip, Some(policy)));
+                .push(self.call_retry_checkpoint(self.ip, resume));
             tracer.trace_checkpoint_created(self.ip);
         }
 
-        // Save tree depth AFTER navigation. On Return, we go up to this depth.
-        let saved_depth = self.cursor.depth();
-        tracer.trace_call(c.target.get());
-        self.frames.push(c.next.get(), saved_depth);
-        self.recursion_depth += 1;
-        self.ip = c.target.get();
+        self.enter_callee(c.target.get(), c.next.get(), tracer);
         Ok(())
+    }
+
+    /// Push a frame for `target` (returning to `next`) and jump in. Tree depth
+    /// is saved AFTER navigation; on Return the cursor ascends back to it.
+    fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
+        let saved_depth = self.cursor.depth();
+        tracer.trace_call(target);
+        self.frames.push(next, saved_depth);
+        self.recursion_depth += 1;
+        self.ip = target;
+        // The callee owns its own match: until one of its Matches succeeds,
+        // there is no matched node. Clearing here lets a zero-width callee
+        // return "nothing" instead of leaking the call-site node (#383).
+        self.matched_node = None;
     }
 
     /// Execute a Trampoline instruction.
@@ -560,9 +556,14 @@ impl<'t> VM<'t> {
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
 
-        // Set matched_node BEFORE going up so effects after
-        // a Call can capture the node that the callee matched.
-        self.matched_node = Some(self.cursor.node());
+        // Set matched_node BEFORE going up so effects after a Call can capture
+        // the node that the callee matched. Only do so when the callee actually
+        // matched something: a zero-width return leaves `matched_node` at the
+        // `None` that `enter_callee` cleared it to, so the caller captures
+        // nothing rather than the call site (#383).
+        if self.matched_node.is_some() {
+            self.matched_node = Some(self.cursor.node());
+        }
 
         // Go up to saved depth level. This preserves sibling advances
         // (continue_search at same level) while restoring level when
@@ -586,16 +587,33 @@ impl<'t> VM<'t> {
         self.recursion_depth = cp.recursion_depth;
         self.suppress_depth = cp.suppress_depth;
 
-        // Call retry: advance cursor to next sibling before re-executing
-        if let Some(policy) = cp.skip_policy {
-            if !self.cursor.continue_search(policy) {
+        let Some(resume) = cp.call_resume else {
+            self.ip = cp.ip;
+            return Err(RuntimeError::Backtracked);
+        };
+
+        // Call retry: advance to the next candidate, then re-enter the callee.
+        // If siblings are exhausted, keep backtracking to an earlier checkpoint.
+        if !self.cursor.continue_search(resume.policy) {
+            return self.backtrack(tracer);
+        }
+        tracer.trace_nav(continuation_nav(Nav::Down), self.cursor.node());
+
+        // Enforce the field constraint at the new candidate. A mismatch ends
+        // this Call's search, exactly like the navigate-time field check.
+        if let Some(field_id) = resume.field {
+            if self.cursor.field_id() != Some(field_id) {
+                tracer.trace_field_failure(self.cursor.node());
                 return self.backtrack(tracer);
             }
-            tracer.trace_nav(continuation_nav(Nav::Down), self.cursor.node());
-            self.skip_call_nav = true;
+            tracer.trace_field_success(field_id);
         }
 
-        self.ip = cp.ip;
+        // Re-establish the retry checkpoint at the new candidate, then enter.
+        self.checkpoints
+            .push(self.call_retry_checkpoint(cp.ip, resume));
+        tracer.trace_checkpoint_created(cp.ip);
+        self.enter_callee(resume.target, resume.next, tracer);
         Err(RuntimeError::Backtracked)
     }
 
@@ -613,7 +631,7 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) {
+    fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) -> Result<(), RuntimeError> {
         use EffectOpcode::*;
 
         let effect = match op.opcode {
@@ -621,7 +639,7 @@ impl<'t> VM<'t> {
             SuppressBegin => {
                 tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
                 self.suppress_depth += 1;
-                return;
+                return Ok(());
             }
             SuppressEnd => {
                 self.suppress_depth = self
@@ -629,21 +647,26 @@ impl<'t> VM<'t> {
                     .checked_sub(1)
                     .expect("SuppressEnd without matching SuppressBegin");
                 tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
-                return;
+                return Ok(());
             }
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
                 tracer.trace_effect_suppressed(op.opcode, op.payload);
-                return;
+                return Ok(());
             }
 
-            // Data effects
-            Node => {
-                RuntimeEffect::Node(self.matched_node.expect("Node effect without matched_node"))
-            }
-            Text => {
-                RuntimeEffect::Text(self.matched_node.expect("Text effect without matched_node"))
+            // Node-valued captures. A missing `matched_node` means the source
+            // matched nothing (a zero-width callee return, #383): fail this path
+            // rather than fabricate the call-site node.
+            Node | Text => {
+                let Some(node) = self.matched_node else {
+                    return self.backtrack(tracer);
+                };
+                match op.opcode {
+                    Node => RuntimeEffect::Node(node),
+                    _ => RuntimeEffect::Text(node),
+                }
             }
             Arr => RuntimeEffect::Arr,
             Push => RuntimeEffect::Push,
@@ -659,5 +682,6 @@ impl<'t> VM<'t> {
 
         tracer.trace_effect(&effect);
         self.effects.push(effect);
+        Ok(())
     }
 }

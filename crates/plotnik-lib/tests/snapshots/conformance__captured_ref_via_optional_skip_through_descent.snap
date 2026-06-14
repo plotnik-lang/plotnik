@@ -3,7 +3,7 @@ source: crates/plotnik-lib/tests/conformance.rs
 ---
 ==== query ====
 A = (identifier)??
-Q = (A) @x
+Q = (program (A) @x)
 
 ==== source ====
 foo

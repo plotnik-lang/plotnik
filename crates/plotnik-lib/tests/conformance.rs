@@ -326,11 +326,42 @@ fn collapse_prefix_drops_referenced_instruction() {
     shot_exec!(r#"Q = (program (comment)? (comment)? (comment)?)"#, "// c");
 }
 
-/// BUG #383: a captured ref that returns via a non-greedy optional skip
-/// fabricates the root `program` node for `x` instead of yielding nothing.
+/// #383: a captured ref whose callee returns via a non-greedy optional skip
+/// matched nothing, so the required `@x` cannot bind — the query yields no
+/// match instead of fabricating the call-site (`program`) node.
 #[test]
 fn captured_ref_via_non_greedy_optional_skip() {
     shot_exec!("A = (identifier)??\nQ = (A) @x", "foo");
+}
+
+/// #383 (descend flavor): the same zero-width return reached through a `Down`
+/// call captures the descended child (`expression_statement`) unless the empty
+/// match is rejected. Expected: no match.
+#[test]
+fn captured_ref_via_optional_skip_through_descent() {
+    shot_exec!("A = (identifier)??\nQ = (program (A) @x)", "foo");
+}
+
+/// #383 (ascension flavor): a captured ref that matches a child and then
+/// ascends must capture the matched child, not the parent it ascends to. The
+/// capture used to ride the closing `Up` step and grab `program`; it now binds
+/// `lexical_declaration`.
+#[test]
+fn captured_ref_keeps_match_across_ascension() {
+    shot_exec!("A = (lexical_declaration)\nQ = (program (A) @a)", "let x;");
+}
+
+/// #419: an anchor-preceded ref is wrapped in the unified position search, so a
+/// failed candidate must drive a sibling retry through the wrapper. The first
+/// comma's anchored sibling is a number (fail); the search advances to the
+/// second comma, whose sibling is the string. Exercises ref-body backtracking
+/// at runtime, beyond the emit snapshot.
+#[test]
+fn ref_before_anchor_backtracks_across_siblings() {
+    shot_exec!(
+        "Comma = \",\"\nQ = (program (expression_statement (array (Comma) . (string) @s)))",
+        r#"[1, 2, "x"]"#
+    );
 }
 
 /// BUG #441: an anchor before a quantified follower is not enforced, so `b`

@@ -2,18 +2,18 @@
 source: crates/plotnik-lib/tests/conformance.rs
 ---
 ==== query ====
-A = (identifier)??
-Q = (A) @x
+A = (lexical_declaration)
+Q = (program (A) @a)
 
 ==== source ====
-foo
+let x;
 
 ==== types ====
 export interface Q {
-  x: Node;
+  a: Node;
 }
 
 export type A = undefined;
 
 ==== result ====
-<no match>
+{"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]}}

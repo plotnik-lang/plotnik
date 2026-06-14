@@ -438,10 +438,10 @@ impl Compiler<'_> {
                 // First iteration: must match at least once; if all siblings fail,
                 // backtrack propagates to the caller (quantifier fails)
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                let first_iterate = self.compile_skip_retry_iteration(first_nav_mode, body_entry);
+                let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
 
                 // Repeat iteration: failure exits via loop_entry's checkpoint
-                let repeat_iterate = self.compile_skip_retry_iteration(Nav::Next, body_entry);
+                let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
 
                 // loop_entry → [repeat_iterate, exit]
                 self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
@@ -475,11 +475,10 @@ impl Compiler<'_> {
                     // First iteration: Down navigation with skip-retry; zero-match
                     // failure exits via the entry epsilon's checkpoint below
                     let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                    let first_iterate =
-                        self.compile_skip_retry_iteration(first_nav_mode, body_entry);
+                    let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
 
                     // Repeat iteration: Next navigation with skip-retry
-                    let repeat_iterate = self.compile_skip_retry_iteration(Nav::Next, body_entry);
+                    let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
 
                     // loop_entry → [repeat_iterate, exit]
                     self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
@@ -506,51 +505,12 @@ impl Compiler<'_> {
                 // backtracks to the entry epsilon's checkpoint, which restores the
                 // cursor to the pre-navigation position and takes skip_with_null.
                 let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                let iterate = self.compile_skip_retry_iteration(first_nav_mode, body_entry);
+                let iterate = self.emit_position_search(first_nav_mode, body_entry);
 
                 // entry → [iterate, skip_with_null]
                 self.emit_branch_epsilon(iterate, skip_with_null, is_greedy)
             }
         }
-    }
-
-    /// Compile a "try-skip-retry" iteration for quantifiers.
-    ///
-    /// Structure:
-    /// ```text
-    ///   navigate: Match(nav, wildcard) → try
-    ///   try: epsilon → [body, retry_nav]
-    ///   retry_nav: Match(Nav::Next, wildcard) → try
-    /// ```
-    ///
-    /// When the body fails (even deep inside on a descendant), we backtrack to `try`,
-    /// which falls through to `retry_nav`, advancing to the next sibling and retrying.
-    /// When siblings are exhausted, backtracking propagates to the loop-boundary
-    /// epsilon, whose exit checkpoint restores the cursor to the position of the
-    /// last successful match (or the quantifier entry). The iteration itself has no
-    /// exit edge: an exit taken at a failed-candidate cursor position would let
-    /// following patterns bind non-leftmost nodes.
-    ///
-    /// The body is always preferred over advancing, regardless of greediness:
-    /// non-greediness means fewer iterations (loop-boundary epsilon ordering),
-    /// never skipping a candidate that matches at the current position.
-    ///
-    /// Returns the navigate label (entry point for this iteration).
-    fn compile_skip_retry_iteration(&mut self, nav: Nav, body_entry: Label) -> Label {
-        let try_label = self.fresh_label();
-
-        // retry_nav: advance and loop back to try
-        let retry_nav = self.fresh_label();
-        self.emit_wildcard_nav(retry_nav, Nav::Next, try_label);
-
-        // try: epsilon → [body, retry_nav]
-        self.emit_branch_epsilon_at(try_label, body_entry, retry_nav, true);
-
-        // navigate: wildcard nav → try
-        let navigate = self.fresh_label();
-        self.emit_wildcard_nav(navigate, nav, try_label);
-
-        navigate
     }
 
     /// Helper for star with split exits and skip-retry.
@@ -581,10 +541,10 @@ impl Compiler<'_> {
         // backtracks to the entry epsilon's checkpoint, restoring the cursor to
         // the pre-Down position and taking skip_exit (bypass Up).
         let first_nav_mode = nav_override.unwrap_or(Nav::Down);
-        let first_iterate = self.compile_skip_retry_iteration(first_nav_mode, body_entry);
+        let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
 
         // Repeat iteration: failure exits via loop_entry's checkpoint
-        let repeat_iterate = self.compile_skip_retry_iteration(Nav::Next, body_entry);
+        let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
 
         // loop_entry → [repeat_iterate, match_exit]
         self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
