@@ -1999,7 +1999,6 @@ dependencies = [
  "insta",
  "plotnik-bytecode",
  "plotnik-core",
- "regex-automata",
  "serde",
  "thiserror",
 ]

@@ -9,6 +9,8 @@
 
 pub mod bytecode;
 pub mod dfa;
+#[cfg(test)]
+mod dfa_tests;
 pub mod predicate_op;
 pub mod type_system;
 
@@ -23,6 +25,6 @@ pub use bytecode::{
     format_effect, nav_symbol, select_match_opcode, superscript, trace, truncate_text,
     width_for_count,
 };
-pub use dfa::deserialize_dfa;
+pub use dfa::{RegexDfas, deserialize_dfa};
 pub use predicate_op::PredicateOp;
 pub use type_system::{Arity, PrimitiveType, QuantifierKind};

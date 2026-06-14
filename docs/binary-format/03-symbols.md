@@ -11,7 +11,7 @@ Precompiled DFA patterns for predicate matching. Uses the sentinel pattern like 
 - **Section Offset**: Computed (follows StringBlob)
 - **Size**: `header.regex_blob_size`
 
-Contains concatenated serialized DFAs (from `regex-automata`). Each DFA is deserialized via `DFA::from_bytes()` for O(1) loading.
+Contains concatenated serialized DFAs (from `regex-automata`). Each DFA is deserialized once via `DFA::from_bytes()` when the module loads — that pass both validates the automaton and caches it as an owned DFA, so predicate evaluation reuses the parsed automaton instead of re-deserializing per match (issue #426).
 
 ### RegexTable
 

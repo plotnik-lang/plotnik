@@ -5,7 +5,7 @@
 //! [`Module::load`] rejects it with a clean [`ModuleError`] rather than letting a
 //! later view/decode, VM, or materializer access panic. Together they guard the
 //! load-time structural validators (`validate_string_ids`, `validate_transitions`,
-//! `validate_entrypoints`, `validate_regex_dfas`, `validate_effect_stack`) that
+//! `validate_entrypoints`, `load_regex_dfas`, `validate_effect_stack`) that
 //! uphold the format's "a loaded module never panics on later access" guarantee.
 //!
 //! These live in-crate rather than under `tests/`: forging exact bytes needs the
@@ -440,9 +440,9 @@ fn forged_regex_pattern_string_id_is_rejected() {
 
 #[test]
 fn forged_corrupt_regex_dfa_is_rejected() {
-    // The regex blob holds the serialized sparse DFA the VM deserializes per
-    // evaluation; a corrupt blob must be rejected at load, not `.expect()`ed at
-    // match time.
+    // The regex blob holds the serialized sparse DFA the loader deserializes
+    // once into the module's cache; a corrupt blob must be rejected at load, not
+    // `.expect()`ed at match time.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (blob_off, blob_len) = {
         let m = Module::load(&bytes).expect("module loads before tampering");
@@ -607,11 +607,11 @@ fn forged_out_of_range_trampoline_target_is_rejected() {
 
 #[test]
 fn forged_regex_predicate_sentinel_operand_is_rejected() {
-    // Regex value_ref `0` is the reserved sentinel: `validate_regex_dfas` skips it,
-    // so its DFA bytes are empty and unvalidated, and the VM asserts non-empty
-    // regex bytes. The loader must reject the sentinel operand — real regexes start
-    // at index 1 — instead of letting it reach that assert. (The string side is
-    // safe at `0`: index 0 there is the validated easter-egg string.)
+    // Regex value_ref `0` is the reserved sentinel: `load_regex_dfas` skips it,
+    // so its DFA slot is `None`, and the VM expects a populated slot. The loader
+    // must reject the sentinel operand — real regexes start at index 1 — instead
+    // of letting it reach that expect. (The string side is safe at `0`: index 0
+    // there is the validated easter-egg string.)
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /needle/)"#);
     let pred_off = find_predicate_off(&bytes);
     bytes[pred_off + 2..pred_off + 4].copy_from_slice(&0u16.to_le_bytes());

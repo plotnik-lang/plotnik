@@ -673,3 +673,50 @@ fn interior_anchor_ignored_with_trailing_anchor() {
 fn supertype_pattern_silently_never_matches() {
     shot_exec!(r#"Q = (program (statement)* @s)"#, "let x;");
 }
+
+// Regex predicate execution (#426). The DFAs are deserialized once at module
+// load and reused on every evaluation; these pin the match/no-match behavior
+// that the load-time cache must preserve, including repeated evaluation of a
+// single cached DFA across a quantified pattern. Inputs put the needle off the
+// start (`barfoo`, `ax`) so the `^` anchor is genuinely exercised — an
+// unanchored search would (wrongly) match these.
+
+/// A `=~` predicate that matches binds its node.
+#[test]
+fn regex_predicate_matches() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (identifier =~ /^foo/) @id))"#,
+        "foobar;"
+    );
+}
+
+/// A `=~` predicate that fails gates the whole match out. `barfoo` contains the
+/// needle but not at the start, so the `^` anchor must reject it.
+#[test]
+fn regex_predicate_rejects_non_match() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (identifier =~ /^foo/) @id))"#,
+        "barfoo;"
+    );
+}
+
+/// A negated `!~` predicate passes exactly when the pattern does not match;
+/// `^foo` does not match `barfoo`, so the node binds.
+#[test]
+fn negated_regex_predicate_matches_non_match() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (identifier !~ /^foo/) @id))"#,
+        "barfoo;"
+    );
+}
+
+/// One cached DFA, evaluated once per statement across a quantified pattern —
+/// the hot path the load-time cache exists to serve (#426). `ax` carries the
+/// needle off the start, so only the anchored `x1`/`x3` survive.
+#[test]
+fn regex_predicate_in_quantified_pattern() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)"#,
+        "x1; ax; x3;"
+    );
+}

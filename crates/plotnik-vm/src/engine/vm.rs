@@ -356,24 +356,12 @@ impl<'t> VM<'t> {
         let op = PredicateOp::from_byte(op);
 
         if is_regex {
-            // Non-empty, deserializable DFA bytes are an invariant established at
-            // load by `Module::validate_regex_dfas`; these are unreachable on any
-            // module that passed `Module::load`.
-            let regex_bytes = module.regexes().get_by_index(value_ref as usize);
-            assert!(
-                !regex_bytes.is_empty(),
-                "regex predicate references empty DFA bytes"
-            );
-            let dfa = plotnik_bytecode::deserialize_dfa(regex_bytes)
-                .expect("regex DFA deserialization failed");
-
-            use regex_automata::Input;
-            use regex_automata::dfa::Automaton;
-            let input = Input::new(node_text);
-            let matched = dfa
-                .try_search_fwd(&input)
-                .expect("DFA search failed")
-                .is_some();
+            // The DFAs are deserialized once at `Module::load` and reused here;
+            // `RegexDfas::is_match` upholds the populated-slot invariant that a
+            // module passing load guarantees. Deserializing per evaluation, as
+            // this once did, re-validated the whole automaton on every predicate
+            // test (issue #426).
+            let matched = module.regex_dfas().is_match(value_ref as usize, node_text);
 
             match op {
                 PredicateOp::RegexMatch => matched,
