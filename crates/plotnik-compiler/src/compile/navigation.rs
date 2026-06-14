@@ -9,9 +9,6 @@ use crate::analyze::symbol_table::SymbolTable;
 use crate::parser::{Expr, Ref, SeqItem};
 use plotnik_bytecode::Nav;
 
-// Re-export from parser for compile module consumers
-pub use crate::parser::is_truly_empty_scope;
-
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
     symbol_table: &'a SymbolTable,
@@ -256,14 +253,4 @@ pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
                 | SyntaxKind::PlusQuestion
         )
     })
-}
-
-/// Determines if an expression creates a scope boundary when captured.
-/// Sequences and alternations create scopes; named nodes/refs don't.
-pub fn inner_creates_scope(inner: &Expr) -> bool {
-    match inner {
-        Expr::SeqExpr(_) | Expr::AltExpr(_) => true,
-        Expr::QuantifiedExpr(q) => q.inner().is_some_and(|i| inner_creates_scope(&i)),
-        _ => false,
-    }
 }

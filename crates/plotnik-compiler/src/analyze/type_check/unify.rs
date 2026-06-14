@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use super::context::TypeContext;
 use super::symbol::Symbol;
-use super::types::{FieldInfo, TYPE_VOID, TypeFlow, TypeId};
+use super::types::{FieldInfo, TYPE_VOID, TypeFlow, TypeId, TypeShape};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
@@ -62,18 +62,18 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
     match (a, b) {
         (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
 
-        // Void ∪ Bubble -> Bubble (all fields become optional)
+        // Void ∪ Bubble -> Bubble (every field is absent in the Void branch)
         (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
             let fields = ctx.get_struct_fields(id).cloned().unwrap_or_default();
-            let optional_fields = make_all_optional(fields);
-            Ok(TypeFlow::Bubble(ctx.intern_struct(optional_fields)))
+            let relaxed = relax_all_for_absence(ctx, fields);
+            Ok(TypeFlow::Bubble(ctx.intern_struct(relaxed)))
         }
 
         (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
             let a_fields = ctx.get_struct_fields(a_id).cloned().unwrap_or_default();
             let b_fields = ctx.get_struct_fields(b_id).cloned().unwrap_or_default();
 
-            let merged = merge_fields(a_fields, b_fields)?;
+            let merged = merge_fields(ctx, a_fields, b_fields)?;
             Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
         }
 
@@ -82,11 +82,37 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
     }
 }
 
-/// Make all fields in a map optional.
-fn make_all_optional(fields: BTreeMap<Symbol, FieldInfo>) -> BTreeMap<Symbol, FieldInfo> {
+/// Relax a field that is absent from some branch, keeping the output shape stable
+/// (every key present).
+///
+/// A *required* list stays present as a (possibly empty) array — the absent branch
+/// emits `[]`, never null — so it relaxes to zero-or-more. Everything else becomes
+/// nullable, including an already-optional list: `((x)+ @a)?` emits null when its
+/// `?` is skipped, so forcing it to a non-null `[]` here would make the declared
+/// type lie. Nullability (`optional`), not the array shape, decides the default,
+/// which keeps inference in lockstep with what the emitter writes.
+fn relax_for_absence(ctx: &mut TypeContext, info: FieldInfo) -> FieldInfo {
+    if !info.optional
+        && let Some(TypeShape::Array { element, .. }) = ctx.get_type(info.type_id)
+    {
+        let element = *element;
+        let array = ctx.intern_type(TypeShape::Array {
+            element,
+            non_empty: false,
+        });
+        return FieldInfo::required(array);
+    }
+    info.make_optional()
+}
+
+/// Relax every field in a map for absence (see [`relax_for_absence`]).
+fn relax_all_for_absence(
+    ctx: &mut TypeContext,
+    fields: BTreeMap<Symbol, FieldInfo>,
+) -> BTreeMap<Symbol, FieldInfo> {
     fields
         .into_iter()
-        .map(|(k, v)| (k, v.make_optional()))
+        .map(|(k, v)| (k, relax_for_absence(ctx, v)))
         .collect()
 }
 
@@ -94,8 +120,9 @@ fn make_all_optional(fields: BTreeMap<Symbol, FieldInfo>) -> BTreeMap<Symbol, Fi
 ///
 /// Rules:
 /// - Keys in both: types must be compatible, field is required iff required in both.
-/// - Keys in only one: field becomes optional.
+/// - Keys in only one: relaxed for absence (nullable, or an empty-able list).
 fn merge_fields(
+    ctx: &mut TypeContext,
     a: BTreeMap<Symbol, FieldInfo>,
     mut b: BTreeMap<Symbol, FieldInfo>,
 ) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
@@ -109,13 +136,15 @@ fn merge_fields(
             let optional = a_info.optional || b_info.optional;
             result.insert(key, FieldInfo { type_id, optional });
         } else {
-            // Key only in 'a': make optional
-            result.insert(key, a_info.make_optional());
+            // Key only in 'a': absent from 'b'
+            result.insert(key, relax_for_absence(ctx, a_info));
         }
     }
 
-    // Remaining keys in 'b' were not in 'a': make optional
-    result.extend(make_all_optional(b));
+    // Remaining keys in 'b' were not in 'a': absent from 'a'
+    for (key, b_info) in b {
+        result.insert(key, relax_for_absence(ctx, b_info));
+    }
 
     Ok(result)
 }

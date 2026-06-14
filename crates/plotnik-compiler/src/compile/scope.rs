@@ -82,9 +82,14 @@ impl Compiler<'_> {
             this.compile_expr_with_nav(inner, endobj_step, nav_override)
         });
 
+        // `outer_capture.pre` runs in the enclosing scope before this struct opens —
+        // e.g. an alternation branch's null-injected defaults, set on the parent
+        // object before `Obj` switches the current scope. Mirrors `compile_array_scope`;
+        // dropping it would silently lose those defaults (a missing field at runtime).
         let obj_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(obj_step, inner_entry)
+                .pre_effects(outer_capture.pre)
                 .pre_effect(EffectIR::start_obj())
                 .into(),
         );

@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program [(lexical_declaration (variable_declarator)+ @vs)  (expression_statement) @s])
+
+==== source ====
+foo;
+
+==== types ====
+export interface Q {
+  s: Node | null;
+  vs: Node[];
+}
+
+==== result ====
+{"vs":[],"s":{"kind":"expression_statement","text":"foo;","span":[0, 4]}}

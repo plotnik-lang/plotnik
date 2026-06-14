@@ -9,7 +9,7 @@ bar; debugger; foo;
 
 ==== types ====
 export interface Q {
-  a?: Node;
+  a: Node | null;
   b: Node[];
   c: Node;
 }

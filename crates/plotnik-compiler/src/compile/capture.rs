@@ -5,13 +5,14 @@
 
 use std::collections::HashSet;
 
-use crate::analyze::type_check::{TypeContext, TypeId, TypeShape};
+use crate::analyze::type_check::{
+    CaptureMechanism, TypeContext, TypeId, TypeShape, capture_mechanism,
+};
 use crate::bytecode::EffectIR;
 use crate::parser::ast::{self, Expr};
 use plotnik_bytecode::EffectOpcode;
 
 use super::Compiler;
-use super::navigation::{inner_creates_scope, is_star_or_plus_quantifier, is_truly_empty_scope};
 
 /// Capture effects to attach to match instructions.
 ///
@@ -119,40 +120,14 @@ impl Compiler<'_> {
     ) -> Vec<EffectIR> {
         let mut effects = Vec::with_capacity(2);
 
-        // Skip Node/Text when the value comes from somewhere other than matched_node:
-        // 1. Refs returning structured types (Call leaves result pending)
-        // 2. Scope-creating expressions (Seq/Alt) producing structured types (EndObj/EndEnum)
-        // 3. Array captures (EndArr produces value)
-        let is_structured_ref = inner.is_some_and(|i| self.is_ref_returning_structured(i));
-        let is_array = is_star_or_plus_quantifier(inner);
-
-        // Check if inner is a scope-creating expression (SeqExpr/AltExpr) that produces
-        // a structured type (Struct/Enum) or truly empty struct. Named nodes with bubble
-        // captures don't count - they still need Node because we're capturing the matched
-        // node, not the struct.
-        //
-        // For FieldExpr, look through to the value. The parser treats `field: expr @cap` as
-        // `(field: expr) @cap` so that quantifiers work on fields (e.g., `decorator: (x)*`
-        // for repeating fields). This means captures wrap the FieldExpr, but the value
-        // determines whether it produces a structured type. See `parse_expr_no_suffix`.
-        let creates_structured_scope = inner.and_then(unwrap_field_value).is_some_and(|ei| {
-            // Truly empty scopes (like `{ }`) produce empty struct
-            if is_truly_empty_scope(&ei) {
-                return true;
-            }
-            if !inner_creates_scope(&ei) {
-                return false;
-            }
-            let Some(info) = self.ctx.type_ctx.get_term_info(&ei) else {
-                return false;
-            };
-            info.flow
-                .type_id()
-                .and_then(|id| self.ctx.type_ctx.get_type(id))
-                .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
+        // Only the `Node` mechanism captures the matched node/text directly. Every
+        // other mechanism (struct scope, pass-through ref/enum/forward, array)
+        // produces its value via EndObj/EndEnum/EndArr/Call, so the capture itself
+        // emits no Node/Text. A bare capture (`@x` with no inner) is a Node.
+        let is_node_mechanism = inner.is_none_or(|i| {
+            capture_mechanism(i, self.ctx.type_ctx, self.ctx.interner) == CaptureMechanism::Node
         });
-
-        if !is_structured_ref && !creates_structured_scope && !is_array {
+        if is_node_mechanism {
             let effect = if cap.has_string_annotation() {
                 EffectIR::text()
             } else {
@@ -261,17 +236,6 @@ impl Compiler<'_> {
         let mut names = HashSet::new();
         collect(expr, &mut names);
         names
-    }
-}
-
-/// Unwrap FieldExpr to get its value, pass through other expressions.
-///
-/// Used when checking properties of a captured expression - captures on fields
-/// like `field: [A: B:] @cap` wrap the FieldExpr, but we need to inspect the value.
-fn unwrap_field_value(expr: &Expr) -> Option<Expr> {
-    match expr {
-        Expr::FieldExpr(f) => f.value(),
-        other => Some(other.clone()),
     }
 }
 
