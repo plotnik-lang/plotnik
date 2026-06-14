@@ -5,7 +5,7 @@
 
 use std::num::NonZeroU16;
 
-use super::constants::{SECTION_ALIGN, STEP_SIZE};
+use super::constants::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE};
 use super::effects::EffectOp;
 use super::nav::Nav;
 use super::node_type_ir::NodeTypeIR;
@@ -331,6 +331,182 @@ impl<'a> Match<'a> {
             (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2;
         let predicate_size = if self.has_predicate { 4 } else { 0 };
         8 + effects_size + predicate_size
+    }
+
+    /// Collect this borrowed view into an owned, encodable [`MatchInstr`].
+    ///
+    /// Lets the decoder be re-encoded for roundtrip testing.
+    pub fn to_instr(&self) -> MatchInstr {
+        MatchInstr {
+            nav: self.nav,
+            node_type: self.node_type,
+            node_field: self.node_field,
+            pre_effects: self.pre_effects().collect(),
+            neg_fields: self.neg_fields().collect(),
+            post_effects: self.post_effects().collect(),
+            predicate: self.predicate().map(MatchPredicate::from_tuple),
+            successors: self.successors().collect(),
+        }
+    }
+}
+
+/// Predicate filter carried by an extended Match (text comparison).
+///
+/// Mirrors the tuple returned by [`Match::predicate`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct MatchPredicate {
+    /// Operator byte (see [`crate::predicate_op::PredicateOp`]).
+    pub op: u8,
+    /// Whether `value_ref` indexes the regex table (`true`) or string table.
+    pub is_regex: bool,
+    /// Index into the string or regex table.
+    pub value_ref: u16,
+}
+
+impl MatchPredicate {
+    fn from_tuple((op, is_regex, value_ref): (u8, bool, u16)) -> Self {
+        Self {
+            op,
+            is_regex,
+            value_ref,
+        }
+    }
+}
+
+/// Owned, encodable form of a Match instruction.
+///
+/// This is the encode-side mirror of the [`Match`] decoder: the emitter
+/// resolves symbolic references into one of these and calls [`encode`](Self::encode),
+/// keeping encode and decode in one crate so a roundtrip can be property-tested.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct MatchInstr {
+    pub nav: Nav,
+    pub node_type: NodeTypeIR,
+    pub node_field: Option<NonZeroU16>,
+    pub pre_effects: Vec<EffectOp>,
+    pub neg_fields: Vec<u16>,
+    pub post_effects: Vec<EffectOp>,
+    pub predicate: Option<MatchPredicate>,
+    pub successors: Vec<StepId>,
+}
+
+/// Error returned when an instruction cannot be encoded into bytecode.
+///
+/// Every variant is reachable from a `check`-clean query, so the emitter
+/// surfaces these as compile errors instead of letting an `as`-narrowing wrap
+/// or an `assert!` panic at encode time.
+#[derive(Clone, PartialEq, Eq, Debug, thiserror::Error)]
+pub enum EncodeError {
+    #[error("too many pre-effects on one match: {0} (max {MAX_PRE_EFFECTS})")]
+    TooManyPreEffects(usize),
+    #[error("too many negated fields on one match: {0} (max 7)")]
+    TooManyNegFields(usize),
+    #[error("too many post-effects on one match: {0} (max 7)")]
+    TooManyPostEffects(usize),
+    #[error("too many successors on one match: {0} (max 31)")]
+    TooManySuccessors(usize),
+    #[error("match payload too large: {0} slots (max {MAX_MATCH_PAYLOAD_SLOTS})")]
+    PayloadTooLarge(usize),
+    #[error("effect payload exceeds 10-bit limit: {0} (max 1023)")]
+    EffectPayloadOverflow(usize),
+}
+
+/// Maximum effect payload (10 bits), shared by encode and decode.
+const EFFECT_PAYLOAD_MAX: usize = 0x3FF;
+
+impl MatchInstr {
+    /// Encode to bytecode bytes, choosing the smallest fitting Match variant.
+    ///
+    /// Returns [`EncodeError`] rather than panicking when a count or payload
+    /// exceeds what the format can represent.
+    pub fn encode(&self) -> Result<Vec<u8>, EncodeError> {
+        for effect in self.pre_effects.iter().chain(&self.post_effects) {
+            if effect.payload > EFFECT_PAYLOAD_MAX {
+                return Err(EncodeError::EffectPayloadOverflow(effect.payload));
+            }
+        }
+
+        let (node_kind, node_type_val) = self.node_type.to_bytes();
+        let node_field_val = self.node_field.map_or(0, |n| n.get());
+
+        let can_use_match8 = self.pre_effects.is_empty()
+            && self.neg_fields.is_empty()
+            && self.post_effects.is_empty()
+            && self.predicate.is_none()
+            && self.successors.len() <= 1;
+
+        if can_use_match8 {
+            let mut bytes = vec![0u8; 8];
+            bytes[0] = (node_kind << 4) | (Opcode::Match8 as u8);
+            bytes[1] = self.nav.to_byte();
+            bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
+            bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
+            let next = self.successors.first().map_or(0, |s| s.get());
+            bytes[6..8].copy_from_slice(&next.to_le_bytes());
+            return Ok(bytes);
+        }
+
+        let pre = self.pre_effects.len();
+        let neg = self.neg_fields.len();
+        let post = self.post_effects.len();
+        let succ = self.successors.len();
+        if pre > MAX_PRE_EFFECTS {
+            return Err(EncodeError::TooManyPreEffects(pre));
+        }
+        if neg > 7 {
+            return Err(EncodeError::TooManyNegFields(neg));
+        }
+        if post > 7 {
+            return Err(EncodeError::TooManyPostEffects(post));
+        }
+        if succ > 31 {
+            return Err(EncodeError::TooManySuccessors(succ));
+        }
+
+        let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
+        let slots = pre + neg + post + predicate_slots + succ;
+        let opcode = select_match_opcode(slots).ok_or(EncodeError::PayloadTooLarge(slots))?;
+
+        let mut bytes = vec![0u8; opcode.size()];
+        bytes[0] = (node_kind << 4) | (opcode as u8);
+        bytes[1] = self.nav.to_byte();
+        bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
+        bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
+
+        // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
+        let counts = ((pre as u16) << 13)
+            | ((neg as u16) << 10)
+            | ((post as u16) << 7)
+            | ((succ as u16) << 2)
+            | ((self.predicate.is_some() as u16) << 1);
+        bytes[6..8].copy_from_slice(&counts.to_le_bytes());
+
+        let mut offset = 8;
+        for effect in &self.pre_effects {
+            bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
+            offset += 2;
+        }
+        for &field in &self.neg_fields {
+            bytes[offset..offset + 2].copy_from_slice(&field.to_le_bytes());
+            offset += 2;
+        }
+        for effect in &self.post_effects {
+            bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
+            offset += 2;
+        }
+        if let Some(pred) = &self.predicate {
+            let op_and_flags = (pred.op as u16) | ((pred.is_regex as u16) << 8);
+            bytes[offset..offset + 2].copy_from_slice(&op_and_flags.to_le_bytes());
+            offset += 2;
+            bytes[offset..offset + 2].copy_from_slice(&pred.value_ref.to_le_bytes());
+            offset += 2;
+        }
+        for succ in &self.successors {
+            bytes[offset..offset + 2].copy_from_slice(&succ.get().to_le_bytes());
+            offset += 2;
+        }
+
+        Ok(bytes)
     }
 }
 

@@ -100,14 +100,17 @@ impl LayoutIR {
 
     fn finalize(self) -> LayoutResult {
         let mut mapping = BTreeMap::new();
-        let mut max_step_end = 0u16;
+        // Accumulate in u32 so the step count never wraps; the emitter rejects a
+        // layout exceeding the u16 address space before any `step as u16` (which
+        // may wrap here) is read.
+        let mut max_step_end: u32 = 0;
 
         for (block_idx, block) in self.blocks.iter().enumerate() {
-            let block_base_step = (block_idx * CACHE_LINE / STEP_SIZE) as u16;
+            let block_base_step = (block_idx * CACHE_LINE / STEP_SIZE) as u32;
             for placement in &block.placements {
-                let step = block_base_step + (placement.offset / STEP_SIZE as u8) as u16;
-                mapping.insert(placement.label, step);
-                let step_end = step + (placement.size / STEP_SIZE as u8) as u16;
+                let step = block_base_step + (placement.offset / STEP_SIZE as u8) as u32;
+                mapping.insert(placement.label, step as u16);
+                let step_end = step + (placement.size / STEP_SIZE as u8) as u32;
                 max_step_end = max_step_end.max(step_end);
             }
         }

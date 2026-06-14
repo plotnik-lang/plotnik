@@ -163,7 +163,7 @@ pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
         return Err(CliError::FatalRendered);
     }
 
-    let bytecode = emit(&query).expect("emit failed");
+    let bytecode = emit(&query).map_err(|e| CliError::fatal(e.to_string()))?;
     let module = Module::load(&bytecode).expect("module load failed");
 
     let entry = input.entry.or(loaded.shebang.entry.as_deref());

@@ -93,3 +93,24 @@ struct Header {
     _reserved: [u8; 22],
 }
 ```
+
+## Loading & validation
+
+`Module::load` rejects malformed input instead of failing open. A loaded module
+is guaranteed not to panic on later view/decode access. Validation, in order:
+
+1. **Magic / version / size** — `PTKQ`, version 5, and `total_size` equal to the
+   byte length.
+2. **Reserved bytes** — bytes 42–63 must be zero (the checksum does not cover the
+   header, so these are checked explicitly).
+3. **Section bounds** — the section layout is recomputed in 64-bit arithmetic; the
+   Transitions section (and therefore every earlier section) must fit within
+   `total_size`.
+4. **Checksum** — CRC32 of everything after the 64-byte header must equal
+   `checksum`. This catches any corruption of the body.
+5. **Table sentinels** — String and Regex offset tables must be non-decreasing and
+   end exactly at their blob length; string slices must be valid UTF-8.
+6. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
+   (`data + count`) must stay within `type_members_count`.
+7. **Entrypoints** — each `target` must address a real step and `result_type` a
+   real TypeDef.

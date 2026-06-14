@@ -13,7 +13,7 @@ use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
-use super::{Entrypoint, STEP_SIZE, VERSION};
+use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
 
 /// Read a little-endian u16 from bytes at the given offset.
 #[inline]
@@ -30,6 +30,12 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
         bytes[offset + 2],
         bytes[offset + 3],
     ])
+}
+
+/// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
+#[inline]
+fn align_up_u64(value: u64, align: u64) -> u64 {
+    (value + align - 1) & !(align - 1)
 }
 
 /// Storage for bytecode bytes with guaranteed 64-byte alignment.
@@ -143,6 +149,20 @@ pub enum ModuleError {
     FileTooSmall(usize),
     #[error("size mismatch: header says {header} bytes, got {actual}")]
     SizeMismatch { header: u32, actual: usize },
+    #[error("malformed header: reserved bytes must be zero")]
+    MalformedHeader,
+    #[error("section out of bounds: header counts exceed the {total}-byte file")]
+    SectionOutOfBounds { total: u32 },
+    #[error("checksum mismatch: header {expected:#010x}, computed {actual:#010x}")]
+    ChecksumMismatch { expected: u32, actual: u32 },
+    #[error("malformed string table")]
+    MalformedStringTable,
+    #[error("malformed regex table")]
+    MalformedRegexTable,
+    #[error("invalid type definition at index {0}")]
+    InvalidTypeDef(usize),
+    #[error("invalid entrypoint at index {0}")]
+    InvalidEntrypoint(usize),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -226,14 +246,175 @@ impl Module {
             });
         }
 
-        // Compute all section offsets from header counts and blob sizes
+        // Bound every section against the file in u64 *before* `compute_offsets`
+        // does its u32 arithmetic: a corrupt header with a near-`u32::MAX` blob
+        // size or count would otherwise overflow that arithmetic and panic
+        // (debug) instead of returning an error.
+        Self::validate_section_bounds(&header)?;
+
+        // Section bounds held, so the u32 offset arithmetic cannot wrap.
         let offsets = header.compute_offsets();
 
-        Ok(Self {
+        let module = Self {
             storage,
             header,
             offsets,
-        })
+        };
+        module.validate()?;
+        Ok(module)
+    }
+
+    /// Validate a loaded module so later *view* accesses cannot panic and
+    /// accidental corruption of the body is detected.
+    ///
+    /// Section bounds are checked earlier, in [`validate_section_bounds`], before
+    /// offsets are computed. The remaining checks here defend a corrupted header
+    /// (which the CRC does not cover) whose counts/sizes would otherwise drive
+    /// out-of-bounds slicing: the reserved bytes are zero, the CRC32 over the
+    /// post-header body matches, the string/regex table sentinels are
+    /// well-formed, the documented TypeDef member ranges stay in bounds, and
+    /// entrypoint targets address real steps.
+    ///
+    /// The CRC32 detects *accidental* corruption of the body — the format's
+    /// threat model (truncation, bit-rot). It is not a MAC, so it does not by
+    /// itself reject a deliberately forged module whose checksum was recomputed
+    /// over crafted instruction bytes; instruction operands are decoded lazily
+    /// and are not structurally re-verified here.
+    fn validate(&self) -> Result<(), ModuleError> {
+        // Reserved header bytes are not covered by the CRC; v5 fixes them at zero.
+        if self.header._reserved != [0u8; 22] {
+            return Err(ModuleError::MalformedHeader);
+        }
+
+        let computed = crc32fast::hash(&self.storage[64..]);
+        if computed != self.header.checksum {
+            return Err(ModuleError::ChecksumMismatch {
+                expected: self.header.checksum,
+                actual: computed,
+            });
+        }
+
+        self.validate_string_table()?;
+        self.validate_regex_table()?;
+        self.validate_type_defs()?;
+        self.validate_entrypoints()?;
+        Ok(())
+    }
+
+    /// Recompute the section layout in `u64` (no overflow) and ensure every
+    /// section, up to and including Transitions, fits inside the file.
+    ///
+    /// Runs on the raw header *before* [`Header::compute_offsets`], so a corrupt
+    /// header cannot drive that u32 arithmetic to overflow. Sections are laid
+    /// out consecutively with alignment padding, so verifying the final
+    /// Transitions end also bounds every earlier section. Passing this check
+    /// also proves the `u32` [`SectionOffsets`] will not wrap, so the view
+    /// methods can trust them.
+    fn validate_section_bounds(h: &Header) -> Result<(), ModuleError> {
+        let total = h.total_size;
+        let align = SECTION_ALIGN as u64;
+        let oob = || ModuleError::SectionOutOfBounds { total };
+
+        let mut cursor = align; // str_blob starts right after the header
+        cursor = align_up_u64(cursor + h.str_blob_size as u64, align);
+        cursor = align_up_u64(cursor + h.regex_blob_size as u64, align);
+        cursor = align_up_u64(cursor + (h.str_table_count as u64 + 1) * 4, align);
+        cursor = align_up_u64(cursor + (h.regex_table_count as u64 + 1) * 8, align);
+        cursor = align_up_u64(cursor + h.node_types_count as u64 * 4, align);
+        cursor = align_up_u64(cursor + h.node_fields_count as u64 * 4, align);
+        cursor = align_up_u64(cursor + h.type_defs_count as u64 * 4, align);
+        cursor = align_up_u64(cursor + h.type_members_count as u64 * 4, align);
+        cursor = align_up_u64(cursor + h.type_names_count as u64 * 4, align);
+        cursor = align_up_u64(cursor + h.entrypoints_count as u64 * 8, align);
+        // `cursor` now points at the Transitions section.
+        let transitions_end = cursor + h.transitions_count as u64 * STEP_SIZE as u64;
+
+        if transitions_end > total as u64 {
+            return Err(oob());
+        }
+        Ok(())
+    }
+
+    /// The string offset table is `count + 1` ascending `u32` offsets ending at
+    /// the blob length; each delimited slice must be valid UTF-8.
+    fn validate_string_table(&self) -> Result<(), ModuleError> {
+        let table = self.string_table_slice();
+        let blob_len = self.header.str_blob_size;
+        let count = self.header.str_table_count as usize;
+        let blob = &self.storage[self.offsets.str_blob as usize..][..blob_len as usize];
+
+        let mut prev = 0u32;
+        for i in 0..=count {
+            let off = read_u32_le(table, i * 4);
+            if off < prev || off > blob_len {
+                return Err(ModuleError::MalformedStringTable);
+            }
+            if i > 0 && std::str::from_utf8(&blob[prev as usize..off as usize]).is_err() {
+                return Err(ModuleError::MalformedStringTable);
+            }
+            prev = off;
+        }
+        if prev != blob_len {
+            return Err(ModuleError::MalformedStringTable);
+        }
+        Ok(())
+    }
+
+    /// The regex table is `count + 1` entries whose DFA offsets ascend and end
+    /// at the blob length, so [`RegexView::get_by_index`] never slices OOB.
+    fn validate_regex_table(&self) -> Result<(), ModuleError> {
+        let table = self.regex_table_slice();
+        let blob_len = self.header.regex_blob_size;
+        let count = self.header.regex_table_count as usize;
+
+        let mut prev = 0u32;
+        for i in 0..=count {
+            // Entry layout: string_id (u16) | reserved (u16) | offset (u32).
+            let off = read_u32_le(table, i * 8 + 4);
+            if off < prev || off > blob_len {
+                return Err(ModuleError::MalformedRegexTable);
+            }
+            prev = off;
+        }
+        if prev != blob_len {
+            return Err(ModuleError::MalformedRegexTable);
+        }
+        Ok(())
+    }
+
+    /// Every TypeDef must have a known kind, and Struct/Enum member ranges must
+    /// stay inside the TypeMembers section (`docs/binary-format/04-types.md`).
+    fn validate_type_defs(&self) -> Result<(), ModuleError> {
+        let types = self.types();
+        let members = self.header.type_members_count as u32;
+        for i in 0..types.defs_count() {
+            let def = types.get_def(i);
+            let Some(kind) = TypeKind::from_u8(def.kind_byte()) else {
+                return Err(ModuleError::InvalidTypeDef(i));
+            };
+            if kind.is_composite() {
+                let (start, count) = def.member_range();
+                if start as u32 + count as u32 > members {
+                    return Err(ModuleError::InvalidTypeDef(i));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Entrypoint targets must address a real step so the VM's first
+    /// [`decode_step`](Self::decode_step) cannot read out of bounds.
+    fn validate_entrypoints(&self) -> Result<(), ModuleError> {
+        let entrypoints = self.entrypoints();
+        let steps = self.header.transitions_count;
+        let type_defs = self.header.type_defs_count;
+        for i in 0..entrypoints.len() {
+            let ep = entrypoints.get(i);
+            if ep.target() >= steps || ep.result_type().0 >= type_defs {
+                return Err(ModuleError::InvalidEntrypoint(i));
+            }
+        }
+        Ok(())
     }
 
     /// Get the parsed header.

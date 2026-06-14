@@ -57,7 +57,9 @@ fn resolve_match_terminal() {
     let mut map = BTreeMap::new();
     map.insert(Label(0), 1u16);
 
-    let bytes = m.resolve(&map, |_, _| None, |_| None, |_| None);
+    let bytes = m
+        .resolve(&map, |_, _| None, |_| None, |_| None)
+        .expect("terminal match encodes");
     assert_eq!(bytes.len(), 8);
 
     // Verify opcode is Match8 (0x0)
