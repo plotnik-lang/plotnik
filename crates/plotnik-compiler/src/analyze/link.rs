@@ -434,7 +434,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 )
                 .message(field_name)
                 .related_to(
-                    self.source_id,
+                    ctx.parent_source,
                     ctx.parent_range,
                     format!("on `{}`", parent_name),
                 )
@@ -582,6 +582,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                     node.text_range(),
                     ctx.parent_id,
                     ctx.parent_range,
+                    ctx.parent_source,
                 );
             }
             return;
@@ -600,6 +601,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 type_token.text_range(),
                 ctx.parent_id,
                 ctx.parent_range,
+                ctx.parent_source,
             );
             return;
         }
@@ -611,6 +613,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 child_id,
                 ctx.parent_id,
                 ctx.parent_range,
+                ctx.parent_source,
             );
         }
     }
@@ -886,6 +889,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         child_id: NodeTypeId,
         parent_id: NodeTypeId,
         parent_range: TextRange,
+        parent_source: SourceId,
     ) {
         let child_name = self
             .grammar
@@ -902,11 +906,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         self.diagnostics
             .report(self.source_id, DiagnosticKind::InvalidChildType, range)
             .message(child_name)
-            .related_to(
-                self.source_id,
-                parent_range,
-                format!("on `{}`", parent_name),
-            )
+            .related_to(parent_source, parent_range, format!("on `{}`", parent_name))
             .hint(hint)
             .emit();
     }
@@ -917,6 +917,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         range: TextRange,
         parent_id: NodeTypeId,
         parent_range: TextRange,
+        parent_source: SourceId,
     ) {
         let parent_name = self
             .grammar
@@ -927,7 +928,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         self.diagnostics
             .report(self.source_id, DiagnosticKind::ChildUnderLeafToken, range)
             .message(&parent_name)
-            .related_to(self.source_id, parent_range, format!("`{}`", parent_name))
+            .related_to(parent_source, parent_range, format!("`{}`", parent_name))
             .hint(format!(
                 "a leaf token's content is its text — match it directly `({0})` or by value `({0} == \"foo\")`",
                 parent_name
