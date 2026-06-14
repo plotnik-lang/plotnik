@@ -59,7 +59,7 @@ pub fn run(args: InferArgs) -> CliResult {
         );
         return Err(CliError::FatalRendered);
     }
-    let bytecode = linked.emit().expect("bytecode emission failed");
+    let bytecode = linked.emit().map_err(|e| CliError::fatal(e.to_string()))?;
     let module = Module::load(&bytecode).expect("module loading failed");
 
     // Emit TypeScript types

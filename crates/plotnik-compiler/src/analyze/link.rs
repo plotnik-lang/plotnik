@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 use rowan::TextRange;
@@ -176,8 +176,8 @@ impl<'a, 'q> Linker<'a, 'q> {
         let defs: Vec<_> = root.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
-            let mut visited = IndexSet::new();
-            self.validate_expr_structure(&body, None, false, &mut visited);
+            let mut walk = RefWalk::default();
+            self.validate_expr_structure(&body, None, false, &mut walk);
         }
     }
 
@@ -191,7 +191,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         expr: &Expr,
         ctx: Option<ValidationContext>,
         deferred: bool,
-        visited: &mut IndexSet<String>,
+        walk: &mut RefWalk,
     ) {
         match expr {
             Expr::NamedNode(node) => {
@@ -230,7 +230,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
                 for child in node.children() {
                     if let Expr::FieldExpr(f) = &child {
-                        self.validate_field_expr(f, child_ctx.as_ref(), deferred, visited);
+                        self.validate_field_expr(f, child_ctx.as_ref(), deferred, walk);
                     } else {
                         if !deferred
                             && let (Some(ctx), Some((adm, parent_is_token))) =
@@ -238,7 +238,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                         {
                             self.check_bare_child(&child, ctx, *parent_is_token, adm);
                         }
-                        self.validate_expr_structure(&child, child_ctx, deferred, visited);
+                        self.validate_expr_structure(&child, child_ctx, deferred, walk);
                     }
                 }
 
@@ -253,41 +253,52 @@ impl<'a, 'q> Linker<'a, 'q> {
             Expr::AnonymousNode(_) => {}
             Expr::FieldExpr(f) => {
                 // Should be handled by parent NamedNode, but handle gracefully
-                self.validate_field_expr(f, ctx.as_ref(), deferred, visited);
+                self.validate_field_expr(f, ctx.as_ref(), deferred, walk);
             }
             Expr::AltExpr(alt) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx, true, visited);
+                    self.validate_expr_structure(&body, ctx, true, walk);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx, deferred, visited);
+                    self.validate_expr_structure(&child, ctx, deferred, walk);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, deferred, visited);
+                self.validate_expr_structure(&inner, ctx, deferred, walk);
             }
             Expr::QuantifiedExpr(q) => {
                 let Some(inner) = q.inner() else { return };
                 // The body is optional/repeated — zero occurrences can satisfy it, so defer.
-                self.validate_expr_structure(&inner, ctx, true, visited);
+                self.validate_expr_structure(&inner, ctx, true, walk);
             }
             Expr::Ref(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
-                if !visited.insert(name.to_string()) {
+                // Validation is a pure function of `(name, ctx, deferred)`, so caching it
+                // collapses diamond-shaped reference graphs that would otherwise be re-walked
+                // 2^depth times. `deferred` is part of the key: a definition reached both inside
+                // and outside an alternation/quantifier must still be checked in its non-deferred
+                // context even after the deferred reach cached it. Cut cycles are never cached:
+                // they return below without reaching the `validated.insert`.
+                let key = (name.to_string(), ctx, deferred);
+                if walk.validated.contains(&key) {
+                    return;
+                }
+                if !walk.in_progress.insert(name.to_string()) {
                     return;
                 }
                 let Some(body) = self.symbol_table.get(name).cloned() else {
-                    visited.swap_remove(name);
+                    walk.in_progress.remove(name);
                     return;
                 };
-                self.validate_expr_structure(&body, ctx, deferred, visited);
-                visited.swap_remove(name);
+                self.validate_expr_structure(&body, ctx, deferred, walk);
+                walk.in_progress.remove(name);
+                walk.validated.insert(key);
             }
         }
     }
@@ -319,7 +330,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         field: &ast::FieldExpr,
         ctx: Option<&ValidationContext>,
         deferred: bool,
-        visited: &mut IndexSet<String>,
+        walk: &mut RefWalk,
     ) {
         let Some(name_token) = field.name() else {
             return;
@@ -360,7 +371,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 name_token.text_range(),
             );
         }
-        self.validate_expr_structure(&value, Some(*ctx), deferred, visited);
+        self.validate_expr_structure(&value, Some(*ctx), deferred, walk);
     }
 
     fn validate_negated_field(
@@ -1036,12 +1047,23 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 }
 
 /// Context for validating child types.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ValidationContext {
     /// The parent node type being validated against.
     parent_id: NodeTypeId,
     /// The parent node type token range for related_to.
     parent_range: TextRange,
+}
+
+/// State for walking the reference graph during structural validation.
+#[derive(Default)]
+struct RefWalk {
+    /// Definitions currently on the recursion stack — guards against cycles.
+    in_progress: HashSet<String>,
+    /// Definitions already validated under a given context. A definition's
+    /// validation depends only on `(name, ctx, deferred)`, so caching it keeps shared
+    /// references (e.g. diamond graphs) from being re-walked exponentially.
+    validated: HashSet<(String, Option<ValidationContext>, bool)>,
 }
 
 /// Combined symbol resolver for node types and fields.

@@ -16,12 +16,15 @@ struct VM<'t> {
 }
 
 struct Checkpoint {
-    descendant_index: u32,           // cursor position (4 bytes)
-    effect_watermark: usize,         // effect log length
-    frame_index: Option<u32>,        // call stack state
-    ip: StepId,                      // resume point
+    descendant_index: u32,             // cursor position (4 bytes)
+    effect_watermark: usize,           // effect log length
+    frame_index: Option<u32>,          // call stack state
+    ip: StepId,                        // resume point (plain branch)
+    call_resume: Option<CallResume>,   // if set: advance + re-enter a callee
 }
 ```
+
+A plain (branch) checkpoint resumes at `ip`. A `call_resume` checkpoint instead carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. Keeping this on the checkpoint, rather than in ambient VM state, is what gives Call-driven sibling search the same backtracking power as in-pattern search (see [Call Navigation](#call-navigation)).
 
 **Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root — `reset(node)` would invalidate all checkpoints.
 
@@ -144,6 +147,8 @@ An anchor before an alternation is classified per branch: `(a) . [(b) ","]` uses
 ### Compilation Examples
 
 Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
+
+> These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a branch into the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
 
 **Simple**: `(function (identifier) @name)`
 
@@ -304,3 +309,13 @@ pub struct Call {
 ```
 
 For `field: (Ref)` patterns, this allows checking field and type on the same node without extra instructions.
+
+### Sibling search and resume
+
+A `Call` navigates to its first candidate the same way a `Match` does. When the nav is a searching one (skip policy `Any`/`Trivia`/`Extras`, i.e. not `Exact`/`Stay`), the callee may need to be retried at later siblings if it fails — the candidate is not fixed. `exec_call` handles this by pushing a `call_resume` checkpoint (see [Checkpoint](#treecursor-api)) _before_ entering the callee. On backtrack, that checkpoint advances the cursor to the next candidate (honoring the skip invariant and any field constraint) and re-enters the callee, looping until the siblings are exhausted. `Exact`/`Stay` calls have a single fixed candidate and push no retry checkpoint.
+
+This is the same forward-search-with-backtracking that in-pattern anchors and quantifiers use; the resume state lives on the checkpoint so there is exactly one notion of "advance to the next sibling and try again," shared by `Call` retry and pattern search alike.
+
+### Zero-width returns
+
+A captured ref binds the node its callee matched. If the callee returns without matching anything — e.g. a non-greedy optional that took its skip path — there is no such node. `matched_node` is cleared on callee entry and only a successful `Match` sets it, so a zero-width return leaves it cleared and a `Node`/`Text` capture over it fails the path rather than fabricating the call-site node. A required capture therefore yields no match instead of a stale ancestor.

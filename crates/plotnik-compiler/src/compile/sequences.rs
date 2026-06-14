@@ -16,8 +16,8 @@ use plotnik_bytecode::{EffectOpcode, Nav};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{
-    AnonymousClassifier, compute_nav_modes, expr_owns_sibling_search, is_down_nav,
-    is_skippable_quantifier, repeat_nav_for,
+    AnonymousClassifier, compute_nav_modes, expr_owns_iteration, is_down_nav,
+    is_skippable_quantifier,
 };
 
 /// Extract the navigation if it's a resumable sibling search (`SkipPolicy::Any`).
@@ -183,18 +183,19 @@ impl Compiler<'_> {
             // An anchored follower checks adjacency at its exact position, so this
             // item must own a resumable search: the in-instruction candidate search
             // commits to its first match without a checkpoint and could never retry
-            // at a later sibling when the anchored follower fails.
+            // at a later sibling when the anchored follower fails. Wrap it in a
+            // position search unless it already owns its iteration (a quantifier).
             let followed_by_anchor = matches!(
                 following_nav,
                 Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
             );
             let search_nav = resumable_search_nav(nav_override)
-                .filter(|_| followed_by_anchor && !expr_owns_sibling_search(expr));
+                .filter(|_| followed_by_anchor && !expr_owns_iteration(expr));
 
             current_exit = if let Some(nav) = search_nav {
                 let body =
                     self.compile_expr_inner(expr, current_exit, Some(Nav::StayExact), item_capture);
-                self.compile_search_retry_wrapper(nav, body)
+                self.emit_position_search(nav, body)
             } else {
                 self.compile_expr_inner(expr, current_exit, nav_override, item_capture)
             };
@@ -404,29 +405,9 @@ impl Compiler<'_> {
         };
 
         if let Some(nav) = search_nav {
-            return self.compile_search_retry_wrapper(nav, alt_entry);
+            return self.emit_position_search(nav, alt_entry);
         }
 
         alt_entry
-    }
-
-    /// Compile a resumable sibling search around a body that matches exactly at
-    /// the current position: navigate to a candidate, try the body there, then
-    /// advance and retry if the body or its continuation fails.
-    ///
-    /// Used for alternations (whose branches use exact navs) and for items that
-    /// precede an interior anchor (whose follower can't search on its own).
-    fn compile_search_retry_wrapper(&mut self, nav: Nav, body: Label) -> Label {
-        let try_label = self.fresh_label();
-
-        let retry_nav = self.fresh_label();
-        let next_nav = repeat_nav_for(Some(nav)).expect("search navs have repeat navs");
-        self.emit_wildcard_nav(retry_nav, next_nav, try_label);
-
-        self.emit_branch_epsilon_at(try_label, body, retry_nav, true);
-
-        let navigate = self.fresh_label();
-        self.emit_wildcard_nav(navigate, nav, try_label);
-        navigate
     }
 }

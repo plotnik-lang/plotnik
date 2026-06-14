@@ -448,4 +448,41 @@ impl Compiler<'_> {
         };
         self.emit_epsilon(label, successors);
     }
+
+    /// Emit a resumable sibling search around a `body` that matches exactly at
+    /// the current position. This is the single primitive for every kind of
+    /// position search: navigate to a candidate, try the body there, and on
+    /// failure advance to the next sibling and retry.
+    ///
+    /// ```text
+    ///   navigate: Match(nav, wildcard) → try
+    ///   try:      epsilon → [body, retry]
+    ///   retry:    Match(Next, wildcard) → try
+    /// ```
+    ///
+    /// When the body fails (even deep inside, on a descendant), the VM
+    /// backtracks to `try`, which falls through to `retry`, advances to the
+    /// next sibling, and retries. When siblings are exhausted, backtracking
+    /// propagates past `try` to the caller's checkpoint.
+    ///
+    /// The body is always preferred over advancing: the iteration has no exit
+    /// edge of its own, so a following pattern can never bind at a
+    /// failed-candidate cursor position (see #414). Greediness and zero-match
+    /// escape, where applicable, live on the caller's loop-boundary epsilons,
+    /// not here.
+    ///
+    /// Returns the `navigate` label (the entry point for the search).
+    pub(super) fn emit_position_search(&mut self, nav: Nav, body: Label) -> Label {
+        let try_label = self.fresh_label();
+
+        let retry = self.fresh_label();
+        self.emit_wildcard_nav(retry, Nav::Next, try_label);
+
+        self.emit_branch_epsilon_at(try_label, body, retry, true);
+
+        let navigate = self.fresh_label();
+        self.emit_wildcard_nav(navigate, nav, try_label);
+
+        navigate
+    }
 }

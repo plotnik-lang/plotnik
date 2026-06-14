@@ -210,7 +210,8 @@ impl TypeTableBuilder {
                         .push(TypeMember::new(field_name, field_type));
                 }
 
-                let member_count = fields.len() as u8;
+                let member_count = u8::try_from(fields.len())
+                    .map_err(|_| EmitError::TooManyFields(fields.len()))?;
                 self.type_defs[slot_index] = TypeDef::struct_type(member_start, member_count);
                 Ok(())
             }
@@ -231,7 +232,8 @@ impl TypeTableBuilder {
                         .push(TypeMember::new(variant_name, variant_type));
                 }
 
-                let member_count = variants.len() as u8;
+                let member_count = u8::try_from(variants.len())
+                    .map_err(|_| EmitError::TooManyVariants(variants.len()))?;
                 self.type_defs[slot_index] = TypeDef::enum_type(member_start, member_count);
                 Ok(())
             }

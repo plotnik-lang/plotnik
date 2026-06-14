@@ -8,83 +8,17 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeId;
+use crate::emit::EmitError;
 use plotnik_bytecode::{
-    Call, EffectOp, EffectOpcode, Nav, Opcode, PredicateOp, Return, StepAddr, StepId, Trampoline,
-    select_match_opcode,
+    Call, EffectOp, EffectOpcode, MatchInstr, MatchPredicate, Nav, PredicateOp, Return, StepAddr,
+    StepId, Trampoline, select_match_opcode,
 };
 
 /// Node type constraint for Match instructions.
 ///
-/// Distinguishes between named nodes (`(identifier)`), anonymous nodes (`"text"`),
-/// and wildcards (`_`, `(_)`). Encoded in bytecode header byte bits 5-4.
-///
-/// | `node_kind` | Value | Meaning      | `node_type=0`       | `node_type>0`                     |
-/// | ----------- | ----- | ------------ | ------------------- | --------------------------------- |
-/// | `00`        | Any   | `_` pattern  | No check            | (invalid)                         |
-/// | `01`        | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `is_named()` + `kind_id()`  |
-/// | `10`        | Anon  | `"text"`     | Check `!is_named()` | Check `!is_named()` + `kind_id()` |
-/// | `11`        | -     | Reserved     | Error               | Error                             |
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub enum NodeTypeIR {
-    /// Any node (`_` pattern) - no type check performed.
-    #[default]
-    Any,
-    /// Named node constraint (`(_)` or `(identifier)`).
-    /// - `None` = any named node (check `is_named()`)
-    /// - `Some(id)` = specific named type (check `is_named()` and `kind_id()`)
-    Named(Option<NonZeroU16>),
-    /// Anonymous node constraint (`"text"` literals).
-    /// - `None` = any anonymous node (check `!is_named()`)
-    /// - `Some(id)` = specific anonymous type (check `!is_named()` and `kind_id()`)
-    Anonymous(Option<NonZeroU16>),
-}
-
-impl NodeTypeIR {
-    /// Encode to bytecode: returns (node_kind bits, node_type value).
-    ///
-    /// `node_kind` is 2 bits for header byte bits 5-4.
-    /// `node_type` is u16 for bytes 2-3.
-    pub fn to_bytes(self) -> (u8, u16) {
-        match self {
-            Self::Any => (0b00, 0),
-            Self::Named(opt) => (0b01, opt.map(|n| n.get()).unwrap_or(0)),
-            Self::Anonymous(opt) => (0b10, opt.map(|n| n.get()).unwrap_or(0)),
-        }
-    }
-
-    /// Decode from bytecode: node_kind bits (2 bits) and node_type value (u16).
-    pub fn from_bytes(node_kind: u8, node_type: u16) -> Self {
-        match node_kind {
-            0b00 => Self::Any,
-            0b01 => Self::Named(NonZeroU16::new(node_type)),
-            0b10 => Self::Anonymous(NonZeroU16::new(node_type)),
-            _ => panic!("invalid node_kind: {node_kind}"),
-        }
-    }
-
-    /// Check if this represents a specific type ID (not a wildcard).
-    pub fn type_id(&self) -> Option<NonZeroU16> {
-        match self {
-            Self::Any => None,
-            Self::Named(opt) | Self::Anonymous(opt) => *opt,
-        }
-    }
-
-    /// Check if this is the Any wildcard.
-    pub fn is_any(&self) -> bool {
-        matches!(self, Self::Any)
-    }
-
-    /// Check if this is a Named constraint (wildcard or specific).
-    pub fn is_named(&self) -> bool {
-        matches!(self, Self::Named(_))
-    }
-
-    /// Check if this is an Anonymous constraint (wildcard or specific).
-    pub fn is_anonymous(&self) -> bool {
-        matches!(self, Self::Anonymous(_))
-    }
-}
+/// The bytecode crate owns this type; re-exported here so existing
+/// `crate::bytecode::NodeTypeIR` references resolve unchanged.
+pub use plotnik_bytecode::NodeTypeIR;
 
 /// Symbolic reference, resolved to step address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -381,7 +315,7 @@ impl InstructionIR {
         lookup_member: F,
         get_member_base: G,
         lookup_regex: R,
-    ) -> Vec<u8>
+    ) -> Result<Vec<u8>, EmitError>
     where
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
@@ -389,9 +323,9 @@ impl InstructionIR {
     {
         match self {
             Self::Match(m) => m.resolve(map, lookup_member, get_member_base, lookup_regex),
-            Self::Call(c) => c.resolve(map).to_vec(),
-            Self::Return(r) => r.resolve().to_vec(),
-            Self::Trampoline(t) => t.resolve(map).to_vec(),
+            Self::Call(c) => Ok(c.resolve(map).to_vec()),
+            Self::Return(r) => Ok(r.resolve().to_vec()),
+            Self::Trampoline(t) => Ok(t.resolve(map).to_vec()),
         }
     }
 }
@@ -542,7 +476,11 @@ impl MatchIR {
         select_match_opcode(slots).map(|op| op.size()).unwrap_or(64)
     }
 
-    /// Resolve labels and serialize to bytecode bytes.
+    /// Resolve symbolic references and encode to bytecode bytes.
+    ///
+    /// Builds the owned [`MatchInstr`] the bytecode crate knows how to encode,
+    /// so encode and decode live together and capacity overflows surface as
+    /// [`EmitError`] instead of panicking.
     ///
     /// - `lookup_member`: maps (field_name Symbol, field_type TypeId) to member index
     /// - `get_member_base`: maps parent TypeId to member base index
@@ -553,120 +491,53 @@ impl MatchIR {
         lookup_member: F,
         get_member_base: G,
         lookup_regex: R,
-    ) -> Vec<u8>
+    ) -> Result<Vec<u8>, EmitError>
     where
         F: Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         G: Fn(TypeId) -> Option<u16>,
         R: Fn(plotnik_bytecode::StringId) -> Option<u16>,
     {
-        let can_use_match8 = self.pre_effects.is_empty()
-            && self.neg_fields.is_empty()
-            && self.post_effects.is_empty()
-            && self.predicate.is_none()
-            && self.successors.len() <= 1;
+        let pre_effects = self
+            .pre_effects
+            .iter()
+            .map(|e| e.resolve(&lookup_member, &get_member_base))
+            .collect();
+        let post_effects = self
+            .post_effects
+            .iter()
+            .map(|e| e.resolve(&lookup_member, &get_member_base))
+            .collect();
+        let predicate = self.predicate.as_ref().map(|pred| {
+            let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
+            let value_ref = match &pred.value {
+                PredicateValueIR::String(string_id) => string_id.get(),
+                PredicateValueIR::Regex(string_id) => {
+                    lookup_regex(*string_id).expect("regex predicate must be interned")
+                }
+            };
+            MatchPredicate {
+                op: pred.op_byte(),
+                is_regex,
+                value_ref,
+            }
+        });
+        let successors = self
+            .successors
+            .iter()
+            .map(|&l| StepId::new(l.resolve(map)))
+            .collect();
 
-        let opcode = if can_use_match8 {
-            Opcode::Match8
-        } else {
-            let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
-            let slots_needed = self.pre_effects.len()
-                + self.neg_fields.len()
-                + self.post_effects.len()
-                + predicate_slots
-                + self.successors.len();
-            select_match_opcode(slots_needed).expect("instruction too large")
+        let instr = MatchInstr {
+            nav: self.nav,
+            node_type: self.node_type,
+            node_field: self.node_field,
+            pre_effects,
+            neg_fields: self.neg_fields.clone(),
+            post_effects,
+            predicate,
+            successors,
         };
-
-        let size = opcode.size();
-        let mut bytes = vec![0u8; size];
-
-        // Header byte layout: segment(2) | node_kind(2) | opcode(4)
-        let (node_kind, node_type_val) = self.node_type.to_bytes();
-        bytes[0] = (node_kind << 4) | (opcode as u8); // segment 0
-        bytes[1] = self.nav.to_byte();
-        bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
-        let node_field_val = self.node_field.map(|n| n.get()).unwrap_or(0);
-        bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
-
-        if opcode == Opcode::Match8 {
-            let next = self
-                .successors
-                .first()
-                .map(|&l| l.resolve(map))
-                .unwrap_or(0);
-            bytes[6..8].copy_from_slice(&next.to_le_bytes());
-        } else {
-            let pre_count = self.pre_effects.len();
-            let neg_count = self.neg_fields.len();
-            let post_count = self.post_effects.len();
-            let succ_count = self.successors.len();
-            let has_predicate = self.predicate.is_some();
-
-            // Validate bit-packed field limits
-            // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
-            assert!(
-                pre_count <= 7,
-                "pre_effects overflow: {pre_count} > 7 (lowering should have cascaded)"
-            );
-            assert!(
-                neg_count <= 7,
-                "neg_fields overflow: {neg_count} > 7 (lowering should have cascaded)"
-            );
-            assert!(
-                post_count <= 7,
-                "post_effects overflow: {post_count} > 7 (lowering should have cascaded)"
-            );
-            assert!(
-                succ_count <= 31,
-                "successors overflow: {succ_count} > 31 (lowering should have cascaded)"
-            );
-
-            let counts = ((pre_count as u16) << 13)
-                | ((neg_count as u16) << 10)
-                | ((post_count as u16) << 7)
-                | ((succ_count as u16) << 2)
-                | ((has_predicate as u16) << 1);
-            bytes[6..8].copy_from_slice(&counts.to_le_bytes());
-
-            let mut offset = 8;
-            for effect in &self.pre_effects {
-                let resolved = effect.resolve(&lookup_member, &get_member_base);
-                bytes[offset..offset + 2].copy_from_slice(&resolved.to_bytes());
-                offset += 2;
-            }
-            for &field in &self.neg_fields {
-                bytes[offset..offset + 2].copy_from_slice(&field.to_le_bytes());
-                offset += 2;
-            }
-            for effect in &self.post_effects {
-                let resolved = effect.resolve(&lookup_member, &get_member_base);
-                bytes[offset..offset + 2].copy_from_slice(&resolved.to_bytes());
-                offset += 2;
-            }
-            // Emit predicate: op_byte(u8) + is_regex(u8) | value_ref(u16)
-            if let Some(pred) = &self.predicate {
-                let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
-                let op_and_flags = (pred.op_byte() as u16) | ((is_regex as u16) << 8);
-                bytes[offset..offset + 2].copy_from_slice(&op_and_flags.to_le_bytes());
-                offset += 2;
-
-                let value_ref = match &pred.value {
-                    PredicateValueIR::String(string_id) => string_id.get(),
-                    PredicateValueIR::Regex(string_id) => {
-                        lookup_regex(*string_id).expect("regex predicate must be interned")
-                    }
-                };
-                bytes[offset..offset + 2].copy_from_slice(&value_ref.to_le_bytes());
-                offset += 2;
-            }
-            for &label in &self.successors {
-                let addr = label.resolve(map);
-                bytes[offset..offset + 2].copy_from_slice(&addr.to_le_bytes());
-                offset += 2;
-            }
-        }
-
-        bytes
+        instr.encode().map_err(EmitError::from)
     }
 
     /// Check if this is an epsilon transition (no node interaction).
@@ -799,13 +670,15 @@ impl From<TrampolineIR> for InstructionIR {
 pub struct LayoutResult {
     /// Mapping from symbolic labels to concrete step addresses (raw u16).
     pub(crate) label_to_step: BTreeMap<Label, StepAddr>,
-    /// Total number of steps (for header).
-    pub(crate) total_steps: u16,
+    /// Total number of steps. Held as `u32` so a query whose layout overflows
+    /// the `u16` step-address space is detectable at emit time instead of
+    /// wrapping silently; `emit` rejects it before any address is used.
+    pub(crate) total_steps: u32,
 }
 
 impl LayoutResult {
     /// Create a new layout result.
-    pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u16) -> Self {
+    pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u32) -> Self {
         Self {
             label_to_step,
             total_steps,
@@ -823,7 +696,7 @@ impl LayoutResult {
     pub fn label_to_step(&self) -> &BTreeMap<Label, StepAddr> {
         &self.label_to_step
     }
-    pub fn total_steps(&self) -> u16 {
+    pub fn total_steps(&self) -> u32 {
         self.total_steps
     }
 }

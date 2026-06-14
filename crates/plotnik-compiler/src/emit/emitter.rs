@@ -44,8 +44,9 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     entry_labels.extend(compile_result.def_entries.values().copied());
     let layout = CacheAligned::layout(&compile_result.instructions, &entry_labels);
 
-    // Validate transition count
-    if layout.total_steps as usize > 65535 {
+    // Reject layouts whose step addresses overflow the u16 address space.
+    // `total_steps` is computed in u32 precisely so this guard is reachable.
+    if layout.total_steps > u16::MAX as u32 {
         return Err(EmitError::TooManyTransitions(layout.total_steps as usize));
     }
 
@@ -90,6 +91,12 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     // Validate counts
     strings.validate()?;
     types.validate()?;
+    if node_symbols.len() > u16::MAX as usize {
+        return Err(EmitError::TooManyNodeTypes(node_symbols.len()));
+    }
+    if field_symbols.len() > u16::MAX as usize {
+        return Err(EmitError::TooManyNodeFields(field_symbols.len()));
+    }
     if entrypoints.len() > 65535 {
         return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
     }
@@ -106,7 +113,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         &types,
         &strings,
         &regexes,
-    );
+    )?;
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -148,7 +155,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         type_members_count: types.type_members_count() as u16,
         type_names_count: types.type_names_count() as u16,
         entrypoints_count: entrypoints.len() as u16,
-        transitions_count: layout.total_steps,
+        transitions_count: layout.total_steps as u16,
         str_blob_size: str_blob.len() as u32,
         regex_blob_size: regex_blob.len() as u32,
         total_size,
@@ -176,7 +183,7 @@ fn emit_transitions(
     types: &TypeTableBuilder,
     strings: &StringTableBuilder,
     regexes: &RegexTableBuilder,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, EmitError> {
     // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps as usize * 8];
 
@@ -203,7 +210,7 @@ fn emit_transitions(
             lookup_member,
             get_member_base,
             lookup_regex,
-        );
+        )?;
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();
@@ -212,7 +219,7 @@ fn emit_transitions(
         }
     }
 
-    bytes
+    Ok(bytes)
 }
 
 /// Pre-scan instructions for regex predicates and intern them.

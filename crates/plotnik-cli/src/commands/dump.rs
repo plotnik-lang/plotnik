@@ -45,7 +45,7 @@ pub fn run(args: DumpArgs) -> CliResult {
         );
         return Err(CliError::FatalRendered);
     }
-    let bytecode = linked.emit().expect("bytecode emission failed");
+    let bytecode = linked.emit().map_err(|e| CliError::fatal(e.to_string()))?;
 
     let module = Module::load(&bytecode).expect("module loading failed");
     let colors = Colors::new(args.color);

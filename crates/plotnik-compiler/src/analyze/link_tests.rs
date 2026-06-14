@@ -470,6 +470,73 @@ fn ref_followed_valid_case() {
 }
 
 #[test]
+fn diamond_reference_graph_links() {
+    // Each definition references the next one twice, so the reference graph is
+    // diamond-shaped. Without memoization, structural validation walks it
+    // 2^depth times — intractable by this depth (issue #416); with it, instant.
+    let depth = 30;
+    let mut input = String::new();
+    for i in 0..depth {
+        input.push_str(&format!(
+            "D{i} = (statement_block (D{next}) (D{next}))\n",
+            next = i + 1
+        ));
+    }
+    input.push_str(&format!("D{depth} = (identifier) @x\n"));
+
+    Query::expect_valid_linking(&input);
+}
+
+#[test]
+fn shared_definition_validated_per_context() {
+    // A definition whose body is a bare field is validated against each
+    // referencing parent, so memoization must key on context, not name alone:
+    // `arguments` is valid on `call_expression` but not on `binary_expression`.
+    let input = indoc! {r#"
+        Args = arguments: (identifier)
+        Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+    "#};
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: field `arguments` is not valid on this node type
+      |
+    1 | Args = arguments: (identifier)
+      |        ^^^^^^^^^
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |                                                ----------------- on `binary_expression`
+      |
+    help: valid fields for `binary_expression`: `left`, `operator`, `right`
+
+    error: `identifier` can't be the value of `arguments`
+      |
+    1 | Args = arguments: (identifier)
+      |        ---------   ^^^^^^^^^^
+      |        |
+      |        field `arguments`
+      |
+    help: `arguments` accepts: `arguments`, `template_string`
+
+    error: `call_expression` cannot be a child of this node
+      |
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |      ---------------  ^^^^^^^^^^^^^^^
+      |      |
+      |      on `statement_block`
+      |
+    help: valid children of `statement_block`: `statement`
+
+    error: `binary_expression` cannot be a child of this node
+      |
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |      --------------- on `statement_block`      ^^^^^^^^^^^^^^^^^
+      |
+    help: valid children of `statement_block`: `statement`
+    ");
+}
+
+#[test]
 fn invalid_child_kind_rejected() {
     let input = r"Q = (function_declaration (class_declaration))";
 
@@ -674,4 +741,20 @@ fn sibling_of_alternation_is_still_checked() {
     Query::expect_invalid_linking(
         r"Q = (function_declaration (class_declaration) [(identifier) (number)])",
     );
+}
+
+#[test]
+fn shared_definition_rejected_at_non_deferred_use_after_deferred() {
+    // `Bad` is a bare field, impossible only against a parent lacking it — standalone (ctx = None)
+    // it is not checked, so only its use carries the rejection. `arguments` is absent on
+    // `binary_expression`. `Bad` is reached first inside the alternation (deferred — field check
+    // skipped, result memoized) and then as a direct child (non-deferred). The memo keys on
+    // `deferred`, so the cached deferred result does not mask the rejection at the non-deferred use
+    // — keying on `(name, ctx)` alone would wrongly accept this query.
+    let input = indoc! {r#"
+        Bad = arguments: (identifier)
+        Q = (binary_expression [(Bad) (identifier)] (Bad))
+    "#};
+
+    Query::expect_invalid_linking(input);
 }

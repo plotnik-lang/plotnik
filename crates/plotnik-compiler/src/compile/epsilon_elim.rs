@@ -11,6 +11,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use plotnik_bytecode::EffectOpcode;
+
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
 use crate::compile::error::CompileResult;
 
@@ -97,6 +99,15 @@ fn see_through(
     }
 }
 
+/// Whether any effect reads the VM's `matched_node` (`Node`/`Text`). Such
+/// effects are position-sensitive: their meaning depends on which node was
+/// most recently matched, so they cannot be reordered across a navigation.
+fn reads_matched_node(effects: &[EffectIR]) -> bool {
+    effects
+        .iter()
+        .any(|e| matches!(e.opcode, EffectOpcode::Node | EffectOpcode::Text))
+}
+
 /// Phase A: Forward migration.
 ///
 /// Effectful epsilons with exclusive edge to a non-epsilon successor
@@ -129,6 +140,14 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         };
         if succ.is_epsilon() {
+            continue;
+        }
+
+        // Effects that read `matched_node` (Node/Text) must not migrate forward:
+        // the non-epsilon successor's navigation clears `matched_node` before the
+        // migrated effects would run, so they'd capture the successor's node
+        // instead of the inbound one (#383). Keep such epsilons in place.
+        if reads_matched_node(&eps.pre_effects) || reads_matched_node(&eps.post_effects) {
             continue;
         }
 
@@ -228,6 +247,12 @@ fn laser_vision(result: &mut CompileResult) -> bool {
                 continue;
             }
 
+            // No `reads_matched_node` guard is needed here (unlike forward_migrate):
+            // `m` is non-epsilon so it sets `matched_node`, and the seen-through
+            // chain is all epsilons (which preserve it), so absorbing into `post`
+            // still reads `m`'s node — the node these effects saw at their original
+            // position. forward_migrate is unsafe only because it pushes effects
+            // *past* a navigation that clears `matched_node`.
             succs[j] = target;
             post.extend(effects);
             modified = true;

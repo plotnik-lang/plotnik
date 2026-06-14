@@ -4,7 +4,25 @@
 //! a checkpoint for each alternative. On failure, it restores the
 //! most recent checkpoint and continues.
 
+use std::num::NonZeroU16;
+
 use super::cursor::SkipPolicy;
+
+/// Everything needed to re-enter a callee at the next sibling after a Call's
+/// callee fails. Carrying this on the checkpoint (rather than in ambient VM
+/// state) keeps the resume fully self-contained: `backtrack` advances the
+/// cursor and re-enters the callee without re-running the Call's navigation.
+#[derive(Clone, Copy, Debug)]
+pub struct CallResume {
+    /// Callee entry (raw step index).
+    pub(crate) target: u16,
+    /// Return address after the callee (raw step index).
+    pub(crate) next: u16,
+    /// Field constraint the next candidate must satisfy, if any.
+    pub(crate) field: Option<NonZeroU16>,
+    /// How to advance to the next candidate.
+    pub(crate) policy: SkipPolicy,
+}
 
 /// Checkpoint for backtracking.
 #[derive(Clone, Copy, Debug)]
@@ -17,26 +35,24 @@ pub struct Checkpoint {
     pub(crate) frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
     pub(crate) recursion_depth: u32,
-    /// Resume point (raw step index).
+    /// Resume point for a plain (branch) checkpoint (raw step index).
     pub(crate) ip: u16,
-    /// If set, advance cursor before retrying (for Call instruction retry).
-    /// When a Call navigates and the callee fails, we need to try the next
-    /// sibling. This policy determines how to advance.
-    pub(crate) skip_policy: Option<SkipPolicy>,
+    /// If set, this is a Call retry: advance the cursor and re-enter the
+    /// callee instead of resuming at `ip`.
+    pub(crate) call_resume: Option<CallResume>,
     /// Suppression depth at checkpoint.
     pub(crate) suppress_depth: u16,
 }
 
 #[allow(dead_code)] // Getters useful for debugging/tracing
 impl Checkpoint {
-    /// Create a new checkpoint.
-    pub fn new(
+    /// Create a plain (branch alternative) checkpoint that resumes at `ip`.
+    pub fn branch(
         descendant_index: u32,
         effect_watermark: usize,
         frame_index: Option<u32>,
         recursion_depth: u32,
         ip: u16,
-        skip_policy: Option<SkipPolicy>,
         suppress_depth: u16,
     ) -> Self {
         Self {
@@ -45,7 +61,30 @@ impl Checkpoint {
             frame_index,
             recursion_depth,
             ip,
-            skip_policy,
+            call_resume: None,
+            suppress_depth,
+        }
+    }
+
+    /// Create a Call retry checkpoint that advances and re-enters the callee.
+    /// `call_ip` is the Call's own address, retained only for trace rendering;
+    /// re-entry is driven entirely by `call_resume`.
+    pub fn call_retry(
+        descendant_index: u32,
+        effect_watermark: usize,
+        frame_index: Option<u32>,
+        recursion_depth: u32,
+        call_ip: u16,
+        suppress_depth: u16,
+        call_resume: CallResume,
+    ) -> Self {
+        Self {
+            descendant_index,
+            effect_watermark,
+            frame_index,
+            recursion_depth,
+            ip: call_ip,
+            call_resume: Some(call_resume),
             suppress_depth,
         }
     }
@@ -64,9 +103,6 @@ impl Checkpoint {
     }
     pub fn ip(&self) -> u16 {
         self.ip
-    }
-    pub fn skip_policy(&self) -> Option<SkipPolicy> {
-        self.skip_policy
     }
     pub fn suppress_depth(&self) -> u16 {
         self.suppress_depth
