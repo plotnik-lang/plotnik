@@ -168,12 +168,14 @@ impl TypeTableBuilder {
                 let name = strings.get_or_intern(*sym, interner)?;
                 self.type_names.push(TypeName::new(name, bc_type_id));
 
-                // Custom types alias Node - look up Node's actual bytecode ID
-                let node_bc_id = self
-                    .mapping
-                    .get(&TYPE_NODE)
-                    .copied()
-                    .unwrap_or(BytecodeTypeId(0));
+                // Custom types alias Node - look up Node's actual bytecode ID.
+                // Reaching a Custom type means it was in `ordered_types`, so
+                // `collect_builtin_refs` marked Node used (type_table.rs: `Custom(_) =>
+                // used[1] = true`) and Phase 1 emitted it into `mapping`.
+                let node_bc_id =
+                    self.mapping.get(&TYPE_NODE).copied().expect(
+                        "Node must be mapped before a Custom alias that targets it is emitted",
+                    );
                 self.type_defs[slot_index] = TypeDef::alias(node_bc_id);
                 Ok(())
             }

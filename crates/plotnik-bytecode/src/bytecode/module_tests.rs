@@ -11,7 +11,7 @@ use super::{AlignedVec, STEP_SIZE};
 /// other `validate_*` passes accept: the empty string/regex tables collapse to a
 /// single zero sentinel that already lives in the zero-filled body. The checksum
 /// is recomputed the same way `Module::validate` checks it (CRC32 over the
-/// post-header bytes), so the only thing under test is `validate_opcodes`.
+/// post-header bytes), so the only thing under test is `validate_transitions`.
 fn module_with_transitions(transitions: &[u8], transitions_count: u16) -> Vec<u8> {
     let mut header = Header {
         transitions_count,

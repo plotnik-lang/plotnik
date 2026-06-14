@@ -103,9 +103,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             match &child_info.flow {
                 TypeFlow::Bubble(type_id) => {
-                    if let Some(fields) = self.ctx.type_ctx.get_struct_fields(*type_id).cloned() {
-                        self.merge_fields(&mut merged_fields, &fields, child.text_range());
-                    }
+                    let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
+                    self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
                 TypeFlow::Scalar(type_id) => {
                     if self.produces_output(*type_id) {
@@ -194,9 +193,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             match &child_info.flow {
                 TypeFlow::Bubble(type_id) => {
-                    if let Some(fields) = self.ctx.type_ctx.get_struct_fields(*type_id).cloned() {
-                        self.merge_fields(&mut merged_fields, &fields, child.text_range());
-                    }
+                    let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
+                    self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
                 TypeFlow::Scalar(type_id) => {
                     if self.produces_output(*type_id) {
@@ -397,12 +395,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let TypeFlow::Bubble(type_id) = &inner_info.flow else {
                 unreachable!()
             };
-            let mut fields = self
-                .ctx
-                .type_ctx
-                .get_struct_fields(*type_id)
-                .cloned()
-                .unwrap_or_default();
+            let mut fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
             fields.insert(capture_name, field_info);
 
             TermInfo::new(
@@ -612,12 +605,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 TypeFlow::Scalar(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
             }
             TypeFlow::Bubble(type_id) => {
-                let fields = self
-                    .ctx
-                    .type_ctx
-                    .get_struct_fields(type_id)
-                    .cloned()
-                    .unwrap_or_default();
+                let fields = self.ctx.type_ctx.expect_struct_fields(type_id).clone();
                 let optional_fields = fields
                     .into_iter()
                     .map(|(k, v)| (k, v.make_optional()))
@@ -744,11 +732,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             return;
         };
 
-        let fields = self
-            .ctx
-            .type_ctx
-            .get_struct_fields(*type_id)
-            .expect("Bubble flow must point to a Struct type");
+        let fields = self.ctx.type_ctx.expect_struct_fields(*type_id);
         if fields.is_empty() {
             return;
         }

@@ -45,11 +45,18 @@ impl NodeTypeIR {
 
     /// Decode from bytecode: node_kind bits (2 bits) and node_type value (u16).
     pub fn from_bytes(node_kind: u8, node_type: u16) -> Self {
+        Self::try_from_bytes(node_kind, node_type)
+            .unwrap_or_else(|| panic!("invalid node_kind: {node_kind}"))
+    }
+
+    /// Non-panicking decode, for validating an untrusted instruction stream at
+    /// load time. `node_kind` `0b11` is reserved and has no valid decoding.
+    pub fn try_from_bytes(node_kind: u8, node_type: u16) -> Option<Self> {
         match node_kind {
-            0b00 => Self::Any,
-            0b01 => Self::Named(NonZeroU16::new(node_type)),
-            0b10 => Self::Anonymous(NonZeroU16::new(node_type)),
-            _ => panic!("invalid node_kind: {node_kind}"),
+            0b00 => Some(Self::Any),
+            0b01 => Some(Self::Named(NonZeroU16::new(node_type))),
+            0b10 => Some(Self::Anonymous(NonZeroU16::new(node_type))),
+            _ => None,
         }
     }
 

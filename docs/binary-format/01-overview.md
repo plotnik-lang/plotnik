@@ -97,7 +97,11 @@ struct Header {
 ## Loading & validation
 
 `Module::load` rejects malformed input instead of failing open. A loaded module
-is guaranteed not to panic on later view/decode access. Validation, in order:
+is guaranteed not to panic on later view/decode access — for _any_ input that
+passes these checks, including a deliberately forged module whose CRC was
+recomputed over crafted bytes. The CRC is not a MAC, so the structural checks
+(steps 5–11), not the checksum, are what uphold the no-panic guarantee.
+Validation, in order:
 
 1. **Magic / version / size** — `PTKQ`, version 5, and `total_size` equal to the
    byte length.
@@ -107,10 +111,30 @@ is guaranteed not to panic on later view/decode access. Validation, in order:
    Transitions section (and therefore every earlier section) must fit within
    `total_size`.
 4. **Checksum** — CRC32 of everything after the 64-byte header must equal
-   `checksum`. This catches any corruption of the body.
+   `checksum`. This catches accidental corruption of the body.
 5. **Table sentinels** — String and Regex offset tables must be non-decreasing and
    end exactly at their blob length; string slices must be valid UTF-8.
-6. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
+6. **Regex DFAs** — every real regex entry's serialized sparse DFA must
+   deserialize, so the VM's per-evaluation deserialize is a sound invariant.
+7. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
    (`data + count`) must stay within `type_members_count`.
-7. **Entrypoints** — each `target` must address a real step and `result_type` a
-   real TypeDef.
+8. **String IDs** — every _required_ embedded `StringId` (entrypoint, node/field
+   symbol, type, member, and regex pattern names) must address a real string-table
+   entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
+9. **Transitions** — the instruction stream is walked twice. Pass 1 decodes each
+   instruction's fixed-size slot, validating opcode, segment, nav, node kind,
+   effect opcodes, `Set`/`Enum` member operands, and predicate operands, and
+   rejecting any zero successor; it records each instruction start and must tile
+   the section exactly. Pass 2 requires every jump target (successor, call
+   next/target, trampoline next) to land on a recorded instruction start. This
+   makes every lazy `decode_step` / view / materializer access panic-free.
+10. **Entrypoints** — each `target` must land on a recorded instruction start
+    (not merely in range — an entrypoint into the interior of a multi-step
+    instruction would start decoding mid-instruction) and `result_type` must
+    address a real TypeDef.
+11. **Effect stack** — an interprocedural walk of the committed-effect order
+    (across `Call`/`Return`/`Trampoline`, under the suppression filter) proves no
+    path can drive the materializer's builder stack (`Push`/`Set`/`EndArr`/
+    `EndObj`/`EndEnum`) or the VM's suppression counter into a panic. This closes
+    the last forged-module panic class — the materializer's builder-stack panics
+    and the VM's `SuppressEnd` underflow — that decode-level checks cannot see.

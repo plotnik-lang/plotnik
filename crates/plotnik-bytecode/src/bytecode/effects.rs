@@ -21,7 +21,13 @@ pub enum EffectOpcode {
 
 impl EffectOpcode {
     fn from_u8(v: u8) -> Self {
-        match v {
+        Self::try_from_u8(v).unwrap_or_else(|| panic!("invalid effect opcode: {v}"))
+    }
+
+    /// Non-panicking decode, for validating an untrusted instruction stream at
+    /// load time before the VM decodes its effect payload.
+    pub(crate) fn try_from_u8(v: u8) -> Option<Self> {
+        let op = match v {
             0 => Self::Node,
             1 => Self::Arr,
             2 => Self::Push,
@@ -36,8 +42,9 @@ impl EffectOpcode {
             11 => Self::Null,
             12 => Self::SuppressBegin,
             13 => Self::SuppressEnd,
-            _ => panic!("invalid effect opcode: {v}"),
-        }
+            _ => return None,
+        };
+        Some(op)
     }
 }
 
@@ -58,6 +65,15 @@ impl EffectOp {
         let opcode = EffectOpcode::from_u8((raw >> 10) as u8);
         let payload = (raw & 0x3FF) as usize;
         Self { opcode, payload }
+    }
+
+    /// Non-panicking decode, for validating an untrusted instruction stream at
+    /// load time. Returns `None` when the opcode field is not a known effect.
+    pub(crate) fn try_from_bytes(bytes: [u8; 2]) -> Option<Self> {
+        let raw = u16::from_le_bytes(bytes);
+        let opcode = EffectOpcode::try_from_u8((raw >> 10) as u8)?;
+        let payload = (raw & 0x3FF) as usize;
+        Some(Self { opcode, payload })
     }
 
     pub fn to_bytes(self) -> [u8; 2] {

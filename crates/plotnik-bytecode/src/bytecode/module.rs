@@ -8,9 +8,12 @@ use std::ops::Deref;
 use std::path::Path;
 
 use super::aligned_vec::AlignedVec;
+use super::effects::{EffectOp, EffectOpcode};
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
+use super::nav::Nav;
+use super::node_type_ir::NodeTypeIR;
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
@@ -159,12 +162,22 @@ pub enum ModuleError {
     MalformedStringTable,
     #[error("malformed regex table")]
     MalformedRegexTable,
+    #[error("invalid regex DFA at index {0}")]
+    InvalidRegexDfa(usize),
     #[error("invalid type definition at index {0}")]
     InvalidTypeDef(usize),
     #[error("invalid entrypoint at index {0}")]
     InvalidEntrypoint(usize),
     #[error("invalid opcode {opcode:#x} at step {step}")]
     InvalidOpcode { step: u16, opcode: u8 },
+    #[error("string id out of range at index {0}")]
+    InvalidStringId(usize),
+    #[error("predicate operand out of range at step {0}")]
+    InvalidPredicateOperand(usize),
+    #[error("malformed transitions section")]
+    MalformedTransitions,
+    #[error("effect stack imbalance at step {0}")]
+    EffectStackImbalance(u16),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -278,10 +291,14 @@ impl Module {
     /// entrypoint targets address real steps.
     ///
     /// The CRC32 detects *accidental* corruption of the body — the format's
-    /// threat model (truncation, bit-rot). It is not a MAC, so it does not by
-    /// itself reject a deliberately forged module whose checksum was recomputed
-    /// over crafted instruction bytes; instruction operands are decoded lazily
-    /// and are not structurally re-verified here.
+    /// threat model (truncation, bit-rot). It is not a MAC, so a deliberately
+    /// forged module can recompute a matching checksum over crafted bytes;
+    /// [`Self::validate_transitions`] therefore re-verifies the lazily-decoded
+    /// instruction stream structurally, and
+    /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
+    /// proves no path can panic the materializer's builder stack or the VM's
+    /// suppression counter — so a loaded module never panics on view/decode/VM
+    /// access regardless of how it was crafted.
     fn validate(&self) -> Result<(), ModuleError> {
         // Reserved header bytes are not covered by the CRC; v5 fixes them at zero.
         if self.header._reserved != [0u8; 22] {
@@ -298,33 +315,19 @@ impl Module {
 
         self.validate_string_table()?;
         self.validate_regex_table()?;
+        self.validate_regex_dfas()?;
         self.validate_type_defs()?;
-        self.validate_entrypoints()?;
-        self.validate_opcodes()?;
-        Ok(())
-    }
-
-    /// Every instruction in the Transitions section must carry a known opcode so
-    /// the lazy [`decode_step`](Self::decode_step) path cannot hit an unknown
-    /// nibble and panic on untrusted bytecode. Walks the section by instruction
-    /// size, which `validate_section_bounds` already proved fits the file.
-    fn validate_opcodes(&self) -> Result<(), ModuleError> {
-        let count = self.header.transitions_count as u32;
-        let base = self.offsets.transitions as usize;
-        // Walk in u32 so a large trailing opcode near the count boundary cannot
-        // overflow the cursor (a crafted header would otherwise debug-panic).
-        let mut step = 0u32;
-        while step < count {
-            let byte = self.storage[base + step as usize * STEP_SIZE];
-            let nibble = byte & 0xF;
-            let Some(opcode) = Opcode::from_u8(nibble) else {
-                return Err(ModuleError::InvalidOpcode {
-                    step: step as u16,
-                    opcode: nibble,
-                });
-            };
-            step += opcode.step_count() as u32;
-        }
+        // Bound every embedded `StringId` before any later check constructs a
+        // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
+        // `Entrypoint`, which would otherwise panic on a forged zero name.
+        self.validate_string_ids()?;
+        let is_start = self.validate_transitions()?;
+        self.validate_entrypoints(&is_start)?;
+        // Structural validity (every step decodes, every jump lands on a start)
+        // is now established, so the effect-stack walk can use the safe typed
+        // instruction API. This closes the last forged-module panic class: the
+        // materializer's builder-stack panics and the VM's suppression underflow.
+        super::effect_stack::validate_effect_stack(self)?;
         Ok(())
     }
 
@@ -409,6 +412,24 @@ impl Module {
         Ok(())
     }
 
+    /// Every regex entry's serialized sparse DFA must deserialize, so the VM's
+    /// per-evaluation [`deserialize_dfa`](crate::deserialize_dfa) (which the hot
+    /// predicate path `.expect()`s) and the `!is_empty()` assertion are sound
+    /// invariants, not reachable panics on a forged blob. Index 0 is the reserved
+    /// sentinel — never evaluated — so the scan starts at 1. The offset table is
+    /// already bounded by [`Self::validate_regex_table`], so `get_by_index` here
+    /// cannot slice out of range.
+    fn validate_regex_dfas(&self) -> Result<(), ModuleError> {
+        let regexes = self.regexes();
+        for i in 1..self.header.regex_table_count as usize {
+            let bytes = regexes.get_by_index(i);
+            if bytes.is_empty() || crate::deserialize_dfa(bytes).is_err() {
+                return Err(ModuleError::InvalidRegexDfa(i));
+            }
+        }
+        Ok(())
+    }
+
     /// Every TypeDef must have a known kind, and Struct/Enum member ranges must
     /// stay inside the TypeMembers section (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
@@ -431,15 +452,338 @@ impl Module {
 
     /// Entrypoint targets must address a real step so the VM's first
     /// [`decode_step`](Self::decode_step) cannot read out of bounds.
-    fn validate_entrypoints(&self) -> Result<(), ModuleError> {
+    /// `is_start` is the instruction-start bitmap from
+    /// [`Self::validate_transitions`]: a `target` that lands inside a multi-step
+    /// instruction would make the VM start decoding mid-instruction, so it must
+    /// be an instruction start, not merely in range.
+    fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
         let entrypoints = self.entrypoints();
         let steps = self.header.transitions_count;
         let type_defs = self.header.type_defs_count;
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
-            if ep.target() >= steps || ep.result_type().0 >= type_defs {
+            let target = ep.target();
+            if target >= steps || !is_start[target as usize] || ep.result_type().0 >= type_defs {
                 return Err(ModuleError::InvalidEntrypoint(i));
             }
+        }
+        Ok(())
+    }
+
+    /// Every *required* `StringId` held in a section — entrypoint names,
+    /// node/field symbol names, type names, type member names, and regex pattern
+    /// names — must address a real string-table entry, so the view accessors that
+    /// resolve them (and `find_by_name`, the materializer's struct-field keys,
+    /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
+    /// offsets, so the valid id range is `0..str_table_count`. This upholds the
+    /// format's guarantee that a loaded module never panics on view access
+    /// (`docs/binary-format/01-overview.md`).
+    fn validate_string_ids(&self) -> Result<(), ModuleError> {
+        let storage: &[u8] = &self.storage;
+        let n = self.header.str_table_count;
+
+        // Read the raw `u16` rather than the typed accessor: a required `StringId`
+        // is a `NonZeroU16`, so `StringId::new(0)` on a forged zero would panic
+        // here in the validator itself, defeating the purpose. A valid required id
+        // is a real, non-easter-egg entry: `1..str_table_count`. Section bounds are
+        // already proven by `validate_section_bounds`, so the reads stay in range.
+        let check = |base: u32, stride: usize, name_off: usize, start: usize, count: usize| {
+            let base = base as usize;
+            for i in start..count {
+                let raw = read_u16_le(storage, base + i * stride + name_off);
+                if raw == 0 || raw >= n {
+                    return Err(ModuleError::InvalidStringId(i));
+                }
+            }
+            Ok(())
+        };
+
+        // entrypoint name: u16 at entry+0 (8-byte entries)
+        check(
+            self.offsets.entrypoints,
+            8,
+            0,
+            0,
+            self.header.entrypoints_count as usize,
+        )?;
+        // node/field symbol name: u16 at entry+2 (4-byte entries)
+        check(
+            self.offsets.node_types,
+            4,
+            2,
+            0,
+            self.header.node_types_count as usize,
+        )?;
+        check(
+            self.offsets.node_fields,
+            4,
+            2,
+            0,
+            self.header.node_fields_count as usize,
+        )?;
+        // type name / member name: u16 at entry+0 (4-byte entries)
+        check(
+            self.offsets.type_names,
+            4,
+            0,
+            0,
+            self.header.type_names_count as usize,
+        )?;
+        check(
+            self.offsets.type_members,
+            4,
+            0,
+            0,
+            self.header.type_members_count as usize,
+        )?;
+        // regex pattern name: u16 at entry+0 (8-byte entries). Index 0 is the
+        // reserved sentinel — never resolved — so start at 1; `dump`/`trace`
+        // resolve `string_id` for every real entry through the panicking
+        // `RegexView::get_string_id` (and then index the string blob).
+        check(
+            self.offsets.regex_table,
+            8,
+            0,
+            1,
+            self.header.regex_table_count as usize,
+        )?;
+        Ok(())
+    }
+
+    /// Structurally re-verify the whole instruction stream so the documented
+    /// guarantee — a loaded module never panics on view/decode access — holds
+    /// for *any* module whose header and CRC check out, including a deliberately
+    /// forged one.
+    ///
+    /// A module is decoded lazily: [`decode_step`](Self::decode_step) and the
+    /// per-opcode decoders, the effect/predicate iterators, and the materializer
+    /// all build `NonZero`/enum values and index tables straight from
+    /// instruction bytes. Each is a panic site on crafted input — `Opcode`,
+    /// `Nav`, `NodeTypeIR`, `EffectOpcode`, and `StepId::new` decoding, plus
+    /// `get_member` / `get_by_index` table lookups. This walk rejects every such
+    /// input up front, reading only through checked slicing so it never panics
+    /// itself.
+    ///
+    /// Two passes over the stream:
+    /// 1. Decode each instruction's fixed-size slot (the slot size is fixed by
+    ///    the opcode, so the walk is unambiguous), validating opcode, segment,
+    ///    nav, node kind, effect opcodes, `Set`/`Enum` member operands, and
+    ///    predicate operands, and rejecting any zero successor address. Record
+    ///    each instruction start and collect every jump target.
+    /// 2. Every collected jump target — successor, call next/target, trampoline
+    ///    next — must land on a recorded instruction start.
+    ///
+    /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
+    /// hold entrypoint targets to the same rule: an entrypoint pointing into the
+    /// interior of a multi-step instruction would otherwise begin decoding
+    /// mid-instruction.
+    ///
+    /// Out of scope (not a decode/view panic): node-kind/field ids, which are
+    /// resolved against the tree-sitter grammar at match time, and member
+    /// `type_id`s, which the materializer reads through the checked `Types::get`
+    /// that returns `Option`.
+    fn validate_transitions(&self) -> Result<Vec<bool>, ModuleError> {
+        let storage: &[u8] = &self.storage;
+        let base = self.offsets.transitions as usize;
+        let steps = self.header.transitions_count;
+
+        let read_u8 = |off: usize| {
+            storage
+                .get(off)
+                .copied()
+                .ok_or(ModuleError::MalformedTransitions)
+        };
+        let read_u16 = |off: usize| {
+            storage
+                .get(off..off + 2)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                .ok_or(ModuleError::MalformedTransitions)
+        };
+
+        let mut is_start = vec![false; steps as usize];
+        let mut targets: Vec<u16> = Vec::new();
+
+        let mut step: u16 = 0;
+        while step < steps {
+            is_start[step as usize] = true;
+            let instr_off = base + step as usize * STEP_SIZE;
+            let header = read_u8(instr_off)?;
+
+            let nibble = header & 0x0F;
+            let Some(opcode) = Opcode::from_u8(nibble) else {
+                return Err(ModuleError::InvalidOpcode {
+                    step,
+                    opcode: nibble,
+                });
+            };
+            // Every opcode reserves the segment bits; the call/return/trampoline
+            // decoders `assert!` segment == 0, and a non-zero segment is unused.
+            if (header >> 6) & 0x3 != 0 {
+                return Err(ModuleError::MalformedTransitions);
+            }
+
+            match opcode {
+                Opcode::Return => {}
+                Opcode::Trampoline => {
+                    let next = read_u16(instr_off + 2)?;
+                    if next == 0 {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    targets.push(next);
+                }
+                Opcode::Call => {
+                    // `Call::from_bytes` decodes a nav and two non-zero `StepId`s.
+                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    let next = read_u16(instr_off + 4)?;
+                    let target = read_u16(instr_off + 6)?;
+                    if next == 0 || target == 0 {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    targets.push(next);
+                    targets.push(target);
+                }
+                _ => {
+                    // A Match variant (`Match8` or extended).
+                    let node_kind = (header >> 4) & 0x3;
+                    if NodeTypeIR::try_from_bytes(node_kind, read_u16(instr_off + 2)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+
+                    if opcode == Opcode::Match8 {
+                        // bytes 6-7 hold the single successor; `0` means terminal.
+                        let next = read_u16(instr_off + 6)?;
+                        if next != 0 {
+                            targets.push(next);
+                        }
+                    } else {
+                        self.validate_extended_match(opcode, instr_off, step, &mut targets)?;
+                    }
+                }
+            }
+
+            step = step
+                .checked_add(opcode.step_count())
+                .ok_or(ModuleError::MalformedTransitions)?;
+        }
+
+        // A well-formed stream tiles the section in whole instructions. An
+        // overrun means a trailing instruction's slot crosses the section end,
+        // so a successor pointing into it could later decode past the buffer.
+        if step != steps {
+            return Err(ModuleError::MalformedTransitions);
+        }
+
+        for t in targets {
+            if t >= steps || !is_start[t as usize] {
+                return Err(ModuleError::MalformedTransitions);
+            }
+        }
+        Ok(is_start)
+    }
+
+    /// Validate the payload of one extended `Match` (`Match16`..`Match64`):
+    /// effects, predicate, and successors. Appends each successor to `targets`
+    /// for the pass-2 jump-target check in [`Self::validate_transitions`].
+    fn validate_extended_match(
+        &self,
+        opcode: Opcode,
+        instr_off: usize,
+        step: u16,
+        targets: &mut Vec<u16>,
+    ) -> Result<(), ModuleError> {
+        let storage: &[u8] = &self.storage;
+        let read_u16 = |off: usize| {
+            storage
+                .get(off..off + 2)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                .ok_or(ModuleError::MalformedTransitions)
+        };
+
+        let counts = read_u16(instr_off + 6)?;
+        let pre = ((counts >> 13) & 0x7) as usize;
+        let neg = ((counts >> 10) & 0x7) as usize;
+        let post = ((counts >> 7) & 0x7) as usize;
+        let succ = ((counts >> 2) & 0x1F) as usize;
+        let has_predicate = (counts >> 1) & 0x1 != 0;
+
+        // Every payload slot the decoders read — effects, predicate, successors —
+        // must lie within this instruction's fixed-size slot, or the iterators
+        // read into the next instruction (or past the buffer at the stream end).
+        let used = pre + neg + post + if has_predicate { 2 } else { 0 } + succ;
+        if used > opcode.payload_slots() {
+            return Err(ModuleError::MalformedTransitions);
+        }
+
+        // Pre/post effect opcodes are decoded (neg fields are plain `u16`); a
+        // `Set`/`Enum` operand indexes the type-member table via the
+        // materializer's `get_member`, which asserts the index is in bounds.
+        let members = self.header.type_members_count;
+        let check_effect = |slot: usize| -> Result<(), ModuleError> {
+            let off = instr_off + 8 + slot * 2;
+            let b = storage
+                .get(off..off + 2)
+                .ok_or(ModuleError::MalformedTransitions)?;
+            let op =
+                EffectOp::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
+            if matches!(op.opcode, EffectOpcode::Set | EffectOpcode::Enum)
+                && op.payload as u16 >= members
+            {
+                return Err(ModuleError::MalformedTransitions);
+            }
+            Ok(())
+        };
+        for i in 0..pre {
+            check_effect(i)?;
+        }
+        for i in 0..post {
+            check_effect(pre + neg + i)?;
+        }
+
+        if has_predicate {
+            let pred_off = instr_off + 8 + (pre + neg + post) * 2;
+            let b = storage
+                .get(pred_off..pred_off + 4)
+                .ok_or(ModuleError::MalformedTransitions)?;
+            let op_and_flags = u16::from_le_bytes([b[0], b[1]]);
+            let op = (op_and_flags & 0xFF) as u8;
+            let is_regex = (op_and_flags >> 8) & 0x1 != 0;
+            let value_ref = u16::from_le_bytes([b[2], b[3]]);
+
+            // The operator must be a known predicate op (0..=6), the regex flag
+            // must agree with the operator's class, and the operand must index
+            // its table — otherwise `PredicateOp::from_byte`, `get_by_index`, or
+            // the VM's op/flag `unreachable!` would panic when this predicate is
+            // evaluated or dumped. The regex operand must be a *real* entry
+            // (`1..count`): index 0 is the reserved sentinel that
+            // `validate_regex_dfas` skips, so its DFA bytes are unvalidated and
+            // empty, and the VM `.expect()`s non-empty regex bytes. A string
+            // operand of 0 is benign — the validated easter-egg entry, never
+            // asserted non-empty.
+            let op_is_regex = matches!(op, 5 | 6); // RegexMatch | RegexNoMatch
+            let operand_ok = if is_regex {
+                (1..self.header.regex_table_count).contains(&value_ref)
+            } else {
+                value_ref < self.header.str_table_count
+            };
+            if op > 6 || op_is_regex != is_regex || !operand_ok {
+                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+            }
+        }
+
+        let succ_off = instr_off + 8 + (pre + neg + post) * 2 + if has_predicate { 4 } else { 0 };
+        for i in 0..succ {
+            let next = read_u16(succ_off + i * 2)?;
+            // An extended successor decodes through `StepId::new`, which panics
+            // on zero; `0` is the terminal marker only for the `Match8` slot.
+            if next == 0 {
+                return Err(ModuleError::MalformedTransitions);
+            }
+            targets.push(next);
         }
         Ok(())
     }
