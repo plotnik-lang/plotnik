@@ -382,6 +382,24 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.bump_as_error();
     }
 
+    /// Like [`Self::error_and_bump`], but attaches a machine-applicable fix over the
+    /// offending token before consuming it.
+    pub(super) fn error_and_bump_with_fix(
+        &mut self,
+        kind: DiagnosticKind,
+        fix_description: impl Into<String>,
+        fix_replacement: impl Into<String>,
+    ) {
+        if let Some((range, suppression)) = self.get_error_ranges() {
+            self.diagnostics
+                .report(self.source_id, kind, range)
+                .suppression_range(suppression)
+                .fix(fix_description, fix_replacement)
+                .emit();
+        }
+        self.bump_as_error();
+    }
+
     pub(super) fn enter_recursion(&mut self) -> bool {
         if self.depth < self.max_depth {
             self.depth += 1;

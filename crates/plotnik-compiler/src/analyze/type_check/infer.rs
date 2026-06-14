@@ -848,18 +848,23 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         parent_range: TextRange,
         outputs: &[(TextRange, TypeId)],
     ) {
-        self.ctx
+        let source_id = self.ctx.source_id;
+        let mut builder = self
+            .ctx
             .diag
             .report(
-                self.ctx.source_id,
+                source_id,
                 DiagnosticKind::AmbiguousUncapturedOutputs,
                 parent_range,
             )
             .message(format!(
-                "{} expressions produce output without capture",
+                "{} expressions here produce a value but none is captured",
                 outputs.len()
-            ))
-            .emit();
+            ));
+        for (range, _) in outputs {
+            builder = builder.related_to(source_id, *range, "produces a value");
+        }
+        builder.emit();
     }
 
     fn report_uncaptured_output_with_captures(&mut self, outputs: &[(TextRange, TypeId)]) {
@@ -879,18 +884,20 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let (kind, msg, hint) = match err {
             UnifyError::ScalarInUntagged => (
                 DiagnosticKind::IncompatibleTypes,
-                "scalar type in untagged alternation".to_string(),
-                Some("use tagged alternation if branches need different types"),
+                "a branch produces a value but the alternation is unlabeled".to_string(),
+                Some("give every branch a branch label for a tagged union, e.g. `[A: ... B: ...]`"),
             ),
             UnifyError::IncompatibleTypes { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
                 self.ctx.interner.resolve(*field).to_string(),
-                Some("all branches must produce the same type for merged captures"),
+                Some(
+                    "make every branch produce the same type, or label the branches for a tagged union",
+                ),
             ),
             UnifyError::IncompatibleStructs { field } => (
                 DiagnosticKind::IncompatibleStructShapes,
                 self.ctx.interner.resolve(*field).to_string(),
-                Some("use tagged alternation if branches need different fields"),
+                Some("use a tagged union if branches need different fields"),
             ),
             UnifyError::IncompatibleArrayElements { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,

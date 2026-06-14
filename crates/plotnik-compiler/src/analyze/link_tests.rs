@@ -50,12 +50,14 @@ fn predicate_on_non_leaf() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: predicates match text content, but this node can contain children
       |
     1 | Q = (function_declaration == 'foo')
       |                           ^^^^^^^^
-    ");
+      |
+    help: predicates match text content; apply them to a leaf node or an anonymous node like `"foo"`
+    "#);
 }
 
 #[test]
@@ -93,13 +95,16 @@ fn unknown_node_type_with_suggestion() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = (function_declaraton) @fn
       |      ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
+      |
+    1 | Q = (function_declaration) @fn
+      |                       +
     ");
 }
 
@@ -128,13 +133,16 @@ fn unknown_field_with_suggestion() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `nme` is not a valid field
       |
     2 |     nme: (identifier) @name) @fn
       |     ^^^
       |
     help: did you mean `name`?
+      |
+    2 |     name: (identifier) @name) @fn
+      |      +
     ");
 }
 
@@ -186,7 +194,7 @@ fn field_not_on_node_type_with_suggestion() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: field `parameter` is not valid on this node type
       |
     1 | Q = (function_declaration
@@ -195,6 +203,9 @@ fn field_not_on_node_type_with_suggestion() {
       |     ^^^^^^^^^
       |
     help: did you mean `parameters`?
+      |
+    2 |     parameters: (formal_parameters) @params
+      |              +
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
 }
@@ -207,13 +218,16 @@ fn negated_field_unknown() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `nme` is not a valid field
       |
     1 | Q = (function_declaration -nme) @fn
       |                            ^^^
       |
     help: did you mean `name`?
+      |
+    1 | Q = (function_declaration -name) @fn
+      |                             +
     ");
 }
 
@@ -245,7 +259,7 @@ fn negated_field_not_on_node_type_with_suggestion() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: field `parameter` is not valid on this node type
       |
     1 | Q = (function_declaration -parameter) @fn
@@ -254,6 +268,9 @@ fn negated_field_not_on_node_type_with_suggestion() {
       |      on `function_declaration`
       |
     help: did you mean `parameters`?
+      |
+    1 | Q = (function_declaration -parameters) @fn
+      |                                     +
     help: valid fields for `function_declaration`: `body`, `name`, `parameters`
     ");
 }
@@ -309,13 +326,16 @@ fn multiple_errors_in_query() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = (function_declaraton
       |      ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
+      |
+    1 | Q = (function_declaration
+      |                       +
 
     error: `nme` is not a valid field
       |
@@ -323,6 +343,9 @@ fn multiple_errors_in_query() {
       |     ^^^
       |
     help: did you mean `name`?
+      |
+    2 |     name: (identifer) @name) @fn
+      |      +
 
     error: `identifer` is not a valid node type
       |
@@ -330,6 +353,9 @@ fn multiple_errors_in_query() {
       |           ^^^^^^^^^
       |
     help: did you mean `identifier`?
+      |
+    2 |     nme: (identifier) @name) @fn
+      |                  +
     ");
 }
 
@@ -353,13 +379,16 @@ fn alternation_with_link_errors() {
 
     let res = Query::expect_invalid_linking(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `function_declaraton` is not a valid node type
       |
     1 | Q = [(function_declaraton)
       |       ^^^^^^^^^^^^^^^^^^^
       |
     help: did you mean `function_declaration`?
+      |
+    1 | Q = [(function_declaration)
+      |                        +
 
     error: `class_declaraton` is not a valid node type
       |
@@ -367,6 +396,9 @@ fn alternation_with_link_errors() {
       |   ^^^^^^^^^^^^^^^^
       |
     help: did you mean `class_declaration`?
+      |
+    2 |  (class_declaration)] @decl
+      |                 +
     ");
 }
 
@@ -582,14 +614,14 @@ fn invalid_subtype_rejected() {
     let res = Query::expect_invalid_linking(input);
 
     insta::assert_snapshot!(res, @"
-    error: `statement_block` is not a kind of `expression`
+    error: `statement_block` is not a subtype of `expression`
       |
     1 | Q = (expression#statement_block)
       |      ---------- ^^^^^^^^^^^^^^^
       |      |
       |      base type `expression`
       |
-    help: kinds of `expression` include: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)
+    help: subtypes of `expression` include: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)
     ");
 }
 

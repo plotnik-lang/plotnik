@@ -259,11 +259,13 @@ fn complex_example() {
 #[test]
 fn ast_with_errors() {
     let res = Query::expect_invalid("Q = (call (Undefined))");
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Undefined` is not defined
       |
     1 | Q = (call (Undefined))
       |            ^^^^^^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 

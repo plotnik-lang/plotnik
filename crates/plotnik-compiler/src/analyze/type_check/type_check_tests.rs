@@ -618,7 +618,7 @@ fn error_star_with_internal_captures_no_row() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
       |
     1 | Bad = {(identifier) @a (number) @b}*
@@ -636,7 +636,7 @@ fn error_plus_with_internal_capture_no_row() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: quantifier `+` contains captures (`@c`) but has no struct capture
       |
     1 | Bad = {(identifier) @c}+
@@ -654,7 +654,7 @@ fn error_named_node_with_capture_quantified() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: quantifier `*` contains captures (`@name`) but has no struct capture
       |
     1 | Bad = (array (identifier) @name)*
@@ -912,11 +912,14 @@ fn error_multiple_uncaptured_outputs() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
-    error: multiple expressions produce output without capture: 2 expressions produce output without capture
+    insta::assert_snapshot!(res, @"
+    error: 2 expressions here produce a value but none is captured
       |
     3 | Q = (program (A) (B))
-      |     ^^^^^^^^^^^^^^^^^
+      |     ^^^^^^^^^---^---^
+      |              |   |
+      |              |   produces a value
+      |              produces a value
       |
     help: capture each expression explicitly: `(X) @x (Y) @y`
     ");

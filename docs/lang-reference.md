@@ -210,7 +210,7 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 // ERROR: internal capture without struct capture
 (method_definition name: (identifier) @name)*
 
-// OK: struct capture on the group
+// OK: struct capture on the sequence
 { (method_definition name: (identifier) @name) @method }* @methods
 → { methods: { method: Node, name: Node }[] }
 ```
@@ -272,7 +272,7 @@ Output type:
 { func: { node: Node, name: Node, body: Node } }
 ```
 
-The `@func` capture on the group creates a nested scope. All captures inside (`@node`, `@name`, `@body`) become fields of that nested object.
+The `@func` capture on the sequence creates a nested scope. All captures inside (`@node`, `@name`, `@body`) become fields of that nested object.
 
 ### Type Annotations
 
@@ -511,7 +511,7 @@ The separator is tight-binding — no whitespace around `#`. The tree-sitter spe
 
 ## Fields
 
-Constrain children to named fields. A field value must be a node pattern, an alternation, or a quantifier applied to one of these. Groups `{...}` are not allowed as direct field values.
+Constrain children to named fields. A field value must be a node pattern, an alternation, or a quantifier applied to one of these. Sequences `{...}` are not allowed as direct field values.
 
 ```
 (assignment_expression

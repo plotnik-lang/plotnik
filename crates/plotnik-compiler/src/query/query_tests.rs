@@ -276,7 +276,7 @@ fn multifile_field_with_ref_to_seq_error() {
         "main.ptk": "Q = (call name: (X))",
     };
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: field `name` cannot match a sequence
      --> main.ptk:1:17
       |
@@ -287,5 +287,7 @@ fn multifile_field_with_ref_to_seq_error() {
       |
     1 | X = {(a) (b)}
       |     --------- defined here
+      |
+    help: a field holds a single child node; match one pattern, or move the sequence outside the field
     ");
 }

@@ -9,6 +9,8 @@ fn backreference_error() {
       |
     1 | Q = (identifier =~ /(.)\1/)
       |                        ^^
+      |
+    help: the regex engine is linear-time and cannot match backreferences; rewrite without `\1`
     ");
 }
 
@@ -16,11 +18,13 @@ fn backreference_error() {
 fn lookahead_error() {
     let q = QueryAnalyzed::expect(r"Q = (identifier =~ /foo(?=bar)/)");
     assert!(!q.is_valid());
-    insta::assert_snapshot!(q.dump_diagnostics(), @r"
+    insta::assert_snapshot!(q.dump_diagnostics(), @"
     error: lookahead/lookbehind is not supported in regex
       |
     1 | Q = (identifier =~ /foo(?=bar)/)
       |                         ^^
+      |
+    help: the regex engine cannot match lookaround; match the surrounding context with the query pattern instead
     ");
 }
 
@@ -28,11 +32,13 @@ fn lookahead_error() {
 fn lookbehind_error() {
     let q = QueryAnalyzed::expect(r"Q = (identifier =~ /(?<=foo)bar/)");
     assert!(!q.is_valid());
-    insta::assert_snapshot!(q.dump_diagnostics(), @r"
+    insta::assert_snapshot!(q.dump_diagnostics(), @"
     error: lookahead/lookbehind is not supported in regex
       |
     1 | Q = (identifier =~ /(?<=foo)bar/)
       |                      ^^^
+      |
+    help: the regex engine cannot match lookaround; match the surrounding context with the query pattern instead
     ");
 }
 
@@ -40,11 +46,18 @@ fn lookbehind_error() {
 fn named_capture_error() {
     let q = QueryAnalyzed::expect(r"Q = (identifier =~ /(?P<name>foo)/)");
     assert!(!q.is_valid());
-    insta::assert_snapshot!(q.dump_diagnostics(), @r"
+    insta::assert_snapshot!(q.dump_diagnostics(), @"
     error: named captures are not supported in regex
       |
     1 | Q = (identifier =~ /(?P<name>foo)/)
       |                      ^^^^^^^^
+      |
+    help: remove the named-capture marker
+      |
+    1 - Q = (identifier =~ /(?P<name>foo)/)
+    1 + Q = (identifier =~ /(foo)/)
+      |
+    help: regex captures are inert in plotnik; capture nodes with `@name` outside the regex
     ");
 }
 
@@ -64,12 +77,14 @@ fn syntax_error() {
 fn empty_regex_error() {
     let q = QueryAnalyzed::expect(r"Q = (identifier =~ //)");
     assert!(!q.is_valid());
-    insta::assert_snapshot!(q.dump_diagnostics(), @r"
+    insta::assert_snapshot!(q.dump_diagnostics(), @r#"
     error: empty regex pattern
       |
     1 | Q = (identifier =~ //)
       |                    ^^
-    ");
+      |
+    help: put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== "foo"`
+    "#);
 }
 
 #[test]

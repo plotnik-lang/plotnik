@@ -159,7 +159,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 .message(type_name);
 
             if let Some(similar) = suggestion {
-                builder = builder.hint(format!("did you mean `{}`?", similar));
+                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
             builder.emit();
         }
@@ -196,7 +196,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             .message(field_name);
 
         if let Some(similar) = suggestion {
-            builder = builder.hint(format!("did you mean `{}`?", similar));
+            builder = builder.fix(format!("did you mean `{}`?", similar), similar);
         }
         builder.emit();
     }
@@ -497,7 +497,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         } else {
             let max_dist = (field_name.len() / 3).clamp(2, 4);
             if let Some(similar) = find_similar(field_name, &valid_fields, max_dist) {
-                builder = builder.hint(format!("did you mean `{}`?", similar));
+                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
             builder = builder.hint(format!(
                 "valid fields for `{}`: {}",
@@ -840,7 +840,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 )
                 .message(sub_name);
             if let Some(similar) = suggestion {
-                builder = builder.hint(format!("did you mean `{}`?", similar));
+                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
             builder.emit();
             return;
@@ -868,7 +868,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             .collect::<Vec<_>>();
         let kinds_hint = (!kinds.is_empty()).then(|| {
             format!(
-                "kinds of `{}` include: {}",
+                "subtypes of `{}` include: {}",
                 super_name,
                 format_list(&kinds, 8)
             )
@@ -882,7 +882,10 @@ impl<'a, 'q> Linker<'a, 'q> {
                 DiagnosticKind::InvalidSubtype,
                 sub_token.text_range(),
             )
-            .message(format!("`{}` is not a kind of `{}`", sub_name, super_name))
+            .message(format!(
+                "`{}` is not a subtype of `{}`",
+                sub_name, super_name
+            ))
             .related_to(
                 self.state.source_id,
                 super_token.text_range(),

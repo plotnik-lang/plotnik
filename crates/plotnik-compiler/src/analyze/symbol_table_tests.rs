@@ -48,11 +48,13 @@ fn undefined_reference() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Undefined` is not defined
       |
     1 | Call = (call_expression function: (Undefined))
       |                                    ^^^^^^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -195,11 +197,13 @@ fn entry_point_undefined_reference() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `Unknown` is not defined
       |
     1 | Q = (call function: (Unknown))
       |                      ^^^^^^^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
@@ -243,21 +247,27 @@ fn multiple_undefined() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: `X` is not defined
       |
     1 | Q = (foo (X) (Y) (Z))
       |           ^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
     error: `Y` is not defined
       |
     1 | Q = (foo (X) (Y) (Z))
       |               ^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
     error: `Z` is not defined
       |
     1 | Q = (foo (X) (Y) (Z))
       |                   ^
+      |
+    help: `(Name)` uses a definition; define `Name = ...` or check the spelling
     ");
 }
 
