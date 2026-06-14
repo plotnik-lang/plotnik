@@ -14,7 +14,25 @@ use plotnik_bytecode::Nav;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};
-use super::navigation::is_star_or_plus_quantifier;
+use super::navigation::{is_star_or_plus_quantifier, resumable_search_nav};
+
+/// The nav under which a quantifier iteration runs a resumable position search,
+/// or `None` for a bounded anchor that matches a single candidate directly.
+///
+/// Identical to [`resumable_search_nav`] except `StayExact` is also a search.
+/// The difference is the consumer, not the nav: a *match-once* item at
+/// `StayExact` is positioned by an outer search and matches exactly there, but a
+/// quantifier is a *loop* — even from a fixed `StayExact` start (a called def
+/// body, an alternation candidate, the entrypoint) it must scan its siblings
+/// forward, so it owns a resumable search. A bounded anchor (`*Skip*`/`*Exact`)
+/// stays put in both. Folding this case back into `resumable_search_nav` makes
+/// alternations double-wrap and regresses; the two must stay distinct.
+pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
+    match nav {
+        Nav::StayExact => Some(Nav::StayExact),
+        other => resumable_search_nav(Some(other)),
+    }
+}
 
 /// Quantifier operator classification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -382,6 +400,64 @@ impl Compiler<'_> {
         self.compile_quantified_unified(config)
     }
 
+    /// Emit a single quantifier iteration (`?`, or the leading match of `*`/`+`):
+    /// reach one element via `nav`, match `compile_body` there, exit to `exit`.
+    ///
+    /// A search nav (see [`quantifier_search_nav`]) wraps a `StayExact` body in
+    /// [`emit_position_search`](Self::emit_position_search), which owns a
+    /// checkpoint so the search can resume at a later sibling when a following
+    /// pattern fails. A bounded (anchored/exact) nav is applied to the body
+    /// directly: it has a single candidate, so the VM's own `continue_search`
+    /// enforces the skip policy and the iteration never advances past a named
+    /// sibling.
+    fn emit_iteration(
+        &mut self,
+        nav: Nav,
+        exit: Label,
+        compile_body: impl Fn(&mut Self, Nav, Label) -> Label,
+    ) -> Label {
+        match quantifier_search_nav(nav) {
+            Some(search) => {
+                let body = compile_body(self, Nav::StayExact, exit);
+                self.emit_position_search(search, body)
+            }
+            None => compile_body(self, nav, exit),
+        }
+    }
+
+    /// Emit the first and repeat iterations of a looping quantifier (`*`/`+`),
+    /// both looping back to `loop_entry`.
+    ///
+    /// A resumable search nav shares one `StayExact` body behind two position
+    /// searches, so the repeat reuses the body and resumes via the same
+    /// mechanism as the first. A bounded nav instead compiles the body twice —
+    /// the first iteration applies `first_nav`, the repeat applies its
+    /// [`sibling_continuation`](Nav::sibling_continuation) — so repeated matches
+    /// are bounded sibling steps (back-to-back) rather than a forward search.
+    fn emit_loop_iterations(
+        &mut self,
+        first_nav: Nav,
+        loop_entry: Label,
+        compile_body: impl Fn(&mut Self, Nav, Label) -> Label,
+    ) -> (Label, Label) {
+        let repeat_nav = first_nav.sibling_continuation();
+        if let Some(first_search) = quantifier_search_nav(first_nav) {
+            let body = compile_body(self, Nav::StayExact, loop_entry);
+            // Invariant guarded by `quantifier_tests::search_nav_repeats_as_search`.
+            let repeat_search =
+                quantifier_search_nav(repeat_nav).expect("a search nav repeats as a search");
+            (
+                self.emit_position_search(first_search, body),
+                self.emit_position_search(repeat_search, body),
+            )
+        } else {
+            (
+                compile_body(self, first_nav, loop_entry),
+                compile_body(self, repeat_nav, loop_entry),
+            )
+        }
+    }
+
     /// Unified quantifier compilation.
     ///
     /// This is the single entry point for all quantifier compilation, handling:
@@ -411,37 +487,28 @@ impl Compiler<'_> {
         };
 
         // Compile body helper - handles struct wrapper logic in one place
-        let compile_body = |this: &mut Self, nav: Option<Nav>, exit: Label| -> Label {
+        let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
             if needs_struct_wrapper {
-                this.compile_struct_for_array(inner, exit, nav, row_type_id)
+                this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
             } else if in_array_context {
                 this.compile_with_optional_scope(row_type_id, |t| {
-                    t.compile_expr_inner(inner, exit, nav, element_capture.clone())
+                    t.compile_expr_inner(inner, exit, Some(nav), element_capture.clone())
                 })
             } else {
-                this.compile_expr_inner(inner, exit, nav, element_capture.clone())
+                this.compile_expr_inner(inner, exit, Some(nav), element_capture.clone())
             }
         };
 
         let is_greedy = kind.is_greedy();
+        let first_nav_mode = first_nav.unwrap_or(Nav::Down);
 
         match kind {
             QuantifierKind::Plus | QuantifierKind::PlusNonGreedy => {
-                // Plus with skip-retry: must match at least once
-                // First iteration has no exit fallback (backtrack propagates to caller)
+                // Plus: must match at least once. The first iteration has no exit
+                // fallback, so a total failure backtracks to the caller.
                 let loop_entry = self.fresh_label();
-
-                // Compile body ONCE with Nav::StayExact (exact match at current position,
-                // skip-retry handles advancement if all branches fail)
-                let body_entry = compile_body(self, Some(Nav::StayExact), loop_entry);
-
-                // First iteration: must match at least once; if all siblings fail,
-                // backtrack propagates to the caller (quantifier fails)
-                let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
-
-                // Repeat iteration: failure exits via loop_entry's checkpoint
-                let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
+                let (first_iterate, repeat_iterate) =
+                    self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
                 // loop_entry → [repeat_iterate, exit]
                 self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
@@ -451,7 +518,7 @@ impl Compiler<'_> {
 
             QuantifierKind::Star | QuantifierKind::StarNonGreedy => {
                 if needs_split_exits {
-                    // Star with split exits: uses skip-retry with separate exit paths
+                    // Star with split exits: zero-match takes a separate skip path.
                     let skip = skip_exit.expect("split exits requires skip_exit");
                     self.compile_star_with_skip_retry_split_exits(
                         inner,
@@ -464,21 +531,9 @@ impl Compiler<'_> {
                         row_type_id,
                     )
                 } else {
-                    // Regular star with skip-retry:
-                    // When pattern fails (even on descendant), retry with next sibling
                     let loop_entry = self.fresh_label();
-
-                    // Compile body ONCE with Nav::StayExact (exact match at current position,
-                    // skip-retry handles advancement if all branches fail)
-                    let body_entry = compile_body(self, Some(Nav::StayExact), loop_entry);
-
-                    // First iteration: Down navigation with skip-retry; zero-match
-                    // failure exits via the entry epsilon's checkpoint below
-                    let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                    let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
-
-                    // Repeat iteration: Next navigation with skip-retry
-                    let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
+                    let (first_iterate, repeat_iterate) =
+                        self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
                     // loop_entry → [repeat_iterate, exit]
                     self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
@@ -489,11 +544,7 @@ impl Compiler<'_> {
             }
 
             QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
-                // Optional with skip-retry: matches 0 or 1 time
-                // Compile body with Nav::StayExact (exact match at current position)
-                let body_entry = compile_body(self, Some(Nav::StayExact), match_exit);
-
-                // Build exit-with-null path for when no match found
+                // Build exit-with-null path for when no match is found.
                 let skip_with_null = if needs_split_exits {
                     skip_exit.expect("split exits requires skip_exit")
                 } else {
@@ -501,11 +552,10 @@ impl Compiler<'_> {
                     self.emit_null_for_internal_captures(null_exit, inner)
                 };
 
-                // Skip-retry iteration: any failure (nav failure or retry exhaust)
-                // backtracks to the entry epsilon's checkpoint, which restores the
-                // cursor to the pre-navigation position and takes skip_with_null.
-                let first_nav_mode = first_nav.unwrap_or(Nav::Down);
-                let iterate = self.emit_position_search(first_nav_mode, body_entry);
+                // Match 0 or 1 time: any failure backtracks to the entry epsilon's
+                // checkpoint, which restores the pre-navigation cursor and takes
+                // skip_with_null.
+                let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
 
                 // entry → [iterate, skip_with_null]
                 self.emit_branch_epsilon(iterate, skip_with_null, is_greedy)
@@ -527,29 +577,24 @@ impl Compiler<'_> {
         needs_struct_wrapper: bool,
         row_type_id: Option<TypeId>,
     ) -> Label {
-        let loop_entry = self.fresh_label();
-
-        // Compile body ONCE with Nav::StayExact (exact match at current position,
-        // skip-retry handles advancement if all branches fail)
-        let body_entry = if needs_struct_wrapper {
-            self.compile_struct_for_array(inner, loop_entry, Some(Nav::StayExact), row_type_id)
-        } else {
-            self.compile_expr_inner(inner, loop_entry, Some(Nav::StayExact), capture)
+        let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
+            if needs_struct_wrapper {
+                this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+            } else {
+                this.compile_expr_inner(inner, exit, Some(nav), capture.clone())
+            }
         };
 
-        // First iteration: zero-match failure (Down failure or retry exhaust)
-        // backtracks to the entry epsilon's checkpoint, restoring the cursor to
-        // the pre-Down position and taking skip_exit (bypass Up).
+        let loop_entry = self.fresh_label();
         let first_nav_mode = nav_override.unwrap_or(Nav::Down);
-        let first_iterate = self.emit_position_search(first_nav_mode, body_entry);
-
-        // Repeat iteration: failure exits via loop_entry's checkpoint
-        let repeat_iterate = self.emit_position_search(Nav::Next, body_entry);
+        let (first_iterate, repeat_iterate) =
+            self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
         // loop_entry → [repeat_iterate, match_exit]
         self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
 
-        // entry → [first_iterate, skip_exit]
+        // entry → [first_iterate, skip_exit]; zero-match backtracks to the entry
+        // epsilon's checkpoint, restoring the pre-nav cursor and taking skip_exit.
         self.emit_branch_epsilon(first_iterate, skip_exit, is_greedy)
     }
 }

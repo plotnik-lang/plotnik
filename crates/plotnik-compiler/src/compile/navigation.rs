@@ -205,6 +205,30 @@ pub fn expr_owns_iteration(expr: &Expr) -> bool {
     quantifier_operator_kind(expr).is_some()
 }
 
+/// Extract the navigation if a *match-once* item under it owns a resumable
+/// sibling search (`SkipPolicy::Any`).
+///
+/// For an item that matches a single candidate (a node, ref, field, or
+/// alternation branch), only `Down`/`Next`/`Stay` skip past named siblings, so
+/// they have multiple candidate positions and need the resumable
+/// `emit_position_search` wrapper to retry a later sibling when a following
+/// pattern fails. Bounded navs (anchored, exact) skip only trivia, so they have
+/// a single candidate and the VM's in-instruction `continue_search` suffices;
+/// `Up` navs don't search siblings.
+///
+/// `StayExact` is excluded on purpose: a match-once item lands at `StayExact`
+/// only when an *outer* context already positioned the cursor (a Call's resume
+/// checkpoint, or an alternation/sequence wrapper), so that context — not the
+/// item — owns the search. Including it here makes alternations double-wrap and
+/// regresses (verified: ~19 alternation/recursion tests). A quantifier loop is
+/// the deliberate exception; see `quantifier::quantifier_search_nav`.
+pub fn resumable_search_nav(nav: Option<Nav>) -> Option<Nav> {
+    match nav {
+        Some(nav @ (Nav::Down | Nav::Next | Nav::Stay)) => Some(nav),
+        _ => None,
+    }
+}
+
 /// Check if navigation is a Down variant (descends into children).
 pub fn is_down_nav(nav: Option<Nav>) -> bool {
     matches!(

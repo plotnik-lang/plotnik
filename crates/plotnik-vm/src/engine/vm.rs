@@ -7,24 +7,6 @@ use plotnik_bytecode::{
     PredicateOp, StepAddr, Trampoline,
 };
 
-/// Get the nav for continue_search (always a sibling move).
-/// Up/Stay/Epsilon variants return Next as a default since they don't do sibling search.
-fn continuation_nav(nav: Nav) -> Nav {
-    match nav {
-        Nav::Down | Nav::Next => Nav::Next,
-        Nav::DownSkip | Nav::NextSkip => Nav::NextSkip,
-        Nav::DownSkipExtras | Nav::NextSkipExtras => Nav::NextSkipExtras,
-        Nav::DownExact | Nav::NextExact => Nav::NextExact,
-        Nav::Epsilon
-        | Nav::Up(_)
-        | Nav::UpSkipTrivia(_)
-        | Nav::UpSkipExtras(_)
-        | Nav::UpExact(_)
-        | Nav::Stay
-        | Nav::StayExact => Nav::Next,
-    }
-}
-
 use super::checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
 use super::cursor::{CursorWrapper, SkipPolicy};
 use super::effect::{EffectLog, RuntimeEffect};
@@ -328,7 +310,7 @@ impl<'t> VM<'t> {
         };
         tracer.trace_nav(m.nav, self.cursor.node());
 
-        let cont_nav = continuation_nav(m.nav);
+        let cont_nav = m.nav.sibling_continuation();
         loop {
             if self.candidate_matches(m, module, tracer) {
                 break;
@@ -545,7 +527,7 @@ impl<'t> VM<'t> {
             return Ok(Some(policy));
         };
 
-        let cont_nav = continuation_nav(nav);
+        let cont_nav = nav.sibling_continuation();
         loop {
             if self.cursor.field_id() == Some(field_id) {
                 tracer.trace_field_success(field_id);
@@ -618,7 +600,7 @@ impl<'t> VM<'t> {
         if !self.cursor.continue_search(resume.policy) {
             return self.backtrack(tracer);
         }
-        tracer.trace_nav(continuation_nav(Nav::Down), self.cursor.node());
+        tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
 
         // Enforce the field constraint at the new candidate. A mismatch ends
         // this Call's search, exactly like the navigate-time field check.

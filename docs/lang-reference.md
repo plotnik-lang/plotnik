@@ -874,6 +874,22 @@ When the item before an anchor is optional (`?` or `*`), the anchor's meaning de
 
 Strictness carries through both paths: with `.!`, no trivia is tolerated on either the adjacency or the leading interpretation.
 
+The anchor pins where a **quantified follower** begins, not just a single node:
+
+```
+(program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement) @c})
+```
+
+The anchor before `(debugger_statement)*` fixes its starting position the same way — adjacent to `@a` when present, the first child when `@a` is skipped. The repeated matches are then **back-to-back**: the quantifier consumes consecutive matching siblings (trivia aside) and stops at the first gap. So with `@a` skipped, `debugger; debugger; foo;` collects both debuggers, but `bar; debugger; foo;` does not match — `@b` may not skip past `bar;` to start later.
+
+A **trailing anchor** combines with the leading interpretation rather than overriding it:
+
+```
+(program {(lexical_declaration)? @a . (debugger_statement) @b .})
+```
+
+When `@a` is skipped, `@b` must be both the first child (leading anchor) and the last child (trailing anchor) — so only `debugger;` alone matches, while `foo; debugger;` (not first) and `debugger; foo;` (not last) do not.
+
 ### Output Types
 
 Anchors are structural constraints only — they don't affect output types:
