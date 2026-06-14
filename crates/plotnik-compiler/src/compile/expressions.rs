@@ -173,22 +173,10 @@ impl Compiler<'_> {
             None,
         );
 
-        // Build skip-retry structure:
-        // try: epsilon → [body, retry_nav]
-        // retry_nav: Match(Next, wildcard) → try
-        let try_label = self.fresh_label();
-        let retry_nav = self.fresh_label();
-
-        // retry_nav: advance to next sibling and loop back
-        self.emit_wildcard_nav(retry_nav, Nav::Next, try_label);
-
-        // try: branch to body (prefer) or retry (fallback)
-        // Greedy: try body first, then retry on failure
-        self.emit_branch_epsilon_at(try_label, body, retry_nav, true);
-
-        // down_wildcard: navigate to first child → try
-        let down_wildcard = self.fresh_label();
-        self.emit_wildcard_nav(down_wildcard, Nav::Down, try_label);
+        // The node's children are searched with a resumable position search:
+        // an adjacency failure at the trailing anchor (`up_check`) retries at the
+        // next child instead of failing the whole match.
+        let down_wildcard = self.emit_position_search(Nav::Down, body);
 
         // entry: match parent node → down_wildcard (only pre_effects here)
         let mut entry_match = MatchIR::epsilon(entry, down_wildcard)

@@ -193,40 +193,19 @@ pub fn compute_nav_modes(
     result
 }
 
-/// Check if an expression compiles to a structure that already owns a
-/// resumable sibling search: alternations emit a search-retry wrapper,
-/// refs compile to Call instructions with retry checkpoints, quantifiers
-/// run their own skip-retry loops. Everything else relies on the VM's
-/// in-instruction candidate search, which commits to its first match
-/// without leaving a checkpoint.
-pub fn expr_owns_sibling_search(expr: &Expr) -> bool {
-    match expr {
-        Expr::AltExpr(_) | Expr::Ref(_) => true,
-        Expr::QuantifiedExpr(q) => q.operator().is_some(),
-        Expr::CapturedExpr(cap) => cap.inner().as_ref().is_some_and(expr_owns_sibling_search),
-        Expr::FieldExpr(field) => field
-            .value()
-            .as_ref()
-            .is_some_and(|value| matches!(value, Expr::Ref(_))),
-        Expr::NamedNode(_) | Expr::AnonymousNode(_) | Expr::SeqExpr(_) => false,
-    }
-}
-
-/// Compute navigation for repeat iterations in quantifiers.
+/// Check if an expression compiles to a loop that owns its own sibling
+/// iteration. Only quantifiers do: a quantifier matches a variable number of
+/// siblings *starting at a fixed position*, so it must drive its own
+/// advancement and must not be wrapped in a position search (that would let it
+/// start past non-matching siblings, breaking adjacency).
 ///
-/// When a quantifier repeats, it needs to advance to the next sibling:
-/// - First iteration uses `nav_override` (e.g., Down into parent's children)
-/// - Repeat iterations must use Next to advance to subsequent siblings
-pub fn repeat_nav_for(first_nav: Option<Nav>) -> Option<Nav> {
-    match first_nav {
-        Some(Nav::Down) => Some(Nav::Next),
-        Some(Nav::DownSkip) => Some(Nav::NextSkip),
-        Some(Nav::DownSkipExtras) => Some(Nav::NextSkipExtras),
-        Some(Nav::DownExact) => Some(Nav::NextExact),
-        Some(nav @ (Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)) => Some(nav),
-        None | Some(Nav::Stay) => Some(Nav::Next),
-        _ => None,
-    }
+/// Every other form matches a single candidate. When such an item precedes an
+/// anchored follower, the sequence compiler wraps it with `emit_position_search`
+/// and a `StayExact` body, so the wrapper — not the item — owns the resumable
+/// search. This is the single ownership rule that replaced the old
+/// per-form classification.
+pub fn expr_owns_iteration(expr: &Expr) -> bool {
+    quantifier_operator_kind(expr).is_some()
 }
 
 /// Check if navigation is a Down variant (descends into children).
