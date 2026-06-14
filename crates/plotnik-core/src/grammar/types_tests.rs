@@ -6,6 +6,39 @@ use super::types::{
 };
 use crate::{NodeType, NodeTypeId};
 
+impl NodeShape {
+    /// A named node kind: non-root, no fields, no children.
+    fn named(name: &str) -> Self {
+        Self {
+            type_name: name.to_string(),
+            named: true,
+            root: false,
+            extra: false,
+            fields: Default::default(),
+            children: None,
+            subtypes: None,
+        }
+    }
+
+    /// The grammar's root node kind.
+    fn root(name: &str) -> Self {
+        Self {
+            root: true,
+            ..Self::named(name)
+        }
+    }
+
+    fn with_children(mut self, children: NodeSlot) -> Self {
+        self.children = Some(children);
+        self
+    }
+
+    fn with_field(mut self, name: &str, slot: NodeSlot) -> Self {
+        self.fields.insert(name.to_string(), slot);
+        self
+    }
+}
+
 fn node_id_for_type(node_type: NodeType<&str>) -> Option<NodeTypeId> {
     match node_type {
         NodeType::Named("root") => NonZeroU16::new(1),
@@ -23,15 +56,11 @@ fn field_id_for_name(field: &str) -> Option<NonZeroU16> {
 
 #[test]
 fn builds_node_constraints_from_node_shapes() {
-    let shapes = vec![NodeShape {
-        type_name: "root".to_string(),
-        named: true,
-        root: true,
-        extra: false,
-        fields: [("body".to_string(), child_slot(false, true))].into(),
-        children: Some(child_slot(true, false)),
-        subtypes: None,
-    }];
+    let shapes = vec![
+        NodeShape::root("root")
+            .with_field("body", child_slot(false, true))
+            .with_children(child_slot(true, false)),
+    ];
 
     let (node_constraints, _, root_node_type) =
         build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
@@ -43,22 +72,7 @@ fn builds_node_constraints_from_node_shapes() {
 
 #[test]
 fn rejects_unknown_child_types() {
-    let shapes = vec![NodeShape {
-        type_name: "root".to_string(),
-        named: true,
-        root: true,
-        extra: false,
-        fields: Default::default(),
-        children: Some(NodeSlot {
-            multiple: true,
-            required: false,
-            types: vec![NodeKindRef {
-                type_name: "missing".to_string(),
-                named: true,
-            }],
-        }),
-        subtypes: None,
-    }];
+    let shapes = vec![NodeShape::root("root").with_children(slot_of("missing"))];
 
     let err = build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
         .expect_err("unknown child type should fail");
@@ -76,31 +90,8 @@ fn rejects_unknown_child_types() {
 #[test]
 fn skips_known_abstract_child_shapes() {
     let shapes = vec![
-        NodeShape {
-            type_name: "root".to_string(),
-            named: true,
-            root: true,
-            extra: false,
-            fields: Default::default(),
-            children: Some(NodeSlot {
-                multiple: true,
-                required: false,
-                types: vec![NodeKindRef {
-                    type_name: "_abstract".to_string(),
-                    named: true,
-                }],
-            }),
-            subtypes: None,
-        },
-        NodeShape {
-            type_name: "_abstract".to_string(),
-            named: true,
-            root: false,
-            extra: false,
-            fields: Default::default(),
-            children: None,
-            subtypes: None,
-        },
+        NodeShape::root("root").with_children(slot_of("_abstract")),
+        NodeShape::named("_abstract"),
     ];
 
     let (node_constraints, _, _) =
@@ -145,18 +136,6 @@ fn slot_of(child: &str) -> NodeSlot {
     }
 }
 
-fn leaf_shape(name: &str) -> NodeShape {
-    NodeShape {
-        type_name: name.to_string(),
-        named: true,
-        root: false,
-        extra: false,
-        fields: Default::default(),
-        children: None,
-        subtypes: None,
-    }
-}
-
 #[test]
 fn alias_token_with_children_is_not_a_leaf_token() {
     // A kind reached by a terminal symbol must not be classified as a leaf token when it also has a
@@ -166,25 +145,9 @@ fn alias_token_with_children_is_not_a_leaf_token() {
     // real trees produce) is not rejected.
     let metadata = GrammarMetadata {
         node_shapes: vec![
-            NodeShape {
-                type_name: "root".to_string(),
-                named: true,
-                root: true,
-                extra: false,
-                fields: Default::default(),
-                children: Some(slot_of("leafy")),
-                subtypes: None,
-            },
-            NodeShape {
-                type_name: "leafy".to_string(),
-                named: true,
-                root: false,
-                extra: false,
-                fields: Default::default(),
-                children: Some(slot_of("child")),
-                subtypes: None,
-            },
-            leaf_shape("child"),
+            NodeShape::root("root").with_children(slot_of("leafy")),
+            NodeShape::named("leafy").with_children(slot_of("child")),
+            NodeShape::named("child"),
         ],
         symbols: vec![
             named_symbol(1, "root", false),
@@ -212,16 +175,8 @@ fn terminal_kind_without_children_is_a_leaf_token() {
     // under it are still rejected.
     let metadata = GrammarMetadata {
         node_shapes: vec![
-            NodeShape {
-                type_name: "root".to_string(),
-                named: true,
-                root: true,
-                extra: false,
-                fields: Default::default(),
-                children: Some(slot_of("leaf")),
-                subtypes: None,
-            },
-            leaf_shape("leaf"),
+            NodeShape::root("root").with_children(slot_of("leaf")),
+            NodeShape::named("leaf"),
         ],
         symbols: vec![
             named_symbol(1, "root", false),
@@ -244,15 +199,7 @@ fn constraint_lookup_on_shapeless_kind_is_empty_not_panic() {
     // lookups for it must return empty instead of panicking, so the linker never crashes on a query
     // such as `(jsx_text (comment))`.
     let metadata = GrammarMetadata {
-        node_shapes: vec![NodeShape {
-            type_name: "root".to_string(),
-            named: true,
-            root: true,
-            extra: false,
-            fields: Default::default(),
-            children: None,
-            subtypes: None,
-        }],
+        node_shapes: vec![NodeShape::root("root")],
         symbols: vec![
             named_symbol(1, "root", false),
             named_symbol(2, "bare", true),
