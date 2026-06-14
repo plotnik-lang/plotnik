@@ -469,8 +469,6 @@ fn ref_followed_valid_case() {
     Query::expect_valid_linking(input);
 }
 
-// --- Structural validation: impossible queries must be rejected. ---
-
 #[test]
 fn invalid_child_kind_rejected() {
     let input = r"Q = (function_declaration (class_declaration))";
@@ -578,8 +576,6 @@ fn anonymous_only_field_value_rejected() {
     help: `operator` accepts only literal tokens — write `operator: "!="`
     "#);
 }
-
-// --- Regression guards: provably-possible queries must not be rejected. ---
 
 #[test]
 fn alternation_branch_admissibility_is_not_checked() {
