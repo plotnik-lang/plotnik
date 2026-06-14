@@ -3,13 +3,20 @@
 //! Checks constraints that are easier to express after parsing:
 //! - Mixed tagged/untagged alternations
 
+use super::ValidateInput;
 use crate::SourceId;
 use crate::analyze::invariants::ensure_both_branch_kinds;
 use crate::analyze::visitor::{Visitor, walk, walk_alt_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{AltExpr, AltKind, Branch, Root};
 
-pub fn validate_alt_kinds(source_id: SourceId, ast: &Root, diag: &mut Diagnostics) {
+pub fn validate_alt_kinds(input: ValidateInput) {
+    let ValidateInput {
+        source_id,
+        ast,
+        diag,
+        ..
+    } = input;
     let mut visitor = AltKindsValidator { diag, source_id };
     visitor.visit(ast);
 }

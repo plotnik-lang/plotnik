@@ -63,25 +63,25 @@ impl CaptureEffects {
     pub fn nest_scope(mut self, open: EffectIR, close: EffectIR) -> Self {
         assert!(
             matches!(
-                open.opcode,
+                open.opcode(),
                 EffectOpcode::Obj
                     | EffectOpcode::Enum
                     | EffectOpcode::Arr
                     | EffectOpcode::SuppressBegin
             ),
             "nest_scope expects scope-opening effect, got {:?}",
-            open.opcode
+            open.opcode()
         );
         assert!(
             matches!(
-                close.opcode,
+                close.opcode(),
                 EffectOpcode::EndObj
                     | EffectOpcode::EndEnum
                     | EffectOpcode::EndArr
                     | EffectOpcode::SuppressEnd
             ),
             "nest_scope expects scope-closing effect, got {:?}",
-            close.opcode
+            close.opcode()
         );
         self.pre.push(open);
         self.post.insert(0, close);

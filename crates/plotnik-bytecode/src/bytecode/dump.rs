@@ -376,18 +376,15 @@ fn is_padding(instr: &Instruction) -> bool {
     }
 }
 
-/// Format a single padding step line.
-///
-/// Output: `  07  ... ` (step number and " ... " in symbol column)
-fn format_padding_step(step: u16, step_width: usize) -> String {
-    LineBuilder::new(step_width).instruction_prefix(step, Symbol::PADDING)
-}
-
 fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let header = module.header();
     let transitions_count = header.transitions_count as usize;
-    let step_width = ctx.step_width;
+    let fmt = DumpFormatter {
+        module,
+        ctx,
+        step_width: ctx.step_width,
+    };
 
     writeln!(out, "{}[transitions]{}", c.blue, c.reset).unwrap();
 
@@ -408,12 +405,12 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
 
         // Check for padding (all-zeros Match8 instruction)
         if is_padding(&instr) {
-            writeln!(out, "{}", format_padding_step(step, step_width)).unwrap();
+            writeln!(out, "{}", fmt.padding_step(step)).unwrap();
             step += 1;
             continue;
         }
 
-        let line = format_instruction(step, &instr, module, ctx, step_width);
+        let line = fmt.instruction(step, &instr);
         out.push_str(&line);
         out.push('\n');
 
@@ -421,6 +418,14 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         let size = instruction_step_count(&instr);
         step += size;
     }
+}
+
+/// Bundles the module, precomputed context, and step-index width threaded
+/// through every per-instruction formatting routine.
+struct DumpFormatter<'a> {
+    module: &'a Module,
+    ctx: &'a DumpContext,
+    step_width: usize,
 }
 
 fn instruction_step_count(instr: &Instruction) -> u16 {
@@ -451,225 +456,214 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
     }
 }
 
-fn format_instruction(
-    step: u16,
-    instr: &Instruction,
-    module: &Module,
-    ctx: &DumpContext,
-    step_width: usize,
-) -> String {
-    match instr {
-        Instruction::Match(m) => format_match(step, m, module, ctx, step_width),
-        Instruction::Call(c) => format_call(step, c, module, ctx, step_width),
-        Instruction::Return(r) => format_return(step, r, module, ctx, step_width),
-        Instruction::Trampoline(t) => format_trampoline(step, t, ctx, step_width),
-    }
-}
-
-fn format_match(
-    step: u16,
-    m: &Match,
-    module: &Module,
-    ctx: &DumpContext,
-    step_width: usize,
-) -> String {
-    let builder = LineBuilder::new(step_width);
-    let symbol = nav_symbol(m.nav);
-    let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
-
-    let content = format_match_content(m, module, ctx);
-    let successors = format_match_successors(m, ctx, step_width);
-
-    let base = format!("{prefix}{content}");
-    builder.pad_successors(base, &successors)
-}
-
-fn format_match_content(m: &Match, module: &Module, ctx: &DumpContext) -> String {
-    let mut parts = Vec::new();
-
-    let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
-    if !pre.is_empty() {
-        parts.push(format!("[{}]", pre.join(" ")));
+impl DumpFormatter<'_> {
+    /// Format a single padding step line.
+    ///
+    /// Output: `  07  ... ` (step number and " ... " in symbol column)
+    fn padding_step(&self, step: u16) -> String {
+        LineBuilder::new(self.step_width).instruction_prefix(step, Symbol::PADDING)
     }
 
-    // Skip neg_fields and node pattern for epsilon (no node interaction)
-    if !m.is_epsilon() {
-        for field_id in m.neg_fields() {
+    fn instruction(&self, step: u16, instr: &Instruction) -> String {
+        match instr {
+            Instruction::Match(m) => self.format_match(step, m),
+            Instruction::Call(c) => self.format_call(step, c),
+            Instruction::Return(r) => self.format_return(step, r),
+            Instruction::Trampoline(t) => self.format_trampoline(step, t),
+        }
+    }
+
+    fn format_match(&self, step: u16, m: &Match) -> String {
+        let builder = LineBuilder::new(self.step_width);
+        let symbol = nav_symbol(m.nav);
+        let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = self.step_width);
+
+        let content = self.format_match_content(m);
+        let successors = self.format_match_successors(m);
+
+        let base = format!("{prefix}{content}");
+        builder.pad_successors(base, &successors)
+    }
+
+    fn format_match_content(&self, m: &Match) -> String {
+        let ctx = self.ctx;
+        let mut parts = Vec::new();
+
+        let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
+        if !pre.is_empty() {
+            parts.push(format!("[{}]", pre.join(" ")));
+        }
+
+        // Skip neg_fields and node pattern for epsilon (no node interaction)
+        if !m.is_epsilon() {
+            for field_id in m.neg_fields() {
+                let name = ctx
+                    .node_field_name(field_id)
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("field#{field_id}"));
+                parts.push(format!("-{name}"));
+            }
+
+            let node_part = self.format_node_pattern(m);
+            if !node_part.is_empty() {
+                parts.push(node_part);
+            }
+
+            // Format predicate if present
+            if let Some((op, is_regex, value_ref)) = m.predicate() {
+                let op = PredicateOp::from_byte(op);
+                let value = if is_regex {
+                    let string_id = self.module.regexes().get_string_id(value_ref as usize);
+                    let pattern = &ctx.all_strings[string_id.get() as usize];
+                    format!("/{}/", pattern)
+                } else {
+                    let s = &ctx.all_strings[value_ref as usize];
+                    format!("{:?}", s)
+                };
+                parts.push(format!("{} {}", op.as_str(), value));
+            }
+        }
+
+        let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
+        if !post.is_empty() {
+            parts.push(format!("[{}]", post.join(" ")));
+        }
+
+        parts.join(" ")
+    }
+
+    /// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)` or `"text"`
+    fn format_node_pattern(&self, m: &Match) -> String {
+        let ctx = self.ctx;
+        let mut result = String::new();
+
+        if let Some(field_id) = m.node_field {
             let name = ctx
-                .node_field_name(field_id)
+                .node_field_name(field_id.get())
                 .map(String::from)
-                .unwrap_or_else(|| format!("field#{field_id}"));
-            parts.push(format!("-{name}"));
-        }
-
-        let node_part = format_node_pattern(m, ctx);
-        if !node_part.is_empty() {
-            parts.push(node_part);
-        }
-
-        // Format predicate if present
-        if let Some((op, is_regex, value_ref)) = m.predicate() {
-            let op = PredicateOp::from_byte(op);
-            let value = if is_regex {
-                let string_id = module.regexes().get_string_id(value_ref as usize);
-                let pattern = &ctx.all_strings[string_id.get() as usize];
-                format!("/{}/", pattern)
-            } else {
-                let s = &ctx.all_strings[value_ref as usize];
-                format!("{:?}", s)
-            };
-            parts.push(format!("{} {}", op.as_str(), value));
-        }
-    }
-
-    let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
-    if !post.is_empty() {
-        parts.push(format!("[{}]", post.join(" ")));
-    }
-
-    parts.join(" ")
-}
-
-/// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)` or `"text"`
-fn format_node_pattern(m: &Match, ctx: &DumpContext) -> String {
-    let mut result = String::new();
-
-    if let Some(field_id) = m.node_field {
-        let name = ctx
-            .node_field_name(field_id.get())
-            .map(String::from)
-            .unwrap_or_else(|| format!("field#{}", field_id.get()));
-        result.push_str(&name);
-        result.push_str(": ");
-    }
-
-    match m.node_type {
-        NodeTypeIR::Any => {
-            // Any node wildcard: `_`
-            result.push('_');
-        }
-        NodeTypeIR::Named(None) => {
-            // Named wildcard: any named node
-            result.push_str("(_)");
-        }
-        NodeTypeIR::Named(Some(type_id)) => {
-            // Specific named node type
-            let name = ctx
-                .node_type_name(type_id.get())
-                .map(String::from)
-                .unwrap_or_else(|| format!("node#{}", type_id.get()));
-            result.push('(');
+                .unwrap_or_else(|| format!("field#{}", field_id.get()));
             result.push_str(&name);
-            result.push(')');
+            result.push_str(": ");
         }
-        NodeTypeIR::Anonymous(None) => {
-            // Anonymous wildcard: any anonymous node (future syntax)
-            result.push_str("\"_\"");
+
+        match m.node_type {
+            NodeTypeIR::Any => {
+                // Any node wildcard: `_`
+                result.push('_');
+            }
+            NodeTypeIR::Named(None) => {
+                // Named wildcard: any named node
+                result.push_str("(_)");
+            }
+            NodeTypeIR::Named(Some(type_id)) => {
+                // Specific named node type
+                let name = ctx
+                    .node_type_name(type_id.get())
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("node#{}", type_id.get()));
+                result.push('(');
+                result.push_str(&name);
+                result.push(')');
+            }
+            NodeTypeIR::Anonymous(None) => {
+                // Anonymous wildcard: any anonymous node (future syntax)
+                result.push_str("\"_\"");
+            }
+            NodeTypeIR::Anonymous(Some(type_id)) => {
+                // Specific anonymous node (literal token)
+                let name = ctx
+                    .node_type_name(type_id.get())
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("anon#{}", type_id.get()));
+                result.push('"');
+                result.push_str(&name);
+                result.push('"');
+            }
         }
-        NodeTypeIR::Anonymous(Some(type_id)) => {
-            // Specific anonymous node (literal token)
-            let name = ctx
-                .node_type_name(type_id.get())
+
+        result
+    }
+
+    fn format_match_successors(&self, m: &Match) -> String {
+        if m.is_terminal() {
+            "◼".to_string()
+        } else {
+            m.successors()
+                .map(|s| self.format_step(s))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    }
+
+    fn format_call(&self, step: u16, call: &Call) -> String {
+        let c = &self.ctx.colors;
+        let builder = LineBuilder::new(self.step_width);
+        let symbol = nav_symbol(call.nav());
+        let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = self.step_width);
+
+        // Format field constraint if present
+        let field_part = if let Some(field_id) = call.node_field {
+            let name = self
+                .ctx
+                .node_field_name(field_id.get())
                 .map(String::from)
-                .unwrap_or_else(|| format!("anon#{}", type_id.get()));
-            result.push('"');
-            result.push_str(&name);
-            result.push('"');
-        }
-    }
+                .unwrap_or_else(|| format!("field#{}", field_id.get()));
+            format!("{name}: ")
+        } else {
+            String::new()
+        };
 
-    result
-}
-
-fn format_match_successors(m: &Match, ctx: &DumpContext, step_width: usize) -> String {
-    if m.is_terminal() {
-        "◼".to_string()
-    } else {
-        m.successors()
-            .map(|s| format_step(s, ctx, step_width))
-            .collect::<Vec<_>>()
-            .join(", ")
-    }
-}
-
-fn format_call(
-    step: u16,
-    call: &Call,
-    _module: &Module,
-    ctx: &DumpContext,
-    step_width: usize,
-) -> String {
-    let c = &ctx.colors;
-    let builder = LineBuilder::new(step_width);
-    let symbol = nav_symbol(call.nav());
-    let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = step_width);
-
-    // Format field constraint if present
-    let field_part = if let Some(field_id) = call.node_field {
-        let name = ctx
-            .node_field_name(field_id.get())
+        let target_name = self
+            .ctx
+            .label_for(call.target)
             .map(String::from)
-            .unwrap_or_else(|| format!("field#{}", field_id.get()));
-        format!("{name}: ")
-    } else {
-        String::new()
-    };
+            .unwrap_or_else(|| format!("@{:0w$}", call.target.0, w = self.step_width));
+        // Definition name in call is blue
+        let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
+        // Format as "target : return" with numeric IDs
+        let successors = format!(
+            "{:0w$} : {:0w$}",
+            call.target.get(),
+            call.next.get(),
+            w = self.step_width
+        );
 
-    let target_name = ctx
-        .label_for(call.target)
-        .map(String::from)
-        .unwrap_or_else(|| format!("@{:0w$}", call.target.0, w = step_width));
-    // Definition name in call is blue
-    let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
-    // Format as "target : return" with numeric IDs
-    let successors = format!(
-        "{:0w$} : {:0w$}",
-        call.target.get(),
-        call.next.get(),
-        w = step_width
-    );
+        let base = format!("{prefix}{content}");
+        builder.pad_successors(base, &successors)
+    }
 
-    let base = format!("{prefix}{content}");
-    builder.pad_successors(base, &successors)
-}
+    fn format_return(&self, step: u16, _r: &Return) -> String {
+        let builder = LineBuilder::new(self.step_width);
+        let prefix = format!(
+            "  {:0sw$} {} ",
+            step,
+            Symbol::EMPTY.format(),
+            sw = self.step_width
+        );
+        builder.pad_successors(prefix, "▶")
+    }
 
-fn format_return(
-    step: u16,
-    _r: &Return,
-    _module: &Module,
-    _ctx: &DumpContext,
-    step_width: usize,
-) -> String {
-    let builder = LineBuilder::new(step_width);
-    let prefix = format!(
-        "  {:0sw$} {} ",
-        step,
-        Symbol::EMPTY.format(),
-        sw = step_width
-    );
-    builder.pad_successors(prefix, "▶")
-}
+    fn format_trampoline(&self, step: u16, t: &Trampoline) -> String {
+        let builder = LineBuilder::new(self.step_width);
+        let prefix = format!(
+            "  {:0sw$} {} ",
+            step,
+            Symbol::EMPTY.format(),
+            sw = self.step_width
+        );
+        let content = "Trampoline";
+        let successors = format!("{:0w$}", t.next.get(), w = self.step_width);
+        let base = format!("{prefix}{content}");
+        builder.pad_successors(base, &successors)
+    }
 
-fn format_trampoline(step: u16, t: &Trampoline, _ctx: &DumpContext, step_width: usize) -> String {
-    let builder = LineBuilder::new(step_width);
-    let prefix = format!(
-        "  {:0sw$} {} ",
-        step,
-        Symbol::EMPTY.format(),
-        sw = step_width
-    );
-    let content = "Trampoline";
-    let successors = format!("{:0w$}", t.next.get(), w = step_width);
-    let base = format!("{prefix}{content}");
-    builder.pad_successors(base, &successors)
-}
-
-/// Format a step ID, showing entrypoint label or numeric ID.
-fn format_step(step: StepId, ctx: &DumpContext, step_width: usize) -> String {
-    let c = &ctx.colors;
-    if let Some(label) = ctx.label_for(step) {
-        format!("▶({}{}{})", c.blue, label, c.reset)
-    } else {
-        format!("{:0w$}", step.get(), w = step_width)
+    /// Format a step ID, showing entrypoint label or numeric ID.
+    fn format_step(&self, step: StepId) -> String {
+        let c = &self.ctx.colors;
+        if let Some(label) = self.ctx.label_for(step) {
+            format!("▶({}{}{})", c.blue, label, c.reset)
+        } else {
+            format!("{:0w$}", step.get(), w = self.step_width)
+        }
     }
 }

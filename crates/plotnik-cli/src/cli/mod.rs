@@ -38,6 +38,15 @@ pub enum ColorChoice {
 }
 
 impl ColorChoice {
+    /// Parse the `--color` flag into a `ColorChoice`.
+    pub fn from_matches(m: &clap::ArgMatches) -> Self {
+        match m.get_one::<String>("color").map(|s| s.as_str()) {
+            Some("always") => ColorChoice::Always,
+            Some("never") => ColorChoice::Never,
+            _ => ColorChoice::Auto,
+        }
+    }
+
     pub fn should_colorize(self) -> bool {
         match self {
             ColorChoice::Always => true,

@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use plotnik_core::{NodeType, Symbol};
 
 use crate::analyze::type_check::TypeId;
-use crate::bytecode::{InstructionIR, Label, PredicateValueIR};
+use crate::bytecode::{EmitContext, InstructionIR, Label, PredicateValueIR};
 use crate::compile::{CompileCtx, Compiler};
 use crate::query::LinkedQuery;
 use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN};
@@ -20,7 +20,7 @@ use super::type_table::TypeTableBuilder;
 pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let type_ctx = query.type_context();
     let interner = query.interner();
-    let symbol_table = &query.symbol_table;
+    let symbol_table = query.symbol_table();
     let node_type_ids = query.node_type_ids();
     let node_field_ids = query.node_field_ids();
 
@@ -46,8 +46,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
     // Reject layouts whose step addresses overflow the u16 address space.
     // `total_steps` is computed in u32 precisely so this guard is reachable.
-    if layout.total_steps > u16::MAX as u32 {
-        return Err(EmitError::TooManyTransitions(layout.total_steps as usize));
+    if layout.total_steps() > u16::MAX as u32 {
+        return Err(EmitError::TooManyTransitions(layout.total_steps() as usize));
     }
 
     // Collect node symbols
@@ -155,7 +155,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         type_members_count: types.type_members_count() as u16,
         type_names_count: types.type_names_count() as u16,
         entrypoints_count: entrypoints.len() as u16,
-        transitions_count: layout.total_steps as u16,
+        transitions_count: layout.total_steps() as u16,
         str_blob_size: str_blob.len() as u32,
         regex_blob_size: regex_blob.len() as u32,
         total_size,
@@ -185,32 +185,26 @@ fn emit_transitions(
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
     // Allocate buffer for all steps (8 bytes each)
-    let mut bytes = vec![0u8; layout.total_steps as usize * 8];
+    let mut bytes = vec![0u8; layout.total_steps() as usize * 8];
 
-    // Create resolver closures for member indices.
-    // lookup_member: for struct fields (deduplicated by field identity)
-    // get_member_base: for enum variants (parent_type + relative_index)
+    // Member index resolvers: struct fields are deduplicated by field identity,
+    // enum variants use parent_type + relative_index, regex predicates index the
+    // RegexTable. Bundled into EmitContext so resolution signatures stay flat.
     let lookup_member = |field_name: Symbol, field_type: TypeId| {
         types.lookup_member(field_name, field_type, strings)
     };
     let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
-
-    // Predicate regex resolution closure.
     let lookup_regex = |string_id: plotnik_bytecode::StringId| regexes.get(string_id);
+    let ctx = EmitContext::new(&lookup_member, &get_member_base, &lookup_regex);
 
     for instr in instructions {
         let label = instr.label();
-        let Some(&step_id) = layout.label_to_step.get(&label) else {
+        let Some(&step_id) = layout.label_to_step().get(&label) else {
             continue;
         };
 
         let offset = step_id as usize * 8; // STEP_SIZE
-        let resolved = instr.resolve(
-            &layout.label_to_step,
-            lookup_member,
-            get_member_base,
-            lookup_regex,
-        )?;
+        let resolved = instr.resolve(layout.label_to_step(), &ctx)?;
 
         // Copy instruction bytes to the correct position
         let end = offset + resolved.len();
@@ -266,9 +260,9 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * 8);
     for ep in entrypoints {
-        bytes.extend_from_slice(&ep.name.get().to_le_bytes());
-        bytes.extend_from_slice(&ep.target.to_le_bytes());
-        bytes.extend_from_slice(&ep.result_type.0.to_le_bytes());
+        bytes.extend_from_slice(&ep.name().get().to_le_bytes());
+        bytes.extend_from_slice(&ep.target().to_le_bytes());
+        bytes.extend_from_slice(&ep.result_type().0.to_le_bytes());
         bytes.extend_from_slice(&0u16.to_le_bytes()); // _pad is always 0
     }
     bytes

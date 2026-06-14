@@ -95,12 +95,20 @@ pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypo
 }
 
 /// Validate common arguments.
-fn validate(has_source: bool, source_is_inline: bool, has_lang: bool) -> Result<(), CliError> {
+fn validate(
+    source_text: Option<&str>,
+    source_path: Option<&Path>,
+    lang: Option<&str>,
+    declared_lang: Option<&str>,
+) -> Result<(), CliError> {
+    let has_source = source_text.is_some() || source_path.is_some();
     if !has_source {
         return Err(CliError::fatal(
             "source is required: use positional argument or -s/--source",
         ));
     }
+    let source_is_inline = source_text.is_some();
+    let has_lang = lang.is_some() || declared_lang.is_some();
     if source_is_inline && !has_lang {
         return Err(CliError::fatal("--lang is required when using --source"));
     }
@@ -131,9 +139,10 @@ pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
     let loaded = load_query_source(input.query_path, input.query_text)?;
 
     validate(
-        input.source_text.is_some() || input.source_path.is_some(),
-        input.source_text.is_some(),
-        input.lang.is_some() || loaded.shebang.lang.is_some(),
+        input.source_text,
+        input.source_path,
+        input.lang,
+        loaded.shebang.lang.as_deref(),
     )?;
 
     if loaded.sources.is_empty() {

@@ -3,6 +3,13 @@ use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
 
+/// Whether a parsed expression should absorb a trailing quantifier/capture suffix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SuffixMode {
+    Apply,
+    Skip,
+}
+
 impl Parser<'_, '_> {
     /// Parse an expression, or emit an error if current token can't start one.
     /// Returns `true` if a valid expression was parsed, `false` on error.
@@ -35,22 +42,21 @@ impl Parser<'_, '_> {
     /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
     /// instead of the generic one — these are exactly the spots a tree-sitter user pastes them.
     pub(crate) fn parse_required_expr(&mut self) {
-        self.parse_required_expr_inner(true)
+        self.parse_required_expr_inner(SuffixMode::Apply)
     }
 
     /// Like [`Self::parse_required_expr`], but without applying a quantifier/capture suffix —
     /// for field values, so the suffix wraps the whole field constraint (see
     /// [`Self::parse_expr_no_suffix`]).
     pub(crate) fn parse_required_expr_no_suffix(&mut self) {
-        self.parse_required_expr_inner(false)
+        self.parse_required_expr_inner(SuffixMode::Skip)
     }
 
-    fn parse_required_expr_inner(&mut self, with_suffix: bool) {
+    fn parse_required_expr_inner(&mut self, suffix: SuffixMode) {
         if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            if with_suffix {
-                self.parse_expr();
-            } else {
-                self.parse_expr_no_suffix();
+            match suffix {
+                SuffixMode::Apply => self.parse_expr(),
+                SuffixMode::Skip => self.parse_expr_no_suffix(),
             }
             return;
         }
@@ -65,7 +71,7 @@ impl Parser<'_, '_> {
 
     /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier/capture suffix.
     pub(crate) fn parse_expr(&mut self) {
-        self.parse_expr_inner(true)
+        self.parse_expr_inner(SuffixMode::Apply)
     }
 
     /// Parse expression without applying quantifier/capture suffix.
@@ -78,10 +84,10 @@ impl Parser<'_, '_> {
     /// by looking through FieldExpr to determine the actual value type. See
     /// `build_capture_effects` in compile/capture.rs.
     pub(crate) fn parse_expr_no_suffix(&mut self) {
-        self.parse_expr_inner(false)
+        self.parse_expr_inner(SuffixMode::Skip)
     }
 
-    fn parse_expr_inner(&mut self, with_suffix: bool) {
+    fn parse_expr_inner(&mut self, suffix: SuffixMode) {
         if !self.enter_recursion() {
             self.start_node(SyntaxKind::Error);
             while !self.should_stop() {
@@ -118,7 +124,7 @@ impl Parser<'_, '_> {
             // Anchors constrain position and produce no value: `*` or `@x` after
             // one is always a mistake, never a suffix to wrap.
             self.reject_anchor_suffixes();
-        } else if with_suffix {
+        } else if suffix == SuffixMode::Apply {
             self.try_parse_quantifier(checkpoint);
             self.try_parse_capture(checkpoint);
         }

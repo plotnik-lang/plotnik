@@ -76,17 +76,17 @@ impl Default for Header {
 /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
-    pub str_blob: u32,
-    pub regex_blob: u32,
-    pub str_table: u32,
-    pub regex_table: u32,
-    pub node_types: u32,
-    pub node_fields: u32,
-    pub type_defs: u32,
-    pub type_members: u32,
-    pub type_names: u32,
-    pub entrypoints: u32,
-    pub transitions: u32,
+    pub(crate) str_blob: u32,
+    pub(crate) regex_blob: u32,
+    pub(crate) str_table: u32,
+    pub(crate) regex_table: u32,
+    pub(crate) node_types: u32,
+    pub(crate) node_fields: u32,
+    pub(crate) type_defs: u32,
+    pub(crate) type_members: u32,
+    pub(crate) type_names: u32,
+    pub(crate) entrypoints: u32,
+    pub(crate) transitions: u32,
 }
 
 impl Header {

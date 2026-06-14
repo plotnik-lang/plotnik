@@ -59,8 +59,8 @@ impl<'a> Emitter<'a> {
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let name = self.strings.get(ep.name).to_string();
-            let type_id = ep.result_type;
+            let name = self.strings.get(ep.name()).to_string();
+            let type_id = ep.result_type();
 
             match primary_names.entry(type_id) {
                 Entry::Vacant(e) => {
@@ -76,7 +76,7 @@ impl<'a> Emitter<'a> {
         let mut to_emit = HashSet::new();
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            self.collect_reachable_types(ep.result_type, &mut to_emit);
+            self.collect_reachable_types(ep.result_type(), &mut to_emit);
         }
 
         // Emit in topological order

@@ -23,7 +23,7 @@ pub struct DependencyAnalysis {
     /// - `sccs.last()` depends on everything else.
     /// - Definitions within an SCC are mutually recursive.
     /// - Every definition in the symbol table appears exactly once.
-    pub sccs: Vec<Vec<String>>,
+    sccs: Vec<Vec<String>>,
 
     /// Maps definition name (Symbol) to its DefId.
     name_to_def: HashMap<Symbol, DefId>,
@@ -86,6 +86,11 @@ impl DependencyAnalysis {
     /// or it's a single definition that references itself.
     pub fn is_recursive(&self, name: &str) -> bool {
         self.recursive_defs.contains(name)
+    }
+
+    /// Strongly connected components in reverse topological order (leaves first).
+    pub fn sccs(&self) -> &[Vec<String>] {
+        &self.sccs
     }
 }
 

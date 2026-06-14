@@ -25,12 +25,46 @@ fn continuation_nav(nav: Nav) -> Nav {
     }
 }
 
-use super::checkpoint::{CallResume, Checkpoint, CheckpointStack};
+use super::checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
 use super::cursor::{CursorWrapper, SkipPolicy};
 use super::effect::{EffectLog, RuntimeEffect};
-use super::error::RuntimeError;
+use super::error::{ControlFlow, RuntimeError, Signal};
 use super::frame::FrameArena;
 use super::trace::{NoopTracer, Tracer};
+
+/// Tracks the node matched by the most recent `Match`, which node-valued
+/// captures (`Node`/`Text`) read. A missing node means the source matched
+/// nothing (e.g. a zero-width callee return, #383), so the consuming effect
+/// fails rather than fabricating a node. Centralizing the set/clear/refresh
+/// transitions here keeps that contract in one place.
+#[derive(Clone, Copy, Default)]
+struct MatchedNode<'t>(Option<Node<'t>>);
+
+impl<'t> MatchedNode<'t> {
+    /// Record `node` as the most recent match.
+    fn set(&mut self, node: Node<'t>) {
+        self.0 = Some(node);
+    }
+
+    /// Forget any matched node (no source matched yet on this path).
+    fn clear(&mut self) {
+        self.0 = None;
+    }
+
+    /// Replace the node only when one is already present, leaving an absent
+    /// match absent. Used on Return so a non-empty callee match re-points at
+    /// the current cursor node while a zero-width return stays empty (#383).
+    fn refresh(&mut self, node: Node<'t>) {
+        if self.0.is_some() {
+            self.0 = Some(node);
+        }
+    }
+
+    /// The matched node, if any.
+    fn get(&self) -> Option<Node<'t>> {
+        self.0
+    }
+}
 
 /// Runtime limits for query execution.
 #[derive(Clone, Copy, Debug)]
@@ -84,7 +118,7 @@ pub struct VM<'t> {
     pub(crate) frames: FrameArena,
     pub(crate) checkpoints: CheckpointStack,
     pub(crate) effects: EffectLog<'t>,
-    pub(crate) matched_node: Option<Node<'t>>,
+    matched_node: MatchedNode<'t>,
 
     // Fuel tracking
     pub(crate) exec_fuel: u32,
@@ -146,7 +180,7 @@ impl<'t> VMBuilder<'t> {
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
-            matched_node: None,
+            matched_node: MatchedNode::default(),
             exec_fuel: self.limits.get_exec_fuel(),
             recursion_depth: 0,
             limits: self.limits,
@@ -169,30 +203,35 @@ impl<'t> VM<'t> {
         Self::builder(source, tree).limits(limits).build()
     }
 
+    /// Snapshot the VM state a checkpoint restores on backtrack.
+    fn checkpoint_state(&self) -> CheckpointState {
+        CheckpointState {
+            descendant_index: self.cursor.descendant_index(),
+            effect_watermark: self.effects.len(),
+            frame_index: self.frames.current(),
+            recursion_depth: self.recursion_depth,
+            suppress_depth: self.suppress_depth,
+        }
+    }
+
+    /// Restore VM state from a checkpoint's snapshot.
+    fn restore_checkpoint_state(&mut self, state: CheckpointState) {
+        self.cursor.goto_descendant(state.descendant_index);
+        self.effects.truncate(state.effect_watermark);
+        self.frames.restore(state.frame_index);
+        self.recursion_depth = state.recursion_depth;
+        self.suppress_depth = state.suppress_depth;
+    }
+
     /// Checkpoint that resumes a branch alternative at `ip`.
     fn branch_checkpoint(&self, ip: u16) -> Checkpoint {
-        Checkpoint::branch(
-            self.cursor.descendant_index(),
-            self.effects.len(),
-            self.frames.current(),
-            self.recursion_depth,
-            ip,
-            self.suppress_depth,
-        )
+        Checkpoint::branch(self.checkpoint_state(), ip)
     }
 
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
     /// callee. `call_ip` is the Call's address (for trace rendering only).
     fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
-        Checkpoint::call_retry(
-            self.cursor.descendant_index(),
-            self.effects.len(),
-            self.frames.current(),
-            self.recursion_depth,
-            call_ip,
-            self.suppress_depth,
-            resume,
-        )
+        Checkpoint::call_retry(self.checkpoint_state(), call_ip, resume)
     }
 
     /// Execute query from entrypoint, returning effect log.
@@ -224,7 +263,7 @@ impl<'t> VM<'t> {
         // Bootstrap address: where VM starts execution (preamble entry point).
         // Caller provides this, enabling different preamble types (root-match, recursive, etc.).
         self.ip = bootstrap;
-        self.entrypoint_target = entrypoint.target;
+        self.entrypoint_target = entrypoint.target();
         tracer.trace_enter_preamble();
 
         loop {
@@ -246,9 +285,9 @@ impl<'t> VM<'t> {
             };
 
             match result {
-                Ok(()) | Err(RuntimeError::Backtracked) => continue,
-                Err(RuntimeError::Accept) => return Ok(self.effects),
-                Err(e) => return Err(e),
+                Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
+                Err(Signal::Flow(ControlFlow::Accept)) => return Ok(self.effects),
+                Err(Signal::Error(e)) => return Err(e),
             }
         }
     }
@@ -258,11 +297,11 @@ impl<'t> VM<'t> {
         m: Match<'_>,
         module: &Module,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), Signal> {
         // Only clear matched_node for non-epsilon transitions.
         // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
-            self.matched_node = None;
+            self.matched_node.clear();
             self.navigate_and_match(m, module, tracer)?;
         }
 
@@ -282,7 +321,7 @@ impl<'t> VM<'t> {
         m: Match<'_>,
         module: &Module,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), Signal> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
             tracer.trace_nav_failure(m.nav);
             return self.backtrack(tracer);
@@ -302,7 +341,7 @@ impl<'t> VM<'t> {
             tracer.trace_field_success(field_id);
         }
 
-        self.matched_node = Some(self.cursor.node());
+        self.matched_node.set(self.cursor.node());
         Ok(())
     }
 
@@ -410,9 +449,9 @@ impl<'t> VM<'t> {
         &mut self,
         m: Match<'_>,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), Signal> {
         if m.succ_count() == 0 {
-            return Err(RuntimeError::Accept);
+            return Err(ControlFlow::Accept.into());
         }
 
         // Push checkpoints for alternate branches (in reverse order)
@@ -426,10 +465,16 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), RuntimeError> {
+    /// Fail the run if entering another callee would exceed the recursion limit.
+    fn check_recursion_limit(&self) -> Result<(), Signal> {
         if self.recursion_depth >= self.limits.recursion_limit {
-            return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth));
+            return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth).into());
         }
+        Ok(())
+    }
+
+    fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), Signal> {
+        self.check_recursion_limit()?;
 
         // Navigate to the candidate node (and its field, if constrained).
         let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
@@ -466,21 +511,15 @@ impl<'t> VM<'t> {
         // The callee owns its own match: until one of its Matches succeeds,
         // there is no matched node. Clearing here lets a zero-width callee
         // return "nothing" instead of leaking the call-site node (#383).
-        self.matched_node = None;
+        self.matched_node.clear();
     }
 
     /// Execute a Trampoline instruction.
     ///
     /// Trampoline is like Call, but the target comes from VM context (entrypoint_target)
     /// rather than being encoded in the instruction. Used for universal entry preamble.
-    fn exec_trampoline<T: Tracer>(
-        &mut self,
-        t: Trampoline,
-        tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
-        if self.recursion_depth >= self.limits.recursion_limit {
-            return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth));
-        }
+    fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
+        self.check_recursion_limit()?;
 
         // Trampoline doesn't navigate - it's always at root, cursor stays at root
         let saved_depth = self.cursor.depth();
@@ -499,7 +538,7 @@ impl<'t> VM<'t> {
         nav: Nav,
         field: Option<std::num::NonZeroU16>,
         tracer: &mut T,
-    ) -> Result<Option<SkipPolicy>, RuntimeError> {
+    ) -> Result<Option<SkipPolicy>, Signal> {
         if nav == Nav::Stay || nav == Nav::StayExact {
             self.check_field(field, tracer)?;
             return Ok(None);
@@ -530,7 +569,7 @@ impl<'t> VM<'t> {
         &mut self,
         field: Option<std::num::NonZeroU16>,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), Signal> {
         let Some(field_id) = field else {
             return Ok(());
         };
@@ -542,12 +581,12 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn exec_return<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), RuntimeError> {
+    fn exec_return<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
         tracer.trace_return();
 
         // If no frames, we're returning from top-level entrypoint → Accept
         if self.frames.is_empty() {
-            return Err(RuntimeError::Accept);
+            return Err(ControlFlow::Accept.into());
         }
 
         let (return_addr, saved_depth) = self.frames.pop();
@@ -556,14 +595,9 @@ impl<'t> VM<'t> {
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
 
-        // Set matched_node BEFORE going up so effects after a Call can capture
-        // the node that the callee matched. Only do so when the callee actually
-        // matched something: a zero-width return leaves `matched_node` at the
-        // `None` that `enter_callee` cleared it to, so the caller captures
-        // nothing rather than the call site (#383).
-        if self.matched_node.is_some() {
-            self.matched_node = Some(self.cursor.node());
-        }
+        // Re-point at the callee's match BEFORE going up so effects after a
+        // Call can capture it; `refresh` leaves a zero-width return empty (#383).
+        self.matched_node.refresh(self.cursor.node());
 
         // Go up to saved depth level. This preserves sibling advances
         // (continue_search at same level) while restoring level when
@@ -578,18 +612,14 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), RuntimeError> {
+    fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
         let cp = self.checkpoints.pop().ok_or(RuntimeError::NoMatch)?;
         tracer.trace_backtrack();
-        self.cursor.goto_descendant(cp.descendant_index);
-        self.effects.truncate(cp.effect_watermark);
-        self.frames.restore(cp.frame_index);
-        self.recursion_depth = cp.recursion_depth;
-        self.suppress_depth = cp.suppress_depth;
+        self.restore_checkpoint_state(cp.state);
 
         let Some(resume) = cp.call_resume else {
             self.ip = cp.ip;
-            return Err(RuntimeError::Backtracked);
+            return Err(ControlFlow::Backtracked.into());
         };
 
         // Call retry: advance to the next candidate, then re-enter the callee.
@@ -614,7 +644,7 @@ impl<'t> VM<'t> {
             .push(self.call_retry_checkpoint(cp.ip, resume));
         tracer.trace_checkpoint_created(cp.ip);
         self.enter_callee(resume.target, resume.next, tracer);
-        Err(RuntimeError::Backtracked)
+        Err(ControlFlow::Backtracked.into())
     }
 
     /// Advance to next sibling or backtrack if search exhausted.
@@ -623,7 +653,7 @@ impl<'t> VM<'t> {
         policy: SkipPolicy,
         cont_nav: Nav,
         tracer: &mut T,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), Signal> {
         if !self.cursor.continue_search(policy) {
             return self.backtrack(tracer);
         }
@@ -631,7 +661,7 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) -> Result<(), RuntimeError> {
+    fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) -> Result<(), Signal> {
         use EffectOpcode::*;
 
         let effect = match op.opcode {
@@ -660,7 +690,7 @@ impl<'t> VM<'t> {
             // matched nothing (a zero-width callee return, #383): fail this path
             // rather than fabricate the call-site node.
             Node | Text => {
-                let Some(node) = self.matched_node else {
+                let Some(node) = self.matched_node.get() else {
                     return self.backtrack(tracer);
                 };
                 match op.opcode {

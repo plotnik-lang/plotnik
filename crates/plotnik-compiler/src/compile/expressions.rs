@@ -20,6 +20,24 @@ use crate::analyze::type_check::{CaptureMechanism, capture_mechanism};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::check_trailing_anchor;
+use super::sequences::SeqItemsCtx;
+
+/// Parameters for compiling a named node whose body ends in a trailing anchor.
+///
+/// Bundles the parent-node match envelope (`entry`/`exit`/`nav`/`node_type`/
+/// `neg_fields`/`predicate`/`capture`), the resolved Up navigation, and the
+/// borrowed body items into one descriptor for the skip-retry emission.
+struct NamedNodeTrailingCtx<'a> {
+    entry: Label,
+    exit: Label,
+    nav: Nav,
+    node_type: NodeTypeIR,
+    neg_fields: Vec<u16>,
+    predicate: Option<PredicateIR>,
+    items: &'a [ast::SeqItem],
+    up_nav: Nav,
+    capture: CaptureEffects,
+}
 
 impl Compiler<'_> {
     /// Compile a named node with capture effects.
@@ -68,9 +86,17 @@ impl Compiler<'_> {
         // When the anchor check fails (matched node is not last), we need to
         // retry with the next sibling until we find one that IS last.
         if has_trailing_anchor {
-            return self.compile_named_node_with_trailing_anchor(
-                entry, exit, nav, node_type, neg_fields, predicate, &items, up_nav, capture,
-            );
+            return self.compile_named_node_with_trailing_anchor(NamedNodeTrailingCtx {
+                entry,
+                exit,
+                nav,
+                node_type,
+                neg_fields,
+                predicate,
+                items: &items,
+                up_nav,
+                capture,
+            });
         }
 
         // Split capture.post: Node/Text effects (and their Set) go on entry (need matched_node
@@ -84,10 +110,10 @@ impl Compiler<'_> {
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
-            if matches!(eff.opcode, EffectOpcode::Node | EffectOpcode::Text) {
+            if matches!(eff.opcode(), EffectOpcode::Node | EffectOpcode::Text) {
                 entry_effects.push(eff);
                 // Take the following Set if present (Node/Text are always followed by Set)
-                if iter.peek().is_some_and(|e| e.opcode == EffectOpcode::Set) {
+                if iter.peek().is_some_and(|e| e.opcode() == EffectOpcode::Set) {
                     entry_effects.push(iter.next().unwrap());
                 }
             } else {
@@ -99,14 +125,14 @@ impl Compiler<'_> {
         let final_exit = self.emit_post_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
-        let items_entry = self.compile_seq_items_inner(
-            &items,
-            up_label,
-            true,
-            None,
-            CaptureEffects::default(),
-            Some(final_exit), // Skip exit bypasses Up when Down fails (childless node)
-        );
+        let items_entry = self.compile_seq_items_inner(SeqItemsCtx {
+            items: &items,
+            exit: up_label,
+            is_inside_node: true,
+            first_nav: None,
+            capture: CaptureEffects::default(),
+            skip_exit: Some(final_exit), // Skip exit bypasses Up when Down fails (childless node)
+        });
 
         self.instructions
             .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
@@ -141,19 +167,19 @@ impl Compiler<'_> {
     /// When items match but the trailing anchor check fails, we backtrack to `try`,
     /// which falls through to `retry_nav`, advances to next sibling, and retries.
     /// Only when siblings are exhausted does backtracking propagate to the caller.
-    #[allow(clippy::too_many_arguments)]
-    fn compile_named_node_with_trailing_anchor(
-        &mut self,
-        entry: Label,
-        exit: Label,
-        nav: Nav,
-        node_type: NodeTypeIR,
-        neg_fields: Vec<u16>,
-        predicate: Option<PredicateIR>,
-        items: &[ast::SeqItem],
-        up_nav: Nav,
-        capture: CaptureEffects,
-    ) -> Label {
+    fn compile_named_node_with_trailing_anchor(&mut self, ctx: NamedNodeTrailingCtx<'_>) -> Label {
+        let NamedNodeTrailingCtx {
+            entry,
+            exit,
+            nav,
+            node_type,
+            neg_fields,
+            predicate,
+            items,
+            up_nav,
+            capture,
+        } = ctx;
+
         let final_exit = self.emit_post_effects_exit(exit, capture.post);
 
         // up_check: Match(up_nav) → final_exit
@@ -164,14 +190,14 @@ impl Compiler<'_> {
         // body: items with StayExact navigation → up_check
         // Items are compiled with StayExact because the skip-retry loop handles
         // advancement; the body should match at the current position only.
-        let body = self.compile_seq_items_inner(
+        let body = self.compile_seq_items_inner(SeqItemsCtx {
             items,
-            up_check,
-            true,
-            Some(Nav::StayExact), // First item uses StayExact (we're already at position)
-            CaptureEffects::default(),
-            None,
-        );
+            exit: up_check,
+            is_inside_node: true,
+            first_nav: Some(Nav::StayExact), // First item uses StayExact (we're already at position)
+            capture: CaptureEffects::default(),
+            skip_exit: None,
+        });
 
         // The node's children are searched with a resumable position search:
         // an adjacency failure at the trailing anchor (`up_check`) retries at the

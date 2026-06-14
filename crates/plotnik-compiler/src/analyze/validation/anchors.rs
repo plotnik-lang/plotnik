@@ -6,12 +6,19 @@
 //!
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
+use super::ValidateInput;
 use crate::SourceId;
 use crate::analyze::visitor::{Visitor, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{NamedNode, Root, SeqExpr, SeqItem};
+use crate::parser::{NamedNode, SeqExpr, SeqItem};
 
-pub fn validate_anchors(source_id: SourceId, ast: &Root, diag: &mut Diagnostics) {
+pub fn validate_anchors(input: ValidateInput) {
+    let ValidateInput {
+        source_id,
+        ast,
+        diag,
+        ..
+    } = input;
     let mut visitor = AnchorValidator {
         diag,
         source_id,

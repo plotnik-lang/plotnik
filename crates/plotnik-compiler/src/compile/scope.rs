@@ -378,7 +378,7 @@ impl Compiler<'_> {
         let null_effects: Vec<_> = capture
             .post
             .iter()
-            .filter(|eff| eff.opcode == EffectOpcode::Set)
+            .filter(|eff| eff.opcode() == EffectOpcode::Set)
             .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
             .collect();
 

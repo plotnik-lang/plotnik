@@ -2,12 +2,19 @@
 //!
 //! Bans empty trees `()`, empty sequences `{}`, and empty alternations `[]`.
 
+use super::ValidateInput;
 use crate::SourceId;
 use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_named_node, walk_seq_expr};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{AltExpr, NamedNode, Root, SeqExpr};
+use crate::parser::{AltExpr, NamedNode, SeqExpr};
 
-pub fn validate_empty_constructs(source_id: SourceId, ast: &Root, diag: &mut Diagnostics) {
+pub fn validate_empty_constructs(input: ValidateInput) {
+    let ValidateInput {
+        source_id,
+        ast,
+        diag,
+        ..
+    } = input;
     let mut visitor = EmptyConstructsValidator { diag, source_id };
     visitor.visit(ast);
 }

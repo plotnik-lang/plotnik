@@ -51,7 +51,7 @@ impl AstParams {
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
             raw: m.get_flag("raw"),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -87,7 +87,7 @@ impl CheckParams {
             lang: m.get_one::<String>("lang").cloned(),
             strict: m.get_flag("strict"),
             json: m.get_flag("json"),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -120,7 +120,7 @@ impl DumpParams {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -169,7 +169,7 @@ impl InferParams {
 
             // Output
             output: m.get_one::<PathBuf>("output").cloned(),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -226,7 +226,7 @@ impl RunParams {
             // Output options
             compact: m.get_flag("compact"),
             entry: m.get_one::<String>("entry").cloned(),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -287,7 +287,7 @@ impl TraceParams {
             verbose: m.get_count("verbose"),
             no_result: m.get_flag("no_result"),
             fuel: m.get_one::<u32>("fuel").copied().unwrap_or(1_000_000),
-            color: parse_color(m),
+            color: ColorChoice::from_matches(m),
         }
     }
 }
@@ -334,15 +334,6 @@ impl LangDumpParams {
         Self {
             lang: m.get_one::<String>("lang").cloned().unwrap(),
         }
-    }
-}
-
-/// Parse --color flag into ColorChoice.
-fn parse_color(m: &ArgMatches) -> ColorChoice {
-    match m.get_one::<String>("color").map(|s| s.as_str()) {
-        Some("always") => ColorChoice::Always,
-        Some("never") => ColorChoice::Never,
-        _ => ColorChoice::Auto,
     }
 }
 

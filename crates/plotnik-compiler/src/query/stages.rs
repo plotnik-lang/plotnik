@@ -11,10 +11,11 @@ use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{
-    validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
+    ValidateInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
+    validate_predicates,
 };
 use crate::analyze::{dependencies, validate_recursion};
-use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, Parser, Root, SyntaxNode, lex};
+use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex};
 
 pub type AstMap = IndexMap<SourceId, Root>;
 
@@ -65,18 +66,40 @@ impl QueryBuilder {
                 source.id,
                 tokens,
                 &mut diag,
-                self.config.query_parse_fuel,
-                self.config.query_parse_max_depth,
+                ParseConfig {
+                    fuel: self.config.query_parse_fuel,
+                    max_depth: self.config.query_parse_max_depth,
+                },
             );
 
             let res = parser.parse()?;
 
-            validate_alt_kinds(source.id, &res.ast, &mut diag);
-            validate_anchors(source.id, &res.ast, &mut diag);
-            validate_empty_constructs(source.id, &res.ast, &mut diag);
-            validate_predicates(source.id, source.content, &res.ast, &mut diag);
-            total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed);
-            ast.insert(source.id, res.ast);
+            validate_alt_kinds(ValidateInput {
+                source_id: source.id,
+                ast: res.ast(),
+                source_content: None,
+                diag: &mut diag,
+            });
+            validate_anchors(ValidateInput {
+                source_id: source.id,
+                ast: res.ast(),
+                source_content: None,
+                diag: &mut diag,
+            });
+            validate_empty_constructs(ValidateInput {
+                source_id: source.id,
+                ast: res.ast(),
+                source_content: None,
+                diag: &mut diag,
+            });
+            validate_predicates(ValidateInput {
+                source_id: source.id,
+                ast: res.ast(),
+                source_content: Some(source.content),
+                diag: &mut diag,
+            });
+            total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed());
+            ast.insert(source.id, res.into_ast());
         }
 
         Ok(QueryParsed {
@@ -164,7 +187,7 @@ pub struct QueryContext<'q> {
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     interner: Interner,
-    pub symbol_table: SymbolTable,
+    symbol_table: SymbolTable,
     type_context: TypeContext,
 }
 
@@ -214,6 +237,10 @@ impl QueryAnalyzed {
 
     pub fn type_context(&self) -> &TypeContext {
         &self.type_context
+    }
+
+    pub fn symbol_table(&self) -> &SymbolTable {
+        &self.symbol_table
     }
 
     pub fn interner(&self) -> &Interner {
@@ -275,11 +302,11 @@ impl LinkedQuery {
     }
 
     pub fn node_type_ids(&self) -> &IndexMap<NodeType<Symbol>, NodeTypeId> {
-        &self.linking.node_type_ids
+        self.linking.node_type_ids()
     }
 
     pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
-        &self.linking.node_field_ids
+        self.linking.node_field_ids()
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.

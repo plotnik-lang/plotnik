@@ -16,8 +16,8 @@ use super::cst::SyntaxKind;
 /// Zero-copy token: kind + span, text retrieved via [`token_text`] when needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
-    pub kind: SyntaxKind,
-    pub span: TextRange,
+    pub(crate) kind: SyntaxKind,
+    pub(crate) span: TextRange,
 }
 
 impl Token {

@@ -13,6 +13,28 @@ use super::nav::Nav;
 use super::node_type_ir::NodeTypeIR;
 
 #[test]
+fn from_u8_decodes_known_and_rejects_unknown() {
+    let known = [
+        (0x0u8, Opcode::Match8),
+        (0x1, Opcode::Match16),
+        (0x2, Opcode::Match24),
+        (0x3, Opcode::Match32),
+        (0x4, Opcode::Match48),
+        (0x5, Opcode::Match64),
+        (0x6, Opcode::Call),
+        (0x7, Opcode::Return),
+        (0x8, Opcode::Trampoline),
+    ];
+
+    for (nibble, expected) in known {
+        assert_eq!(Opcode::from_u8(nibble), Some(expected));
+    }
+    for nibble in 0x9u8..=0xF {
+        assert_eq!(Opcode::from_u8(nibble), None, "nibble {nibble:#x}");
+    }
+}
+
+#[test]
 fn opcode_sizes() {
     assert_eq!(Opcode::Match8.size(), 8);
     assert_eq!(Opcode::Match16.size(), 16);
