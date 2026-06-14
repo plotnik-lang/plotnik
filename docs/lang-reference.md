@@ -56,7 +56,7 @@ When either side is anonymous, `.` skips extras but not other anonymous tokens:
 
 Bare `_` is anonymous, so `(a) . _` is extras-only. `(_)` is named, so `(a) . (_)` skips trivia.
 
-An anchor before an alternation applies per branch: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. An anchor after an alternation is conservative: `[(b) ","] . (a)` is extras-only because some branch may match an anonymous node.
+An anchor next to an alternation applies per branch on both sides. Before: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. After a named follower: `[(b) ","] . (a)` uses named-named soft adjacency for the `(b)` path and extras-only for the `","` path, so adding an anonymous branch no longer makes the named branches stricter. When the follower is itself anonymous (`[(b) ","] . ","`), extras-only applies to every branch, since both-sides-named never holds. (Some advanced forms still stay extras-only on every branch — a ref or scope-captured follower, a scope/named-tag-captured alternation, a quantified branch, or a branch that is a sequence containing punctuation; see [Tree Navigation](tree-navigation.md).)
 
 Use `.!` for exact adjacency:
 

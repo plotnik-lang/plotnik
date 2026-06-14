@@ -1,0 +1,17 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement (call_expression arguments: (arguments [(identifier) @x ";"] . (identifier) @y))))
+
+==== source ====
+f(a, b)
+
+==== types ====
+export interface Q {
+  x: Node | null;
+  y: Node;
+}
+
+==== result ====
+{"x":{"kind":"identifier","text":"a","span":[2, 3]},"y":{"kind":"identifier","text":"b","span":[5, 6]}}
