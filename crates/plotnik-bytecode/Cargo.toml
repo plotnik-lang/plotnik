@@ -17,4 +17,4 @@ thiserror = "2.0.17"
 
 [dev-dependencies]
 insta = { version = "=1.48.0", features = ["yaml"] }
-proptest = "1"
+proptest = "=1.11.0"
