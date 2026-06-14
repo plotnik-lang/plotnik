@@ -446,10 +446,12 @@ impl Compiler<'_> {
                 // Look up variant info by branch label (using BTreeMap order, not AST order)
                 let label = branch.label().expect("tagged branch must have label");
                 let label_text = label.text();
-                let (variant_idx, payload_type_id) = variant_info
-                    .iter()
-                    .find(|(sym, _)| self.ctx.interner.resolve(**sym) == label_text)
-                    .map(|(_, &(idx, type_id))| (idx, type_id))
+                let (variant_idx, payload_type_id) = self
+                    .ctx
+                    .interner
+                    .get(label_text)
+                    .and_then(|sym| variant_info.get(&sym))
+                    .map(|&(idx, type_id)| (idx, type_id))
                     .expect("variant must exist for labeled branch");
 
                 // Create Enum effect for branch entry

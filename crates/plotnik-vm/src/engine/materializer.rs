@@ -53,8 +53,9 @@ impl<'a> ValueMaterializer<'a> {
         match def.classify() {
             TypeData::Composite {
                 kind: TypeKind::Struct,
+                member_count,
                 ..
-            } => Builder::Object(vec![]),
+            } => Builder::Object(Vec::with_capacity(member_count as usize)),
             TypeData::Composite {
                 kind: TypeKind::Enum,
                 ..

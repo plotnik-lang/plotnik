@@ -649,14 +649,12 @@ impl Compiler<'_> {
     /// In unlinked mode, returns the StringId of the field name.
     pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> Option<NonZeroU16> {
         if let Some(ids) = self.ctx.node_fields {
-            // Linked mode: resolve to NodeFieldId from grammar
-            for (&sym, &id) in ids {
-                if self.ctx.interner.resolve(sym) == field_name {
-                    return NonZeroU16::new(id.get());
-                }
-            }
-            // If not found in grammar, treat as no constraint (linked mode)
-            None
+            // Linked mode: an unknown field is left unconstrained.
+            self.ctx
+                .interner
+                .get(field_name)
+                .and_then(|sym| ids.get(&sym))
+                .and_then(|id| NonZeroU16::new(id.get()))
         } else {
             // Unlinked mode: store StringId referencing the field name
             let string_id = self.ctx.strings.borrow_mut().intern_str(field_name);

@@ -27,7 +27,7 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
     let successors: std::collections::BTreeMap<Label, Vec<Label>> = result
         .instructions
         .iter()
-        .map(|instr| (instr.label(), instr.successors()))
+        .map(|instr| (instr.label(), instr.successors().to_vec()))
         .collect();
 
     // BFS from all entry points

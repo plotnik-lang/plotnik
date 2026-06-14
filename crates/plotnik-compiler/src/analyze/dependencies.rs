@@ -221,7 +221,7 @@ pub(super) fn collect_refs<'a>(expr: &Expr, symbol_table: &'a SymbolTable) -> In
             continue;
         };
         let Some(name_tok) = r.name() else { continue };
-        let Some(key) = symbol_table.keys().find(|&k| k == name_tok.text()) else {
+        let Some(key) = symbol_table.lookup_key(name_tok.text()) else {
             continue;
         };
         refs.insert(key);

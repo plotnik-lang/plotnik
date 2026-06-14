@@ -1,5 +1,7 @@
 //! Output value types for materialization.
 
+use std::fmt::Write as _;
+
 use arborium_tree_sitter::Node;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -12,8 +14,9 @@ use plotnik_core::Colors;
 /// a reference to the tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeHandle {
-    /// Node kind name (e.g., "identifier", "number").
-    pub kind: String,
+    /// Node kind name (e.g., "identifier"). Tree-sitter kind names live in the
+    /// grammar's static symbol table, hence `&'static`.
+    pub kind: &'static str,
     /// Source text of the node.
     pub text: String,
     /// Byte span [start, end).
@@ -28,7 +31,7 @@ impl NodeHandle {
             .expect("node text extraction failed")
             .to_owned();
         Self {
-            kind: node.kind().to_owned(),
+            kind: node.kind(),
             text,
             span: (node.start_byte() as u32, node.end_byte() as u32),
         }
@@ -129,7 +132,7 @@ fn format_value(out: &mut String, value: &Value, c: &Colors, pretty: bool, inden
         Value::String(s) => {
             out.push_str(c.green);
             out.push('"');
-            out.push_str(&escape_json_string(s));
+            escape_json_into(out, s);
             out.push('"');
             out.push_str(c.reset);
         }
@@ -158,7 +161,7 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     // Field 1: "kind"
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(field_indent));
+        push_indent(out, field_indent);
     }
     out.push_str(c.blue);
     out.push_str("\"kind\"");
@@ -171,7 +174,7 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     }
     out.push_str(c.green);
     out.push('"');
-    out.push_str(&escape_json_string(&h.kind));
+    escape_json_into(out, h.kind);
     out.push('"');
     out.push_str(c.reset);
 
@@ -181,7 +184,7 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push_str(c.reset);
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(field_indent));
+        push_indent(out, field_indent);
     }
     out.push_str(c.blue);
     out.push_str("\"text\"");
@@ -194,7 +197,7 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     }
     out.push_str(c.green);
     out.push('"');
-    out.push_str(&escape_json_string(&h.text));
+    escape_json_into(out, &h.text);
     out.push('"');
     out.push_str(c.reset);
 
@@ -204,7 +207,7 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push_str(c.reset);
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(field_indent));
+        push_indent(out, field_indent);
     }
     out.push_str(c.blue);
     out.push_str("\"span\"");
@@ -218,18 +221,18 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push_str(c.dim);
     out.push('[');
     out.push_str(c.reset);
-    out.push_str(&h.span.0.to_string());
+    let _ = write!(out, "{}", h.span.0);
     out.push_str(c.dim);
     out.push_str(", ");
     out.push_str(c.reset);
-    out.push_str(&h.span.1.to_string());
+    let _ = write!(out, "{}", h.span.1);
     out.push_str(c.dim);
     out.push(']');
     out.push_str(c.reset);
 
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(indent));
+        push_indent(out, indent);
     }
 
     out.push_str(c.dim);
@@ -260,7 +263,7 @@ fn format_array(out: &mut String, arr: &[Value], c: &Colors, pretty: bool, inden
 
         if pretty {
             out.push('\n');
-            out.push_str(&" ".repeat(elem_indent));
+            push_indent(out, elem_indent);
         }
 
         format_value(out, item, c, pretty, elem_indent);
@@ -268,7 +271,7 @@ fn format_array(out: &mut String, arr: &[Value], c: &Colors, pretty: bool, inden
 
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(indent));
+        push_indent(out, indent);
     }
 
     out.push_str(c.dim);
@@ -305,13 +308,13 @@ fn format_object(
 
         if pretty {
             out.push('\n');
-            out.push_str(&" ".repeat(field_indent));
+            push_indent(out, field_indent);
         }
 
         // Key in blue
         out.push_str(c.blue);
         out.push('"');
-        out.push_str(&escape_json_string(key));
+        escape_json_into(out, key);
         out.push('"');
         out.push_str(c.reset);
 
@@ -328,7 +331,7 @@ fn format_object(
 
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(indent));
+        push_indent(out, indent);
     }
 
     out.push_str(c.dim);
@@ -352,7 +355,7 @@ fn format_tagged(
 
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(field_indent));
+        push_indent(out, field_indent);
     }
 
     // $tag key in blue
@@ -371,7 +374,7 @@ fn format_tagged(
     // Tag value is green (string)
     out.push_str(c.green);
     out.push('"');
-    out.push_str(&escape_json_string(tag));
+    escape_json_into(out, tag);
     out.push('"');
     out.push_str(c.reset);
 
@@ -383,7 +386,7 @@ fn format_tagged(
 
         if pretty {
             out.push('\n');
-            out.push_str(&" ".repeat(field_indent));
+            push_indent(out, field_indent);
         }
 
         // $data key in blue
@@ -404,7 +407,7 @@ fn format_tagged(
 
     if pretty {
         out.push('\n');
-        out.push_str(&" ".repeat(indent));
+        push_indent(out, indent);
     }
 
     out.push_str(c.dim);
@@ -412,20 +415,36 @@ fn format_tagged(
     out.push_str(c.reset);
 }
 
-fn escape_json_string(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    for ch in s.chars() {
+/// Escape `s` as a JSON string body, appending to `out`.
+fn escape_json_into(out: &mut String, s: &str) {
+    let needs_escape = |c: char| matches!(c, '"' | '\\' | '\n' | '\r' | '\t') || c.is_control();
+
+    // Copy the unescaped prefix in one shot, then escape from the first
+    // offending char onward.
+    let Some((split, _)) = s.char_indices().find(|&(_, c)| needs_escape(c)) else {
+        out.push_str(s);
+        return;
+    };
+
+    out.push_str(&s[..split]);
+    for ch in s[split..].chars() {
         match ch {
-            '"' => result.push_str("\\\""),
-            '\\' => result.push_str("\\\\"),
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
             c if c.is_control() => {
-                result.push_str(&format!("\\u{:04x}", c as u32));
+                let _ = write!(out, "\\u{:04x}", c as u32);
             }
-            c => result.push(c),
+            c => out.push(c),
         }
     }
-    result
+}
+
+/// Append `n` spaces to `out`.
+fn push_indent(out: &mut String, n: usize) {
+    for _ in 0..n {
+        out.push(' ');
+    }
 }

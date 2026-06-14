@@ -5,7 +5,7 @@
 //!
 //! The interner can be serialized to a binary blob format for the compiled query.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 /// A lightweight handle to an interned string.
 ///
@@ -43,8 +43,9 @@ impl Ord for Symbol {
 /// String interner. Deduplicates strings and returns cheap Symbol handles.
 #[derive(Debug, Clone, Default)]
 pub struct Interner {
-    /// Map from string to symbol for deduplication.
-    map: HashMap<String, Symbol>,
+    /// Map from string to symbol for deduplication. Keys are trusted internal
+    /// identifiers, never adversarial input, so a non-cryptographic hasher is fine.
+    map: FxHashMap<String, Symbol>,
     /// Storage for interned strings, indexed by Symbol.
     strings: Vec<String>,
 }

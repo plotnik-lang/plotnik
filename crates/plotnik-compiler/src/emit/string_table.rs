@@ -3,6 +3,7 @@
 //! Builds the string table section, remapping query Symbols to bytecode StringIds.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use plotnik_core::{Interner, Symbol};
 
@@ -26,10 +27,11 @@ pub const EASTER_EGG: &str = "Beauty will save the world";
 pub struct StringTableBuilder {
     /// Map from query Symbol to bytecode StringId.
     mapping: HashMap<Symbol, StringId>,
-    /// Reverse lookup from string content to StringId (for intern_str).
-    str_lookup: HashMap<String, StringId>,
+    /// Reverse lookup from string content to StringId (for intern_str). Shares
+    /// each string's allocation with `strings` via `Rc`.
+    str_lookup: HashMap<Rc<str>, StringId>,
     /// Ordered strings for the binary.
-    strings: Vec<String>,
+    strings: Vec<Rc<str>>,
 }
 
 impl StringTableBuilder {
@@ -40,7 +42,7 @@ impl StringTableBuilder {
             strings: Vec::new(),
         };
         // Reserve index 0 for easter egg (never looked up via str_lookup)
-        builder.strings.push(EASTER_EGG.to_string());
+        builder.strings.push(Rc::from(EASTER_EGG));
         builder
     }
 
@@ -59,8 +61,9 @@ impl StringTableBuilder {
             .ok_or(EmitError::StringNotFound(sym))?;
 
         let id = StringId::new(self.strings.len() as u16);
-        self.strings.push(text.to_string());
-        self.str_lookup.insert(text.to_string(), id);
+        let text: Rc<str> = Rc::from(text);
+        self.strings.push(Rc::clone(&text));
+        self.str_lookup.insert(text, id);
         self.mapping.insert(sym, id);
         Ok(id)
     }
@@ -72,8 +75,9 @@ impl StringTableBuilder {
         }
 
         let id = StringId::new(self.strings.len() as u16);
-        self.strings.push(s.to_string());
-        self.str_lookup.insert(s.to_string(), id);
+        let s: Rc<str> = Rc::from(s);
+        self.strings.push(Rc::clone(&s));
+        self.str_lookup.insert(s, id);
         id
     }
 
@@ -104,7 +108,7 @@ impl StringTableBuilder {
 
     /// Look up a string by its StringId.
     pub fn get_str(&self, id: StringId) -> &str {
-        &self.strings[id.get() as usize]
+        self.strings[id.get() as usize].as_ref()
     }
 
     /// Emit the string blob and offset table.

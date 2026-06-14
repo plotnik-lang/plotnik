@@ -198,7 +198,7 @@ impl Graph {
             let label = instr.label();
             successors.entry(label).or_default();
 
-            for succ in instr.successors() {
+            for &succ in instr.successors() {
                 successors.entry(label).or_default().push(succ);
                 predecessors.entry(succ).or_default().push(label);
             }
@@ -284,7 +284,7 @@ fn build_block_refs(ir: &LayoutIR, label_to_instr: &BTreeMap<Label, &Instruction
         let Some(instr) = label_to_instr.get(&label) else {
             continue;
         };
-        for succ in instr.successors() {
+        for &succ in instr.successors() {
             if let Some(&succ_block) = ir.label_to_block.get(&succ)
                 && succ_block != block_idx
             {
@@ -315,7 +315,7 @@ fn pack_successors(
         };
 
         // For each successor of this instruction
-        for succ in instr.successors() {
+        for &succ in instr.successors() {
             if let Some(&succ_block) = ir.label_to_block.get(&succ) {
                 // Only consider moving if successor is in a later block
                 if succ_block > block_idx {
@@ -342,13 +342,14 @@ fn pack_successors(
 
         // Find the best earlier block with free space
         // Prefer blocks that reference the predecessor block (cache locality)
+        let scores: Vec<_> = (0..current_block)
+            .map(|c| block_score(pred_block, c, refs))
+            .collect();
         let best = (0..current_block)
             .filter(|&c| ir.blocks[c].can_fit(size))
             .max_by(|&a, &b| {
-                let score_a = block_score(pred_block, a, refs);
-                let score_b = block_score(pred_block, b, refs);
-                score_a
-                    .partial_cmp(&score_b)
+                scores[a]
+                    .partial_cmp(&scores[b])
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 

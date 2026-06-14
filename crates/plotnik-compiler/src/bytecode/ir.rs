@@ -345,12 +345,12 @@ impl InstructionIR {
     }
 
     /// Get all successor labels (for graph building).
-    pub fn successors(&self) -> Vec<Label> {
+    pub fn successors(&self) -> &[Label] {
         match self {
-            Self::Match(m) => m.successors.clone(),
-            Self::Call(c) => vec![c.next],
-            Self::Return(_) => vec![],
-            Self::Trampoline(t) => vec![t.next],
+            Self::Match(m) => &m.successors,
+            Self::Call(c) => std::slice::from_ref(&c.next),
+            Self::Return(_) => &[],
+            Self::Trampoline(t) => std::slice::from_ref(&t.next),
         }
     }
 

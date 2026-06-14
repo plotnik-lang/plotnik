@@ -51,6 +51,10 @@ pub struct Checkpoint {
     /// If set, this is a Call retry: advance the cursor and re-enter the
     /// callee instead of resuming at `ip`.
     pub(crate) call_resume: Option<CallResume>,
+    /// Maximum `frame_index` over this checkpoint and everything beneath it on
+    /// the stack. The whole stack's max is therefore the top's `running_max`,
+    /// so pruning never has to scan.
+    pub(crate) running_max: Option<u32>,
 }
 
 #[allow(dead_code)] // Getters useful for debugging/tracing
@@ -61,6 +65,7 @@ impl Checkpoint {
             state,
             ip,
             call_resume: None,
+            running_max: None,
         }
     }
 
@@ -72,6 +77,7 @@ impl Checkpoint {
             state,
             ip: call_ip,
             call_resume: Some(call_resume),
+            running_max: None,
         }
     }
 
@@ -102,9 +108,10 @@ impl Checkpoint {
 
 /// Stack of checkpoints with O(1) max_frame_ref tracking.
 ///
-/// The `max_frame_ref` is maintained for frame arena pruning:
-/// we track the highest frame index referenced by any checkpoint
-/// so pruning knows which frames are safe to remove.
+/// The `max_frame_ref` is maintained for frame arena pruning: we track the
+/// highest frame index referenced by any checkpoint so pruning knows which
+/// frames are safe to remove. It is kept current through each checkpoint's
+/// `running_max` prefix-max rather than recomputed on backtrack.
 #[derive(Debug)]
 pub struct CheckpointStack {
     stack: Vec<Checkpoint>,
@@ -122,30 +129,20 @@ impl CheckpointStack {
     }
 
     /// Push a checkpoint.
-    pub fn push(&mut self, checkpoint: Checkpoint) {
-        // Update max_frame_ref (O(1))
-        if let Some(frame_idx) = checkpoint.state.frame_index {
-            self.max_frame_ref = Some(match self.max_frame_ref {
-                Some(max) => max.max(frame_idx),
-                None => frame_idx,
-            });
-        }
+    pub fn push(&mut self, mut checkpoint: Checkpoint) {
+        let prev = self.stack.last().and_then(|c| c.running_max);
+        checkpoint.running_max = match (checkpoint.state.frame_index, prev) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        };
+        self.max_frame_ref = checkpoint.running_max;
         self.stack.push(checkpoint);
     }
 
     /// Pop and return the most recent checkpoint.
     pub fn pop(&mut self) -> Option<Checkpoint> {
         let cp = self.stack.pop()?;
-
-        // Recompute max_frame_ref only if we removed the max holder
-        // This is O(1) amortized: each checkpoint contributes to at most
-        // one recomputation over its lifetime.
-        if cp.state.frame_index == self.max_frame_ref && !self.stack.is_empty() {
-            self.max_frame_ref = self.stack.iter().filter_map(|c| c.state.frame_index).max();
-        } else if self.stack.is_empty() {
-            self.max_frame_ref = None;
-        }
-
+        self.max_frame_ref = self.stack.last().and_then(|c| c.running_max);
         Some(cp)
     }
 
