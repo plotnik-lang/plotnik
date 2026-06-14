@@ -196,33 +196,28 @@ fn extract_choices(rule: Rule) -> Vec<Rule> {
     }
 }
 
-fn symbol_is_used(variables: &[SyntaxVariable], symbol: Symbol) -> bool {
-    for variable in variables {
-        for production in &variable.productions {
-            for step in &production.steps {
-                if step.symbol == symbol {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 fn validate_productions(
     variables: &[SyntaxVariable],
     variables_to_inline: &[Symbol],
 ) -> FlattenGrammarResult<()> {
+    let used_symbols: FxHashSet<Symbol> = variables
+        .iter()
+        .flat_map(|v| &v.productions)
+        .flat_map(|p| &p.steps)
+        .map(|step| step.symbol)
+        .collect();
+    let inline_set: FxHashSet<Symbol> = variables_to_inline.iter().copied().collect();
+
     for (i, variable) in variables.iter().enumerate() {
         let symbol = Symbol::non_terminal(i);
-        let used = symbol_is_used(variables, symbol);
+        let used = used_symbols.contains(&symbol);
 
         for production in &variable.productions {
             if used && production.steps.is_empty() {
                 Err(FlattenGrammarError::EmptyString(variable.name.clone()))?;
             }
 
-            if variables_to_inline.contains(&symbol)
+            if inline_set.contains(&symbol)
                 && production.steps.iter().any(|step| step.symbol == symbol)
             {
                 Err(FlattenGrammarError::RecursiveInline(variable.name.clone()))?;

@@ -89,6 +89,12 @@ impl SymbolTable {
         self.table.keys().map(String::as_str)
     }
 
+    /// Return the table's own borrow of the stored key for `name` — for callers
+    /// that need a `&str` tied to the table's lifetime, not to their search string.
+    pub fn lookup_key(&self, name: &str) -> Option<&str> {
+        self.table.get_key_value(name).map(|(k, _)| k.as_str())
+    }
+
     /// Iterate over (name, expr) pairs in insertion order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &ast::Expr)> {
         self.table.iter().map(|(k, v)| (k.as_str(), v))

@@ -30,7 +30,7 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
     let mut preds: HashMap<Label, Vec<Label>> = HashMap::new();
     for instr in instructions {
         let from = instr.label();
-        for succ in instr.successors() {
+        for &succ in instr.successors() {
             preds.entry(succ).or_default().push(from);
         }
     }
@@ -229,9 +229,8 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         };
 
         let single = m.successors.len() == 1;
-        let mut succs = m.successors.clone();
-        let mut post = m.post_effects.clone();
-        let mut modified = false;
+        // Cloned lazily on the first rewrite; the common no-op case allocates nothing.
+        let mut edited: Option<(Vec<Label>, Vec<EffectIR>)> = None;
 
         for (j, &succ) in m.successors.iter().enumerate() {
             let Some((target, effects)) = see_through(succ, &result.instructions, &idx) else {
@@ -253,12 +252,13 @@ fn laser_vision(result: &mut CompileResult) -> bool {
             // still reads `m`'s node — the node these effects saw at their original
             // position. forward_migrate is unsafe only because it pushes effects
             // *past* a navigation that clears `matched_node`.
+            let (succs, post) =
+                edited.get_or_insert_with(|| (m.successors.clone(), m.post_effects.clone()));
             succs[j] = target;
             post.extend(effects);
-            modified = true;
         }
 
-        if modified {
+        if let Some((succs, post)) = edited {
             let m = match &mut result.instructions[i] {
                 InstructionIR::Match(m) => m,
                 _ => unreachable!(),

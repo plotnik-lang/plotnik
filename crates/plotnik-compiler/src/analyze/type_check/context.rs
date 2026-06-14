@@ -158,13 +158,11 @@ impl TypeContext {
         self.def_ids.get(&sym).copied()
     }
 
-    /// Get DefId for a definition name (requires interner for lookup).
+    /// Get DefId for a definition name. `def_ids` is keyed by `Symbol`, so the
+    /// name is resolved through the same interner that populated it.
     pub fn get_def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
-        // Linear scan - only used during analysis, not hot path.
-        // Necessary because we don't assume Interner has reverse lookup here.
-        self.def_ids
-            .iter()
-            .find_map(|(&sym, &id)| (interner.resolve(sym) == name).then_some(id))
+        let sym = interner.get(name)?;
+        self.get_def_id_sym(sym)
     }
 
     /// Get the name Symbol for a DefId.

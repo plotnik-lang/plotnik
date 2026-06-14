@@ -1,6 +1,6 @@
 //! Type graph traversal and analysis.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use plotnik_bytecode::{TypeData, TypeId, TypeKind};
 
@@ -70,25 +70,25 @@ impl Emitter<'_> {
             }
         }
 
-        // Kahn's algorithm
+        // Kahn's algorithm. Ready types are kept in a max-heap keyed by raw id
+        // (TypeId is not Ord) so each step deterministically takes the largest
+        // available id, matching the previous sort-then-pop-last ordering.
         let mut result = Vec::with_capacity(types.len());
-        let mut queue: Vec<TypeId> = deps
+        let mut queue: BinaryHeap<u16> = deps
             .iter()
             .filter(|(_, d)| d.is_empty())
-            .map(|(&tid, _)| tid)
+            .map(|(&tid, _)| tid.0)
             .collect();
 
-        queue.sort_by_key(|tid| tid.0);
-
-        while let Some(tid) = queue.pop() {
+        while let Some(raw) = queue.pop() {
+            let tid = TypeId(raw);
             result.push(tid);
             if let Some(dependents) = rdeps.get(&tid) {
                 for &dependent in dependents {
                     if let Some(dep_set) = deps.get_mut(&dependent) {
                         dep_set.remove(&tid);
                         if dep_set.is_empty() {
-                            queue.push(dependent);
-                            queue.sort_by_key(|t| t.0);
+                            queue.push(dependent.0);
                         }
                     }
                 }

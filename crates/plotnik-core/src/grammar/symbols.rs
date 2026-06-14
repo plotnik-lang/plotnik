@@ -1,4 +1,5 @@
 use log::warn;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -34,10 +35,7 @@ pub(super) fn resolve_symbols(
     word_token_name: Option<&str>,
     reserved_word_sets: &[ReservedWordContext<Rule>],
 ) -> InternSymbolsResult<ResolvedGrammar> {
-    let interner = Interner {
-        variables: source_variables,
-        external_rules,
-    };
+    let interner = Interner::new(source_variables, external_rules);
 
     if variable_type_for_name(&source_variables[0].name) == VariableType::Hidden {
         Err(InternSymbolsError::HiddenStartRule)?;
@@ -131,11 +129,29 @@ pub(super) fn resolve_symbols(
 }
 
 struct Interner<'a> {
-    variables: &'a [Variable],
-    external_rules: &'a [Rule],
+    /// Name → Symbol. Variables take priority over external rules, and the
+    /// lowest index wins within each group, matching the original ordered scan.
+    name_map: FxHashMap<&'a str, Symbol>,
 }
 
-impl Interner<'_> {
+impl<'a> Interner<'a> {
+    fn new(variables: &'a [Variable], external_rules: &'a [Rule]) -> Self {
+        let mut name_map = FxHashMap::default();
+        for (i, variable) in variables.iter().enumerate() {
+            name_map
+                .entry(variable.name.as_str())
+                .or_insert_with(|| Symbol::non_terminal(i));
+        }
+        for (i, external_token) in external_rules.iter().enumerate() {
+            if let Rule::NamedSymbol(name) = external_token {
+                name_map
+                    .entry(name.as_str())
+                    .or_insert_with(|| Symbol::external(i));
+            }
+        }
+        Self { name_map }
+    }
+
     fn intern_rule(&self, rule: &Rule, name: Option<&str>) -> InternSymbolsResult<Rule> {
         match rule {
             Rule::Choice(elements) => {
@@ -172,21 +188,7 @@ impl Interner<'_> {
     }
 
     fn intern_name(&self, symbol: &str) -> Option<Symbol> {
-        for (i, variable) in self.variables.iter().enumerate() {
-            if variable.name == symbol {
-                return Some(Symbol::non_terminal(i));
-            }
-        }
-
-        for (i, external_token) in self.external_rules.iter().enumerate() {
-            if let Rule::NamedSymbol(name) = external_token
-                && name == symbol
-            {
-                return Some(Symbol::external(i));
-            }
-        }
-
-        None
+        self.name_map.get(symbol).copied()
     }
 
     // In the case of a seq or choice rule of 1 element in a hidden rule, weird

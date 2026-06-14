@@ -558,7 +558,7 @@ mod debug_impl {
         }
 
         for instr in instructions {
-            for succ in instr.successors() {
+            for &succ in instr.successors() {
                 if !index.contains_key(&succ) {
                     return Err(format!(
                         "dangling successor {:?} referenced by {:?}",

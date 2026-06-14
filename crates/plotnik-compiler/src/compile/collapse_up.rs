@@ -29,7 +29,7 @@ pub fn collapse_up(result: &mut CompileResult) {
     // Count predecessors for each label - only remove labels with exactly one predecessor
     let mut predecessor_count: HashMap<Label, usize> = HashMap::new();
     for instr in &result.instructions {
-        for succ in instr.successors() {
+        for &succ in instr.successors() {
             *predecessor_count.entry(succ).or_default() += 1;
         }
     }

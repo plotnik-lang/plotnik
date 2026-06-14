@@ -38,7 +38,9 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
 /// - Splits `StringLiteral` tokens into quote + content + quote
 /// - Splits `RegexPredicateMatch`/`RegexPredicateNoMatch` into operator + whitespace + regex
 pub fn lex(source: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
+    // Every token spans at least one byte, so source.len() bounds the count;
+    // the divisor approximates the average bytes per token.
+    let mut tokens = Vec::with_capacity(source.len() / 4 + 8);
     let mut lexer = SyntaxKind::lexer(source);
     let mut error_start: Option<usize> = None;
 

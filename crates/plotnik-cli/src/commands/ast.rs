@@ -1,5 +1,6 @@
 //! Show AST of query and/or source file.
 
+use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use arborium_tree_sitter as tree_sitter;
@@ -101,32 +102,41 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
 }
 
 fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool) -> String {
-    format_node(tree.root_node(), source, 0, raw) + "\n"
+    let mut out = String::new();
+    format_node(&mut out, tree.root_node(), source, 0, raw);
+    out.push('\n');
+    out
 }
 
 fn format_node(
+    out: &mut String,
     node: tree_sitter::Node,
     source: &str,
     depth: usize,
     include_anonymous: bool,
-) -> String {
-    format_node_with_field(node, None, source, depth, include_anonymous)
+) {
+    format_node_with_field(out, node, None, source, depth, include_anonymous);
 }
 
 fn format_node_with_field(
+    out: &mut String,
     node: tree_sitter::Node,
     field_name: Option<&str>,
     source: &str,
     depth: usize,
     include_anonymous: bool,
-) -> String {
+) {
     if !include_anonymous && !node.is_named() {
-        return String::new();
+        return;
     }
 
-    let indent = "  ".repeat(depth);
+    for _ in 0..depth {
+        out.push_str("  ");
+    }
+    if let Some(f) = field_name {
+        let _ = write!(out, "{}: ", f);
+    }
     let kind = node.kind();
-    let field_prefix = field_name.map(|f| format!("{}: ", f)).unwrap_or_default();
 
     let children: Vec<_> = {
         let mut cursor = node.walk();
@@ -149,46 +159,45 @@ fn format_node_with_field(
         let text = node
             .utf8_text(source.as_bytes())
             .unwrap_or("<invalid utf8>");
-        return if text == kind {
-            format!("{}{}(\"{}\")", indent, field_prefix, escape_string(kind))
+        if text == kind {
+            out.push_str("(\"");
+            escape_string_into(out, kind);
+            out.push_str("\")");
         } else {
-            format!(
-                "{}{}({} \"{}\")",
-                indent,
-                field_prefix,
-                kind,
-                escape_string(text)
-            )
-        };
+            let _ = write!(out, "({} \"", kind);
+            escape_string_into(out, text);
+            out.push_str("\")");
+        }
+        return;
     }
 
-    let mut out = format!("{}{}({}", indent, field_prefix, kind);
+    let _ = write!(out, "({}", kind);
     for (child, child_field) in children {
         out.push('\n');
-        out.push_str(&format_node_with_field(
+        format_node_with_field(
+            out,
             child,
             child_field,
             source,
             depth + 1,
             include_anonymous,
-        ));
+        );
     }
     out.push(')');
-    out
 }
 
-fn escape_string(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
+fn escape_string_into(out: &mut String, s: &str) {
     for c in s.chars() {
         match c {
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
-            '\\' => result.push_str("\\\\"),
-            '"' => result.push_str("\\\""),
-            c if c.is_control() => result.push_str(&format!("\\u{{{:04x}}}", c as u32)),
-            c => result.push(c),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            c if c.is_control() => {
+                let _ = write!(out, "\\u{{{:04x}}}", c as u32);
+            }
+            c => out.push(c),
         }
     }
-    result
 }
