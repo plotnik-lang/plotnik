@@ -214,6 +214,31 @@ fn anchor_before_alternation_in_first_child() {
     );
 }
 
+// Anchor *after* a mixed alternation is classified per branch (#410): the named
+// branch reaches the follower via soft adjacency (skips anonymous + extras), the
+// anonymous branch via extras-only.
+
+#[test]
+fn anchor_after_mixed_alternation_named_branch_skips_anonymous_operator() {
+    // The `(identifier)` branch matches `a`, then the soft anchor must skip the
+    // anonymous `+` operator and the comment to bind `b`. Extras-only adjacency
+    // (the old whole-alternation classification) could skip neither operator.
+    shot_exec!(
+        r#"Q = (program (expression_statement (binary_expression [(identifier) @left ";"] . (identifier) @right)))"#,
+        "a + /* c */ b"
+    );
+}
+
+#[test]
+fn anchor_after_mixed_alternation_named_branch_skips_comma() {
+    // The anonymous `";"` branch cannot match anything here, so the match exists
+    // only if the named `(identifier)` branch's soft anchor skips the `,` sibling.
+    shot_exec!(
+        r#"Q = (program (expression_statement (call_expression arguments: (arguments [(identifier) @x ";"] . (identifier) @y))))"#,
+        "f(a, b)"
+    );
+}
+
 // Soft vs strict anchors and runtime trivia skipping (#411).
 
 #[test]

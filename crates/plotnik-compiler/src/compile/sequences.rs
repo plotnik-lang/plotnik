@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashSet};
 use plotnik_core::Symbol;
 
 use crate::analyze::type_check::{TypeId, TypeShape};
-use crate::bytecode::{EffectIR, Label, MemberRef};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MemberRef, NodeTypeIR};
 use crate::parser::ast::{self, Expr, SeqItem};
 use plotnik_bytecode::{EffectOpcode, Nav};
 
@@ -395,6 +395,41 @@ impl Compiler<'_> {
         self.wrap_entry_pre(entry, capture.pre.clone())
     }
 
+    /// When an alternation sits immediately before a soft sibling anchor into a
+    /// *named* follower (`[(b) ","] . (a)`), the follower's entry was classified
+    /// conservatively as `NextSkipExtras` because *some* branch may match an
+    /// anonymous node (`compute_nav_modes` sees the whole alternation, not the
+    /// branch that actually matched). A named branch on the matched side deserves
+    /// the both-sides-named soft skip (`NextSkip`), which also skips anonymous
+    /// siblings. Emit a twin of the follower's entry instruction with `NextSkip`,
+    /// sharing its successors and effects, and return its label so named branches
+    /// route to it. Exactly one of the two entries runs per match path, so cloning
+    /// the effects is sound.
+    ///
+    /// Returns `None` — caller stays conservative — unless the follower's entry is
+    /// a single `Match` carrying `NextSkipExtras` on a `Named` node, the one shape
+    /// where the upgrade is both safe and needed. Anonymous/`_` followers are
+    /// intrinsically extras-only; refs (`Call`) and scope-wrapped followers
+    /// (epsilon entry) carry no such instruction and are left for follow-up.
+    fn clone_named_follower_skip_entry(&mut self, exit: Label) -> Option<Label> {
+        let mut twin = {
+            let InstructionIR::Match(m) = self.instructions.iter().find(|i| i.label() == exit)?
+            else {
+                return None;
+            };
+            if m.nav != Nav::NextSkipExtras || !matches!(m.node_type, NodeTypeIR::Named(_)) {
+                return None;
+            }
+            m.clone()
+        };
+
+        twin.label = self.fresh_label();
+        twin.nav = Nav::NextSkip;
+        let label = twin.label;
+        self.instructions.push(twin.into());
+        Some(label)
+    }
+
     /// Compile an alternation with capture effects (passed to each branch).
     pub(super) fn compile_alt_inner(
         &mut self,
@@ -443,11 +478,46 @@ impl Compiler<'_> {
         let search_nav = resumable_search_nav(first_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
 
+        // A branch is "named" (eligible for the soft-skip follower twin) when it
+        // cannot match an anonymous node and does not own its own iteration. A
+        // quantified branch's zero-match path leaves no named node on the anchor's
+        // left, so the soft-skip upgrade is unsound there; quantified followers are
+        // a separate (deferred) case. The anonymity test is whole-branch, matching
+        // `nav_for_alt_branch`'s before-anchor classification: a sequence branch
+        // with a named tail but interior punctuation stays conservative (safe, not
+        // a wrong match) until a trailing-position classifier exists. Computed once
+        // and reused for both the twin gate and per-branch routing.
+        let branch_named: Vec<bool> = branches
+            .iter()
+            .map(|b| {
+                b.body().is_some_and(|body| {
+                    !expr_owns_iteration(&body) && !classifier.expr_may_match_anonymous(Some(&body))
+                })
+            })
+            .collect();
+
+        // A soft sibling anchor after this alternation classified the named follower
+        // conservatively (`NextSkipExtras`) because some branch may match an anonymous
+        // node. Give named branches a `NextSkip` twin of that follower to route to.
+        // Only worth cloning when at least one branch is itself named.
+        let named_exit = branch_named
+            .iter()
+            .any(|&named| named)
+            .then(|| self.clone_named_follower_skip_entry(exit))
+            .flatten();
+
         // Compile each branch, collecting entry labels
         let mut successors = Vec::new();
-        for branch in branches.iter() {
+        for (branch_idx, branch) in branches.iter().enumerate() {
             let Some(body) = branch.body() else {
                 continue;
+            };
+
+            // Named branches route to the soft-skip follower twin; anonymous branches
+            // keep the conservative extras-only follower at `exit`.
+            let branch_exit = match named_exit {
+                Some(skip) if branch_named[branch_idx] => skip,
+                _ => exit,
             };
 
             if is_enum {
@@ -479,7 +549,7 @@ impl Compiler<'_> {
 
                 // Compile body with merged effects - no separate epsilon wrappers needed
                 let body_entry = self.with_scope(payload_type_id, |this| {
-                    this.compile_expr_inner(&body, exit, branch_nav, branch_capture)
+                    this.compile_expr_inner(&body, branch_exit, branch_nav, branch_capture)
                 });
 
                 successors.push(body_entry);
@@ -534,7 +604,8 @@ impl Compiler<'_> {
                 let branch_capture = capture.clone().with_pre_values(null_effects);
 
                 let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
-                let branch_entry = self.compile_expr_inner(&body, exit, branch_nav, branch_capture);
+                let branch_entry =
+                    self.compile_expr_inner(&body, branch_exit, branch_nav, branch_capture);
                 successors.push(branch_entry);
             }
         }

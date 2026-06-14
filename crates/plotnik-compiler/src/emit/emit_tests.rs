@@ -568,6 +568,79 @@ fn anchors_with_mixed_alternation_classifies_each_branch() {
 }
 
 #[test]
+fn anchors_after_mixed_alternation_classifies_each_branch() {
+    // A soft anchor after a mixed alternation must classify per branch: the named
+    // `(number)` branch reaches the `(identifier)` follower via `NextSkip` (─•─),
+    // the anonymous `"+"` branch via `NextSkipExtras` (─◦─). The follower's entry
+    // is cloned so both navs converge on the same successor.
+    shot_bytecode!(
+        r#"
+        Test = {[(number) "+"] . (identifier)}
+    "#
+    );
+}
+
+#[test]
+fn anchors_after_alternation_anonymous_follower_stays_conservative() {
+    // The follower `","` is anonymous, so both-sides-named never holds and every
+    // branch keeps extras-only adjacency — no follower twin is emitted.
+    shot_bytecode!(
+        r#"
+        Test = {[(number) (string)] . ","}
+    "#
+    );
+}
+
+#[test]
+fn anchors_after_alternation_captured_named_follower() {
+    // The follower carries a capture; cloning its entry duplicates the capture
+    // effects, but only the matched branch's path runs them.
+    shot_bytecode!(
+        r#"
+        Test = {[(number) "+"] . (identifier) @id}
+    "#
+    );
+}
+
+#[test]
+fn anchors_after_inline_captured_alternation_splits() {
+    // A scalar capture's effects ride the branch instructions, leaving the exit as
+    // the follower's `Match` — so the split still fires: `(number)` reaches the
+    // follower via `NextSkip`, `"+"` via `NextSkipExtras`.
+    shot_bytecode!(
+        r#"
+        Test = {[(number) "+"] @t . (identifier)}
+    "#
+    );
+}
+
+#[test]
+fn anchors_after_captured_alternation_stays_conservative() {
+    // When the alternation itself is captured (here, tagged with `@t`), its exit is
+    // an effect-bearing epsilon — the `Set` for the bound value — rather than the
+    // follower's `Match`, so no twin is emitted and every branch keeps extras-only
+    // adjacency. Documented follower-side limitation pending follow-up.
+    shot_bytecode!(
+        r#"
+        Test = {[A: (number) B: "+"] @t . (identifier)}
+    "#
+    );
+}
+
+#[test]
+fn anchors_after_alternation_quantified_branch_stays_conservative() {
+    // A quantified branch's zero-match path leaves no named node on the anchor's
+    // left, so the soft-skip upgrade is unsound; the `(identifier)?` branch keeps
+    // extras-only adjacency rather than routing to a `NextSkip` twin. Quantified
+    // followers are a separate deferred case.
+    shot_bytecode!(
+        r#"
+        Test = (array [(identifier)? @x ";"] . (identifier) @y)
+    "#
+    );
+}
+
+#[test]
 fn anchors_with_ref_to_anonymous() {
     shot_bytecode!(
         r#"
