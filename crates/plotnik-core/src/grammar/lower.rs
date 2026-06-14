@@ -318,6 +318,7 @@ pub(super) fn derive_symbols(
             named,
             visible,
             supertype,
+            terminal: symbol.is_terminal() || symbol.is_external(),
         });
     }
 
@@ -334,6 +335,11 @@ pub(super) fn derive_symbols(
             named: alias.is_named,
             visible: true,
             supertype: false,
+            // Aliases get fresh ids here, so this `terminal` value never reaches the aliased public
+            // id's per-kind accumulation. `is_token` does not rely on it being accurate: it also
+            // checks the node shape (a kind with a children/fields slot is never a token), so
+            // `false` is a safe default.
+            terminal: false,
         });
     }
 

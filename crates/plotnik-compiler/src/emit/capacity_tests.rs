@@ -95,7 +95,7 @@ fn effect_member_payload_overflow_is_emit_error() {
 
 #[test]
 fn truncated_or_corrupted_module_is_rejected() {
-    let bytes = try_emit("Q = (program (identifier) @name)").expect("valid query emits");
+    let bytes = try_emit("Q = (program (_) @name)").expect("valid query emits");
 
     // The pristine module loads.
     Module::load(&bytes).expect("pristine module loads");
@@ -127,7 +127,7 @@ fn crafted_header_blob_size_does_not_overflow_offsets() {
     // cover, so a corrupt near-`u32::MAX` value reaches offset computation. It
     // must be rejected by the section-bounds check, not overflow the u32
     // arithmetic in `compute_offsets` (a debug panic — load failing open).
-    let mut bytes = try_emit("Q = (program (identifier) @name)").expect("valid query emits");
+    let mut bytes = try_emit("Q = (program (_) @name)").expect("valid query emits");
     bytes[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
 
     assert!(

@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,11 @@ pub(super) struct NodeSymbol {
     pub(super) named: bool,
     pub(super) visible: bool,
     pub(super) supertype: bool,
+    /// True when this symbol is a lexical terminal or an external token. A public
+    /// node kind is a leaf token only when *every* contributing symbol is terminal
+    /// (see `token_node_ids`), which distinguishes real leaves like `identifier`
+    /// from childless syntax nodes like `debugger_statement`.
+    pub(super) terminal: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +51,10 @@ pub struct Grammar {
     field_names: HashMap<NodeFieldId, String>,
     supertype_ids: HashSet<NodeTypeId>,
     subtypes: HashMap<NodeTypeId, Vec<NodeTypeId>>,
+    /// Public node kinds that are leaf tokens (no child nodes are derivable).
+    token_node_ids: HashSet<NodeTypeId>,
+    /// Public node ids that name anonymous (literal-token) kinds.
+    anonymous_node_id_set: HashSet<NodeTypeId>,
     fields_by_node: HashMap<NodeTypeId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
@@ -154,16 +164,27 @@ impl Grammar {
         Self::from_metadata(raw.name.clone(), metadata).map_err(GrammarError::Analysis)
     }
 
-    fn from_metadata(name: String, metadata: GrammarMetadata) -> Result<Self, String> {
+    pub(super) fn from_metadata(name: String, metadata: GrammarMetadata) -> Result<Self, String> {
         let mut node_ids = HashMap::<NodeType<&str>, NodeTypeId>::new();
         let mut named_node_ids = HashMap::new();
         let mut anonymous_node_ids = HashMap::new();
         let mut node_names = HashMap::new();
         let mut supertype_ids = HashSet::new();
 
+        // A public node kind can be reached by multiple symbols (e.g. via aliases). It is a leaf
+        // token only when every contributing symbol is terminal, so this accumulates per kind with
+        // AND: a single non-terminal contributor (like `debugger_statement` = `"debugger" ";"`)
+        // keeps the kind out of the token set even when it otherwise looks childless.
+        let mut all_terminal: HashMap<NodeTypeId, bool> = HashMap::new();
+
         for symbol in &metadata.symbols {
             let node_id = node_type_id(symbol.id);
             node_names.insert(node_id, symbol.type_name.clone());
+
+            all_terminal
+                .entry(node_id)
+                .and_modify(|every| *every &= symbol.terminal)
+                .or_insert(symbol.terminal);
 
             if symbol.supertype {
                 supertype_ids.insert(node_id);
@@ -241,6 +262,28 @@ impl Grammar {
         let mut all_field_names = field_ids.keys().cloned().collect::<Vec<_>>();
         all_field_names.sort();
 
+        // A kind is a leaf token only when it is terminal AND its shape declares no children and
+        // no fields. The terminal flag alone is not enough: alias-introduced symbols receive fresh
+        // node ids (see `derive_symbols`), so their non-terminal `terminal: false` never reaches
+        // the public id's per-kind accumulation. A kind reachable both by a terminal symbol and by
+        // children-bearing aliases then accumulates to all-terminal even though it has a real
+        // children slot. Confirming against the node shape handles this: a kind with a
+        // children/fields slot is never a leaf token, so a named child under it is valid.
+        let token_node_ids = all_terminal
+            .into_iter()
+            .filter(|&(_, every_terminal)| every_terminal)
+            .filter_map(|(node_id, _)| {
+                let constraints = node_constraints.get(&node_id);
+                let has_children = constraints
+                    .and_then(|c| c.children.as_ref())
+                    .is_some_and(|children| !children.valid_types.is_empty());
+                let has_fields = constraints.is_some_and(|c| !c.fields.is_empty());
+                (!has_children && !has_fields).then_some(node_id)
+            })
+            .collect::<HashSet<_>>();
+
+        let anonymous_node_id_set = anonymous_node_ids.values().copied().collect::<HashSet<_>>();
+
         Ok(Self {
             name,
             node_constraints,
@@ -253,6 +296,8 @@ impl Grammar {
             field_names,
             supertype_ids,
             subtypes,
+            token_node_ids,
+            anonymous_node_id_set,
             fields_by_node,
             all_named_node_kinds,
             all_anonymous_node_kinds,
@@ -324,6 +369,35 @@ impl Grammar {
             .get(&supertype)
             .map(Vec::as_slice)
             .unwrap_or(&[])
+    }
+
+    /// Transitive closure of a supertype's subtypes (direct and indirect), excluding the
+    /// supertype itself. `subtypes` is direct-only, so structural validation expands it here.
+    /// Sequence validation calls it too; centralized here to avoid duplicating the traversal.
+    pub fn collect_subtypes(&self, supertype: NodeTypeId) -> HashSet<NodeTypeId> {
+        let mut closure = HashSet::new();
+        let mut stack = vec![supertype];
+        while let Some(node) = stack.pop() {
+            for &sub in self.subtypes(node) {
+                if closure.insert(sub) {
+                    stack.push(sub);
+                }
+            }
+        }
+        closure
+    }
+
+    /// Whether `node_type_id` is a leaf token kind — a node whose content is its own text and
+    /// which never has child nodes (e.g. `identifier`). Childless *syntax* nodes such as
+    /// `debugger_statement` are not tokens: extras like comments can still attach beneath them.
+    pub fn is_token(&self, node_type_id: NodeTypeId) -> bool {
+        self.token_node_ids.contains(&node_type_id)
+    }
+
+    /// Whether `node_type_id` names an anonymous (literal-token) kind, e.g. `"+"`. Used to
+    /// distinguish fields that only accept literal tokens (where a `(_)` value is impossible).
+    pub fn is_anonymous_node(&self, node_type_id: NodeTypeId) -> bool {
+        self.anonymous_node_id_set.contains(&node_type_id)
     }
 
     pub fn root(&self) -> Option<NodeTypeId> {
@@ -399,12 +473,16 @@ impl Grammar {
     }
 
     fn node_constraints_for(&self, node_type_id: NodeTypeId) -> &NodeConstraints {
-        self.node_constraints.get(&node_type_id).unwrap_or_else(|| {
-            panic!(
-                "Grammar: node type id {node_type_id} not found \
-                     (grammar metadata must match linked node ids)"
-            )
-        })
+        // Leaf-token kinds (and some alias-produced ids) carry no node shape, so they have no
+        // constraints entry. Treat them as having no children/fields rather than panicking: a
+        // token has no children, so an empty view is correct, and any named child under it is
+        // already handled by the `is_token` leaf check. Returning empty keeps every constraint lookup
+        // (admissibility, predicate-on-leaf, hints) total instead of crashing on such ids.
+        static EMPTY: LazyLock<NodeConstraints> = LazyLock::new(|| NodeConstraints {
+            fields: HashMap::new(),
+            children: None,
+        });
+        self.node_constraints.get(&node_type_id).unwrap_or(&EMPTY)
     }
 }
 

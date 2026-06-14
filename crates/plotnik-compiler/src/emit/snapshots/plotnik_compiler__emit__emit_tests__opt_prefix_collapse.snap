@@ -1,14 +1,14 @@
 ---
 source: crates/plotnik-compiler/src/emit/emit_tests.rs
 ---
-Test = [(object (pair)) (object (string))]
+Test = [(object (pair)) (object (spread_element))]
 ---
 [strings]
 S0 "Beauty will save the world"
 S1 "Test"
 S2 "object"
 S3 "pair"
-S4 "string"
+S4 "spread_element"
 
 [type_defs]
 T0 = <Void>
@@ -34,6 +34,6 @@ Test:
   08   !   (object)                         10, 12
   10  └‣─  (pair)                           11
   11  ─‣┘  _                                14
-  12  └‣─  (string)                         13
+  12  └‣─  (spread_element)                 13
   13  ─‣┘  _                                14
   14                                        ▶

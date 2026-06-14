@@ -1,15 +1,16 @@
 ---
 source: crates/plotnik-compiler/src/emit/emit_tests.rs
 ---
-Test = (pair key: (property_identifier) @key -value)
+Test = (import_specifier name: (identifier) @key -alias)
 ---
 [strings]
 S0 "Beauty will save the world"
 S1 "key"
 S2 "Test"
-S3 "pair"
-S4 "property_identifier"
-S5 "value"
+S3 "import_specifier"
+S4 "identifier"
+S5 "alias"
+S6 "name"
 
 [type_defs]
 T0 = <Node>
@@ -32,7 +33,7 @@ _ObjWrap:
   05                                        ▶
 
 Test:
-  06   !   -value (pair)                    08
-  08  └‣─  key: (property_identifier) [Node Set(M0)]  10
+  06   !   -alias (import_specifier)        08
+  08  └‣─  name: (identifier) [Node Set(M0)]  10
   10  ─‣┘  _                                11
   11                                        ▶

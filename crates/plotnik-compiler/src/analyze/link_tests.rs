@@ -260,8 +260,9 @@ fn negated_field_not_on_node_type_with_suggestion() {
 
 #[test]
 fn negated_field_valid() {
+    // `label` is optional on `break_statement`, so asserting its absence is satisfiable.
     let input = indoc! {r#"
-        Q = (function_declaration -name) @fn
+        Q = (break_statement -label) @brk
     "#};
 
     Query::expect_valid_linking(input);
@@ -510,5 +511,253 @@ fn shared_definition_validated_per_context() {
       |                                                ----------------- on `binary_expression`
       |
     help: valid fields for `binary_expression`: `left`, `operator`, `right`
+
+    error: `identifier` can't be the value of `arguments`
+      |
+    1 | Args = arguments: (identifier)
+      |        ---------   ^^^^^^^^^^
+      |        |
+      |        field `arguments`
+      |
+    help: `arguments` accepts: `arguments`, `template_string`
+
+    error: `call_expression` cannot be a child of this node
+      |
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |      ---------------  ^^^^^^^^^^^^^^^
+      |      |
+      |      on `statement_block`
+      |
+    help: valid children of `statement_block`: `statement`
+
+    error: `binary_expression` cannot be a child of this node
+      |
+    2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+      |      --------------- on `statement_block`      ^^^^^^^^^^^^^^^^^
+      |
+    help: valid children of `statement_block`: `statement`
     ");
+}
+
+#[test]
+fn invalid_child_kind_rejected() {
+    let input = r"Q = (function_declaration (class_declaration))";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: `class_declaration` cannot be a child of this node
+      |
+    1 | Q = (function_declaration (class_declaration))
+      |      --------------------  ^^^^^^^^^^^^^^^^^
+      |      |
+      |      on `function_declaration`
+      |
+    help: `function_declaration` has no unlabeled children — its children are fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`
+    ");
+}
+
+#[test]
+fn invalid_field_value_kind_rejected() {
+    let input = r"Q = (function_declaration name: (number))";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: `number` can't be the value of `name`
+      |
+    1 | Q = (function_declaration name: (number))
+      |                           ----   ^^^^^^
+      |                           |
+      |                           field `name`
+      |
+    help: `name` accepts: `identifier`
+    ");
+}
+
+#[test]
+fn invalid_subtype_rejected() {
+    let input = r"Q = (expression#statement_block)";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: `statement_block` is not a kind of `expression`
+      |
+    1 | Q = (expression#statement_block)
+      |      ---------- ^^^^^^^^^^^^^^^
+      |      |
+      |      base type `expression`
+      |
+    help: kinds of `expression` include: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)
+    ");
+}
+
+#[test]
+fn child_under_leaf_token_rejected() {
+    let input = r"Q = (identifier (_))";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: `identifier` is a leaf token — it has no child nodes
+      |
+    1 | Q = (identifier (_))
+      |      ---------- ^^^
+      |      |
+      |      `identifier`
+      |
+    help: a leaf token's content is its text — match it directly `(identifier)` or by value `(identifier == "foo")`
+    "#);
+}
+
+#[test]
+fn negated_required_field_rejected() {
+    let input = r"Q = (function_declaration -name) @fn";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @"
+    error: `-name` can never match
+      |
+    1 | Q = (function_declaration -name) @fn
+      |      --------------------  ^^^^
+      |      |
+      |      on `function_declaration`
+      |
+    help: `-name` requires `name` to be absent, but every `function_declaration` has one — drop `-name`
+    ");
+}
+
+#[test]
+fn anonymous_only_field_value_rejected() {
+    let input = r"Q = (binary_expression operator: (identifier))";
+
+    let res = Query::expect_invalid_linking(input);
+
+    insta::assert_snapshot!(res, @r#"
+    error: `identifier` can't be the value of `operator`
+      |
+    1 | Q = (binary_expression operator: (identifier))
+      |                        --------   ^^^^^^^^^^
+      |                        |
+      |                        field `operator`
+      |
+    help: `operator` accepts only literal tokens — write `operator: "!="`
+    "#);
+}
+
+#[test]
+fn alternation_branch_admissibility_is_not_checked() {
+    // One branch is a valid `body`, so the alternation is satisfiable; structural checks are
+    // skipped inside `[...]`.
+    let input = r"Q = (function_declaration body: [(statement_block) @a (class_declaration) @b])";
+
+    Query::expect_valid_linking(input);
+}
+
+#[test]
+fn transitive_supertype_as_child_valid() {
+    // `decorator` accepts `call_expression`/`identifier`/`member_expression`; `expression` and
+    // `primary_expression` are supertypes that reach them only through multi-hop subtyping.
+    Query::expect_valid_linking(r"Q = (decorator (expression))");
+    Query::expect_valid_linking(r"Q = (decorator (primary_expression))");
+}
+
+#[test]
+fn transitive_subtype_valid() {
+    // `expression -> primary_expression -> call_expression` is a two-hop subtype path.
+    Query::expect_valid_linking(r"Q = (expression#call_expression)");
+}
+
+#[test]
+fn overlapping_supertype_refinement_valid() {
+    // `expression` and `pattern` are sibling supertypes that share concrete members (`identifier`,
+    // `member_expression`, ...), so a single node can be both. `(expression#pattern)` can therefore
+    // match, even though `pattern` is not itself listed among `expression`'s subtypes.
+    Query::expect_valid_linking(r"Q = (expression#pattern)");
+    Query::expect_valid_linking(r"Q = (pattern#expression)");
+}
+
+#[test]
+fn quantified_child_admissibility_is_not_checked() {
+    // `(identifier)?` matches zero, so the position is satisfiable; structural checks are skipped
+    // inside quantifiers.
+    let input = r"Q = (statement_block (identifier)?)";
+
+    Query::expect_valid_linking(input);
+}
+
+#[test]
+fn child_under_childless_syntax_node_valid() {
+    // `debugger_statement` is childless in node-types but is a syntax node, not a leaf token:
+    // an extra (comment) can attach, so `(_)` is satisfiable and must not be rejected.
+    Query::expect_valid_linking(r"Q = (debugger_statement (_))");
+}
+
+#[test]
+fn violation_in_alternation_branch_does_not_reject_query() {
+    // A branch with an internal violation is a dead branch, but a sibling branch keeps the
+    // alternation satisfiable — so the whole query can match and must NOT be rejected. One case per
+    // violation kind, each paired with a valid `(identifier)` branch.
+    Query::expect_valid_linking(r"Q = [(function_declaration (class_declaration)) (identifier)]");
+    Query::expect_valid_linking(r"Q = [(function_declaration name: (number)) (identifier)]");
+    Query::expect_valid_linking(r"Q = [(expression#statement_block) (identifier)]");
+    Query::expect_valid_linking(r"Q = [(identifier (number)) (number)]");
+    Query::expect_valid_linking(r"Q = [(function_declaration -name) (identifier)]");
+    Query::expect_valid_linking(
+        r"Q = [(function_declaration condition: (identifier)) (identifier)]",
+    );
+    Query::expect_valid_linking(r"Q = [(function_declaration -condition) (identifier)]");
+    Query::expect_valid_linking(r#"Q = [(function_declaration == "x") (identifier)]"#);
+}
+
+#[test]
+fn violation_under_quantifier_does_not_reject_query() {
+    // A quantified subtree matches zero times, so an internal violation never blocks a match.
+    Query::expect_valid_linking(r"Q = (program (function_declaration (class_declaration))* @x)");
+    Query::expect_valid_linking(r"Q = (program (function_declaration name: (number))? @x)");
+    Query::expect_valid_linking(r"Q = (program (function_declaration -name)? @x)");
+    Query::expect_valid_linking(
+        r"Q = (program (function_declaration condition: (identifier))? @x)",
+    );
+    Query::expect_valid_linking(r"Q = (program (function_declaration -condition)? @x)");
+    Query::expect_valid_linking(r#"Q = (program (function_declaration == "x")? @x)"#);
+    // The same holds at arbitrary depth and through `+`.
+    Query::expect_valid_linking(
+        r"Q = (program (function_declaration name: (number) body: (number))+ @x)",
+    );
+}
+
+#[test]
+fn deep_violation_in_alternation_does_not_reject_query() {
+    // Skipping applies at every level nested under the alternation, not just the first.
+    Query::expect_valid_linking(
+        r"Q = [(call_expression function: (member_expression object: (number))) (identifier)]",
+    );
+}
+
+#[test]
+fn sibling_of_alternation_is_still_checked() {
+    // Guards against over-skipping: only the alternation is skipped. A bad bare child sitting
+    // beside it is always evaluated and must be rejected.
+    Query::expect_invalid_linking(
+        r"Q = (function_declaration (class_declaration) [(identifier) (number)])",
+    );
+}
+
+#[test]
+fn shared_definition_rejected_at_non_deferred_use_after_deferred() {
+    // `Bad` is a bare field, impossible only against a parent lacking it — standalone (ctx = None)
+    // it is not checked, so only its use carries the rejection. `arguments` is absent on
+    // `binary_expression`. `Bad` is reached first inside the alternation (deferred — field check
+    // skipped, result memoized) and then as a direct child (non-deferred). The memo keys on
+    // `deferred`, so the cached deferred result does not mask the rejection at the non-deferred use
+    // — keying on `(name, ctx)` alone would wrongly accept this query.
+    let input = indoc! {r#"
+        Bad = arguments: (identifier)
+        Q = (binary_expression [(Bad) (identifier)] (Bad))
+    "#};
+
+    Query::expect_invalid_linking(input);
 }
