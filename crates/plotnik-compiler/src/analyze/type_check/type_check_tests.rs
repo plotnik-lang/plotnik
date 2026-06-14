@@ -945,7 +945,7 @@ fn error_uncaptured_output_with_captures() {
 fn output_captured_with_bubbles_ok() {
     let input = indoc! {r#"
     A = [X: (identifier) Y: (number)]
-    Q = (program (A) @a (string) @name)
+    Q = (program (A) @a (debugger_statement) @name)
     "#};
 
     let res = Query::expect_valid_types(input);

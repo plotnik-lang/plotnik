@@ -188,7 +188,7 @@ fn fields_multiple() {
 fn fields_negated() {
     shot_bytecode!(
         r#"
-        Test = (pair key: (property_identifier) @key -value)
+        Test = (import_specifier name: (identifier) @key -alias)
     "#
     );
 }
@@ -706,7 +706,7 @@ fn recursion_with_structured_result() {
 fn optional_first_child() {
     shot_bytecode!(
         r#"
-        Test = (program (identifier)? @id (number) @n)
+        Test = (program (lexical_declaration)? @id (debugger_statement) @n)
     "#
     );
 }
@@ -750,7 +750,7 @@ fn optional_null_injection() {
 fn opt_prefix_collapse() {
     shot_bytecode!(
         r#"
-        Test = [(object (pair)) (object (string))]
+        Test = [(object (pair)) (object (spread_element))]
     "#
     );
 }

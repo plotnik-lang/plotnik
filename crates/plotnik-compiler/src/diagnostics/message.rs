@@ -97,6 +97,9 @@ pub enum DiagnosticKind {
     FieldNotOnNodeType,
     InvalidFieldChildType,
     InvalidChildType,
+    InvalidSubtype,
+    ChildUnderLeafToken,
+    NegatedRequiredField,
 
     // Often consequences of earlier errors
     UnnamedDef,
@@ -301,6 +304,9 @@ impl DiagnosticKind {
             Self::FieldNotOnNodeType => "field not valid on this node type",
             Self::InvalidFieldChildType => "node type not valid for this field",
             Self::InvalidChildType => "node type not valid as child",
+            Self::InvalidSubtype => "node type is not a subtype of this type",
+            Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
+            Self::NegatedRequiredField => "this field is always present",
 
             // Structural
             Self::UnnamedDef => "definition must be named",
@@ -341,8 +347,13 @@ impl DiagnosticKind {
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
             Self::UnknownField => "`{}` is not a valid field".to_string(),
             Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
-            Self::InvalidFieldChildType => "node type `{}` is not valid for this field".to_string(),
+            // The detail is the full message: "`number` can't be the value of `name`".
+            Self::InvalidFieldChildType => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
+            // The detail is the full message: "`statement_block` is not a kind of `expression`".
+            Self::InvalidSubtype => "{}".to_string(),
+            Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
+            Self::NegatedRequiredField => "`-{}` can never match".to_string(),
 
             // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),

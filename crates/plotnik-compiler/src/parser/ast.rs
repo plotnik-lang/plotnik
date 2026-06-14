@@ -255,6 +255,21 @@ impl NamedNode {
         })
     }
 
+    /// For a `#subtype` (or deprecated `/subtype`) refinement, returns the subtype kind
+    /// token: `(expression#statement_block)` → `statement_block`. Returns `None` for a bare
+    /// category `(expression#)`, a plain node, or a string subtype (`#"x"`) — the last of
+    /// which structural validation conservatively skips.
+    pub fn subtype(&self) -> Option<SyntaxToken> {
+        let mut tokens = self
+            .0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token());
+        tokens
+            .by_ref()
+            .find(|t| matches!(t.kind(), SyntaxKind::Hash | SyntaxKind::Slash))?;
+        tokens.find(|t| t.kind() == SyntaxKind::Id)
+    }
+
     /// Returns true if the node type is wildcard (`_`), matching any named node.
     pub fn is_any(&self) -> bool {
         self.node_type()
