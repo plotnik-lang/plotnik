@@ -179,7 +179,7 @@ M59: S60 → T30  ; A29: T30
 N0: S61 → T31  ; Q
 
 [entrypoints]
-Q = 006 :: T31
+Q = 008 :: T31
 
 [transitions]
 _ObjWrap:
@@ -187,69 +187,65 @@ _ObjWrap:
   002       Trampoline                      003
   003  -ε-  [EndObj]                        005
   005                                       ▶
+  006  ...  
+  007  ...  
 
 Q:
-  006  -ε-                                  008
-  007  ...  
-  008  -ε-                                  120, 123, 128
-  010                                       ▶
-  011   !   [Enum(M30)] (identifier) [Node Set(M0) EndEnum]  010
-  014  ...  
-  015  ...  
-  016   !   [Enum(M31)] (identifier) [Node Set(M1) EndEnum]  010
-  019   !   [Enum(M32)] (identifier) [Node Set(M2) EndEnum]  010
-  022  ...  
+  008  -ε-                                  017, 020, 024, 027, 032, 035, 040, 043, 048, 051, 056, 059, 064, 067, 072, 075, 080, 083, 088, 091, 096, 099, 104, 107, 112, 115, 120, 126
+  016                                       ▶
+  017   !   [Enum(M30)] (identifier) [Node Set(M0) EndEnum]  016
+  020   !   [Enum(M31)] (identifier) [Node Set(M1) EndEnum]  016
   023  ...  
-  024   !   [Enum(M33)] (identifier) [Node Set(M3) EndEnum]  010
-  027   !   [Enum(M34)] (identifier) [Node Set(M4) EndEnum]  010
+  024   !   [Enum(M32)] (identifier) [Node Set(M2) EndEnum]  016
+  027   !   [Enum(M33)] (identifier) [Node Set(M3) EndEnum]  016
   030  ...  
   031  ...  
-  032   !   [Enum(M35)] (identifier) [Node Set(M5) EndEnum]  010
-  035   !   [Enum(M36)] (identifier) [Node Set(M6) EndEnum]  010
+  032   !   [Enum(M34)] (identifier) [Node Set(M4) EndEnum]  016
+  035   !   [Enum(M35)] (identifier) [Node Set(M5) EndEnum]  016
   038  ...  
   039  ...  
-  040   !   [Enum(M37)] (identifier) [Node Set(M7) EndEnum]  010
-  043   !   [Enum(M38)] (identifier) [Node Set(M8) EndEnum]  010
+  040   !   [Enum(M36)] (identifier) [Node Set(M6) EndEnum]  016
+  043   !   [Enum(M37)] (identifier) [Node Set(M7) EndEnum]  016
   046  ...  
   047  ...  
-  048   !   [Enum(M39)] (identifier) [Node Set(M9) EndEnum]  010
-  051   !   [Enum(M40)] (identifier) [Node Set(M10) EndEnum]  010
+  048   !   [Enum(M38)] (identifier) [Node Set(M8) EndEnum]  016
+  051   !   [Enum(M39)] (identifier) [Node Set(M9) EndEnum]  016
   054  ...  
   055  ...  
-  056   !   [Enum(M41)] (identifier) [Node Set(M11) EndEnum]  010
-  059   !   [Enum(M42)] (identifier) [Node Set(M12) EndEnum]  010
+  056   !   [Enum(M40)] (identifier) [Node Set(M10) EndEnum]  016
+  059   !   [Enum(M41)] (identifier) [Node Set(M11) EndEnum]  016
   062  ...  
   063  ...  
-  064   !   [Enum(M43)] (identifier) [Node Set(M13) EndEnum]  010
-  067   !   [Enum(M44)] (identifier) [Node Set(M14) EndEnum]  010
+  064   !   [Enum(M42)] (identifier) [Node Set(M12) EndEnum]  016
+  067   !   [Enum(M43)] (identifier) [Node Set(M13) EndEnum]  016
   070  ...  
   071  ...  
-  072   !   [Enum(M45)] (identifier) [Node Set(M15) EndEnum]  010
-  075   !   [Enum(M46)] (identifier) [Node Set(M16) EndEnum]  010
+  072   !   [Enum(M44)] (identifier) [Node Set(M14) EndEnum]  016
+  075   !   [Enum(M45)] (identifier) [Node Set(M15) EndEnum]  016
   078  ...  
   079  ...  
-  080   !   [Enum(M47)] (identifier) [Node Set(M17) EndEnum]  010
-  083   !   [Enum(M48)] (identifier) [Node Set(M18) EndEnum]  010
+  080   !   [Enum(M46)] (identifier) [Node Set(M16) EndEnum]  016
+  083   !   [Enum(M47)] (identifier) [Node Set(M17) EndEnum]  016
   086  ...  
   087  ...  
-  088   !   [Enum(M49)] (identifier) [Node Set(M19) EndEnum]  010
-  091   !   [Enum(M50)] (identifier) [Node Set(M20) EndEnum]  010
+  088   !   [Enum(M48)] (identifier) [Node Set(M18) EndEnum]  016
+  091   !   [Enum(M49)] (identifier) [Node Set(M19) EndEnum]  016
   094  ...  
   095  ...  
-  096   !   [Enum(M51)] (identifier) [Node Set(M21) EndEnum]  010
-  099   !   [Enum(M52)] (identifier) [Node Set(M22) EndEnum]  010
+  096   !   [Enum(M50)] (identifier) [Node Set(M20) EndEnum]  016
+  099   !   [Enum(M51)] (identifier) [Node Set(M21) EndEnum]  016
   102  ...  
   103  ...  
-  104   !   [Enum(M53)] (identifier) [Node Set(M23) EndEnum]  010
-  107   !   [Enum(M54)] (identifier) [Node Set(M24) EndEnum]  010
+  104   !   [Enum(M52)] (identifier) [Node Set(M22) EndEnum]  016
+  107   !   [Enum(M53)] (identifier) [Node Set(M23) EndEnum]  016
   110  ...  
   111  ...  
-  112   !   [Enum(M55)] (identifier) [Node Set(M25) EndEnum]  010
-  115   !   [Enum(M56)] (identifier) [Node Set(M26) EndEnum]  010
+  112   !   [Enum(M54)] (identifier) [Node Set(M24) EndEnum]  016
+  115   !   [Enum(M55)] (identifier) [Node Set(M25) EndEnum]  016
   118  ...  
   119  ...  
-  120   !   [Enum(M57)] (identifier) [Node Set(M27) EndEnum]  010
-  123   !   [Enum(M58)] (identifier) [Node Set(M28) EndEnum]  010
-  126  ...  
-  127  ...  
-  128   !   [Enum(M59)] (identifier) [Node Set(M29) EndEnum]  010
+  120   !   [Enum(M56)] (identifier) [Node Set(M26) EndEnum]  016
+  123   !   [Enum(M57)] (identifier) [Node Set(M27) EndEnum]  016
+  126  -ε-                                  123, 128, 131
+  128   !   [Enum(M58)] (identifier) [Node Set(M28) EndEnum]  016
+  131   !   [Enum(M59)] (identifier) [Node Set(M29) EndEnum]  016

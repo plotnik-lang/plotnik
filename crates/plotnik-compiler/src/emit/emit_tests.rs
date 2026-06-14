@@ -744,10 +744,10 @@ fn optional_null_injection() {
     );
 }
 
-// Optimization: prefix collapse
+// Alternation whose branches share a head node type (each branch keeps its own match)
 
 #[test]
-fn opt_prefix_collapse() {
+fn alternation_branches_share_head_node() {
     shot_bytecode!(
         r#"
         Test = [(object (pair)) (object (spread_element))]

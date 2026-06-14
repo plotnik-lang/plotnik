@@ -467,8 +467,22 @@ impl Compiler<'_> {
             // named node forwarding a structured child). Emit the inner, then a
             // trailing Set; no Node, no wrapper.
             CaptureMechanism::SetAfter => {
-                let set_step = self.emit_effects_epsilon(exit, capture_effects, outer_capture);
-                self.compile_expr_inner(&inner, set_step, nav_override, CaptureEffects::default())
+                let CaptureEffects { pre, post } = outer_capture;
+                let set_step = self.emit_effects_epsilon(
+                    exit,
+                    capture_effects,
+                    CaptureEffects::new_post(post),
+                );
+                let inner_entry = self.compile_expr_inner(
+                    &inner,
+                    set_step,
+                    nav_override,
+                    CaptureEffects::default(),
+                );
+                // The enclosing variant's `Enum`-open (in `pre`) must run before the
+                // inner produces its pending value; routing it through the trailing
+                // `Set` step would drop it and unbalance the scope.
+                self.wrap_entry_pre(inner_entry, pre)
             }
 
             // Ref: hand the capture to the call site, which wraps Call/Return (and
@@ -502,7 +516,7 @@ impl Compiler<'_> {
     /// Compile a suppressive capture (@_ or @_name).
     ///
     /// Suppressive captures match structurally but don't emit effects.
-    /// Flow: SuppressBegin → inner → SuppressEnd → outer_effects → exit
+    /// Flow: outer.pre → SuppressBegin → inner → SuppressEnd → outer.post → exit
     fn compile_suppressive_capture(
         &mut self,
         cap: &ast::CapturedExpr,
@@ -510,17 +524,21 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
     ) -> Label {
+        let CaptureEffects { pre, post } = outer_capture;
+
         let Some(inner) = cap.inner() else {
-            // Bare @_ with no inner - just pass through outer effects
-            if outer_capture.post.is_empty() {
+            // Bare @_ with no inner - just pass through outer effects.
+            if pre.is_empty() && post.is_empty() {
                 return exit;
             }
-            return self.emit_effects_epsilon(exit, vec![], outer_capture);
+            let entry = self.emit_effects_epsilon(exit, vec![], CaptureEffects::new_post(post));
+            return self.wrap_entry_pre(entry, pre);
         };
 
-        // SuppressEnd + outer capture effects → exit
+        // SuppressEnd + outer post (e.g. a tagged variant's EndEnum) → exit
         let suppress_end = vec![EffectIR::suppress_end()];
-        let end_label = self.emit_effects_epsilon(exit, suppress_end, outer_capture);
+        let end_label =
+            self.emit_effects_epsilon(exit, suppress_end, CaptureEffects::new_post(post));
 
         // Compile inner → end_label (inner gets NO capture effects)
         let inner_entry =
@@ -528,7 +546,12 @@ impl Compiler<'_> {
 
         // SuppressBegin → inner_entry
         let suppress_begin = vec![EffectIR::suppress_begin()];
-        self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default())
+        let begin_entry =
+            self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default());
+
+        // outer `pre` (the variant's `Enum`-open) runs before SuppressBegin, in the
+        // enclosing scope — so the tag is produced and the later `EndEnum` matches.
+        self.wrap_entry_pre(begin_entry, pre)
     }
 
     /// Resolve an anonymous node's literal text to its node type constraint.

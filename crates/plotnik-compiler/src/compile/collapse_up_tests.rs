@@ -213,8 +213,32 @@ fn collapse_up_with_effects_no_merge() {
 }
 
 #[test]
-fn collapse_up_max_63() {
-    // Up(60) → Up(10) should become Up(63) (capped)
+fn collapse_up_merges_up_to_max() {
+    // Up(60) → Up(3) sums to exactly 63 (the max), so the merge is allowed.
+    let mut result = CompileResult {
+        instructions: vec![
+            MatchIR::at(Label(0)).nav(Nav::Up(60)).next(Label(1)).into(),
+            MatchIR::at(Label(1)).nav(Nav::Up(3)).next(Label(2)).into(),
+            MatchIR::terminal(Label(2)).into(),
+        ],
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    collapse_up(&mut result);
+
+    assert_eq!(result.instructions.len(), 2);
+
+    let InstructionIR::Match(m) = &result.instructions[0] else {
+        panic!("expected Match");
+    };
+    assert_eq!(m.nav, Nav::Up(63));
+}
+
+#[test]
+fn collapse_up_refuses_merge_exceeding_max() {
+    // Up(60) → Up(10) would sum to 70 > 63. Capping to 63 would silently drop 7
+    // levels of upward movement, so the merge is refused and both steps remain.
     let mut result = CompileResult {
         instructions: vec![
             MatchIR::at(Label(0)).nav(Nav::Up(60)).next(Label(1)).into(),
@@ -227,13 +251,12 @@ fn collapse_up_max_63() {
 
     collapse_up(&mut result);
 
-    // Capped at 63, remaining Up(7) stays separate
-    assert_eq!(result.instructions.len(), 2);
+    assert_eq!(result.instructions.len(), 3);
 
     let InstructionIR::Match(m) = &result.instructions[0] else {
         panic!("expected Match");
     };
-    assert_eq!(m.nav, Nav::Up(63));
+    assert_eq!(m.nav, Nav::Up(60));
 }
 
 #[test]

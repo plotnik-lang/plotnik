@@ -75,8 +75,17 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
         post_chains.push(PostChain::PostEffects(overflow));
     }
 
-    if m.successors.len() > MAX_MATCH_PAYLOAD_SLOTS {
-        let overflow: Vec<_> = m.successors.drain(MAX_MATCH_PAYLOAD_SLOTS - 1..).collect();
+    // Successors share the 28-slot Match64 payload with the match's own retained
+    // pre/neg/post effects and predicate (`MatchIR::resolve` panics on a combined
+    // overflow). Budget the successor split against those other slots — not the bare
+    // 28 — so the kept successors plus the cascade entry appended below land exactly at
+    // the limit, never one over. (`other_slots` ≤ 7+7+7+2, so the budget stays ≥ 5.)
+    let predicate_slots = if m.predicate.is_some() { 2 } else { 0 };
+    let other_slots =
+        m.pre_effects.len() + m.neg_fields.len() + m.post_effects.len() + predicate_slots;
+    let succ_budget = MAX_MATCH_PAYLOAD_SLOTS - other_slots;
+    if m.successors.len() > succ_budget {
+        let overflow: Vec<_> = m.successors.drain(succ_budget - 1..).collect();
         post_chains.push(PostChain::Successors(overflow));
     }
 
@@ -98,8 +107,11 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
                 emit_effects_chain_to_succs(chain_entry, current_succs, effects, out, next_label);
             }
             PostChain::Successors(succs) => {
+                // The cascade holds the *overflow* (lowest-priority) successors. It is an
+                // additional branch, so append its entry after the kept successors rather
+                // than replacing them — replacing silently drops the kept successors.
                 emit_successors_cascade(chain_entry, succs, out, next_label);
-                current_succs = vec![chain_entry];
+                current_succs.push(chain_entry);
                 continue;
             }
         }

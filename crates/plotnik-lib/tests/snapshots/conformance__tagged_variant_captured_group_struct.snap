@@ -1,0 +1,23 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program [Tag: ((expression_statement) @a) @x])
+
+==== source ====
+a;
+
+==== types ====
+export interface QTag {
+  $tag: "Tag";
+  $data: { x: Struct };
+}
+
+export type Q = QTag;
+
+export interface Struct {
+  a: Node;
+}
+
+==== result ====
+{"$tag":"Tag","$data":{"x":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}

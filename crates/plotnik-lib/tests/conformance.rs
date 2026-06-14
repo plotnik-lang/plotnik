@@ -501,10 +501,109 @@ fn cross_file_ref_attributes_diagnostic_to_owning_file() {
 
 // IR pass soundness (#421).
 
+/// Regression for #421: `collapse_prefix` deleted a still-referenced instruction
+/// for back-to-back optionals, so `check` passed but `emit`/`dump`/`run` panicked
+/// with "label not in layout". Deleting the pass (an unsound size optimization)
+/// fixes it; this query must compile and execute through the seam.
 #[test]
-#[ignore = "#421: collapse_prefix deletes a still-referenced instruction; emit panics with 'label not in layout'"]
 fn collapse_prefix_drops_referenced_instruction() {
     shot_exec!(r#"Q = (program (comment)? (comment)? (comment)?)"#, "// c");
+}
+
+// #421 scope balance: a capture's enclosing-scope effects — a tagged variant's
+// `Enum`/`EndEnum`, an untagged branch's null-injected defaults — must stay
+// balanced along every path, regardless of the capture mechanism or a leading
+// skippable item. These shapes used to drop an `Enum`-open or duplicate it.
+
+/// Regression for #421 (bug 4): a tagged-alternation variant whose body is a
+/// sequence with a leading optional. When the optional is skipped, `Enum` (opened
+/// only on the present branch) and the trailing `EndEnum` left the path unbalanced,
+/// and the follower over-advanced past the first child. The skip path must open the
+/// variant scope once and bind `a`/`b` to the first two children.
+#[test]
+fn tagged_variant_leading_optional_skipped() {
+    shot_exec!(
+        r#"Q = (program [Tag: {(comment)? (expression_statement) @a (expression_statement) @b}])"#,
+        "a; b;"
+    );
+}
+
+/// Companion to `tagged_variant_leading_optional_skipped`: the present-branch path
+/// (optional matched) must yield the same `Tag` shape, with the scope opened once.
+#[test]
+fn tagged_variant_leading_optional_matched() {
+    shot_exec!(
+        r#"Q = (program [Tag: {(comment)? (expression_statement) @a (expression_statement) @b}])"#,
+        "/* c */ a; b;"
+    );
+}
+
+/// Regression for #421 (bug 4): the skipped optional carries its own capture `c`.
+/// The `Null Set` for `c` must land inside the variant scope (so `c: null` sits in
+/// `$data`, not outside the tagged value), and `a`/`b` must still bind.
+#[test]
+fn tagged_variant_leading_optional_nulls_inner_capture() {
+    shot_exec!(
+        r#"Q = (program [Tag: {(expression_statement (call_expression) @c)? (expression_statement) @a (expression_statement) @b}])"#,
+        "a; b;"
+    );
+}
+
+/// Regression for #421 (bug 4): an array of tagged variants whose body has a
+/// skippable boundary. The element's post-effects are `[EndEnum, Push]` — the close
+/// produces the variant value, `Push` consumes it into the array. They must stay
+/// together on the path that closes the scope: splitting them would push before the
+/// close (panic) or, on the skip path, never push (empty array). Each statement must
+/// appear as its own `Tag` element.
+#[test]
+fn tagged_variant_array_with_skippable_boundary() {
+    shot_exec!(
+        r#"Q = (program ([Tag: {(expression_statement) @a (comment)?}])* @items)"#,
+        "a; b;"
+    );
+}
+
+/// Captured group `((…) @a) @x` as a tagged variant: the variant's `Enum` wraps
+/// the capture's own `Obj` scope, so `x` holds the struct `{a}` inside the `Tag`
+/// value. Were the `Enum`-open (the capture's enclosing `pre`) dropped, the path
+/// would close an `EndEnum` with no matching open.
+#[test]
+fn tagged_variant_captured_group_struct() {
+    shot_exec!(
+        r#"Q = (program [Tag: ((expression_statement) @a) @x])"#,
+        "a;"
+    );
+}
+
+/// Suppressive capture `(…) @_` as a tagged variant: the `Enum` opens before
+/// `SuppressBegin`, not at the `SuppressEnd` exit, so the scope stays balanced.
+/// The payload is suppressed, so the result is the bare `Tag` with no `$data`.
+#[test]
+fn tagged_variant_captured_suppressed() {
+    shot_exec!(r#"Q = (program [Tag: (expression_statement) @_])"#, "a;");
+}
+
+/// A captured tagged enum `[In: …] @y` as a tagged variant: the outer `Enum` opens
+/// before the inner enum runs, so the outer `EndEnum` has a match and the two enums
+/// nest — `y` holds the `In` value inside the `Tag` value.
+#[test]
+fn tagged_variant_captured_inner_enum() {
+    shot_exec!(
+        r#"Q = (program [Tag: [In: (expression_statement) @a] @y])"#,
+        "a;"
+    );
+}
+
+/// The untagged, silent twin: a branch nulls the captures it lacks, and that
+/// `Null Set` rides the capture's enclosing `pre`. With a captured-group branch,
+/// `b` must come back `null` (not missing) in the merged result — a dropped
+/// pre-effect here is wrong output with no panic.
+#[test]
+fn untagged_alt_captured_group_branch_nulls_sibling() {
+    shot_exec!(
+        r#"Q = (program [(((expression_statement) @a) @grp) ((comment) @b)] @w)"#,
+        "a;"
+    );
 }
 
 /// #383: a captured ref whose callee returns via a non-greedy optional skip

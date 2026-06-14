@@ -350,52 +350,15 @@ fn expand_branching_epsilons(result: &mut CompileResult) -> bool {
 
 /// Eliminate epsilon transitions from compiled IR.
 ///
-/// In debug builds, verifies semantic fingerprints are preserved.
-#[allow(unused_variables)]
-pub fn eliminate_epsilons(result: &mut CompileResult, ctx: &super::compiler::CompileCtx) {
-    #[cfg(debug_assertions)]
-    let before: Vec<_> = {
-        use super::verify::fingerprint_from_ir;
-        result
-            .def_entries
-            .iter()
-            .map(|(def_id, &entry)| {
-                let fp = fingerprint_from_ir(&result.instructions, entry, &result.def_entries, ctx);
-                (*def_id, fp)
-            })
-            .collect()
-    };
-
-    // Iterate phases until fixed point
+/// Runs the migrate/expand/laser-vision phases to a fixed point. Semantic
+/// preservation is asserted by the caller via `verify::run_verified` (debug only).
+pub fn eliminate_epsilons(result: &mut CompileResult) {
     loop {
         let a = forward_migrate(&mut result.instructions);
         let b = expand_branching_epsilons(result);
         let c = laser_vision(result);
         if !a && !b && !c {
             break;
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    {
-        use super::verify::fingerprint_from_ir;
-        for (def_id, before_fp) in before {
-            let entry = result.def_entries[&def_id];
-            let after_fp =
-                fingerprint_from_ir(&result.instructions, entry, &result.def_entries, ctx);
-
-            if before_fp != after_fp {
-                eprintln!("=== Fingerprint mismatch for def {:?} ===", def_id);
-                eprintln!("Before ({} paths):", before_fp.len());
-                for (i, path) in before_fp.iter().enumerate() {
-                    eprintln!("  {}: {:?}", i, path);
-                }
-                eprintln!("After ({} paths):", after_fp.len());
-                for (i, path) in after_fp.iter().enumerate() {
-                    eprintln!("  {}: {:?}", i, path);
-                }
-                panic!("epsilon elimination changed semantics for def {:?}", def_id);
-            }
         }
     }
 }
