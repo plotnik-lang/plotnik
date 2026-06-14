@@ -2,10 +2,10 @@
 source: crates/plotnik-lib/tests/conformance.rs
 ---
 ==== query ====
-Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})
+Q = (program {(lexical_declaration)? @a .! (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})
 
 ==== source ====
-bar; debugger; foo;
+/* c */ debugger; foo;
 
 ==== types ====
 export interface Q {

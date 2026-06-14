@@ -2,16 +2,15 @@
 source: crates/plotnik-lib/tests/conformance.rs
 ---
 ==== query ====
-Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})
+Q = (program {(lexical_declaration)? @a . (debugger_statement) @b .})
 
 ==== source ====
-bar; debugger; foo;
+let x; foo; debugger;
 
 ==== types ====
 export interface Q {
   a: Node | null;
-  b: Node[];
-  c: Node;
+  b: Node;
 }
 
 ==== result ====

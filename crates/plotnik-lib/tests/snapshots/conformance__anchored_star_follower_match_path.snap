@@ -5,7 +5,7 @@ source: crates/plotnik-lib/tests/conformance.rs
 Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})
 
 ==== source ====
-bar; debugger; foo;
+let x; debugger; debugger; foo;
 
 ==== types ====
 export interface Q {
@@ -15,4 +15,4 @@ export interface Q {
 }
 
 ==== result ====
-<no match>
+{"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]},"b":[{"kind":"debugger_statement","text":"debugger;","span":[7, 16]},{"kind":"debugger_statement","text":"debugger;","span":[17, 26]}],"c":{"kind":"expression_statement","text":"foo;","span":[27, 31]}}

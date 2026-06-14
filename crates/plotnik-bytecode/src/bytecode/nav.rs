@@ -110,6 +110,30 @@ impl Nav {
         }
     }
 
+    /// Navigation that advances to the next sibling while preserving this nav's
+    /// skip policy.
+    ///
+    /// Shared source of truth for the two places that step a sibling search
+    /// forward: the VM's in-instruction `continue_search`, and the compiler's
+    /// quantifier repeat iteration. A `Down*` entry and its `Next*` continuation
+    /// share a skip policy (trivia/extras/exact), so both map to the same
+    /// `Next*`; navs that drive no sibling search default to `Next`.
+    pub fn sibling_continuation(self) -> Self {
+        match self {
+            Self::Down | Self::Next => Self::Next,
+            Self::DownSkip | Self::NextSkip => Self::NextSkip,
+            Self::DownSkipExtras | Self::NextSkipExtras => Self::NextSkipExtras,
+            Self::DownExact | Self::NextExact => Self::NextExact,
+            Self::Epsilon
+            | Self::Stay
+            | Self::StayExact
+            | Self::Up(_)
+            | Self::UpSkipTrivia(_)
+            | Self::UpSkipExtras(_)
+            | Self::UpExact(_) => Self::Next,
+        }
+    }
+
     /// Convert navigation to its exact variant (no search loop).
     ///
     /// Used by alternation branches which should match at their exact

@@ -17,16 +17,23 @@ use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::{
     AnonymousClassifier, compute_nav_modes, expr_owns_iteration, is_down_nav,
-    is_skippable_quantifier,
+    is_skippable_quantifier, resumable_search_nav,
 };
 
-/// Extract the navigation if it's a resumable sibling search (`SkipPolicy::Any`).
-/// Bounded navs (anchored, exact) have deterministic candidates and need no
-/// search wrapper; Up navs don't search siblings at all.
-fn resumable_search_nav(first_nav: Option<Nav>) -> Option<Nav> {
-    match first_nav {
-        Some(nav @ (Nav::Down | Nav::Next | Nav::Stay)) => Some(nav),
-        _ => None,
+/// The sibling nav implied by a sequence's trailing anchor, used to mark the
+/// last expression as anchor-followed.
+///
+/// A trailing anchor (`{… .}`) enforces last-child adjacency via the parent
+/// node's `Up*` nav. That check can still fail — the matched child is not the
+/// last one — and must then retry at a later sibling. Treating the last item as
+/// "followed by an anchor" routes its child search through the resumable
+/// `emit_position_search` wrapper (when its own nav is a resumable search), so
+/// the retry can happen. Returns `None` when the sequence has no trailing anchor.
+fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
+    match items.last()? {
+        SeqItem::Anchor(a) if a.is_strict() => Some(Nav::NextExact),
+        SeqItem::Anchor(_) => Some(Nav::NextSkip),
+        SeqItem::Expr(_) => None,
     }
 }
 
@@ -231,7 +238,10 @@ impl Compiler<'_> {
             None => capture.post.clone(),
         };
         let count = nav_modes.len();
-        let mut following_nav: Option<Nav> = None;
+        // Seed the reverse walk so the last expression sees a trailing anchor as
+        // its follower: its child search then stays resumable for the up-nav
+        // lastness retry. Interior items overwrite this with their real follower.
+        let mut following_nav: Option<Nav> = trailing_anchor_follow_nav(items);
         for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
             let expr = items[expr_idx]
                 .as_expr()

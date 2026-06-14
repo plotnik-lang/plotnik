@@ -36,6 +36,8 @@ mod collapse_up_tests;
 mod compile_tests;
 #[cfg(test)]
 mod lower_tests;
+#[cfg(test)]
+mod quantifier_tests;
 
 pub use capture::CaptureEffects;
 pub use compiler::{CompileCtx, Compiler};

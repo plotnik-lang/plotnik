@@ -22,23 +22,6 @@ use super::capture::CaptureEffects;
 use super::navigation::check_trailing_anchor;
 use super::sequences::SeqItemsCtx;
 
-/// Parameters for compiling a named node whose body ends in a trailing anchor.
-///
-/// Bundles the parent-node match envelope (`entry`/`exit`/`nav`/`node_type`/
-/// `neg_fields`/`predicate`/`capture`), the resolved Up navigation, and the
-/// borrowed body items into one descriptor for the skip-retry emission.
-struct NamedNodeTrailingCtx<'a> {
-    entry: Label,
-    exit: Label,
-    nav: Nav,
-    node_type: NodeTypeIR,
-    neg_fields: Vec<u16>,
-    predicate: Option<PredicateIR>,
-    items: &'a [ast::SeqItem],
-    up_nav: Nav,
-    capture: CaptureEffects,
-}
-
 impl Compiler<'_> {
     /// Compile a named node with capture effects.
     pub(super) fn compile_named_node_inner(
@@ -75,29 +58,15 @@ impl Compiler<'_> {
         let (has_trailing_anchor, trailing_nav) =
             check_trailing_anchor(&items, self.ctx.symbol_table);
 
-        // Emit Up instruction with appropriate strictness
+        // Emit Up instruction with appropriate strictness. A trailing anchor only
+        // changes this ascent into a lastness check (`Up*`); the body itself
+        // compiles like any node body, with `compile_seq_items_inner` keeping the
+        // last item's child search resumable so a lastness failure can retry.
         let up_nav = if has_trailing_anchor {
             trailing_nav.unwrap_or(Nav::UpSkipTrivia(1))
         } else {
             Nav::Up(1)
         };
-
-        // Trailing anchor requires skip-retry pattern for backtracking.
-        // When the anchor check fails (matched node is not last), we need to
-        // retry with the next sibling until we find one that IS last.
-        if has_trailing_anchor {
-            return self.compile_named_node_with_trailing_anchor(NamedNodeTrailingCtx {
-                entry,
-                exit,
-                nav,
-                node_type,
-                neg_fields,
-                predicate,
-                items: &items,
-                up_nav,
-                capture,
-            });
-        }
 
         // Split capture.post: Node/Text effects (and their Set) go on entry (need matched_node
         // right after match), other effects go on final_exit (after children processing).
@@ -144,72 +113,6 @@ impl Compiler<'_> {
             .neg_fields(neg_fields)
             .pre_effects(capture.pre)
             .post_effects(entry_effects);
-        if let Some(p) = predicate {
-            entry_match = entry_match.predicate(p);
-        }
-        self.emit_match(entry_match);
-
-        entry
-    }
-
-    /// Compile a named node with trailing anchor using skip-retry pattern.
-    ///
-    /// Structure:
-    /// ```text
-    /// entry: Match(nav, node_type) → down_wildcard
-    /// down_wildcard: Match(Down, wildcard) → try
-    /// try: epsilon → [body, retry_nav]
-    /// body: items (StayExact) → up_check
-    /// up_check: Match(up_nav, None) → exit
-    /// retry_nav: Match(Next, wildcard) → try
-    /// ```
-    ///
-    /// When items match but the trailing anchor check fails, we backtrack to `try`,
-    /// which falls through to `retry_nav`, advances to next sibling, and retries.
-    /// Only when siblings are exhausted does backtracking propagate to the caller.
-    fn compile_named_node_with_trailing_anchor(&mut self, ctx: NamedNodeTrailingCtx<'_>) -> Label {
-        let NamedNodeTrailingCtx {
-            entry,
-            exit,
-            nav,
-            node_type,
-            neg_fields,
-            predicate,
-            items,
-            up_nav,
-            capture,
-        } = ctx;
-
-        let final_exit = self.emit_post_effects_exit(exit, capture.post);
-
-        // up_check: Match(up_nav) → final_exit
-        let up_check = self.fresh_label();
-        self.instructions
-            .push(MatchIR::epsilon(up_check, final_exit).nav(up_nav).into());
-
-        // body: items with StayExact navigation → up_check
-        // Items are compiled with StayExact because the skip-retry loop handles
-        // advancement; the body should match at the current position only.
-        let body = self.compile_seq_items_inner(SeqItemsCtx {
-            items,
-            exit: up_check,
-            is_inside_node: true,
-            first_nav: Some(Nav::StayExact), // First item uses StayExact (we're already at position)
-            capture: CaptureEffects::default(),
-            skip_exit: None,
-        });
-
-        // The node's children are searched with a resumable position search:
-        // an adjacency failure at the trailing anchor (`up_check`) retries at the
-        // next child instead of failing the whole match.
-        let down_wildcard = self.emit_position_search(Nav::Down, body);
-
-        // entry: match parent node → down_wildcard (only pre_effects here)
-        let mut entry_match = MatchIR::epsilon(entry, down_wildcard)
-            .nav(nav)
-            .node_type(node_type)
-            .neg_fields(neg_fields)
-            .pre_effects(capture.pre);
         if let Some(p) = predicate {
             entry_match = entry_match.predicate(p);
         }

@@ -644,9 +644,9 @@ fn ref_before_anchor_backtracks_across_siblings() {
     );
 }
 
-/// BUG #441: an anchor before a quantified follower is not enforced, so `b`
-/// matches `debugger;` even though `a` was skipped and `b` must be the first
-/// child. Expected: no match.
+/// #441 regression: an anchor before a quantified follower is enforced. `a` is
+/// skipped, so the leading anchor pins `b` to the first child; `debugger` sits
+/// after `bar`, so the match is correctly rejected.
 #[test]
 fn anchored_quantified_follower_overshoots() {
     shot_exec!(
@@ -655,14 +655,171 @@ fn anchored_quantified_follower_overshoots() {
     );
 }
 
-/// BUG #439: with a trailing anchor present, the interior anchor after a
-/// skippable first item is ignored, so `b` binds past the first child.
-/// Expected: no match.
+/// #441: the same overshoot for `+`, `?`, and the non-greedy `*?`/`+?` — every
+/// quantifier kind honors the leading anchor after the optional is skipped.
+#[test]
+fn anchored_plus_follower_overshoots() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)+ @b . (expression_statement (identifier == "foo")) @c})"#,
+        "bar; debugger; foo;"
+    );
+}
+
+#[test]
+fn anchored_optional_follower_overshoots() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)? @b . (expression_statement (identifier == "foo")) @c})"#,
+        "bar; debugger; foo;"
+    );
+}
+
+#[test]
+fn anchored_nongreedy_star_follower_overshoots() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)*? @b . (expression_statement (identifier == "foo")) @c})"#,
+        "bar; debugger; foo;"
+    );
+}
+
+#[test]
+fn anchored_nongreedy_plus_follower_overshoots() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)+? @b . (expression_statement (identifier == "foo")) @c})"#,
+        "bar; debugger; foo;"
+    );
+}
+
+/// #441 match path: optional present, the `*` follower starts adjacent to it and
+/// collects the back-to-back run of debuggers before `foo`.
+#[test]
+fn anchored_star_follower_match_path() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})"#,
+        "let x; debugger; debugger; foo;"
+    );
+}
+
+/// #441 skip path: optional absent, the `*` follower starts at the first child
+/// and collects the leading run of debuggers → match with `a` null.
+#[test]
+fn anchored_star_follower_skip_path_match() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})"#,
+        "debugger; debugger; foo;"
+    );
+}
+
+/// #441: a soft anchor before the quantified follower still skips a leading
+/// comment on the skip path → match.
+#[test]
+fn anchored_soft_quantified_follower_skips_comment() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})"#,
+        "/* c */ debugger; foo;"
+    );
+}
+
+/// #441: a strict anchor before the quantified follower rejects the leading
+/// comment → no match.
+#[test]
+fn anchored_strict_quantified_follower_rejects_comment() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a .! (debugger_statement)* @b . (expression_statement (identifier == "foo")) @c})"#,
+        "/* c */ debugger; foo;"
+    );
+}
+
+/// #439 regression: a trailing anchor no longer suppresses the interior anchor
+/// after a skippable first item. `a` is skipped, so `b` must be the first child;
+/// `debugger` is the second, so the match is correctly rejected.
 #[test]
 fn interior_anchor_ignored_with_trailing_anchor() {
     shot_exec!(
         r#"Q = (program {(lexical_declaration)? @a . (debugger_statement) @b .})"#,
         "foo; debugger;"
+    );
+}
+
+/// #439 match path: optional present and adjacent, follower is the last child.
+#[test]
+fn trailing_anchor_optional_present_adjacent() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement) @b .})"#,
+        "let x; debugger;"
+    );
+}
+
+/// #439 match path: optional present but a statement breaks adjacency → no match.
+#[test]
+fn trailing_anchor_optional_present_adjacency_broken() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement) @b .})"#,
+        "let x; foo; debugger;"
+    );
+}
+
+/// #439 skip path: optional absent, follower is the sole child (first and last)
+/// → match with `a` null.
+#[test]
+fn trailing_anchor_optional_absent_sole_child() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement) @b .})"#,
+        "debugger;"
+    );
+}
+
+/// #439 strict variants: `.!` on both ends. Optional absent, follower is the
+/// sole child → match; a leading comment breaks the strict leading anchor.
+#[test]
+fn trailing_strict_anchor_optional_absent_sole_child() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a .! (debugger_statement) @b .!})"#,
+        "debugger;"
+    );
+}
+
+#[test]
+fn trailing_strict_anchor_optional_absent_rejects_leading_comment() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a .! (debugger_statement) @b .!})"#,
+        "/* c */ debugger;"
+    );
+}
+
+/// #439 strict variant, match path: present and strictly adjacent → match;
+/// a comment between the pair breaks strict adjacency → no match.
+#[test]
+fn trailing_strict_anchor_optional_present_adjacent() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a .! (debugger_statement) @b .!})"#,
+        "let x; debugger;"
+    );
+}
+
+#[test]
+fn trailing_strict_anchor_optional_present_comment_breaks_adjacency() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a .! (debugger_statement) @b .!})"#,
+        "let x; /* c */ debugger;"
+    );
+}
+
+/// #439 × #441: optional first item, a quantified follower, AND a trailing
+/// anchor at once. With `@a` skipped the follower starts at the first child,
+/// collects the back-to-back run, and the run's end must be the last child.
+#[test]
+fn trailing_anchor_quantified_follower_skip_path_match() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b .})"#,
+        "debugger; debugger;"
+    );
+}
+
+#[test]
+fn trailing_anchor_quantified_follower_not_last() {
+    shot_exec!(
+        r#"Q = (program {(lexical_declaration)? @a . (debugger_statement)* @b .})"#,
+        "debugger; foo;"
     );
 }
 
