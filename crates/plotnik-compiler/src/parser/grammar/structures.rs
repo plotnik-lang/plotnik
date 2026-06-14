@@ -8,7 +8,7 @@ use crate::parser::cst::token_sets::{
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
 
-use super::utils::{capitalize_first, starts_uppercase};
+use super::utils::{starts_uppercase, to_pascal_case};
 
 /// What the identifier after `(` turned out to be.
 enum TreeHead<'q> {
@@ -345,8 +345,18 @@ impl<'q> Parser<'q, '_> {
         self.start_node_at(checkpoint, SyntaxKind::Tree);
         self.bump(); // KwError
         if !self.currently_is(SyntaxKind::ParenClose) {
-            self.error(DiagnosticKind::ErrorTakesNoArguments);
+            let children_start = self.current_span().start();
             self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
+            let children_end = self.last_non_trivia_end().unwrap_or(children_start);
+            let children_span = TextRange::new(children_start, children_end);
+            self.diagnostics
+                .report(
+                    self.source_id,
+                    DiagnosticKind::ErrorTakesNoArguments,
+                    children_span,
+                )
+                .fix("remove the children", "")
+                .emit();
         }
         self.pop_delimiter();
         self.expect(SyntaxKind::ParenClose, "closing ')' for (ERROR)");
@@ -391,6 +401,7 @@ impl<'q> Parser<'q, '_> {
                         children_span,
                     )
                     .message(name)
+                    .fix("remove the children", "")
                     .emit();
                 "closing ')' for tree"
             }
@@ -539,13 +550,13 @@ impl<'q> Parser<'q, '_> {
 
         let span = self.current_span();
         let label_text = self.current_text();
-        let capitalized = capitalize_first(label_text);
+        let pascal = to_pascal_case(label_text);
 
         self.error_with_fix(
             DiagnosticKind::BranchLabelInvalid,
             span,
-            format!("use `{}`", capitalized),
-            capitalized,
+            format!("use `{}`", pascal),
+            pascal,
         );
 
         self.bump();

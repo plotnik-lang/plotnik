@@ -9,13 +9,15 @@ fn missing_paren() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `)`
       |
     1 | (identifier
       | -^^^^^^^^^^
       | |
       | node started here
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -27,13 +29,15 @@ fn missing_bracket() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `]`
       |
     1 | [(identifier) (string)
       | -^^^^^^^^^^^^^^^^^^^^^
       | |
       | alternation started here
+      |
+    help: add `]` to close the alternation
     ");
 }
 
@@ -45,13 +49,15 @@ fn missing_brace() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `}`
       |
     1 | {(a) (b)
       | -^^^^^^^
       | |
       | sequence started here
+      |
+    help: add `}` to close the sequence
     ");
 }
 
@@ -63,13 +69,15 @@ fn nested_unclosed() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `)`
       |
     1 | (a (b (c)
       |    -^^^^^
       |    |
       |    node started here
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -81,13 +89,15 @@ fn deeply_nested_unclosed() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `)`
       |
     1 | (a (b (c (d
       |          -^
       |          |
       |          node started here
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -99,13 +109,15 @@ fn unclosed_alternation_nested() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `)`
       |
     1 | [(a) (b
       |      -^
       |      |
       |      node started here
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -136,7 +148,7 @@ fn unclosed_tree_shows_open_location() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `)`
       |
     1 |   (call
@@ -145,6 +157,8 @@ fn unclosed_tree_shows_open_location() {
       | |
     2 | |     (identifier)
       | |_________________^
+      |
+    help: add `)` to close the node
     ");
 }
 
@@ -158,7 +172,7 @@ fn unclosed_alternation_shows_open_location() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `]`
       |
     1 |   [
@@ -168,6 +182,8 @@ fn unclosed_alternation_shows_open_location() {
     2 | |     (a)
     3 | |     (b)
       | |________^
+      |
+    help: add `]` to close the alternation
     ");
 }
 
@@ -181,7 +197,7 @@ fn unclosed_sequence_shows_open_location() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: missing closing `}`
       |
     1 |   {
@@ -191,6 +207,8 @@ fn unclosed_sequence_shows_open_location() {
     2 | |     (a)
     3 | |     (b)
       | |________^
+      |
+    help: add `}` to close the sequence
     ");
 }
 
@@ -201,10 +219,12 @@ fn unclosed_double_quote_string() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing quote
+    error: unterminated string
       |
     1 | (call "foo)
       |       ^^^^^
+      |
+    help: anonymous nodes match literal tokens; close the quote: `"foo"`
     "#);
 }
 
@@ -214,10 +234,12 @@ fn unclosed_single_quote_string() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @"
-    error: missing closing quote
+    insta::assert_snapshot!(res, @r#"
+    error: unterminated string
       |
     1 | (call 'foo)
       |       ^^^^^
-    ");
+      |
+    help: anonymous nodes match literal tokens; close the quote: `"foo"`
+    "#);
 }

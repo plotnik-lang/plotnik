@@ -93,8 +93,11 @@ impl PredicateValidator<'_, '_> {
 
         for capture_span in detector.named_captures {
             let span = self.map_regex_span(&capture_span, regex_range);
+            // The span covers `?P<name>` / `?<name>` (the `(` is excluded), so deleting it
+            // turns `(?P<name>foo)` into a plain group `(foo)`.
             self.diag
                 .report(self.source_id, DiagnosticKind::RegexNamedCapture, span)
+                .fix("remove the named-capture marker", "")
                 .emit();
         }
     }

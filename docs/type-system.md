@@ -96,7 +96,7 @@ For node patterns with internal captures, wrap explicitly:
 // ERROR: internal capture without struct capture
 (parameter (identifier) @name)*
 
-// OK: struct capture on the group
+// OK: struct capture on the sequence
 { (parameter (identifier) @name) @param }* @params
 → { params: { param: Node, name: string }[] }
 ```
@@ -105,7 +105,7 @@ The strict rule forces you to think about structure upfront.
 
 ### Optional Bubbling
 
-The `?` quantifier does **not** add dimensionality — it produces at most one value, not a list. Therefore, optional groups without captures are allowed:
+The `?` quantifier does **not** add dimensionality — it produces at most one value, not a list. Therefore, optional sequences without captures are allowed:
 
 ```
 { (decorator) @dec }?
@@ -142,7 +142,7 @@ This enables reusable pattern fragments that contribute fields directly to paren
 
 New data structures are created only when explicitly requested:
 
-1. **Captured Groups**: `{...} @name` → Struct
+1. **Captured Sequences**: `{...} @name` → Struct
 2. **Captured Alternations**: `[...] @name` → Union
 3. **Tagged Alternations**: `[ L: ... ] @name` → Tagged Union
 

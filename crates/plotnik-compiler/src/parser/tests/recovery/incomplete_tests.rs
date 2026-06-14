@@ -27,12 +27,14 @@ fn missing_field_value() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: expected an expression
       |
     1 | (call name:)
       |            ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -41,12 +43,14 @@ fn named_def_eof_after_equals() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: expected an expression
       |
     1 | Expr = 
       |        ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -111,12 +115,14 @@ fn tagged_branch_missing_expression() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: expected an expression
       |
     1 | [Label:]
       |        ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -177,12 +183,14 @@ fn field_value_is_garbage() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @r#"
     error: expected an expression
       |
     1 | (call name: %%%)
       |             ^^^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -281,7 +289,7 @@ fn field_equals_typo_missing_value() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @"
+    insta::assert_snapshot!(res, @r#"
     error: fields use `:`, not `=`
       |
     1 | (call name = )
@@ -297,7 +305,9 @@ fn field_equals_typo_missing_value() {
       |
     1 | (call name = )
       |              ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -306,7 +316,7 @@ fn lowercase_branch_label_missing_expression() {
 
     let res = Query::expect_invalid(input);
 
-    insta::assert_snapshot!(res, @"
+    insta::assert_snapshot!(res, @r#"
     error: branch labels must be PascalCase
       |
     1 | [label:]
@@ -317,13 +327,15 @@ fn lowercase_branch_label_missing_expression() {
     1 - [label:]
     1 + [Label:]
       |
-    help: branch labels become enum variants in the output
+    help: branch labels become variants of a tagged union in the output
 
     error: expected an expression
       |
     1 | [label:]
       |        ^
-    ");
+      |
+    help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`
+    "#);
 }
 
 #[test]
@@ -335,10 +347,12 @@ fn unterminated_string_in_node() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing quote
+    error: unterminated string
       |
     1 | (call "abc
       |       ^^^^
+      |
+    help: anonymous nodes match literal tokens; close the quote: `"foo"`
     "#);
 }
 
@@ -351,10 +365,12 @@ fn unterminated_string_in_predicate() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing quote
+    error: unterminated string
       |
     1 | (name == "foo
       |          ^^^^
+      |
+    help: anonymous nodes match literal tokens; close the quote: `"foo"`
     "#);
 }
 
@@ -367,9 +383,11 @@ fn unterminated_string_swallows_closing_paren() {
     let res = Query::expect_invalid(input);
 
     insta::assert_snapshot!(res, @r#"
-    error: missing closing quote
+    error: unterminated string
       |
     1 | Q = ("abc)
       |      ^^^^^
+      |
+    help: anonymous nodes match literal tokens; close the quote: `"foo"`
     "#);
 }
