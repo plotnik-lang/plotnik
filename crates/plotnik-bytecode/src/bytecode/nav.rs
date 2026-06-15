@@ -27,51 +27,73 @@ pub enum Nav {
     UpExact(u8),
 }
 
-const UP_SKIP_EXTRAS_BASE: u8 = 10;
-const MAX_UP_SKIP_EXTRAS_LEVEL: u8 = 63 - UP_SKIP_EXTRAS_BASE;
+/// Bit 7 of a Nav byte marks the Up family; a clear bit 7 is a standard command.
+const UP_FLAG: u8 = 0b1000_0000;
+/// The Up mode tag occupies bits 6-5, just above the level field.
+const UP_MODE_SHIFT: u8 = 5;
+
+/// Up mode tags (bits 6-5 of an Up byte), in `Nav` declaration order.
+const UP_ANY: u8 = 0b00;
+const UP_SKIP_TRIVIA: u8 = 0b01;
+const UP_SKIP_EXTRAS: u8 = 0b10;
+const UP_EXACT: u8 = 0b11;
 
 impl Nav {
-    /// Decode from bytecode byte.
+    /// Largest level a single `Up*` instruction can encode. The level lives in
+    /// bits 4-0, so the range is `1..=31`. The compiler splits a deeper ascent
+    /// into a chain of same-mode `Up*` instructions, which is exact because
+    /// `Up*` composes — the VM re-checks the exit constraint at every level it
+    /// leaves (see `plotnik_vm`'s `go_up`).
+    pub const MAX_UP_LEVEL: u8 = (1 << UP_MODE_SHIFT) - 1;
+
+    /// Decode from a bytecode byte, panicking on an invalid encoding.
     ///
     /// Byte layout:
-    /// - Bits 7-6: Mode (00=Standard/UpSkipExtras, 01=Up, 10=UpSkipTrivia, 11=UpExact)
-    /// - Bits 5-0: Payload (enum value for Standard, level count for Up variants)
+    /// - Bit 7 set — an Up command: bits 6-5 are the mode (`00` Up, `01`
+    ///   UpSkipTrivia, `10` UpSkipExtras, `11` UpExact), bits 4-0 the level
+    ///   (`1..=31`).
+    /// - Bit 7 clear — a standard command: bits 6-0 are its enum value (`0..=10`).
     pub fn from_byte(b: u8) -> Self {
         Self::try_from_byte(b).unwrap_or_else(|| panic!("invalid nav byte: {b:#04x}"))
     }
 
     /// Non-panicking nav decode, for validating an untrusted instruction stream
-    /// at load time before the VM decodes it. The only invalid encodings are the
-    /// `Up*` modes (`01`/`10`/`11`) with a zero level — every mode-`00` payload is
-    /// a valid Standard or `UpSkipExtras` command.
+    /// at load time before the VM decodes it. The invalid encodings are an Up
+    /// byte with a zero level and a standard byte whose enum value is unassigned
+    /// (`11..=127`).
     pub fn try_from_byte(b: u8) -> Option<Self> {
-        let mode = b >> 6;
-        let payload = b & 0x3F;
+        if b & UP_FLAG != 0 {
+            let level = b & Self::MAX_UP_LEVEL;
+            if level == 0 {
+                return None;
+            }
+            let nav = match (b >> UP_MODE_SHIFT) & 0b11 {
+                UP_ANY => Self::Up(level),
+                UP_SKIP_TRIVIA => Self::UpSkipTrivia(level),
+                UP_SKIP_EXTRAS => Self::UpSkipExtras(level),
+                _ => Self::UpExact(level), // UP_EXACT
+            };
+            return Some(nav);
+        }
 
-        let nav = match mode {
-            0b00 => match payload {
-                0 => Self::Epsilon,
-                1 => Self::Stay,
-                2 => Self::StayExact,
-                3 => Self::Next,
-                4 => Self::NextSkip,
-                5 => Self::NextSkipExtras,
-                6 => Self::NextExact,
-                7 => Self::Down,
-                8 => Self::DownSkip,
-                9 => Self::DownSkipExtras,
-                10 => Self::DownExact,
-                _ => Self::UpSkipExtras(payload - UP_SKIP_EXTRAS_BASE),
-            },
-            0b01 if payload >= 1 => Self::Up(payload),
-            0b10 if payload >= 1 => Self::UpSkipTrivia(payload),
-            0b11 if payload >= 1 => Self::UpExact(payload),
+        let nav = match b {
+            0 => Self::Epsilon,
+            1 => Self::Stay,
+            2 => Self::StayExact,
+            3 => Self::Next,
+            4 => Self::NextSkip,
+            5 => Self::NextSkipExtras,
+            6 => Self::NextExact,
+            7 => Self::Down,
+            8 => Self::DownSkip,
+            9 => Self::DownSkipExtras,
+            10 => Self::DownExact,
             _ => return None,
         };
         Some(nav)
     }
 
-    /// Encode to bytecode byte.
+    /// Encode to a bytecode byte.
     pub fn to_byte(self) -> u8 {
         match self {
             Self::Epsilon => 0,
@@ -85,28 +107,65 @@ impl Nav {
             Self::DownSkip => 8,
             Self::DownSkipExtras => 9,
             Self::DownExact => 10,
-            Self::Up(n) => {
-                assert!((1..=63).contains(&n), "Up level overflow: {n} > 63");
-                0b01_000000 | n
+            Self::Up(n) => Self::up_byte(UP_ANY, n),
+            Self::UpSkipTrivia(n) => Self::up_byte(UP_SKIP_TRIVIA, n),
+            Self::UpSkipExtras(n) => Self::up_byte(UP_SKIP_EXTRAS, n),
+            Self::UpExact(n) => Self::up_byte(UP_EXACT, n),
+        }
+    }
+
+    /// Pack an Up command: family flag, 2-bit mode, 5-bit level.
+    fn up_byte(mode: u8, level: u8) -> u8 {
+        assert!(
+            (1..=Self::MAX_UP_LEVEL).contains(&level),
+            "Up level overflow: {level} > {}",
+            Self::MAX_UP_LEVEL
+        );
+        UP_FLAG | (mode << UP_MODE_SHIFT) | level
+    }
+
+    /// The level of this `Up*` nav, or `None` for any non-`Up*` nav.
+    pub fn up_level(self) -> Option<u8> {
+        match self {
+            Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) | Self::UpExact(n) => {
+                Some(n)
             }
-            Self::UpSkipTrivia(n) => {
-                assert!(
-                    (1..=63).contains(&n),
-                    "UpSkipTrivia level overflow: {n} > 63"
-                );
-                0b10_000000 | n
-            }
-            Self::UpSkipExtras(n) => {
-                assert!(
-                    (1..=MAX_UP_SKIP_EXTRAS_LEVEL).contains(&n),
-                    "UpSkipExtras level overflow: {n} > {MAX_UP_SKIP_EXTRAS_LEVEL}"
-                );
-                UP_SKIP_EXTRAS_BASE + n
-            }
-            Self::UpExact(n) => {
-                assert!((1..=63).contains(&n), "UpExact level overflow: {n} > 63");
-                0b11_000000 | n
-            }
+            _ => None,
+        }
+    }
+
+    /// The 2-bit Up mode tag (bits 6-5 of the encoded byte), or `None` for any
+    /// non-`Up*` nav — the constraint family, independent of level.
+    pub fn up_mode_tag(self) -> Option<u8> {
+        let tag = match self {
+            Self::Up(_) => UP_ANY,
+            Self::UpSkipTrivia(_) => UP_SKIP_TRIVIA,
+            Self::UpSkipExtras(_) => UP_SKIP_EXTRAS,
+            Self::UpExact(_) => UP_EXACT,
+            _ => return None,
+        };
+        Some(tag)
+    }
+
+    /// Whether `self` and `other` are the same `Up*` mode, ignoring level. False
+    /// if either is not an `Up*` nav.
+    pub fn same_up_mode(self, other: Self) -> bool {
+        matches!(
+            (self.up_mode_tag(), other.up_mode_tag()),
+            (Some(a), Some(b)) if a == b
+        )
+    }
+
+    /// This `Up*` nav with a different level, preserving its mode.
+    ///
+    /// Panics if `self` is not an `Up*` nav; callers gate on [`Nav::up_level`].
+    pub fn with_up_level(self, level: u8) -> Self {
+        match self {
+            Self::Up(_) => Self::Up(level),
+            Self::UpSkipTrivia(_) => Self::UpSkipTrivia(level),
+            Self::UpSkipExtras(_) => Self::UpSkipExtras(level),
+            Self::UpExact(_) => Self::UpExact(level),
+            _ => panic!("with_up_level on non-Up nav: {self:?}"),
         }
     }
 

@@ -8,7 +8,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v3: Removed flags field (unlinked mode).
 /// v4: Removed the trivia section.
 /// v5: Added extras-only anchor navigation modes.
-pub const VERSION: u32 = 5;
+/// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
+pub const VERSION: u32 = 6;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

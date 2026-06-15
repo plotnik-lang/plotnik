@@ -2,10 +2,17 @@
 //!
 //! Transforms: Up(1) → Up(1) → Up(2) into Up(4)
 //!
+//! Merging the constraint-carrying modes (`UpSkipTrivia`/`UpSkipExtras`/`UpExact`)
+//! is sound because `Up*` composes: the VM re-validates the exit constraint at
+//! every level it ascends (see `plotnik_vm`'s `go_up`), so `Up*(a)` then `Up*(b)`
+//! is exactly `Up*(a+b)`. A merge that would overflow the level field is refused,
+//! leaving a contiguous chain whose per-level checks partition the levels with no
+//! gap — never a capped instruction that silently drops upward movement.
+//!
 //! Constraints:
 //! - Same mode only (Up, UpSkipTrivia, UpSkipExtras, UpExact can't mix)
 //! - Effectless only (no pre_effects, post_effects, neg_fields)
-//! - Max 63 (6-bit payload limit)
+//! - Capped at `Nav::MAX_UP_LEVEL` per instruction (the 5-bit level field)
 //! - Single successor (can't merge branching instructions)
 
 use std::collections::{HashMap, HashSet};
@@ -14,8 +21,6 @@ use plotnik_bytecode::Nav;
 
 use crate::bytecode::{InstructionIR, Label, MatchIR, NodeTypeIR};
 use crate::compile::CompileResult;
-
-const MAX_UP_LEVEL: u8 = 63;
 
 /// Collapse consecutive Up instructions of the same mode.
 pub fn collapse_up(result: &mut CompileResult) {
@@ -48,7 +53,7 @@ pub fn collapse_up(result: &mut CompileResult) {
             continue;
         };
 
-        let Some(up_level) = get_up_level(m.nav) else {
+        let Some(up_level) = m.nav.up_level() else {
             continue;
         };
 
@@ -61,7 +66,7 @@ pub fn collapse_up(result: &mut CompileResult) {
         let mut final_successors = m.successors.clone();
 
         // Absorb chain of effectless Up instructions with same mode
-        while current_level < max_up_level(current_nav) {
+        while current_level < Nav::MAX_UP_LEVEL {
             let &[succ_label] = final_successors.as_slice() else {
                 break;
             };
@@ -78,11 +83,11 @@ pub fn collapse_up(result: &mut CompileResult) {
                 break;
             };
 
-            let Some(succ_level) = get_up_level(succ.nav) else {
+            let Some(succ_level) = succ.nav.up_level() else {
                 break;
             };
 
-            if !same_up_mode(current_nav, succ.nav) || !is_effectless(succ) {
+            if !current_nav.same_up_mode(succ.nav) || !is_effectless(succ) {
                 break;
             }
 
@@ -95,12 +100,11 @@ pub fn collapse_up(result: &mut CompileResult) {
             // Merge: add levels, but only when the sum is still encodable. If it would
             // overflow the level field, refuse the merge — capping to the max would
             // silently drop upward movement while still absorbing the successor.
-            let max_level = max_up_level(current_nav);
             let new_level = current_level.saturating_add(succ_level);
-            if new_level > max_level {
+            if new_level > Nav::MAX_UP_LEVEL {
                 break;
             }
-            current_nav = set_up_level(current_nav, new_level);
+            current_nav = current_nav.with_up_level(new_level);
             current_level = new_level;
             final_successors = succ.successors.clone();
             removed.insert(succ_label);
@@ -120,43 +124,6 @@ pub fn collapse_up(result: &mut CompileResult) {
     result
         .instructions
         .retain(|instr| !removed.contains(&instr.label()));
-}
-
-fn max_up_level(nav: Nav) -> u8 {
-    match nav {
-        Nav::UpSkipExtras(_) => 53,
-        _ => MAX_UP_LEVEL,
-    }
-}
-
-/// Extract Up level from Nav, if it's an Up variant.
-fn get_up_level(nav: Nav) -> Option<u8> {
-    match nav {
-        Nav::Up(n) | Nav::UpSkipTrivia(n) | Nav::UpSkipExtras(n) | Nav::UpExact(n) => Some(n),
-        _ => None,
-    }
-}
-
-/// Set the level on an Up Nav variant.
-fn set_up_level(nav: Nav, level: u8) -> Nav {
-    match nav {
-        Nav::Up(_) => Nav::Up(level),
-        Nav::UpSkipTrivia(_) => Nav::UpSkipTrivia(level),
-        Nav::UpSkipExtras(_) => Nav::UpSkipExtras(level),
-        Nav::UpExact(_) => Nav::UpExact(level),
-        _ => nav,
-    }
-}
-
-/// Check if two Nav values are the same Up mode (ignoring level).
-fn same_up_mode(a: Nav, b: Nav) -> bool {
-    matches!(
-        (a, b),
-        (Nav::Up(_), Nav::Up(_))
-            | (Nav::UpSkipTrivia(_), Nav::UpSkipTrivia(_))
-            | (Nav::UpSkipExtras(_), Nav::UpSkipExtras(_))
-            | (Nav::UpExact(_), Nav::UpExact(_))
-    )
 }
 
 /// Check if a MatchIR has no effects or constraints (pure navigation).

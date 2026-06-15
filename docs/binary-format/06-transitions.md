@@ -65,16 +65,23 @@ type_id (u8)
 
 ### 3.1. Nav (u8)
 
-Bit-packed navigation command.
+Bit-packed navigation command. **Bit 7** selects the family:
 
-| Bits 7-6 | Mode                  | Bits 5-0 Payload       |
-| :------- | :-------------------- | :--------------------- |
-| `00`     | Standard/UpSkipExtras | Enum or level encoding |
-| `01`     | Up                    | Level count `n` (1-63) |
-| `10`     | UpSkipTrivia          | Level count `n` (1-63) |
-| `11`     | UpExact               | Level count `n` (1-63) |
+- **Set** — an Up-family ascent: **bits 6-5** select the mode, **bits 4-0** hold the level (`1..=31`).
+- **Clear** — a standard command: **bits 6-0** are its enum value.
 
-**Standard Modes**:
+**Up modes** (bits 6-5, bit 7 set):
+
+| Bits 6-5 | Mode           | Per-level exit constraint |
+| :------- | :------------- | :------------------------ |
+| `00`     | `Up`           | none                      |
+| `01`     | `UpSkipTrivia` | last non-trivia child     |
+| `10`     | `UpSkipExtras` | last non-extra child      |
+| `11`     | `UpExact`      | last child                |
+
+One instruction encodes up to 31 levels; a deeper ascent compiles to a chain of same-mode `Up*` (sound because `Up*` composes — the VM re-checks the constraint at every level). A level of `0` is invalid — every `Up*` ascends at least one level — so a loader must reject an Up byte (bit 7 set) whose level field is `0`.
+
+**Standard commands** (bits 6-0, bit 7 clear):
 
 - `0`: `Epsilon` (Pure control flow, no cursor movement or node check)
 - `1`: `Stay` (No movement)
@@ -87,7 +94,7 @@ Bit-packed navigation command.
 - `8`: `DownSkip` (Child, skip trivia)
 - `9`: `DownSkipExtras` (Child, skip extras only)
 - `10`: `DownExact` (Child, exact)
-- `11..63`: `UpSkipExtras(n)` where `n = payload - 10`
+- `11..=127`: reserved
 
 ### 3.2. EffectOp (u16)
 

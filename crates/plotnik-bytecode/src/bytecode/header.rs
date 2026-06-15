@@ -19,7 +19,7 @@ pub struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     /// Magic bytes: b"PTKQ"
     pub magic: [u8; 4],
-    /// Format version (currently 5)
+    /// Format version (currently 6)
     pub version: u32,
     /// CRC32 checksum of everything after the header
     pub checksum: u32,

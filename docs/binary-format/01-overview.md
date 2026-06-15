@@ -72,7 +72,7 @@ Section offsets are not stored in the header. Loaders compute them by:
 struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     magic: [u8; 4],          // b"PTKQ"
-    version: u32,            // 5
+    version: u32,            // 6
     checksum: u32,           // CRC32 of everything after header
     total_size: u32,
     str_blob_size: u32,
@@ -103,7 +103,7 @@ recomputed over crafted bytes. The CRC is not a MAC, so the structural checks
 (steps 5–11), not the checksum, are what uphold the no-panic guarantee.
 Validation, in order:
 
-1. **Magic / version / size** — `PTKQ`, version 5, and `total_size` equal to the
+1. **Magic / version / size** — `PTKQ`, version 6, and `total_size` equal to the
    byte length.
 2. **Reserved bytes** — bytes 42–63 must be zero (the checksum does not cover the
    header, so these are checked explicitly).

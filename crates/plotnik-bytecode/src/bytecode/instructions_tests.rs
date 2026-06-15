@@ -165,10 +165,10 @@ fn arb_nav() -> impl Strategy<Value = Nav> {
         Just(Nav::DownSkip),
         Just(Nav::DownSkipExtras),
         Just(Nav::DownExact),
-        (1u8..=63).prop_map(Nav::Up),
-        (1u8..=63).prop_map(Nav::UpSkipTrivia),
-        (1u8..=53).prop_map(Nav::UpSkipExtras),
-        (1u8..=63).prop_map(Nav::UpExact),
+        (1u8..=Nav::MAX_UP_LEVEL).prop_map(Nav::Up),
+        (1u8..=Nav::MAX_UP_LEVEL).prop_map(Nav::UpSkipTrivia),
+        (1u8..=Nav::MAX_UP_LEVEL).prop_map(Nav::UpSkipExtras),
+        (1u8..=Nav::MAX_UP_LEVEL).prop_map(Nav::UpExact),
     ]
 }
 

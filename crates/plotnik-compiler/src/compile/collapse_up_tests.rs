@@ -107,11 +107,12 @@ fn collapse_up_skip_trivia_same_mode() {
 }
 
 #[test]
-fn collapse_up_skip_extras_same_mode_within_encoding_limit() {
+fn collapse_up_skip_extras_same_mode() {
+    // UpSkipExtras(1) → UpSkipExtras(1) should merge
     let mut result = CompileResult {
         instructions: vec![
             MatchIR::at(Label(0))
-                .nav(Nav::UpSkipExtras(52))
+                .nav(Nav::UpSkipExtras(1))
                 .next(Label(1))
                 .into(),
             MatchIR::at(Label(1))
@@ -131,30 +132,7 @@ fn collapse_up_skip_extras_same_mode_within_encoding_limit() {
     let InstructionIR::Match(m) = &result.instructions[0] else {
         panic!("expected Match");
     };
-    assert_eq!(m.nav, Nav::UpSkipExtras(53));
-}
-
-#[test]
-fn collapse_up_skip_extras_does_not_exceed_encoding_limit() {
-    let mut result = CompileResult {
-        instructions: vec![
-            MatchIR::at(Label(0))
-                .nav(Nav::UpSkipExtras(52))
-                .next(Label(1))
-                .into(),
-            MatchIR::at(Label(1))
-                .nav(Nav::UpSkipExtras(2))
-                .next(Label(2))
-                .into(),
-            MatchIR::terminal(Label(2)).into(),
-        ],
-        def_entries: Default::default(),
-        preamble_entry: Label(0),
-    };
-
-    collapse_up(&mut result);
-
-    assert_eq!(result.instructions.len(), 3);
+    assert_eq!(m.nav, Nav::UpSkipExtras(2));
 }
 
 #[test]
@@ -214,10 +192,13 @@ fn collapse_up_with_effects_no_merge() {
 
 #[test]
 fn collapse_up_merges_up_to_max() {
-    // Up(60) → Up(3) sums to exactly 63 (the max), so the merge is allowed.
+    // (MAX - 3) → Up(3) sums to exactly Nav::MAX_UP_LEVEL, so the merge is allowed.
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0)).nav(Nav::Up(60)).next(Label(1)).into(),
+            MatchIR::at(Label(0))
+                .nav(Nav::Up(Nav::MAX_UP_LEVEL - 3))
+                .next(Label(1))
+                .into(),
             MatchIR::at(Label(1)).nav(Nav::Up(3)).next(Label(2)).into(),
             MatchIR::terminal(Label(2)).into(),
         ],
@@ -232,16 +213,19 @@ fn collapse_up_merges_up_to_max() {
     let InstructionIR::Match(m) = &result.instructions[0] else {
         panic!("expected Match");
     };
-    assert_eq!(m.nav, Nav::Up(63));
+    assert_eq!(m.nav, Nav::Up(Nav::MAX_UP_LEVEL));
 }
 
 #[test]
 fn collapse_up_refuses_merge_exceeding_max() {
-    // Up(60) → Up(10) would sum to 70 > 63. Capping to 63 would silently drop 7
-    // levels of upward movement, so the merge is refused and both steps remain.
+    // A maxed-out ascent plus more would exceed Nav::MAX_UP_LEVEL. Capping would
+    // silently drop upward movement, so the merge is refused and both steps remain.
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0)).nav(Nav::Up(60)).next(Label(1)).into(),
+            MatchIR::at(Label(0))
+                .nav(Nav::Up(Nav::MAX_UP_LEVEL))
+                .next(Label(1))
+                .into(),
             MatchIR::at(Label(1)).nav(Nav::Up(10)).next(Label(2)).into(),
             MatchIR::terminal(Label(2)).into(),
         ],
@@ -256,7 +240,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
     let InstructionIR::Match(m) = &result.instructions[0] else {
         panic!("expected Match");
     };
-    assert_eq!(m.nav, Nav::Up(60));
+    assert_eq!(m.nav, Nav::Up(Nav::MAX_UP_LEVEL));
 }
 
 #[test]
@@ -288,7 +272,7 @@ fn collapse_up_branching_no_merge() {
 
 #[test]
 fn collapse_up_deep_chain_splits_without_dangling() {
-    // Regression for #455. A same-mode Up run longer than the 63-level cap forces
+    // Regression for #455. A same-mode Up run longer than Nav::MAX_UP_LEVEL forces
     // the head to stop mid-chain. The absorbed node at that boundary used to be
     // reprocessed as a fresh merge start, re-absorbing (and removing) the live
     // boundary node the head now points at — dangling the head's successor.
@@ -322,7 +306,10 @@ fn collapse_up_deep_chain_splits_without_dangling() {
         if let InstructionIR::Match(m) = instr
             && let Nav::Up(n) = m.nav
         {
-            assert!(n <= 63, "Up({n}) exceeds the encodable level");
+            assert!(
+                n <= Nav::MAX_UP_LEVEL,
+                "Up({n}) exceeds the encodable level"
+            );
             total += u32::from(n);
         }
     }
@@ -330,6 +317,70 @@ fn collapse_up_deep_chain_splits_without_dangling() {
         total, DEPTH,
         "ascent depth must be preserved across the split"
     );
+}
+
+/// A deep run of same-mode *constraint* Ups splits at the encoding cap exactly
+/// like plain `Up`: contiguous, no dangling edge, total ascent preserved. Sound
+/// because `Up*` composes — the VM checks the constraint at every exited level,
+/// so the split runs partition the levels with no gap (#471).
+fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
+    const DEPTH: u32 = 130;
+
+    let mut instructions: Vec<InstructionIR> = (0..DEPTH)
+        .map(|i| MatchIR::at(Label(i)).nav(make(1)).next(Label(i + 1)).into())
+        .collect();
+    instructions.push(MatchIR::terminal(Label(DEPTH)).into());
+
+    let mut result = CompileResult {
+        instructions,
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    collapse_up(&mut result);
+
+    let present: std::collections::HashSet<Label> =
+        result.instructions.iter().map(|i| i.label()).collect();
+    let mut total = 0u32;
+    for instr in &result.instructions {
+        for succ in instr.successors() {
+            assert!(present.contains(succ), "dangling successor {succ:?}");
+        }
+        if let InstructionIR::Match(m) = instr
+            && let Some(n) = m.nav.up_level()
+        {
+            assert_eq!(
+                m.nav.up_mode_tag(),
+                make(1).up_mode_tag(),
+                "split changed the Up mode"
+            );
+            assert!(
+                n <= Nav::MAX_UP_LEVEL,
+                "level {n} exceeds the encodable cap {}",
+                Nav::MAX_UP_LEVEL
+            );
+            total += u32::from(n);
+        }
+    }
+    assert_eq!(
+        total, DEPTH,
+        "ascent depth must be preserved across the split"
+    );
+}
+
+#[test]
+fn collapse_up_skip_trivia_deep_chain_splits() {
+    assert_constraint_chain_splits(Nav::UpSkipTrivia);
+}
+
+#[test]
+fn collapse_up_skip_extras_deep_chain_splits() {
+    assert_constraint_chain_splits(Nav::UpSkipExtras);
+}
+
+#[test]
+fn collapse_up_exact_deep_chain_splits() {
+    assert_constraint_chain_splits(Nav::UpExact);
 }
 
 #[test]

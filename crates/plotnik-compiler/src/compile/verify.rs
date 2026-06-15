@@ -98,7 +98,7 @@ mod debug_impl {
     #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     enum SemanticOp {
         Nav(Nav),
-        /// Up navigation: (mode tag, level). See [`up_mode_tag`].
+        /// Up navigation: (mode tag, level). See [`Nav::up_mode_tag`].
         UpNav(u8, u32),
         MatchNamed(Option<String>),
         MatchAnon(Option<String>),
@@ -145,24 +145,6 @@ mod debug_impl {
         succs: Vec<Label>,
     }
 
-    /// Map a Nav to its Up "mode" tag (`None` for non-Up navs).
-    fn up_mode_tag(nav: Nav) -> Option<u8> {
-        match nav {
-            Nav::Up(_) => Some(0),
-            Nav::UpSkipTrivia(_) => Some(1),
-            Nav::UpSkipExtras(_) => Some(2),
-            Nav::UpExact(_) => Some(3),
-            _ => None,
-        }
-    }
-
-    fn up_level(nav: Nav) -> Option<u8> {
-        match nav {
-            Nav::Up(n) | Nav::UpSkipTrivia(n) | Nav::UpSkipExtras(n) | Nav::UpExact(n) => Some(n),
-            _ => None,
-        }
-    }
-
     /// Collect the ordered ops a single match contributes.
     fn match_ops(m: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
@@ -174,8 +156,8 @@ mod debug_impl {
         }
 
         if m.nav != Nav::Epsilon {
-            if let Some(mode) = up_mode_tag(m.nav) {
-                ops.push(SemanticOp::UpNav(mode, up_level(m.nav).unwrap() as u32));
+            if let Some(mode) = m.nav.up_mode_tag() {
+                ops.push(SemanticOp::UpNav(mode, m.nav.up_level().unwrap() as u32));
             } else {
                 ops.push(SemanticOp::Nav(m.nav));
             }

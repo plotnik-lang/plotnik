@@ -1995,6 +1995,7 @@ dependencies = [
 name = "plotnik-vm"
 version = "0.3.3"
 dependencies = [
+ "arborium-javascript",
  "arborium-tree-sitter",
  "insta",
  "plotnik-bytecode",
