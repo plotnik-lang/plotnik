@@ -287,6 +287,52 @@ fn collapse_up_branching_no_merge() {
 }
 
 #[test]
+fn collapse_up_deep_chain_splits_without_dangling() {
+    // Regression for #455. A same-mode Up run longer than the 63-level cap forces
+    // the head to stop mid-chain. The absorbed node at that boundary used to be
+    // reprocessed as a fresh merge start, re-absorbing (and removing) the live
+    // boundary node the head now points at — dangling the head's successor.
+    const DEPTH: u32 = 130;
+
+    let mut instructions: Vec<InstructionIR> = (0..DEPTH)
+        .map(|i| {
+            MatchIR::at(Label(i))
+                .nav(Nav::Up(1))
+                .next(Label(i + 1))
+                .into()
+        })
+        .collect();
+    instructions.push(MatchIR::terminal(Label(DEPTH)).into());
+
+    let mut result = CompileResult {
+        instructions,
+        def_entries: Default::default(),
+        preamble_entry: Label(0),
+    };
+
+    collapse_up(&mut result);
+
+    let present: std::collections::HashSet<Label> =
+        result.instructions.iter().map(|i| i.label()).collect();
+    let mut total = 0u32;
+    for instr in &result.instructions {
+        for succ in instr.successors() {
+            assert!(present.contains(succ), "dangling successor {succ:?}");
+        }
+        if let InstructionIR::Match(m) = instr
+            && let Nav::Up(n) = m.nav
+        {
+            assert!(n <= 63, "Up({n}) exceeds the encodable level");
+            total += u32::from(n);
+        }
+    }
+    assert_eq!(
+        total, DEPTH,
+        "ascent depth must be preserved across the split"
+    );
+}
+
+#[test]
 fn collapse_up_no_up_unchanged() {
     // Non-Up instructions should pass through unchanged
     let mut result = CompileResult {
