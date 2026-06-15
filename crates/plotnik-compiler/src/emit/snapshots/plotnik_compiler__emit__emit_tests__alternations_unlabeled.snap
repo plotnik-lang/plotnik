@@ -14,15 +14,11 @@ S5 "string"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { id, str }
-T2 = Struct  M2:1  ; { id }
-T3 = Struct  M3:1  ; { str }
-T4 = Optional(T0)  ; <Node>?
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T4  ; id: T4
-M1: S2 → T4  ; str: T4
-M2: S1 → T0  ; id: <Node>
-M3: S2 → T0  ; str: <Node>
+M0: S1 → T2  ; id: T2
+M1: S2 → T2  ; str: T2
 
 [type_names]
 N0: S3 → T1  ; Test

@@ -68,7 +68,7 @@ mod debug_impl {
     use plotnik_core::{NodeType, Symbol};
 
     use crate::analyze::type_check::DefId;
-    use crate::bytecode::{InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, PredicateValueIR};
+    use crate::bytecode::{InstructionIR, Label, MatchIR, NodeTypeIR, PredicateValueIR};
     use crate::compile::CompileResult;
     use crate::emit::StringTableBuilder;
 
@@ -167,11 +167,10 @@ mod debug_impl {
     fn match_ops(m: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
 
+        // Member names aren't resolved at the IR fingerprint stage (that needs the
+        // type table); the effect opcode alone keys the fingerprint.
         for e in &m.pre_effects {
-            ops.push(SemanticOp::Effect(
-                e.opcode() as u8,
-                resolve_member_name(&e.member_ref(), ctx.interner),
-            ));
+            ops.push(SemanticOp::Effect(e.opcode() as u8, None));
         }
 
         if m.nav != Nav::Epsilon {
@@ -216,10 +215,7 @@ mod debug_impl {
         }
 
         for e in &m.post_effects {
-            ops.push(SemanticOp::Effect(
-                e.opcode() as u8,
-                resolve_member_name(&e.member_ref(), ctx.interner),
-            ));
+            ops.push(SemanticOp::Effect(e.opcode() as u8, None));
         }
 
         ops
@@ -679,16 +675,6 @@ mod debug_impl {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
         }
-    }
-
-    fn resolve_member_name(
-        member_ref: &Option<MemberRef>,
-        interner: &plotnik_core::Interner,
-    ) -> Option<String> {
-        let Some(MemberRef::Deferred { field_name, .. }) = member_ref else {
-            return None;
-        };
-        interner.try_resolve(*field_name).map(|s| s.to_string())
     }
 
     fn resolve_node_type_name(

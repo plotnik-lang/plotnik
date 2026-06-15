@@ -2,7 +2,8 @@
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
 //! After layout, labels are resolved to step addresses (u16) for serialization.
-//! Member indices use deferred resolution via `MemberRef`.
+//! A `MemberRef` stores a parent type plus a relative index, resolved to an
+//! absolute member index at emit time.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
@@ -16,12 +17,11 @@ use plotnik_bytecode::{
 
 /// Resolver bundle for bytecode emission.
 ///
-/// Bundles the three deferred-reference resolvers (`lookup_member` for struct
-/// fields, `get_member_base` for enum variants, `lookup_regex` for predicate
-/// patterns) into one value so `resolve` signatures stay flat. The resolvers
-/// borrow the emission tables; build via [`EmitContext::from_tables`].
+/// Bundles the deferred-reference resolvers (`get_member_base` for struct/enum
+/// member bases, `lookup_regex` for predicate patterns) into one value so
+/// `resolve` signatures stay flat. The resolvers borrow the emission tables;
+/// build via [`EmitContext::new`].
 pub struct EmitContext<'a> {
-    lookup_member: &'a dyn Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
     get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
     lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
 }
@@ -29,32 +29,13 @@ pub struct EmitContext<'a> {
 impl<'a> EmitContext<'a> {
     /// Build a resolver context from explicit resolver functions.
     pub fn new(
-        lookup_member: &'a dyn Fn(plotnik_core::Symbol, TypeId) -> Option<u16>,
         get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
         lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
     ) -> Self {
         Self {
-            lookup_member,
             get_member_base,
             lookup_regex,
         }
-    }
-
-    /// Resolve a struct field reference to its member index.
-    ///
-    /// Members are deduplicated globally by field identity (name, type).
-    fn lookup_member(&self, field_name: plotnik_core::Symbol, field_type: TypeId) -> Option<u16> {
-        (self.lookup_member)(field_name, field_type)
-    }
-
-    /// Resolve an enum's parent type to its member base index.
-    fn get_member_base(&self, parent_type: TypeId) -> Option<u16> {
-        (self.get_member_base)(parent_type)
-    }
-
-    /// Resolve a regex predicate pattern to its RegexTable index.
-    fn lookup_regex(&self, string_id: plotnik_bytecode::StringId) -> Option<u16> {
-        (self.lookup_regex)(string_id)
     }
 }
 
@@ -77,77 +58,32 @@ impl Label {
 }
 
 /// Symbolic reference to a struct field or enum variant.
-/// Resolved to absolute member index during bytecode emission.
 ///
-/// Struct field indices are deduplicated globally: same (name, type) pair → same index.
-/// This enables call-site scoping where uncaptured refs share the caller's scope.
-///
-/// Enum variant indices use the traditional (parent_type, relative_index) approach
-/// since enum variants don't bubble between scopes.
+/// Resolved to an absolute member index at emit time: the parent type's member
+/// base (`get_member_base`) plus `relative_index`. The parent type is a scope or
+/// enum that an entrypoint result reaches, so it is always present in the emitted
+/// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MemberRef {
-    /// Already resolved to absolute index (for cases where it's known).
-    Absolute(u16),
-    /// Deferred resolution by field identity (for struct fields).
-    /// The same (field_name, field_type) pair resolves to the same member index
-    /// regardless of which struct type contains it.
-    Deferred {
-        /// The Symbol of the field name (from query interner).
-        field_name: plotnik_core::Symbol,
-        /// The TypeId of the field's value type (from query TypeContext).
-        field_type: TypeId,
-    },
-    /// Deferred resolution by parent type + relative index (for enum variants).
-    /// Uses the parent enum's member_base + relative_index.
-    DeferredByIndex {
-        /// The TypeId of the parent enum type.
-        parent_type: TypeId,
-        /// Relative index within the parent type's members.
-        relative_index: u16,
-    },
+pub struct MemberRef {
+    /// The query type whose member table this indexes (struct or enum).
+    pub parent_type: TypeId,
+    /// Relative index within the parent type's members.
+    pub relative_index: u16,
 }
 
 impl MemberRef {
-    /// Create an absolute reference.
-    pub fn absolute(index: u16) -> Self {
-        Self::Absolute(index)
-    }
-
-    /// Create a deferred reference by field identity (for struct fields).
-    pub fn deferred(field_name: plotnik_core::Symbol, field_type: TypeId) -> Self {
-        Self::Deferred {
-            field_name,
-            field_type,
-        }
-    }
-
-    /// Create a deferred reference by parent type + index (for enum variants).
-    pub fn deferred_by_index(parent_type: TypeId, relative_index: u16) -> Self {
-        Self::DeferredByIndex {
+    /// Create a member reference by parent type + relative index.
+    pub fn new(parent_type: TypeId, relative_index: u16) -> Self {
+        Self {
             parent_type,
             relative_index,
         }
     }
 
-    /// Resolve this reference using the emission context's lookup tables.
+    /// Resolve this reference to an absolute member index.
     pub fn resolve(self, ctx: &EmitContext) -> u16 {
-        match self {
-            Self::Absolute(n) => n,
-            Self::Deferred {
-                field_name,
-                field_type,
-            } => ctx
-                .lookup_member(field_name, field_type)
-                .expect("deferred member reference must resolve"),
-            Self::DeferredByIndex {
-                parent_type,
-                relative_index,
-            } => {
-                ctx.get_member_base(parent_type)
-                    .expect("deferred member base must resolve")
-                    + relative_index
-            }
-        }
+        (ctx.get_member_base)(self.parent_type).expect("member base must resolve")
+            + self.relative_index
     }
 }
 
@@ -173,12 +109,6 @@ impl EffectIR {
     #[inline]
     pub fn payload(&self) -> usize {
         self.payload
-    }
-
-    /// The member reference for Set/Enum effects (None for other effects).
-    #[inline]
-    pub fn member_ref(&self) -> Option<MemberRef> {
-        self.member_ref
     }
 
     /// Create a simple effect without member reference.
@@ -531,9 +461,9 @@ impl MatchIR {
             let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
             let value_ref = match &pred.value {
                 PredicateValueIR::String(string_id) => string_id.get(),
-                PredicateValueIR::Regex(string_id) => ctx
-                    .lookup_regex(*string_id)
-                    .expect("regex predicate must be interned"),
+                PredicateValueIR::Regex(string_id) => {
+                    (ctx.lookup_regex)(*string_id).expect("regex predicate must be interned")
+                }
             };
             MatchPredicate {
                 op: pred.op_byte(),

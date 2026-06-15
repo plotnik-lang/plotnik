@@ -2,7 +2,8 @@
 //!
 //! Compiles query AST expressions into bytecode IR with symbolic labels.
 //! Labels are resolved to concrete StepIds during the layout phase.
-//! Member indices use deferred resolution via MemberRef for correct absolute indices.
+//! A `MemberRef` carries a parent type plus relative index, resolved to an
+//! absolute member index at emit time.
 //!
 //! # Module Organization
 //!

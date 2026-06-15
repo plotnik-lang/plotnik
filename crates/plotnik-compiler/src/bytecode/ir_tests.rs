@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
 use plotnik_bytecode::{EffectOpcode, Nav};
-use plotnik_core::Symbol;
 
 use super::ir::{
     CallIR, EffectIR, EmitContext, InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, ReturnIR,
@@ -59,7 +58,7 @@ fn resolve_match_terminal() {
     let mut map = BTreeMap::new();
     map.insert(Label(0), 1u16);
 
-    let ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
+    let ctx = EmitContext::new(&|_| None, &|_| None);
     let bytes = m.resolve(&map, &ctx).expect("terminal match encodes");
     assert_eq!(bytes.len(), 8);
 
@@ -71,64 +70,31 @@ fn resolve_match_terminal() {
 
 #[test]
 fn member_ref_resolution() {
-    // Create test symbols (these are just integer handles)
-    let field_name = Symbol::from_raw(100);
-    let field_type = TypeId(10);
     let parent_type = TypeId(20);
 
-    // Test absolute reference
-    let abs = MemberRef::absolute(42);
-    let abs_ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
-    assert_eq!(abs.resolve(&abs_ctx), 42);
-
-    // Test deferred reference with lookup (struct field)
-    let deferred = MemberRef::deferred(field_name, field_type);
-    let lookup_member = |name, ty| {
-        if name == field_name && ty == field_type {
-            Some(77)
-        } else {
-            None
-        }
-    };
-    let deferred_ctx = EmitContext::new(&lookup_member, &|_| None, &|_| None);
-    assert_eq!(deferred.resolve(&deferred_ctx), 77);
-
-    // Test deferred by index reference (enum variant)
-    let by_index = MemberRef::deferred_by_index(parent_type, 3);
+    // A member ref resolves to the parent type's member base plus the relative index.
+    let member = MemberRef::new(parent_type, 3);
     let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
-    let by_index_ctx = EmitContext::new(&|_, _| None, &get_member_base, &|_| None);
-    assert_eq!(
-        by_index.resolve(&by_index_ctx),
-        53 // base 50 + relative 3
-    );
+    let ctx = EmitContext::new(&get_member_base, &|_| None);
+    assert_eq!(member.resolve(&ctx), 53); // base 50 + relative 3
 }
 
 #[test]
 fn effect_ir_resolution() {
-    let field_name = Symbol::from_raw(200);
-    let field_type = TypeId(10);
+    let parent_type = TypeId(10);
 
     // Simple effect without member ref
     let simple = EffectIR::simple(EffectOpcode::Node, 5);
-    let simple_ctx = EmitContext::new(&|_, _| None, &|_| None, &|_| None);
+    let simple_ctx = EmitContext::new(&|_| None, &|_| None);
     let resolved = simple.resolve(&simple_ctx);
     assert_eq!(resolved.opcode, EffectOpcode::Node);
     assert_eq!(resolved.payload, 5);
 
-    // Effect with deferred member ref
-    let set_effect = EffectIR::with_member(
-        EffectOpcode::Set,
-        MemberRef::deferred(field_name, field_type),
-    );
-    let lookup_member = |name, ty| {
-        if name == field_name && ty == field_type {
-            Some(51)
-        } else {
-            None
-        }
-    };
-    let set_ctx = EmitContext::new(&lookup_member, &|_| None, &|_| None);
+    // Effect with a member ref resolves through the parent type's member base.
+    let set_effect = EffectIR::with_member(EffectOpcode::Set, MemberRef::new(parent_type, 1));
+    let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
+    let set_ctx = EmitContext::new(&get_member_base, &|_| None);
     let resolved = set_effect.resolve(&set_ctx);
     assert_eq!(resolved.opcode, EffectOpcode::Set);
-    assert_eq!(resolved.payload, 51);
+    assert_eq!(resolved.payload, 51); // base 50 + relative 1
 }

@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use plotnik_core::{NodeType, Symbol};
+use plotnik_core::NodeType;
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{EmitContext, InstructionIR, Label, PredicateValueIR};
@@ -25,8 +25,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let node_field_ids = query.node_field_ids();
 
     let strings = RefCell::new(StringTableBuilder::new());
-    let mut types = TypeTableBuilder::new();
-    types.build(type_ctx, interner, &mut strings.borrow_mut())?;
 
     let ctx = CompileCtx {
         interner,
@@ -37,6 +35,12 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         node_fields: Some(node_field_ids),
     };
     let compile_result = Compiler::compile(&ctx).map_err(EmitError::Compile)?;
+
+    // Every emitted effect's member ref names a type reachable from an entrypoint
+    // result, so dead-type elimination roots at those results alone. Built after
+    // `compile` so both share one string table (`strings`).
+    let mut types = TypeTableBuilder::new();
+    types.build(type_ctx, interner, &mut strings.borrow_mut())?;
 
     // Layout with cache alignment
     // Preamble entry FIRST ensures it gets the lowest address (step 0)
@@ -107,13 +111,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     regexes.validate()?;
 
     // Resolve and serialize transitions
-    let transitions_bytes = emit_transitions(
-        &compile_result.instructions,
-        &layout,
-        &types,
-        &strings,
-        &regexes,
-    )?;
+    let transitions_bytes =
+        emit_transitions(&compile_result.instructions, &layout, &types, &regexes)?;
 
     // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
@@ -193,21 +192,17 @@ fn emit_transitions(
     instructions: &[crate::bytecode::InstructionIR],
     layout: &crate::bytecode::LayoutResult,
     types: &TypeTableBuilder,
-    strings: &StringTableBuilder,
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
     // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps() as usize * 8];
 
-    // Member index resolvers: struct fields are deduplicated by field identity,
-    // enum variants use parent_type + relative_index, regex predicates index the
+    // Member index resolvers: struct fields and enum variants both resolve via
+    // parent_type + relative_index (get_member_base); regex predicates index the
     // RegexTable. Bundled into EmitContext so resolution signatures stay flat.
-    let lookup_member = |field_name: Symbol, field_type: TypeId| {
-        types.lookup_member(field_name, field_type, strings)
-    };
     let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
     let lookup_regex = |string_id: plotnik_bytecode::StringId| regexes.get(string_id);
-    let ctx = EmitContext::new(&lookup_member, &get_member_base, &lookup_regex);
+    let ctx = EmitContext::new(&get_member_base, &lookup_regex);
 
     for instr in instructions {
         let label = instr.label();

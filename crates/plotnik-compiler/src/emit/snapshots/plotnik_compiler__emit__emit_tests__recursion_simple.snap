@@ -26,8 +26,6 @@ T1 = <String>
 T2 = Struct  M0:1  ; { value }
 T3 = Struct  M1:2  ; { fn, inner }
 T4 = Enum    M3:2  ; Lit | Rec
-T5 = Struct  M5:1  ; { fn }
-T6 = Struct  M6:1  ; { inner }
 
 [type_members]
 M0: S01 → T1  ; value: <String>
@@ -35,8 +33,6 @@ M1: S02 → T0  ; fn: <Node>
 M2: S03 → T4  ; inner: Expr
 M3: S04 → T2  ; Lit: T2
 M4: S05 → T3  ; Rec: T3
-M5: S02 → T0  ; fn: <Node>
-M6: S03 → T4  ; inner: Expr
 
 [type_names]
 N0: S06 → T4  ; Expr

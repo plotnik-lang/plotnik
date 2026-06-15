@@ -69,15 +69,13 @@ impl Compiler<'_> {
         result
     }
 
-    /// Look up a capture name in a type, returning a deferred member reference.
-    ///
-    /// Uses (struct_type, relative_index) for deferred resolution.
-    /// Member deduplication for call-site scoping will be added later.
+    /// Look up a capture name in a type, returning a member reference by
+    /// (struct_type, relative_index).
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
         let fields = self.ctx.type_ctx.get_struct_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
             if self.ctx.interner.resolve(field_sym) == capture_name {
-                return Some(MemberRef::deferred_by_index(type_id, relative_index as u16));
+                return Some(MemberRef::new(type_id, relative_index as u16));
             }
         }
         None
