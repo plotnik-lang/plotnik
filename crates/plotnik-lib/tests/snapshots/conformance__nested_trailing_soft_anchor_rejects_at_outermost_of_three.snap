@@ -1,0 +1,16 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement (array (array (array (number) @n .) .) .)))
+
+==== source ====
+[[[1]], x]
+
+==== types ====
+export interface Q {
+  n: Node;
+}
+
+==== result ====
+<no match>

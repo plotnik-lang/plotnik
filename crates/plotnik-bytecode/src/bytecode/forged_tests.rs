@@ -312,10 +312,11 @@ fn forged_reserved_node_kind_is_rejected() {
 
 #[test]
 fn forged_invalid_nav_is_rejected() {
-    // `0x40` is an `Up`-mode byte with a zero level; `Nav::from_byte` would panic.
+    // `0x80` is an Up-family byte (bit 7 set) with a zero level; `Nav::from_byte`
+    // would panic, so the loader must reject it.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |o| o <= 5);
-    bytes[off + 1] = 0x40;
+    bytes[off + 1] = 0x80;
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged nav must be rejected");

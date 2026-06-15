@@ -22,16 +22,17 @@ pub enum SkipPolicy {
     Exact,
 }
 
-/// Exit constraint for Up navigation.
+/// Exit constraint for Up navigation, checked at *each* level ascended (so
+/// same-mode `Up*` instructions compose; see [`CursorWrapper::go_up`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UpMode {
     /// No constraint - just ascend.
     Any,
-    /// Must be at last non-trivia child before ascending.
+    /// Each node left must be its parent's last non-trivia child.
     SkipTrivia,
-    /// Must be at last non-extra child before ascending.
+    /// Each node left must be its parent's last non-extra child.
     SkipExtras,
-    /// Must be at last child before ascending.
+    /// Each node left must be its parent's last child.
     Exact,
 }
 
@@ -87,8 +88,12 @@ impl<'t> CursorWrapper<'t> {
     }
 
     /// Check if a node is trivia.
+    ///
+    /// TODO: when extracting common tree-sitter API wrapper (arborium vs vanilla tre-sitter),
+    ///       make sure is_trivia() is just a method on the wrapper around `Node`,
+    ///       such that n.is_trivia(), n.is_named(), and n.is_extra() are uniform.
     #[inline]
-    pub fn is_trivia(&self, node: &Node<'_>) -> bool {
+    pub fn is_trivia(node: &Node<'_>) -> bool {
         // Anonymous skipping is documented anchor semantics; `is_extra` is the
         // parser's per-instance bit, so the same kind can be extra in one
         // position and structural in another.
@@ -136,56 +141,61 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_next_sibling()
     }
 
-    /// Ascend n levels with exit constraint.
+    /// Ascend `levels` levels, validating the exit constraint at *every* level.
+    ///
+    /// Same-mode `Up*` instructions compose: `Up*(a)` then `Up*(b)` is `Up*(a+b)`,
+    /// because each node being exited is checked in turn. This is what makes a
+    /// nested trailing anchor — `(array (object (pair) .) .)`, "pair last in
+    /// object AND object last in array" — sound when `collapse_up` merges the two
+    /// single-level ascents (and why merging caps at the encoding limit rather
+    /// than dropping checks; see docs/tree-navigation.md).
+    ///
+    /// On any failure the cursor is restored to where it started, so a failed
+    /// navigation leaves no net movement (the VM also backtracks to a checkpoint,
+    /// but keeping this self-contained avoids relying on that).
     fn go_up(&mut self, levels: u8, mode: UpMode) -> bool {
-        // Check exit constraint before ascending
-        match mode {
-            UpMode::Any => {}
-            UpMode::Exact => {
-                // Must be at last child
-                if self.cursor.goto_next_sibling() {
-                    // Oops, there was a next sibling - restore position
-                    self.cursor.goto_previous_sibling();
-                    return false;
-                }
-            }
-            UpMode::SkipTrivia => {
-                // Must be at last non-trivia child
-                // Save position
-                let saved = self.cursor.descendant_index();
-
-                // Look for non-trivia siblings after us
-                while self.cursor.goto_next_sibling() {
-                    if !self.is_trivia(&self.cursor.node()) {
-                        // Found non-trivia sibling - fail
-                        self.cursor.goto_descendant(saved);
-                        return false;
-                    }
-                }
-                // Restore position
-                self.cursor.goto_descendant(saved);
-            }
-            UpMode::SkipExtras => {
-                // Must be at last non-extra child
-                let saved = self.cursor.descendant_index();
-
-                while self.cursor.goto_next_sibling() {
-                    if !self.cursor.node().is_extra() {
-                        self.cursor.goto_descendant(saved);
-                        return false;
-                    }
-                }
-
-                self.cursor.goto_descendant(saved);
-            }
-        }
-
-        // Ascend n levels
+        let origin = self.cursor.descendant_index();
         for _ in 0..levels {
-            if !self.cursor.goto_parent() {
+            if !self.exit_constraint_holds(mode) || !self.cursor.goto_parent() {
+                self.cursor.goto_descendant(origin);
                 return false;
             }
         }
+        true
+    }
+
+    /// Whether the current node satisfies `mode`'s last-child constraint. Any
+    /// sibling probe is undone before returning, so the cursor stays on the
+    /// current node either way — ready for the caller to ascend.
+    fn exit_constraint_holds(&mut self, mode: UpMode) -> bool {
+        match mode {
+            UpMode::Any => true,
+            UpMode::Exact => {
+                // Must be the last child — no next sibling at all.
+                if self.cursor.goto_next_sibling() {
+                    self.cursor.goto_previous_sibling();
+                    return false;
+                }
+                true
+            }
+            // Last child once trailing trivia / extras are ignored.
+            UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
+            UpMode::SkipExtras => self.is_last_child_skipping(|n| n.is_extra()),
+        }
+    }
+
+    /// Whether no non-`skippable` sibling follows the current node — i.e. it is
+    /// the last child once trailing `skippable` siblings are ignored. The sibling
+    /// scan is undone before returning, so the cursor stays on the current node.
+    fn is_last_child_skipping(&mut self, skippable: impl Fn(&Node<'t>) -> bool) -> bool {
+        let saved = self.cursor.descendant_index();
+        while self.cursor.goto_next_sibling() {
+            if !skippable(&self.cursor.node()) {
+                self.cursor.goto_descendant(saved);
+                return false;
+            }
+        }
+        self.cursor.goto_descendant(saved);
         true
     }
 
@@ -203,7 +213,7 @@ impl<'t> CursorWrapper<'t> {
             SkipPolicy::Exact => false,
             SkipPolicy::Trivia => {
                 // Fail if current node is non-trivia (we'd have to skip it)
-                if !self.is_trivia(&self.cursor.node()) {
+                if !Self::is_trivia(&self.cursor.node()) {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

@@ -80,24 +80,24 @@ impl Symbol {
 
 /// Format navigation command as a dump symbol.
 ///
-/// | Nav             | Symbol examples | Notes                              |
-/// | --------------- | --------------- | ---------------------------------- |
-/// | Epsilon         | -ε-             | Pure control flow, no cursor check |
-/// | Stay            | (blank)         | No movement                        |
-/// | StayExact       | !               | Stay at position, exact match only |
-/// | Down            | └‣─             | First child, skip any              |
-/// | DownSkip        | └•─             | First child, skip trivia           |
-/// | DownSkipExtras  | └◦─             | First child, skip extras only      |
-/// | DownExact       | └─!             | First child, exact                 |
-/// | Next            | ─‣─             | Next sibling, skip any             |
-/// | NextSkip        | ─•─             | Next sibling, skip trivia          |
-/// | NextSkipExtras  | ─◦─             | Next sibling, skip extras only     |
-/// | NextExact       | ──!             | Next sibling, exact                |
-/// | Up(1)           | ─‣┘             | Ascend 1 level, skip any           |
-/// | Up(2), Up(10)   | ─‣┘², ─‣┘¹⁰    | Ascend n levels, skip any          |
-/// | UpSkipTrivia(n) | ─•┘², ─•┘¹⁰    | Ascend n, must be last non-trivia  |
-/// | UpSkipExtras(n) | ─◦┘², ─◦┘¹⁰    | Ascend n, must be last non-extra   |
-/// | UpExact(n)      | !─┘², !─┘¹⁰    | Ascend n, must be last child       |
+/// | Nav             | Symbol examples | Notes                                   |
+/// | --------------- | --------------- | --------------------------------------- |
+/// | Epsilon         | -ε-             | Pure control flow, no cursor check      |
+/// | Stay            | (blank)         | No movement                             |
+/// | StayExact       | !               | Stay at position, exact match only      |
+/// | Down            | └‣─             | First child, skip any                   |
+/// | DownSkip        | └•─             | First child, skip trivia                |
+/// | DownSkipExtras  | └◦─             | First child, skip extras only           |
+/// | DownExact       | └─!             | First child, exact                      |
+/// | Next            | ─‣─             | Next sibling, skip any                  |
+/// | NextSkip        | ─•─             | Next sibling, skip trivia               |
+/// | NextSkipExtras  | ─◦─             | Next sibling, skip extras only          |
+/// | NextExact       | ──!             | Next sibling, exact                     |
+/// | Up(1)           | ─‣┘             | Ascend 1 level, skip any                |
+/// | Up(2), Up(10)   | ─‣┘², ─‣┘¹⁰     | Ascend n levels, skip any               |
+/// | UpSkipTrivia(n) | ─•┘², ─•┘¹⁰     | Ascend n, last non-trivia on each level |
+/// | UpSkipExtras(n) | ─◦┘², ─◦┘¹⁰     | Ascend n, last non-extra on each level  |
+/// | UpExact(n)      | !─┘², !─┘¹⁰     | Ascend n, last child on each level      |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Epsilon => Symbol::EPSILON,

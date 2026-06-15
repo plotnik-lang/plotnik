@@ -18,3 +18,4 @@ thiserror = "2.0.17"
 
 [dev-dependencies]
 insta = { version = "=1.48.0", features = ["yaml"] }
+arborium-javascript = "2.18.0"

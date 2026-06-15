@@ -163,25 +163,25 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Nav Symbols
 
-| Nav             | Symbol | Notes                                        |
-| --------------- | :----: | -------------------------------------------- |
-| Epsilon         |  -ε-   | Pure control flow, no cursor check           |
-| Stay            |        | No movement, fill with spaces                |
-| StayExact       |   !    | No movement, exact match only                |
-| Down            |  └‣─   | First child, skip any                        |
-| DownSkip        |  └•─   | First child, skip trivia                     |
-| DownSkipExtras  |  └◦─   | First child, skip extras only                |
-| DownExact       |  └─!   | First child, exact                           |
-| Next            |  ─‣─   | Next sibling, skip any                       |
-| NextSkip        |  ─•─   | Next sibling, skip trivia                    |
-| NextSkipExtras  |  ─◦─   | Next sibling, skip extras only               |
-| NextExact       |  ──!   | Next sibling, exact                          |
-| Up(1)           |  ─‣┘   | Skip any and ascend 1 level (no superscript) |
-| Up(2)           |  ─‣┘²  | Skip any and ascend 2 levels                 |
-| Up(12)          | ─‣┘¹²  | Skip any and ascend 12 levels                |
-| UpSkipTrivia(2) |  ─•┘²  | If only trivia remains, ascend 2 levels      |
-| UpSkipExtras(2) |  ─◦┘²  | If only extras remain, ascend 2 levels       |
-| UpExact(2)      |  !─┘²  | If nothing remains, ascend 2 levels          |
+| Nav             | Symbol | Notes                                         |
+| --------------- | :----: | --------------------------------------------- |
+| Epsilon         |  -ε-   | Pure control flow, no cursor check            |
+| Stay            |        | No movement, fill with spaces                 |
+| StayExact       |   !    | No movement, exact match only                 |
+| Down            |  └‣─   | First child, skip any                         |
+| DownSkip        |  └•─   | First child, skip trivia                      |
+| DownSkipExtras  |  └◦─   | First child, skip extras only                 |
+| DownExact       |  └─!   | First child, exact                            |
+| Next            |  ─‣─   | Next sibling, skip any                        |
+| NextSkip        |  ─•─   | Next sibling, skip trivia                     |
+| NextSkipExtras  |  ─◦─   | Next sibling, skip extras only                |
+| NextExact       |  ──!   | Next sibling, exact                           |
+| Up(1)           |  ─‣┘   | Skip any and ascend 1 level (no superscript)  |
+| Up(2)           |  ─‣┘²  | Skip any and ascend 2 levels                  |
+| Up(12)          | ─‣┘¹²  | Skip any and ascend 12 levels                 |
+| UpSkipTrivia(2) |  ─•┘²  | Ascend 2 levels, each only if trivia remains  |
+| UpSkipExtras(2) |  ─◦┘²  | Ascend 2 levels, each only if extras remain   |
+| UpExact(2)      |  !─┘²  | Ascend 2 levels, each only if nothing remains |
 
 **Note**: `-ε-` appears for `Nav::Epsilon` — a distinct mode from `Stay`. A step with `nav == Stay` but with type constraints (e.g., `(identifier)`) shows blank, not `-ε-`.
 

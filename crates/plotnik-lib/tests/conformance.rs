@@ -347,6 +347,59 @@ fn up_strict_anchor_rejects_trailing_comment() {
     );
 }
 
+// #471: a nested trailing anchor asserts last-child at *every* level it exits.
+// `collapse_up` merges the per-level ascents into one `UpSkipTrivia`/`UpExact`,
+// and the VM must still check each level (not only the innermost).
+
+/// `(object)` is not the last child of `(array)` (`b` follows), so the outer `.`
+/// must reject even though `(pair)` is the last child of `(object)`.
+#[test]
+fn nested_trailing_soft_anchor_rejects_when_outer_not_last() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (array (object (pair) @p .) .)))"#,
+        "[{a:1}, b]"
+    );
+}
+
+/// Match path: the object *is* the last child of the array, so both levels hold.
+#[test]
+fn nested_trailing_soft_anchor_matches_when_truly_last() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (array (object (pair) @p .) .)))"#,
+        "[{a:1}]"
+    );
+}
+
+/// Three stacked anchors collapse to `UpSkipTrivia(3)`; the *outermost* level
+/// (mid-array last in outer array) is the one a shallow check would drop. Here
+/// `x` follows the mid array, so it must reject.
+#[test]
+fn nested_trailing_soft_anchor_rejects_at_outermost_of_three() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (array (array (array (number) @n .) .) .)))"#,
+        "[[[1]], x]"
+    );
+}
+
+/// Same three-level pattern, all levels last: matches.
+#[test]
+fn nested_trailing_soft_anchor_matches_three_levels_last() {
+    shot_exec!(
+        r#"Q = (program (expression_statement (array (array (array (number) @n .) .) .)))"#,
+        "[[[1]]]"
+    );
+}
+
+/// Strict variant: `(return_statement)` is not the absolute-last child of the
+/// block (`}` follows), so the outer `.!` must reject.
+#[test]
+fn nested_trailing_strict_anchor_rejects_when_outer_not_last() {
+    shot_exec!(
+        r#"Q = (program (function_declaration body: (statement_block (return_statement (identifier) @id .!) .!)))"#,
+        "function f(){ return x }"
+    );
+}
+
 #[test]
 fn explicit_comment_pattern_matches_before_skip_policy() {
     shot_exec!(

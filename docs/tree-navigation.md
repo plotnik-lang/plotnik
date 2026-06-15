@@ -47,23 +47,23 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 `Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](binary-format/06-transitions.md) for bit layout.
 
-| Nav               | Dump Symbol | Movement                      |
-| ----------------- | ----------- | ----------------------------- |
-| `Stay`            | (space)     | No movement                   |
-| `StayExact`       | `!`         | No movement, exact match only |
-| `Down`            | `└‣─`       | First child, skip any         |
-| `DownSkip`        | `└•─`       | First child, skip trivia only |
-| `DownSkipExtras`  | `└◦─`       | First child, skip extras only |
-| `DownExact`       | `└─!`       | First child, exact            |
-| `Next`            | `─‣─`       | Next sibling, skip any        |
-| `NextSkip`        | `─•─`       | Next sibling, skip trivia     |
-| `NextSkipExtras`  | `─◦─`       | Next sibling, skip extras     |
-| `NextExact`       | `──!`       | Next sibling, exact           |
-| `Up(1)`           | `─‣┘`       | Ascend 1 level                |
-| `Up(2)`           | `─‣┘²`      | Ascend 2 levels               |
-| `UpSkipTrivia(2)` | `─•┘²`      | Ascend 2, last non-trivia     |
-| `UpSkipExtras(2)` | `─◦┘²`      | Ascend 2, last non-extra      |
-| `UpExact(2)`      | `!─┘²`      | Ascend 2, last child          |
+| Nav               | Dump Symbol | Movement                                |
+| ----------------- | ----------- | --------------------------------------- |
+| `Stay`            | (space)     | No movement                             |
+| `StayExact`       | `!`         | No movement, exact match only           |
+| `Down`            | `└‣─`       | First child, skip any                   |
+| `DownSkip`        | `└•─`       | First child, skip trivia only           |
+| `DownSkipExtras`  | `└◦─`       | First child, skip extras only           |
+| `DownExact`       | `└─!`       | First child, exact                      |
+| `Next`            | `─‣─`       | Next sibling, skip any                  |
+| `NextSkip`        | `─•─`       | Next sibling, skip trivia               |
+| `NextSkipExtras`  | `─◦─`       | Next sibling, skip extras               |
+| `NextExact`       | `──!`       | Next sibling, exact                     |
+| `Up(1)`           | `─‣┘`       | Ascend 1 level                          |
+| `Up(2)`           | `─‣┘²`      | Ascend 2 levels                         |
+| `UpSkipTrivia(2)` | `─•┘²`      | Ascend 2, last non-trivia on each level |
+| `UpSkipExtras(2)` | `─◦┘²`      | Ascend 2, last non-extra on each level  |
+| `UpExact(2)`      | `!─┘²`      | Ascend 2, last child on each level      |
 
 ## Search Loop
 
@@ -77,7 +77,10 @@ Navigation and matching are intertwined. The `Nav` mode determines initial movem
 3. EFFECTS On success: set matched_node, execute post_effects
 ```
 
-For `Up*` variants, step 2 becomes: validate exit constraint, ascend n levels.
+For `Up*` variants, step 2 becomes: for each of the n levels, validate the exit
+constraint on the node being left, then ascend one level. The constraint is
+checked at **every** level, which is what lets same-mode `Up*` instructions
+compose: `Up*(a)` followed by `Up*(b)` is exactly `Up*(a+b)`.
 
 ### Skip Policy
 
@@ -94,12 +97,12 @@ Each mode defines what happens when a match fails:
 
 **Up variants** (exit validation):
 
-| Mode              | Constraint                                    |
-| ----------------- | --------------------------------------------- |
-| `Up(n)`           | None — just ascend n levels                   |
-| `UpSkipTrivia(n)` | Must be at last non-trivia child, then ascend |
-| `UpSkipExtras(n)` | Must be at last non-extra child, then ascend  |
-| `UpExact(n)`      | Must be at last child, then ascend            |
+| Mode              | Constraint (checked at each of the n levels)              |
+| ----------------- | --------------------------------------------------------- |
+| `Up(n)`           | None — just ascend n levels                               |
+| `UpSkipTrivia(n)` | Each node left must be its parent's last non-trivia child |
+| `UpSkipExtras(n)` | Each node left must be its parent's last non-extra child  |
+| `UpExact(n)`      | Each node left must be its parent's last child            |
 
 ### Example: `(foo (bar))` vs `(foo (foo) (foo) (bar))`
 
@@ -237,7 +240,7 @@ Anonymous operands make `.` skip extras only. Comments can appear between the op
   05  ─‣┘³                                      ◼
 ```
 
-Multi-level `Up(n)` coalesces ascent when no intermediate anchors exist: the compiler merges consecutive effectless `Up` steps of the same mode into a single instruction.
+Multi-level ascent coalesces: the compiler merges consecutive effectless `Up*` steps of the same mode into one instruction, capped at the level field's encoding limit (31). This holds for the constraint-carrying modes too — `Up*` composes, so the merged instruction re-checks the constraint at every level it ascends (see [Search Loop](#search-loop)). A run deeper than the cap splits into several adjacent instructions whose per-level checks partition the levels with no gap.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
@@ -261,7 +264,7 @@ The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
   07  ─‣┘                                       ◼
 ```
 
-The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Cannot combine steps 05+07 into `UpSkipTrivia(2)` because the constraint applies only at the object level.
+The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Steps 05 and 07 are **not** adjacent — the `─‣─` sibling match sits between them — so they are never coalesced. (Were they adjacent, merging into `UpSkipTrivia(2)` would be sound: `Up*` composes, checking each level in turn.)
 
 ## Field Handling
 
