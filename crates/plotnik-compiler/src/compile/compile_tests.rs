@@ -72,6 +72,31 @@ fn compile_nested() {
     shot_bytecode!("Test = (call_expression function: (identifier) @fn)");
 }
 
+// Split-exit captures at a navigating first-child position (`?`/`*` whose skip
+// path must restore the cursor). These pin the bytecode of the unified
+// exit-aware emitters — `Obj`/`Arr`/`Suppress` opening once and closing on both
+// the match and skip exits — so an effect-ordering regression is caught here even
+// when it still produces the right conformance JSON on a narrow input (#470).
+
+/// Struct capture: `Obj → inner → EndObj+Set`, one EndObj per exit.
+#[test]
+fn compile_optional_struct_capture_split_exits() {
+    shot_bytecode!("Test = (program {(identifier) @id}? @outer)");
+}
+
+/// Array capture: `Arr → loop(Push) → EndArr+Set`, one EndArr per exit.
+#[test]
+fn compile_optional_array_capture_split_exits() {
+    shot_bytecode!("Test = (program (expression_statement)* @rows)");
+}
+
+/// Suppressive capture: `SuppressBegin → inner → SuppressEnd`, one SuppressEnd per
+/// exit; emits no value despite the inner's struct mechanism.
+#[test]
+fn compile_optional_suppressed_capture_split_exits() {
+    shot_bytecode!("Test = (program {(identifier) @id}? @_)");
+}
+
 #[test]
 fn compile_large_tagged_alternation() {
     // Regression test: alternations with 30+ branches should compile

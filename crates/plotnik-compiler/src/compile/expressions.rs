@@ -20,6 +20,7 @@ use crate::analyze::type_check::{CaptureMechanism, capture_mechanism};
 use super::Compiler;
 use super::capture::CaptureEffects;
 use super::navigation::check_trailing_anchor;
+use super::scope::CaptureExits;
 use super::sequences::SeqItemsCtx;
 
 impl Compiler<'_> {
@@ -330,68 +331,135 @@ impl Compiler<'_> {
         value_entry
     }
 
-    /// Compile a captured expression with capture effects from outer layers.
+    /// Compile a captured expression, dispatching on its capture mechanism — the
+    /// single source of truth shared with inference (#420) — so the effects we
+    /// emit always match the declared type.
     ///
-    /// Capture effects are placed on the innermost match instruction:
-    /// - Scalar: inner_pattern[Node/Text, Set] → exit
-    /// - Struct: Obj epsilon → inner_pattern[Node/Text, Set] → EndObj epsilon → exit
-    /// - Array:  Arr epsilon → quantifier (with Push on body) → EndArr+Set epsilon → exit
-    /// - Ref:    Call → Set epsilon → exit (structured result needs epsilon)
+    /// `exits` selects single- or split-exit lowering (see [`CaptureExits`]). The
+    /// ordinary capture path ([`compile_expr_inner`](Self::compile_expr_inner)) and
+    /// the navigating-first-child skippable path
+    /// ([`compile_skippable_with_exits`](Self::compile_skippable_with_exits)) both
+    /// route here, so a mechanism can never be handled by one and dropped by the
+    /// other (the drift behind #470 and the suppressive `@_` panic).
+    ///
+    /// Capture effects land on the innermost match / scope-close instruction:
+    /// - Node:   inner_pattern[Node/Text, Set] → exit
+    /// - Struct: Obj → inner[…] → EndObj+capture → exit
+    /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
+    /// - Ref:    Call → Set epsilon → exit
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
-    pub(super) fn compile_captured_inner(
+    pub(super) fn compile_captured(
         &mut self,
         cap: &ast::CapturedExpr,
-        exit: Label,
+        inner_opt: Option<Expr>,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
+        exits: CaptureExits,
     ) -> Label {
-        // Handle suppressive captures: wrap inner with SuppressBegin/End
+        // Suppressive captures wrap their inner in SuppressBegin/SuppressEnd and emit
+        // no value, whatever the inner's mechanism — so this comes before the
+        // mechanism dispatch (and before building any capture effects).
         if cap.is_suppressive() {
-            return self.compile_suppressive_capture(cap, exit, nav_override, outer_capture);
+            return self.compile_suppressive(
+                inner_opt.as_ref(),
+                nav_override,
+                outer_capture,
+                exits,
+            );
         }
 
-        let inner = cap.inner();
-        let inner_info = inner
+        // Classify the inner once — both the capture effects and the dispatch below
+        // read it, so the declared type and the emitted effects can't disagree
+        // (#420). `None` is a bare capture (`@x`), which captures the matched node.
+        let mechanism = inner_opt
             .as_ref()
-            .and_then(|i| self.ctx.type_ctx.get_term_info(i));
-        let inner_is_bubble = inner_info
-            .as_ref()
-            .is_some_and(|info| info.flow.is_bubble());
+            .map(|inner| capture_mechanism(inner, self.ctx.type_ctx, self.ctx.interner));
 
-        // Build capture effects: [Node/Text] (only for the Node mechanism) + Set.
-        let capture_effects = self.build_capture_effects(cap, inner.as_ref());
+        // [Node/Text] (only for the Node mechanism) + Set.
+        let capture_effects = self.build_capture_effects(cap, mechanism);
 
-        // Bare capture: just emit effects at current position
-        let Some(inner) = inner else {
-            return self.emit_effects_epsilon(exit, capture_effects, outer_capture);
+        // Bare capture (`@x` with no inner): emit effects at the current position.
+        let (Some(inner), Some(mechanism)) = (inner_opt, mechanism) else {
+            return self.emit_effects_epsilon(exits.match_exit(), capture_effects, outer_capture);
         };
 
-        // The classifier is the single source of truth shared with inference, so
-        // the effects we emit here always match the type that was declared.
-        match capture_mechanism(&inner, self.ctx.type_ctx, self.ctx.interner) {
-            // Array: Arr → quantifier (with Push) → EndArr+capture → exit
-            CaptureMechanism::Array => self.compile_array_scope(
+        match mechanism {
+            // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
+            CaptureMechanism::Array => self.compile_array_capture(
                 &inner,
-                exit,
                 nav_override,
                 capture_effects,
                 outer_capture,
                 cap.has_string_annotation(),
+                exits,
             ),
 
-            // Struct scope: Obj → inner → EndObj+capture → exit (also empty `{}`).
+            // Struct scope: Obj → inner → EndObj+capture → exit(s) (also empty `{}`).
+            // Without the wrapper the Set lands on the raw inner node and both the
+            // struct scope and the inner Sets are lost (#470).
             CaptureMechanism::StructScope => {
-                let scope_type_id = inner_info.as_ref().and_then(|info| info.flow.type_id());
-                self.compile_struct_scope(
+                let scope_type_id = self
+                    .ctx
+                    .type_ctx
+                    .get_term_info(&inner)
+                    .and_then(|info| info.flow.type_id());
+                self.compile_struct_capture(
                     &inner,
-                    exit,
                     nav_override,
                     scope_type_id,
                     capture_effects,
                     outer_capture,
+                    exits,
                 )
             }
 
+            // Node/Ref/SetAfter own no capture-site scope (their wrapper, if any, is
+            // part of the inner). With split exits all three fold the capture onto the
+            // body and recurse, letting the inner optional/star own the skip/match
+            // split; that context always enters with empty `pre`, so the per-mechanism
+            // single-exit handling (SetAfter's trailing Set, Node's bubble) is
+            // unnecessary there.
+            mechanism @ (CaptureMechanism::Node
+            | CaptureMechanism::Ref
+            | CaptureMechanism::SetAfter) => match exits {
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit,
+                } => {
+                    let combined = outer_capture.with_post_values(capture_effects);
+                    self.compile_skippable_with_exits(
+                        &inner,
+                        match_exit,
+                        skip_exit,
+                        nav_override,
+                        combined,
+                    )
+                }
+                CaptureExits::Single(exit) => self.compile_passthrough_capture(
+                    mechanism,
+                    &inner,
+                    exit,
+                    nav_override,
+                    capture_effects,
+                    outer_capture,
+                ),
+            },
+        }
+    }
+
+    /// Single-exit lowering for the pass-through mechanisms (Node/Ref/SetAfter):
+    /// the captured value is produced by the inner itself, so the capture emits no
+    /// scope — only a trailing `Set` (plus the `Node`/`Text` for a plain node).
+    fn compile_passthrough_capture(
+        &mut self,
+        mechanism: CaptureMechanism,
+        inner: &Expr,
+        exit: Label,
+        nav_override: Option<Nav>,
+        capture_effects: Vec<EffectIR>,
+        outer_capture: CaptureEffects,
+    ) -> Label {
+        match mechanism {
             // Set-after: the inner leaves the value pending (tagged alternation or a
             // named node forwarding a structured child). Emit the inner, then a
             // trailing Set; no Node, no wrapper.
@@ -403,7 +471,7 @@ impl Compiler<'_> {
                     CaptureEffects::new_post(post),
                 );
                 let inner_entry = self.compile_expr_inner(
-                    &inner,
+                    inner,
                     set_step,
                     nav_override,
                     CaptureEffects::default(),
@@ -419,15 +487,20 @@ impl Compiler<'_> {
             // definition's internal captures before the Set.
             CaptureMechanism::Ref => {
                 let combined = outer_capture.with_post_values(capture_effects);
-                self.compile_expr_inner(&inner, exit, nav_override, combined)
+                self.compile_expr_inner(inner, exit, nav_override, combined)
             }
 
-            // Node: capture the matched node. Bubbling children, if any, set into
-            // the current scope alongside the capture.
+            // Node: capture the matched node. Bubbling children, if any, set into the
+            // current scope alongside the capture.
             CaptureMechanism::Node => {
+                let inner_is_bubble = self
+                    .ctx
+                    .type_ctx
+                    .get_term_info(inner)
+                    .is_some_and(|info| info.flow.is_bubble());
                 if inner_is_bubble {
                     self.compile_bubble_with_node_capture(
-                        &inner,
+                        inner,
                         exit,
                         nav_override,
                         None,
@@ -436,27 +509,38 @@ impl Compiler<'_> {
                     )
                 } else {
                     let combined = outer_capture.with_post_values(capture_effects);
-                    self.compile_expr_inner(&inner, exit, nav_override, combined)
+                    self.compile_expr_inner(inner, exit, nav_override, combined)
                 }
+            }
+
+            CaptureMechanism::Array | CaptureMechanism::StructScope => {
+                unreachable!("scope mechanisms are handled by compile_captured")
             }
         }
     }
 
-    /// Compile a suppressive capture (@_ or @_name).
+    /// Compile a suppressive capture (`@_`/`@_name`): wrap the inner in
+    /// SuppressBegin/SuppressEnd and emit no value. The suppress region brackets
+    /// whatever the inner emits (its own `Set`s, a skipped optional's nulls) and
+    /// discards it at runtime, matching the `void` the type system infers.
     ///
-    /// Suppressive captures match structurally but don't emit effects.
-    /// Flow: outer.pre → SuppressBegin → inner → SuppressEnd → outer.post → exit
-    fn compile_suppressive_capture(
+    /// With `Split` exits the inner's match/skip paths route to two SuppressEnd
+    /// steps. `outer.pre` (e.g. a tagged variant's `Enum`-open) runs before
+    /// SuppressBegin in the enclosing scope, so the tag is produced and the later
+    /// `EndEnum` matches.
+    fn compile_suppressive(
         &mut self,
-        cap: &ast::CapturedExpr,
-        exit: Label,
+        inner: Option<&Expr>,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
+        exits: CaptureExits,
     ) -> Label {
         let CaptureEffects { pre, post } = outer_capture;
 
-        let Some(inner) = cap.inner() else {
-            // Bare @_ with no inner - just pass through outer effects.
+        let Some(inner) = inner else {
+            // Bare `@_` with no inner: just pass through outer effects. A bare
+            // capture never skips, so the match exit is the only continuation.
+            let exit = exits.match_exit();
             if pre.is_empty() && post.is_empty() {
                 return exit;
             }
@@ -464,22 +548,46 @@ impl Compiler<'_> {
             return self.wrap_entry_pre(entry, pre);
         };
 
-        // SuppressEnd + outer post (e.g. a tagged variant's EndEnum) → exit
-        let suppress_end = vec![EffectIR::suppress_end()];
-        let end_label =
-            self.emit_effects_epsilon(exit, suppress_end, CaptureEffects::new_post(post));
+        // SuppressEnd + outer post (e.g. a tagged variant's EndEnum) closes each exit;
+        // the inner is compiled with NO capture effects.
+        let inner_entry = match exits {
+            CaptureExits::Single(exit) => {
+                let end_label = self.emit_effects_epsilon(
+                    exit,
+                    vec![EffectIR::suppress_end()],
+                    CaptureEffects::new_post(post),
+                );
+                self.compile_expr_inner(inner, end_label, nav_override, CaptureEffects::default())
+            }
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => {
+                let end_match = self.emit_effects_epsilon(
+                    match_exit,
+                    vec![EffectIR::suppress_end()],
+                    CaptureEffects::new_post(post.clone()),
+                );
+                let end_skip = self.emit_effects_epsilon(
+                    skip_exit,
+                    vec![EffectIR::suppress_end()],
+                    CaptureEffects::new_post(post),
+                );
+                self.compile_skippable_with_exits(
+                    inner,
+                    end_match,
+                    end_skip,
+                    nav_override,
+                    CaptureEffects::default(),
+                )
+            }
+        };
 
-        // Compile inner → end_label (inner gets NO capture effects)
-        let inner_entry =
-            self.compile_expr_inner(&inner, end_label, nav_override, CaptureEffects::default());
-
-        // SuppressBegin → inner_entry
-        let suppress_begin = vec![EffectIR::suppress_begin()];
-        let begin_entry =
-            self.emit_effects_epsilon(inner_entry, suppress_begin, CaptureEffects::default());
-
-        // outer `pre` (the variant's `Enum`-open) runs before SuppressBegin, in the
-        // enclosing scope — so the tag is produced and the later `EndEnum` matches.
+        let begin_entry = self.emit_effects_epsilon(
+            inner_entry,
+            vec![EffectIR::suppress_begin()],
+            CaptureEffects::default(),
+        );
         self.wrap_entry_pre(begin_entry, pre)
     }
 

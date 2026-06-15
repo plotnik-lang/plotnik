@@ -1,0 +1,14 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program {(identifier) @id}? @_)
+
+==== source ====
+a;
+
+==== types ====
+export type Q = undefined;
+
+==== result ====
+null

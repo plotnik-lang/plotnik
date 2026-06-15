@@ -19,6 +19,7 @@ mod type_check_tests;
 #[cfg(test)]
 mod unify_tests;
 
+pub(crate) use capture_shape::is_repeating_quantifier;
 pub use capture_shape::{CaptureMechanism, capture_mechanism, produces_output};
 pub use context::TypeContext;
 pub use symbol::{DefId, Interner, Symbol};

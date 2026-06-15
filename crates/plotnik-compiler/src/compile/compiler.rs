@@ -18,7 +18,7 @@ use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
 use super::error::{CompileError, CompileResult};
 use super::lower::lower;
-use super::scope::StructScope;
+use super::scope::{CaptureExits, StructScope};
 use super::verify::{run_verified, verify_constructed};
 
 /// Compilation context bundling all shared compilation state.
@@ -197,7 +197,13 @@ impl<'a> Compiler<'a> {
             // Alternations: pass capture to each branch
             Expr::AltExpr(a) => self.compile_alt_inner(a, exit, nav_override, capture),
             // Wrappers: propagate capture through
-            Expr::CapturedExpr(c) => self.compile_captured_inner(c, exit, nav_override, capture),
+            Expr::CapturedExpr(c) => self.compile_captured(
+                c,
+                c.inner(),
+                nav_override,
+                capture,
+                CaptureExits::Single(exit),
+            ),
             Expr::QuantifiedExpr(q) => {
                 self.compile_quantified_inner(q, exit, nav_override, capture)
             }

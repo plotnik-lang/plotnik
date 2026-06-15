@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureMechanism, capture_mechanism};
+use super::capture_shape::{CaptureMechanism, capture_mechanism, quantifier_arity};
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{
@@ -25,7 +25,7 @@ use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node,
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{
     AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
-    Ref, Root, SeqExpr, SyntaxKind, is_truly_empty_scope,
+    Ref, Root, SeqExpr, is_truly_empty_scope,
 };
 use crate::query::SourceId;
 
@@ -759,16 +759,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     fn parse_quantifier(&self, quant: &QuantifiedExpr) -> QuantifierKind {
-        let Some(op) = quant.operator() else {
-            return QuantifierKind::ZeroOrMore;
-        };
-
-        match op.kind() {
-            SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
-            SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
-            SyntaxKind::Plus | SyntaxKind::PlusQuestion => QuantifierKind::OneOrMore,
-            _ => QuantifierKind::ZeroOrMore,
-        }
+        // Shared with `capture_mechanism` and `compile`'s implicit-array gate so the
+        // three never disagree on a quantifier's arity. A malformed operator-less
+        // quantifier can't reach inference, so the fallback is unreachable in practice.
+        quantifier_arity(quant).unwrap_or(QuantifierKind::ZeroOrMore)
     }
 
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {

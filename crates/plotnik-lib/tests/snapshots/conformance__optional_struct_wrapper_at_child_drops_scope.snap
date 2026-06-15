@@ -1,0 +1,20 @@
+---
+source: crates/plotnik-lib/tests/conformance.rs
+---
+==== query ====
+Q = (program (expression_statement {(identifier) @id}? @outer))
+
+==== source ====
+a;
+
+==== types ====
+export interface QOuter {
+  id: Node | null;
+}
+
+export interface Q {
+  outer: QOuter | null;
+}
+
+==== result ====
+{"outer":{"id":{"kind":"identifier","text":"a","span":[0, 1]}}}
