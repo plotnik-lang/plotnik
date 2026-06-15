@@ -6,7 +6,7 @@
 //! - Whether it's skippable (first-child with Down navigation)
 //! - Whether skip/match need separate exits
 
-use crate::analyze::type_check::TypeId;
+use crate::analyze::type_check::{TypeId, is_repeating_quantifier};
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::SyntaxKind;
 use crate::parser::ast::{self, Expr};
@@ -14,7 +14,8 @@ use plotnik_bytecode::Nav;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};
-use super::navigation::{is_star_or_plus_quantifier, resumable_search_nav};
+use super::navigation::resumable_search_nav;
+use super::scope::CaptureExits;
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.
@@ -140,19 +141,19 @@ impl Compiler<'_> {
         // When the inner returns a structured type (enum/struct) and this is a star/plus
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // because the type system expects an array of these values.
-        let needs_implicit_array = matches!(kind, QuantifierKind::Star | QuantifierKind::Plus)
-            && self.is_ref_returning_structured(&inner);
+        let needs_implicit_array =
+            is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
-            // Use array scope: Arr → quantifier with Push → EndArr → exit
-            // No capture effects on the array itself (no Set), just collect values
-            return self.compile_array_scope(
+            // Implicit array: Arr → quantifier with Push → EndArr → exit. No capture
+            // effects on the array itself (no Set), just collect the values.
+            return self.compile_array_capture(
                 &Expr::QuantifiedExpr(quant.clone()),
-                exit,
                 nav_override,
-                vec![], // No capture effects (no @name to set)
+                vec![],
                 capture,
                 false, // Not a string capture
+                CaptureExits::Single(exit),
             );
         }
 
@@ -211,32 +212,23 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         capture: CaptureEffects,
     ) -> Label {
-        // Handle CapturedExpr wrapping
+        // A captured optional/star at this navigating position shares the single
+        // mechanism dispatch with the ordinary capture path (`compile_captured`),
+        // split exits and all, so the two can never drift — the gap behind both
+        // #470 and the suppressive `@_` panic. It emits the scope that matches the
+        // declared type (`Obj`/`Arr`/`Suppress`), closing it on both exits.
         if let Expr::CapturedExpr(cap) = expr
             && let Some(inner) = cap.inner()
         {
-            // Array capture: need special handling with Arr/EndArr
-            if is_star_or_plus_quantifier(Some(&inner)) {
-                return self.compile_array_capture_with_exits(
-                    cap,
-                    &inner,
+            return self.compile_captured(
+                cap,
+                Some(inner),
+                nav_override,
+                capture,
+                CaptureExits::Split {
                     match_exit,
                     skip_exit,
-                    nav_override,
-                    capture,
-                );
-            }
-
-            // Non-array capture: build capture effects and recurse
-            let capture_effects = self.build_capture_effects(cap, Some(&inner));
-            let combined = capture.clone().with_post_values(capture_effects);
-
-            return self.compile_skippable_with_exits(
-                &inner,
-                match_exit,
-                skip_exit,
-                nav_override,
-                combined,
+                },
             );
         }
 
@@ -256,16 +248,20 @@ impl Compiler<'_> {
         // When the inner returns a structured type (enum/struct) and this is a star/plus
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // with split exits for the skip/match paths.
-        let needs_implicit_array = matches!(kind, QuantifierKind::Star | QuantifierKind::Plus)
-            && self.is_ref_returning_structured(&inner);
+        let needs_implicit_array =
+            is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
-            return self.compile_implicit_array_with_exits(
-                quant,
-                match_exit,
-                skip_exit,
+            return self.compile_array_capture(
+                &Expr::QuantifiedExpr(quant.clone()),
                 nav_override,
+                vec![],
                 capture,
+                false, // Not a string capture
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit,
+                },
             );
         }
 
@@ -287,30 +283,26 @@ impl Compiler<'_> {
         self.compile_quantified_unified(config)
     }
 
-    /// Compile an array capture (star/plus with @capture) as first-child with separate exits.
-    ///
-    /// For array captures, we need:
-    /// - Arr step at entry
-    /// - Two EndArr steps: one for skip (→ skip_exit), one for match (→ match_exit)
-    /// - Star compiled to route skip to skip_EndArr, loop exit to match_EndArr
-    fn compile_array_capture_with_exits(
+    /// Compile an array capture (`(x)* @cap`) or an uncaptured implicit array
+    /// (`(R)*` where `R` returns a structured type) — `Arr → quantifier (with Push)
+    /// → EndArr+capture → exit(s)`. With `Single` exits the loop falls straight
+    /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
+    /// takes `match_exit`, each closing the array. `capture_effects` is built once
+    /// by the caller (empty for an implicit array); the matched element's
+    /// `Node`/`Text` is pushed only when the element is not already a structured
+    /// value ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
+    pub(super) fn compile_array_capture(
         &mut self,
-        cap: &ast::CapturedExpr,
         inner: &Expr,
-        match_exit: Label,
-        skip_exit: Label,
         nav_override: Option<Nav>,
+        capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
+        use_text_for_elements: bool,
+        exits: CaptureExits,
     ) -> Label {
-        let capture_effects = self.build_capture_effects(cap, Some(inner));
-
-        // Create two EndArr steps with different continuations
-        let match_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
-        let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
-
         let push_effects =
             CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
-                let node_eff = if cap.has_string_annotation() {
+                let node_eff = if use_text_for_elements {
                     EffectIR::text()
                 } else {
                     EffectIR::node()
@@ -319,47 +311,33 @@ impl Compiler<'_> {
             } else {
                 vec![EffectIR::push()]
             });
-        let inner_entry = self.compile_star_for_array_with_exits(
-            inner,
-            match_endarr,
-            skip_endarr,
-            nav_override,
-            push_effects,
-        );
 
-        // Emit Arr step at entry (with outer pre-effects like Enum)
-        self.emit_arr_step(inner_entry, outer_capture.pre)
-    }
-
-    /// Compile an implicit array (star/plus without @capture) returning structured type,
-    /// as first-child with separate exits.
-    ///
-    /// Like `compile_array_capture_with_exits` but without explicit capture effects.
-    /// Used when `(RefName)*` where RefName returns enum/struct.
-    fn compile_implicit_array_with_exits(
-        &mut self,
-        quant: &ast::QuantifiedExpr,
-        match_exit: Label,
-        skip_exit: Label,
-        nav_override: Option<Nav>,
-        outer_capture: CaptureEffects,
-    ) -> Label {
-        // No capture effects since there's no @name
-        let capture_effects = vec![];
-
-        // Create two EndArr steps with different continuations
-        let match_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
-        let skip_endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
-
-        // Inner returns structured type, so no Node effect needed - just Push
-        let push_effects = CaptureEffects::new_post(vec![EffectIR::push()]);
-        let inner_entry = self.compile_star_for_array_with_exits(
-            &Expr::QuantifiedExpr(quant.clone()),
-            match_endarr,
-            skip_endarr,
-            nav_override,
-            push_effects,
-        );
+        let inner_entry = match exits {
+            CaptureExits::Single(exit) => {
+                let endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, exit);
+                if let Expr::QuantifiedExpr(quant) = inner {
+                    self.compile_quantified_for_array(quant, endarr, nav_override, push_effects)
+                } else {
+                    self.compile_expr_with_nav(inner, endarr, nav_override)
+                }
+            }
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => {
+                let match_endarr =
+                    self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
+                let skip_endarr =
+                    self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
+                self.compile_star_for_array_with_exits(
+                    inner,
+                    match_endarr,
+                    skip_endarr,
+                    nav_override,
+                    push_effects,
+                )
+            }
+        };
 
         // Emit Arr step at entry (with outer pre-effects like Enum)
         self.emit_arr_step(inner_entry, outer_capture.pre)

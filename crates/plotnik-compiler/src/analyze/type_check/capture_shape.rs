@@ -9,10 +9,10 @@
 
 use plotnik_core::Interner;
 
-use crate::parser::{Expr, SyntaxKind, is_truly_empty_scope};
+use crate::parser::{Expr, QuantifiedExpr, SyntaxKind, is_truly_empty_scope};
 
 use super::context::TypeContext;
-use super::types::{TYPE_NODE, TypeFlow, TypeId, TypeShape};
+use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
@@ -48,11 +48,11 @@ pub fn capture_mechanism(inner: &Expr, ctx: &TypeContext, interner: &Interner) -
     let expr = unwrap_field(inner);
 
     if let Expr::QuantifiedExpr(quant) = &expr {
-        return match quantifier_op(quant) {
+        return match quantifier_arity(quant) {
             // `*` / `+` collect into an array regardless of element shape.
-            Some(QuantOp::Repeat) => CaptureMechanism::Array,
+            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureMechanism::Array,
             // `?` only adds optionality; the value mechanism is the inner's.
-            Some(QuantOp::Optional) => quant
+            Some(QuantifierKind::Optional) => quant
                 .inner()
                 .map(|i| capture_mechanism(&i, ctx, interner))
                 .unwrap_or(CaptureMechanism::Node),
@@ -118,23 +118,30 @@ fn unwrap_field(expr: &Expr) -> Expr {
     }
 }
 
-enum QuantOp {
-    /// `*` or `+`
-    Repeat,
-    /// `?`
-    Optional,
+/// Classify a quantifier operator into its arity — the single source of truth for
+/// which quantifier `SyntaxKind`s repeat. `capture_mechanism` (here), the arity
+/// inference in `infer.rs`, and the implicit-array gate in `compile/quantifier.rs`
+/// all read this, so the type system and the emitter can never disagree on whether
+/// a quantifier collects an array. `None` only for a malformed quantifier with no
+/// operator (the parser guarantees a valid `QuantifiedExpr` carries one).
+pub(crate) fn quantifier_arity(quant: &QuantifiedExpr) -> Option<QuantifierKind> {
+    Some(match quant.operator()?.kind() {
+        SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
+        SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
+        SyntaxKind::Plus | SyntaxKind::PlusQuestion => QuantifierKind::OneOrMore,
+        _ => return None,
+    })
 }
 
-fn quantifier_op(quant: &crate::parser::QuantifiedExpr) -> Option<QuantOp> {
-    let op = quant.operator()?;
-    match op.kind() {
-        SyntaxKind::Star
-        | SyntaxKind::StarQuestion
-        | SyntaxKind::Plus
-        | SyntaxKind::PlusQuestion => Some(QuantOp::Repeat),
-        SyntaxKind::Question | SyntaxKind::QuestionQuestion => Some(QuantOp::Optional),
-        _ => None,
-    }
+/// Whether a quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an array,
+/// as opposed to `?`. Gating an implicit array scope on the greedy kinds alone
+/// drops it for the non-greedy twins (#469), so this reads [`quantifier_arity`]
+/// rather than re-listing the operators.
+pub(crate) fn is_repeating_quantifier(quant: &QuantifiedExpr) -> bool {
+    matches!(
+        quantifier_arity(quant),
+        Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
+    )
 }
 
 /// Whether `expr` is a reference to a definition that returns a structured type.

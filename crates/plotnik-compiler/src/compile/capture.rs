@@ -5,9 +5,7 @@
 
 use std::collections::HashSet;
 
-use crate::analyze::type_check::{
-    CaptureMechanism, TypeContext, TypeId, TypeShape, capture_mechanism,
-};
+use crate::analyze::type_check::{CaptureMechanism, TypeContext, TypeId, TypeShape};
 use crate::bytecode::EffectIR;
 use crate::parser::ast::{self, Expr};
 use plotnik_bytecode::EffectOpcode;
@@ -112,11 +110,15 @@ impl CaptureEffects {
 }
 
 impl Compiler<'_> {
-    /// Build capture effects (Node/Text + Set) based on capture type.
+    /// Build capture effects (Node/Text + Set) for a capture whose inner was
+    /// classified as `mechanism` (or `None` for a bare `@x`).
+    ///
+    /// The caller already runs [`capture_mechanism`] to dispatch, so it passes the
+    /// result in rather than have this re-classify the same inner.
     pub(super) fn build_capture_effects(
         &self,
         cap: &ast::CapturedExpr,
-        inner: Option<&Expr>,
+        mechanism: Option<CaptureMechanism>,
     ) -> Vec<EffectIR> {
         let mut effects = Vec::with_capacity(2);
 
@@ -124,9 +126,7 @@ impl Compiler<'_> {
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
         // produces its value via EndObj/EndEnum/EndArr/Call, so the capture itself
         // emits no Node/Text. A bare capture (`@x` with no inner) is a Node.
-        let is_node_mechanism = inner.is_none_or(|i| {
-            capture_mechanism(i, self.ctx.type_ctx, self.ctx.interner) == CaptureMechanism::Node
-        });
+        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureMechanism::Node);
         if is_node_mechanism {
             let effect = if cap.has_string_annotation() {
                 EffectIR::text()

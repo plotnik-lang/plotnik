@@ -17,6 +17,36 @@ use super::capture::CaptureEffects;
 #[derive(Clone, Copy, Debug)]
 pub struct StructScope(pub TypeId);
 
+/// Where a captured expression's compiled scope continues.
+///
+/// Most captures have one continuation (`Single`). A capture wrapping an
+/// optional/star at a navigating first-child position needs two: the parent must
+/// restore the cursor and take a different path when the inner matches zero
+/// times, so the match and skip paths exit separately (`Split`). A scope emitter
+/// closes its scope on *every* continuation, so the only difference between the
+/// two modes is how many close steps it emits. Threading this through one
+/// mechanism dispatch (`compile_captured`) keeps the single- and split-exit paths
+/// from drifting — the gap behind both #470 and the suppressive `@_` panic.
+#[derive(Clone, Copy)]
+pub(super) enum CaptureExits {
+    /// One continuation for the matched path (a non-skippable capture, or the
+    /// single-exit caller where match and skip coincide).
+    Single(Label),
+    /// Distinct continuations for the matched path and the zero-match skip path.
+    Split { match_exit: Label, skip_exit: Label },
+}
+
+impl CaptureExits {
+    /// The continuation taken when the capture matches. For `Single` this is the
+    /// only continuation; a bare capture (which never skips) uses it too.
+    pub(super) fn match_exit(self) -> Label {
+        match self {
+            CaptureExits::Single(exit) => exit,
+            CaptureExits::Split { match_exit, .. } => match_exit,
+        }
+    }
+}
+
 impl Compiler<'_> {
     /// Execute with optional scope - avoids repeated if-let pattern.
     pub(super) fn compile_with_optional_scope<T>(
@@ -59,42 +89,63 @@ impl Compiler<'_> {
         self.lookup_member(capture_name, type_id)
     }
 
-    /// Compile struct scope: Obj → inner → EndObj+capture → exit
-    pub(super) fn compile_struct_scope(
+    /// Compile a struct-scope capture: `Obj → inner → EndObj+capture → exit(s)`.
+    ///
+    /// The struct opens once and closes on every continuation. With `Single` exits
+    /// the inner is compiled straight through; with `Split` exits (a `{...}? @cap`
+    /// optional at a navigating first-child) the inner is compiled with split exits
+    /// inside the scope and the struct closes on both — a skipped optional yields
+    /// `{ field: null }`, never a bare null capture, so the child position stays
+    /// consistent with the same pattern at the query root (#470).
+    ///
+    /// `outer_capture.pre` runs in the enclosing scope before the struct opens
+    /// (e.g. an alternation branch's null-injected defaults, or a tagged variant's
+    /// `Enum`); dropping it would lose those and close a scope that never opened.
+    /// `@cap` is resolved by the caller, against the enclosing scope.
+    pub(super) fn compile_struct_capture(
         &mut self,
         inner: &Expr,
-        exit: Label,
         nav_override: Option<Nav>,
         scope_type_id: Option<TypeId>,
         capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
+        exits: CaptureExits,
     ) -> Label {
-        let endobj_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(endobj_step, exit)
-                .post_effect(EffectIR::end_obj())
-                .post_effects(capture_effects)
-                .post_effects(outer_capture.post)
-                .into(),
-        );
+        let inner_entry = match exits {
+            CaptureExits::Single(exit) => {
+                let endobj =
+                    self.emit_endobj_step_with_effects(&capture_effects, &outer_capture.post, exit);
+                self.compile_with_optional_scope(scope_type_id, |this| {
+                    this.compile_expr_with_nav(inner, endobj, nav_override)
+                })
+            }
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => {
+                let match_endobj = self.emit_endobj_step_with_effects(
+                    &capture_effects,
+                    &outer_capture.post,
+                    match_exit,
+                );
+                let skip_endobj = self.emit_endobj_step_with_effects(
+                    &capture_effects,
+                    &outer_capture.post,
+                    skip_exit,
+                );
+                self.compile_with_optional_scope(scope_type_id, |this| {
+                    this.compile_skippable_with_exits(
+                        inner,
+                        match_endobj,
+                        skip_endobj,
+                        nav_override,
+                        CaptureEffects::default(),
+                    )
+                })
+            }
+        };
 
-        let inner_entry = self.compile_with_optional_scope(scope_type_id, |this| {
-            this.compile_expr_with_nav(inner, endobj_step, nav_override)
-        });
-
-        // `outer_capture.pre` runs in the enclosing scope before this struct opens —
-        // e.g. an alternation branch's null-injected defaults, set on the parent
-        // object before `Obj` switches the current scope. Mirrors `compile_array_scope`;
-        // dropping it would silently lose those defaults (a missing field at runtime).
-        let obj_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(obj_step, inner_entry)
-                .pre_effects(outer_capture.pre)
-                .pre_effect(EffectIR::start_obj())
-                .into(),
-        );
-
-        obj_step
+        self.emit_obj_step_with_pre(inner_entry, outer_capture.pre)
     }
 
     /// Compile bubble with node capture: inner[capture] → exit (with optional outer effects)
@@ -163,57 +214,6 @@ impl Compiler<'_> {
         obj_step
     }
 
-    /// Compile array scope: Arr → quantifier (with Push) → EndArr+capture → exit
-    ///
-    /// `use_text_for_elements` indicates whether to use `Text` effect for array elements
-    /// (true when the capture has `:: string` annotation).
-    pub(super) fn compile_array_scope(
-        &mut self,
-        inner: &Expr,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
-        use_text_for_elements: bool,
-    ) -> Label {
-        let endarr_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(endarr_step, exit)
-                .post_effect(EffectIR::end_arr())
-                .post_effects(capture_effects)
-                .post_effects(outer_capture.post)
-                .into(),
-        );
-
-        let push_effects =
-            CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
-                // Use Text if the capture has `:: string` annotation, else Node
-                let node_eff = if use_text_for_elements {
-                    EffectIR::text()
-                } else {
-                    EffectIR::node()
-                };
-                vec![node_eff, EffectIR::push()]
-            } else {
-                vec![EffectIR::push()]
-            });
-        let inner_entry = if let Expr::QuantifiedExpr(quant) = inner {
-            self.compile_quantified_for_array(quant, endarr_step, nav_override, push_effects)
-        } else {
-            self.compile_expr_with_nav(inner, endarr_step, nav_override)
-        };
-
-        let arr_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(arr_step, inner_entry)
-                .pre_effects(outer_capture.pre)
-                .pre_effect(EffectIR::start_arr())
-                .into(),
-        );
-
-        arr_step
-    }
-
     /// Compile an expression with Obj/EndObj wrapping for array iteration.
     ///
     /// Used when inner is a scope-creating expression (sequence/alternation) with
@@ -268,23 +268,33 @@ impl Compiler<'_> {
         label
     }
 
-    /// Emit an Obj epsilon step.
+    /// Emit an Obj epsilon step (no enclosing pre-effects).
     pub(super) fn emit_obj_step(&mut self, successor: Label) -> Label {
-        let label = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(label, successor)
-                .pre_effect(EffectIR::start_obj())
-                .into(),
-        );
-        label
+        self.emit_obj_step_with_pre(successor, vec![])
     }
 
-    /// Emit an EndObj epsilon step.
+    /// Emit an EndObj epsilon step (no capture or outer effects).
     pub(super) fn emit_endobj_step(&mut self, successor: Label) -> Label {
+        self.emit_endobj_step_with_effects(&[], &[], successor)
+    }
+
+    /// Emit an EndObj epsilon step carrying capture + outer effects.
+    ///
+    /// The struct-scope counterpart of [`emit_endarr_step`](Self::emit_endarr_step),
+    /// used by split-exit struct captures to close the object and Set the capture
+    /// on each exit.
+    pub(super) fn emit_endobj_step_with_effects(
+        &mut self,
+        capture_effects: &[EffectIR],
+        outer_effects: &[EffectIR],
+        exit: Label,
+    ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(label, successor)
+            MatchIR::epsilon(label, exit)
                 .post_effect(EffectIR::end_obj())
+                .post_effects(capture_effects.iter().cloned())
+                .post_effects(outer_effects.iter().cloned())
                 .into(),
         );
         label
@@ -297,6 +307,26 @@ impl Compiler<'_> {
             MatchIR::epsilon(label, successor)
                 .pre_effects(pre_effects)
                 .pre_effect(EffectIR::start_arr())
+                .into(),
+        );
+        label
+    }
+
+    /// Emit an Obj epsilon step with optional pre-effects before start_obj.
+    ///
+    /// The struct-scope counterpart of [`emit_arr_step`](Self::emit_arr_step),
+    /// used by split-exit struct captures to open the object after the enclosing
+    /// scope's pre-effects (e.g. a tagged variant's `Enum`).
+    pub(super) fn emit_obj_step_with_pre(
+        &mut self,
+        successor: Label,
+        pre_effects: Vec<EffectIR>,
+    ) -> Label {
+        let label = self.fresh_label();
+        self.instructions.push(
+            MatchIR::epsilon(label, successor)
+                .pre_effects(pre_effects)
+                .pre_effect(EffectIR::start_obj())
                 .into(),
         );
         label
@@ -345,7 +375,7 @@ impl Compiler<'_> {
     /// the enclosing scope. Returns the new entry, or `entry` unchanged when
     /// `pre` is empty.
     ///
-    /// Scope-opening captures (`compile_struct_scope`, `compile_array_scope`)
+    /// Scope-opening captures (`compile_struct_capture`, `compile_array_capture`)
     /// fold `outer_capture.pre` onto their own `Obj`/`Arr` step. Captures that
     /// own no such step — `SetAfter` and suppressive — have nowhere to fold it,
     /// so they call this. Dropping it loses a tagged variant's `Enum`-open (or an

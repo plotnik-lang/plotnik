@@ -902,3 +902,84 @@ fn regex_predicate_in_quantified_pattern() {
         "x1; ax; x3;"
     );
 }
+
+// #469 / #470: `compile_skippable_with_exits` (the split-exit first-child path)
+// used ad-hoc syntactic predicates instead of `capture_mechanism`, so it dropped
+// the implicit array scope for non-greedy quantifiers and the struct scope for a
+// captured optional wrapper.
+
+/// #469: a non-greedy `*?` over an uncaptured, structured-returning ref must emit
+/// the implicit array scope (`Arr`/`Push`/`EndArr`) just like its greedy twin.
+/// The leading anchor forces collection — an *unanchored* non-greedy legitimately
+/// prefers zero matches and lets the follower overshoot (same as the captured
+/// path). Pre-fix the forced collection pushed with no open array: the type said
+/// `A[]` but no scope was emitted, so this panicked `debug_verify_type`.
+#[test]
+fn nongreedy_uncaptured_structured_quantifier_drops_array() {
+    shot_exec!(
+        r#"A = [X: (expression_statement)]
+Q = (program (A)*? . (debugger_statement))"#,
+        "a; b; debugger;"
+    );
+}
+
+/// #469, the `+?` twin: `is_repeating()` admits non-greedy *plus* to the implicit
+/// array path too. The anchor forces collection of both statements before the
+/// `debugger_statement`, so the `A[]` materializes — gating on the greedy kinds
+/// alone (the pre-fix bug) would drop the scope here just as it did for `*?`.
+#[test]
+fn nongreedy_plus_uncaptured_structured_quantifier_drops_array() {
+    shot_exec!(
+        r#"A = [X: (expression_statement)]
+Q = (program (A)+? . (debugger_statement))"#,
+        "a; b; debugger;"
+    );
+}
+
+/// #470 match path: a captured optional wrapper `{...}? @cap` whose inner is a
+/// bubbling sequence, at a navigating child position. Pre-fix the split-exit path
+/// dropped the `Obj`/`EndObj` scope and set `@outer` to the raw node, panicking
+/// `debug_verify_type` (`outer: type object, value Node`). It must materialize as
+/// the declared `{ id } | null` with `@id` preserved.
+#[test]
+fn optional_struct_wrapper_at_child_drops_scope() {
+    shot_exec!(
+        r#"Q = (program (expression_statement {(identifier) @id}? @outer))"#,
+        "a;"
+    );
+}
+
+/// #470 skip path: the same wrapper when the optional is absent (`42` is a number,
+/// not an identifier). The struct scope is opened on both paths, so `outer`
+/// materializes as `{ id: null }` — consistent with the same pattern at the query
+/// root — never a bare null capture.
+#[test]
+fn optional_struct_wrapper_at_child_skip_path() {
+    shot_exec!(
+        r#"Q = (program (expression_statement {(identifier) @id}? @outer))"#,
+        "42;"
+    );
+}
+
+// The split-exit first-child path must also honor suppressive captures (`@_`):
+// like the single-exit `compile_captured_inner`, it wraps the inner in
+// SuppressBegin/SuppressEnd and emits no value. Pre-fix it skipped straight to the
+// `capture_mechanism` dispatch, so the inner leaked a value the type says is
+// `void`, panicking the VM on a query `check`/`infer` accept (`Q = undefined`).
+
+/// Node sub-case: a suppressed optional node `(x)? @_`. Pre-fix the Node mechanism
+/// folded a `node` effect onto the match path with no enclosing scope, panicking
+/// `debug_verify_type` (`type void, value Node`). The match yields nothing.
+#[test]
+fn suppressed_optional_node_at_child_emits_no_value() {
+    shot_exec!(r#"Q = (program (expression_statement)? @_)"#, "a;");
+}
+
+/// Struct-scope sub-case: a suppressed optional wrapper `{...}? @_`. Pre-fix the
+/// new `StructScope` arm opened an `Obj` scope for a subtree the type says is
+/// `void`, panicking `debug_verify_type` (`type void, value object`). Suppression
+/// must win over the inner's mechanism, so the match yields nothing.
+#[test]
+fn suppressed_optional_struct_at_child_emits_no_value() {
+    shot_exec!(r#"Q = (program {(identifier) @id}? @_)"#, "a;");
+}

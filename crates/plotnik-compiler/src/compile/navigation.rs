@@ -264,17 +264,3 @@ pub fn is_skippable_quantifier(expr: &Expr) -> bool {
         )
     })
 }
-
-/// Syntactic check for star/plus quantifier (fallback when type info unavailable).
-pub fn is_star_or_plus_quantifier(expr: Option<&Expr>) -> bool {
-    use crate::parser::SyntaxKind;
-    expr.and_then(quantifier_operator_kind).is_some_and(|k| {
-        matches!(
-            k,
-            SyntaxKind::Star
-                | SyntaxKind::StarQuestion
-                | SyntaxKind::Plus
-                | SyntaxKind::PlusQuestion
-        )
-    })
-}
