@@ -213,19 +213,6 @@ impl TypeContext {
         self.term_info.get(expr).map(|info| info.arity)
     }
 
-    /// Iterate over all interned types.
-    pub fn iter_types(&self) -> impl Iterator<Item = (TypeId, &TypeShape)> {
-        self.types
-            .iter()
-            .enumerate()
-            .map(|(i, k)| (TypeId(i as u32), k))
-    }
-
-    /// Number of interned types.
-    pub fn type_count(&self) -> usize {
-        self.types.len()
-    }
-
     /// Iterate over all definition types as (DefId, TypeId) in DefId order.
     /// DefId order corresponds to SCC processing order (leaves first).
     pub fn iter_def_types(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
@@ -245,11 +232,6 @@ impl TypeContext {
     /// Associate an explicit name with a type (from `@x :: TypeName` on struct captures).
     pub fn set_type_name(&mut self, type_id: TypeId, name: Symbol) {
         self.type_names.insert(type_id, name);
-    }
-
-    /// Get the explicit name for a type, if any.
-    pub fn get_type_name(&self, type_id: TypeId) -> Option<Symbol> {
-        self.type_names.get(&type_id).copied()
     }
 
     /// Iterate over all explicit type names as (TypeId, Symbol).

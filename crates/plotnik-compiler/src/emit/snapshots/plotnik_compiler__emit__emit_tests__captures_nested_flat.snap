@@ -15,16 +15,11 @@ S6 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:3  ; { a, b, c }
-T2 = Struct  M3:1  ; { c }
-T3 = Struct  M4:2  ; { b, c }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
 M2: S3 → T0  ; c: <Node>
-M3: S3 → T0  ; c: <Node>
-M4: S2 → T0  ; b: <Node>
-M5: S3 → T0  ; c: <Node>
 
 [type_names]
 N0: S4 → T1  ; Test

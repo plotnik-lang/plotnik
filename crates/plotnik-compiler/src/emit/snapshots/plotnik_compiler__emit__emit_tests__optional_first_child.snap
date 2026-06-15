@@ -15,15 +15,11 @@ S6 "debugger_statement"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { id, n }
-T2 = Struct  M2:1  ; { id }
-T3 = Struct  M3:1  ; { n }
-T4 = Optional(T0)  ; <Node>?
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T4  ; id: T4
+M0: S1 → T2  ; id: T2
 M1: S2 → T0  ; n: <Node>
-M2: S1 → T4  ; id: T4
-M3: S2 → T0  ; n: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test

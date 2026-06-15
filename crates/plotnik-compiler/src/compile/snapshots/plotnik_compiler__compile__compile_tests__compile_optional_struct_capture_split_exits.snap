@@ -15,14 +15,12 @@ S5 "identifier"
 T0 = <Node>
 T1 = Struct  M0:1  ; { id }
 T2 = Struct  M1:1  ; { outer }
-T3 = Struct  M2:1  ; { id }
-T4 = Optional(T0)  ; <Node>?
-T5 = Optional(T1)  ; T1?
+T3 = Optional(T0)  ; <Node>?
+T4 = Optional(T1)  ; T1?
 
 [type_members]
-M0: S1 → T4  ; id: T4
-M1: S2 → T5  ; outer: T5
-M2: S1 → T0  ; id: <Node>
+M0: S1 → T3  ; id: T3
+M1: S2 → T4  ; outer: T4
 
 [type_names]
 N0: S3 → T2  ; Test

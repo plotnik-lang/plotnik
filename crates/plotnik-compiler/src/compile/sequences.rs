@@ -536,10 +536,7 @@ impl Compiler<'_> {
 
                 // Create Enum effect for branch entry
                 let e_effect = if let Some(type_id) = alt_type_id {
-                    EffectIR::with_member(
-                        EffectOpcode::Enum,
-                        MemberRef::deferred_by_index(type_id, variant_idx),
-                    )
+                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::new(type_id, variant_idx))
                 } else {
                     EffectIR::start_enum()
                 };
@@ -560,45 +557,50 @@ impl Compiler<'_> {
                 // child scope (`{...} @row`) belongs to that scope, not here. The
                 // branch's inferred bubble is the single source of truth; a syntactic
                 // capture walk would miscount nested names and drop a needed default.
-                let null_effects: Vec<_> =
-                    if let (Some(fields), Some(alt_type)) = (merged_fields, alt_type_id) {
-                        let provided: HashSet<Symbol> = self
-                            .ctx
-                            .type_ctx
-                            .get_term_info(&body)
-                            .and_then(|info| info.flow.type_id())
-                            .and_then(|id| self.ctx.type_ctx.get_struct_fields(id))
-                            .map(|f| f.keys().copied().collect())
-                            .unwrap_or_default();
-                        fields
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, (sym, _))| !provided.contains(*sym))
-                            .flat_map(|(idx, (_, field_info))| {
-                                let set = EffectIR::with_member(
-                                    EffectOpcode::Set,
-                                    MemberRef::deferred_by_index(alt_type, idx as u16),
+                let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
+                    let provided: HashSet<Symbol> = self
+                        .ctx
+                        .type_ctx
+                        .get_term_info(&body)
+                        .and_then(|info| info.flow.type_id())
+                        .and_then(|id| self.ctx.type_ctx.get_struct_fields(id))
+                        .map(|f| f.keys().copied().collect())
+                        .unwrap_or_default();
+                    fields
+                        .iter()
+                        .filter(|(sym, _)| !provided.contains(*sym))
+                        .flat_map(|(sym, field_info)| {
+                            // Resolve the default into the enclosing scope — the same
+                            // struct this branch's real captures Set into — so the member
+                            // ref names a type an entrypoint result reaches. The
+                            // alternation's own merged struct is otherwise unreachable;
+                            // pointing defaults at it would force dead-type elimination to
+                            // keep a parallel root set of effect-referenced types alive.
+                            let name = self.ctx.interner.resolve(*sym);
+                            let member_ref = self.lookup_member_in_scope(name).expect(
+                                "alternation bubbling field must resolve in enclosing scope",
+                            );
+                            let set = EffectIR::with_member(EffectOpcode::Set, member_ref);
+                            // A non-optional list defaults to `[]`; everything else
+                            // — scalars, and optional lists like `((x)+ @a)?` —
+                            // defaults to null. The `optional` flag, not the array
+                            // shape, is the source of truth, matching the relaxed
+                            // type from `relax_for_absence`.
+                            let is_required_list = !field_info.optional
+                                && matches!(
+                                    self.ctx.type_ctx.get_type(field_info.type_id),
+                                    Some(TypeShape::Array { .. })
                                 );
-                                // A non-optional list defaults to `[]`; everything else
-                                // — scalars, and optional lists like `((x)+ @a)?` —
-                                // defaults to null. The `optional` flag, not the array
-                                // shape, is the source of truth, matching the relaxed
-                                // type from `relax_for_absence`.
-                                let is_required_list = !field_info.optional
-                                    && matches!(
-                                        self.ctx.type_ctx.get_type(field_info.type_id),
-                                        Some(TypeShape::Array { .. })
-                                    );
-                                if is_required_list {
-                                    vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
-                                } else {
-                                    vec![EffectIR::null(), set]
-                                }
-                            })
-                            .collect()
-                    } else {
-                        vec![]
-                    };
+                            if is_required_list {
+                                vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                            } else {
+                                vec![EffectIR::null(), set]
+                            }
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                };
 
                 // Merge null injection with outer capture effects
                 let branch_capture = capture.clone().with_pre_values(null_effects);

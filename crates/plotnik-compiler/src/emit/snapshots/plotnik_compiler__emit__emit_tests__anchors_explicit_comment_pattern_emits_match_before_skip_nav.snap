@@ -15,14 +15,10 @@ S6 "function_declaration"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { c, f }
-T2 = Struct  M2:1  ; { c }
-T3 = Struct  M3:1  ; { f }
 
 [type_members]
 M0: S1 → T0  ; c: <Node>
 M1: S2 → T0  ; f: <Node>
-M2: S1 → T0  ; c: <Node>
-M3: S2 → T0  ; f: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test

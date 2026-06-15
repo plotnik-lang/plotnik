@@ -1,4 +1,5 @@
 use super::capture::CaptureEffects;
+use crate::analyze::type_check::TypeId;
 use crate::bytecode::{EffectIR, MemberRef};
 use plotnik_bytecode::EffectOpcode;
 
@@ -23,7 +24,7 @@ fn with_pre_values_appends_after_scope_opens() {
 
     let result = outer.with_pre_values(vec![
         EffectIR::null(),
-        EffectIR::with_member(EffectOpcode::Set, MemberRef::absolute(0)),
+        EffectIR::with_member(EffectOpcode::Set, MemberRef::new(TypeId(0), 0)),
     ]);
 
     assert_eq!(result.pre.len(), 3);
@@ -38,7 +39,7 @@ fn with_post_values_prepends_before_scope_closes() {
 
     let result = outer.with_post_values(vec![
         EffectIR::node(),
-        EffectIR::with_member(EffectOpcode::Set, MemberRef::absolute(0)),
+        EffectIR::with_member(EffectOpcode::Set, MemberRef::new(TypeId(0), 0)),
     ]);
 
     assert_eq!(result.post.len(), 3);

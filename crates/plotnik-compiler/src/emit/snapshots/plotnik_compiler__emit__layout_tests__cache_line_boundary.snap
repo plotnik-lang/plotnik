@@ -26,41 +26,24 @@ S11 "number"
 S12 "string"
 
 [type_defs]
-T00 = <Node>
-T01 = Struct  M00:7  ; { a, b, c, d, e, x, y }
-T02 = Struct  M07:1  ; { a }
-T03 = Struct  M08:1  ; { b }
-T04 = Struct  M09:1  ; { c }
-T05 = Struct  M10:1  ; { d }
-T06 = Struct  M11:1  ; { e }
-T07 = Struct  M12:1  ; { x }
-T08 = Struct  M13:1  ; { y }
-T09 = Struct  M14:2  ; { x, y }
-T10 = Optional(T00)  ; <Node>?
+T0 = <Node>
+T1 = Struct  M0:7  ; { a, b, c, d, e, x, y }
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M00: S01 → T00  ; a: <Node>
-M01: S02 → T00  ; b: <Node>
-M02: S03 → T00  ; c: <Node>
-M03: S04 → T00  ; d: <Node>
-M04: S05 → T00  ; e: <Node>
-M05: S06 → T10  ; x: T10
-M06: S07 → T10  ; y: T10
-M07: S01 → T00  ; a: <Node>
-M08: S02 → T00  ; b: <Node>
-M09: S03 → T00  ; c: <Node>
-M10: S04 → T00  ; d: <Node>
-M11: S05 → T00  ; e: <Node>
-M12: S06 → T00  ; x: <Node>
-M13: S07 → T00  ; y: <Node>
-M14: S06 → T10  ; x: T10
-M15: S07 → T10  ; y: T10
+M0: S01 → T0  ; a: <Node>
+M1: S02 → T0  ; b: <Node>
+M2: S03 → T0  ; c: <Node>
+M3: S04 → T0  ; d: <Node>
+M4: S05 → T0  ; e: <Node>
+M5: S06 → T2  ; x: T2
+M6: S07 → T2  ; y: T2
 
 [type_names]
-N0: S08 → T01  ; Test
+N0: S08 → T1  ; Test
 
 [entrypoints]
-Test = 06 :: T01
+Test = 06 :: T1
 
 [transitions]
 _ObjWrap:
@@ -79,6 +62,6 @@ Test:
   16  ─‣─  (identifier) [Node Set(M4)]      18
   18  ─‣─  _                                21, 24, 27
   20                                        ▶
-  21   !   [Null Set(M15)] (number) [Node Set(M5)]  07
-  24   !   [Null Set(M14)] (string) [Node Set(M6)]  07
+  21   !   [Null Set(M6)] (number) [Node Set(M5)]  07
+  24   !   [Null Set(M5)] (string) [Node Set(M6)]  07
   27  ─‣─  _                                21, 24, 27

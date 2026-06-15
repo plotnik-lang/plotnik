@@ -16,14 +16,10 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { left, right }
-T2 = Struct  M2:1  ; { left }
-T3 = Struct  M3:1  ; { right }
 
 [type_members]
 M0: S1 → T0  ; left: <Node>
 M1: S2 → T0  ; right: <Node>
-M2: S1 → T0  ; left: <Node>
-M3: S2 → T0  ; right: <Node>
 
 [type_names]
 N0: S3 → T1  ; Test

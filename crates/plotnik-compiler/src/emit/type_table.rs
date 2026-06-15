@@ -4,13 +4,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use plotnik_core::{Interner, Symbol};
+use plotnik_core::Interner;
 
 use crate::analyze::type_check::{
     FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
 };
 use plotnik_bytecode::{
-    StringId, TypeData, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeName,
+    TypeData, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeName,
 };
 
 use super::{EmitError, StringTableBuilder};
@@ -28,10 +28,6 @@ pub struct TypeTableBuilder {
     type_names: Vec<TypeName>,
     /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
     optional_wrappers: HashMap<BytecodeTypeId, BytecodeTypeId>,
-    /// Cache for deduplicated members: (StringId, BytecodeTypeId) -> member_index.
-    /// Same (name, type) pair → same member index globally.
-    /// This enables call-site scoping where uncaptured refs share the caller's scope.
-    member_cache: HashMap<(StringId, BytecodeTypeId), u16>,
 }
 
 impl TypeTableBuilder {
@@ -42,32 +38,29 @@ impl TypeTableBuilder {
             type_members: Vec::new(),
             type_names: Vec::new(),
             optional_wrappers: HashMap::new(),
-            member_cache: HashMap::new(),
         }
     }
 
-    /// Build type table from TypeContext.
+    /// Build the type table, remapping query TypeIds to bytecode ids.
     ///
-    /// Types are collected in definition order, depth-first, to mirror query structure.
-    /// Used builtins are emitted first, then custom types - no reserved slots.
+    /// Only types reachable from an entrypoint result are emitted. Dead
+    /// intermediate types produced during inference — an untagged alternation's
+    /// per-branch merge structs, for instance — are pruned. Used builtins are
+    /// emitted first, then custom types in definition order, depth-first.
     pub fn build(
         &mut self,
         type_ctx: &TypeContext,
         interner: &Interner,
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
-        // Collect custom types in definition order, depth-first
+        // Collect custom types depth-first from definition result types. Every
+        // emitted effect's member ref names a type that one of these reaches, so
+        // this single walk also covers all effect-referenced types. Definition
+        // order fixes the emission order entrypoints rely on.
         let mut ordered_types: Vec<TypeId> = Vec::new();
         let mut seen: HashSet<TypeId> = HashSet::new();
 
-        // First walk from definition types (maintains order for entrypoints)
         for (_def_id, type_id) in type_ctx.iter_def_types() {
-            collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
-        }
-
-        // Then collect any remaining interned types not reachable from definitions
-        // (e.g., enum types inside named nodes that don't propagate TypeFlow::Scalar)
-        for (type_id, _) in type_ctx.iter_types() {
             collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
         }
 
@@ -132,13 +125,19 @@ impl TypeTableBuilder {
             self.type_names.push(TypeName::new(name, bc_type_id));
         }
 
-        // Collect TypeName entries for explicit type annotations on struct captures
-        // e.g., `{(fn) @fn} @outer :: FunctionInfo` names the struct "FunctionInfo"
+        // Collect TypeName entries for explicit type annotations on struct captures,
+        // e.g. `{(fn) @fn} @outer :: FunctionInfo` names the struct "FunctionInfo".
+        // A name only attaches to a non-suppressive capture's struct/enum, so the
+        // type is reachable from a def result and must survive dead-type elimination;
+        // a miss here is a compiler bug, not anything a query can trigger.
         for (type_id, name_sym) in type_ctx.iter_type_names() {
-            if let Some(&bc_type_id) = self.mapping.get(&type_id) {
-                let name = strings.get_or_intern(name_sym, interner)?;
-                self.type_names.push(TypeName::new(name, bc_type_id));
-            }
+            let bc_type_id = self
+                .mapping
+                .get(&type_id)
+                .copied()
+                .expect("named type annotation must survive dead-type elimination");
+            let name = strings.get_or_intern(name_sym, interner)?;
+            self.type_names.push(TypeName::new(name, bc_type_id));
         }
 
         Ok(())
@@ -332,22 +331,6 @@ impl TypeTableBuilder {
             TypeData::Composite { member_start, .. } => Some(member_start),
             _ => None,
         }
-    }
-
-    /// Look up member index by field identity (name Symbol, value TypeId).
-    ///
-    /// Members are deduplicated globally: same (name, type) pair → same index.
-    /// This enables call-site scoping where uncaptured refs share the caller's scope.
-    pub fn lookup_member(
-        &self,
-        field_name: Symbol,
-        field_type: TypeId,
-        strings: &StringTableBuilder,
-    ) -> Option<u16> {
-        // Convert query-level identifiers to bytecode-level identifiers
-        let string_id = strings.get(field_name)?;
-        let type_id = self.mapping.get(&field_type)?;
-        self.member_cache.get(&(string_id, *type_id)).copied()
     }
 
     /// Emit type definitions, members, and names as bytes.
