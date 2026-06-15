@@ -37,6 +37,13 @@ pub fn collapse_up(result: &mut CompileResult) {
     let mut removed: HashSet<Label> = HashSet::new();
 
     for i in 0..result.instructions.len() {
+        // An already-absorbed instruction must not seed a new merge: its original
+        // successor edge is stale, and reusing it lets a removed node re-absorb the
+        // live boundary node a capped chain stopped at, dangling the head's edge.
+        if removed.contains(&result.instructions[i].label()) {
+            continue;
+        }
+
         let InstructionIR::Match(m) = &result.instructions[i] else {
             continue;
         };
