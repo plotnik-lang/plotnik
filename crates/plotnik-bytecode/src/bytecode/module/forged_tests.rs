@@ -5,15 +5,16 @@
 //! [`Module::load`] rejects it with a clean [`ModuleError`] rather than letting a
 //! later view/decode, VM, or materializer access panic. Together they guard the
 //! load-time structural validators (`validate_string_ids`, `validate_transitions`,
-//! `validate_entrypoints`, `load_regex_dfas`, `validate_effect_stack`) that
-//! uphold the format's "a loaded module never panics on later access" guarantee.
+//! `validate_entrypoints`, `validate_type_defs`, `validate_type_names`,
+//! `load_regex_dfas`, `validate_effect_stack`) that uphold the format's "a loaded
+//! module never panics on later access" guarantee.
 //!
-//! These live in-crate rather than under `tests/`: forging exact bytes needs the
-//! `pub(crate)` section offsets from [`Module::offsets`], which an external
-//! integration test cannot reach. Minting a real module needs the compiler, which
-//! depends on this crate — a cycle that is fine through a `[dev-dependencies]`
-//! edge, since it never enters the build graph. `build.rs` exposes the JavaScript
-//! `grammar.json` the fixtures link against.
+//! These live in-crate rather than under `tests/`: forging exact byte offsets
+//! reads `SectionOffsets`' `pub(crate)` fields (via [`Module::offsets`]), which an
+//! external integration test cannot reach. Minting a real module needs the
+//! compiler, which depends on this crate — a cycle that is fine through a
+//! `[dev-dependencies]` edge, since it never enters the build graph. `build.rs`
+//! exposes the JavaScript `grammar.json` the fixtures link against.
 
 use std::sync::LazyLock;
 

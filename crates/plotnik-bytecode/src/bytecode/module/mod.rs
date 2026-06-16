@@ -8,19 +8,18 @@ use std::ops::Deref;
 use std::path::Path;
 
 use super::aligned_vec::AlignedVec;
-use super::effects::{EffectOp, EffectOpcode};
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
-use super::nav::Nav;
-use super::node_type_ir::NodeTypeIR;
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
-use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
+use super::{Entrypoint, STEP_SIZE};
 use crate::dfa::RegexDfas;
 
 mod effect_stack;
 mod load;
+
+pub use load::ModuleError;
 
 /// Read a little-endian u16 from bytes at the given offset.
 #[inline]
@@ -37,12 +36,6 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
         bytes[offset + 2],
         bytes[offset + 3],
     ])
-}
-
-/// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
-#[inline]
-fn align_up_u64(value: u64, align: u64) -> u64 {
-    (value + align - 1) & !(align - 1)
 }
 
 /// Storage for bytecode bytes with guaranteed 64-byte alignment.
@@ -143,49 +136,6 @@ impl<'a> Instruction<'a> {
             _ => Self::Match(Match::from_bytes(bytes)),
         }
     }
-}
-
-/// Module load error.
-#[derive(Debug, thiserror::Error)]
-pub enum ModuleError {
-    #[error("invalid magic: expected PTKQ")]
-    InvalidMagic,
-    #[error("unsupported version: {0} (expected {VERSION})")]
-    UnsupportedVersion(u32),
-    #[error("file too small: {0} bytes (minimum 64)")]
-    FileTooSmall(usize),
-    #[error("size mismatch: header says {header} bytes, got {actual}")]
-    SizeMismatch { header: u32, actual: usize },
-    #[error("malformed header: reserved bytes must be zero")]
-    MalformedHeader,
-    #[error("section out of bounds: header counts exceed the {total}-byte file")]
-    SectionOutOfBounds { total: u32 },
-    #[error("checksum mismatch: header {expected:#010x}, computed {actual:#010x}")]
-    ChecksumMismatch { expected: u32, actual: u32 },
-    #[error("malformed string table")]
-    MalformedStringTable,
-    #[error("malformed regex table")]
-    MalformedRegexTable,
-    #[error("invalid regex DFA at index {0}")]
-    InvalidRegexDfa(usize),
-    #[error("invalid type definition at index {0}")]
-    InvalidTypeDef(usize),
-    #[error("invalid type name at index {0}")]
-    InvalidTypeName(usize),
-    #[error("invalid entrypoint at index {0}")]
-    InvalidEntrypoint(usize),
-    #[error("invalid opcode {opcode:#x} at step {step}")]
-    InvalidOpcode { step: u16, opcode: u8 },
-    #[error("string id out of range at index {0}")]
-    InvalidStringId(usize),
-    #[error("predicate operand out of range at step {0}")]
-    InvalidPredicateOperand(usize),
-    #[error("malformed transitions section")]
-    MalformedTransitions,
-    #[error("effect stack imbalance at step {0}")]
-    EffectStackImbalance(u16),
-    #[error("io error: {0}")]
-    Io(#[from] io::Error),
 }
 
 /// A compiled bytecode module.

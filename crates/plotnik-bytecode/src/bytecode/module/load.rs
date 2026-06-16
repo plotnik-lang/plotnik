@@ -5,7 +5,70 @@
 //! module completely (the no-panic guarantee, see `effect_stack.rs`). On any
 //! malformed input it returns a [`ModuleError`], never panics.
 
+use std::io;
+
+use super::super::effects::{EffectOp, EffectOpcode};
+use super::super::nav::Nav;
+use super::super::node_type_ir::NodeTypeIR;
+use super::super::{SECTION_ALIGN, VERSION};
 use super::*;
+
+/// Module load error.
+///
+/// Every variant is raised at the trust boundary (this module and
+/// `effect_stack.rs`); the reader side never constructs one. Re-exported as
+/// `super::ModuleError` for the rest of the crate.
+#[derive(Debug, thiserror::Error)]
+pub enum ModuleError {
+    #[error("invalid magic: expected PTKQ")]
+    InvalidMagic,
+    #[error("unsupported version: {0} (expected {VERSION})")]
+    UnsupportedVersion(u32),
+    #[error("file too small: {0} bytes (minimum 64)")]
+    FileTooSmall(usize),
+    #[error("size mismatch: header says {header} bytes, got {actual}")]
+    SizeMismatch { header: u32, actual: usize },
+    #[error("malformed header: reserved bytes must be zero")]
+    MalformedHeader,
+    #[error("section out of bounds: header counts exceed the {total}-byte file")]
+    SectionOutOfBounds { total: u32 },
+    #[error("checksum mismatch: header {expected:#010x}, computed {actual:#010x}")]
+    ChecksumMismatch { expected: u32, actual: u32 },
+    #[error("malformed string table")]
+    MalformedStringTable,
+    #[error("malformed regex table")]
+    MalformedRegexTable,
+    #[error("invalid regex DFA at index {0}")]
+    InvalidRegexDfa(usize),
+    #[error("invalid type definition at index {0}")]
+    InvalidTypeDef(usize),
+    #[error("invalid type name at index {0}")]
+    InvalidTypeName(usize),
+    #[error("invalid entrypoint at index {0}")]
+    InvalidEntrypoint(usize),
+    #[error("invalid opcode {opcode:#x} at step {step}")]
+    InvalidOpcode { step: u16, opcode: u8 },
+    #[error("string id out of range at index {0}")]
+    InvalidStringId(usize),
+    #[error("predicate operand out of range at step {0}")]
+    InvalidPredicateOperand(usize),
+    #[error("malformed transitions section")]
+    MalformedTransitions,
+    #[error("effect stack imbalance at step {0}")]
+    EffectStackImbalance(u16),
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+}
+
+/// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
+///
+/// The `u64` width lets [`Module::validate_section_bounds`] re-derive the section
+/// layout from a possibly-corrupt header without the overflow the real `u32`
+/// [`Header::compute_offsets`] would hit.
+#[inline]
+fn align_up_u64(value: u64, align: u64) -> u64 {
+    (value + align - 1) & !(align - 1)
+}
 
 impl Module {
     /// Load a module from storage.
