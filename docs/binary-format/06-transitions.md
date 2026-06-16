@@ -209,7 +209,7 @@ counts (u16)
 - **Bits 9-7**: `post_count` (0-7)
 - **Bits 6-2**: `succ_count` (0-31)
 - **Bit 1**: `has_predicate` (if set, payload includes 4-byte predicate before successors)
-- **Bit 0**: Reserved (must be 0)
+- **Bit 0**: Reserved; must be 0, loaders reject a set bit
 
 **Payload** (immediately follows header):
 

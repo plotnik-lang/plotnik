@@ -628,6 +628,11 @@ impl Module {
         };
 
         let counts = read_u16(instr_off + 6)?;
+        // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
+        // the decoder never reads it, so a forged set bit would load unnoticed.
+        if counts & 0x1 != 0 {
+            return Err(ModuleError::MalformedTransitions);
+        }
         let pre = ((counts >> 13) & 0x7) as usize;
         let neg = ((counts >> 10) & 0x7) as usize;
         let post = ((counts >> 7) & 0x7) as usize;

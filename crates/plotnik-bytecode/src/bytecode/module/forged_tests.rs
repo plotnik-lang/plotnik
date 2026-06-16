@@ -609,6 +609,23 @@ fn forged_out_of_range_trampoline_target_is_rejected() {
 }
 
 #[test]
+fn forged_set_extended_match_reserved_count_bit_is_rejected() {
+    // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
+    // (docs/binary-format/06-transitions.md); the decoder never reads it, so a
+    // forged set bit must be rejected at load.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
+    bytes[off + 6] |= 0x01;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged reserved count bit must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedTransitions),
+        "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_nonzero_return_pad_is_rejected() {
     // A Return is `header || 7 reserved padding bytes` (`Return::to_bytes`); the
     // decoder drops bytes 1-7, so a forged non-zero pad must be rejected at load.
