@@ -227,7 +227,7 @@ counts (u16)
 ```rust
 #[repr(C)]
 struct Predicate {
-    op: u16,        // Bits 0-3: operator (1-7), rest reserved
+    op: u16,        // low byte: operator; bit 8: regex flag; bits 9-15 reserved (zero, rejected at load)
     value_ref: u16, // StringId (string ops) or RegexId (regex ops)
 }
 ```

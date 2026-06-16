@@ -663,6 +663,23 @@ fn forged_nonzero_trampoline_pad_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_predicate_reserved_bits_is_rejected() {
+    // Only the op/flags word's low byte (operator) and bit 8 (regex flag) are
+    // decoded; bits 9-15 are reserved-zero. A forged set bit there must be
+    // rejected at load. Bit 9 is the low bit of the word's high byte.
+    let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
+    let pred_off = find_predicate_off(&bytes);
+    bytes[pred_off + 1] |= 0x02;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged predicate reserved bit must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidPredicateOperand(_)),
+        "expected InvalidPredicateOperand, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_regex_predicate_sentinel_operand_is_rejected() {
     // Regex value_ref `0` is the reserved sentinel: `load_regex_dfas` skips it,
     // so its DFA slot is `None`, and the VM expects a populated slot. The loader

@@ -682,6 +682,13 @@ impl Module {
             let is_regex = (op_and_flags >> 8) & 0x1 != 0;
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
+            // Only the low byte (operator) and bit 8 (regex flag) are decoded; bits
+            // 9-15 are reserved-zero (docs/binary-format/06-transitions.md), so a
+            // forged set bit there must not load.
+            if op_and_flags >> 9 != 0 {
+                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+            }
+
             // The operator must be a known predicate op (0..=6), the regex flag
             // must agree with the operator's class, and the operand must index
             // its table — otherwise `PredicateOp::from_byte`, `get_by_index`, or
