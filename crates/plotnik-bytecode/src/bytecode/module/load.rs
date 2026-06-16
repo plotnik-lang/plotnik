@@ -213,20 +213,44 @@ impl Module {
         Ok(RegexDfas::new(dfas))
     }
 
-    /// Every TypeDef must have a known kind, and Struct/Enum member ranges must
-    /// stay inside the TypeMembers section (`docs/binary-format/04-types.md`).
+    /// Validate every TypeDef: a known kind, member runs that stay inside the
+    /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
+    /// type or a struct/enum member type — addressing a real def, so the
+    /// materializer never resolves a type out of range
+    /// (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
         let types = self.types();
         let members = self.header.type_members_count as u32;
+        let type_defs = self.header.type_defs_count;
+
         for i in 0..types.defs_count() {
-            let def = types.get_def(i);
-            let Some(kind) = TypeKind::from_u8(def.kind_byte()) else {
-                return Err(ModuleError::InvalidTypeDef(i));
+            let invalid = || ModuleError::InvalidTypeDef(i);
+            // Reject an unknown kind here, so the typed reads below cannot panic.
+            let Some(data) = types.get_def(i).try_classify() else {
+                return Err(invalid());
             };
-            if kind.is_composite() {
-                let (start, count) = def.member_range();
-                if start as u32 + count as u32 > members {
-                    return Err(ModuleError::InvalidTypeDef(i));
+            match data {
+                TypeData::Primitive(_) => {}
+                TypeData::Wrapper { inner, .. } => {
+                    if inner.0 >= type_defs {
+                        return Err(invalid());
+                    }
+                }
+                TypeData::Composite {
+                    member_start,
+                    member_count,
+                    ..
+                } => {
+                    // Bound the run before reading any member.
+                    if member_start as u32 + member_count as u32 > members {
+                        return Err(invalid());
+                    }
+                    let start = member_start as usize;
+                    if (start..start + member_count as usize)
+                        .any(|m| types.member_type_id(m).0 >= type_defs)
+                    {
+                        return Err(invalid());
+                    }
                 }
             }
         }

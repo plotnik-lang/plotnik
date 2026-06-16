@@ -21,6 +21,7 @@ use plotnik_compiler::{QueryBuilder, SourceMap};
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
 use super::module::{Module, ModuleError};
+use super::type_meta::TypeData;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -718,5 +719,59 @@ fn forged_type_member_name_string_id_is_rejected() {
     assert!(
         matches!(err, ModuleError::InvalidStringId(_)),
         "expected InvalidStringId, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_oob_member_type_id_is_rejected() {
+    // A TypeMember's `type_id` (bytes 2-3 of the 4-byte entry) must address a real
+    // TypeDef, or the materializer resolves a struct field to a type out of range.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let (members_off, type_defs) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        (
+            m.offsets().type_members as usize,
+            m.header().type_defs_count,
+        )
+    };
+
+    // `type_defs_count` is one past the last valid TypeId.
+    bytes[members_off + 2..members_off + 4].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged member type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_oob_wrapper_inner_type_id_is_rejected() {
+    // A wrapper/alias TypeDef holds its inner TypeId in `data` (bytes 0-1 of the
+    // 4-byte entry); it must address a real def or `unwrap_optional` / the array
+    // element lookup resolves a type out of range.
+    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let (defs_off, type_defs, wrapper_idx) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        let types = m.types();
+        let idx = (0..types.defs_count())
+            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .expect("array query must emit a wrapper type def");
+        (
+            m.offsets().type_defs as usize,
+            m.header().type_defs_count,
+            idx,
+        )
+    };
+
+    let off = defs_off + wrapper_idx * 4;
+    bytes[off..off + 2].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged wrapper inner type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
     );
 }

@@ -514,6 +514,14 @@ impl<'a> TypesView<'a> {
         )
     }
 
+    /// A member's `type_id` without building the (`NonZero`) name `StringId`.
+    /// Load-time validation uses this so a forged zero name cannot panic the
+    /// validator before `validate_string_ids` rejects it.
+    pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
+        assert!(idx < self.members_count, "type member index out of bounds");
+        TypeId(read_u16_le(self.members_bytes, idx * 4 + 2))
+    }
+
     /// Get a type name entry by index.
     pub fn get_name(&self, idx: usize) -> TypeName {
         assert!(idx < self.names_count, "type name index out of bounds");
