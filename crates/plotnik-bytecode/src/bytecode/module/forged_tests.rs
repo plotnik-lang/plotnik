@@ -20,8 +20,8 @@ use std::sync::LazyLock;
 use plotnik_compiler::{QueryBuilder, SourceMap};
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
-use super::module::{Module, ModuleError};
-use super::type_meta::TypeData;
+use super::{Module, ModuleError};
+use crate::bytecode::type_meta::TypeData;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {

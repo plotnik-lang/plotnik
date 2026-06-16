@@ -44,8 +44,8 @@
 
 use std::collections::HashMap;
 
-use super::effects::EffectOpcode;
-use super::module::{Instruction, Module, ModuleError};
+use super::{Instruction, Module, ModuleError};
+use crate::bytecode::effects::EffectOpcode;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
 /// scalar, but the walk starts at the always-`Obj` preamble, so only these three

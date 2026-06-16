@@ -1,8 +1,8 @@
 //! Tests for the bytecode module.
 
-use super::header::Header;
-use super::module::{ByteStorage, Module, ModuleError};
-use super::{AlignedVec, STEP_SIZE};
+use super::{ByteStorage, Module, ModuleError};
+use crate::bytecode::Header;
+use crate::bytecode::{AlignedVec, STEP_SIZE};
 
 /// Build a minimal-but-valid module whose only populated section is Transitions,
 /// carrying `transitions_count` steps drawn from `transitions`.

@@ -67,7 +67,7 @@ impl Module {
     /// forged module can recompute a matching checksum over crafted bytes;
     /// [`Self::validate_transitions`] therefore re-verifies the lazily-decoded
     /// instruction stream structurally, and
-    /// [`validate_effect_stack`](crate::bytecode::effect_stack::validate_effect_stack)
+    /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
     /// proves no path can panic the materializer's builder stack or the VM's
     /// suppression counter — so a loaded module never panics on view/decode/VM
     /// access regardless of how it was crafted.
@@ -100,7 +100,7 @@ impl Module {
         // is now established, so the effect-stack walk can use the safe typed
         // instruction API. This closes the last forged-module panic class: the
         // materializer's builder-stack panics and the VM's suppression underflow.
-        crate::bytecode::effect_stack::validate_effect_stack(self)?;
+        super::effect_stack::validate_effect_stack(self)?;
         Ok(regex_dfas)
     }
 

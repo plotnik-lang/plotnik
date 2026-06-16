@@ -19,6 +19,7 @@ use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE, VERSION};
 use crate::dfa::RegexDfas;
 
+mod effect_stack;
 mod load;
 
 /// Read a little-endian u16 from bytes at the given offset.
@@ -616,3 +617,8 @@ impl<'a> EntrypointsView<'a> {
             .find(|e| strings.get(e.name()) == name)
     }
 }
+
+#[cfg(test)]
+mod forged_tests;
+#[cfg(test)]
+mod module_tests;
