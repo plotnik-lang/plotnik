@@ -778,6 +778,58 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
+    // Void/Node/String carry no payload: both `data` (bytes 0-1) and `count`
+    // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
+    // in either must be rejected, not silently ignored by the typed view.
+    for byte in [0usize, 2] {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let (defs_off, prim_idx) = {
+            let m = Module::load(&bytes).expect("module loads before tampering");
+            let types = m.types();
+            let idx = (0..types.defs_count())
+                .find(|&i| matches!(types.get_def(i).classify(), TypeData::Primitive(_)))
+                .expect("struct query must emit a primitive type def");
+            (m.offsets().type_defs as usize, idx)
+        };
+
+        bytes[defs_off + prim_idx * 4 + byte] = 1;
+        reseal(&mut bytes);
+
+        let err =
+            Module::load(&bytes).expect_err("forged primitive reserved field must be rejected");
+        assert!(
+            matches!(err, ModuleError::InvalidTypeDef(_)),
+            "forged byte {byte}: expected InvalidTypeDef, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_nonzero_wrapper_typedef_count_is_rejected() {
+    // A wrapper/alias TypeDef uses `data` for its inner id but reserves `count`
+    // (byte 2) as zero. A non-zero count must be rejected.
+    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let (defs_off, wrapper_idx) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        let types = m.types();
+        let idx = (0..types.defs_count())
+            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .expect("array query must emit a wrapper type def");
+        (m.offsets().type_defs as usize, idx)
+    };
+
+    bytes[defs_off + wrapper_idx * 4 + 2] = 1;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged wrapper count must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_oob_type_name_type_id_is_rejected() {
     // A TypeName's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
     // real TypeDef; a named definition emits at least one entry.

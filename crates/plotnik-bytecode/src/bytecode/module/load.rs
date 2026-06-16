@@ -289,14 +289,22 @@ impl Module {
 
         for i in 0..types.defs_count() {
             let invalid = || ModuleError::InvalidTypeDef(i);
+            let def = types.get_def(i);
             // Reject an unknown kind here, so the typed reads below cannot panic.
-            let Some(data) = types.get_def(i).try_classify() else {
+            let Some(data) = def.try_classify() else {
                 return Err(invalid());
             };
+            // Fields the kind does not name are reserved-zero
+            // (docs/binary-format/04-types.md); smuggled state there must not load.
+            let (raw_data, raw_count) = def.member_range();
             match data {
-                TypeData::Primitive(_) => {}
+                TypeData::Primitive(_) => {
+                    if raw_data != 0 || raw_count != 0 {
+                        return Err(invalid());
+                    }
+                }
                 TypeData::Wrapper { inner, .. } => {
-                    if inner.0 >= type_defs {
+                    if raw_count != 0 || inner.0 >= type_defs {
                         return Err(invalid());
                     }
                 }
@@ -305,7 +313,7 @@ impl Module {
                     member_count,
                     ..
                 } => {
-                    // Bound the run before reading any member.
+                    // Both fields carry meaning here; only the run bound applies.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }

@@ -172,11 +172,16 @@ N1: S3 → T2  ; Q
 
 ## Validation
 
-Loaders must verify for `Struct`/`Enum` kinds:
+Loaders must verify:
 
-- `(data as u32) + (count as u32) ≤ type_members_count`
+- `Struct`/`Enum`: `(data as u32) + (count as u32) ≤ type_members_count`, and every
+  member's `ty` is a valid TypeId (`< type_defs_count`).
+- Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
+  reserved `count` is `0`.
+- `Void`/`Node`/`String`: the reserved `data` and `count` are both `0`.
 
-This prevents out-of-bounds reads from malformed binaries.
+The bounds checks prevent out-of-bounds reads from malformed binaries; the
+reserved-zero checks reject smuggled state where the format pins a field to zero.
 
 ## Code Generation
 
