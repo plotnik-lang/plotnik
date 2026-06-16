@@ -203,6 +203,11 @@ impl<'t> VM<'t> {
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.suppress_depth;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after checkpoint restore"
+        );
     }
 
     /// Checkpoint that resumes a branch alternative at `ip`.
@@ -488,6 +493,11 @@ impl<'t> VM<'t> {
         tracer.trace_call(target);
         self.frames.push(next, saved_depth);
         self.recursion_depth += 1;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Call"
+        );
         self.ip = target;
         // The callee owns its own match: until one of its Matches succeeds,
         // there is no matched node. Clearing here lets a zero-width callee
@@ -507,6 +517,11 @@ impl<'t> VM<'t> {
         tracer.trace_call(self.entrypoint_target);
         self.frames.push(t.next.get(), saved_depth);
         self.recursion_depth += 1;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Trampoline"
+        );
         self.ip = self.entrypoint_target;
         Ok(())
     }
@@ -571,7 +586,15 @@ impl<'t> VM<'t> {
         }
 
         let (return_addr, saved_depth) = self.frames.pop();
-        self.recursion_depth -= 1;
+        self.recursion_depth = self
+            .recursion_depth
+            .checked_sub(1)
+            .expect("recursion_depth underflow on Return");
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Return"
+        );
 
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
