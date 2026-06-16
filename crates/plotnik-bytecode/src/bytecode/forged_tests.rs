@@ -775,3 +775,27 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
         "expected InvalidTypeDef, got {err:?}"
     );
 }
+
+#[test]
+fn forged_oob_type_name_type_id_is_rejected() {
+    // A TypeName's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
+    // real TypeDef; a named definition emits at least one entry.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let (names_off, type_defs) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        assert!(
+            m.types().names_count() > 0,
+            "named def must emit a type name"
+        );
+        (m.offsets().type_names as usize, m.header().type_defs_count)
+    };
+
+    bytes[names_off + 2..names_off + 4].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged type name type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeName(_)),
+        "expected InvalidTypeName, got {err:?}"
+    );
+}

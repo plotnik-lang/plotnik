@@ -89,6 +89,7 @@ impl Module {
         self.validate_regex_table()?;
         let regex_dfas = self.load_regex_dfas()?;
         self.validate_type_defs()?;
+        self.validate_type_names()?;
         // Bound every embedded `StringId` before any later check constructs a
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
         // `Entrypoint`, which would otherwise panic on a forged zero name.
@@ -252,6 +253,19 @@ impl Module {
                         return Err(invalid());
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Every TypeName must target a real TypeDef; its name `StringId` is checked
+    /// separately by [`validate_string_ids`](Self::validate_string_ids).
+    fn validate_type_names(&self) -> Result<(), ModuleError> {
+        let types = self.types();
+        let type_defs = self.header.type_defs_count;
+        for i in 0..types.names_count() {
+            if types.name_type_id(i).0 >= type_defs {
+                return Err(ModuleError::InvalidTypeName(i));
             }
         }
         Ok(())

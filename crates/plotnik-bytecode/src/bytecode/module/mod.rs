@@ -169,6 +169,8 @@ pub enum ModuleError {
     InvalidRegexDfa(usize),
     #[error("invalid type definition at index {0}")]
     InvalidTypeDef(usize),
+    #[error("invalid type name at index {0}")]
+    InvalidTypeName(usize),
     #[error("invalid entrypoint at index {0}")]
     InvalidEntrypoint(usize),
     #[error("invalid opcode {opcode:#x} at step {step}")]
@@ -530,6 +532,13 @@ impl<'a> TypesView<'a> {
             StringId::new(read_u16_le(self.names_bytes, offset)),
             TypeId(read_u16_le(self.names_bytes, offset + 2)),
         )
+    }
+
+    /// A type name's target `type_id` without building the (`NonZero`) name
+    /// `StringId` — same boundary reason as [`member_type_id`](Self::member_type_id).
+    pub(crate) fn name_type_id(&self, idx: usize) -> TypeId {
+        assert!(idx < self.names_count, "type name index out of bounds");
+        TypeId(read_u16_le(self.names_bytes, idx * 4 + 2))
     }
 
     /// Number of type definitions.
