@@ -85,8 +85,6 @@ type Summaries = HashMap<u16, u8>;
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
     let entrypoints = module.entrypoints();
 
-    // Seed the definition set with entrypoint bodies; `analyze` discovers the
-    // rest (call targets) as it walks.
     let mut defs: Vec<u16> = Vec::new();
     for i in 0..entrypoints.len() {
         push_unique(&mut defs, entrypoints.get(i).target());

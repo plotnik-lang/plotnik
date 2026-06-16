@@ -1,5 +1,3 @@
-//! Sequence parsing tests.
-
 use crate::{Query, shot_cst, shot_error};
 
 #[test]

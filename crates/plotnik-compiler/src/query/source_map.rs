@@ -1,13 +1,9 @@
 //! Source storage for query compilation.
-//!
-//! Stores sources as owned strings, providing a simple interface for
-//! multi-source compilation sessions.
 
 /// Lightweight handle to a source in a compilation session.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct SourceId(pub(crate) u32);
 
-/// Describes the origin of a source.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceKind {
     /// A one-liner query passed directly (e.g., CLI `-q` argument).
@@ -19,7 +15,6 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    /// Returns the display name for diagnostics.
     pub fn display_name(&self) -> &str {
         match self {
             SourceKind::OneLiner => "<query>",
@@ -44,14 +39,12 @@ impl<'q> Source<'q> {
     }
 }
 
-/// Metadata for a source.
 #[derive(Clone, Debug)]
 struct SourceEntry {
     kind: SourceKind,
     content: String,
 }
 
-/// Registry of all sources.
 #[derive(Clone, Debug, Default)]
 pub struct SourceMap {
     entries: Vec<SourceEntry>,
@@ -67,17 +60,14 @@ impl SourceMap {
         self.push_entry(SourceKind::OneLiner, content)
     }
 
-    /// Add a source read from stdin.
     pub fn add_stdin(&mut self, content: &str) -> SourceId {
         self.push_entry(SourceKind::Stdin, content)
     }
 
-    /// Add a file source with its path.
     pub fn add_file(&mut self, path: &str, content: &str) -> SourceId {
         self.push_entry(SourceKind::File(path.to_owned()), content)
     }
 
-    /// Create a SourceMap with a single one-liner source.
     /// Convenience for single-source use cases (CLI, REPL, tests).
     pub fn one_liner(content: &str) -> Self {
         let mut map = Self::new();
@@ -85,7 +75,6 @@ impl SourceMap {
         map
     }
 
-    /// Get the content of a source by ID.
     pub fn content(&self, id: SourceId) -> &str {
         self.entries
             .get(id.0 as usize)
@@ -93,7 +82,6 @@ impl SourceMap {
             .expect("invalid SourceId")
     }
 
-    /// Get the kind of a source by ID.
     pub fn kind(&self, id: SourceId) -> &SourceKind {
         self.entries
             .get(id.0 as usize)
@@ -101,7 +89,6 @@ impl SourceMap {
             .expect("invalid SourceId")
     }
 
-    /// Get the file path if this source is a file, None otherwise.
     pub fn path(&self, id: SourceId) -> Option<&str> {
         let entry = self.entries.get(id.0 as usize).expect("invalid SourceId");
         match &entry.kind {
@@ -120,7 +107,6 @@ impl SourceMap {
         self.entries.is_empty()
     }
 
-    /// Get a source by ID, returning a `Source` view.
     pub fn get(&self, id: SourceId) -> Source<'_> {
         let entry = self.entries.get(id.0 as usize).expect("invalid SourceId");
         Source {

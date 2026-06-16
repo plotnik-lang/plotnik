@@ -8,43 +8,37 @@ use clap::Command;
 
 use super::args::*;
 
-/// Add hidden source input args (for commands that don't use source).
 fn with_hidden_source_args(cmd: Command) -> Command {
     cmd.arg(source_path_arg().hide(true))
         .arg(source_text_arg().hide(true))
 }
 
-/// Add hidden exec output args (for commands that don't produce JSON).
 fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
         .arg(verbose_nodes_arg().hide(true))
 }
 
-/// Add hidden exec output args, excluding --verbose-nodes (for infer which has it visible).
+// --verbose-nodes is visible for infer, so exclude it from the hidden set.
 fn with_hidden_exec_args_partial(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
 }
 
-/// Add hidden trace args (for commands that don't trace).
 fn with_hidden_trace_args(cmd: Command) -> Command {
     cmd.arg(verbose_arg().hide(true))
         .arg(no_result_arg().hide(true))
         .arg(fuel_arg().hide(true))
 }
 
-/// Add hidden AST args (for commands that don't show AST).
 fn with_hidden_ast_args(cmd: Command) -> Command {
     cmd.arg(raw_arg().hide(true))
 }
 
-/// Add hidden --json arg (for commands without JSON diagnostics yet).
 fn with_hidden_json_arg(cmd: Command) -> Command {
     cmd.arg(json_arg().hide(true))
 }
 
-/// Build the complete CLI with all subcommands.
 pub fn build_cli() -> Command {
     Command::new("plotnik")
         .about("Query language for tree-sitter AST with type inference")
@@ -75,11 +69,6 @@ Run 'plotnik <command> --help' for examples."#,
         .subcommand(completions_command())
 }
 
-/// Show AST of query and/or source file.
-///
-/// Accepts all runtime flags for unified CLI experience.
-/// Shows query AST when query is provided, source AST when source is provided.
-/// Single positional file is auto-detected: .ptk → query, otherwise → source.
 pub fn ast_command() -> Command {
     let cmd = Command::new("ast")
         .about("Show AST of query and/or source file")
@@ -110,14 +99,9 @@ pub fn ast_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags
     with_hidden_json_arg(with_hidden_trace_args(with_hidden_exec_args(cmd)))
 }
 
-/// Validate a query.
-///
-/// Accepts all runtime flags for unified CLI experience, but only uses
-/// query/lang/strict/color.
 pub fn check_command() -> Command {
     let cmd = Command::new("check")
         .about("Validate a query")
@@ -145,16 +129,11 @@ pub fn check_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags
     with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args(
         with_hidden_source_args(cmd),
     )))
 }
 
-/// Show compiled bytecode.
-///
-/// Accepts all runtime flags for unified CLI experience, but only uses
-/// query/lang/color. Source and execution flags are hidden and ignored.
 pub fn dump_command() -> Command {
     let cmd = Command::new("dump")
         .about("Show compiled bytecode")
@@ -177,16 +156,11 @@ pub fn dump_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags
     with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
         with_hidden_exec_args(with_hidden_source_args(cmd)),
     )))
 }
 
-/// Generate type definitions from a query.
-///
-/// Accepts all runtime flags for unified CLI experience, but only uses
-/// query/lang and infer-specific options.
 pub fn infer_command() -> Command {
     let cmd = Command::new("infer")
         .about("Generate type definitions from a query")
@@ -215,15 +189,11 @@ pub fn infer_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags (use partial exec args since --verbose-nodes is visible)
     with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
         with_hidden_exec_args_partial(with_hidden_source_args(cmd)),
     )))
 }
 
-/// Execute a query against source code and output JSON.
-///
-/// Accepts trace flags for unified CLI experience, but ignores them.
 pub fn run_command() -> Command {
     let cmd = Command::new("run")
         .alias("exec")
@@ -253,13 +223,9 @@ pub fn run_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags
     with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(cmd)))
 }
 
-/// Trace query execution for debugging.
-///
-/// Accepts exec output flags for unified CLI experience, but ignores them.
 pub fn trace_command() -> Command {
     let cmd = Command::new("trace")
         .about("Trace query execution for debugging")
@@ -289,14 +255,12 @@ pub fn trace_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    // Hidden unified flags (exec output flags only - entry is visible for trace)
     with_hidden_json_arg(with_hidden_ast_args(
         cmd.arg(compact_arg().hide(true))
             .arg(verbose_nodes_arg().hide(true)),
     ))
 }
 
-/// Language information commands.
 pub fn lang_command() -> Command {
     Command::new("lang")
         .about("Language information and grammar dump")
@@ -307,12 +271,10 @@ pub fn lang_command() -> Command {
         .subcommand(lang_dump_command())
 }
 
-/// List supported languages.
 fn lang_list_command() -> Command {
     Command::new("list").about("List supported languages with aliases")
 }
 
-/// Generate shell completions.
 pub fn completions_command() -> Command {
     Command::new("completions")
         .about("Generate shell completions")
@@ -329,7 +291,6 @@ pub fn completions_command() -> Command {
         )
 }
 
-/// Dump grammar for a language.
 fn lang_dump_command() -> Command {
     Command::new("dump")
         .about("Dump grammar in Plotnik-like syntax")

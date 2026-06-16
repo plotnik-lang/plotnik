@@ -14,7 +14,6 @@ use super::query_loader::load_query_source;
 use crate::error::CliError;
 use plotnik::language_registry::{self, Lang};
 
-/// Load source code from file, stdin, or inline text.
 pub fn load_source(
     source_text: Option<&str>,
     source_path: Option<&Path>,
@@ -94,7 +93,6 @@ pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypo
     }
 }
 
-/// Validate common arguments.
 fn validate(
     source_text: Option<&str>,
     source_path: Option<&Path>,
@@ -134,7 +132,6 @@ pub struct PreparedQuery {
     pub source_code: String,
 }
 
-/// Load, parse, analyze, link, and emit a query.
 pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
     let loaded = load_query_source(input.query_path, input.query_text)?;
 

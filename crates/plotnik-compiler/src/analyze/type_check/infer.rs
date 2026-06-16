@@ -294,7 +294,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let mut flows: Vec<TypeFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
-        // Collect from branches
         for branch in alt.branches() {
             if let Some(body) = branch.body() {
                 let info = self.infer_expr(&body);
@@ -303,7 +302,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             }
         }
 
-        // Collect from direct expressions
         for expr in alt.exprs() {
             let info = self.infer_expr(&expr);
             combined_arity = combined_arity.combine(info.arity);
@@ -634,8 +632,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 TypeFlow::Scalar(array_type)
             }
             TypeFlow::Bubble(struct_type) => {
-                // Note: Bubble with * or + is strictly invalid unless it's a row capture,
-                // but we construct a valid type as fallback.
+                // `check_strict_dimensionality` already emitted an error for this case
+                // (Bubble under * or + without a row capture). We still produce a
+                // plausible array type so downstream inference isn't poisoned by void.
                 let array_type = self.ctx.type_ctx.intern_type(TypeShape::Array {
                     element: struct_type,
                     non_empty,
@@ -1021,7 +1020,6 @@ impl<'a> InferencePass<'a> {
             root,
         );
 
-        // Register the definition's output type based on the inferred body flow
         if let Some(body) = self.symbol_table.get(def_name)
             && let Some(info) = self.ctx.get_term_info(body).cloned()
         {

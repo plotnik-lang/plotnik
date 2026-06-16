@@ -12,8 +12,6 @@ use plotnik_bytecode::{EffectOpcode, Nav};
 use super::Compiler;
 use super::capture::CaptureEffects;
 
-/// Struct scope for tracking captures in nested contexts.
-/// Each scope represents a struct type whose fields can receive captures.
 #[derive(Clone, Copy, Debug)]
 pub struct StructScope(pub TypeId);
 
@@ -48,7 +46,7 @@ impl CaptureExits {
 }
 
 impl Compiler<'_> {
-    /// Execute with optional scope - avoids repeated if-let pattern.
+    /// Avoids the repeated `if let Some(type_id) = type_id { with_scope } else { f }` pattern.
     pub(super) fn compile_with_optional_scope<T>(
         &mut self,
         type_id: Option<TypeId>,
@@ -61,7 +59,6 @@ impl Compiler<'_> {
         }
     }
 
-    /// Execute a closure with a scope pushed, automatically popping afterward.
     pub(super) fn with_scope<T>(&mut self, type_id: TypeId, f: impl FnOnce(&mut Self) -> T) -> T {
         self.scope_stack.push(StructScope(type_id));
         let result = f(self);
@@ -69,8 +66,7 @@ impl Compiler<'_> {
         result
     }
 
-    /// Look up a capture name in a type, returning a member reference by
-    /// (struct_type, relative_index).
+    /// Returns a `MemberRef` keyed by (struct_type, relative_index).
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
         let fields = self.ctx.type_ctx.get_struct_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
@@ -81,7 +77,6 @@ impl Compiler<'_> {
         None
     }
 
-    /// Look up a capture name in the current scope stack.
     pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
         let StructScope(type_id) = *self.scope_stack.last()?;
         self.lookup_member(capture_name, type_id)
@@ -146,15 +141,12 @@ impl Compiler<'_> {
         self.emit_obj_step_with_pre(inner_entry, outer_capture.pre)
     }
 
-    /// Compile bubble with node capture: inner[capture] → exit (with optional outer effects)
+    /// Compile a node capture that also contains bubbling inner captures.
     ///
-    /// Used when a named node contains bubbling captures but the capture itself
-    /// should capture the node value (not a struct). The capture_effects go on
-    /// the inner match instruction, and outer_capture effects are emitted after.
-    ///
-    /// Note: Previously this always wrapped in Obj/EndObj, but that was incorrect
-    /// when scope_type_id is None. The inner captures use the current scope from
-    /// the outer context (e.g., array row struct), so no new scope is needed.
+    /// `capture_effects` land on the inner match instruction (not an EndObj step).
+    /// When `scope_type_id` is `None` the inner captures use the already-open outer
+    /// scope (e.g., an array row struct) — no Obj/EndObj is emitted. When it is
+    /// `Some`, Obj/EndObj wraps the inner to open a fresh struct scope.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
         inner: &Expr,
@@ -164,10 +156,7 @@ impl Compiler<'_> {
         capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
     ) -> Label {
-        // When scope_type_id is None, inner captures use the current scope
-        // (no new Obj/EndObj scope needed - just compile with combined effects)
         if scope_type_id.is_none() {
-            // If we have outer_capture effects (like Push), emit epsilon step for them
             let actual_exit = if outer_capture.post.is_empty() {
                 exit
             } else {
@@ -180,13 +169,12 @@ impl Compiler<'_> {
                 outer_step
             };
 
-            // Compile inner with capture_effects on the match instruction
             let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
             return self.compile_expr_inner(inner, actual_exit, nav_override, inner_capture);
         }
 
-        // When scope_type_id is Some, we need Obj/EndObj to create the scope
-        // EndObj step with ONLY outer_capture effects (like Push), NOT capture_effects
+        // EndObj carries ONLY outer_capture effects (e.g. Push), not capture_effects,
+        // which belong on the inner match instruction.
         let endobj_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(endobj_step, exit)
@@ -195,12 +183,12 @@ impl Compiler<'_> {
                 .into(),
         );
 
-        // Compile inner WITH capture_effects on the match instruction
-        // Note: pre effects don't propagate through Obj/EndObj scope wrapper
+        // pre effects don't propagate through an Obj/EndObj scope wrapper.
         let inner_capture = CaptureEffects::new_post(capture_effects);
-        let inner_entry = self.with_scope(scope_type_id.unwrap(), |this| {
-            this.compile_expr_inner(inner, endobj_step, nav_override, inner_capture)
-        });
+        let inner_entry = self.with_scope(
+            scope_type_id.expect("scope_type_id is Some after the early return on None above"),
+            |this| this.compile_expr_inner(inner, endobj_step, nav_override, inner_capture),
+        );
 
         let obj_step = self.fresh_label();
         self.instructions.push(
@@ -223,7 +211,6 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         row_type_id: Option<TypeId>,
     ) -> Label {
-        // EndObj Push → exit
         let endobj_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(endobj_step, exit)
@@ -232,12 +219,11 @@ impl Compiler<'_> {
                 .into(),
         );
 
-        // Compile inner with row scope (for Set effects to work)
+        // row_type_id drives Set effects inside the struct scope.
         let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
             this.compile_expr_with_nav(inner, endobj_step, nav_override)
         });
 
-        // Obj → inner_entry
         let obj_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(obj_step, inner_entry)
@@ -248,7 +234,6 @@ impl Compiler<'_> {
         obj_step
     }
 
-    /// Emit an EndArr epsilon step with the given effects.
     pub(super) fn emit_endarr_step(
         &mut self,
         capture_effects: &[EffectIR],
@@ -330,7 +315,6 @@ impl Compiler<'_> {
         label
     }
 
-    /// Emit a Call instruction.
     pub(super) fn emit_call(
         &mut self,
         nav: Nav,
@@ -389,20 +373,14 @@ impl Compiler<'_> {
         pre_step
     }
 
-    /// Emit null effects for a skip path in optional/star quantifiers.
-    ///
-    /// When an optional/star pattern is skipped, any captures it would have set
-    /// need to be explicitly nulled. This mirrors the null injection that
-    /// alternations do for asymmetric branches.
-    ///
-    /// Returns the new exit label (with null effects) or the original exit if
-    /// no null effects are needed.
+    /// Null-inject captures on the skip path of an optional/star quantifier,
+    /// mirroring what alternations do for asymmetric branches.
+    /// Returns `exit` unchanged when no Set effects are present.
     pub(super) fn emit_null_for_skip_path(
         &mut self,
         exit: Label,
         capture: &CaptureEffects,
     ) -> Label {
-        // Collect Set effects - these are the fields that need nulling
         let null_effects: Vec<_> = capture
             .post
             .iter()
@@ -449,18 +427,13 @@ impl Compiler<'_> {
         self.emit_effects_epsilon(exit, null_effects, CaptureEffects::default())
     }
 
-    /// Emit an epsilon transition (no node interaction).
-    ///
     /// Cascading for bytecode limits is handled by the lowering pass.
     pub(super) fn emit_epsilon(&mut self, label: Label, successors: Vec<Label>) {
         self.instructions
             .push(MatchIR::at(label).next_many(successors).into());
     }
 
-    /// Emit a Match instruction.
-    ///
     /// Cascading for bytecode limits is handled by the lowering pass.
-    ///
     /// Returns the entry label (same as `instr.label`).
     pub(super) fn emit_match(&mut self, instr: MatchIR) -> Label {
         let entry = instr.label;
@@ -490,7 +463,6 @@ impl Compiler<'_> {
         entry
     }
 
-    /// Emit an epsilon branch at a specific label.
     pub(super) fn emit_branch_epsilon_at(
         &mut self,
         label: Label,

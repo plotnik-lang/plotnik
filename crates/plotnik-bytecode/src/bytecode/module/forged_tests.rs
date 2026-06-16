@@ -35,7 +35,6 @@ fn javascript() -> &'static Grammar {
     &GRAMMAR
 }
 
-/// Emit bytecode for a query that must link.
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
     source_map.add_file("query.ptk", query_src);
@@ -157,7 +156,6 @@ fn forged_invalid_predicate_op_is_rejected() {
 const STRUCT_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
 
-/// `(base, steps)` of a freshly-emitted (still valid) module's transitions.
 fn transitions(bytes: &[u8]) -> (usize, u16) {
     let m = Module::load(bytes).expect("module loads before tampering");
     (
@@ -179,7 +177,6 @@ fn instr_size(opcode: u8) -> usize {
     }
 }
 
-/// Byte offset of the first instruction whose opcode nibble satisfies `want`.
 fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
     let (base, steps) = transitions(bytes);
     let mut step = 0u16;
@@ -232,7 +229,6 @@ fn first_multistep_interior_step(bytes: &[u8]) -> u16 {
     panic!("no multi-step instruction in transitions");
 }
 
-/// Byte offset of the first extended-match successor slot in the stream.
 fn first_ext_successor(bytes: &[u8]) -> usize {
     let (base, steps) = transitions(bytes);
     let mut step = 0u16;

@@ -22,7 +22,6 @@ use plotnik_bytecode::Nav;
 use crate::bytecode::{InstructionIR, Label, MatchIR, NodeTypeIR};
 use crate::compile::CompileResult;
 
-/// Collapse consecutive Up instructions of the same mode.
 pub fn collapse_up(result: &mut CompileResult) {
     let label_to_idx: HashMap<Label, usize> = result
         .instructions
@@ -31,7 +30,7 @@ pub fn collapse_up(result: &mut CompileResult) {
         .map(|(i, instr)| (instr.label(), i))
         .collect();
 
-    // Count predecessors for each label - only remove labels with exactly one predecessor
+    // Only collapse into a successor with exactly one predecessor; others still point to it.
     let mut predecessor_count: HashMap<Label, usize> = HashMap::new();
     for instr in &result.instructions {
         for &succ in instr.successors() {
@@ -65,7 +64,6 @@ pub fn collapse_up(result: &mut CompileResult) {
         let mut current_nav = m.nav;
         let mut final_successors = m.successors.clone();
 
-        // Absorb chain of effectless Up instructions with same mode
         while current_level < Nav::MAX_UP_LEVEL {
             let &[succ_label] = final_successors.as_slice() else {
                 break;
@@ -91,8 +89,6 @@ pub fn collapse_up(result: &mut CompileResult) {
                 break;
             }
 
-            // Only absorb if this label has exactly one predecessor
-            // (otherwise other instructions still need it)
             if predecessor_count.get(&succ_label).copied().unwrap_or(0) != 1 {
                 break;
             }
@@ -110,7 +106,6 @@ pub fn collapse_up(result: &mut CompileResult) {
             removed.insert(succ_label);
         }
 
-        // Update the instruction if we merged anything
         if current_level != up_level {
             let InstructionIR::Match(m) = &mut result.instructions[i] else {
                 unreachable!()
@@ -120,7 +115,6 @@ pub fn collapse_up(result: &mut CompileResult) {
         }
     }
 
-    // Remove absorbed instructions
     result
         .instructions
         .retain(|instr| !removed.contains(&instr.label()));

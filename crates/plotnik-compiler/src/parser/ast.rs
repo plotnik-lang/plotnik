@@ -23,7 +23,6 @@ pub fn token_src<'q>(token: &SyntaxToken, source: &'q str) -> &'q str {
     &source[range.start().into()..range.end().into()]
 }
 
-/// First direct child token matching the predicate.
 fn find_token(node: &SyntaxNode, pred: impl Fn(SyntaxKind) -> bool) -> Option<SyntaxToken> {
     node.children_with_tokens()
         .filter_map(|it| it.into_token())
@@ -83,7 +82,6 @@ macro_rules! define_expr {
 }
 
 impl Expr {
-    /// Returns direct child expressions.
     pub fn children(&self) -> Vec<Expr> {
         match self {
             Expr::NamedNode(n) => n.children().collect(),
@@ -168,7 +166,6 @@ impl AnonymousNode {
         find_token(&self.0, |k| k == SyntaxKind::StrVal)
     }
 
-    /// Returns true if this is the "any" wildcard (`_`).
     pub fn is_any(&self) -> bool {
         self.0.kind() == SyntaxKind::Wildcard
     }
@@ -185,10 +182,8 @@ pub enum AltKind {
     Mixed,
 }
 
-// Re-export PredicateOp from bytecode crate
 pub use plotnik_bytecode::PredicateOp;
 
-/// Convert SyntaxKind to PredicateOp.
 fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
     match kind {
         SyntaxKind::OpEq => Some(PredicateOp::Eq),
@@ -270,14 +265,12 @@ impl NamedNode {
         tokens.find(|t| t.kind() == SyntaxKind::Id)
     }
 
-    /// Returns true if the node type is wildcard (`_`), matching any named node.
     pub fn is_any(&self) -> bool {
         self.node_type()
             .map(|t| t.kind() == SyntaxKind::Underscore)
             .unwrap_or(false)
     }
 
-    /// Returns true if this is a MISSING node: `(MISSING ...)`.
     pub fn is_missing(&self) -> bool {
         self.node_type()
             .map(|t| t.kind() == SyntaxKind::KwMissing)
@@ -304,7 +297,6 @@ impl NamedNode {
         self.0.children().filter_map(Expr::cast)
     }
 
-    /// Returns all anchors in this node.
     pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
         self.0.children().filter_map(Anchor::cast)
     }
@@ -321,28 +313,23 @@ impl NamedNode {
 }
 
 impl NodePredicate {
-    /// Returns the operator token.
     pub fn operator_token(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| predicate_op_from_syntax_kind(k).is_some())
     }
 
-    /// Returns the operator kind.
     pub fn operator(&self) -> Option<PredicateOp> {
         self.operator_token()
             .and_then(|t| predicate_op_from_syntax_kind(t.kind()))
     }
 
-    /// Returns the string value if the predicate uses a string.
     pub fn string_value(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::StrVal)
     }
 
-    /// Returns the regex literal if the predicate uses a regex.
     pub fn regex(&self) -> Option<RegexLiteral> {
         self.0.children().find_map(RegexLiteral::cast)
     }
 
-    /// Returns the predicate value (string or regex pattern).
     pub fn value<'q>(&self, source: &'q str) -> Option<PredicateValue<'q>> {
         if let Some(str_token) = self.string_value() {
             return Some(PredicateValue::String(token_src(&str_token, source)));
@@ -419,7 +406,6 @@ impl SeqExpr {
         self.0.children().filter_map(Expr::cast)
     }
 
-    /// Returns all anchors in this sequence.
     pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
         self.0.children().filter_map(Anchor::cast)
     }
@@ -453,7 +439,6 @@ impl CapturedExpr {
         self.0.children().find_map(Type::cast)
     }
 
-    /// Returns true if this capture has a `:: string` type annotation.
     pub fn has_string_annotation(&self) -> bool {
         self.type_annotation()
             .is_some_and(|t| t.name().is_some_and(|n| n.text() == "string"))

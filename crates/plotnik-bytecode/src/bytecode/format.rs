@@ -49,7 +49,6 @@ impl Default for Symbol {
 }
 
 impl Symbol {
-    /// Create a new symbol with all parts.
     pub const fn new(left: &'static str, center: &'static str, right: &'static str) -> Self {
         Self {
             left,
@@ -58,7 +57,6 @@ impl Symbol {
         }
     }
 
-    /// Create a symbol with an owned right side.
     pub fn with_right(left: &'static str, center: &'static str, right: String) -> Self {
         Self {
             left,
@@ -76,7 +74,6 @@ impl Symbol {
     /// Padding indicator (centered "..." in 5-char column).
     pub const PADDING: Symbol = Symbol::new(" ", "...", " ");
 
-    /// Format for display.
     pub fn format(&self) -> String {
         format!("{}{}{}", self.left, self.center, self.right)
     }
@@ -154,7 +151,12 @@ pub fn superscript(n: u8) -> String {
     } else {
         n.to_string()
             .chars()
-            .map(|c| SUPERSCRIPT_DIGITS[c.to_digit(10).unwrap() as usize])
+            .map(|c| {
+                SUPERSCRIPT_DIGITS[c
+                    .to_digit(10)
+                    .expect("char is an ASCII digit from integer formatting")
+                    as usize]
+            })
             .collect()
     }
 }
@@ -167,7 +169,6 @@ fn up_symbol(left: &'static str, center: &'static str, n: u8) -> Symbol {
     Symbol::with_right(left, center, format!("┘{}", superscript(n)))
 }
 
-/// Calculate minimum width needed to display numbers up to `count - 1`.
 pub fn width_for_count(count: usize) -> usize {
     if count <= 1 {
         1
@@ -265,7 +266,6 @@ fn display_width(s: &str) -> usize {
     width
 }
 
-/// Format an effect operation for display.
 pub fn format_effect(effect: &EffectOp) -> String {
     match effect.opcode {
         EffectOpcode::Node => "Node".to_string(),

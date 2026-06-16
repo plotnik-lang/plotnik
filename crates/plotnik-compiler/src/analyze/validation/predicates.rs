@@ -38,7 +38,6 @@ struct PredicateValidator<'q, 'd> {
 
 impl Visitor for PredicateValidator<'_, '_> {
     fn visit_named_node(&mut self, node: &NamedNode) {
-        // Validate regex syntax if this is a regex predicate
         if let Some(pred) = node.predicate()
             && let Some(op) = pred.operator()
             && op.is_regex_op()
@@ -52,7 +51,6 @@ impl Visitor for PredicateValidator<'_, '_> {
 
 impl PredicateValidator<'_, '_> {
     fn validate_regex(&mut self, pattern: &str, regex_range: TextRange) {
-        // Reject empty regex patterns
         if pattern.is_empty() {
             self.diag
                 .report(self.source_id, DiagnosticKind::EmptyRegex, regex_range)
@@ -93,7 +91,6 @@ impl PredicateValidator<'_, '_> {
             }
         };
 
-        // Walk AST to find named captures
         let detector = NamedCaptureDetector {
             named_captures: Vec::new(),
         };
@@ -110,7 +107,6 @@ impl PredicateValidator<'_, '_> {
         }
     }
 
-    /// Map a span within the regex pattern to a span in the query source.
     fn map_regex_span(&self, regex_span: &ast::Span, regex_range: TextRange) -> TextRange {
         // regex_range includes the `/` delimiters, so content starts at +1
         let content_start = u32::from(regex_range.start()) + 1;

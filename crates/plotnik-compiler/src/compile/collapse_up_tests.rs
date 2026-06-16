@@ -21,7 +21,6 @@ fn collapse_up_single_mode() {
 
     collapse_up(&mut result);
 
-    // Should collapse to 2 instructions: Up(2) and terminal
     assert_eq!(result.instructions.len(), 2);
 
     let InstructionIR::Match(m) = &result.instructions[0] else {
@@ -73,7 +72,6 @@ fn collapse_up_mixed_modes_no_merge() {
 
     collapse_up(&mut result);
 
-    // Should stay 3 instructions
     assert_eq!(result.instructions.len(), 3);
 }
 
@@ -186,7 +184,6 @@ fn collapse_up_with_effects_no_merge() {
 
     collapse_up(&mut result);
 
-    // Should stay 3 instructions (effectful Up can't be absorbed)
     assert_eq!(result.instructions.len(), 3);
 }
 
@@ -262,8 +259,6 @@ fn collapse_up_branching_no_merge() {
 
     collapse_up(&mut result);
 
-    // Branching instruction can't merge, but its successors can be processed
-    // Label(0) has 2 successors, so it stays as Up(1)
     let InstructionIR::Match(m) = &result.instructions[0] else {
         panic!("expected Match");
     };

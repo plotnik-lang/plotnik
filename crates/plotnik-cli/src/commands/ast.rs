@@ -31,7 +31,6 @@ pub fn run(args: AstArgs) -> CliResult {
 
     let show_headers = has_query && has_source;
 
-    // Show Query AST if query provided
     let mut declared_lang = None;
     if has_query {
         if show_headers {
@@ -40,7 +39,6 @@ pub fn run(args: AstArgs) -> CliResult {
         declared_lang = print_query_ast(&args)?;
     }
 
-    // Show Source AST if source provided
     if has_source {
         if show_headers {
             println!("\n# Source AST");
@@ -67,7 +65,6 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
         .map_err(|e| CliError::fatal(e.to_string()))?
         .analyze();
 
-    // Show diagnostics if any (warnings)
     if query.diagnostics().has_errors() || query.diagnostics().has_warnings() {
         eprint!(
             "{}",
@@ -77,7 +74,6 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
         );
     }
 
-    // Print AST (or CST if --raw)
     let output = query.printer().raw(args.raw).with_trivia(args.raw).dump();
     print!("{}", output);
 

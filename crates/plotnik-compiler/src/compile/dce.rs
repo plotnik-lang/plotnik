@@ -10,10 +10,6 @@ use crate::bytecode::Label;
 
 use super::error::CompileResult;
 
-/// Remove instructions not reachable from any entry point.
-///
-/// This pass runs after epsilon elimination to clean up instructions
-/// that were bypassed during optimization.
 pub fn remove_unreachable(result: &mut CompileResult) {
     let reachable = compute_reachable(result);
     result
@@ -21,16 +17,13 @@ pub fn remove_unreachable(result: &mut CompileResult) {
         .retain(|instr| reachable.contains(&instr.label()));
 }
 
-/// Compute all labels reachable from entry points via BFS.
 fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
-    // Build successor map
     let successors: std::collections::BTreeMap<Label, Vec<Label>> = result
         .instructions
         .iter()
         .map(|instr| (instr.label(), instr.successors().to_vec()))
         .collect();
 
-    // BFS from all entry points
     let mut reachable = HashSet::new();
     let mut queue: Vec<Label> = vec![result.preamble_entry];
     queue.extend(result.def_entries.values().copied());

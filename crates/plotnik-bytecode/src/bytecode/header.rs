@@ -1,6 +1,6 @@
 //! Bytecode file header (64 bytes).
 //!
-//! v5 layout: Offsets are computed from counts + SECTION_ALIGN (64 bytes).
+//! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
 //! NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Transitions
@@ -19,7 +19,7 @@ pub(crate) const SECTION_COUNT: usize = 11;
 
 /// File header - first 64 bytes of the bytecode file.
 ///
-/// v5 layout (offsets computed from counts):
+/// Layout (offsets computed from counts):
 /// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
 /// - 24-41: counts (9 × u16) — order matches section order
 /// - 42-63: reserved
@@ -136,7 +136,6 @@ impl SectionOffsets {
 }
 
 impl Header {
-    /// Decode header from 64 bytes.
     pub fn from_bytes(bytes: &[u8]) -> Self {
         assert!(bytes.len() >= HEADER_SIZE, "header too short");
 
@@ -163,7 +162,6 @@ impl Header {
         }
     }
 
-    /// Encode header to 64 bytes.
     pub fn to_bytes(&self) -> [u8; HEADER_SIZE] {
         let mut bytes = [0u8; HEADER_SIZE];
         bytes[0..4].copy_from_slice(&self.magic);

@@ -36,7 +36,6 @@ impl NodeSymbol {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    /// Create a new node symbol.
     pub fn new(id: u16, name: StringId) -> Self {
         Self { id, name }
     }
@@ -58,7 +57,6 @@ impl FieldSymbol {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    /// Create a new field symbol.
     pub fn new(id: u16, name: StringId) -> Self {
         Self { id, name }
     }

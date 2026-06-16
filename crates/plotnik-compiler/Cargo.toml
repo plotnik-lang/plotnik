@@ -6,8 +6,8 @@ license.workspace = true
 repository.workspace = true
 description = "Compiler for Plotnik query language (parser, analyzer, bytecode emitter)"
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+[lints]
+workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true

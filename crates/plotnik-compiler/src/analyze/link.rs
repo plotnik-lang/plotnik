@@ -11,7 +11,6 @@ use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
 use rowan::TextRange;
 
-/// Output from the link phase for binary emission.
 #[derive(Default)]
 pub struct LinkOutput {
     /// Interned named/anonymous node type → NodeTypeId (for binary: StringId → NodeTypeId)
@@ -48,10 +47,7 @@ use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::{SyntaxKind, SyntaxToken, token_src};
 use crate::query::{AstMap, SourceId, SourceMap};
 
-/// Link query against a language grammar.
-///
-/// This function is decoupled from `Query` to allow easier testing and
-/// modularity. It orchestrates the resolution and validation phases.
+/// Decoupled from `Query` to allow testing without a full query context.
 pub fn link<'q>(
     interner: &mut Interner,
     grammar: &Grammar,
@@ -249,8 +245,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                         .emit();
                 }
 
-                // The set of child kinds the grammar can place under this parent, computed once
-                // once for the inadmissible-child and child-under-leaf-token diagnostics.
+                // Computed once for both the inadmissible-child and child-under-leaf-token checks.
                 let parent_admissibility = child_ctx.as_ref().map(|ctx| {
                     (
                         self.admissible_set(ctx.parent_id),
@@ -282,7 +277,8 @@ impl<'a, 'q> Linker<'a, 'q> {
             }
             Expr::AnonymousNode(_) => {}
             Expr::FieldExpr(f) => {
-                // Should be handled by parent NamedNode, but handle gracefully
+                // Normally handled by the parent NamedNode; reached only on a bare field
+                // at root or inside a seq without a named-node parent.
                 self.validate_field_expr(f, ctx.as_ref(), deferred, walk);
             }
             Expr::AltExpr(alt) => {
@@ -343,7 +339,6 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
     }
 
-    /// Create validation context for a named node's children.
     fn make_node_context(&self, node: &NamedNode) -> Option<ValidationContext> {
         if node.is_any() {
             return None;
@@ -357,7 +352,6 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
         let key = NodeType::Named(token_src(&type_token, self.source()));
         let parent_id = self.node_type_ids.get(&key).copied().flatten()?;
-        // Verify the node type exists in the grammar
         self.grammar.node_type_name(parent_id)?;
         Some(ValidationContext {
             parent_id,
@@ -617,12 +611,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         };
 
         if parent_is_token {
-            // A leaf token has no child nodes, so any named child is impossible.
             self.emit_child_under_leaf_token(type_token.text_range(), ctx);
             return;
         }
 
-        // The kind is not among the parent's admissible children.
         if !self.admissible_child(child_id, adm) {
             self.emit_invalid_child(type_token.text_range(), child_id, ctx);
         }
@@ -751,7 +743,6 @@ impl<'a, 'q> Linker<'a, 'q> {
         );
     }
 
-    /// Field value types expanded through supertype subtyping.
     fn field_admissible_set(
         &self,
         parent: NodeTypeId,
@@ -897,7 +888,6 @@ impl<'a, 'q> Linker<'a, 'q> {
         builder.emit();
     }
 
-    /// Emit an inadmissible-bare-child diagnostic with a children-vs-fields hint.
     fn emit_invalid_child(
         &mut self,
         range: TextRange,
@@ -933,7 +923,6 @@ impl<'a, 'q> Linker<'a, 'q> {
             .emit();
     }
 
-    /// Emit a child-under-leaf-token diagnostic.
     fn emit_child_under_leaf_token(&mut self, range: TextRange, ctx: &ValidationContext) {
         let parent_name = self
             .grammar
@@ -1001,7 +990,6 @@ impl<'a, 'q> Linker<'a, 'q> {
         format!("`{}: ({})`", field_name, type_name)
     }
 
-    /// Emit an invalid-field-value diagnostic with an accepts-list hint.
     fn emit_invalid_field_value(
         &mut self,
         range: TextRange,
@@ -1058,7 +1046,6 @@ impl<'a, 'q> Linker<'a, 'q> {
     }
 }
 
-/// Format a list of items for display, truncating if too long.
 fn format_list(items: &[&str], max_items: usize) -> String {
     if items.is_empty() {
         return String::new();
@@ -1082,12 +1069,9 @@ fn format_list(items: &[&str], max_items: usize) -> String {
     }
 }
 
-/// Context for validating child types.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ValidationContext {
-    /// The parent node type being validated against.
     parent_id: NodeTypeId,
-    /// The parent node type token range for related_to.
     parent_range: TextRange,
     /// Source the parent node lives in. May differ from the source currently
     /// being walked once validation crosses a reference into another workspace
@@ -1095,7 +1079,6 @@ struct ValidationContext {
     parent_source: SourceId,
 }
 
-/// State for walking the reference graph during structural validation.
 #[derive(Default)]
 struct RefWalk {
     /// Definitions currently on the recursion stack — guards against cycles.
@@ -1106,7 +1089,6 @@ struct RefWalk {
     validated: HashSet<(String, Option<ValidationContext>, bool)>,
 }
 
-/// Combined symbol resolver for node types and fields.
 struct SymbolResolver<'l, 'a, 'q> {
     linker: &'l mut Linker<'a, 'q>,
 }

@@ -65,14 +65,13 @@ impl TypeContext {
         ctx
     }
 
-    /// Seed definition mappings from DependencyAnalysis.
-    /// This avoids re-registering definitions that were already assigned DefIds.
+    /// Avoids re-registering definitions that DependencyAnalysis already assigned DefIds to.
     pub fn seed_defs(&mut self, def_names: &[Symbol], name_to_def: &HashMap<Symbol, DefId>) {
         self.def_names = def_names.to_vec();
         self.def_ids = name_to_def.clone();
     }
 
-    /// Intern a type, returning its ID. Deduplicates identical types.
+    /// Intern a type shape, deduplicating by structural equality.
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
         if let Some(&id) = self.type_map.get(&shape) {
             return id;
@@ -84,28 +83,23 @@ impl TypeContext {
         id
     }
 
-    /// Get the TypeShape for a TypeId.
     pub fn get_type(&self, id: TypeId) -> Option<&TypeShape> {
         self.types.get(id.0 as usize)
     }
 
-    /// Get or create a type, returning both the ID and a reference.
     pub fn get_or_intern(&mut self, shape: TypeShape) -> (TypeId, &TypeShape) {
         let id = self.intern_type(shape);
         (id, &self.types[id.0 as usize])
     }
 
-    /// Intern a struct type from fields.
     pub fn intern_struct(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
         self.intern_type(TypeShape::Struct(fields))
     }
 
-    /// Intern a struct type with a single field.
     pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
-    /// Get struct fields from a TypeId, if it points to a Struct.
     pub fn get_struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
         match self.get_type(id)? {
             TypeShape::Struct(fields) => Some(fields),
@@ -125,23 +119,19 @@ impl TypeContext {
             .expect("Bubble flow must point to a Struct type")
     }
 
-    /// Cache term info for an expression.
     pub fn set_term_info(&mut self, expr: Expr, info: TermInfo) {
         self.term_info.insert(expr, info);
     }
 
-    /// Get cached term info for an expression.
     pub fn get_term_info(&self, expr: &Expr) -> Option<&TermInfo> {
         self.term_info.get(expr)
     }
 
-    /// Register a definition by name, returning its DefId.
     pub fn register_def(&mut self, interner: &mut Interner, name: &str) -> DefId {
         let sym = interner.intern(name);
         self.register_def_sym(sym)
     }
 
-    /// Register a definition by pre-interned Symbol, returning its DefId.
     pub fn register_def_sym(&mut self, sym: Symbol) -> DefId {
         if let Some(&def_id) = self.def_ids.get(&sym) {
             return def_id;
@@ -153,7 +143,6 @@ impl TypeContext {
         def_id
     }
 
-    /// Get DefId for a definition by Symbol.
     pub fn get_def_id_sym(&self, sym: Symbol) -> Option<DefId> {
         self.def_ids.get(&sym).copied()
     }
@@ -165,50 +154,41 @@ impl TypeContext {
         self.get_def_id_sym(sym)
     }
 
-    /// Get the name Symbol for a DefId.
     pub fn def_name_sym(&self, def_id: DefId) -> Symbol {
         self.def_names[def_id.index()]
     }
 
-    /// Get the name string for a DefId.
     pub fn def_name<'a>(&self, interner: &'a Interner, def_id: DefId) -> &'a str {
         interner.resolve(self.def_names[def_id.index()])
     }
 
-    /// Mark a definition as recursive.
     pub fn mark_recursive(&mut self, def_id: DefId) {
         self.recursive_defs.insert(def_id);
     }
 
-    /// Check if a definition is recursive.
     pub fn is_recursive(&self, def_id: DefId) -> bool {
         self.recursive_defs.contains(&def_id)
     }
 
-    /// Register the output type for a definition by DefId.
     pub fn set_def_type(&mut self, def_id: DefId, type_id: TypeId) {
         self.def_types.insert(def_id, type_id);
     }
 
-    /// Register the output type for a definition by string name.
     /// Registers the def if not already known.
     pub fn set_def_type_by_name(&mut self, interner: &mut Interner, name: &str, type_id: TypeId) {
         let def_id = self.register_def(interner, name);
         self.set_def_type(def_id, type_id);
     }
 
-    /// Get the output type for a definition by DefId.
     pub fn get_def_type(&self, def_id: DefId) -> Option<TypeId> {
         self.def_types.get(&def_id).copied()
     }
 
-    /// Get the output type for a definition by string name.
     pub fn get_def_type_by_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {
         let id = self.get_def_id(interner, name)?;
         self.get_def_type(id)
     }
 
-    /// Get arity for an expression.
     pub fn get_arity(&self, expr: &Expr) -> Option<Arity> {
         self.term_info.get(expr).map(|info| info.arity)
     }
@@ -234,7 +214,6 @@ impl TypeContext {
         self.type_names.insert(type_id, name);
     }
 
-    /// Iterate over all explicit type names as (TypeId, Symbol).
     pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
         self.type_names.iter().map(|(&id, &sym)| (id, sym))
     }

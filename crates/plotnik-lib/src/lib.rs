@@ -16,15 +16,12 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-// Re-export modules from plotnik-core
 pub use plotnik_core::colors;
 pub use plotnik_core::grammar;
 
-// Re-export modules from plotnik-bytecode
 pub use plotnik_bytecode as bytecode;
 pub use plotnik_bytecode::type_system;
 
-// Re-export modules from plotnik-compiler
 pub use plotnik_compiler::analyze;
 pub use plotnik_compiler::compile;
 pub use plotnik_compiler::diagnostics;
@@ -33,17 +30,13 @@ pub use plotnik_compiler::parser;
 pub use plotnik_compiler::query;
 pub use plotnik_compiler::typegen;
 
-// Re-export modules from plotnik-vm
 pub use plotnik_vm::engine;
 
-// Re-export key types from core
 pub use plotnik_core::Colors;
 
-// Re-export key types from compiler
 pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
 pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
-// Re-export VM types
 pub use plotnik_vm::{
     EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
     Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type,

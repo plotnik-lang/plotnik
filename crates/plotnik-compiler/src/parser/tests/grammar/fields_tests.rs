@@ -1,5 +1,3 @@
-//! Field parsing tests.
-
 use crate::shot_cst;
 
 #[test]

@@ -1,8 +1,5 @@
 //! Quantifier kinds for type inference.
-//!
-//! Quantifiers determine cardinality: how many times a pattern can match.
 
-/// Quantifier kind for pattern matching.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum QuantifierKind {
     /// `?` or `??` - zero or one.
@@ -14,20 +11,16 @@ pub enum QuantifierKind {
 }
 
 impl QuantifierKind {
-    /// Whether this quantifier requires strict dimensionality (row capture).
-    ///
-    /// `*` and `+` produce arrays, so internal captures need explicit row structure.
-    /// `?` produces at most one value, so no dimensionality issue.
+    /// `*` and `+` produce arrays; internal captures need explicit row structure.
+    /// `?` produces at most one value, so no dimensionality constraint applies.
     pub fn requires_row_capture(self) -> bool {
         matches!(self, Self::ZeroOrMore | Self::OneOrMore)
     }
 
-    /// Whether this quantifier guarantees at least one match.
     pub fn is_non_empty(self) -> bool {
         matches!(self, Self::OneOrMore)
     }
 
-    /// Whether this quantifier can match zero times.
     pub fn can_be_empty(self) -> bool {
         matches!(self, Self::Optional | Self::ZeroOrMore)
     }

@@ -41,7 +41,7 @@ impl Parser<'_, '_> {
             "::",
         );
 
-        self.bump(); // colon
+        self.bump();
 
         // `currently_is` skips trivia, so this handles `@x : Type` with space
         if self.currently_is(SyntaxKind::Id) {
@@ -57,7 +57,6 @@ impl Parser<'_, '_> {
     pub(crate) fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
 
-        // Accept both `-` (preferred) and `!` (deprecated)
         if self.currently_is(SyntaxKind::Negation) {
             let span = self.current_span();
             self.error_with_fix(
@@ -145,7 +144,6 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// If current token is quantifier, wrap preceding expression using checkpoint.
     pub(crate) fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
         if self.currently_is_one_of(QUANTIFIERS) {
             self.start_node_at(checkpoint, SyntaxKind::Quantifier);
@@ -154,7 +152,6 @@ impl Parser<'_, '_> {
         }
     }
 
-    /// If current token is a capture (`@name` or `@_`), wrap preceding expression with Capture using checkpoint.
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
         let is_capture = self.currently_is(SyntaxKind::CaptureToken);
         let is_suppressive = self.currently_is(SyntaxKind::SuppressiveCapture);
@@ -168,7 +165,7 @@ impl Parser<'_, '_> {
 
         let source = self.source;
         let span = self.current_span();
-        self.bump(); // consume CaptureToken or SuppressiveCapture
+        self.bump();
 
         let end = self.consume_dotted_capture_tail(span.end());
         let full_span = TextRange::new(span.start(), end);

@@ -1,11 +1,6 @@
-//! Comprehensive bytecode emission tests.
-//!
-//! Tests are organized by language feature and use file-based snapshots.
-//! Each test verifies the bytecode output for a specific language construct.
+//! Bytecode emission tests, organized by language feature.
 
 use crate::shot_bytecode;
-
-// Nodes
 
 #[test]
 fn nodes_named() {
@@ -60,8 +55,6 @@ fn nodes_missing() {
     "#
     );
 }
-
-// Captures
 
 #[test]
 fn captures_basic() {
@@ -162,8 +155,6 @@ fn captures_enum_with_type_annotation() {
     );
 }
 
-// Fields
-
 #[test]
 fn fields_single() {
     shot_bytecode!(
@@ -201,8 +192,6 @@ fn fields_alternation() {
     "#
     );
 }
-
-// Quantifiers
 
 #[test]
 fn quantifiers_optional() {
@@ -296,8 +285,6 @@ fn quantifiers_sequence_in_called_def() {
     );
 }
 
-// Sequences
-
 #[test]
 fn sequences_basic() {
     shot_bytecode!(
@@ -333,8 +320,6 @@ fn sequences_in_quantifier() {
     "#
     );
 }
-
-// Alternations
 
 #[test]
 fn alternations_unlabeled() {
@@ -429,8 +414,6 @@ fn alternations_tagged_in_field_constraint() {
     "#
     );
 }
-
-// Anchors
 
 #[test]
 fn anchors_between_siblings() {
@@ -704,8 +687,6 @@ fn anchors_explicit_comment_pattern_emits_match_before_skip_nav() {
     );
 }
 
-// Named expressions
-
 #[test]
 fn definitions_single() {
     shot_bytecode!(
@@ -745,8 +726,6 @@ fn definitions_nested_capture() {
     );
 }
 
-// Recursion
-
 #[test]
 fn recursion_simple() {
     shot_bytecode!(
@@ -782,8 +761,6 @@ fn recursion_def_level_alias_emits_alias_type() {
     "#
     );
 }
-
-// Optionals
 
 #[test]
 fn optional_first_child() {
@@ -827,8 +804,6 @@ fn optional_null_injection() {
     );
 }
 
-// Alternation whose branches share a head node type (each branch keeps its own match)
-
 #[test]
 fn alternation_branches_share_head_node() {
     shot_bytecode!(
@@ -837,8 +812,6 @@ fn alternation_branches_share_head_node() {
     "#
     );
 }
-
-// Comprehensive
 
 #[test]
 fn comprehensive_multi_definition() {

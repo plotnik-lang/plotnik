@@ -24,7 +24,6 @@ use super::scope::CaptureExits;
 use super::sequences::SeqItemsCtx;
 
 impl Compiler<'_> {
-    /// Compile a named node with capture effects.
     pub(super) fn compile_named_node_inner(
         &mut self,
         node: &ast::NamedNode,
@@ -36,12 +35,10 @@ impl Compiler<'_> {
         let node_type = self.resolve_node_type(node);
         let nav = nav_override.unwrap_or(Nav::Stay);
 
-        // Collect items, negated fields, and predicate
         let items: Vec<_> = node.items().collect();
         let neg_fields = self.collect_neg_fields(node);
         let predicate = self.compile_predicate(node);
 
-        // If no items, just match and exit (capture effects go here)
         if items.is_empty() {
             let mut m = MatchIR::epsilon(entry, exit)
                 .nav(nav)
@@ -55,7 +52,6 @@ impl Compiler<'_> {
             return self.emit_match(m);
         }
 
-        // Determine Up navigation based on trailing anchor
         let (has_trailing_anchor, trailing_nav) =
             check_trailing_anchor(&items, self.ctx.symbol_table);
 
@@ -75,16 +71,18 @@ impl Compiler<'_> {
         // before descending into children (which may clobber matched_node via backtracking).
         use plotnik_bytecode::EffectOpcode;
 
-        // Find Node/Text effects and their following Set effects (they come in pairs: Node Set)
         let mut entry_effects = Vec::new();
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
             if matches!(eff.opcode(), EffectOpcode::Node | EffectOpcode::Text) {
                 entry_effects.push(eff);
-                // Take the following Set if present (Node/Text are always followed by Set)
+                // Node/Text are always paired with a following Set
                 if iter.peek().is_some_and(|e| e.opcode() == EffectOpcode::Set) {
-                    entry_effects.push(iter.next().unwrap());
+                    entry_effects.push(
+                        iter.next()
+                            .expect("peek confirmed the iterator has a next element"),
+                    );
                 }
             } else {
                 exit_effects.push(eff);
@@ -107,7 +105,6 @@ impl Compiler<'_> {
         self.instructions
             .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
 
-        // Emit entry instruction with node_effects on post (executes right after match)
         let mut entry_match = MatchIR::epsilon(entry, items_entry)
             .nav(nav)
             .node_type(node_type)
@@ -122,11 +119,8 @@ impl Compiler<'_> {
         entry
     }
 
-    /// Emit post-effects on an epsilon step after the exit label.
-    ///
-    /// Post-effects (like EndEnum) must execute AFTER children complete, not after
-    /// matching the parent node. This helper creates an epsilon step for the effects
-    /// when needed, or returns the original exit if no effects.
+    /// Post-effects (like `EndEnum`) must run after children complete, not right after
+    /// matching the parent node. Returns `exit` unchanged when `post` is empty.
     fn emit_post_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
         if post.is_empty() {
             exit
@@ -135,7 +129,6 @@ impl Compiler<'_> {
         }
     }
 
-    /// Compile an anonymous node with capture effects.
     pub(super) fn compile_anonymous_node_inner(
         &mut self,
         node: &ast::AnonymousNode,
@@ -146,7 +139,6 @@ impl Compiler<'_> {
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
 
-        // Extract literal value (Any for wildcard `_`, Anonymous for literals)
         let node_type = match node.value() {
             Some(token) => self.resolve_anonymous_node_type(token.text()),
             None => NodeTypeIR::Any, // `_` wildcard matches any node
@@ -192,13 +184,11 @@ impl Compiler<'_> {
             return exit;
         };
 
-        // Check if the called definition returns a struct (needs scope isolation when captured)
         let def_type_id = self.ctx.type_ctx.get_def_type(def_id);
         let ref_returns_struct = def_type_id
             .and_then(|tid| self.ctx.type_ctx.get_type(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
 
-        // Determine if this is a captured ref that needs scope isolation
         let is_captured = !capture.post.is_empty();
         let needs_scope = is_captured && ref_returns_struct;
 
@@ -216,21 +206,18 @@ impl Compiler<'_> {
 
         // Call instructions don't have pre_effects, so emit epsilon if needed
         let call_entry = if needs_scope {
-            // Captured ref returning struct: Obj → Call → EndObj → Set → exit
-            // The Obj creates an isolated scope for the definition's internal captures.
+            // Obj isolates the definition's internal captures before the Set.
             let set_step = self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
             let endobj_step = self.emit_endobj_step(set_step);
             let call_label = self.emit_call(nav, field_override, endobj_step, target);
             self.emit_obj_step(call_label)
         } else if is_captured {
-            // Captured ref returning scalar: Call → Set → exit
             let return_addr =
                 self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
             self.emit_call(nav, field_override, return_addr, target)
         } else if suppress_opaque_recursion {
-            // Uncaptured opaque recursion: SuppressBegin → Call → SuppressEnd → exit.
-            // The recursion still matches structurally but contributes no effects,
-            // matching its inferred Void type.
+            // Suppress bracket keeps the structural match but discards all effects,
+            // matching the Void that inference assigns to uncaptured opaque recursion.
             let suppress_end = self.emit_effects_epsilon(
                 exit,
                 vec![EffectIR::suppress_end()],
@@ -255,7 +242,6 @@ impl Compiler<'_> {
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    /// Compile a field constraint with capture effects (passed to inner pattern).
     pub(super) fn compile_field_inner(
         &mut self,
         field: &ast::FieldExpr,
@@ -269,17 +255,13 @@ impl Compiler<'_> {
 
         let node_field = self.resolve_field(field);
 
-        // Special case: if value is a reference, pass field and capture to Call instruction
         if let Expr::Ref(r) = &value {
             return self.compile_ref_inner(r, exit, nav_override, node_field, capture);
         }
 
-        // Check if value is a complex pattern (alternation, sequence, quantified)
-        // that will produce an epsilon branch and thus need a wrapper instruction.
-        // For these patterns, we must:
-        // 1. Compile the value WITHOUT navigation (branches use Stay)
-        // 2. Create a wrapper WITH navigation AND field check
-        // This ensures the field is checked AFTER navigating to the child node.
+        // Alternations, sequences, and quantified patterns emit an epsilon entry and
+        // cannot carry a field constraint directly — the field must go on a wrapper
+        // that navigates first, then lets the epsilon branch under it.
         let needs_wrapper = node_field.is_some()
             && matches!(
                 &value,
@@ -287,7 +269,6 @@ impl Compiler<'_> {
             );
 
         if needs_wrapper {
-            // Compile value WITHOUT navigation - wrapper will handle it
             let value_entry = self.compile_expr_inner(&value, exit, None, capture);
 
             let entry = self.fresh_label();
@@ -300,12 +281,9 @@ impl Compiler<'_> {
             return entry;
         }
 
-        // Simple pattern: compile with navigation, merge field afterward
         let value_entry = self.compile_expr_inner(&value, exit, nav_override, capture);
 
-        // If we have a field constraint, try to merge it into the value's instruction
         if let Some(field_id) = node_field {
-            // Try to find and merge with the instruction we just created
             if let Some(instr) = self
                 .instructions
                 .iter_mut()
@@ -317,8 +295,8 @@ impl Compiler<'_> {
                 return value_entry;
             }
 
-            // Fallback: wrap with field-checking Match for patterns that couldn't merge.
-            // Use Stay since value was already compiled with navigation.
+            // Fallback for patterns whose entry instruction couldn't accept the field;
+            // Stay because the value was already compiled with navigation.
             let entry = self.fresh_label();
             self.instructions.push(
                 MatchIR::epsilon(entry, value_entry)
@@ -356,9 +334,8 @@ impl Compiler<'_> {
         outer_capture: CaptureEffects,
         exits: CaptureExits,
     ) -> Label {
-        // Suppressive captures wrap their inner in SuppressBegin/SuppressEnd and emit
-        // no value, whatever the inner's mechanism — so this comes before the
-        // mechanism dispatch (and before building any capture effects).
+        // Must precede mechanism dispatch: suppressive captures ignore the mechanism
+        // entirely and must not build any capture effects for it.
         if cap.is_suppressive() {
             return self.compile_suppressive(
                 inner_opt.as_ref(),
@@ -375,10 +352,8 @@ impl Compiler<'_> {
             .as_ref()
             .map(|inner| capture_mechanism(inner, self.ctx.type_ctx, self.ctx.interner));
 
-        // [Node/Text] (only for the Node mechanism) + Set.
         let capture_effects = self.build_capture_effects(cap, mechanism);
 
-        // Bare capture (`@x` with no inner): emit effects at the current position.
         let (Some(inner), Some(mechanism)) = (inner_opt, mechanism) else {
             return self.emit_effects_epsilon(exits.match_exit(), capture_effects, outer_capture);
         };
@@ -490,8 +465,7 @@ impl Compiler<'_> {
                 self.compile_expr_inner(inner, exit, nav_override, combined)
             }
 
-            // Node: capture the matched node. Bubbling children, if any, set into the
-            // current scope alongside the capture.
+            // Bubbling children, if any, set into the current scope alongside the capture.
             CaptureMechanism::Node => {
                 let inner_is_bubble = self
                     .ctx
@@ -538,8 +512,7 @@ impl Compiler<'_> {
         let CaptureEffects { pre, post } = outer_capture;
 
         let Some(inner) = inner else {
-            // Bare `@_` with no inner: just pass through outer effects. A bare
-            // capture never skips, so the match exit is the only continuation.
+            // Bare `@_` never skips, so the match exit is the only continuation.
             let exit = exits.match_exit();
             if pre.is_empty() && post.is_empty() {
                 return exit;
@@ -591,9 +564,6 @@ impl Compiler<'_> {
         self.wrap_entry_pre(begin_entry, pre)
     }
 
-    /// Resolve an anonymous node's literal text to its node type constraint.
-    ///
-    /// Returns `NodeTypeIR::Anonymous` with the type ID.
     pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
         if let Some(ids) = self.ctx.node_types {
             // Linked mode: resolve to NodeTypeId from grammar
@@ -618,13 +588,11 @@ impl Compiler<'_> {
     /// - `None` for wildcard `(_)` (any named node)
     /// - `Some(id)` for specific types like `(identifier)`
     pub(super) fn resolve_node_type(&mut self, node: &ast::NamedNode) -> NodeTypeIR {
-        // For wildcard (_), return Named(None) for "any named node"
         if node.is_any() {
             return NodeTypeIR::Named(None);
         }
 
         let Some(type_token) = node.node_type() else {
-            // No type specified - treat as any named
             return NodeTypeIR::Named(None);
         };
         let type_name = type_token.text();
@@ -673,7 +641,6 @@ impl Compiler<'_> {
         }
     }
 
-    /// Collect negated fields from a NamedNode.
     pub(super) fn collect_neg_fields(&mut self, node: &ast::NamedNode) -> Vec<u16> {
         node.as_cst()
             .children()
@@ -693,13 +660,11 @@ impl Compiler<'_> {
         let pred = node.predicate()?;
         let op = pred.operator()?;
 
-        // Try string value first
         if let Some(str_token) = pred.string_value() {
             let string_id = self.ctx.strings.borrow_mut().intern_str(str_token.text());
             return Some(PredicateIR::string(op, string_id));
         }
 
-        // Try regex value
         if let Some(regex) = pred.regex() {
             // Get pattern text by stripping `/` delimiters from CST text
             let text: String = regex.as_cst().text().into();

@@ -1,5 +1,3 @@
-//! Special node (ERROR, MISSING) parsing tests.
-
 use crate::shot_cst;
 
 #[test]

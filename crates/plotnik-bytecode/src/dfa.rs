@@ -4,8 +4,6 @@ use regex_automata::Input;
 use regex_automata::dfa::Automaton;
 use regex_automata::dfa::sparse::DFA;
 
-/// Deserialize a sparse DFA from bytecode, borrowing `bytes`.
-///
 /// `DFA::from_bytes` validates the entire serialized automaton, so this doubles
 /// as the load-time gate that proves a module's regex blob is well-formed.
 /// [`RegexDfas`] keeps the validated automaton instead of re-deserializing it.
@@ -40,7 +38,6 @@ pub struct RegexDfas {
 }
 
 impl RegexDfas {
-    /// Wrap per-index owned DFAs (slot 0 is the reserved sentinel).
     pub(crate) fn new(dfas: Vec<Option<DFA<Vec<u8>>>>) -> Self {
         Self { dfas }
     }

@@ -17,7 +17,7 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Str);
 
         let open_quote = self.current();
-        self.bump(); // opening quote
+        self.bump();
 
         let has_content = self.currently_is(SyntaxKind::StrVal);
         if has_content {
@@ -32,7 +32,7 @@ impl Parser<'_, '_> {
             open_quote, closing
         );
         let end = self.current_span().end();
-        self.bump(); // closing quote
+        self.bump();
 
         self.finish_node();
 
@@ -51,10 +51,10 @@ impl Parser<'_, '_> {
     /// Used for contexts where string appears as a raw value (supertype, MISSING arg).
     pub(crate) fn bump_string_tokens(&mut self) {
         let open_quote = self.current();
-        self.bump(); // opening quote
+        self.bump();
 
         if self.currently_is(SyntaxKind::StrVal) {
-            self.bump(); // content
+            self.bump();
         }
 
         let closing = self.current();

@@ -14,7 +14,6 @@ mod dfa_tests;
 pub mod predicate_op;
 pub mod type_system;
 
-// Re-export commonly used items at crate root
 pub use bytecode::{
     AlignedVec, ByteStorage, Call, EffectOp, EffectOpcode, EncodeError, Entrypoint,
     EntrypointsView, FieldSymbol, HEADER_SIZE, Header, Instruction, LineBuilder, MAGIC,

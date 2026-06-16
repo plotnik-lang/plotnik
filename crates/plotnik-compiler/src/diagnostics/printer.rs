@@ -51,12 +51,10 @@ impl<'q> DiagnosticsPrinter<'q> {
             primary_snippet =
                 primary_snippet.annotation(AnnotationKind::Primary.span(range.clone()));
 
-            // Collect same-file and cross-file related info separately
             let mut cross_file_snippets = Vec::new();
 
             for related in &diag.related {
                 if related.span.source == diag.source {
-                    // Same file: add annotation to primary snippet
                     primary_snippet = primary_snippet.annotation(
                         AnnotationKind::Context
                             .span(related.span.range.into())
@@ -65,7 +63,6 @@ impl<'q> DiagnosticsPrinter<'q> {
                     continue;
                 }
 
-                // Different file: create separate snippet
                 let related_content = self.sources.content(related.span.source);
                 let mut snippet = Snippet::source(related_content);
                 if let Some(name) = self.source_path(related.span.source) {

@@ -1,10 +1,8 @@
-//! Unified quantifier compilation.
+//! Unified quantifier compilation (`?`, `*`, `+` and non-greedy variants).
 //!
-//! Consolidates the 6+ code paths for quantified expression compilation into
-//! a single unified approach with configuration for:
-//! - Whether it's inside an array scope
-//! - Whether it's skippable (first-child with Down navigation)
-//! - Whether skip/match need separate exits
+//! All quantifier paths — plain, array-context, and split-exit — share one
+//! `compile_quantified_unified` entry point so greediness and search-nav logic
+//! stay in one place.
 
 use crate::analyze::type_check::{TypeId, is_repeating_quantifier};
 use crate::bytecode::{EffectIR, Label};
@@ -38,22 +36,15 @@ pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
 /// Quantifier operator classification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuantifierKind {
-    /// `?` - matches 0 or 1 time
     Optional,
-    /// `??` - non-greedy optional
     OptionalNonGreedy,
-    /// `*` - matches 0 or more times
     Star,
-    /// `*?` - non-greedy star
     StarNonGreedy,
-    /// `+` - matches 1 or more times
     Plus,
-    /// `+?` - non-greedy plus
     PlusNonGreedy,
 }
 
 impl QuantifierKind {
-    /// Parse from a SyntaxKind.
     pub fn from_syntax(kind: SyntaxKind) -> Option<Self> {
         match kind {
             SyntaxKind::Question => Some(Self::Optional),
@@ -82,10 +73,6 @@ enum QuantifierParse {
     Quantified { inner: Expr, kind: QuantifierKind },
 }
 
-/// Parse a quantified expression into its components.
-///
-/// Returns `Empty` if no inner, `Plain` if inner but no quantifier,
-/// `Quantified` if both inner and valid quantifier operator.
 fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
     let Some(inner) = quant.inner() else {
         return QuantifierParse::Empty;
@@ -103,21 +90,15 @@ fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
 
 /// Configuration for unified quantifier compilation.
 pub struct QuantifierConfig<'a> {
-    /// The inner expression to match.
     pub inner: &'a Expr,
-    /// The quantifier kind.
     pub kind: QuantifierKind,
-    /// Navigation for first iteration.
+    /// Navigation for the first iteration.
     pub first_nav: Option<Nav>,
-    /// Whether this is inside an array capture context (needs Push on each iteration).
+    /// Inside an array capture context — each matched element gets a Push.
     pub in_array_context: bool,
-    /// Capture effects for each iteration (e.g., Push for arrays).
     pub element_capture: CaptureEffects,
-    /// When true, skip and match paths need separate exit labels.
     pub needs_split_exits: bool,
-    /// Exit for match path (when needs_split_exits is true).
     pub match_exit: Label,
-    /// Exit for skip path (when needs_split_exits is true). Only used for skippable quantifiers.
     pub skip_exit: Option<Label>,
 }
 
@@ -145,8 +126,7 @@ impl Compiler<'_> {
             is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
-            // Implicit array: Arr → quantifier with Push → EndArr → exit. No capture
-            // effects on the array itself (no Set), just collect the values.
+            // No Set on the array itself — collect structured values via Push only.
             return self.compile_array_capture(
                 &Expr::QuantifiedExpr(quant.clone()),
                 nav_override,
@@ -265,7 +245,6 @@ impl Compiler<'_> {
             );
         }
 
-        // Handle null injection for both passed captures and internal captures
         let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
         let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
 
@@ -343,7 +322,6 @@ impl Compiler<'_> {
         self.emit_arr_step(inner_entry, outer_capture.pre)
     }
 
-    /// Compile a star quantifier for array context with separate exits.
     fn compile_star_for_array_with_exits(
         &mut self,
         expr: &Expr,
@@ -436,13 +414,7 @@ impl Compiler<'_> {
         }
     }
 
-    /// Unified quantifier compilation.
-    ///
-    /// This is the single entry point for all quantifier compilation, handling:
-    /// - Star (`*`), Plus (`+`), and Optional (`?`) quantifiers
-    /// - Greedy and non-greedy variants
-    /// - Array context (with struct wrappers if needed)
-    /// - Split exits for first-child skippable patterns
+    /// Single dispatch point for all quantifier shapes; see [`QuantifierConfig`] for knobs.
     fn compile_quantified_unified(&mut self, config: QuantifierConfig<'_>) -> Label {
         let QuantifierConfig {
             inner,
@@ -455,7 +427,6 @@ impl Compiler<'_> {
             skip_exit,
         } = config;
 
-        // Determine if struct wrapper is needed (once, here)
         let needs_struct_wrapper =
             in_array_context && check_needs_struct_wrapper(inner, self.ctx.type_ctx);
         let row_type_id = if in_array_context {
@@ -464,7 +435,6 @@ impl Compiler<'_> {
             None
         };
 
-        // Compile body helper - handles struct wrapper logic in one place
         let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
             if needs_struct_wrapper {
                 this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
@@ -488,7 +458,6 @@ impl Compiler<'_> {
                 let (first_iterate, repeat_iterate) =
                     self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                // loop_entry → [repeat_iterate, exit]
                 self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
 
                 first_iterate
@@ -496,7 +465,6 @@ impl Compiler<'_> {
 
             QuantifierKind::Star | QuantifierKind::StarNonGreedy => {
                 if needs_split_exits {
-                    // Star with split exits: zero-match takes a separate skip path.
                     let skip = skip_exit.expect("split exits requires skip_exit");
                     self.compile_star_with_skip_retry_split_exits(
                         inner,
@@ -513,16 +481,12 @@ impl Compiler<'_> {
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                    // loop_entry → [repeat_iterate, exit]
                     self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
-
-                    // entry → [first_iterate, exit]
                     self.emit_branch_epsilon(first_iterate, match_exit, is_greedy)
                 }
             }
 
             QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
-                // Build exit-with-null path for when no match is found.
                 let skip_with_null = if needs_split_exits {
                     skip_exit.expect("split exits requires skip_exit")
                 } else {
@@ -530,19 +494,14 @@ impl Compiler<'_> {
                     self.emit_null_for_internal_captures(null_exit, inner)
                 };
 
-                // Match 0 or 1 time: any failure backtracks to the entry epsilon's
-                // checkpoint, which restores the pre-navigation cursor and takes
-                // skip_with_null.
+                // Any failure backtracks to the entry epsilon's checkpoint, restoring
+                // the pre-navigation cursor and taking skip_with_null.
                 let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
-
-                // entry → [iterate, skip_with_null]
                 self.emit_branch_epsilon(iterate, skip_with_null, is_greedy)
             }
         }
     }
 
-    /// Helper for star with split exits and skip-retry.
-    /// Skip path goes to skip_exit, match path goes to match_exit.
     #[allow(clippy::too_many_arguments)]
     fn compile_star_with_skip_retry_split_exits(
         &mut self,
@@ -568,11 +527,10 @@ impl Compiler<'_> {
         let (first_iterate, repeat_iterate) =
             self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-        // loop_entry → [repeat_iterate, match_exit]
         self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
 
-        // entry → [first_iterate, skip_exit]; zero-match backtracks to the entry
-        // epsilon's checkpoint, restoring the pre-nav cursor and taking skip_exit.
+        // zero-match backtracks to the entry epsilon's checkpoint, restoring the
+        // pre-nav cursor and taking skip_exit.
         self.emit_branch_epsilon(first_iterate, skip_exit, is_greedy)
     }
 }

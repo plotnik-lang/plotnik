@@ -168,43 +168,26 @@ impl Tracer for NoopTracer {
 
 use std::collections::BTreeMap;
 
-/// Tracer that collects execution trace for debugging.
 pub struct PrintTracer<'s> {
-    /// Source code for extracting node text.
     pub(crate) source: &'s [u8],
-    /// Verbosity level for output filtering.
     pub(crate) verbosity: Verbosity,
-    /// Collected trace lines.
     pub(crate) lines: Vec<String>,
-    /// Line builder for formatting.
     pub(crate) builder: LineBuilder,
-    /// Maps node type ID to name.
     pub(crate) node_type_names: BTreeMap<u16, String>,
-    /// Maps node field ID to name.
     pub(crate) node_field_names: BTreeMap<u16, String>,
-    /// Maps member index to name (for Set/Enum effect display).
     pub(crate) member_names: Vec<String>,
-    /// All strings from StringTable (for predicate value display).
     pub(crate) all_strings: Vec<String>,
-    /// Regex patterns indexed by RegexId (for predicate display).
     pub(crate) regex_patterns: Vec<String>,
-    /// Maps entrypoint target IP to name (for labels and call/return).
     pub(crate) entrypoint_by_ip: BTreeMap<u16, String>,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
     pub(crate) checkpoint_ips: Vec<u16>,
-    /// Stack of definition names (for return display).
     pub(crate) definition_stack: Vec<String>,
-    /// Pending return instruction IP (for consolidated return line).
     pub(crate) pending_return_ip: Option<u16>,
-    /// Step width for formatting.
     pub(crate) step_width: usize,
-    /// Color palette.
     pub(crate) colors: Colors,
-    /// Previous instruction IP (for cache line boundary detection).
     pub(crate) prev_ip: Option<u16>,
 }
 
-/// Builder for `PrintTracer`.
 pub struct PrintTracerBuilder<'s, 'm> {
     source: &'s str,
     module: &'m Module,
@@ -223,7 +206,6 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         }
     }
 
-    /// Set the verbosity level.
     pub fn verbosity(mut self, verbosity: Verbosity) -> Self {
         self.verbosity = verbosity;
         self
@@ -257,25 +239,22 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             node_field_names.insert(f.id, strings.get(f.name).to_string());
         }
 
-        // Build member names lookup (index -> name)
         let member_names: Vec<String> = (0..types.members_count())
             .map(|i| strings.get(types.get_member(i).name).to_string())
             .collect();
 
-        // Build all_strings for predicate value display (same as dump.rs)
+        // Same index space as dump.rs — must stay aligned with StringTable layout.
         let all_strings: Vec<String> = (0..header.str_table_count as usize)
             .map(|i| strings.get_by_index(i).to_string())
             .collect();
 
-        // Build regex patterns (indexed by RegexId → pattern string)
-        // Index 0 is reserved, so we start with an empty string placeholder
+        // Index 0 is reserved in RegexTable, so seed with a placeholder.
         let mut regex_patterns = vec![String::new()];
         for i in 1..header.regex_table_count as usize {
             let string_id = regexes.get_string_id(i);
             regex_patterns.push(strings.get(string_id).to_string());
         }
 
-        // Build entrypoint IP -> name lookup
         let mut entrypoint_by_ip = BTreeMap::new();
         for i in 0..entrypoints.len() {
             let e = entrypoints.get(i);
@@ -356,18 +335,16 @@ impl<'s> PrintTracer<'s> {
         let available = cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
 
         if is_named {
-            // Named: show kind + text
             let text_budget = available.saturating_sub(kind.len() + 1).max(12);
             let truncated = truncate_text(text, text_budget);
             format!("{} {}{}{}{}", kind, c.dim, c.green, truncated, c.reset)
         } else {
-            // Anonymous: just text dim green (kind == text, no redundancy)
+            // Anonymous: kind == text, so showing kind would duplicate.
             let truncated = truncate_text(text, available);
             format!("{}{}{}{}", c.dim, c.green, truncated, c.reset)
         }
     }
 
-    /// Format a runtime effect for display.
     fn format_effect(&self, effect: &RuntimeEffect<'_>) -> String {
         use RuntimeEffect::*;
         match effect {
@@ -386,7 +363,6 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    /// Format a suppressed effect from opcode and payload.
     fn format_effect_from_opcode(&self, opcode: EffectOpcode, payload: usize) -> String {
         use EffectOpcode::*;
         match opcode {
@@ -412,7 +388,6 @@ impl<'s> PrintTracer<'s> {
     fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
-        // Pre-effects: [Effect1 Effect2]
         let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
         if !pre.is_empty() {
             parts.push(format!("[{}]", pre.join(" ")));
@@ -420,19 +395,16 @@ impl<'s> PrintTracer<'s> {
 
         // Skip neg_fields and node pattern for epsilon (no node interaction)
         if !m.is_epsilon() {
-            // Negated fields: !field1 !field2
             for field_id in m.neg_fields() {
                 let name = self.node_field_name(field_id);
                 parts.push(format!("!{name}"));
             }
 
-            // Node pattern: field: (type) / (type) / field: _ / empty
             let node_part = self.format_node_pattern(m);
             if !node_part.is_empty() {
                 parts.push(node_part);
             }
 
-            // Predicate: == "value" or =~ /pattern/
             if let Some((op, is_regex, value_ref)) = m.predicate() {
                 let op = PredicateOp::from_byte(op);
                 let value = if is_regex {
@@ -446,7 +418,6 @@ impl<'s> PrintTracer<'s> {
             }
         }
 
-        // Post-effects: [Effect1 Effect2]
         let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
         if !post.is_empty() {
             parts.push(format!("[{}]", post.join(" ")));
@@ -466,25 +437,20 @@ impl<'s> PrintTracer<'s> {
 
         match m.node_type {
             NodeTypeIR::Any => {
-                // Any node wildcard: `_`
                 result.push('_');
             }
             NodeTypeIR::Named(None) => {
-                // Named wildcard: any named node
                 result.push_str("(_)");
             }
             NodeTypeIR::Named(Some(t)) => {
-                // Specific named node type
                 result.push('(');
                 result.push_str(self.node_type_name(t.get()));
                 result.push(')');
             }
             NodeTypeIR::Anonymous(None) => {
-                // Anonymous wildcard: any anonymous node
                 result.push_str("\"_\"");
             }
             NodeTypeIR::Anonymous(Some(t)) => {
-                // Specific anonymous node (literal token)
                 result.push('"');
                 result.push_str(self.node_type_name(t.get()));
                 result.push('"');
@@ -494,14 +460,12 @@ impl<'s> PrintTracer<'s> {
         result
     }
 
-    /// Print all trace lines.
     pub fn print(&self) {
         for line in &self.lines {
             println!("{}", line);
         }
     }
 
-    /// Add an instruction line.
     fn add_instruction(&mut self, ip: u16, symbol: Symbol, content: &str, successors: &str) {
         let prefix = format!("  {:0sw$} {} ", ip, symbol.format(), sw = self.step_width);
         let line = self
@@ -529,7 +493,6 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    /// Format definition label with colon (blue).
     fn format_def_label(&self, name: &str) -> String {
         let c = self.colors;
         format!("{}{}{}:", c.blue, name, c.reset)
@@ -543,7 +506,6 @@ impl<'s> PrintTracer<'s> {
         self.lines.push(self.format_def_label(name));
     }
 
-    /// Format cache line boundary separator (full-width dashes, dimmed).
     fn format_cache_line_separator(&self) -> String {
         // Content spans TOTAL_WIDTH (same as instruction lines before successors)
         let c = self.colors;
@@ -562,7 +524,6 @@ impl<'s> PrintTracer<'s> {
     /// Cache line = 64 bytes = 8 steps (each step is 8 bytes).
     /// Only shows separator in verbose modes (-v, -vv).
     fn check_cache_line_boundary(&mut self, ip: u16) {
-        // Only show cache line separators in verbose modes
         if self.verbosity == Verbosity::Default {
             self.prev_ip = Some(ip);
             return;
@@ -580,7 +541,6 @@ impl<'s> PrintTracer<'s> {
 
 impl Tracer for PrintTracer<'_> {
     fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>) {
-        // Check for cache line boundary crossing
         self.check_cache_line_boundary(ip);
 
         match instr {
@@ -605,7 +565,6 @@ impl Tracer for PrintTracer<'_> {
                 self.pending_return_ip = Some(ip);
             }
             Instruction::Trampoline(t) => {
-                // Trampoline shows as a call to the entrypoint target
                 let content = "Trampoline";
                 let successors = format!("{:02}", t.next.get());
                 self.add_instruction(ip, Symbol::EMPTY, content, &successors);
@@ -614,7 +573,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>) {
-        // Navigation sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -622,7 +580,6 @@ impl Tracer for PrintTracer<'_> {
         let kind = node.kind();
         let symbol = nav_symbol(nav);
 
-        // Text only in VeryVerbose
         if self.verbosity == Verbosity::VeryVerbose {
             let text = node.utf8_text(self.source).unwrap_or("?");
             let content = self.format_kind_with_text(kind, text, node.is_named());
@@ -634,7 +591,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_nav_failure(&mut self, nav: Nav) {
-        // Navigation failure sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -650,7 +606,6 @@ impl Tracer for PrintTracer<'_> {
     fn trace_match_success(&mut self, node: Node<'_>) {
         let kind = node.kind();
 
-        // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
             let text = node.utf8_text(self.source).unwrap_or("?");
             let content = self.format_kind_with_text(kind, text, node.is_named());
@@ -664,7 +619,6 @@ impl Tracer for PrintTracer<'_> {
     fn trace_match_failure(&mut self, node: Node<'_>) {
         let kind = node.kind();
 
-        // Text on match/failure in Verbose+
         if self.verbosity != Verbosity::Default {
             let text = node.utf8_text(self.source).unwrap_or("?");
             let content = self.format_kind_with_text(kind, text, node.is_named());
@@ -676,7 +630,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_field_success(&mut self, field_id: NonZeroU16) {
-        // Field success sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -690,7 +643,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {
-        // Effect sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -700,7 +652,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_effect_suppressed(&mut self, opcode: EffectOpcode, payload: usize) {
-        // Effect sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -710,7 +661,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_suppress_control(&mut self, opcode: EffectOpcode, suppressed: bool) {
-        // Effect sub-lines hidden in default verbosity
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -749,7 +699,6 @@ impl Tracer for PrintTracer<'_> {
         let is_top_level = self.definition_stack.is_empty();
         let successor = if is_top_level { "◼" } else { "" };
         self.add_instruction(ip, trace::RETURN, &content, successor);
-        // Print caller's label after return (if not top-level)
         if let Some(caller) = self.definition_stack.last().cloned() {
             self.push_def_label(&caller);
         }
@@ -785,7 +734,6 @@ impl Tracer for PrintTracer<'_> {
     }
 }
 
-/// Format match successors for instruction line.
 fn format_match_successors(m: &Match<'_>) -> String {
     if m.is_terminal() {
         "◼".to_string()

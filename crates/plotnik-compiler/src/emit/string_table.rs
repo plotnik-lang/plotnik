@@ -15,9 +15,7 @@ use super::EmitError;
 /// StringId(0) is reserved and never referenced by instructions.
 pub const EASTER_EGG: &str = "Beauty will save the world";
 
-/// Builds the string table, remapping query Symbols to bytecode StringIds.
-///
-/// The bytecode format requires a subset of the query interner's strings.
+/// Builds a subset of the query interner's strings into bytecode StringIds.
 /// This builder collects only the strings that are actually used and assigns
 /// compact StringId indices.
 ///
@@ -46,7 +44,6 @@ impl StringTableBuilder {
         builder
     }
 
-    /// Get or create a StringId for a Symbol.
     pub fn get_or_intern(
         &mut self,
         sym: Symbol,
@@ -106,14 +103,11 @@ impl StringTableBuilder {
         self.mapping.get(&sym).copied()
     }
 
-    /// Look up a string by its StringId.
     pub fn get_str(&self, id: StringId) -> &str {
         self.strings[id.get() as usize].as_ref()
     }
 
-    /// Emit the string blob and offset table.
-    ///
-    /// Returns (blob_bytes, table_bytes).
+    /// Returns `(blob_bytes, table_bytes)`.
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>) {
         let mut blob = Vec::new();
         let mut offsets: Vec<u32> = Vec::with_capacity(self.strings.len() + 1);
@@ -124,7 +118,6 @@ impl StringTableBuilder {
         }
         offsets.push(blob.len() as u32); // sentinel
 
-        // Convert offsets to bytes
         let table_bytes: Vec<u8> = offsets.iter().flat_map(|o| o.to_le_bytes()).collect();
 
         (blob, table_bytes)

@@ -7,8 +7,8 @@ repository.workspace = true
 description = "Bytecode format and runtime types for Plotnik"
 build = "build.rs"
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+[lints]
+workspace = true
 
 [dependencies]
 plotnik-core.workspace = true

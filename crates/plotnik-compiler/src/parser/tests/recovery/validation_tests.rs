@@ -107,7 +107,6 @@ fn reference_with_category_syntax_error() {
 
 #[test]
 fn supertype_slash_deprecated_warning() {
-    // Tree-sitter `/` supertype syntax is kept for compatibility but nudges toward `#`.
     let input = "Q = (expression/binary_expression)";
 
     let res = Query::expect_warning(input);
@@ -1617,7 +1616,6 @@ fn single_colon_primitive_type() {
 
 #[test]
 fn treesitter_sequence_syntax_warning() {
-    // Tree-sitter uses ((a) (b)) for sequences, Plotnik uses {(a) (b)}
     let input = "Test = ((a) (b))";
 
     let res = Query::expect_warning(input);
@@ -1656,7 +1654,6 @@ fn named_node_with_children_no_warning() {
 
 #[test]
 fn negation_syntax_deprecated_warning() {
-    // Old syntax `!field` is deprecated in favor of `-field`
     let input = "Test = (call !name)";
 
     let res = Query::expect_warning(input);

@@ -78,7 +78,6 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
 }
 
 impl Module {
-    /// Load a module from storage.
     pub(super) fn from_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
         if storage.len() < HEADER_SIZE {
             return Err(ModuleError::FileTooSmall(storage.len()));
@@ -153,7 +152,7 @@ impl Module {
     /// suppression counter — so a loaded module never panics on view/decode/VM
     /// access regardless of how it was crafted.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
-        // Reserved header bytes are not covered by the CRC; v5 fixes them at zero.
+        // Reserved header bytes are not covered by the CRC; v6 fixes them at zero.
         if self.header._reserved != [0u8; 22] {
             return Err(ModuleError::MalformedHeader);
         }

@@ -1,5 +1,3 @@
-//! Integration tests for the compilation pipeline.
-
 use std::cell::RefCell;
 use std::num::NonZeroU16;
 

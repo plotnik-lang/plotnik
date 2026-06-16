@@ -16,7 +16,6 @@ pub(super) struct NamingContext {
 
 impl Emitter<'_> {
     pub(super) fn assign_generated_names(&mut self) {
-        // Collect naming contexts from entrypoints → fields
         let mut contexts: HashMap<TypeId, NamingContext> = HashMap::new();
 
         for i in 0..self.entrypoints.len() {
@@ -32,7 +31,6 @@ impl Emitter<'_> {
             );
         }
 
-        // Assign names to types that need them
         for i in 0..self.types.defs_count() {
             let type_id = TypeId(i as u16);
             if self.type_names.contains_key(&type_id) {

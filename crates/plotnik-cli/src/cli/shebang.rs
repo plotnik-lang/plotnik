@@ -17,14 +17,12 @@ use clap::Command;
 
 use super::args::*;
 
-/// Semantic options declared in a `.ptk` shebang line.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShebangOptions {
     pub lang: Option<String>,
     pub entry: Option<String>,
 }
 
-/// Subcommands that may follow the `plotnik` token in a shebang.
 const SUBCOMMANDS: &[&str] = &[
     "run", "exec", "check", "infer", "ast", "trace", "dump", "test",
 ];
@@ -42,13 +40,11 @@ pub fn parse_shebang(source: &str) -> Result<Option<ShebangOptions>, String> {
         return Ok(None);
     };
 
-    // Lenient prefix: skip interpreter path and env flags up to the plotnik token
     let mut tokens = rest.split_whitespace();
     if !tokens.any(|tok| tok == "plotnik" || tok.ends_with("/plotnik")) {
         return Ok(None);
     }
 
-    // Strict suffix: optional subcommand, then unified flags only
     let mut suffix: Vec<&str> = tokens.collect();
     if suffix.first().is_some_and(|tok| SUBCOMMANDS.contains(tok)) {
         suffix.remove(0);
@@ -68,8 +64,7 @@ pub fn parse_shebang(source: &str) -> Result<Option<ShebangOptions>, String> {
     }))
 }
 
-/// The unified run-family flag vocabulary, minus positionals and inline
-/// query/source text (the query is the file itself).
+// No positional args: the file IS the query, so positionals would always be wrong.
 fn shebang_parser() -> Command {
     Command::new("plotnik")
         .no_binary_name(true)

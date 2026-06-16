@@ -10,8 +10,8 @@ readme = "../../README.md"
 keywords = ["tree-sitter", "query", "ast", "parser"]
 categories = ["parsing", "development-tools"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+[lints]
+workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true

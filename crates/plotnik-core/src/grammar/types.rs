@@ -1,5 +1,3 @@
-//! Production grammar type definitions.
-
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;
 use std::sync::LazyLock;
@@ -327,17 +325,14 @@ impl Grammar {
         &self.structure
     }
 
-    /// Resolve a named node kind to its tree-sitter ABI id.
     pub fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
         self.named_node_ids.get(kind).copied()
     }
 
-    /// Resolve an anonymous node kind to its tree-sitter ABI id.
     pub fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
         self.anonymous_node_ids.get(kind).copied()
     }
 
-    /// Resolve a field name to its tree-sitter ABI id.
     pub fn resolve_field(&self, field: &str) -> Option<NodeFieldId> {
         self.field_ids.get(field).copied()
     }
@@ -515,7 +510,6 @@ fn format_node_shape_error(error: NodeShapeBuildError) -> String {
     error.to_string()
 }
 
-/// Grammar-derived metadata for a syntax node kind.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeShape {
     #[serde(rename = "type")]
@@ -549,7 +543,6 @@ pub(crate) struct NodeSlot {
     pub(crate) types: Vec<NodeKindRef>,
 }
 
-/// Reference to a node kind.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeKindRef {
     #[serde(rename = "type")]
@@ -567,7 +560,6 @@ impl NodeKindRef {
     }
 }
 
-/// Error while resolving grammar-derived node shapes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NodeShapeBuildError {
     Field {
@@ -616,21 +608,18 @@ impl std::fmt::Display for NodeShapeBuildError {
 
 impl std::error::Error for NodeShapeBuildError {}
 
-/// Field constraints for a named field on a node type.
 #[derive(Debug, Clone)]
 pub(crate) struct FieldConstraints {
     pub(crate) cardinality: Cardinality,
     pub(crate) valid_types: Vec<NodeTypeId>,
 }
 
-/// Children constraints for non-field children on a node type.
 #[derive(Debug, Clone)]
 pub(crate) struct ChildrenConstraints {
     pub(crate) cardinality: Cardinality,
     pub(crate) valid_types: Vec<NodeTypeId>,
 }
 
-/// Constraints for a concrete node type.
 #[derive(Debug, Clone)]
 pub(crate) struct NodeConstraints {
     pub(crate) fields: HashMap<NodeFieldId, FieldConstraints>,

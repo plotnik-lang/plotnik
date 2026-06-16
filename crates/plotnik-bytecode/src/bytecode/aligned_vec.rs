@@ -39,7 +39,6 @@ impl AlignedVec {
         let num_blocks = bytes.len().div_ceil(SECTION_ALIGN);
         let mut blocks = vec![Block([0; SECTION_ALIGN]); num_blocks];
 
-        // Copy block by block to stay safe
         for (i, chunk) in bytes.chunks(SECTION_ALIGN).enumerate() {
             blocks[i].0[..chunk.len()].copy_from_slice(chunk);
         }

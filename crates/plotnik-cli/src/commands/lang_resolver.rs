@@ -16,9 +16,7 @@ pub fn resolve_named_lang(name: &str) -> Result<&'static Lang, CliError> {
     })
 }
 
-/// Combine the explicit `-l` flag with the shebang declaration.
-///
-/// The shebang is the in-file language declaration; an explicit flag is
+/// The shebang is the in-file language declaration; an explicit `-l` flag is
 /// allowed but must agree with it.
 pub fn merge_lang(
     explicit: Option<&str>,
@@ -88,7 +86,6 @@ pub fn require_lang(
     )))
 }
 
-/// Suggest similar language names for typos.
 pub fn suggest_language(input: &str) -> Option<String> {
     let input_lower = input.to_lowercase();
     language_registry::all()

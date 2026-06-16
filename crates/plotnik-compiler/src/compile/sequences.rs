@@ -111,7 +111,6 @@ pub(super) struct SeqItemsCtx<'a> {
 }
 
 impl Compiler<'_> {
-    /// Compile a sequence with capture effects (passed to last item).
     pub(super) fn compile_seq_inner(
         &mut self,
         seq: &ast::SeqExpr,
@@ -124,8 +123,6 @@ impl Compiler<'_> {
             return exit;
         }
 
-        // Determine if we're inside a node based on the navigation override
-        // Down variants mean we're descending into a node's children
         let is_inside_node = matches!(
             first_nav,
             Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
@@ -156,14 +153,12 @@ impl Compiler<'_> {
             skip_exit,
         } = ctx;
 
-        // Compute navigation modes first (immutable borrow)
         let mut nav_modes = compute_nav_modes(items, is_inside_node, self.ctx.symbol_table);
 
         if nav_modes.is_empty() {
             return exit;
         }
 
-        // Apply navigation to first expression
         let first_expr_nav = if let Some((_, first_mode)) = nav_modes.first_mut()
             && first_mode.is_none()
         {
@@ -194,10 +189,6 @@ impl Compiler<'_> {
             first_is_skippable && first_positions && (nav_modes.len() > 1 || skip_exit.is_some());
 
         if needs_skip_exit {
-            // The continuation needs two versions:
-            // - skip_exit: skipping makes the next item "first", so it re-derives
-            //   first-position nav (`Down*`/`Stay*`)
-            // - match_exit: after matching, advance to the sibling (`Next`)
             return self.compile_seq_items_with_skip_exit(
                 items,
                 &nav_modes,
@@ -220,8 +211,7 @@ impl Compiler<'_> {
             .and_then(|(idx, _)| items[*idx].as_expr())
             .is_some_and(is_skippable_quantifier);
 
-        // Build chain in reverse: last expression exits to `exit`, each prior exits to next
-        // Split capture effects: pre goes to FIRST item, post goes to LAST item
+        // Build chain in reverse: last expression exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
         let last_post = match last_is_skippable
             .then(|| capture.post.iter().position(is_scope_close_effect))
@@ -443,7 +433,6 @@ impl Compiler<'_> {
             return exit;
         }
 
-        // Get alternation's type info
         let alt_expr = Expr::AltExpr(alt.clone());
         let alt_type_id = self
             .ctx
@@ -460,8 +449,7 @@ impl Compiler<'_> {
         let is_enum = is_tagged_alt
             && alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
 
-        // For tagged alternations: build map from label Symbol to (member index, payload TypeId)
-        // This ensures we use the correct BTreeMap order indices, not AST iteration order
+        // BTreeMap order gives stable variant indices independent of AST iteration order.
         let variant_info: BTreeMap<Symbol, (u16, TypeId)> = match alt_type_shape {
             Some(TypeShape::Enum(variants)) => variants
                 .iter()
@@ -506,7 +494,6 @@ impl Compiler<'_> {
             .then(|| self.clone_named_follower_skip_entry(exit))
             .flatten();
 
-        // Compile each branch, collecting entry labels
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
             let Some(body) = branch.body() else {
@@ -534,17 +521,14 @@ impl Compiler<'_> {
                     .map(|&(idx, type_id)| (idx, type_id))
                     .expect("variant must exist for labeled branch");
 
-                // Create Enum effect for branch entry
                 let e_effect = if let Some(type_id) = alt_type_id {
                     EffectIR::with_member(EffectOpcode::Enum, MemberRef::new(type_id, variant_idx))
                 } else {
                     EffectIR::start_enum()
                 };
 
-                // Build capture effects: nest Enum/EndEnum inside outer effects
                 let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
 
-                // Compile body with merged effects - no separate epsilon wrappers needed
                 let body_entry = self.with_scope(payload_type_id, |this| {
                     this.compile_expr_inner(&body, branch_exit, branch_nav, branch_capture)
                 });
@@ -602,7 +586,6 @@ impl Compiler<'_> {
                     vec![]
                 };
 
-                // Merge null injection with outer capture effects
                 let branch_capture = capture.clone().with_pre_values(null_effects);
 
                 let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
@@ -619,7 +602,6 @@ impl Compiler<'_> {
         let alt_entry = if successors.len() == 1 {
             successors[0]
         } else {
-            // Emit epsilon branch to choose among alternatives.
             let entry = self.fresh_label();
             self.emit_epsilon(entry, successors);
             entry

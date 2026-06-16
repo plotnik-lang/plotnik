@@ -128,7 +128,6 @@ mod debug_impl {
         }
     }
 
-    /// Entry point a fingerprint is rooted at.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Key {
         Preamble,
@@ -157,7 +156,13 @@ mod debug_impl {
 
         if m.nav != Nav::Epsilon {
             if let Some(mode) = m.nav.up_mode_tag() {
-                ops.push(SemanticOp::UpNav(mode, m.nav.up_level().unwrap() as u32));
+                ops.push(SemanticOp::UpNav(
+                    mode,
+                    m.nav
+                        .up_level()
+                        .expect("up_mode_tag returned Some, so nav is an Up variant with a level")
+                        as u32,
+                ));
             } else {
                 ops.push(SemanticOp::Nav(m.nav));
             }
@@ -232,7 +237,7 @@ mod debug_impl {
             if let Some((mode, level)) = up_pair {
                 let merged = matches!(pending, Some((pm, _)) if pm == mode);
                 if merged {
-                    let (_, idx) = pending.unwrap();
+                    let (_, idx) = pending.expect("merged is true only when pending is Some");
                     if let SemanticOp::UpNav(_, plevel) = &mut out[idx] {
                         *plevel = plevel.saturating_add(level);
                     }
@@ -499,7 +504,6 @@ mod debug_impl {
         Ok(())
     }
 
-    /// Walk every path from `entry` and assert scope effects are balanced.
     fn check_scopes(
         instructions: &[InstructionIR],
         entry: Label,

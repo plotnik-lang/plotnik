@@ -27,7 +27,6 @@ pub struct EmitContext<'a> {
 }
 
 impl<'a> EmitContext<'a> {
-    /// Build a resolver context from explicit resolver functions.
     pub fn new(
         get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
         lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
@@ -50,7 +49,6 @@ pub use plotnik_bytecode::NodeTypeIR;
 pub struct Label(pub u32);
 
 impl Label {
-    /// Resolve this label to a step address using the layout mapping.
     #[inline]
     pub fn resolve(self, map: &BTreeMap<Label, StepAddr>) -> StepAddr {
         *map.get(&self).expect("label not in layout")
@@ -72,7 +70,6 @@ pub struct MemberRef {
 }
 
 impl MemberRef {
-    /// Create a member reference by parent type + relative index.
     pub fn new(parent_type: TypeId, relative_index: u16) -> Self {
         Self {
             parent_type,
@@ -80,7 +77,6 @@ impl MemberRef {
         }
     }
 
-    /// Resolve this reference to an absolute member index.
     pub fn resolve(self, ctx: &EmitContext) -> u16 {
         (ctx.get_member_base)(self.parent_type).expect("member base must resolve")
             + self.relative_index
@@ -94,7 +90,7 @@ pub struct EffectIR {
     opcode: EffectOpcode,
     /// Payload for effects that don't use member indices.
     payload: usize,
-    /// Member reference for Set/E effects (None for other effects).
+    /// Member reference for Set/Enum effects (None for all other effects).
     member_ref: Option<MemberRef>,
 }
 
@@ -111,7 +107,6 @@ impl EffectIR {
         self.payload
     }
 
-    /// Create a simple effect without member reference.
     pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
         Self {
             opcode,
@@ -120,7 +115,6 @@ impl EffectIR {
         }
     }
 
-    /// Create an effect with a member reference.
     pub fn with_member(opcode: EffectOpcode, member_ref: MemberRef) -> Self {
         Self {
             opcode,
@@ -189,7 +183,6 @@ impl EffectIR {
         Self::simple(EffectOpcode::SuppressEnd, 0)
     }
 
-    /// Resolve this IR effect to a concrete EffectOp.
     pub fn resolve(&self, ctx: &EmitContext) -> EffectOp {
         let payload = if let Some(member_ref) = self.member_ref {
             member_ref.resolve(ctx) as usize
@@ -223,7 +216,6 @@ pub struct PredicateIR {
 }
 
 impl PredicateIR {
-    /// Create a string predicate (==, !=, ^=, $=, *=).
     pub fn string(op: PredicateOp, value: plotnik_bytecode::StringId) -> Self {
         Self {
             op,
@@ -231,7 +223,6 @@ impl PredicateIR {
         }
     }
 
-    /// Create a regex predicate (=~, !~).
     pub fn regex(op: PredicateOp, pattern_id: plotnik_bytecode::StringId) -> Self {
         Self {
             op,
@@ -255,7 +246,6 @@ pub enum InstructionIR {
 }
 
 impl InstructionIR {
-    /// Get the label where this instruction lives.
     #[inline]
     pub fn label(&self) -> Label {
         match self {
@@ -338,7 +328,6 @@ impl MatchIR {
         }
     }
 
-    /// Start building a match instruction at the given label.
     pub fn at(label: Label) -> Self {
         Self::terminal(label)
     }
@@ -348,79 +337,66 @@ impl MatchIR {
         Self::at(label).next(next)
     }
 
-    /// Set the navigation command.
     pub fn nav(mut self, nav: Nav) -> Self {
         self.nav = nav;
         self
     }
 
-    /// Set the node type constraint.
     pub fn node_type(mut self, t: NodeTypeIR) -> Self {
         self.node_type = t;
         self
     }
 
-    /// Set the field constraint.
     pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
         self.node_field = f.into();
         self
     }
 
-    /// Add a negated field constraint.
     pub fn neg_field(mut self, f: u16) -> Self {
         self.neg_fields.push(f);
         self
     }
 
-    /// Add a pre-match effect.
     pub fn pre_effect(mut self, e: EffectIR) -> Self {
         self.pre_effects.push(e);
         self
     }
 
-    /// Add a post-match effect.
     pub fn post_effect(mut self, e: EffectIR) -> Self {
         self.post_effects.push(e);
         self
     }
 
-    /// Add multiple negated field constraints.
     pub fn neg_fields(mut self, fields: impl IntoIterator<Item = u16>) -> Self {
         self.neg_fields.extend(fields);
         self
     }
 
-    /// Add multiple pre-match effects.
     pub fn pre_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
         self.pre_effects.extend(effects);
         self
     }
 
-    /// Add multiple post-match effects.
     pub fn post_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
         self.post_effects.extend(effects);
         self
     }
 
-    /// Set the predicate for node text filtering.
     pub fn predicate(mut self, p: PredicateIR) -> Self {
         self.predicate = Some(p);
         self
     }
 
-    /// Set a single successor.
     pub fn next(mut self, s: Label) -> Self {
         self.successors = vec![s];
         self
     }
 
-    /// Set multiple successors (for branches).
     pub fn next_many(mut self, s: Vec<Label>) -> Self {
         self.successors = s;
         self
     }
 
-    /// Compute instruction size in bytes.
     pub fn size(&self) -> usize {
         // Match8 can be used if: no effects, no neg_fields, no predicate, and at most 1 successor
         let can_use_match8 = self.pre_effects.is_empty()
@@ -433,8 +409,7 @@ impl MatchIR {
             return 8;
         }
 
-        // Extended match: count all payload slots
-        // Predicate uses 2 slots: op_byte(u8) + is_regex(u8) | value_ref(u16)
+        // Predicate occupies 2 slots: op_byte(u8) + is_regex(u8)|value_ref(u16).
         let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
         let slots = self.pre_effects.len()
             + self.neg_fields.len()
@@ -530,19 +505,16 @@ impl CallIR {
         }
     }
 
-    /// Set the navigation command.
     pub fn nav(mut self, nav: Nav) -> Self {
         self.nav = nav;
         self
     }
 
-    /// Set the field constraint.
     pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
         self.node_field = f.into();
         self
     }
 
-    /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         Call::new(
             self.nav,
@@ -568,12 +540,10 @@ pub struct ReturnIR {
 }
 
 impl ReturnIR {
-    /// Create a return instruction at the given label.
     pub fn new(label: Label) -> Self {
         Self { label }
     }
 
-    /// Serialize to bytecode bytes (no labels to resolve).
     pub fn resolve(&self) -> [u8; 8] {
         Return::new().to_bytes()
     }
@@ -598,12 +568,10 @@ pub struct TrampolineIR {
 }
 
 impl TrampolineIR {
-    /// Create a trampoline instruction.
     pub fn new(label: Label, next: Label) -> Self {
         Self { label, next }
     }
 
-    /// Resolve labels and serialize to bytecode bytes.
     pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         Trampoline::new(StepId::new(self.next.resolve(map))).to_bytes()
     }
@@ -627,7 +595,6 @@ pub struct LayoutResult {
 }
 
 impl LayoutResult {
-    /// Create a new layout result.
     pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u32) -> Self {
         Self {
             label_to_step,
@@ -635,7 +602,6 @@ impl LayoutResult {
         }
     }
 
-    /// Create an empty layout result.
     pub fn empty() -> Self {
         Self {
             label_to_step: BTreeMap::new(),

@@ -73,9 +73,8 @@ impl std::fmt::Display for ConflictingPrecedenceOrderingError {
     }
 }
 
-/// Check for indirect recursion cycles in the grammar that can cause infinite loops while
-/// parsing. An indirect recursion cycle occurs when a non-terminal can derive itself through
-/// a chain of single-symbol productions (e.g., A -> B, B -> A).
+/// Detects cycles through chains of single-symbol productions (A→B, B→A), which cause
+/// infinite loops at parse time because no input is consumed between transitions.
 pub(super) fn validate_indirect_recursion(
     variables: &[Variable],
 ) -> Result<(), IndirectRecursionError> {
@@ -121,7 +120,6 @@ fn get_single_symbol_productions(rule: &Rule) -> BTreeSet<String> {
     }
 }
 
-/// Perform a depth-first search to detect cycles in single state transitions.
 fn get_cycle<'a>(
     current: &'a str,
     transitions: &'a IndexMap<&'a str, BTreeSet<String>>,
@@ -152,9 +150,6 @@ fn get_cycle<'a>(
     None
 }
 
-/// Check that all of the named precedences used in the grammar are declared
-/// within the `precedences` lists, and also that there are no conflicting
-/// precedence orderings declared in those lists.
 pub(super) fn validate_precedences(
     variables: &[Variable],
     precedence_orderings: &[Vec<PrecedenceEntry>],
@@ -204,8 +199,6 @@ fn validate_conflicting_precedence_orderings(
     Ok(())
 }
 
-// Check that no rule contains a named precedence that is not present in
-// any of the `precedences` lists.
 fn validate_declared_precedences(
     variables: &[Variable],
     precedence_orderings: &[Vec<PrecedenceEntry>],

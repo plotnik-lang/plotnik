@@ -15,7 +15,6 @@ impl Emitter<'_> {
     }
 
     fn collect_refs_recursive(&mut self, type_id: TypeId) {
-        // Cycle detection
         if !self.refs_visited.insert(type_id) {
             return;
         }
@@ -60,7 +59,6 @@ impl Emitter<'_> {
             rdeps.entry(tid).or_default();
         }
 
-        // Build dependency graph
         for &tid in &types {
             for dep in self.get_direct_deps(tid) {
                 if types.contains(&dep) && dep != tid {
@@ -160,7 +158,6 @@ impl Emitter<'_> {
                 self.collect_reachable_types(member.type_id, out);
             }
         } else {
-            // For non-struct payloads, fall back to regular collection.
             self.collect_reachable_types(type_id, out);
         }
     }
@@ -197,7 +194,6 @@ impl Emitter<'_> {
                 kind: TypeKind::Alias,
                 ..
             } => vec![type_id],
-            // Other wrappers: recurse into inner type
             TypeData::Wrapper { inner, .. } => self.unwrap_for_deps(inner),
             TypeData::Composite { .. } => vec![type_id],
         }

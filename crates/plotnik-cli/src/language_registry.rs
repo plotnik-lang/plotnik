@@ -94,7 +94,6 @@ macro_rules! define_langs {
             }
         ),* $(,)?
     ) => {
-        // Generate static language definitions with LazyLock.
         $(
             #[cfg(feature = $feature)]
             pub fn $fn_name() -> &'static Lang {

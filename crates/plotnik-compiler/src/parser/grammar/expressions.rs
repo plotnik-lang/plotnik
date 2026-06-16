@@ -69,7 +69,6 @@ impl Parser<'_, '_> {
         self.error(DiagnosticKind::ExpectedExpression);
     }
 
-    /// Core recursive descent. Dispatches based on lookahead, then checks for quantifier/capture suffix.
     pub(crate) fn parse_expr(&mut self) {
         self.parse_expr_inner(SuffixMode::Apply)
     }

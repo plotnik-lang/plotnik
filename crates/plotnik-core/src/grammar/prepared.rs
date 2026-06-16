@@ -75,8 +75,6 @@ pub struct LexicalGrammar {
     pub variables: Vec<LexicalVariable>,
 }
 
-// Extracted syntax grammar
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ProductionStep {
     pub symbol: Symbol,

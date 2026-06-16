@@ -23,13 +23,11 @@ mod load;
 
 pub use load::ModuleError;
 
-/// Read a little-endian u16 from bytes at the given offset.
 #[inline]
 fn read_u16_le(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
 }
 
-/// Read a little-endian u32 from bytes at the given offset.
 #[inline]
 fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes([
@@ -88,7 +86,6 @@ impl ByteStorage {
         Self::Static(bytes)
     }
 
-    /// Create from an aligned vector (from compiler or file read).
     pub fn from_aligned(vec: AlignedVec) -> Self {
         Self::Aligned(vec)
     }
@@ -100,13 +97,11 @@ impl ByteStorage {
         Self::Aligned(AlignedVec::copy_from_slice(bytes))
     }
 
-    /// Read a file into aligned storage.
     pub fn from_file(path: impl AsRef<Path>) -> io::Result<Self> {
         Ok(Self::Aligned(AlignedVec::from_file(path)?))
     }
 }
 
-/// Decoded instruction from bytecode.
 #[derive(Clone, Copy, Debug)]
 pub enum Instruction<'a> {
     Match(Match<'a>),
@@ -116,7 +111,6 @@ pub enum Instruction<'a> {
 }
 
 impl<'a> Instruction<'a> {
-    /// Decode an instruction from bytecode bytes.
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(bytes.len() >= STEP_SIZE, "instruction too short");
@@ -124,15 +118,15 @@ impl<'a> Instruction<'a> {
         let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
         match opcode {
             Opcode::Call => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
+                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
                 Self::Call(Call::from_bytes(arr))
             }
             Opcode::Return => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
+                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
                 Self::Return(Return::from_bytes(arr))
             }
             Opcode::Trampoline => {
-                let arr: [u8; 8] = bytes[..8].try_into().unwrap();
+                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
                 Self::Trampoline(Trampoline::from_bytes(arr))
             }
             _ => Self::Match(Match::from_bytes(bytes)),
@@ -163,9 +157,7 @@ pub struct Module {
 }
 
 impl Module {
-    /// Load a module from an aligned vector (compiler output).
-    ///
-    /// This is the primary constructor for bytecode produced by the compiler.
+    /// Primary constructor for bytecode produced by the compiler.
     pub fn from_aligned(vec: AlignedVec) -> Result<Self, ModuleError> {
         Self::from_storage(ByteStorage::from_aligned(vec))
     }
@@ -185,9 +177,6 @@ impl Module {
         Self::from_storage(ByteStorage::from_static(bytes))
     }
 
-    /// Load a module from a file path.
-    ///
-    /// Reads the file into 64-byte aligned storage.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, ModuleError> {
         Self::from_storage(ByteStorage::from_file(&path)?)
     }
@@ -208,22 +197,18 @@ impl Module {
         Self::load(&bytes)
     }
 
-    /// Get the parsed header.
     pub fn header(&self) -> &Header {
         &self.header
     }
 
-    /// Get the computed section offsets.
     pub fn offsets(&self) -> &SectionOffsets {
         &self.offsets
     }
 
-    /// Get the raw bytes.
     pub fn bytes(&self) -> &[u8] {
         &self.storage
     }
 
-    /// Decode an instruction at the given step index.
     #[inline]
     pub fn decode_step(&self, step: u16) -> Instruction<'_> {
         let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
@@ -241,7 +226,6 @@ impl Module {
         self.is_start.get(step as usize).copied().unwrap_or(false)
     }
 
-    /// Get a view into the string table.
     pub fn strings(&self) -> StringsView<'_> {
         StringsView {
             blob: &self.storage[self.offsets.str_blob as usize..],
@@ -249,7 +233,6 @@ impl Module {
         }
     }
 
-    /// Get a view into the node type symbols.
     pub fn node_types(&self) -> SymbolsView<'_, NodeSymbol> {
         let offset = self.offsets.node_types as usize;
         let count = self.header.node_types_count as usize;
@@ -260,7 +243,6 @@ impl Module {
         }
     }
 
-    /// Get a view into the node field symbols.
     pub fn node_fields(&self) -> SymbolsView<'_, FieldSymbol> {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
@@ -271,7 +253,6 @@ impl Module {
         }
     }
 
-    /// Get a view into the regex table.
     pub fn regexes(&self) -> RegexView<'_> {
         RegexView {
             blob: &self.storage[self.offsets.regex_blob as usize..],
@@ -287,7 +268,6 @@ impl Module {
         &self.regex_dfas
     }
 
-    /// Get a view into the type metadata.
     pub fn types(&self) -> TypesView<'_> {
         let defs_offset = self.offsets.type_defs as usize;
         let defs_count = self.header.type_defs_count as usize;
@@ -307,7 +287,6 @@ impl Module {
         }
     }
 
-    /// Get a view into the entrypoints.
     pub fn entrypoints(&self) -> EntrypointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
@@ -317,16 +296,14 @@ impl Module {
         }
     }
 
-    /// Helper to get string table as bytes.
-    /// The table has count+1 entries (includes sentinel for length calculation).
+    /// `count + 1` entries: the extra sentinel offset gives the final string's end.
     fn string_table_slice(&self) -> &[u8] {
         let offset = self.offsets.str_table as usize;
         let count = self.header.str_table_count as usize;
         &self.storage[offset..offset + (count + 1) * STRING_TABLE_ENTRY_SIZE]
     }
 
-    /// Helper to get regex table as bytes.
-    /// The table has count+1 entries (includes sentinel for length calculation).
+    /// `count + 1` entries: the extra sentinel offset gives the final DFA's end.
     fn regex_table_slice(&self) -> &[u8] {
         let offset = self.offsets.regex_table as usize;
         let count = self.header.regex_table_count as usize;
@@ -334,14 +311,13 @@ impl Module {
     }
 }
 
-/// View into the string table for lazy string lookup.
+/// View into the string table.
 pub struct StringsView<'a> {
     blob: &'a [u8],
     table: &'a [u8],
 }
 
 impl<'a> StringsView<'a> {
-    /// Get a string by its ID (type-safe access for bytecode references).
     pub fn get(&self, id: StringId) -> &'a str {
         self.get_by_index(id.get() as usize)
     }
@@ -357,7 +333,6 @@ impl<'a> StringsView<'a> {
     }
 }
 
-/// View into symbol tables (node types or field names).
 pub struct SymbolsView<'a, T> {
     bytes: &'a [u8],
     count: usize,
@@ -365,7 +340,6 @@ pub struct SymbolsView<'a, T> {
 }
 
 impl<'a> SymbolsView<'a, NodeSymbol> {
-    /// Get a node symbol by index.
     pub fn get(&self, idx: usize) -> NodeSymbol {
         assert!(idx < self.count, "node symbol index out of bounds");
         let offset = idx * NodeSymbol::SIZE;
@@ -387,7 +361,6 @@ impl<'a> SymbolsView<'a, NodeSymbol> {
 }
 
 impl<'a> SymbolsView<'a, FieldSymbol> {
-    /// Get a field symbol by index.
     pub fn get(&self, idx: usize) -> FieldSymbol {
         assert!(idx < self.count, "field symbol index out of bounds");
         let offset = idx * FieldSymbol::SIZE;
@@ -408,23 +381,18 @@ impl<'a> SymbolsView<'a, FieldSymbol> {
     }
 }
 
-/// View into the regex table for lazy DFA lookup.
+/// View into the regex table.
 ///
-/// Table format per entry: `string_id (u16) | reserved (u16) | offset (u32)` = 8 bytes.
-/// This allows access to both the pattern string (via StringTable) and DFA bytes.
+/// Entry layout: `string_id (u16) | reserved (u16) | offset (u32)` = 8 bytes.
 pub struct RegexView<'a> {
     blob: &'a [u8],
     table: &'a [u8],
 }
 
 impl<'a> RegexView<'a> {
-    /// Entry size in bytes: string_id (u16) + reserved (u16) + offset (u32).
     const ENTRY_SIZE: usize = REGEX_TABLE_ENTRY_SIZE;
 
-    /// Get regex DFA bytes by index.
-    ///
-    /// Returns the raw DFA bytes for the regex at the given index.
-    /// Use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
+    /// Raw serialized DFA bytes; use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
     pub fn get_by_index(&self, idx: usize) -> &'a [u8] {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let next_entry_offset = (idx + 1) * Self::ENTRY_SIZE;
@@ -434,9 +402,7 @@ impl<'a> RegexView<'a> {
         &self.blob[start..end]
     }
 
-    /// Get the StringId of the pattern for a regex by index.
-    ///
-    /// This allows looking up the pattern text from StringTable for display.
+    /// Pattern `StringId` for display (e.g. `dump`/`trace`).
     pub fn get_string_id(&self, idx: usize) -> super::StringId {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let string_id = read_u16_le(self.table, entry_offset);
@@ -460,14 +426,12 @@ pub struct TypesView<'a> {
 }
 
 impl<'a> TypesView<'a> {
-    /// Get a type definition by index.
     pub fn get_def(&self, idx: usize) -> TypeDef {
         assert!(idx < self.defs_count, "type def index out of bounds");
         let offset = idx * TypeDef::SIZE;
         TypeDef::from_bytes(&self.defs_bytes[offset..])
     }
 
-    /// Get a type definition by TypeId.
     pub fn get(&self, id: TypeId) -> Option<TypeDef> {
         let idx = id.0 as usize;
         if idx < self.defs_count {
@@ -477,7 +441,6 @@ impl<'a> TypesView<'a> {
         }
     }
 
-    /// Get a type member by index.
     pub fn get_member(&self, idx: usize) -> TypeMember {
         assert!(idx < self.members_count, "type member index out of bounds");
         let offset = idx * TypeMember::SIZE;
@@ -495,7 +458,6 @@ impl<'a> TypesView<'a> {
         TypeId(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
     }
 
-    /// Get a type name entry by index.
     pub fn get_name(&self, idx: usize) -> TypeName {
         assert!(idx < self.names_count, "type name index out of bounds");
         let offset = idx * TypeName::SIZE;
@@ -556,14 +518,12 @@ impl<'a> TypesView<'a> {
     }
 }
 
-/// View into entrypoints.
 pub struct EntrypointsView<'a> {
     bytes: &'a [u8],
     count: usize,
 }
 
 impl<'a> EntrypointsView<'a> {
-    /// Get an entrypoint by index.
     pub fn get(&self, idx: usize) -> Entrypoint {
         assert!(idx < self.count, "entrypoint index out of bounds");
         let offset = idx * Entrypoint::SIZE;

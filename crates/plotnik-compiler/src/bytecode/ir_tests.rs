@@ -62,9 +62,7 @@ fn resolve_match_terminal() {
     let bytes = m.resolve(&map, &ctx).expect("terminal match encodes");
     assert_eq!(bytes.len(), 8);
 
-    // Verify opcode is Match8 (0x0)
     assert_eq!(bytes[0] & 0xF, 0);
-    // Verify next is terminal (0)
     assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 0);
 }
 
@@ -72,7 +70,6 @@ fn resolve_match_terminal() {
 fn member_ref_resolution() {
     let parent_type = TypeId(20);
 
-    // A member ref resolves to the parent type's member base plus the relative index.
     let member = MemberRef::new(parent_type, 3);
     let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
     let ctx = EmitContext::new(&get_member_base, &|_| None);
@@ -83,14 +80,12 @@ fn member_ref_resolution() {
 fn effect_ir_resolution() {
     let parent_type = TypeId(10);
 
-    // Simple effect without member ref
     let simple = EffectIR::simple(EffectOpcode::Node, 5);
     let simple_ctx = EmitContext::new(&|_| None, &|_| None);
     let resolved = simple.resolve(&simple_ctx);
     assert_eq!(resolved.opcode, EffectOpcode::Node);
     assert_eq!(resolved.payload, 5);
 
-    // Effect with a member ref resolves through the parent type's member base.
     let set_effect = EffectIR::with_member(EffectOpcode::Set, MemberRef::new(parent_type, 1));
     let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
     let set_ctx = EmitContext::new(&get_member_base, &|_| None);

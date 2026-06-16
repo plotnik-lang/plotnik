@@ -89,13 +89,11 @@ impl DumpContext {
             node_field_names.insert(f.id, strings.get(f.name).to_string());
         }
 
-        // Collect all strings for unlinked mode lookups
         let str_count = header.str_table_count as usize;
         let all_strings: Vec<String> = (0..str_count)
             .map(|i| strings.get_by_index(i).to_string())
             .collect();
 
-        // Compute widths for index formatting
         let types = module.types();
         // Builtins precede custom types; widen for both.
         let type_count = TYPE_CUSTOM_START as usize + types.defs_count();
@@ -123,12 +121,10 @@ impl DumpContext {
         self.step_labels.get(&step.get()).map(|s| s.as_str())
     }
 
-    /// Get the name for a node type ID.
     fn node_type_name(&self, id: u16) -> Option<&str> {
         self.node_type_names.get(&id).map(|s| s.as_str())
     }
 
-    /// Get the name for a node field ID.
     fn node_field_name(&self, id: u16) -> Option<&str> {
         self.node_field_names.get(&id).map(|s| s.as_str())
     }
@@ -140,10 +136,11 @@ fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
     let count = module.header().str_table_count as usize;
     let w = ctx.str_width;
 
-    writeln!(out, "{}[strings]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[strings]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 0..count {
         let s = strings.get_by_index(i);
-        writeln!(out, "S{i:0w$} {}{s:?}{}", c.green, c.reset).unwrap();
+        writeln!(out, "S{i:0w$} {}{s:?}{}", c.green, c.reset)
+            .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -159,12 +156,12 @@ fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
     let regexes = module.regexes();
     let w = width_for_count(count);
 
-    writeln!(out, "{}[regex]{}", c.blue, c.reset).unwrap();
-    // Skip index 0 (reserved)
+    writeln!(out, "{}[regex]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 1..count {
         let string_id = regexes.get_string_id(i);
         let pattern = &ctx.all_strings[string_id.get() as usize];
-        writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset).unwrap();
+        writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset)
+            .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -176,7 +173,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
     let tw = ctx.type_width;
     let mw = ctx.member_width;
 
-    writeln!(out, "{}[type_defs]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[type_defs]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
     // All types are now in type_defs, including builtins
     for i in 0..types.defs_count() {
@@ -251,7 +248,8 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             }
         };
 
-        writeln!(out, "T{i:0tw$} = {formatted}{comment}").unwrap();
+        writeln!(out, "T{i:0tw$} = {formatted}{comment}")
+            .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -264,7 +262,8 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
     let sw = ctx.str_width;
     let tw = ctx.type_width;
 
-    writeln!(out, "{}[type_members]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[type_members]{}", c.blue, c.reset)
+        .expect("writing to a String is infallible");
     for i in 0..types.members_count() {
         let member = types.get_member(i);
         let name = strings.get(member.name);
@@ -274,7 +273,7 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
             "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
             member.name.0, member.type_id.0, c.dim, c.reset
         )
-        .unwrap();
+        .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -287,7 +286,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
     let sw = ctx.str_width;
     let tw = ctx.type_width;
 
-    writeln!(out, "{}[type_names]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[type_names]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         let name = strings.get(entry.name);
@@ -296,7 +295,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
             "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
             entry.name.0, entry.type_id.0, c.dim, c.blue, c.reset
         )
-        .unwrap();
+        .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -306,7 +305,6 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     let types = module.types();
     let strings = module.strings();
 
-    // Check if it's a primitive type
     if let Some(def) = types.get(type_id)
         && let TypeData::Primitive(kind) = def.classify()
         && let Some(name) = kind.primitive_name()
@@ -314,7 +312,6 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
         return format!("<{}>", name);
     }
 
-    // Try to find a name in types.names
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         if entry.type_id == type_id {
@@ -322,7 +319,6 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
         }
     }
 
-    // Fall back to T# format
     let tw = ctx.type_width;
     format!("T{:0tw$}", type_id.0)
 }
@@ -334,9 +330,8 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let stw = ctx.step_width;
     let tw = ctx.type_width;
 
-    writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    // Collect and sort by name for display
     let mut entries: Vec<_> = (0..entrypoints.len())
         .map(|i| {
             let ep = entrypoints.get(i);
@@ -346,7 +341,6 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
         .collect();
     entries.sort_by_key(|(name, _, _)| *name);
 
-    // Find max name length for alignment
     let max_len = entries.iter().map(|(n, _, _)| n.len()).max().unwrap_or(0);
 
     for (name, target, type_id) in entries {
@@ -358,7 +352,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
             target,
             width = max_len
         )
-        .unwrap();
+        .expect("writing to a String is infallible");
     }
     out.push('\n');
 }
@@ -390,7 +384,7 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         step_width: ctx.step_width,
     };
 
-    writeln!(out, "{}[transitions]{}", c.blue, c.reset).unwrap();
+    writeln!(out, "{}[transitions]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
     let mut step = 0u16;
     let mut first_label = true;
@@ -398,18 +392,19 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         // Check if this step has a label (using raw u16)
         if let Some(label) = ctx.step_labels.get(&step) {
             if first_label {
-                writeln!(out, "{}{label}{}:", c.blue, c.reset).unwrap();
+                writeln!(out, "{}{label}{}:", c.blue, c.reset)
+                    .expect("writing to a String is infallible");
                 first_label = false;
             } else {
-                writeln!(out, "\n{}{label}{}:", c.blue, c.reset).unwrap();
+                writeln!(out, "\n{}{label}{}:", c.blue, c.reset)
+                    .expect("writing to a String is infallible");
             }
         }
 
         let instr = module.decode_step(step);
 
-        // Check for padding (all-zeros Match8 instruction)
         if is_padding(&instr) {
-            writeln!(out, "{}", fmt.padding_step(step)).unwrap();
+            writeln!(out, "{}", fmt.padding_step(step)).expect("writing to a String is infallible");
             step += 1;
             continue;
         }
@@ -418,7 +413,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
         out.push_str(&line);
         out.push('\n');
 
-        // Advance by instruction size
         let size = instruction_step_count(&instr);
         step += size;
     }
@@ -492,7 +486,6 @@ impl DumpFormatter<'_> {
                 parts.push(node_part);
             }
 
-            // Format predicate if present
             if let Some((op, is_regex, value_ref)) = m.predicate() {
                 let op = PredicateOp::from_byte(op);
                 let value = if is_regex {
@@ -531,15 +524,12 @@ impl DumpFormatter<'_> {
 
         match m.node_type {
             NodeTypeIR::Any => {
-                // Any node wildcard: `_`
                 result.push('_');
             }
             NodeTypeIR::Named(None) => {
-                // Named wildcard: any named node
                 result.push_str("(_)");
             }
             NodeTypeIR::Named(Some(type_id)) => {
-                // Specific named node type
                 let name = ctx
                     .node_type_name(type_id.get())
                     .map(String::from)
@@ -549,11 +539,10 @@ impl DumpFormatter<'_> {
                 result.push(')');
             }
             NodeTypeIR::Anonymous(None) => {
-                // Anonymous wildcard: any anonymous node (future syntax)
+                // future syntax: anonymous wildcard has no concrete form yet
                 result.push_str("\"_\"");
             }
             NodeTypeIR::Anonymous(Some(type_id)) => {
-                // Specific anonymous node (literal token)
                 let name = ctx
                     .node_type_name(type_id.get())
                     .map(String::from)
@@ -640,7 +629,6 @@ impl DumpFormatter<'_> {
         builder.pad_successors(base, &successors)
     }
 
-    /// Format a step ID, showing entrypoint label or numeric ID.
     fn format_step(&self, step: StepId) -> String {
         let c = &self.ctx.colors;
         if let Some(label) = self.ctx.label_for(step) {

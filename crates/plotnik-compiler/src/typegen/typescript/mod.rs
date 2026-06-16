@@ -15,12 +15,10 @@ pub use emitter::Emitter;
 
 use plotnik_bytecode::Module;
 
-/// Emit TypeScript from a bytecode module.
 pub fn emit(module: &Module) -> String {
     Emitter::new(module, Config::default()).emit()
 }
 
-/// Emit TypeScript from a bytecode module with custom config.
 pub fn emit_with_config(module: &Module, config: Config) -> String {
     Emitter::new(module, config).emit()
 }

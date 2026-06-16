@@ -12,7 +12,6 @@ mod query_tests;
 #[cfg(test)]
 mod source_map_tests;
 
-// Public API
 pub use printer::QueryPrinter;
 pub use source_map::{Source, SourceId, SourceKind, SourceMap};
 pub use stages::{

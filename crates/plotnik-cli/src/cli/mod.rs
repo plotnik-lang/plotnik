@@ -28,7 +28,6 @@ pub fn route_default_subcommand(mut args: Vec<std::ffi::OsString>) -> Vec<std::f
     args
 }
 
-/// Color output mode for CLI commands.
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ColorChoice {
     #[default]
@@ -38,7 +37,6 @@ pub enum ColorChoice {
 }
 
 impl ColorChoice {
-    /// Parse the `--color` flag into a `ColorChoice`.
     pub fn from_matches(m: &clap::ArgMatches) -> Self {
         match m.get_one::<String>("color").map(|s| s.as_str()) {
             Some("always") => ColorChoice::Always,

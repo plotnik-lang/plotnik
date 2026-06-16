@@ -66,8 +66,6 @@ impl Expander {
 
     fn expand_rule(&mut self, rule: &Rule) -> Rule {
         match rule {
-            // For choices, sequences, and metadata, descend into the child rules,
-            // replacing any nested repetitions.
             Rule::Choice(elements) => Rule::Choice(
                 elements
                     .iter()
@@ -115,7 +113,6 @@ impl Expander {
                 Rule::Symbol(repeat_symbol)
             }
 
-            // For primitive rules, don't change anything.
             _ => rule.clone(),
         }
     }

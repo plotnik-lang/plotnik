@@ -18,7 +18,6 @@ use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
-/// Emit bytecode from a LinkedQuery.
 pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let type_ctx = query.type_context();
     let interner = query.interner();
@@ -44,7 +43,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let mut types = TypeTableBuilder::new();
     types.build(type_ctx, interner, &mut strings.borrow_mut())?;
 
-    // Layout with cache alignment
     // Preamble entry FIRST ensures it gets the lowest address (step 0)
     let mut entry_labels: Vec<Label> = vec![compile_result.preamble_entry];
     entry_labels.extend(compile_result.def_entries.values().copied());
@@ -56,7 +54,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         return Err(EmitError::TooManyTransitions(layout.total_steps() as usize));
     }
 
-    // Collect node symbols
     let mut node_symbols: Vec<NodeSymbol> = Vec::new();
     for (node_type, &node_id) in node_type_ids {
         let sym = match node_type {
@@ -66,21 +63,18 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         node_symbols.push(NodeSymbol::new(node_id.get(), name));
     }
 
-    // Collect field symbols
     let mut field_symbols: Vec<FieldSymbol> = Vec::new();
     for (&sym, &field_id) in node_field_ids {
         let name = strings.borrow_mut().get_or_intern(sym, interner)?;
         field_symbols.push(FieldSymbol::new(field_id.get(), name));
     }
 
-    // Collect entrypoints with actual targets from layout
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
         let name = strings.borrow_mut().get_or_intern(name_sym, interner)?;
         let result_type = types.resolve_type(type_id, type_ctx)?;
 
-        // Get actual target from compiled result
         let target = compile_result
             .def_entries
             .get(&def_id)
@@ -91,10 +85,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         entrypoints.push(Entrypoint::new(name, target, result_type));
     }
 
-    // Move strings out of RefCell for final emission
     let strings = strings.into_inner();
 
-    // Validate counts
     strings.validate()?;
     types.validate()?;
     if node_symbols.len() > u16::MAX as usize {
@@ -107,16 +99,13 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
     }
 
-    // Build regex table from predicates in compiled instructions
     let mut regexes = RegexTableBuilder::new();
     intern_regex_predicates(&compile_result.instructions, &strings, &mut regexes)?;
     regexes.validate()?;
 
-    // Resolve and serialize transitions
     let transitions_bytes =
         emit_transitions(&compile_result.instructions, &layout, &types, &regexes)?;
 
-    // Emit all byte sections
     let (str_blob, str_table) = strings.emit();
     let (regex_blob, regex_table) = regexes.emit();
     let (type_defs_bytes, type_members_bytes, type_names_bytes) = types.emit();
@@ -125,7 +114,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let node_fields_bytes = emit_field_symbols(&field_symbols);
     let entrypoints_bytes = emit_entrypoints(&entrypoints);
 
-    // Build output with sections in bytecode order:
+    // Section order matches the binary format:
     // Header → StringBlob → RegexBlob → StringTable → RegexTable →
     // NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
     // Entrypoints → Transitions
@@ -146,7 +135,6 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     pad_to_section(&mut output);
     let total_size = output.len() as u32;
 
-    // Build header (offsets computed from counts and blob sizes)
     let mut header = Header {
         str_table_count: strings.len() as u16,
         node_types_count: node_symbols.len() as u16,
@@ -189,14 +177,12 @@ fn pad_to_section(buf: &mut Vec<u8>) {
     }
 }
 
-/// Emit transitions section from instructions and layout.
 fn emit_transitions(
     instructions: &[crate::bytecode::InstructionIR],
     layout: &crate::bytecode::LayoutResult,
     types: &TypeTableBuilder,
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
-    // Allocate buffer for all steps (8 bytes each)
     let mut bytes = vec![0u8; layout.total_steps() as usize * STEP_SIZE];
 
     // Member index resolvers: struct fields and enum variants both resolve via
@@ -215,7 +201,6 @@ fn emit_transitions(
         let offset = step_id as usize * STEP_SIZE;
         let resolved = instr.resolve(layout.label_to_step(), &ctx)?;
 
-        // Copy instruction bytes to the correct position
         let end = offset + resolved.len();
         if end <= bytes.len() {
             bytes[offset..end].copy_from_slice(&resolved);
@@ -225,7 +210,6 @@ fn emit_transitions(
     Ok(bytes)
 }
 
-/// Pre-scan instructions for regex predicates and intern them.
 fn intern_regex_predicates(
     instructions: &[InstructionIR],
     strings: &StringTableBuilder,

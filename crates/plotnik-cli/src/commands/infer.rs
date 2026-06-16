@@ -24,7 +24,6 @@ pub struct InferArgs {
 }
 
 pub fn run(args: InferArgs) -> CliResult {
-    // Validate format
     let fmt = args.format.to_lowercase();
     if fmt != "typescript" && fmt != "ts" {
         return Err(CliError::fatal("--format must be 'typescript' or 'ts'"));
@@ -36,7 +35,6 @@ pub fn run(args: InferArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    // Parse and analyze
     let query = QueryBuilder::new(loaded.sources)
         .parse()
         .map_err(|e| CliError::fatal(e.to_string()))?
@@ -62,7 +60,6 @@ pub fn run(args: InferArgs) -> CliResult {
     let bytecode = linked.emit().map_err(|e| CliError::fatal(e.to_string()))?;
     let module = Module::load(&bytecode).expect("module loading failed");
 
-    // Emit TypeScript types
     let void_type = match args.void_type.as_deref() {
         Some("null") => typescript::VoidType::Null,
         _ => typescript::VoidType::Undefined,
@@ -77,15 +74,15 @@ pub fn run(args: InferArgs) -> CliResult {
         .colored(use_colors);
     let output = typescript::emit_with_config(&module, config);
 
-    // Write output
     if let Some(ref path) = args.output {
         fs::write(path, &output)
             .map_err(|e| CliError::fatal(format!("failed to write '{}': {}", path.display(), e)))?;
-        // Success message
         let type_count = count_types(&output);
         eprintln!("Wrote {} types to {}", type_count, path.display());
     } else {
-        io::stdout().write_all(output.as_bytes()).unwrap();
+        io::stdout()
+            .write_all(output.as_bytes())
+            .expect("failed to write inferred types to stdout");
     }
 
     Ok(())

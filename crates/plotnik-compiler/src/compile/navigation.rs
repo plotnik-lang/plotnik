@@ -30,7 +30,6 @@ impl<'a> AnonymousClassifier<'a> {
         Self { symbol_table }
     }
 
-    /// Check if an expression may match an anonymous node after syntactic wrappers.
     pub fn expr_may_match_anonymous(&self, expr: Option<&Expr>) -> bool {
         let mut visited = HashSet::new();
         expr.is_some_and(|expr| self.expr_may_match_anonymous_inner(expr, &mut visited))
@@ -83,10 +82,8 @@ impl<'a> AnonymousClassifier<'a> {
     }
 }
 
-/// Check for trailing anchor in items, looking inside sequences if needed.
-/// Returns (has_trailing_anchor, nav mode).
+/// Check for trailing anchor in items, descending into a sole-child sequence if needed.
 pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (bool, Option<Nav>) {
-    // Direct trailing anchor
     if let Some(SeqItem::Anchor(anchor)) = items.last() {
         if anchor.is_strict() {
             return (true, Some(Nav::UpExact(1)));
@@ -109,7 +106,6 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
         return (true, Some(nav));
     }
 
-    // Check if only child is a sequence with trailing anchor
     if items.len() == 1
         && let Some(SeqItem::Expr(Expr::SeqExpr(seq))) = items.first()
     {
@@ -120,8 +116,6 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
     (false, None)
 }
 
-/// Compute navigation modes for each expression based on anchor context.
-/// Returns a vector of (expression index, nav mode) pairs.
 pub fn compute_nav_modes(
     items: &[SeqItem],
     is_inside_node: bool,
@@ -148,9 +142,7 @@ pub fn compute_nav_modes(
                     current_is_anonymous
                 };
                 let nav = if let Some(is_exact) = pending_anchor_strict {
-                    // Anchor between previous item and this one
                     if is_first_expr && is_inside_node {
-                        // First child with leading anchor
                         Some(if is_exact {
                             Nav::DownExact
                         } else if current_is_anonymous_for_anchor {
@@ -159,7 +151,6 @@ pub fn compute_nav_modes(
                             Nav::DownSkip
                         })
                     } else if !is_first_expr {
-                        // Sibling with anchor
                         Some(if is_exact {
                             Nav::NextExact
                         } else if prev_is_anonymous || current_is_anonymous_for_anchor {
@@ -168,14 +159,11 @@ pub fn compute_nav_modes(
                             Nav::NextSkip
                         })
                     } else {
-                        // First in sequence (not inside node)
                         None
                     }
                 } else if !is_first_expr {
-                    // Normal sibling navigation (no anchor)
                     Some(Nav::Next)
                 } else {
-                    // First expression - use default (None for sequences, Down for nodes)
                     None
                 };
 
@@ -229,7 +217,6 @@ pub fn resumable_search_nav(nav: Option<Nav>) -> Option<Nav> {
     }
 }
 
-/// Check if navigation is a Down variant (descends into children).
 pub fn is_down_nav(nav: Option<Nav>) -> bool {
     matches!(
         nav,
@@ -237,8 +224,7 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
     )
 }
 
-/// Extract the operator kind from an expression if it's a quantifier.
-/// Unwraps CapturedExpr if present.
+/// Unwraps CapturedExpr wrappers before testing for a quantifier operator.
 fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::SyntaxKind> {
     let expr = match expr {
         Expr::CapturedExpr(cap) => cap.inner()?,
@@ -251,7 +237,6 @@ fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::SyntaxKind> {
     Some(q.operator()?.kind())
 }
 
-/// Check if expression is optional (?) or star (*) - patterns that can match zero times.
 pub fn is_skippable_quantifier(expr: &Expr) -> bool {
     use crate::parser::SyntaxKind;
     quantifier_operator_kind(expr).is_some_and(|k| {

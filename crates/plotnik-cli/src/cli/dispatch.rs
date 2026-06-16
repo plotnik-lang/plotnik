@@ -34,13 +34,9 @@ impl AstParams {
         let query_text = m.get_one::<String>("query_text").cloned();
         let source_path = m.get_one::<PathBuf>("source_path").cloned();
 
-        // Positional shifting: when -q is used with a single positional,
-        // shift it from query_path to source_path.
         let (query_path, source_path) =
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
-        // Extension-based detection: when a single file is provided without -q,
-        // .ptk → query, otherwise → source (detect language from extension).
         let (query_path, source_path) =
             detect_file_type_by_extension(query_path, source_path, query_text.is_some());
 
@@ -152,12 +148,9 @@ pub struct InferParams {
 impl InferParams {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
-            // Query input
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
             query_text: m.get_one::<String>("query_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-
-            // Format options
             format: m
                 .get_one::<String>("format")
                 .cloned()
@@ -166,8 +159,6 @@ impl InferParams {
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),
             void_type: m.get_one::<String>("void_type").cloned(),
-
-            // Output
             output: m.get_one::<PathBuf>("output").cloned(),
             color: ColorChoice::from_matches(m),
         }
@@ -210,20 +201,15 @@ impl RunParams {
         let query_text = m.get_one::<String>("query_text").cloned();
         let source_path = m.get_one::<PathBuf>("source_path").cloned();
 
-        // Positional shifting: when -q is used with a single positional,
-        // shift it from query_path to source_path.
         let (query_path, source_path) =
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
         Self {
-            // Input (with positional shifting applied)
             query_path,
             query_text,
             source_path,
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-
-            // Output options
             compact: m.get_flag("compact"),
             entry: m.get_one::<String>("entry").cloned(),
             color: ColorChoice::from_matches(m),
@@ -233,7 +219,6 @@ impl RunParams {
 
 impl From<RunParams> for RunArgs {
     fn from(p: RunParams) -> Self {
-        // Pretty by default when stdout is a TTY, unless --compact is passed
         let pretty = !p.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
 
         Self {
@@ -269,20 +254,15 @@ impl TraceParams {
         let query_text = m.get_one::<String>("query_text").cloned();
         let source_path = m.get_one::<PathBuf>("source_path").cloned();
 
-        // Positional shifting: when -q is used with a single positional,
-        // shift it from query_path to source_path.
         let (query_path, source_path) =
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
         Self {
-            // Input (with positional shifting applied)
             query_path,
             query_text,
             source_path,
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
-
-            // Trace options
             entry: m.get_one::<String>("entry").cloned(),
             verbose: m.get_count("verbose"),
             no_result: m.get_flag("no_result"),
@@ -332,13 +312,15 @@ pub struct LangDumpParams {
 impl LangDumpParams {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
-            lang: m.get_one::<String>("lang").cloned().unwrap(),
+            lang: m
+                .get_one::<String>("lang")
+                .cloned()
+                .expect("clap guarantees `lang` is present"),
         }
     }
 }
 
-/// When -q is used with a single positional arg, shift it from query to source.
-/// This enables: `plotnik exec -q 'query' source.js`
+// `-q TEXT source.js` — clap assigns the positional to query_path, so shift it to source.
 fn shift_positional_to_source(
     has_query_text: bool,
     query_path: Option<PathBuf>,
@@ -351,14 +333,12 @@ fn shift_positional_to_source(
     }
 }
 
-/// Detect file type by extension for ast command.
-/// When a single file is provided without -q: .ptk → query, otherwise → source.
+// `ast` takes a single positional for either role; disambiguate by extension.
 fn detect_file_type_by_extension(
     query_path: Option<PathBuf>,
     source_path: Option<PathBuf>,
     has_query_text: bool,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
-    // Only apply when: single positional file, no -q flag, no explicit source
     if has_query_text || source_path.is_some() {
         return (query_path, source_path);
     }
@@ -367,11 +347,9 @@ fn detect_file_type_by_extension(
         return (None, None);
     };
 
-    // .ptk extension → treat as query
     if path.extension().is_some_and(|ext| ext == "ptk") {
         return (Some(path), None);
     }
 
-    // Any other extension → treat as source file
     (None, Some(path))
 }

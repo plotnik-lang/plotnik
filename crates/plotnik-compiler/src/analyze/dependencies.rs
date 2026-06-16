@@ -14,7 +14,6 @@ use super::symbol_table::SymbolTable;
 use super::type_check::DefId;
 use crate::parser::{Expr, Ref};
 
-/// Result of dependency analysis.
 #[derive(Clone, Debug, Default)]
 pub struct DependencyAnalysis {
     /// Strongly connected components in reverse topological order.
@@ -25,26 +24,18 @@ pub struct DependencyAnalysis {
     /// - Every definition in the symbol table appears exactly once.
     sccs: Vec<Vec<String>>,
 
-    /// Maps definition name (Symbol) to its DefId.
     name_to_def: HashMap<Symbol, DefId>,
 
-    /// Maps DefId to definition name Symbol (indexed by DefId).
     def_names: Vec<Symbol>,
 
-    /// Set of recursive definition names.
-    ///
-    /// A definition is recursive if it's in an SCC with >1 member,
-    /// or it's a single-member SCC that references itself.
     recursive_defs: HashSet<String>,
 }
 
 impl DependencyAnalysis {
-    /// Get the DefId for a definition by Symbol.
     pub fn def_id_by_symbol(&self, sym: Symbol) -> Option<DefId> {
         self.name_to_def.get(&sym).copied()
     }
 
-    /// Get the DefId for a definition name (requires interner for lookup).
     pub fn def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
         // Linear scan - only used during analysis, not hot path
         for (&sym, &def_id) in &self.name_to_def {
@@ -55,12 +46,10 @@ impl DependencyAnalysis {
         None
     }
 
-    /// Get the name Symbol for a DefId.
     pub fn def_name_sym(&self, id: DefId) -> Symbol {
         self.def_names[id.index()]
     }
 
-    /// Get the name string for a DefId.
     pub fn def_name<'a>(&self, interner: &'a Interner, id: DefId) -> &'a str {
         interner.resolve(self.def_names[id.index()])
     }
@@ -80,24 +69,16 @@ impl DependencyAnalysis {
         &self.name_to_def
     }
 
-    /// Returns true if this definition is recursive.
-    ///
-    /// A definition is recursive if it's part of a mutual recursion group (SCC > 1),
-    /// or it's a single definition that references itself.
+    /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
     pub fn is_recursive(&self, name: &str) -> bool {
         self.recursive_defs.contains(name)
     }
 
-    /// Strongly connected components in reverse topological order (leaves first).
     pub fn sccs(&self) -> &[Vec<String>] {
         &self.sccs
     }
 }
 
-/// Analyze dependencies between definitions.
-///
-/// Returns the SCCs in reverse topological order, with DefId mappings.
-/// The interner is used to intern definition names as Symbols.
 pub fn analyze_dependencies(
     symbol_table: &SymbolTable,
     interner: &mut Interner,
@@ -110,9 +91,7 @@ pub fn analyze_dependencies(
     let mut recursive_defs = HashSet::new();
 
     for scc in &sccs {
-        // Mark recursive definitions
         if scc.len() > 1 {
-            // Mutual recursion: all members are recursive
             recursive_defs.extend(scc.iter().cloned());
         } else if let Some(name) = scc.first()
             && let Some(body) = symbol_table.get(name)
@@ -185,11 +164,17 @@ impl<'a> SccFinder<'a> {
                 if !self.indices.contains_key(ref_name) {
                     self.strongconnect(ref_name);
                     let ref_lowlink = self.lowlinks[ref_name];
-                    let my_lowlink = self.lowlinks.get_mut(name).unwrap();
+                    let my_lowlink = self
+                        .lowlinks
+                        .get_mut(name)
+                        .expect("lowlink for name was inserted at the start of strongconnect");
                     *my_lowlink = (*my_lowlink).min(ref_lowlink);
                 } else if self.on_stack.contains(ref_name) {
                     let ref_index = self.indices[ref_name];
-                    let my_lowlink = self.lowlinks.get_mut(name).unwrap();
+                    let my_lowlink = self
+                        .lowlinks
+                        .get_mut(name)
+                        .expect("lowlink for name was inserted at the start of strongconnect");
                     *my_lowlink = (*my_lowlink).min(ref_index);
                 }
             }
@@ -198,7 +183,10 @@ impl<'a> SccFinder<'a> {
         if self.lowlinks[name] == self.indices[name] {
             let mut scc = Vec::new();
             loop {
-                let w = self.stack.pop().unwrap();
+                let w = self
+                    .stack
+                    .pop()
+                    .expect("SCC stack holds every on-stack node until its root pops");
                 self.on_stack.swap_remove(&w);
                 let done = w == name;
                 scc.push(w);

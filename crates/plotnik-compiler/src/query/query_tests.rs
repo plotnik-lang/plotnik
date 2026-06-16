@@ -52,7 +52,6 @@ impl QueryAnalyzed {
         use crate::diagnostics::DiagnosticKind::*;
         let source_map = SourceMap::one_liner(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
-        // Only check for parse errors (not semantic errors)
         let diag = query.diagnostics();
         let has_parse_error = diag.raw().iter().any(|d| {
             matches!(

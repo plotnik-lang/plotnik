@@ -26,9 +26,7 @@ fn dump_accepts_trace_flags() {
     let m = result.unwrap();
     let params = DumpParams::from_matches(&m);
 
-    // Query path is extracted
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
-    // fuel and verbose are parsed but not in DumpParams (that's the point)
 }
 
 #[test]
@@ -66,7 +64,6 @@ fn dump_accepts_source_positional() {
     let m = result.unwrap();
     let params = DumpParams::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
-    // source_path is parsed but not in DumpParams
 }
 
 #[test]
@@ -103,7 +100,6 @@ fn run_accepts_trace_flags() {
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
-    // fuel, verbose, no_result are parsed but not in RunParams
 }
 
 #[test]
@@ -127,7 +123,6 @@ fn trace_accepts_run_flags() {
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
-    // compact, verbose_nodes, check are parsed but not in TraceParams
 }
 
 #[test]
@@ -245,12 +240,10 @@ fn dump_help_hides_source_args() {
     let mut cmd = dump_command();
     let help = cmd.render_help().to_string();
 
-    // SOURCE positional should be hidden
     assert!(
         !help.contains("[SOURCE]"),
         "dump help should not show SOURCE positional"
     );
-    // -s/--source flag should be hidden
     assert!(
         !help.contains("Inline source text"),
         "dump help should not show -s description"
@@ -289,7 +282,6 @@ fn check_help_hides_unified_flags() {
     let mut cmd = check_command();
     let help = cmd.render_help().to_string();
 
-    // Source args should be hidden
     assert!(
         !help.contains("[SOURCE]"),
         "check help should not show SOURCE"
@@ -298,8 +290,6 @@ fn check_help_hides_unified_flags() {
         !help.contains("Inline source text"),
         "check help should not show -s"
     );
-
-    // Exec flags should be hidden
     assert!(
         !help.contains("--compact"),
         "check help should not show --compact"
@@ -312,8 +302,6 @@ fn check_help_hides_unified_flags() {
         !help.contains("--entry"),
         "check help should not show --entry"
     );
-
-    // Trace flags should be hidden
     assert!(
         !help.contains("--fuel"),
         "check help should not show --fuel"
@@ -329,7 +317,6 @@ fn infer_help_hides_unified_flags() {
     let mut cmd = infer_command();
     let help = cmd.render_help().to_string();
 
-    // Source args should be hidden
     assert!(
         !help.contains("[SOURCE]"),
         "infer help should not show SOURCE"
@@ -338,8 +325,6 @@ fn infer_help_hides_unified_flags() {
         !help.contains("Inline source text"),
         "infer help should not show -s"
     );
-
-    // Exec flags (except --verbose-nodes which is visible) should be hidden
     assert!(
         !help.contains("--compact"),
         "infer help should not show --compact"
@@ -348,8 +333,6 @@ fn infer_help_hides_unified_flags() {
         !help.contains("--entry"),
         "infer help should not show --entry"
     );
-
-    // Trace flags should be hidden
     assert!(
         !help.contains("--fuel"),
         "infer help should not show --fuel"
@@ -358,8 +341,6 @@ fn infer_help_hides_unified_flags() {
         !help.contains("--no-result"),
         "infer help should not show --no-result"
     );
-
-    // --verbose-nodes SHOULD be visible for infer
     assert!(
         help.contains("--verbose-nodes"),
         "infer help SHOULD show --verbose-nodes"
@@ -375,7 +356,6 @@ fn run_shifts_positional_with_inline_query() {
     let m = result.unwrap();
     let params = RunParams::from_matches(&m);
 
-    // With -q, the single positional should become source_path, not query_path
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -390,7 +370,6 @@ fn run_no_shift_with_both_positionals() {
     let m = result.unwrap();
     let params = RunParams::from_matches(&m);
 
-    // Without -q, both positionals are used as-is
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -456,7 +435,6 @@ fn run_params_extracts_all_fields() {
         "Query",
         "--color",
         "never",
-        // Hidden unified flag, parsed but not extracted
         "--verbose-nodes",
     ]);
     assert!(result.is_ok());
@@ -470,7 +448,6 @@ fn run_params_extracts_all_fields() {
     assert!(params.compact);
     assert_eq!(params.entry, Some("Query".to_string()));
     assert!(matches!(params.color, ColorChoice::Never));
-    // verbose_nodes is parsed but not in RunParams (hidden unified flag)
 }
 
 #[test]
@@ -483,7 +460,6 @@ fn dump_params_extracts_only_relevant_fields() {
         "rust",
         "--color",
         "auto",
-        // All these are accepted but ignored
         "app.rs",
         "--fuel",
         "100",
@@ -497,10 +473,7 @@ fn dump_params_extracts_only_relevant_fields() {
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.lang, Some("rust".to_string()));
     assert!(matches!(params.color, ColorChoice::Auto));
-    // No source_path, fuel, compact fields in DumpParams
 }
-
-// AST command tests
 
 #[test]
 fn ast_accepts_run_flags() {
@@ -559,7 +532,6 @@ fn ast_shifts_positional_with_inline_query() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // With -q, the single positional should become source_path, not query_path
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -574,7 +546,6 @@ fn ast_no_shift_with_both_positionals() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // Without -q, both positionals are used as-is
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -592,7 +563,6 @@ fn ast_help_hides_unified_flags() {
     let mut cmd = ast_command();
     let help = cmd.render_help().to_string();
 
-    // Exec flags should be hidden
     assert!(
         !help.contains("--compact"),
         "ast help should not show --compact"
@@ -605,8 +575,6 @@ fn ast_help_hides_unified_flags() {
         !help.contains("--entry"),
         "ast help should not show --entry"
     );
-
-    // Trace flags should be hidden
     assert!(!help.contains("--fuel"), "ast help should not show --fuel");
     assert!(
         !help.contains("--no-result"),
@@ -642,8 +610,6 @@ fn ast_params_extracts_all_fields() {
     assert!(params.raw);
     assert!(matches!(params.color, ColorChoice::Always));
 }
-
-// Test that other commands accept --raw (unified flag)
 
 #[test]
 fn dump_accepts_raw_flag() {
@@ -689,8 +655,6 @@ fn check_accepts_raw_flag() {
     );
 }
 
-// Extension-based detection tests for ast command
-
 #[test]
 fn ast_detects_ptk_as_query() {
     let cmd = ast_command();
@@ -700,7 +664,6 @@ fn ast_detects_ptk_as_query() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // .ptk extension → treat as query
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, None);
 }
@@ -714,7 +677,6 @@ fn ast_detects_non_ptk_as_source() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // Non-.ptk extension → treat as source
     assert_eq!(params.query_path, None);
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -728,7 +690,6 @@ fn ast_no_extension_detection_with_two_positionals() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // Two positionals → first is query, second is source (no detection)
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -742,13 +703,10 @@ fn ast_no_extension_detection_with_inline_query() {
     let m = result.unwrap();
     let params = AstParams::from_matches(&m);
 
-    // -q provided → positional shift takes precedence, no extension detection
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(id) @x".to_string()));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
-
-// Bare default subcommand routing
 
 #[test]
 fn bare_ptk_file_routes_to_run() {

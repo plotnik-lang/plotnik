@@ -41,12 +41,10 @@ impl Colors {
         reset: "",
     };
 
-    /// Create colors based on enabled flag.
     pub fn new(enabled: bool) -> Self {
         if enabled { Self::ON } else { Self::OFF }
     }
 
-    /// Check if colors are enabled.
     pub fn is_enabled(&self) -> bool {
         !self.blue.is_empty()
     }
