@@ -200,19 +200,19 @@ impl Module {
         let align = SECTION_ALIGN as u64;
         let oob = || ModuleError::SectionOutOfBounds { total };
 
-        let mut cursor = align; // str_blob starts right after the header
-        cursor = align_up_u64(cursor + h.str_blob_size as u64, align);
-        cursor = align_up_u64(cursor + h.regex_blob_size as u64, align);
-        cursor = align_up_u64(cursor + (h.str_table_count as u64 + 1) * 4, align);
-        cursor = align_up_u64(cursor + (h.regex_table_count as u64 + 1) * 8, align);
-        cursor = align_up_u64(cursor + h.node_types_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.node_fields_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_defs_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_members_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_names_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.entrypoints_count as u64 * 8, align);
-        // `cursor` now points at the Transitions section.
-        let transitions_end = cursor + h.transitions_count as u64 * STEP_SIZE as u64;
+        let sizes = h.section_data_sizes();
+        let (transitions, rest) = sizes
+            .split_last()
+            .expect("section layout has at least one section");
+
+        // Every section but the last (Transitions) is alignment-padded; folding
+        // them leaves the cursor at the start of Transitions, whose unaligned end
+        // bounds the file.
+        let mut cursor = HEADER_SIZE as u64; // sections begin right after the header
+        for &size in rest {
+            cursor = align_up_u64(cursor + size, align);
+        }
+        let transitions_end = cursor + transitions;
 
         if transitions_end > total as u64 {
             return Err(oob());
@@ -227,28 +227,17 @@ impl Module {
     /// Section bounds are already proven by [`Self::validate_section_bounds`], so
     /// the slicing here stays in range.
     fn validate_section_padding(&self) -> Result<(), ModuleError> {
-        let h = &self.header;
-        let o = &self.offsets;
-        // (section start, data length) in layout order, terminated by a
-        // zero-length sentinel at the file end so the trailing gap is checked too.
-        let sections = [
-            (o.str_blob, h.str_blob_size),
-            (o.regex_blob, h.regex_blob_size),
-            (o.str_table, (h.str_table_count as u32 + 1) * 4),
-            (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
-            (o.node_types, h.node_types_count as u32 * 4),
-            (o.node_fields, h.node_fields_count as u32 * 4),
-            (o.type_defs, h.type_defs_count as u32 * 4),
-            (o.type_members, h.type_members_count as u32 * 4),
-            (o.type_names, h.type_names_count as u32 * 4),
-            (o.entrypoints, h.entrypoints_count as u32 * 8),
-            (o.transitions, h.transitions_count as u32 * STEP_SIZE as u32),
-            (h.total_size, 0),
-        ];
+        let starts = self.offsets.as_starts();
+        let sizes = self.header.section_data_sizes();
 
-        for win in sections.windows(2) {
-            let gap_start = (win[0].0 + win[0].1) as usize;
-            let gap_end = win[1].0 as usize;
+        // The gap after each section's data, up to the next section's start (or
+        // the file end for the last section), must be all zero.
+        for i in 0..starts.len() {
+            let gap_start = (starts[i] + sizes[i] as u32) as usize;
+            let gap_end = match starts.get(i + 1) {
+                Some(&next) => next as usize,
+                None => self.header.total_size as usize,
+            };
             if self.storage[gap_start..gap_end].iter().any(|&b| b != 0) {
                 return Err(ModuleError::NonZeroSectionPadding);
             }
