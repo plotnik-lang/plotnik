@@ -684,6 +684,25 @@ fn forged_out_of_range_entrypoint_target_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_entrypoint_pad_is_rejected() {
+    // Bytes 6-7 of the 8-byte entrypoint are reserved `_pad`; `from_bytes` drops
+    // them, so a forged non-zero pad must be rejected at load, not ignored.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let ep_off = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .offsets()
+        .entrypoints as usize;
+    bytes[ep_off + 6..ep_off + 8].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged entrypoint pad must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     // `result_type` (u16 at entry+4) must address a real TypeDef, or the
     // materializer's root-frame TypeId lookup reads out of bounds. `type_defs_count`

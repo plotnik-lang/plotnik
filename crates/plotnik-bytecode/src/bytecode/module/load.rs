@@ -352,11 +352,29 @@ impl Module {
         let entrypoints = self.entrypoints();
         let steps = self.header.transitions_count;
         let type_defs = self.header.type_defs_count;
+        let storage: &[u8] = &self.storage;
+        let base = self.offsets.entrypoints as usize;
         for i in 0..entrypoints.len() {
+            let invalid = || ModuleError::InvalidEntrypoint(i);
             let ep = entrypoints.get(i);
             let target = ep.target();
-            if target >= steps || !is_start[target as usize] || ep.result_type().0 >= type_defs {
-                return Err(ModuleError::InvalidEntrypoint(i));
+
+            if target >= steps {
+                return Err(invalid());
+            }
+
+            if !is_start[target as usize] {
+                return Err(invalid());
+            }
+
+            if ep.result_type().0 >= type_defs {
+                return Err(invalid());
+            }
+
+            // Bytes 6-7 are the reserved `_pad`; `Entrypoint::from_bytes` discards
+            // them, so a forged non-zero pad would otherwise load unnoticed.
+            if read_u16_le(storage, base + i * 8 + 6) != 0 {
+                return Err(invalid());
             }
         }
         Ok(())

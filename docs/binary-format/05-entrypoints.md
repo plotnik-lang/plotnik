@@ -26,7 +26,7 @@ struct Entrypoint {
 - **name**: The name of the export (e.g., "Func", "Class"). `StringId`.
 - **target**: The instruction pointer (`StepId`) where execution begins for this definition. This index is relative to the start of the **Transitions** section.
 - **result_type**: The `TypeId` of the structure produced by this query definition.
-- **\_pad**: Reserved for alignment.
+- **\_pad**: Reserved for alignment. Must be zero; loaders reject a non-zero pad.
 
 ### Usage
 
