@@ -311,7 +311,7 @@ Returns from a definition. Pops the return address from the call stack.
 #[repr(C)]
 struct Return {
     type_id: u8,        // segment(2) | 0 | 0x7
-    _pad: [u8; 7],
+    _pad: [u8; 7],      // reserved; must be zero, loaders reject a non-zero pad
 }
 ```
 
@@ -323,9 +323,9 @@ Universal entry point instruction. Like Call, but the target comes from VM conte
 #[repr(C)]
 struct Trampoline {
     type_id: u8,        // segment(2) | 0 | 0x8
-    _pad1: u8,
+    _pad1: u8,          // reserved; must be zero, loaders reject a non-zero pad
     next: u16,          // Return address (StepId)
-    _pad2: [u8; 4],
+    _pad2: [u8; 4],     // reserved; must be zero, loaders reject a non-zero pad
 }
 ```
 

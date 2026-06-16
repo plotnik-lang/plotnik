@@ -509,6 +509,11 @@ impl Module {
                 .map(|b| u16::from_le_bytes([b[0], b[1]]))
                 .ok_or(ModuleError::MalformedTransitions)
         };
+        // A reserved padding run inside an instruction slot must be all zero.
+        let check_zero = |off: usize, len: usize| match storage.get(off..off + len) {
+            Some(run) if run.iter().all(|&b| b == 0) => Ok(()),
+            _ => Err(ModuleError::MalformedTransitions),
+        };
 
         let mut is_start = vec![false; steps as usize];
         let mut targets: Vec<u16> = Vec::new();
@@ -533,12 +538,20 @@ impl Module {
             }
 
             match opcode {
-                Opcode::Return => {}
+                Opcode::Return => {
+                    // Bytes 1-7 are reserved padding (`Return::to_bytes`); a forged
+                    // non-zero pad would otherwise load unnoticed.
+                    check_zero(instr_off + 1, 7)?;
+                }
                 Opcode::Trampoline => {
                     let next = read_u16(instr_off + 2)?;
                     if next == 0 {
                         return Err(ModuleError::MalformedTransitions);
                     }
+                    // Byte 1 and bytes 4-7 are reserved padding (`Trampoline::to_bytes`);
+                    // `next` occupies bytes 2-3.
+                    check_zero(instr_off + 1, 1)?;
+                    check_zero(instr_off + 4, 4)?;
                     targets.push(next);
                 }
                 Opcode::Call => {

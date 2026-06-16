@@ -609,6 +609,43 @@ fn forged_out_of_range_trampoline_target_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_return_pad_is_rejected() {
+    // A Return is `header || 7 reserved padding bytes` (`Return::to_bytes`); the
+    // decoder drops bytes 1-7, so a forged non-zero pad must be rejected at load.
+    for byte in 1usize..8 {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let off = first_instr(&bytes, |o| o == 7); // Return
+        bytes[off + byte] = 1;
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged return pad must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_nonzero_trampoline_pad_is_rejected() {
+    // A Trampoline is `header | pad | next(2) | 4 reserved padding bytes`
+    // (`Trampoline::to_bytes`); only `next` (bytes 2-3) is read, so byte 1 and
+    // bytes 4-7 must be rejected when non-zero.
+    for byte in [1usize, 4, 5, 6, 7] {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let off = first_instr(&bytes, |o| o == 8); // Trampoline
+        bytes[off + byte] = 1;
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged trampoline pad must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
+        );
+    }
+}
+
+#[test]
 fn forged_regex_predicate_sentinel_operand_is_rejected() {
     // Regex value_ref `0` is the reserved sentinel: `load_regex_dfas` skips it,
     // so its DFA slot is `None`, and the VM expects a populated slot. The loader
