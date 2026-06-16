@@ -108,11 +108,22 @@ impl Module {
             header,
             offsets,
             regex_dfas: RegexDfas::default(),
+            #[cfg(debug_assertions)]
+            is_start: Vec::new(),
         };
-        // Validation deserializes every regex DFA to prove it well-formed; it
-        // hands those owned automata back so the VM reuses them instead of
-        // re-deserializing per evaluation (issue #426).
-        module.regex_dfas = module.validate()?;
+        // Validation deserializes every regex DFA to prove it well-formed and
+        // builds the instruction-start bitmap; it hands the owned automata back so
+        // the VM reuses them instead of re-deserializing per evaluation (#426).
+        let (regex_dfas, is_start) = module.validate()?;
+        module.regex_dfas = regex_dfas;
+        // Retain the start bitmap only in debug builds, where it backs the VM's
+        // pre-decode IP assertion; release carries no extra per-module memory.
+        #[cfg(debug_assertions)]
+        {
+            module.is_start = is_start;
+        }
+        #[cfg(not(debug_assertions))]
+        let _ = is_start;
         Ok(module)
     }
 
@@ -136,7 +147,7 @@ impl Module {
     /// proves no path can panic the materializer's builder stack or the VM's
     /// suppression counter — so a loaded module never panics on view/decode/VM
     /// access regardless of how it was crafted.
-    fn validate(&self) -> Result<RegexDfas, ModuleError> {
+    fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
         // Reserved header bytes are not covered by the CRC; v5 fixes them at zero.
         if self.header._reserved != [0u8; 22] {
             return Err(ModuleError::MalformedHeader);
@@ -167,7 +178,7 @@ impl Module {
         // instruction API. This closes the last forged-module panic class: the
         // materializer's builder-stack panics and the VM's suppression underflow.
         super::effect_stack::validate_effect_stack(self)?;
-        Ok(regex_dfas)
+        Ok((regex_dfas, is_start))
     }
 
     /// Recompute the section layout in `u64` (no overflow) and ensure every

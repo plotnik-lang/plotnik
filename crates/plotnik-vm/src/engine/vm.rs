@@ -255,7 +255,15 @@ impl<'t> VM<'t> {
             }
             self.exec_fuel -= 1;
 
-            // Fetch and dispatch
+            // Fetch and dispatch. The IP must address a validated instruction
+            // start; a violation localizes a bad jump to the step that wrote `ip`,
+            // before `decode_step` begins decoding mid-instruction.
+            #[cfg(debug_assertions)]
+            debug_assert!(
+                module.is_validated_step_start(self.ip),
+                "ip {} is not a validated instruction start",
+                self.ip
+            );
             let instr = module.decode_step(self.ip);
             tracer.trace_instruction(self.ip, &instr);
 

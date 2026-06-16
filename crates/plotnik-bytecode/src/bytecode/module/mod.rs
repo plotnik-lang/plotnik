@@ -152,6 +152,12 @@ pub struct Module {
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
+    /// Per-step "is an instruction start" bitmap from load validation
+    /// ([`validate_transitions`](Self::validate_transitions)), retained only in
+    /// debug builds to back the VM's pre-`decode_step` IP assertion. It does not
+    /// exist in release, so the steady-state module carries no extra memory.
+    #[cfg(debug_assertions)]
+    is_start: Vec<bool>,
 }
 
 impl Module {
@@ -220,6 +226,17 @@ impl Module {
     pub fn decode_step(&self, step: u16) -> Instruction<'_> {
         let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
+    }
+
+    /// Whether `step` is a validated instruction start.
+    ///
+    /// Backs the VM's pre-decode IP assertion, localizing a bad jump to the step
+    /// that wrote `ip` rather than letting [`decode_step`](Self::decode_step)
+    /// begin mid-instruction. Debug-only: the backing bitmap is retained at load
+    /// under `debug_assertions` and does not exist in release.
+    #[cfg(debug_assertions)]
+    pub fn is_validated_step_start(&self, step: u16) -> bool {
+        self.is_start.get(step as usize).copied().unwrap_or(false)
     }
 
     /// Get a view into the string table.
