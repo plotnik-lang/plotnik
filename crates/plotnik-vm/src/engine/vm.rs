@@ -611,6 +611,11 @@ impl<'t> VM<'t> {
                 break;
             }
         }
+        debug_assert_eq!(
+            self.cursor.depth(),
+            saved_depth,
+            "Return did not ascend to the caller's saved cursor depth"
+        );
 
         self.ip = return_addr;
         Ok(())
