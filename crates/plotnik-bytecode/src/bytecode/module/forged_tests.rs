@@ -344,6 +344,27 @@ fn forged_nonzero_segment_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
+    // node_kind (header bits 4-5) is meaningful only for Match variants; the
+    // Call/Return/Trampoline decoders ignore it, so the format pins those bits to
+    // zero. This query emits all three: a `(Leaf)` reference (Call), definition
+    // Returns, and the preamble Trampoline.
+    const REF_QUERY: &str = "Top = (binary_expression left: (Leaf) @l)\nLeaf = (identifier) @id";
+    for opcode in [6u8, 7, 8] {
+        let mut bytes = emit_bytes(REF_QUERY);
+        let off = first_instr(&bytes, |o| o == opcode);
+        bytes[off] |= 0x10; // set node_kind bit 4
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged node_kind must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "opcode {opcode}: expected MalformedTransitions, got {err:?}"
+        );
+    }
+}
+
+#[test]
 fn forged_reserved_node_kind_is_rejected() {
     // node_kind `0b11` (header bits 4-5) is reserved; `NodeTypeIR::from_bytes`
     // would panic on it.

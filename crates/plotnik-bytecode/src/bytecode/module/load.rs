@@ -580,6 +580,14 @@ impl Module {
             if (header >> 6) & 0x3 != 0 {
                 return Err(ModuleError::MalformedTransitions);
             }
+            // node_kind (header bits 4-5) is meaningful only for Match variants;
+            // Call/Return/Trampoline ignore it, so the format pins those bits to
+            // zero — a forged non-zero node_kind there is smuggled state.
+            if matches!(opcode, Opcode::Call | Opcode::Return | Opcode::Trampoline)
+                && (header >> 4) & 0x3 != 0
+            {
+                return Err(ModuleError::MalformedTransitions);
+            }
 
             match opcode {
                 Opcode::Return => {

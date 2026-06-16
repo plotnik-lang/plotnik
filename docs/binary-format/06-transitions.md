@@ -30,7 +30,7 @@ type_id (u8)
 ```
 
 - **Bits 7-6 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
-- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Ignored for Call/Return/Trampoline.
+- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Unused for Call/Return/Trampoline, where they must be zero; loaders reject a non-zero value.
 - **Bits 3-0 (Opcode)**: Step type and size.
 
 **NodeKind values** (for Match instructions):
