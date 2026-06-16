@@ -25,7 +25,7 @@ Each entry stores both a StringId (for pattern display) and offset into RegexBlo
 #[repr(C)]
 struct RegexEntry {
     string_id: u16,     // StringId of pattern text (for dump/trace)
-    reserved: u16,      // Reserved for future use
+    reserved: u16,      // Reserved for future use; must be zero, rejected at load
     offset: u32,        // Byte offset into RegexBlob
 }
 ```

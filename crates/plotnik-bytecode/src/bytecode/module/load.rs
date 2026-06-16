@@ -236,6 +236,11 @@ impl Module {
         let mut prev = 0u32;
         for i in 0..=count {
             // Entry layout: string_id (u16) | reserved (u16) | offset (u32).
+            // The reserved u16 is pinned to zero (docs/binary-format/03-symbols.md);
+            // a non-zero value is smuggled state.
+            if read_u16_le(table, i * 8 + 2) != 0 {
+                return Err(ModuleError::MalformedRegexTable);
+            }
             let off = read_u32_le(table, i * 8 + 4);
             if off < prev || off > blob_len {
                 return Err(ModuleError::MalformedRegexTable);

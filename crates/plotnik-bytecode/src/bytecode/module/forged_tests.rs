@@ -442,6 +442,33 @@ fn forged_regex_pattern_string_id_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_regex_table_reserved_is_rejected() {
+    // Each regex-table entry is `string_id(u16) | reserved(u16) | offset(u32)`; the
+    // reserved field is pinned to zero (docs/binary-format/03-symbols.md). A forged
+    // non-zero value must be rejected at load, not carried as smuggled state.
+    let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
+    let (regex_off, regex_count) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        (
+            m.offsets().regex_table as usize,
+            m.header().regex_table_count,
+        )
+    };
+    assert!(regex_count > 1, "query must emit a regex entry");
+
+    // Entry 1's reserved u16 sits 2 bytes into its 8-byte record (index 0 reserved).
+    let reserved_off = regex_off + 8 + 2;
+    bytes[reserved_off..reserved_off + 2].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged regex reserved field must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedRegexTable),
+        "expected MalformedRegexTable, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_corrupt_regex_dfa_is_rejected() {
     // The regex blob holds the serialized sparse DFA the loader deserializes
     // once into the module's cache; a corrupt blob must be rejected at load, not
