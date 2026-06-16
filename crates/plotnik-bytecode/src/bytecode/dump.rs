@@ -8,7 +8,9 @@ use std::fmt::Write as _;
 use crate::predicate_op::PredicateOp;
 use plotnik_core::Colors;
 
-use super::format::{LineBuilder, Symbol, format_effect, nav_symbol, width_for_count};
+use super::format::{
+    LineBuilder, PREAMBLE_NAME, Symbol, format_effect, nav_symbol, width_for_count,
+};
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
@@ -16,6 +18,7 @@ use super::nav::Nav;
 use super::node_type_ir::NodeTypeIR;
 use super::type_meta::{TypeData, TypeKind};
 use super::{Call, Match, Return, Trampoline};
+use crate::type_system::TYPE_CUSTOM_START;
 
 /// Generate a human-readable dump of the bytecode module.
 pub fn dump(module: &Module, colors: Colors) -> String {
@@ -67,7 +70,7 @@ impl DumpContext {
 
         let mut step_labels = BTreeMap::new();
         // Preamble always at step 0 (first in layout)
-        step_labels.insert(0, "_ObjWrap".to_string());
+        step_labels.insert(0, PREAMBLE_NAME.to_string());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name()).to_string();
@@ -94,7 +97,8 @@ impl DumpContext {
 
         // Compute widths for index formatting
         let types = module.types();
-        let type_count = 3 + types.defs_count(); // 3 builtins + custom types
+        // Builtins precede custom types; widen for both.
+        let type_count = TYPE_CUSTOM_START as usize + types.defs_count();
         let str_width = width_for_count(str_count);
         let type_width = width_for_count(type_count);
         let member_width = width_for_count(types.members_count());
@@ -430,28 +434,7 @@ struct DumpFormatter<'a> {
 
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
-        Instruction::Match(m) => {
-            let pre = m.pre_effects().count();
-            let neg = m.neg_fields().count();
-            let post = m.post_effects().count();
-            let succ = m.succ_count();
-            let pred = if m.has_predicate() { 2 } else { 0 };
-            let slots = pre + neg + post + pred + succ;
-
-            if pre == 0 && neg == 0 && post == 0 && pred == 0 && succ <= 1 {
-                1 // Match8
-            } else if slots <= 4 {
-                2 // Match16
-            } else if slots <= 8 {
-                3 // Match24
-            } else if slots <= 12 {
-                4 // Match32
-            } else if slots <= 20 {
-                6 // Match48
-            } else {
-                8 // Match64
-            }
-        }
+        Instruction::Match(m) => m.step_count(),
         Instruction::Call(_) | Instruction::Return(_) | Instruction::Trampoline(_) => 1,
     }
 }

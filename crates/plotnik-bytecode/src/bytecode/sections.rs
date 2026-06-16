@@ -33,11 +33,16 @@ pub struct NodeSymbol {
 }
 
 impl NodeSymbol {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 4;
+
     /// Create a new node symbol.
     pub fn new(id: u16, name: StringId) -> Self {
         Self { id, name }
     }
 }
+
+const _: () = assert!(std::mem::size_of::<NodeSymbol>() == NodeSymbol::SIZE);
 
 /// Maps tree-sitter NodeFieldId to its string name.
 #[derive(Clone, Copy, Debug)]
@@ -50,8 +55,13 @@ pub struct FieldSymbol {
 }
 
 impl FieldSymbol {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 4;
+
     /// Create a new field symbol.
     pub fn new(id: u16, name: StringId) -> Self {
         Self { id, name }
     }
 }
+
+const _: () = assert!(std::mem::size_of::<FieldSymbol>() == FieldSymbol::SIZE);

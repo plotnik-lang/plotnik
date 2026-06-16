@@ -14,8 +14,21 @@ pub const VERSION: u32 = 6;
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
 
+/// File header size in bytes.
+///
+/// The header occupies exactly one `SECTION_ALIGN` block, so the first section
+/// (StringBlob) begins at this offset. `Header` statically asserts it has this
+/// size.
+pub const HEADER_SIZE: usize = SECTION_ALIGN;
+
 /// Step size in bytes (all instructions are 8-byte aligned).
 pub const STEP_SIZE: usize = 8;
+
+/// String offset table entry size: one little-endian `u32` offset per string.
+pub const STRING_TABLE_ENTRY_SIZE: usize = size_of::<u32>();
+
+/// Regex table entry size: `string_id (u16) | reserved (u16) | offset (u32)`.
+pub const REGEX_TABLE_ENTRY_SIZE: usize = 8;
 
 /// Maximum payload slots for Match instructions.
 ///
@@ -29,3 +42,12 @@ pub const MAX_MATCH_PAYLOAD_SLOTS: usize = 28;
 /// Pre-effect count is stored in 3 bits (max 7). When exceeded,
 /// overflow effects must be emitted in leading epsilon transitions.
 pub const MAX_PRE_EFFECTS: usize = 7;
+
+/// Maximum negated fields per Match instruction (3-bit count field).
+pub const MAX_NEG_FIELDS: usize = 7;
+
+/// Maximum post-effects per Match instruction (3-bit count field).
+pub const MAX_POST_EFFECTS: usize = 7;
+
+/// Maximum successors per Match instruction (5-bit count field).
+pub const MAX_SUCCESSORS: usize = 31;

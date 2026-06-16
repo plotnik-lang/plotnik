@@ -31,7 +31,7 @@ pub struct TypeDef {
     kind: u8,
 }
 
-const _: () = assert!(std::mem::size_of::<TypeDef>() == 4);
+const _: () = assert!(std::mem::size_of::<TypeDef>() == TypeDef::SIZE);
 
 /// Structured view of TypeDef data, eliminating the need for Option-returning accessors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,6 +49,9 @@ pub enum TypeData {
 }
 
 impl TypeDef {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 4;
+
     /// Create a builtin type (Void, Node, String).
     pub fn builtin(kind: TypeKind) -> Self {
         Self {
@@ -194,9 +197,12 @@ pub struct TypeName {
     pub type_id: TypeId,
 }
 
-const _: () = assert!(std::mem::size_of::<TypeName>() == 4);
+const _: () = assert!(std::mem::size_of::<TypeName>() == TypeName::SIZE);
 
 impl TypeName {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 4;
+
     /// Create a new type name entry.
     pub fn new(name: StringId, type_id: TypeId) -> Self {
         Self { name, type_id }
@@ -221,9 +227,12 @@ pub struct TypeMember {
     pub type_id: TypeId,
 }
 
-const _: () = assert!(std::mem::size_of::<TypeMember>() == 4);
+const _: () = assert!(std::mem::size_of::<TypeMember>() == TypeMember::SIZE);
 
 impl TypeMember {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 4;
+
     /// Create a new type member entry.
     pub fn new(name: StringId, type_id: TypeId) -> Self {
         Self { name, type_id }

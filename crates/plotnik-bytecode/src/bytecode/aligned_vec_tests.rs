@@ -1,7 +1,8 @@
-use super::aligned_vec::{ALIGN, AlignedVec};
+use super::SECTION_ALIGN;
+use super::aligned_vec::AlignedVec;
 
 fn is_aligned(ptr: *const u8) -> bool {
-    (ptr as usize).is_multiple_of(ALIGN)
+    (ptr as usize).is_multiple_of(SECTION_ALIGN)
 }
 
 #[test]

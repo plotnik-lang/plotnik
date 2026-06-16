@@ -24,8 +24,9 @@ use std::num::NonZeroU16;
 use arborium_tree_sitter::Node;
 
 use plotnik_bytecode::{
-    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, PredicateOp, Symbol,
-    cols, format_effect, nav_symbol, trace, truncate_text, width_for_count,
+    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, PREAMBLE_NAME,
+    PredicateOp, SECTION_ALIGN, STEP_SIZE, Symbol, cols, format_effect, nav_symbol, trace,
+    truncate_text, width_for_count,
 };
 use plotnik_core::Colors;
 
@@ -348,12 +349,11 @@ impl<'s> PrintTracer<'s> {
     fn format_kind_with_text(&self, kind: &str, text: &str, is_named: bool) -> String {
         let c = &self.colors;
 
-        // Available content width = TOTAL_WIDTH - prefix_width + step_width
-        // prefix_width = INDENT + step_width + GAP + SYMBOL + GAP = 9 + step_width
-        // +step_width because ellipsis can extend into the successors column
-        // (sub-lines have no successors, so we use that space)
-        // This simplifies to: TOTAL_WIDTH - 9 = 35
-        let available = cols::TOTAL_WIDTH - 9;
+        // Available content width = TOTAL_WIDTH - prefix_width + step_width.
+        // prefix_width = INDENT + step_width + GAP + SYMBOL + GAP; the +step_width
+        // cancels because the ellipsis can extend into the successors column
+        // (sub-lines have no successors, so we reuse that space).
+        let available = cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
 
         if is_named {
             // Named: show kind + text
@@ -512,7 +512,7 @@ impl<'s> PrintTracer<'s> {
 
     /// Add a sub-line (blank step area + symbol + content).
     fn add_subline(&mut self, symbol: Symbol, content: &str) {
-        let step_area = 2 + self.step_width + 1;
+        let step_area = cols::INDENT + self.step_width + cols::GAP;
         let prefix = format!("{:step_area$}{} ", "", symbol.format());
         self.lines.push(format!("{prefix}{content}"));
     }
@@ -568,7 +568,7 @@ impl<'s> PrintTracer<'s> {
             return;
         }
 
-        const STEPS_PER_CACHE_LINE: u16 = 8;
+        const STEPS_PER_CACHE_LINE: u16 = (SECTION_ALIGN / STEP_SIZE) as u16;
         if let Some(prev) = self.prev_ip
             && prev / STEPS_PER_CACHE_LINE != ip / STEPS_PER_CACHE_LINE
         {
@@ -780,7 +780,6 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_enter_preamble(&mut self) {
-        const PREAMBLE_NAME: &str = "_ObjWrap";
         self.push_def_label(PREAMBLE_NAME);
         self.definition_stack.push(PREAMBLE_NAME.to_string());
     }

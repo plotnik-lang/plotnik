@@ -1,5 +1,12 @@
 //! Effect operations for bytecode.
 
+/// An effect word packs the opcode in the high bits and a payload in the low
+/// [`EFFECT_PAYLOAD_BITS`].
+pub const EFFECT_PAYLOAD_BITS: u32 = 10;
+
+/// Largest representable effect payload (the low [`EFFECT_PAYLOAD_BITS`]).
+pub const EFFECT_PAYLOAD_MAX: usize = (1 << EFFECT_PAYLOAD_BITS) - 1;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum EffectOpcode {
@@ -62,8 +69,8 @@ impl EffectOp {
 
     pub fn from_bytes(bytes: [u8; 2]) -> Self {
         let raw = u16::from_le_bytes(bytes);
-        let opcode = EffectOpcode::from_u8((raw >> 10) as u8);
-        let payload = (raw & 0x3FF) as usize;
+        let opcode = EffectOpcode::from_u8((raw >> EFFECT_PAYLOAD_BITS) as u8);
+        let payload = (raw & EFFECT_PAYLOAD_MAX as u16) as usize;
         Self { opcode, payload }
     }
 
@@ -71,18 +78,19 @@ impl EffectOp {
     /// load time. Returns `None` when the opcode field is not a known effect.
     pub(crate) fn try_from_bytes(bytes: [u8; 2]) -> Option<Self> {
         let raw = u16::from_le_bytes(bytes);
-        let opcode = EffectOpcode::try_from_u8((raw >> 10) as u8)?;
-        let payload = (raw & 0x3FF) as usize;
+        let opcode = EffectOpcode::try_from_u8((raw >> EFFECT_PAYLOAD_BITS) as u8)?;
+        let payload = (raw & EFFECT_PAYLOAD_MAX as u16) as usize;
         Some(Self { opcode, payload })
     }
 
     pub fn to_bytes(self) -> [u8; 2] {
         assert!(
-            self.payload <= 0x3FF,
-            "effect payload exceeds 10-bit limit: {}",
+            self.payload <= EFFECT_PAYLOAD_MAX,
+            "effect payload exceeds {EFFECT_PAYLOAD_BITS}-bit limit: {}",
             self.payload
         );
-        let raw = ((self.opcode as u16) << 10) | ((self.payload as u16) & 0x3FF);
+        let raw = ((self.opcode as u16) << EFFECT_PAYLOAD_BITS)
+            | (self.payload as u16 & EFFECT_PAYLOAD_MAX as u16);
         raw.to_le_bytes()
     }
 }

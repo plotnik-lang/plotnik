@@ -8,10 +8,15 @@
 use std::io;
 
 use super::super::effects::{EffectOp, EffectOpcode};
+use super::super::instructions::{
+    Counts, MATCH_PAYLOAD_START, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
+    PREDICATE_SLOTS, header_byte,
+};
 use super::super::nav::Nav;
 use super::super::node_type_ir::NodeTypeIR;
-use super::super::{SECTION_ALIGN, VERSION};
+use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
+use crate::predicate_op::PredicateOp;
 
 /// Module load error.
 ///
@@ -24,7 +29,7 @@ pub enum ModuleError {
     InvalidMagic,
     #[error("unsupported version: {0} (expected {VERSION})")]
     UnsupportedVersion(u32),
-    #[error("file too small: {0} bytes (minimum 64)")]
+    #[error("file too small: {0} bytes (minimum {HEADER_SIZE})")]
     FileTooSmall(usize),
     #[error("size mismatch: header says {header} bytes, got {actual}")]
     SizeMismatch { header: u32, actual: usize },
@@ -75,11 +80,11 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
 impl Module {
     /// Load a module from storage.
     pub(super) fn from_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
-        if storage.len() < 64 {
+        if storage.len() < HEADER_SIZE {
             return Err(ModuleError::FileTooSmall(storage.len()));
         }
 
-        let header = Header::from_bytes(&storage[..64]);
+        let header = Header::from_bytes(&storage[..HEADER_SIZE]);
 
         if !header.validate_magic() {
             return Err(ModuleError::InvalidMagic);
@@ -153,7 +158,7 @@ impl Module {
             return Err(ModuleError::MalformedHeader);
         }
 
-        let computed = crc32fast::hash(&self.storage[64..]);
+        let computed = crc32fast::hash(&self.storage[HEADER_SIZE..]);
         if computed != self.header.checksum {
             return Err(ModuleError::ChecksumMismatch {
                 expected: self.header.checksum,
@@ -195,19 +200,19 @@ impl Module {
         let align = SECTION_ALIGN as u64;
         let oob = || ModuleError::SectionOutOfBounds { total };
 
-        let mut cursor = align; // str_blob starts right after the header
-        cursor = align_up_u64(cursor + h.str_blob_size as u64, align);
-        cursor = align_up_u64(cursor + h.regex_blob_size as u64, align);
-        cursor = align_up_u64(cursor + (h.str_table_count as u64 + 1) * 4, align);
-        cursor = align_up_u64(cursor + (h.regex_table_count as u64 + 1) * 8, align);
-        cursor = align_up_u64(cursor + h.node_types_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.node_fields_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_defs_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_members_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.type_names_count as u64 * 4, align);
-        cursor = align_up_u64(cursor + h.entrypoints_count as u64 * 8, align);
-        // `cursor` now points at the Transitions section.
-        let transitions_end = cursor + h.transitions_count as u64 * STEP_SIZE as u64;
+        let sizes = h.section_data_sizes();
+        let (transitions, rest) = sizes
+            .split_last()
+            .expect("section layout has at least one section");
+
+        // Every section but the last (Transitions) is alignment-padded; folding
+        // them leaves the cursor at the start of Transitions, whose unaligned end
+        // bounds the file.
+        let mut cursor = HEADER_SIZE as u64; // sections begin right after the header
+        for &size in rest {
+            cursor = align_up_u64(cursor + size, align);
+        }
+        let transitions_end = cursor + transitions;
 
         if transitions_end > total as u64 {
             return Err(oob());
@@ -222,28 +227,17 @@ impl Module {
     /// Section bounds are already proven by [`Self::validate_section_bounds`], so
     /// the slicing here stays in range.
     fn validate_section_padding(&self) -> Result<(), ModuleError> {
-        let h = &self.header;
-        let o = &self.offsets;
-        // (section start, data length) in layout order, terminated by a
-        // zero-length sentinel at the file end so the trailing gap is checked too.
-        let sections = [
-            (o.str_blob, h.str_blob_size),
-            (o.regex_blob, h.regex_blob_size),
-            (o.str_table, (h.str_table_count as u32 + 1) * 4),
-            (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
-            (o.node_types, h.node_types_count as u32 * 4),
-            (o.node_fields, h.node_fields_count as u32 * 4),
-            (o.type_defs, h.type_defs_count as u32 * 4),
-            (o.type_members, h.type_members_count as u32 * 4),
-            (o.type_names, h.type_names_count as u32 * 4),
-            (o.entrypoints, h.entrypoints_count as u32 * 8),
-            (o.transitions, h.transitions_count as u32 * STEP_SIZE as u32),
-            (h.total_size, 0),
-        ];
+        let starts = self.offsets.as_starts();
+        let sizes = self.header.section_data_sizes();
 
-        for win in sections.windows(2) {
-            let gap_start = (win[0].0 + win[0].1) as usize;
-            let gap_end = win[1].0 as usize;
+        // The gap after each section's data, up to the next section's start (or
+        // the file end for the last section), must be all zero.
+        for i in 0..starts.len() {
+            let gap_start = (starts[i] + sizes[i] as u32) as usize;
+            let gap_end = match starts.get(i + 1) {
+                Some(&next) => next as usize,
+                None => self.header.total_size as usize,
+            };
             if self.storage[gap_start..gap_end].iter().any(|&b| b != 0) {
                 return Err(ModuleError::NonZeroSectionPadding);
             }
@@ -463,51 +457,51 @@ impl Module {
             Ok(())
         };
 
-        // entrypoint name: u16 at entry+0 (8-byte entries)
+        // entrypoint name: u16 at entry+0
         check(
             self.offsets.entrypoints,
-            8,
+            Entrypoint::SIZE,
             0,
             0,
             self.header.entrypoints_count as usize,
         )?;
-        // node/field symbol name: u16 at entry+2 (4-byte entries)
+        // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_types,
-            4,
+            NodeSymbol::SIZE,
             2,
             0,
             self.header.node_types_count as usize,
         )?;
         check(
             self.offsets.node_fields,
-            4,
+            FieldSymbol::SIZE,
             2,
             0,
             self.header.node_fields_count as usize,
         )?;
-        // type name / member name: u16 at entry+0 (4-byte entries)
+        // type name / member name: u16 at entry+0
         check(
             self.offsets.type_names,
-            4,
+            TypeName::SIZE,
             0,
             0,
             self.header.type_names_count as usize,
         )?;
         check(
             self.offsets.type_members,
-            4,
+            TypeMember::SIZE,
             0,
             0,
             self.header.type_members_count as usize,
         )?;
-        // regex pattern name: u16 at entry+0 (8-byte entries). Index 0 is the
-        // reserved sentinel — never resolved — so start at 1; `dump`/`trace`
-        // resolve `string_id` for every real entry through the panicking
-        // `RegexView::get_string_id` (and then index the string blob).
+        // regex pattern name: u16 at entry+0. Index 0 is the reserved sentinel —
+        // never resolved — so start at 1; `dump`/`trace` resolve `string_id` for
+        // every real entry through the panicking `RegexView::get_string_id` (and
+        // then index the string blob).
         check(
             self.offsets.regex_table,
-            8,
+            REGEX_TABLE_ENTRY_SIZE,
             0,
             1,
             self.header.regex_table_count as usize,
@@ -579,7 +573,7 @@ impl Module {
             let instr_off = base + step as usize * STEP_SIZE;
             let header = read_u8(instr_off)?;
 
-            let nibble = header & 0x0F;
+            let nibble = header_byte::opcode_nibble(header);
             let Some(opcode) = Opcode::from_u8(nibble) else {
                 return Err(ModuleError::InvalidOpcode {
                     step,
@@ -588,14 +582,14 @@ impl Module {
             };
             // Every opcode reserves the segment bits; the call/return/trampoline
             // decoders `assert!` segment == 0, and a non-zero segment is unused.
-            if (header >> 6) & 0x3 != 0 {
+            if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedTransitions);
             }
             // node_kind (header bits 4-5) is meaningful only for Match variants;
             // Call/Return/Trampoline ignore it, so the format pins those bits to
             // zero — a forged non-zero node_kind there is smuggled state.
             if matches!(opcode, Opcode::Call | Opcode::Return | Opcode::Trampoline)
-                && (header >> 4) & 0x3 != 0
+                && header_byte::node_kind(header) != 0
             {
                 return Err(ModuleError::MalformedTransitions);
             }
@@ -632,7 +626,7 @@ impl Module {
                 }
                 _ => {
                     // A Match variant (`Match8` or extended).
-                    let node_kind = (header >> 4) & 0x3;
+                    let node_kind = header_byte::node_kind(header);
                     if NodeTypeIR::try_from_bytes(node_kind, read_u16(instr_off + 2)?).is_none() {
                         return Err(ModuleError::MalformedTransitions);
                     }
@@ -693,19 +687,22 @@ impl Module {
         let counts = read_u16(instr_off + 6)?;
         // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
         // the decoder never reads it, so a forged set bit would load unnoticed.
-        if counts & 0x1 != 0 {
+        if Counts::reserved_bit_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }
-        let pre = ((counts >> 13) & 0x7) as usize;
-        let neg = ((counts >> 10) & 0x7) as usize;
-        let post = ((counts >> 7) & 0x7) as usize;
-        let succ = ((counts >> 2) & 0x1F) as usize;
-        let has_predicate = (counts >> 1) & 0x1 != 0;
+        let c = Counts::unpack(counts);
+        let (pre, neg, post, succ) = (
+            c.pre as usize,
+            c.neg as usize,
+            c.post as usize,
+            c.succ as usize,
+        );
+        let has_predicate = c.has_predicate;
 
         // Every payload slot the decoders read — effects, predicate, successors —
         // must lie within this instruction's fixed-size slot, or the iterators
         // read into the next instruction (or past the buffer at the stream end).
-        let used = pre + neg + post + if has_predicate { 2 } else { 0 } + succ;
+        let used = pre + neg + post + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
             return Err(ModuleError::MalformedTransitions);
         }
@@ -715,9 +712,9 @@ impl Module {
         // materializer's `get_member`, which asserts the index is in bounds.
         let members = self.header.type_members_count;
         let check_effect = |slot: usize| -> Result<(), ModuleError> {
-            let off = instr_off + 8 + slot * 2;
+            let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
             let b = storage
-                .get(off..off + 2)
+                .get(off..off + PAYLOAD_SLOT_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
             let op =
                 EffectOp::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
@@ -736,46 +733,49 @@ impl Module {
         }
 
         if has_predicate {
-            let pred_off = instr_off + 8 + (pre + neg + post) * 2;
+            let pred_off = instr_off + MATCH_PAYLOAD_START + (pre + neg + post) * PAYLOAD_SLOT_SIZE;
             let b = storage
-                .get(pred_off..pred_off + 4)
+                .get(pred_off..pred_off + PREDICATE_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
             let op_and_flags = u16::from_le_bytes([b[0], b[1]]);
-            let op = (op_and_flags & 0xFF) as u8;
-            let is_regex = (op_and_flags >> 8) & 0x1 != 0;
+            let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
-            // Only the low byte (operator) and bit 8 (regex flag) are decoded; bits
-            // 9-15 are reserved-zero (docs/binary-format/06-transitions.md), so a
-            // forged set bit there must not load.
-            if op_and_flags >> 9 != 0 {
+            // Bits above the operator and regex flag are reserved-zero
+            // (docs/binary-format/06-transitions.md), so a forged set bit must
+            // not load.
+            if MatchPredicate::reserved_bits_set(op_and_flags) {
                 return Err(ModuleError::InvalidPredicateOperand(step as usize));
             }
 
-            // The operator must be a known predicate op (0..=6), the regex flag
-            // must agree with the operator's class, and the operand must index
-            // its table — otherwise `PredicateOp::from_byte`, `get_by_index`, or
-            // the VM's op/flag `unreachable!` would panic when this predicate is
-            // evaluated or dumped. The regex operand must be a *real* entry
-            // (`1..count`): index 0 is the reserved sentinel that
-            // `load_regex_dfas` leaves empty, so its DFA slot is `None`, and the
-            // VM `.expect()`s a populated slot. A string operand of 0 is benign —
-            // the validated easter-egg entry, never
-            // asserted non-empty.
-            let op_is_regex = matches!(op, 5 | 6); // RegexMatch | RegexNoMatch
+            // The operator must be a known predicate op, the regex flag must agree
+            // with the operator's class, and the operand must index its table —
+            // otherwise `PredicateOp::from_byte`, `get_by_index`, or the VM's
+            // op/flag `unreachable!` would panic when this predicate is evaluated
+            // or dumped. The regex operand must be a *real* entry (`1..count`):
+            // index 0 is the reserved sentinel that `load_regex_dfas` leaves empty,
+            // so its DFA slot is `None`, and the VM `.expect()`s a populated slot.
+            // A string operand of 0 is benign — the validated easter-egg entry,
+            // never asserted non-empty.
+            let Some(pred_op) = PredicateOp::try_from_byte(op) else {
+                return Err(ModuleError::InvalidPredicateOperand(step as usize));
+            };
             let operand_ok = if is_regex {
                 (1..self.header.regex_table_count).contains(&value_ref)
             } else {
                 value_ref < self.header.str_table_count
             };
-            if op > 6 || op_is_regex != is_regex || !operand_ok {
+            if pred_op.is_regex_op() != is_regex || !operand_ok {
                 return Err(ModuleError::InvalidPredicateOperand(step as usize));
             }
         }
 
-        let succ_off = instr_off + 8 + (pre + neg + post) * 2 + if has_predicate { 4 } else { 0 };
+        let succ_off = instr_off
+            + MATCH_PAYLOAD_START
+            + (pre + neg + post) * PAYLOAD_SLOT_SIZE
+            + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
-            let next = read_u16(succ_off + i * 2)?;
+            let next = read_u16(succ_off + i * PAYLOAD_SLOT_SIZE)?;
             // An extended successor decodes through `StepId::new`, which panics
             // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {

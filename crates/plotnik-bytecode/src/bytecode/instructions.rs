@@ -5,10 +5,117 @@
 
 use std::num::NonZeroU16;
 
-use super::constants::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE};
-use super::effects::EffectOp;
+use super::constants::{
+    MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
+    SECTION_ALIGN, STEP_SIZE,
+};
+use super::effects::{EFFECT_PAYLOAD_MAX, EffectOp};
 use super::nav::Nav;
 use super::node_type_ir::NodeTypeIR;
+
+/// Fixed header bytes before an extended Match's payload — exactly the first
+/// step. Effects, negated fields, an optional predicate, and successors follow,
+/// each occupying [`PAYLOAD_SLOT_SIZE`] bytes.
+pub(crate) const MATCH_PAYLOAD_START: usize = STEP_SIZE;
+
+/// Each Match payload slot is one little-endian `u16`.
+pub(crate) const PAYLOAD_SLOT_SIZE: usize = size_of::<u16>();
+
+/// A predicate occupies two payload slots: `op|flags (u16)`, then `value_ref (u16)`.
+pub(crate) const PREDICATE_SLOTS: usize = 2;
+
+/// A predicate's size in bytes within the payload.
+pub(crate) const PREDICATE_SIZE: usize = PREDICATE_SLOTS * PAYLOAD_SLOT_SIZE;
+
+/// The first byte of every instruction: `segment(2) | node_kind(2) | opcode(4)`.
+///
+/// One source of truth for the header-byte field positions, shared by every
+/// instruction decoder/encoder and the load-time validator.
+pub(crate) mod header_byte {
+    use super::Opcode;
+
+    const OPCODE_MASK: u8 = 0x0F;
+    const FIELD2_MASK: u8 = 0b11;
+    const NODE_KIND_SHIFT: u32 = 4;
+    const SEGMENT_SHIFT: u32 = 6;
+
+    /// The raw opcode nibble (low 4 bits), without validating it.
+    pub(crate) fn opcode_nibble(b: u8) -> u8 {
+        b & OPCODE_MASK
+    }
+
+    /// The opcode, or `None` if the nibble is unassigned (untrusted input).
+    pub(crate) fn opcode(b: u8) -> Option<Opcode> {
+        Opcode::from_u8(opcode_nibble(b))
+    }
+
+    /// The 2-bit segment field (bits 7-6).
+    pub(crate) fn segment(b: u8) -> u8 {
+        (b >> SEGMENT_SHIFT) & FIELD2_MASK
+    }
+
+    /// The 2-bit node-kind field (bits 5-4); meaningful only for Match.
+    pub(crate) fn node_kind(b: u8) -> u8 {
+        (b >> NODE_KIND_SHIFT) & FIELD2_MASK
+    }
+
+    /// Assemble a header byte from its fields.
+    pub(crate) fn pack(segment: u8, node_kind: u8, opcode: Opcode) -> u8 {
+        (segment << SEGMENT_SHIFT) | (node_kind << NODE_KIND_SHIFT) | (opcode as u8)
+    }
+}
+
+/// The 16-bit counts word of an extended Match (`Match16`–`Match64`):
+/// `pre(3) | neg(3) | post(3) | succ(5) | has_predicate(1) | reserved(1)`.
+///
+/// Decoded once here so the Match decoder, the encoder, and the load-time
+/// validator share one definition of the field positions.
+#[derive(Clone, Copy)]
+pub(crate) struct Counts {
+    pub(crate) pre: u8,
+    pub(crate) neg: u8,
+    pub(crate) post: u8,
+    pub(crate) succ: u8,
+    pub(crate) has_predicate: bool,
+}
+
+impl Counts {
+    const PRE_SHIFT: u32 = 13;
+    const NEG_SHIFT: u32 = 10;
+    const POST_SHIFT: u32 = 7;
+    const SUCC_SHIFT: u32 = 2;
+    const COUNT3_MASK: u16 = 0x7;
+    const SUCC_MASK: u16 = 0x1F;
+    const PREDICATE_BIT: u16 = 1 << 1;
+    const RESERVED_MASK: u16 = 0x1;
+
+    pub(crate) fn unpack(w: u16) -> Self {
+        Self {
+            pre: ((w >> Self::PRE_SHIFT) & Self::COUNT3_MASK) as u8,
+            neg: ((w >> Self::NEG_SHIFT) & Self::COUNT3_MASK) as u8,
+            post: ((w >> Self::POST_SHIFT) & Self::COUNT3_MASK) as u8,
+            succ: ((w >> Self::SUCC_SHIFT) & Self::SUCC_MASK) as u8,
+            has_predicate: w & Self::PREDICATE_BIT != 0,
+        }
+    }
+
+    pub(crate) fn pack(self) -> u16 {
+        ((self.pre as u16) << Self::PRE_SHIFT)
+            | ((self.neg as u16) << Self::NEG_SHIFT)
+            | ((self.post as u16) << Self::POST_SHIFT)
+            | ((self.succ as u16) << Self::SUCC_SHIFT)
+            | if self.has_predicate {
+                Self::PREDICATE_BIT
+            } else {
+                0
+            }
+    }
+
+    /// Whether the reserved bit (bit 0) is set; load-time validation rejects it.
+    pub(crate) fn reserved_bit_set(w: u16) -> bool {
+        w & Self::RESERVED_MASK != 0
+    }
+}
 
 /// Step address in bytecode (raw u16).
 ///
@@ -72,8 +179,9 @@ impl Opcode {
         }
     }
 
-    /// Instruction size in bytes.
-    pub fn size(self) -> usize {
+    /// Instruction size in bytes. The variant ladder is defined here; payload
+    /// capacity and step count derive from it.
+    pub const fn size(self) -> usize {
         match self {
             Self::Match8 => 8,
             Self::Match16 => 16,
@@ -81,19 +189,17 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call => 8,
-            Self::Return => 8,
-            Self::Trampoline => 8,
+            Self::Call | Self::Return | Self::Trampoline => STEP_SIZE,
         }
     }
 
     /// Number of steps this instruction occupies.
-    pub fn step_count(self) -> u16 {
+    pub const fn step_count(self) -> u16 {
         (self.size() / STEP_SIZE) as u16
     }
 
     /// Whether this is a Match variant.
-    pub fn is_match(self) -> bool {
+    pub const fn is_match(self) -> bool {
         matches!(
             self,
             Self::Match8
@@ -106,25 +212,22 @@ impl Opcode {
     }
 
     /// Whether this is an extended Match (Match16-64).
-    pub fn is_extended_match(self) -> bool {
+    pub const fn is_extended_match(self) -> bool {
         matches!(
             self,
             Self::Match16 | Self::Match24 | Self::Match32 | Self::Match48 | Self::Match64
         )
     }
 
-    /// Payload capacity in u16 slots for extended Match variants.
-    pub fn payload_slots(self) -> usize {
-        match self {
-            Self::Match16 => 4,
-            Self::Match24 => 8,
-            Self::Match32 => 12,
-            Self::Match48 => 20,
-            Self::Match64 => 28,
-            _ => 0,
-        }
+    /// Payload capacity in u16 slots — whatever follows the one-step header.
+    /// Zero for non-extended variants (Match8, Call, Return, Trampoline).
+    pub const fn payload_slots(self) -> usize {
+        (self.size() - MATCH_PAYLOAD_START) / PAYLOAD_SLOT_SIZE
     }
 }
+
+/// `MAX_MATCH_PAYLOAD_SLOTS` must track the largest variant's capacity.
+const _: () = assert!(MAX_MATCH_PAYLOAD_SLOTS == Opcode::Match64.payload_slots());
 
 /// Match instruction decoded from bytecode.
 ///
@@ -162,13 +265,12 @@ impl<'a> Match<'a> {
     /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= 8, "Match instruction too short");
+        debug_assert!(bytes.len() >= STEP_SIZE, "Match instruction too short");
 
         let type_id_byte = bytes[0];
-        // Header byte: segment(2) | node_kind(2) | opcode(4)
-        let segment = (type_id_byte >> 6) & 0x3;
-        let node_kind = (type_id_byte >> 4) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
+        let segment = header_byte::segment(type_id_byte);
+        let node_kind = header_byte::node_kind(type_id_byte);
+        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
         debug_assert!(segment == 0, "non-zero segment not yet supported");
         debug_assert!(opcode.is_match(), "expected Match opcode");
 
@@ -182,23 +284,8 @@ impl<'a> Match<'a> {
                 let next = u16::from_le_bytes([bytes[6], bytes[7]]);
                 (true, next, 0, 0, 0, if next == 0 { 0 } else { 1 }, false)
             } else {
-                // counts field layout (16 bits):
-                // bits 15-13: pre_count (3)
-                // bits 12-10: neg_count (3)
-                // bits  9-7:  post_count (3)
-                // bits  6-2:  succ_count (5, max 31)
-                // bit   1:    has_predicate
-                // bit   0:    reserved
-                let counts = u16::from_le_bytes([bytes[6], bytes[7]]);
-                (
-                    false,
-                    0,
-                    ((counts >> 13) & 0x7) as u8,
-                    ((counts >> 10) & 0x7) as u8,
-                    ((counts >> 7) & 0x7) as u8,
-                    ((counts >> 2) & 0x1F) as u8,
-                    (counts >> 1) & 0x1 != 0,
-                )
+                let c = Counts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
+                (false, 0, c.pre, c.neg, c.post, c.succ, c.has_predicate)
             };
 
         Self {
@@ -235,6 +322,14 @@ impl<'a> Match<'a> {
         self.is_match8
     }
 
+    /// Steps (8-byte slots) this instruction occupies, read from its opcode.
+    #[inline]
+    pub fn step_count(&self) -> u16 {
+        header_byte::opcode(self.bytes[0])
+            .expect("decoded Match has a valid opcode")
+            .step_count()
+    }
+
     /// Number of successors.
     #[inline]
     pub fn succ_count(&self) -> usize {
@@ -253,7 +348,7 @@ impl<'a> Match<'a> {
             debug_assert!(self.match8_next != 0, "terminal has no successors");
             StepId::new(self.match8_next)
         } else {
-            let offset = self.succ_offset() + idx * 2;
+            let offset = self.succ_offset() + idx * PAYLOAD_SLOT_SIZE;
             StepId::new(u16::from_le_bytes([
                 self.bytes[offset],
                 self.bytes[offset + 1],
@@ -264,9 +359,9 @@ impl<'a> Match<'a> {
     /// Iterate over pre-effects (executed after transition acceptance, before post-effects).
     #[inline]
     pub fn pre_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
-        let start = 8; // payload starts at byte 8
+        let start = MATCH_PAYLOAD_START;
         (0..self.pre_count as usize).map(move |i| {
-            let offset = start + i * 2;
+            let offset = start + i * PAYLOAD_SLOT_SIZE;
             EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
@@ -274,9 +369,9 @@ impl<'a> Match<'a> {
     /// Iterate over negated fields (must NOT be present on matched node).
     #[inline]
     pub fn neg_fields(&self) -> impl Iterator<Item = u16> + '_ {
-        let start = 8 + (self.pre_count as usize) * 2;
+        let start = MATCH_PAYLOAD_START + (self.pre_count as usize) * PAYLOAD_SLOT_SIZE;
         (0..self.neg_count as usize).map(move |i| {
-            let offset = start + i * 2;
+            let offset = start + i * PAYLOAD_SLOT_SIZE;
             u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
@@ -284,9 +379,10 @@ impl<'a> Match<'a> {
     /// Iterate over post-effects (executed after successful match).
     #[inline]
     pub fn post_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
-        let start = 8 + (self.pre_count as usize + self.neg_count as usize) * 2;
+        let start = MATCH_PAYLOAD_START
+            + (self.pre_count as usize + self.neg_count as usize) * PAYLOAD_SLOT_SIZE;
         (0..self.post_count as usize).map(move |i| {
-            let offset = start + i * 2;
+            let offset = start + i * PAYLOAD_SLOT_SIZE;
             EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
@@ -305,7 +401,7 @@ impl<'a> Match<'a> {
 
     /// Get predicate data if present: (op, is_regex, value_ref).
     ///
-    /// - `op`: operator (0=Eq, 1=Ne, 2=StartsWith, 3=EndsWith, 4=Contains, 5=RegexMatch, 6=RegexNoMatch)
+    /// - `op`: operator (see [`crate::predicate_op::PredicateOp`])
     /// - `is_regex`: true if value_ref is a RegexTable index, false if StringTable index
     /// - `value_ref`: index into the appropriate table
     pub fn predicate(&self) -> Option<(u8, bool, u16)> {
@@ -313,26 +409,34 @@ impl<'a> Match<'a> {
             return None;
         }
 
-        let effects_size =
-            (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2;
-        let offset = 8 + effects_size;
-
+        let offset = MATCH_PAYLOAD_START + self.effects_size();
         let op_and_flags = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
-        let op = (op_and_flags & 0xFF) as u8;
-        let is_regex = (op_and_flags >> 8) & 0x1 != 0;
-        let value_ref = u16::from_le_bytes([self.bytes[offset + 2], self.bytes[offset + 3]]);
+        let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
+        let value_ref = u16::from_le_bytes([
+            self.bytes[offset + PAYLOAD_SLOT_SIZE],
+            self.bytes[offset + PAYLOAD_SLOT_SIZE + 1],
+        ]);
 
         Some((op, is_regex, value_ref))
     }
 
+    /// Bytes occupied by the pre/neg/post payload slots.
+    #[inline]
+    fn effects_size(&self) -> usize {
+        (self.pre_count as usize + self.neg_count as usize + self.post_count as usize)
+            * PAYLOAD_SLOT_SIZE
+    }
+
     /// Byte offset where successors start in the payload.
-    /// Accounts for predicate (4 bytes) if present.
+    /// Accounts for the predicate slots if present.
     #[inline]
     fn succ_offset(&self) -> usize {
-        let effects_size =
-            (self.pre_count as usize + self.neg_count as usize + self.post_count as usize) * 2;
-        let predicate_size = if self.has_predicate { 4 } else { 0 };
-        8 + effects_size + predicate_size
+        let predicate_size = if self.has_predicate {
+            PREDICATE_SIZE
+        } else {
+            0
+        };
+        MATCH_PAYLOAD_START + self.effects_size() + predicate_size
     }
 
     /// Collect this borrowed view into an owned, encodable [`MatchInstr`].
@@ -366,12 +470,36 @@ pub struct MatchPredicate {
 }
 
 impl MatchPredicate {
+    /// Operator occupies the low byte of the op/flags word.
+    const OP_MASK: u16 = 0xFF;
+    /// Bit 8 flags a regex operand; the operator byte is below it.
+    const REGEX_FLAG: u16 = 1 << 8;
+    /// Bits above the operator and regex flag are reserved-zero.
+    const RESERVED_MASK: u16 = !(Self::OP_MASK | Self::REGEX_FLAG);
+
     fn from_tuple((op, is_regex, value_ref): (u8, bool, u16)) -> Self {
         Self {
             op,
             is_regex,
             value_ref,
         }
+    }
+
+    /// Pack the op/flags word — the predicate's first payload slot.
+    fn pack_op_flags(self) -> u16 {
+        (self.op as u16) | if self.is_regex { Self::REGEX_FLAG } else { 0 }
+    }
+
+    /// Unpack `(op, is_regex)` from the op/flags word. Shared by the decoder and
+    /// the load-time validator.
+    pub(crate) fn unpack_op_flags(w: u16) -> (u8, bool) {
+        ((w & Self::OP_MASK) as u8, w & Self::REGEX_FLAG != 0)
+    }
+
+    /// Whether any reserved bit of the op/flags word is set; load-time
+    /// validation rejects it.
+    pub(crate) fn reserved_bits_set(w: u16) -> bool {
+        w & Self::RESERVED_MASK != 0
     }
 }
 
@@ -401,20 +529,17 @@ pub struct MatchInstr {
 pub enum EncodeError {
     #[error("too many pre-effects on one match: {0} (max {MAX_PRE_EFFECTS})")]
     TooManyPreEffects(usize),
-    #[error("too many negated fields on one match: {0} (max 7)")]
+    #[error("too many negated fields on one match: {0} (max {MAX_NEG_FIELDS})")]
     TooManyNegFields(usize),
-    #[error("too many post-effects on one match: {0} (max 7)")]
+    #[error("too many post-effects on one match: {0} (max {MAX_POST_EFFECTS})")]
     TooManyPostEffects(usize),
-    #[error("too many successors on one match: {0} (max 31)")]
+    #[error("too many successors on one match: {0} (max {MAX_SUCCESSORS})")]
     TooManySuccessors(usize),
     #[error("match payload too large: {0} slots (max {MAX_MATCH_PAYLOAD_SLOTS})")]
     PayloadTooLarge(usize),
-    #[error("effect payload exceeds 10-bit limit: {0} (max 1023)")]
+    #[error("effect payload exceeds limit: {0} (max {EFFECT_PAYLOAD_MAX})")]
     EffectPayloadOverflow(usize),
 }
-
-/// Maximum effect payload (10 bits), shared by encode and decode.
-const EFFECT_PAYLOAD_MAX: usize = 0x3FF;
 
 impl MatchInstr {
     /// Encode to bytecode bytes, choosing the smallest fitting Match variant.
@@ -438,8 +563,8 @@ impl MatchInstr {
             && self.successors.len() <= 1;
 
         if can_use_match8 {
-            let mut bytes = vec![0u8; 8];
-            bytes[0] = (node_kind << 4) | (Opcode::Match8 as u8);
+            let mut bytes = vec![0u8; Opcode::Match8.size()];
+            bytes[0] = header_byte::pack(0, node_kind, Opcode::Match8);
             bytes[1] = self.nav.to_byte();
             bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
             bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
@@ -455,57 +580,59 @@ impl MatchInstr {
         if pre > MAX_PRE_EFFECTS {
             return Err(EncodeError::TooManyPreEffects(pre));
         }
-        if neg > 7 {
+        if neg > MAX_NEG_FIELDS {
             return Err(EncodeError::TooManyNegFields(neg));
         }
-        if post > 7 {
+        if post > MAX_POST_EFFECTS {
             return Err(EncodeError::TooManyPostEffects(post));
         }
-        if succ > 31 {
+        if succ > MAX_SUCCESSORS {
             return Err(EncodeError::TooManySuccessors(succ));
         }
 
-        let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
+        let predicate_slots = if self.predicate.is_some() {
+            PREDICATE_SLOTS
+        } else {
+            0
+        };
         let slots = pre + neg + post + predicate_slots + succ;
         let opcode = select_match_opcode(slots).ok_or(EncodeError::PayloadTooLarge(slots))?;
 
         let mut bytes = vec![0u8; opcode.size()];
-        bytes[0] = (node_kind << 4) | (opcode as u8);
+        bytes[0] = header_byte::pack(0, node_kind, opcode);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
 
-        // counts layout: pre(3) | neg(3) | post(3) | succ(5) | has_pred(1) | reserved(1)
-        let counts = ((pre as u16) << 13)
-            | ((neg as u16) << 10)
-            | ((post as u16) << 7)
-            | ((succ as u16) << 2)
-            | ((self.predicate.is_some() as u16) << 1);
-        bytes[6..8].copy_from_slice(&counts.to_le_bytes());
+        let counts = Counts {
+            pre: pre as u8,
+            neg: neg as u8,
+            post: post as u8,
+            succ: succ as u8,
+            has_predicate: self.predicate.is_some(),
+        };
+        bytes[6..8].copy_from_slice(&counts.pack().to_le_bytes());
 
-        let mut offset = 8;
+        let mut offset = MATCH_PAYLOAD_START;
+        let mut put = |bytes: &mut [u8], data: [u8; 2]| {
+            bytes[offset..offset + PAYLOAD_SLOT_SIZE].copy_from_slice(&data);
+            offset += PAYLOAD_SLOT_SIZE;
+        };
         for effect in &self.pre_effects {
-            bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
-            offset += 2;
+            put(&mut bytes, effect.to_bytes());
         }
         for &field in &self.neg_fields {
-            bytes[offset..offset + 2].copy_from_slice(&field.to_le_bytes());
-            offset += 2;
+            put(&mut bytes, field.to_le_bytes());
         }
         for effect in &self.post_effects {
-            bytes[offset..offset + 2].copy_from_slice(&effect.to_bytes());
-            offset += 2;
+            put(&mut bytes, effect.to_bytes());
         }
         if let Some(pred) = &self.predicate {
-            let op_and_flags = (pred.op as u16) | ((pred.is_regex as u16) << 8);
-            bytes[offset..offset + 2].copy_from_slice(&op_and_flags.to_le_bytes());
-            offset += 2;
-            bytes[offset..offset + 2].copy_from_slice(&pred.value_ref.to_le_bytes());
-            offset += 2;
+            put(&mut bytes, pred.pack_op_flags().to_le_bytes());
+            put(&mut bytes, pred.value_ref.to_le_bytes());
         }
         for succ in &self.successors {
-            bytes[offset..offset + 2].copy_from_slice(&succ.get().to_le_bytes());
-            offset += 2;
+            put(&mut bytes, succ.get().to_le_bytes());
         }
 
         Ok(bytes)
@@ -545,8 +672,8 @@ impl Call {
     /// For Call, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
+        let segment = header_byte::segment(type_id_byte);
+        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -567,8 +694,7 @@ impl Call {
     /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        // node_kind = 0 for Call
-        bytes[0] = (self.segment << 6) | (Opcode::Call as u8);
+        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Call);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
         bytes[4..6].copy_from_slice(&self.next.get().to_le_bytes());
@@ -609,8 +735,8 @@ impl Return {
     /// For Return, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
+        let segment = header_byte::segment(type_id_byte);
+        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -625,8 +751,7 @@ impl Return {
     /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        // node_kind = 0 for Return
-        bytes[0] = (self.segment << 6) | (Opcode::Return as u8);
+        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Return);
         // bytes[1..8] are reserved/padding
         bytes
     }
@@ -663,8 +788,8 @@ impl Trampoline {
     /// For Trampoline, node_kind bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
         let type_id_byte = bytes[0];
-        let segment = (type_id_byte >> 6) & 0x3;
-        let opcode = Opcode::from_u8(type_id_byte & 0xF).expect("invalid opcode");
+        let segment = header_byte::segment(type_id_byte);
+        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -682,8 +807,7 @@ impl Trampoline {
     /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
-        // node_kind = 0 for Trampoline
-        bytes[0] = (self.segment << 6) | (Opcode::Trampoline as u8);
+        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Trampoline);
         // bytes[1] is padding
         bytes[2..4].copy_from_slice(&self.next.get().to_le_bytes());
         // bytes[4..8] are reserved/padding
@@ -695,19 +819,21 @@ impl Trampoline {
     }
 }
 
-/// Select the smallest Match variant that fits the given payload.
+/// Select the smallest Match variant that fits the given payload. Returns
+/// `None` when no variant is large enough (the caller must split).
 pub fn select_match_opcode(slots_needed: usize) -> Option<Opcode> {
     if slots_needed == 0 {
         return Some(Opcode::Match8);
     }
-    match slots_needed {
-        1..=4 => Some(Opcode::Match16),
-        5..=8 => Some(Opcode::Match24),
-        9..=12 => Some(Opcode::Match32),
-        13..=20 => Some(Opcode::Match48),
-        21..=28 => Some(Opcode::Match64),
-        _ => None, // Too large, must split
-    }
+    [
+        Opcode::Match16,
+        Opcode::Match24,
+        Opcode::Match32,
+        Opcode::Match48,
+        Opcode::Match64,
+    ]
+    .into_iter()
+    .find(|op| op.payload_slots() >= slots_needed)
 }
 
 /// Pad a size to the next multiple of SECTION_ALIGN (64 bytes).

@@ -5,7 +5,17 @@
 //! NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Transitions
 
-use super::{MAGIC, SECTION_ALIGN, VERSION};
+use super::entrypoint::Entrypoint;
+use super::sections::{FieldSymbol, NodeSymbol};
+use super::type_meta::{TypeDef, TypeMember, TypeName};
+use super::{
+    HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    VERSION,
+};
+
+/// Number of sections after the header, in layout order. The single descriptor
+/// of that layout is [`Header::section_data_sizes`].
+pub(crate) const SECTION_COUNT: usize = 11;
 
 /// File header - first 64 bytes of the bytecode file.
 ///
@@ -45,7 +55,7 @@ pub struct Header {
     pub _reserved: [u8; 22],
 }
 
-const _: () = assert!(std::mem::size_of::<Header>() == 64);
+const _: () = assert!(std::mem::size_of::<Header>() == HEADER_SIZE);
 
 impl Default for Header {
     fn default() -> Self {
@@ -89,13 +99,49 @@ pub struct SectionOffsets {
     pub(crate) transitions: u32,
 }
 
+impl SectionOffsets {
+    /// Build from section start offsets in layout order.
+    fn from_starts(o: [u32; SECTION_COUNT]) -> Self {
+        Self {
+            str_blob: o[0],
+            regex_blob: o[1],
+            str_table: o[2],
+            regex_table: o[3],
+            node_types: o[4],
+            node_fields: o[5],
+            type_defs: o[6],
+            type_members: o[7],
+            type_names: o[8],
+            entrypoints: o[9],
+            transitions: o[10],
+        }
+    }
+
+    /// Section start offsets in layout order.
+    pub(crate) fn as_starts(&self) -> [u32; SECTION_COUNT] {
+        [
+            self.str_blob,
+            self.regex_blob,
+            self.str_table,
+            self.regex_table,
+            self.node_types,
+            self.node_fields,
+            self.type_defs,
+            self.type_members,
+            self.type_names,
+            self.entrypoints,
+            self.transitions,
+        ]
+    }
+}
+
 impl Header {
     /// Decode header from 64 bytes.
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= 64, "header too short");
+        assert!(bytes.len() >= HEADER_SIZE, "header too short");
 
         let mut reserved = [0u8; 22];
-        reserved.copy_from_slice(&bytes[42..64]);
+        reserved.copy_from_slice(&bytes[42..HEADER_SIZE]);
 
         Self {
             magic: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -118,8 +164,8 @@ impl Header {
     }
 
     /// Encode header to 64 bytes.
-    pub fn to_bytes(&self) -> [u8; 64] {
-        let mut bytes = [0u8; 64];
+    pub fn to_bytes(&self) -> [u8; HEADER_SIZE] {
+        let mut bytes = [0u8; HEADER_SIZE];
         bytes[0..4].copy_from_slice(&self.magic);
         bytes[4..8].copy_from_slice(&self.version.to_le_bytes());
         bytes[8..12].copy_from_slice(&self.checksum.to_le_bytes());
@@ -135,7 +181,7 @@ impl Header {
         bytes[36..38].copy_from_slice(&self.type_names_count.to_le_bytes());
         bytes[38..40].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.transitions_count.to_le_bytes());
-        bytes[42..64].copy_from_slice(&self._reserved);
+        bytes[42..HEADER_SIZE].copy_from_slice(&self._reserved);
         bytes
     }
 
@@ -147,62 +193,46 @@ impl Header {
         self.version == VERSION
     }
 
-    /// Compute section offsets from counts and blob sizes.
+    /// Data size (bytes, before alignment padding) of each section, in layout
+    /// order. This is the single descriptor of the section layout — offset
+    /// computation ([`compute_offsets`](Self::compute_offsets)) and the load-time
+    /// bounds/padding checks all fold over it.
     ///
-    /// Section order (all 64-byte aligned):
-    /// Header → StringBlob → RegexBlob → StringTable → RegexTable →
-    /// NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
-    /// Entrypoints → Transitions
+    /// Widened to `u64` so a corrupt header cannot overflow a running layout.
+    ///
+    /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeTypes →
+    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
+    pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
+        // Tables carry a trailing sentinel entry, hence the `+ 1`.
+        [
+            self.str_blob_size as u64,
+            self.regex_blob_size as u64,
+            (self.str_table_count as u64 + 1) * STRING_TABLE_ENTRY_SIZE as u64,
+            (self.regex_table_count as u64 + 1) * REGEX_TABLE_ENTRY_SIZE as u64,
+            self.node_types_count as u64 * NodeSymbol::SIZE as u64,
+            self.node_fields_count as u64 * FieldSymbol::SIZE as u64,
+            self.type_defs_count as u64 * TypeDef::SIZE as u64,
+            self.type_members_count as u64 * TypeMember::SIZE as u64,
+            self.type_names_count as u64 * TypeName::SIZE as u64,
+            self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
+            self.transitions_count as u64 * STEP_SIZE as u64,
+        ]
+    }
+
+    /// Compute section start offsets from counts and blob sizes.
+    ///
+    /// Each section is `SECTION_ALIGN`-aligned and begins right after the header.
+    /// Callers run `Module::validate_section_bounds` first, so the `u32`
+    /// arithmetic here cannot overflow.
     pub fn compute_offsets(&self) -> SectionOffsets {
         let align = SECTION_ALIGN as u32;
-
-        // Blobs first (right after header)
-        let str_blob = align; // 64
-        let regex_blob = align_up(str_blob + self.str_blob_size, align);
-
-        // Tables after blobs
-        let str_table = align_up(regex_blob + self.regex_blob_size, align);
-        let str_table_size = (self.str_table_count as u32 + 1) * 4;
-
-        let regex_table = align_up(str_table + str_table_size, align);
-        let regex_table_size = (self.regex_table_count as u32 + 1) * 8;
-
-        // Symbol sections
-        let node_types = align_up(regex_table + regex_table_size, align);
-        let node_types_size = self.node_types_count as u32 * 4;
-
-        let node_fields = align_up(node_types + node_types_size, align);
-        let node_fields_size = self.node_fields_count as u32 * 4;
-
-        // Type metadata
-        let type_defs = align_up(node_fields + node_fields_size, align);
-        let type_defs_size = self.type_defs_count as u32 * 4;
-
-        let type_members = align_up(type_defs + type_defs_size, align);
-        let type_members_size = self.type_members_count as u32 * 4;
-
-        let type_names = align_up(type_members + type_members_size, align);
-        let type_names_size = self.type_names_count as u32 * 4;
-
-        // Entry points and instructions
-        let entrypoints = align_up(type_names + type_names_size, align);
-        let entrypoints_size = self.entrypoints_count as u32 * 8;
-
-        let transitions = align_up(entrypoints + entrypoints_size, align);
-
-        SectionOffsets {
-            str_blob,
-            regex_blob,
-            str_table,
-            regex_table,
-            node_types,
-            node_fields,
-            type_defs,
-            type_members,
-            type_names,
-            entrypoints,
-            transitions,
+        let mut starts = [0u32; SECTION_COUNT];
+        let mut cursor = HEADER_SIZE as u32; // sections begin right after the header
+        for (start, size) in starts.iter_mut().zip(self.section_data_sizes()) {
+            *start = cursor;
+            cursor = align_up(cursor + size as u32, align);
         }
+        SectionOffsets::from_starts(starts)
     }
 }
 

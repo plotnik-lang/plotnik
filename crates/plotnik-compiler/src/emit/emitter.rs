@@ -8,7 +8,9 @@ use crate::analyze::type_check::TypeId;
 use crate::bytecode::{EmitContext, InstructionIR, Label, PredicateValueIR};
 use crate::compile::{CompileCtx, Compiler};
 use crate::query::LinkedQuery;
-use plotnik_bytecode::{Entrypoint, FieldSymbol, Header, NodeSymbol, SECTION_ALIGN};
+use plotnik_bytecode::{
+    Entrypoint, FieldSymbol, HEADER_SIZE, Header, NodeSymbol, SECTION_ALIGN, STEP_SIZE,
+};
 
 use super::EmitError;
 use super::layout::CacheAligned;
@@ -127,7 +129,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     // Header → StringBlob → RegexBlob → StringTable → RegexTable →
     // NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
     // Entrypoints → Transitions
-    let mut output = vec![0u8; 64]; // Reserve header space
+    let mut output = vec![0u8; HEADER_SIZE]; // Reserve header space
 
     emit_section(&mut output, &str_blob);
     emit_section(&mut output, &regex_blob);
@@ -160,8 +162,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         total_size,
         ..Default::default()
     };
-    header.checksum = crc32fast::hash(&output[64..]);
-    output[..64].copy_from_slice(&header.to_bytes());
+    header.checksum = crc32fast::hash(&output[HEADER_SIZE..]);
+    output[..HEADER_SIZE].copy_from_slice(&header.to_bytes());
 
     // In debug/test builds, prove the emitter only ever produces bytecode the
     // loader accepts: every emission is gated through the full structural
@@ -195,7 +197,7 @@ fn emit_transitions(
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
     // Allocate buffer for all steps (8 bytes each)
-    let mut bytes = vec![0u8; layout.total_steps() as usize * 8];
+    let mut bytes = vec![0u8; layout.total_steps() as usize * STEP_SIZE];
 
     // Member index resolvers: struct fields and enum variants both resolve via
     // parent_type + relative_index (get_member_base); regex predicates index the
@@ -210,7 +212,7 @@ fn emit_transitions(
             continue;
         };
 
-        let offset = step_id as usize * 8; // STEP_SIZE
+        let offset = step_id as usize * STEP_SIZE;
         let resolved = instr.resolve(layout.label_to_step(), &ctx)?;
 
         // Copy instruction bytes to the correct position
@@ -247,7 +249,7 @@ fn emit_section(output: &mut Vec<u8>, data: &[u8]) {
 }
 
 fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * 4);
+    let mut bytes = Vec::with_capacity(symbols.len() * NodeSymbol::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
         bytes.extend_from_slice(&sym.name.get().to_le_bytes());
@@ -256,7 +258,7 @@ fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
 }
 
 fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * 4);
+    let mut bytes = Vec::with_capacity(symbols.len() * FieldSymbol::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
         bytes.extend_from_slice(&sym.name.get().to_le_bytes());
@@ -265,7 +267,7 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
 }
 
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entrypoints.len() * 8);
+    let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
     for ep in entrypoints {
         bytes.extend_from_slice(&ep.name().get().to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
