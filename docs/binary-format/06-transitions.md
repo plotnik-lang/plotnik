@@ -30,7 +30,7 @@ type_id (u8)
 ```
 
 - **Bits 7-6 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
-- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Ignored for Call/Return/Trampoline.
+- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Unused for Call/Return/Trampoline, where they must be zero; loaders reject a non-zero value.
 - **Bits 3-0 (Opcode)**: Step type and size.
 
 **NodeKind values** (for Match instructions):
@@ -209,7 +209,7 @@ counts (u16)
 - **Bits 9-7**: `post_count` (0-7)
 - **Bits 6-2**: `succ_count` (0-31)
 - **Bit 1**: `has_predicate` (if set, payload includes 4-byte predicate before successors)
-- **Bit 0**: Reserved (must be 0)
+- **Bit 0**: Reserved; must be 0, loaders reject a set bit
 
 **Payload** (immediately follows header):
 
@@ -227,7 +227,7 @@ counts (u16)
 ```rust
 #[repr(C)]
 struct Predicate {
-    op: u16,        // Bits 0-3: operator (1-7), rest reserved
+    op: u16,        // low byte: operator; bit 8: regex flag; bits 9-15 reserved (zero, rejected at load)
     value_ref: u16, // StringId (string ops) or RegexId (regex ops)
 }
 ```
@@ -311,7 +311,7 @@ Returns from a definition. Pops the return address from the call stack.
 #[repr(C)]
 struct Return {
     type_id: u8,        // segment(2) | 0 | 0x7
-    _pad: [u8; 7],
+    _pad: [u8; 7],      // reserved; must be zero, loaders reject a non-zero pad
 }
 ```
 
@@ -323,9 +323,9 @@ Universal entry point instruction. Like Call, but the target comes from VM conte
 #[repr(C)]
 struct Trampoline {
     type_id: u8,        // segment(2) | 0 | 0x8
-    _pad1: u8,
+    _pad1: u8,          // reserved; must be zero, loaders reject a non-zero pad
     next: u16,          // Return address (StepId)
-    _pad2: [u8; 4],
+    _pad2: [u8; 4],     // reserved; must be zero, loaders reject a non-zero pad
 }
 ```
 

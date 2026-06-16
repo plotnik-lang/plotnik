@@ -5,22 +5,24 @@
 //! [`Module::load`] rejects it with a clean [`ModuleError`] rather than letting a
 //! later view/decode, VM, or materializer access panic. Together they guard the
 //! load-time structural validators (`validate_string_ids`, `validate_transitions`,
-//! `validate_entrypoints`, `load_regex_dfas`, `validate_effect_stack`) that
-//! uphold the format's "a loaded module never panics on later access" guarantee.
+//! `validate_entrypoints`, `validate_type_defs`, `validate_type_names`,
+//! `load_regex_dfas`, `validate_effect_stack`) that uphold the format's "a loaded
+//! module never panics on later access" guarantee.
 //!
-//! These live in-crate rather than under `tests/`: forging exact bytes needs the
-//! `pub(crate)` section offsets from [`Module::offsets`], which an external
-//! integration test cannot reach. Minting a real module needs the compiler, which
-//! depends on this crate — a cycle that is fine through a `[dev-dependencies]`
-//! edge, since it never enters the build graph. `build.rs` exposes the JavaScript
-//! `grammar.json` the fixtures link against.
+//! These live in-crate rather than under `tests/`: forging exact byte offsets
+//! reads `SectionOffsets`' `pub(crate)` fields (via [`Module::offsets`]), which an
+//! external integration test cannot reach. Minting a real module needs the
+//! compiler, which depends on this crate — a cycle that is fine through a
+//! `[dev-dependencies]` edge, since it never enters the build graph. `build.rs`
+//! exposes the JavaScript `grammar.json` the fixtures link against.
 
 use std::sync::LazyLock;
 
 use plotnik_compiler::{QueryBuilder, SourceMap};
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
-use super::module::{Module, ModuleError};
+use super::{Module, ModuleError};
+use crate::bytecode::type_meta::TypeData;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -262,6 +264,53 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
         .expect("no matching effect slot in transitions")
 }
 
+/// Byte offset of the first non-empty inter-section alignment gap — the padding
+/// the emitter zero-fills before each aligned section (or the final tail).
+fn first_section_gap(bytes: &[u8]) -> usize {
+    let m = Module::load(bytes).expect("module loads before tampering");
+    let o = m.offsets();
+    let h = m.header();
+    // (section start, data length) in layout order, terminated by the file end.
+    let sections = [
+        (o.str_blob, h.str_blob_size),
+        (o.regex_blob, h.regex_blob_size),
+        (o.str_table, (h.str_table_count as u32 + 1) * 4),
+        (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
+        (o.node_types, h.node_types_count as u32 * 4),
+        (o.node_fields, h.node_fields_count as u32 * 4),
+        (o.type_defs, h.type_defs_count as u32 * 4),
+        (o.type_members, h.type_members_count as u32 * 4),
+        (o.type_names, h.type_names_count as u32 * 4),
+        (o.entrypoints, h.entrypoints_count as u32 * 8),
+        (o.transitions, h.transitions_count as u32 * 8),
+        (h.total_size, 0),
+    ];
+    sections
+        .windows(2)
+        .find_map(|w| {
+            let end = w[0].0 + w[0].1;
+            (end < w[1].0).then_some(end as usize)
+        })
+        .expect("query must leave at least one alignment gap")
+}
+
+#[test]
+fn forged_nonzero_section_padding_is_rejected() {
+    // The emitter zero-fills the alignment gap before every aligned section; a
+    // non-zero byte in any gap is smuggled state at a section boundary that the
+    // CRC alone would carry along, so the loader must reject it.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let pad_off = first_section_gap(&bytes);
+    bytes[pad_off] = 1;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged section padding must be rejected");
+    assert!(
+        matches!(err, ModuleError::NonZeroSectionPadding),
+        "expected NonZeroSectionPadding, got {err:?}"
+    );
+}
+
 #[test]
 fn forged_unknown_opcode_is_rejected() {
     // `9` is past the 0x0..=0x8 opcode range; the VM's `decode_step` would
@@ -292,6 +341,27 @@ fn forged_nonzero_segment_is_rejected() {
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
     );
+}
+
+#[test]
+fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
+    // node_kind (header bits 4-5) is meaningful only for Match variants; the
+    // Call/Return/Trampoline decoders ignore it, so the format pins those bits to
+    // zero. This query emits all three: a `(Leaf)` reference (Call), definition
+    // Returns, and the preamble Trampoline.
+    const REF_QUERY: &str = "Top = (binary_expression left: (Leaf) @l)\nLeaf = (identifier) @id";
+    for opcode in [6u8, 7, 8] {
+        let mut bytes = emit_bytes(REF_QUERY);
+        let off = first_instr(&bytes, |o| o == opcode);
+        bytes[off] |= 0x10; // set node_kind bit 4
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged node_kind must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "opcode {opcode}: expected MalformedTransitions, got {err:?}"
+        );
+    }
 }
 
 #[test]
@@ -437,6 +507,33 @@ fn forged_regex_pattern_string_id_is_rejected() {
             "forged regex string_id {value}: expected InvalidStringId, got {err:?}"
         );
     }
+}
+
+#[test]
+fn forged_nonzero_regex_table_reserved_is_rejected() {
+    // Each regex-table entry is `string_id(u16) | reserved(u16) | offset(u32)`; the
+    // reserved field is pinned to zero (docs/binary-format/03-symbols.md). A forged
+    // non-zero value must be rejected at load, not carried as smuggled state.
+    let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
+    let (regex_off, regex_count) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        (
+            m.offsets().regex_table as usize,
+            m.header().regex_table_count,
+        )
+    };
+    assert!(regex_count > 1, "query must emit a regex entry");
+
+    // Entry 1's reserved u16 sits 2 bytes into its 8-byte record (index 0 reserved).
+    let reserved_off = regex_off + 8 + 2;
+    bytes[reserved_off..reserved_off + 2].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged regex reserved field must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedRegexTable),
+        "expected MalformedRegexTable, got {err:?}"
+    );
 }
 
 #[test]
@@ -607,6 +704,77 @@ fn forged_out_of_range_trampoline_target_is_rejected() {
 }
 
 #[test]
+fn forged_set_extended_match_reserved_count_bit_is_rejected() {
+    // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
+    // (docs/binary-format/06-transitions.md); the decoder never reads it, so a
+    // forged set bit must be rejected at load.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
+    bytes[off + 6] |= 0x01;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged reserved count bit must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedTransitions),
+        "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_nonzero_return_pad_is_rejected() {
+    // A Return is `header || 7 reserved padding bytes` (`Return::to_bytes`); the
+    // decoder drops bytes 1-7, so a forged non-zero pad must be rejected at load.
+    for byte in 1usize..8 {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let off = first_instr(&bytes, |o| o == 7); // Return
+        bytes[off + byte] = 1;
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged return pad must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_nonzero_trampoline_pad_is_rejected() {
+    // A Trampoline is `header | pad | next(2) | 4 reserved padding bytes`
+    // (`Trampoline::to_bytes`); only `next` (bytes 2-3) is read, so byte 1 and
+    // bytes 4-7 must be rejected when non-zero.
+    for byte in [1usize, 4, 5, 6, 7] {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let off = first_instr(&bytes, |o| o == 8); // Trampoline
+        bytes[off + byte] = 1;
+        reseal(&mut bytes);
+
+        let err = Module::load(&bytes).expect_err("forged trampoline pad must be rejected");
+        assert!(
+            matches!(err, ModuleError::MalformedTransitions),
+            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_nonzero_predicate_reserved_bits_is_rejected() {
+    // Only the op/flags word's low byte (operator) and bit 8 (regex flag) are
+    // decoded; bits 9-15 are reserved-zero. A forged set bit there must be
+    // rejected at load. Bit 9 is the low bit of the word's high byte.
+    let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
+    let pred_off = find_predicate_off(&bytes);
+    bytes[pred_off + 1] |= 0x02;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged predicate reserved bit must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidPredicateOperand(_)),
+        "expected InvalidPredicateOperand, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_regex_predicate_sentinel_operand_is_rejected() {
     // Regex value_ref `0` is the reserved sentinel: `load_regex_dfas` skips it,
     // so its DFA slot is `None`, and the VM expects a populated slot. The loader
@@ -682,6 +850,25 @@ fn forged_out_of_range_entrypoint_target_is_rejected() {
 }
 
 #[test]
+fn forged_nonzero_entrypoint_pad_is_rejected() {
+    // Bytes 6-7 of the 8-byte entrypoint are reserved `_pad`; `from_bytes` drops
+    // them, so a forged non-zero pad must be rejected at load, not ignored.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let ep_off = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .offsets()
+        .entrypoints as usize;
+    bytes[ep_off + 6..ep_off + 8].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged entrypoint pad must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidEntrypoint(_)),
+        "expected InvalidEntrypoint, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     // `result_type` (u16 at entry+4) must address a real TypeDef, or the
     // materializer's root-frame TypeId lookup reads out of bounds. `type_defs_count`
@@ -718,5 +905,135 @@ fn forged_type_member_name_string_id_is_rejected() {
     assert!(
         matches!(err, ModuleError::InvalidStringId(_)),
         "expected InvalidStringId, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_oob_member_type_id_is_rejected() {
+    // A TypeMember's `type_id` (bytes 2-3 of the 4-byte entry) must address a real
+    // TypeDef, or the materializer resolves a struct field to a type out of range.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let (members_off, type_defs) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        (
+            m.offsets().type_members as usize,
+            m.header().type_defs_count,
+        )
+    };
+
+    // `type_defs_count` is one past the last valid TypeId.
+    bytes[members_off + 2..members_off + 4].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged member type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_oob_wrapper_inner_type_id_is_rejected() {
+    // A wrapper/alias TypeDef holds its inner TypeId in `data` (bytes 0-1 of the
+    // 4-byte entry); it must address a real def or `unwrap_optional` / the array
+    // element lookup resolves a type out of range.
+    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let (defs_off, type_defs, wrapper_idx) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        let types = m.types();
+        let idx = (0..types.defs_count())
+            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .expect("array query must emit a wrapper type def");
+        (
+            m.offsets().type_defs as usize,
+            m.header().type_defs_count,
+            idx,
+        )
+    };
+
+    let off = defs_off + wrapper_idx * 4;
+    bytes[off..off + 2].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged wrapper inner type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
+    // Void/Node/String carry no payload: both `data` (bytes 0-1) and `count`
+    // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
+    // in either must be rejected, not silently ignored by the typed view.
+    for byte in [0usize, 2] {
+        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let (defs_off, prim_idx) = {
+            let m = Module::load(&bytes).expect("module loads before tampering");
+            let types = m.types();
+            let idx = (0..types.defs_count())
+                .find(|&i| matches!(types.get_def(i).classify(), TypeData::Primitive(_)))
+                .expect("struct query must emit a primitive type def");
+            (m.offsets().type_defs as usize, idx)
+        };
+
+        bytes[defs_off + prim_idx * 4 + byte] = 1;
+        reseal(&mut bytes);
+
+        let err =
+            Module::load(&bytes).expect_err("forged primitive reserved field must be rejected");
+        assert!(
+            matches!(err, ModuleError::InvalidTypeDef(_)),
+            "forged byte {byte}: expected InvalidTypeDef, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn forged_nonzero_wrapper_typedef_count_is_rejected() {
+    // A wrapper/alias TypeDef uses `data` for its inner id but reserves `count`
+    // (byte 2) as zero. A non-zero count must be rejected.
+    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let (defs_off, wrapper_idx) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        let types = m.types();
+        let idx = (0..types.defs_count())
+            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .expect("array query must emit a wrapper type def");
+        (m.offsets().type_defs as usize, idx)
+    };
+
+    bytes[defs_off + wrapper_idx * 4 + 2] = 1;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged wrapper count must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeDef(_)),
+        "expected InvalidTypeDef, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_oob_type_name_type_id_is_rejected() {
+    // A TypeName's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
+    // real TypeDef; a named definition emits at least one entry.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let (names_off, type_defs) = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        assert!(
+            m.types().names_count() > 0,
+            "named def must emit a type name"
+        );
+        (m.offsets().type_names as usize, m.header().type_defs_count)
+    };
+
+    bytes[names_off + 2..names_off + 4].copy_from_slice(&type_defs.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged type name type id must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidTypeName(_)),
+        "expected InvalidTypeName, got {err:?}"
     );
 }

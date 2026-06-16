@@ -152,11 +152,18 @@ impl TypeDef {
     /// Classify this type definition into a structured enum.
     ///
     /// # Panics
-    /// Panics if the kind byte is invalid (corrupted bytecode).
+    /// Panics if the kind byte is invalid (corrupted bytecode). Trusted side only;
+    /// at the load boundary use [`try_classify`](Self::try_classify).
     pub fn classify(&self) -> TypeData {
-        let kind = TypeKind::from_u8(self.kind)
-            .unwrap_or_else(|| panic!("invalid TypeKind byte: {}", self.kind));
-        match kind {
+        self.try_classify()
+            .unwrap_or_else(|| panic!("invalid TypeKind byte: {}", self.kind))
+    }
+
+    /// Classify, returning `None` on an unknown kind byte instead of panicking —
+    /// for load-time validation of untrusted bytecode.
+    pub fn try_classify(&self) -> Option<TypeData> {
+        let kind = TypeKind::from_u8(self.kind)?;
+        Some(match kind {
             TypeKind::Void | TypeKind::Node | TypeKind::String => TypeData::Primitive(kind),
             TypeKind::Optional
             | TypeKind::ArrayZeroOrMore
@@ -170,7 +177,7 @@ impl TypeDef {
                 member_start: self.data,
                 member_count: self.count,
             },
-        }
+        })
     }
 }
 

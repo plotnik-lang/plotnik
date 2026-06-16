@@ -65,6 +65,8 @@ Section offsets are not stored in the header. Loaders compute them by:
    - Section size = count × record size (or explicit size for blobs)
 3. Blob sizes come from header: `str_blob_size` and `regex_blob_size`
 
+The bytes filling each 64-byte alignment gap (and the final tail up to `total_size`) are reserved zero; loaders reject a non-zero byte in any gap.
+
 ## Header (v5)
 
 ```rust

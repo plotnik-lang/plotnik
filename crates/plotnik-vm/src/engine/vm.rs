@@ -203,6 +203,64 @@ impl<'t> VM<'t> {
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.suppress_depth;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after checkpoint restore"
+        );
+        #[cfg(debug_assertions)]
+        self.assert_checkpoint_restored(&state);
+    }
+
+    /// Assert the post-restore VM state matches the checkpoint snapshot, and
+    /// classify every VM field as restored-from or intentionally-excluded-from
+    /// `CheckpointState`. The exhaustive destructure is the point: a newly-added
+    /// VM field will not compile until it is classified here, so it cannot
+    /// silently escape the checkpoint contract. `ip` is resumed separately by
+    /// [`Self::backtrack`] and `matched_node` is deliberately not snapshotted
+    /// (#383). Debug-only.
+    #[cfg(debug_assertions)]
+    fn assert_checkpoint_restored(&self, state: &CheckpointState) {
+        let VM {
+            // Restored — must equal the snapshot the checkpoint captured.
+            cursor,
+            frames,
+            effects,
+            recursion_depth,
+            suppress_depth,
+            // Deliberately outside `CheckpointState`:
+            ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _,       // the stack this checkpoint was just popped from
+            matched_node: _,      // intentionally not snapshotted (#383)
+            exec_fuel: _,         // monotonic fuel, never rewound on backtrack
+            limits: _,            // immutable execution config
+            entrypoint_target: _, // set once before the run, never mutated
+            source: _,            // immutable input text
+        } = self;
+
+        debug_assert_eq!(
+            cursor.descendant_index(),
+            state.descendant_index,
+            "checkpoint restore: cursor position"
+        );
+        debug_assert_eq!(
+            effects.len(),
+            state.effect_watermark,
+            "checkpoint restore: effect watermark"
+        );
+        debug_assert_eq!(
+            frames.current(),
+            state.frame_index,
+            "checkpoint restore: frame index"
+        );
+        debug_assert_eq!(
+            *recursion_depth, state.recursion_depth,
+            "checkpoint restore: recursion depth"
+        );
+        debug_assert_eq!(
+            *suppress_depth, state.suppress_depth,
+            "checkpoint restore: suppress depth"
+        );
     }
 
     /// Checkpoint that resumes a branch alternative at `ip`.
@@ -255,7 +313,15 @@ impl<'t> VM<'t> {
             }
             self.exec_fuel -= 1;
 
-            // Fetch and dispatch
+            // Fetch and dispatch. The IP must address a validated instruction
+            // start; a violation localizes a bad jump to the step that wrote `ip`,
+            // before `decode_step` begins decoding mid-instruction.
+            #[cfg(debug_assertions)]
+            debug_assert!(
+                module.is_validated_step_start(self.ip),
+                "ip {} is not a validated instruction start",
+                self.ip
+            );
             let instr = module.decode_step(self.ip);
             tracer.trace_instruction(self.ip, &instr);
 
@@ -480,6 +546,11 @@ impl<'t> VM<'t> {
         tracer.trace_call(target);
         self.frames.push(next, saved_depth);
         self.recursion_depth += 1;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Call"
+        );
         self.ip = target;
         // The callee owns its own match: until one of its Matches succeeds,
         // there is no matched node. Clearing here lets a zero-width callee
@@ -499,6 +570,11 @@ impl<'t> VM<'t> {
         tracer.trace_call(self.entrypoint_target);
         self.frames.push(t.next.get(), saved_depth);
         self.recursion_depth += 1;
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Trampoline"
+        );
         self.ip = self.entrypoint_target;
         Ok(())
     }
@@ -563,7 +639,15 @@ impl<'t> VM<'t> {
         }
 
         let (return_addr, saved_depth) = self.frames.pop();
-        self.recursion_depth -= 1;
+        self.recursion_depth = self
+            .recursion_depth
+            .checked_sub(1)
+            .expect("recursion_depth underflow on Return");
+        debug_assert_eq!(
+            self.recursion_depth,
+            self.frames.depth(),
+            "recursion_depth desynced from frame stack after Return"
+        );
 
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_ref());
@@ -580,6 +664,11 @@ impl<'t> VM<'t> {
                 break;
             }
         }
+        debug_assert_eq!(
+            self.cursor.depth(),
+            saved_depth,
+            "Return did not ascend to the caller's saved cursor depth"
+        );
 
         self.ip = return_addr;
         Ok(())
