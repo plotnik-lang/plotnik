@@ -10,7 +10,7 @@ use std::path::Path;
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
-use super::instructions::{Call, Match, Opcode, Return, Trampoline};
+use super::instructions::{Call, Match, Opcode, Return, Trampoline, header_byte};
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 use super::{
@@ -119,9 +119,9 @@ impl<'a> Instruction<'a> {
     /// Decode an instruction from bytecode bytes.
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= 8, "instruction too short");
+        debug_assert!(bytes.len() >= STEP_SIZE, "instruction too short");
 
-        let opcode = Opcode::from_u8(bytes[0] & 0xF).expect("invalid opcode");
+        let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
         match opcode {
             Opcode::Call => {
                 let arr: [u8; 8] = bytes[..8].try_into().unwrap();

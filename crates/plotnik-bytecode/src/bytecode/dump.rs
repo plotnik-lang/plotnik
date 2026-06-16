@@ -434,28 +434,7 @@ struct DumpFormatter<'a> {
 
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
-        Instruction::Match(m) => {
-            let pre = m.pre_effects().count();
-            let neg = m.neg_fields().count();
-            let post = m.post_effects().count();
-            let succ = m.succ_count();
-            let pred = if m.has_predicate() { 2 } else { 0 };
-            let slots = pre + neg + post + pred + succ;
-
-            if pre == 0 && neg == 0 && post == 0 && pred == 0 && succ <= 1 {
-                1 // Match8
-            } else if slots <= 4 {
-                2 // Match16
-            } else if slots <= 8 {
-                3 // Match24
-            } else if slots <= 12 {
-                4 // Match32
-            } else if slots <= 20 {
-                6 // Match48
-            } else {
-                8 // Match64
-            }
-        }
+        Instruction::Match(m) => m.step_count(),
         Instruction::Call(_) | Instruction::Return(_) | Instruction::Trampoline(_) => 1,
     }
 }

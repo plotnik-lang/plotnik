@@ -395,7 +395,7 @@ impl<'t> VM<'t> {
 
     /// Evaluate a predicate against the matched node's text.
     ///
-    /// - `op`: 0=Eq, 1=Ne, 2=StartsWith, 3=EndsWith, 4=Contains, 5=RegexMatch, 6=RegexNoMatch
+    /// - `op`: operator byte (see [`PredicateOp`])
     /// - `is_regex`: true if value_ref is a RegexTable index
     /// - `value_ref`: index into StringTable or RegexTable
     fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {

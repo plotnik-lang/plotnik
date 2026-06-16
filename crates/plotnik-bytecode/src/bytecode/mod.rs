@@ -37,7 +37,7 @@ pub use type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
 
 pub use nav::Nav;
 
-pub use effects::{EffectOp, EffectOpcode};
+pub use effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectOp, EffectOpcode};
 
 pub use instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepAddr, StepId,
