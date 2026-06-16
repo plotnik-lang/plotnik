@@ -773,6 +773,16 @@ fn recursion_with_structured_result() {
     );
 }
 
+#[test]
+fn recursion_def_level_alias_emits_alias_type() {
+    shot_bytecode!(
+        r#"
+        Rec = [A: (program (expression_statement (Rec) @inner)) B: (identifier) @id]
+        Q = (Rec)
+    "#
+    );
+}
+
 // Optionals
 
 #[test]

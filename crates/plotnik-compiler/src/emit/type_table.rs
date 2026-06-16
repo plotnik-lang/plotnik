@@ -62,6 +62,16 @@ impl TypeTableBuilder {
 
         for (_def_id, type_id) in type_ctx.iter_def_types() {
             collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
+
+            if !matches!(type_ctx.get_type(type_id), Some(TypeShape::Ref(_))) {
+                continue;
+            }
+
+            if !seen.insert(type_id) {
+                continue;
+            }
+
+            ordered_types.push(type_id);
         }
 
         // Determine which builtins are actually used by scanning all types
@@ -121,7 +131,7 @@ impl TypeTableBuilder {
                 .mapping
                 .get(&type_id)
                 .copied()
-                .unwrap_or(BytecodeTypeId(0));
+                .expect("def result type must be mapped");
             self.type_names.push(TypeName::new(name, bc_type_id));
         }
 
@@ -239,36 +249,43 @@ impl TypeTableBuilder {
                 Ok(())
             }
 
-            TypeShape::Ref(_def_id) => {
-                // Ref types are not emitted - they resolve to their target
-                unreachable!("Ref types should not be collected for emission")
+            TypeShape::Ref(def_id) => {
+                let target = type_ctx
+                    .get_def_type(*def_id)
+                    .expect("alias def target must exist");
+                self.type_defs[slot_index] = TypeDef::alias(self.resolve_type(target, type_ctx)?);
+                Ok(())
             }
         }
     }
 
-    /// Resolve a query TypeId to bytecode BytecodeTypeId.
+    /// Resolve a query TypeId to its underlying bytecode BytecodeTypeId.
     ///
-    /// Handles Ref types by following the reference chain to the actual type.
+    /// Ref types are emitted as aliases only when they are definition results. In
+    /// every materialized position, follow the reference chain to the actual shape.
     pub fn resolve_type(
         &self,
         type_id: TypeId,
         type_ctx: &TypeContext,
     ) -> Result<BytecodeTypeId, EmitError> {
-        // Check if already mapped
-        if let Some(&bc_id) = self.mapping.get(&type_id) {
-            return Ok(bc_id);
-        }
+        let type_id = self.resolve_underlying_type_id(type_id, type_ctx);
+        let bc_id = self
+            .mapping
+            .get(&type_id)
+            .copied()
+            .expect("resolved type must be mapped");
+        Ok(bc_id)
+    }
 
-        // Handle Ref types by following the reference
-        if let Some(type_shape) = type_ctx.get_type(type_id)
-            && let TypeShape::Ref(def_id) = type_shape
-            && let Some(def_type_id) = type_ctx.get_def_type(*def_id)
-        {
-            return self.resolve_type(def_type_id, type_ctx);
-        }
+    fn resolve_underlying_type_id(&self, type_id: TypeId, type_ctx: &TypeContext) -> TypeId {
+        let Some(TypeShape::Ref(def_id)) = type_ctx.get_type(type_id) else {
+            return type_id;
+        };
 
-        // If not found, default to first type (should not happen for well-formed types)
-        Ok(BytecodeTypeId(0))
+        let target = type_ctx
+            .get_def_type(*def_id)
+            .expect("ref target def type must exist");
+        self.resolve_underlying_type_id(target, type_ctx)
     }
 
     /// Resolve a field's type, handling optionality.

@@ -1,0 +1,59 @@
+---
+source: crates/plotnik-compiler/src/emit/emit_tests.rs
+---
+Rec = [A: (program (expression_statement (Rec) @inner)) B: (identifier) @id]
+Q = (Rec)
+---
+[strings]
+S0 "Beauty will save the world"
+S1 "inner"
+S2 "id"
+S3 "A"
+S4 "B"
+S5 "Rec"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { inner }
+T2 = Struct  M1:1  ; { id }
+T3 = Enum    M2:2  ; A | B
+T4 = Alias(T3)
+
+[type_members]
+M0: S1 → T3  ; inner: Rec
+M1: S2 → T0  ; id: <Node>
+M2: S3 → T1  ; A: T1
+M3: S4 → T2  ; B: T2
+
+[type_names]
+N0: S5 → T3  ; Rec
+N1: S6 → T4  ; Q
+
+[entrypoints]
+Q   = 08 :: T3
+Rec = 06 :: T3
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Rec:
+  06  -ε-                                   17, 19
+
+Q:
+  08   !   (Rec)                            06 : 09
+  09                                        ▶
+  10  └‣─  (Rec)                            06 : 11
+  11  ─‣┘  [Set(M0)] _                      13
+  13  ─‣┘  _ [EndEnum]                      15
+  15                                        ▶
+  16  └‣─  (expression_statement)           10
+  17   !   [Enum(M2)] (program)             16
+  19   !   [Enum(M3)] (identifier) [Node Set(M1) EndEnum]  15
