@@ -10,7 +10,7 @@ use std::io;
 use super::super::effects::{EffectOp, EffectOpcode};
 use super::super::nav::Nav;
 use super::super::node_type_ir::NodeTypeIR;
-use super::super::{SECTION_ALIGN, VERSION};
+use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
 
 /// Module load error.
@@ -24,7 +24,7 @@ pub enum ModuleError {
     InvalidMagic,
     #[error("unsupported version: {0} (expected {VERSION})")]
     UnsupportedVersion(u32),
-    #[error("file too small: {0} bytes (minimum 64)")]
+    #[error("file too small: {0} bytes (minimum {HEADER_SIZE})")]
     FileTooSmall(usize),
     #[error("size mismatch: header says {header} bytes, got {actual}")]
     SizeMismatch { header: u32, actual: usize },
@@ -75,11 +75,11 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
 impl Module {
     /// Load a module from storage.
     pub(super) fn from_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
-        if storage.len() < 64 {
+        if storage.len() < HEADER_SIZE {
             return Err(ModuleError::FileTooSmall(storage.len()));
         }
 
-        let header = Header::from_bytes(&storage[..64]);
+        let header = Header::from_bytes(&storage[..HEADER_SIZE]);
 
         if !header.validate_magic() {
             return Err(ModuleError::InvalidMagic);
@@ -153,7 +153,7 @@ impl Module {
             return Err(ModuleError::MalformedHeader);
         }
 
-        let computed = crc32fast::hash(&self.storage[64..]);
+        let computed = crc32fast::hash(&self.storage[HEADER_SIZE..]);
         if computed != self.header.checksum {
             return Err(ModuleError::ChecksumMismatch {
                 expected: self.header.checksum,

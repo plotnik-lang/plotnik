@@ -13,7 +13,7 @@ use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
-use super::{Entrypoint, STEP_SIZE};
+use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE};
 use crate::dfa::RegexDfas;
 
 mod effect_stack;
@@ -80,7 +80,7 @@ impl ByteStorage {
     /// Panics if bytes are not 64-byte aligned.
     pub fn from_static(bytes: &'static [u8]) -> Self {
         assert!(
-            (bytes.as_ptr() as usize).is_multiple_of(64),
+            (bytes.as_ptr() as usize).is_multiple_of(SECTION_ALIGN),
             "static bytes must be 64-byte aligned; use include_query_aligned! macro"
         );
         Self::Static(bytes)

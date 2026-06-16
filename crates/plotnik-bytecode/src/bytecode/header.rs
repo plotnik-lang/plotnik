@@ -5,7 +5,7 @@
 //! NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Transitions
 
-use super::{MAGIC, SECTION_ALIGN, VERSION};
+use super::{HEADER_SIZE, MAGIC, SECTION_ALIGN, VERSION};
 
 /// File header - first 64 bytes of the bytecode file.
 ///
@@ -45,7 +45,7 @@ pub struct Header {
     pub _reserved: [u8; 22],
 }
 
-const _: () = assert!(std::mem::size_of::<Header>() == 64);
+const _: () = assert!(std::mem::size_of::<Header>() == HEADER_SIZE);
 
 impl Default for Header {
     fn default() -> Self {
@@ -92,10 +92,10 @@ pub struct SectionOffsets {
 impl Header {
     /// Decode header from 64 bytes.
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= 64, "header too short");
+        assert!(bytes.len() >= HEADER_SIZE, "header too short");
 
         let mut reserved = [0u8; 22];
-        reserved.copy_from_slice(&bytes[42..64]);
+        reserved.copy_from_slice(&bytes[42..HEADER_SIZE]);
 
         Self {
             magic: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -118,8 +118,8 @@ impl Header {
     }
 
     /// Encode header to 64 bytes.
-    pub fn to_bytes(&self) -> [u8; 64] {
-        let mut bytes = [0u8; 64];
+    pub fn to_bytes(&self) -> [u8; HEADER_SIZE] {
+        let mut bytes = [0u8; HEADER_SIZE];
         bytes[0..4].copy_from_slice(&self.magic);
         bytes[4..8].copy_from_slice(&self.version.to_le_bytes());
         bytes[8..12].copy_from_slice(&self.checksum.to_le_bytes());
@@ -135,7 +135,7 @@ impl Header {
         bytes[36..38].copy_from_slice(&self.type_names_count.to_le_bytes());
         bytes[38..40].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.transitions_count.to_le_bytes());
-        bytes[42..64].copy_from_slice(&self._reserved);
+        bytes[42..HEADER_SIZE].copy_from_slice(&self._reserved);
         bytes
     }
 

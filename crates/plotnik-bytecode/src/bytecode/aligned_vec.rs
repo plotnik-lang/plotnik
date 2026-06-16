@@ -6,13 +6,16 @@
 
 use std::ops::Deref;
 
-/// Alignment for bytecode buffers (matches `SECTION_ALIGN`).
-pub const ALIGN: usize = 64;
+use super::SECTION_ALIGN;
 
-/// 64-byte aligned block for bytecode storage.
+/// `repr(align(..))` only accepts a literal, so the alignment is spelled out
+/// here; this guards it against ever drifting from `SECTION_ALIGN`.
+const _: () = assert!(SECTION_ALIGN == 64);
+
+/// One section-aligned block of bytecode storage.
 #[repr(C, align(64))]
 #[derive(Clone, Copy)]
-struct Block([u8; 64]);
+struct Block([u8; SECTION_ALIGN]);
 
 /// Immutable 64-byte aligned byte storage.
 ///
@@ -33,11 +36,11 @@ impl AlignedVec {
             };
         }
 
-        let num_blocks = bytes.len().div_ceil(64);
-        let mut blocks = vec![Block([0; 64]); num_blocks];
+        let num_blocks = bytes.len().div_ceil(SECTION_ALIGN);
+        let mut blocks = vec![Block([0; SECTION_ALIGN]); num_blocks];
 
         // Copy block by block to stay safe
-        for (i, chunk) in bytes.chunks(64).enumerate() {
+        for (i, chunk) in bytes.chunks(SECTION_ALIGN).enumerate() {
             blocks[i].0[..chunk.len()].copy_from_slice(chunk);
         }
 
@@ -68,11 +71,11 @@ impl AlignedVec {
         if self.blocks.is_empty() {
             return &[];
         }
-        if self.len > self.blocks.len() * 64 {
+        if self.len > self.blocks.len() * SECTION_ALIGN {
             panic!(
                 "AlignedVec invariant violated: len {} exceeds capacity {}",
                 self.len,
-                self.blocks.len() * 64
+                self.blocks.len() * SECTION_ALIGN
             );
         }
         // SAFETY: Block is repr(C) with only [u8; 64], so pointer cast is valid.
@@ -104,7 +107,7 @@ impl std::fmt::Debug for AlignedVec {
             .field("len", &self.len)
             .field(
                 "aligned",
-                &(self.blocks.as_ptr() as usize).is_multiple_of(ALIGN),
+                &(self.blocks.as_ptr() as usize).is_multiple_of(SECTION_ALIGN),
             )
             .finish()
     }

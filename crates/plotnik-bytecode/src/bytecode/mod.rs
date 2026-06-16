@@ -20,7 +20,8 @@ mod type_meta;
 pub use aligned_vec::AlignedVec;
 
 pub use constants::{
-    MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE, VERSION,
+    HEADER_SIZE, MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS,
+    MAX_SUCCESSORS, SECTION_ALIGN, STEP_SIZE, VERSION,
 };
 
 pub use ids::{StringId, TypeId};
@@ -50,8 +51,8 @@ pub use module::{
 pub use dump::dump;
 
 pub use format::{
-    LineBuilder, Symbol, cols, format_effect, nav_symbol, superscript, trace, truncate_text,
-    width_for_count,
+    LineBuilder, PREAMBLE_NAME, Symbol, cols, format_effect, nav_symbol, superscript, trace,
+    truncate_text, width_for_count,
 };
 
 pub use node_type_ir::NodeTypeIR;

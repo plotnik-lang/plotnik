@@ -6,10 +6,9 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::{InstructionIR, Label, LayoutResult};
+use plotnik_bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE};
 
-const CACHE_LINE: usize = 64;
-const STEP_SIZE: usize = 8;
+use crate::bytecode::{InstructionIR, Label, LayoutResult};
 
 /// Intermediate representation for layout optimization.
 struct LayoutIR {

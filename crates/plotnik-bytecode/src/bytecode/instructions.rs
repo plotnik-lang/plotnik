@@ -5,7 +5,10 @@
 
 use std::num::NonZeroU16;
 
-use super::constants::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, SECTION_ALIGN, STEP_SIZE};
+use super::constants::{
+    MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
+    SECTION_ALIGN, STEP_SIZE,
+};
 use super::effects::EffectOp;
 use super::nav::Nav;
 use super::node_type_ir::NodeTypeIR;
@@ -401,11 +404,11 @@ pub struct MatchInstr {
 pub enum EncodeError {
     #[error("too many pre-effects on one match: {0} (max {MAX_PRE_EFFECTS})")]
     TooManyPreEffects(usize),
-    #[error("too many negated fields on one match: {0} (max 7)")]
+    #[error("too many negated fields on one match: {0} (max {MAX_NEG_FIELDS})")]
     TooManyNegFields(usize),
-    #[error("too many post-effects on one match: {0} (max 7)")]
+    #[error("too many post-effects on one match: {0} (max {MAX_POST_EFFECTS})")]
     TooManyPostEffects(usize),
-    #[error("too many successors on one match: {0} (max 31)")]
+    #[error("too many successors on one match: {0} (max {MAX_SUCCESSORS})")]
     TooManySuccessors(usize),
     #[error("match payload too large: {0} slots (max {MAX_MATCH_PAYLOAD_SLOTS})")]
     PayloadTooLarge(usize),
@@ -455,13 +458,13 @@ impl MatchInstr {
         if pre > MAX_PRE_EFFECTS {
             return Err(EncodeError::TooManyPreEffects(pre));
         }
-        if neg > 7 {
+        if neg > MAX_NEG_FIELDS {
             return Err(EncodeError::TooManyNegFields(neg));
         }
-        if post > 7 {
+        if post > MAX_POST_EFFECTS {
             return Err(EncodeError::TooManyPostEffects(post));
         }
-        if succ > 31 {
+        if succ > MAX_SUCCESSORS {
             return Err(EncodeError::TooManySuccessors(succ));
         }
 
