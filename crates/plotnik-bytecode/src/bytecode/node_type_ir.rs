@@ -60,7 +60,6 @@ impl NodeTypeIR {
         }
     }
 
-    /// Check if this represents a specific type ID (not a wildcard).
     pub fn type_id(&self) -> Option<NonZeroU16> {
         match self {
             Self::Any => None,
@@ -68,17 +67,14 @@ impl NodeTypeIR {
         }
     }
 
-    /// Check if this is the Any wildcard.
     pub fn is_any(&self) -> bool {
         matches!(self, Self::Any)
     }
 
-    /// Check if this is a Named constraint (wildcard or specific).
     pub fn is_named(&self) -> bool {
         matches!(self, Self::Named(_))
     }
 
-    /// Check if this is an Anonymous constraint (wildcard or specific).
     pub fn is_anonymous(&self) -> bool {
         matches!(self, Self::Anonymous(_))
     }

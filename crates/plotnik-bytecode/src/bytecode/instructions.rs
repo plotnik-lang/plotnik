@@ -133,7 +133,6 @@ pub type StepAddr = u16;
 pub struct StepId(pub NonZeroU16);
 
 impl StepId {
-    /// Create a new StepId. Panics if n == 0.
     #[inline]
     pub fn new(n: u16) -> Self {
         Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
@@ -198,7 +197,6 @@ impl Opcode {
         (self.size() / STEP_SIZE) as u16
     }
 
-    /// Whether this is a Match variant.
     pub const fn is_match(self) -> bool {
         matches!(
             self,
@@ -243,11 +241,9 @@ pub struct Match<'a> {
     pub node_type: NodeTypeIR,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
-    /// Whether this is Match8 (no payload) or extended.
     is_match8: bool,
     /// For Match8: the single successor (0 = terminal).
     match8_next: u16,
-    /// For extended: counts packed into single byte each.
     pre_count: u8,
     neg_count: u8,
     post_count: u8,
@@ -304,13 +300,11 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Check if this is a terminal (accept) state.
     #[inline]
     pub fn is_terminal(&self) -> bool {
         self.succ_count == 0
     }
 
-    /// Check if this is an epsilon transition (no node interaction).
     #[inline]
     pub fn is_epsilon(&self) -> bool {
         self.nav == Nav::Epsilon
@@ -336,7 +330,6 @@ impl<'a> Match<'a> {
         self.succ_count as usize
     }
 
-    /// Get a successor by index.
     #[inline]
     pub fn successor(&self, idx: usize) -> StepId {
         debug_assert!(
@@ -387,13 +380,11 @@ impl<'a> Match<'a> {
         })
     }
 
-    /// Iterate over successors.
     #[inline]
     pub fn successors(&self) -> impl Iterator<Item = StepId> + '_ {
         (0..self.succ_count as usize).map(move |i| self.successor(i))
     }
 
-    /// Whether this instruction has a predicate (text filter).
     #[inline]
     pub fn has_predicate(&self) -> bool {
         self.has_predicate
@@ -655,7 +646,6 @@ pub struct Call {
 }
 
 impl Call {
-    /// Create a new Call instruction.
     pub fn new(nav: Nav, node_field: Option<NonZeroU16>, next: StepId, target: StepId) -> Self {
         Self {
             segment: 0,
@@ -724,7 +714,6 @@ pub struct Return {
 }
 
 impl Return {
-    /// Create a new Return instruction.
     pub fn new() -> Self {
         Self { segment: 0 }
     }
@@ -777,7 +766,6 @@ pub struct Trampoline {
 }
 
 impl Trampoline {
-    /// Create a new Trampoline instruction.
     pub fn new(next: StepId) -> Self {
         Self { segment: 0, next }
     }

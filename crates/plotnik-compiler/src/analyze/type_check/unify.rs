@@ -33,7 +33,6 @@ impl UnifyError {
     }
 }
 
-/// Unify multiple flows from alternation branches.
 pub fn unify_flows(
     ctx: &mut TypeContext,
     flows: impl IntoIterator<Item = TypeFlow>,
@@ -77,8 +76,9 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
             Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
         }
 
-        // Should be unreachable due to initial scalar check, but technically possible if new variants are added
-        _ => Err(UnifyError::ScalarInUntagged),
+        // The scalar guard above (`matches!(a|b, Scalar)`) already returns Err.
+        // Every remaining TypeFlow variant (Void, Bubble) is matched explicitly above.
+        _ => unreachable!("unify_flow: unexpected TypeFlow variant after scalar guard"),
     }
 }
 
@@ -128,20 +128,16 @@ fn merge_fields(
 ) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
     let mut result = BTreeMap::new();
 
-    // Process all keys from 'a'. Check intersection with 'b'.
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
-            // Key exists in both: unify types
             let type_id = unify_type_ids(a_info.type_id, b_info.type_id, key)?;
             let optional = a_info.optional || b_info.optional;
             result.insert(key, FieldInfo { type_id, optional });
         } else {
-            // Key only in 'a': absent from 'b'
             result.insert(key, relax_for_absence(ctx, a_info));
         }
     }
 
-    // Remaining keys in 'b' were not in 'a': absent from 'a'
     for (key, b_info) in b {
         result.insert(key, relax_for_absence(ctx, b_info));
     }
@@ -151,7 +147,7 @@ fn merge_fields(
 
 /// Unify two type IDs.
 ///
-/// For now, types must match exactly (except Node is compatible with Node).
+/// Types must match exactly; `Void` is the identity element (compatible with any type).
 fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyError> {
     if a == b {
         return Ok(a);
@@ -165,6 +161,5 @@ fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyEr
         return Ok(a);
     }
 
-    // Type mismatch
     Err(UnifyError::IncompatibleTypes { field })
 }

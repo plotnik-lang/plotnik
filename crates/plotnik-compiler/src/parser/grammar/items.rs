@@ -43,7 +43,6 @@ impl Parser<'_, '_> {
             return;
         }
 
-        // Check if already at a sync point
         if self.currently_at_def_start() {
             return;
         }

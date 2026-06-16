@@ -23,9 +23,6 @@ struct RegexEntry {
 
 /// Builds the regex table, compiling patterns to sparse DFAs.
 ///
-/// Each regex is compiled to a sparse DFA and serialized. The table stores
-/// both StringId (for pattern display) and offset into the blob (for DFA access).
-///
 /// Index 0 is unused (regex_id 0 means "no regex").
 #[derive(Debug, Default)]
 pub struct RegexTableBuilder {
@@ -43,15 +40,12 @@ impl RegexTableBuilder {
         }
     }
 
-    /// Intern a regex pattern, compiling it to a DFA.
-    ///
-    /// Takes the pattern string and its StringId. Returns the regex ID on success.
+    /// Intern a regex pattern, compiling it to a DFA. Returns the regex ID.
     pub fn intern(&mut self, pattern: &str, string_id: StringId) -> Result<u16, EmitError> {
         if let Some(&id) = self.lookup.get(&string_id) {
             return Ok(id);
         }
 
-        // Compile to dense DFA first, then convert to sparse
         let dense = dense::DFA::builder()
             .configure(
                 dense::DFA::config()
@@ -98,17 +92,12 @@ impl RegexTableBuilder {
         Ok(())
     }
 
-    /// Lookup a regex ID by StringId.
     pub fn get(&self, string_id: StringId) -> Option<u16> {
         self.lookup.get(&string_id).copied()
     }
 
-    /// Emit the regex blob and table.
-    ///
-    /// Returns (blob_bytes, table_bytes).
-    ///
-    /// Table format per entry: `string_id (u16) | reserved (u16) | offset (u32)`
-    /// This allows looking up both the pattern string (via StringTable) and DFA bytes.
+    /// Returns `(blob_bytes, table_bytes)`.
+    /// Table entry: `string_id (u16) | reserved (u16) | offset (u32)`.
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>) {
         let mut blob = Vec::new();
         // One entry per pattern plus the trailing sentinel.
@@ -128,7 +117,6 @@ impl RegexTableBuilder {
                 (0, 0)
             };
 
-            // Emit table entry: string_id (u16) | reserved (u16) | offset (u32)
             table.extend_from_slice(&string_id.to_le_bytes());
             table.extend_from_slice(&0u16.to_le_bytes()); // reserved
             table.extend_from_slice(&offset.to_le_bytes());

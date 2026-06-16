@@ -103,7 +103,10 @@ pub fn lex(source: &str) -> Vec<Token> {
 /// Splits a string literal token into: quote + content + quote
 fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token>) {
     let text = &source[span.clone()];
-    let quote_char = text.chars().next().unwrap();
+    let quote_char = text
+        .chars()
+        .next()
+        .expect("StringLiteral always begins with a quote char");
     let quote_kind = if quote_char == '"' {
         SyntaxKind::DoubleQuote
     } else {
@@ -141,13 +144,13 @@ fn split_regex_predicate(
     let text = &source[span.clone()];
     let start = span.start;
 
-    // Operator is always 2 chars (=~ or !~)
     tokens.push(Token::new(op_kind, range_to_text_range(start..start + 2)));
 
-    // Find where whitespace ends (where `/` starts)
-    let regex_start_in_text = text[2..].find('/').unwrap() + 2;
+    let regex_start_in_text = text[2..]
+        .find('/')
+        .expect("regex predicate always contains '/' after the 2-char operator")
+        + 2;
 
-    // Emit whitespace if present
     if regex_start_in_text > 2 {
         tokens.push(Token::new(
             SyntaxKind::Whitespace,
@@ -155,7 +158,6 @@ fn split_regex_predicate(
         ));
     }
 
-    // Emit regex literal (includes delimiters)
     tokens.push(Token::new(
         SyntaxKind::RegexLiteral,
         range_to_text_range(start + regex_start_in_text..span.end),

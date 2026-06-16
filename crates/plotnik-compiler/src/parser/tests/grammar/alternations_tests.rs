@@ -1,5 +1,3 @@
-//! Alternation parsing tests.
-
 use crate::shot_cst;
 
 #[test]

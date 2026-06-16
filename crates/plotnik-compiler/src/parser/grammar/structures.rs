@@ -10,7 +10,6 @@ use crate::parser::cst::{SyntaxKind, TokenSet};
 
 use super::utils::{starts_uppercase, to_pascal_case};
 
-/// What the identifier after `(` turned out to be.
 enum TreeHead<'q> {
     /// Concrete node type: `(identifier ...)`.
     Node,
@@ -37,8 +36,8 @@ impl<'q> Parser<'q, '_> {
     pub(crate) fn parse_tree(&mut self) {
         let checkpoint = self.checkpoint();
         self.push_delimiter();
-        let open_paren_span = self.current_span(); // save span before bump
-        self.bump(); // consume '('
+        let open_paren_span = self.current_span();
+        self.bump();
 
         let head = match self.current() {
             SyntaxKind::ParenClose => {
@@ -107,7 +106,6 @@ impl<'q> Parser<'q, '_> {
             self.parse_supertype(checkpoint, &mut head, sep.kind);
         }
 
-        // Parse optional predicate: `(identifier == "foo")` or `(identifier =~ /pattern/)`
         if matches!(head, TreeHead::Node) && self.currently_is_one_of(PREDICATE_OPS) {
             self.parse_node_predicate();
         }
@@ -266,10 +264,8 @@ impl<'q> Parser<'q, '_> {
     fn parse_node_predicate(&mut self) {
         self.start_node(SyntaxKind::NodePredicate);
 
-        // Consume the operator
         self.bump();
 
-        // Parse the value (string or regex)
         match self.current() {
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
                 self.bump_string_tokens();
@@ -278,7 +274,6 @@ impl<'q> Parser<'q, '_> {
                 self.error_and_bump(DiagnosticKind::UnclosedString);
             }
             SyntaxKind::RegexLiteral => {
-                // Regex literal from compound token - wrap in Regex node
                 self.start_node(SyntaxKind::Regex);
                 self.bump();
                 self.finish_node();
@@ -314,7 +309,6 @@ impl<'q> Parser<'q, '_> {
                 continue;
             }
 
-            // Check for escaped slash by counting trailing backslashes in source
             let slash_start: usize = self.tokens[self.pos].span.start().into();
             let backslash_count = self.source[..slash_start]
                 .chars()
@@ -322,7 +316,6 @@ impl<'q> Parser<'q, '_> {
                 .take_while(|&c| c == '\\')
                 .count();
 
-            // Odd number of backslashes means the slash is escaped
             if backslash_count % 2 == 1 {
                 self.bump();
                 continue;
@@ -343,7 +336,7 @@ impl<'q> Parser<'q, '_> {
 
     fn parse_tree_error(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Tree);
-        self.bump(); // KwError
+        self.bump();
         if !self.currently_is(SyntaxKind::ParenClose) {
             let children_start = self.current_span().start();
             self.parse_children(SyntaxKind::ParenClose, TREE_RECOVERY_TOKENS);
@@ -365,7 +358,7 @@ impl<'q> Parser<'q, '_> {
 
     fn parse_tree_missing(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Tree);
-        self.bump(); // KwMissing
+        self.bump();
         match self.current() {
             SyntaxKind::Id => {
                 self.bump();
@@ -467,7 +460,7 @@ impl<'q> Parser<'q, '_> {
         self.start_node(SyntaxKind::Alt);
         self.push_delimiter();
         self.assert_current(SyntaxKind::BracketOpen);
-        self.bump(); // consume '['
+        self.bump();
 
         self.parse_alt_children();
 
@@ -476,7 +469,6 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    /// Parse alternation children, handling both tagged `Label: expr` and unlabeled expressions.
     fn parse_alt_children(&mut self) {
         loop {
             if self.eof() {
@@ -572,7 +564,7 @@ impl<'q> Parser<'q, '_> {
         self.start_node(SyntaxKind::Seq);
         self.push_delimiter();
         self.assert_current(SyntaxKind::BraceOpen);
-        self.bump(); // consume '{'
+        self.bump();
 
         self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY_TOKENS);
 
@@ -585,7 +577,6 @@ impl<'q> Parser<'q, '_> {
     fn error_skip_separator(&mut self) {
         let kind = self.current();
         let span = self.current_span();
-        // Invariant: only called when SEPARATORS.contains(kind), which only has Comma and Pipe
         let char_name = match kind {
             SyntaxKind::Comma => ",",
             SyntaxKind::Pipe => "|",

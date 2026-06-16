@@ -387,7 +387,7 @@ impl NfaBuilder {
     }
 
     fn push_advance(&mut self, chars: CharacterSet, state_id: u32) {
-        let precedence = *self.precedence_stack.last().unwrap();
+        let precedence = *self.precedence_stack.last().expect("precedence_stack is initialized with one element and is never emptied below its initial depth");
         self.nfa.states.push(NfaState::Advance {
             chars,
             state_id,

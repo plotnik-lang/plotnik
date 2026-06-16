@@ -23,7 +23,6 @@ use super::trace::{NoopTracer, Tracer};
 struct MatchedNode<'t>(Option<Node<'t>>);
 
 impl<'t> MatchedNode<'t> {
-    /// Record `node` as the most recent match.
     fn set(&mut self, node: Node<'t>) {
         self.0 = Some(node);
     }
@@ -72,13 +71,11 @@ impl FuelLimits {
         Self::default()
     }
 
-    /// Set the execution fuel limit.
     pub fn exec_fuel(mut self, fuel: u32) -> Self {
         self.exec_fuel = fuel;
         self
     }
 
-    /// Set the recursion limit.
     pub fn recursion_limit(mut self, limit: u32) -> Self {
         self.recursion_limit = limit;
         self
@@ -102,7 +99,6 @@ pub struct VM<'t> {
     pub(crate) effects: EffectLog<'t>,
     matched_node: MatchedNode<'t>,
 
-    // Fuel tracking
     pub(crate) exec_fuel: u32,
     pub(crate) recursion_depth: u32,
     pub(crate) limits: FuelLimits,
@@ -115,7 +111,6 @@ pub struct VM<'t> {
     /// Set from entrypoint before execution; Trampoline jumps to this address.
     pub(crate) entrypoint_target: u16,
 
-    /// Source text for predicate evaluation.
     pub(crate) source: &'t str,
 }
 
@@ -136,19 +131,16 @@ impl<'t> VMBuilder<'t> {
         }
     }
 
-    /// Set the fuel limits.
     pub fn limits(mut self, limits: FuelLimits) -> Self {
         self.limits = limits;
         self
     }
 
-    /// Set the execution fuel limit.
     pub fn exec_fuel(mut self, fuel: u32) -> Self {
         self.limits = self.limits.exec_fuel(fuel);
         self
     }
 
-    /// Set the recursion limit.
     pub fn recursion_limit(mut self, limit: u32) -> Self {
         self.limits = self.limits.recursion_limit(limit);
         self
@@ -307,7 +299,6 @@ impl<'t> VM<'t> {
         tracer.trace_enter_preamble();
 
         loop {
-            // Fuel check
             if self.exec_fuel == 0 {
                 return Err(RuntimeError::ExecFuelExhausted(self.limits.exec_fuel));
             }
@@ -372,7 +363,7 @@ impl<'t> VM<'t> {
     ) -> Result<(), Signal> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
             tracer.trace_nav_failure(m.nav);
-            return self.backtrack(tracer);
+            return Err(self.backtrack(tracer));
         };
         tracer.trace_nav(m.nav, self.cursor.node());
 
@@ -393,11 +384,8 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    /// Evaluate a predicate against the matched node's text.
-    ///
-    /// - `op`: operator byte (see [`PredicateOp`])
-    /// - `is_regex`: true if value_ref is a RegexTable index
-    /// - `value_ref`: index into StringTable or RegexTable
+    /// `op` selects the operator (see [`PredicateOp`]); `is_regex` chooses
+    /// RegexTable over StringTable for `value_ref`.
     fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {
         let node = self.cursor.node();
         let node_text = &self.source[node.start_byte()..node.end_byte()];
@@ -430,7 +418,6 @@ impl<'t> VM<'t> {
         }
     }
 
-    /// Check if current candidate passes pure match constraints.
     fn candidate_matches<T: Tracer>(&self, m: Match<'_>, module: &Module, tracer: &mut T) -> bool {
         let node = self.cursor.node();
 
@@ -504,7 +491,6 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    /// Fail the run if entering another callee would exceed the recursion limit.
     fn check_recursion_limit(&self) -> Result<(), Signal> {
         if self.recursion_depth >= self.limits.recursion_limit {
             return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth).into());
@@ -515,7 +501,6 @@ impl<'t> VM<'t> {
     fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), Signal> {
         self.check_recursion_limit()?;
 
-        // Navigate to the candidate node (and its field, if constrained).
         let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
 
         // A searchable nav leaves a retry checkpoint so the callee can be
@@ -595,7 +580,7 @@ impl<'t> VM<'t> {
 
         let Some(policy) = self.cursor.navigate(nav) else {
             tracer.trace_nav_failure(nav);
-            return Err(self.backtrack(tracer).unwrap_err());
+            return Err(self.backtrack(tracer));
         };
         tracer.trace_nav(nav, self.cursor.node());
 
@@ -624,7 +609,7 @@ impl<'t> VM<'t> {
         };
         if self.cursor.field_id() != Some(field_id) {
             tracer.trace_field_failure(self.cursor.node());
-            return self.backtrack(tracer);
+            return Err(self.backtrack(tracer));
         }
         tracer.trace_field_success(field_id);
         Ok(())
@@ -674,14 +659,16 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
-        let cp = self.checkpoints.pop().ok_or(RuntimeError::NoMatch)?;
+    fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
+        let Some(cp) = self.checkpoints.pop() else {
+            return RuntimeError::NoMatch.into();
+        };
         tracer.trace_backtrack();
         self.restore_checkpoint_state(cp.state);
 
         let Some(resume) = cp.call_resume else {
             self.ip = cp.ip;
-            return Err(ControlFlow::Backtracked.into());
+            return ControlFlow::Backtracked.into();
         };
 
         // Call retry: advance to the next candidate, then re-enter the callee.
@@ -701,15 +688,13 @@ impl<'t> VM<'t> {
             tracer.trace_field_success(field_id);
         }
 
-        // Re-establish the retry checkpoint at the new candidate, then enter.
         self.checkpoints
             .push(self.call_retry_checkpoint(cp.ip, resume));
         tracer.trace_checkpoint_created(cp.ip);
         self.enter_callee(resume.target, resume.next, tracer);
-        Err(ControlFlow::Backtracked.into())
+        ControlFlow::Backtracked.into()
     }
 
-    /// Advance to next sibling or backtrack if search exhausted.
     fn advance_or_backtrack<T: Tracer>(
         &mut self,
         policy: SkipPolicy,
@@ -717,7 +702,7 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if !self.cursor.continue_search(policy) {
-            return self.backtrack(tracer);
+            return Err(self.backtrack(tracer));
         }
         tracer.trace_nav(cont_nav, self.cursor.node());
         Ok(())
@@ -727,7 +712,6 @@ impl<'t> VM<'t> {
         use EffectOpcode::*;
 
         let effect = match op.opcode {
-            // Suppress control: trace then update depth
             SuppressBegin => {
                 tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
                 self.suppress_depth += 1;
@@ -753,7 +737,7 @@ impl<'t> VM<'t> {
             // rather than fabricate the call-site node.
             Node | Text => {
                 let Some(node) = self.matched_node.get() else {
-                    return self.backtrack(tracer);
+                    return Err(self.backtrack(tracer));
                 };
                 match op.opcode {
                     Node => RuntimeEffect::Node(node),

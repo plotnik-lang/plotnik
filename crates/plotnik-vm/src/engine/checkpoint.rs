@@ -41,7 +41,6 @@ pub(crate) struct CheckpointState {
     pub(crate) suppress_depth: u16,
 }
 
-/// Checkpoint for backtracking.
 #[derive(Clone, Copy, Debug)]
 pub struct Checkpoint {
     /// VM state to restore on backtrack.
@@ -81,7 +80,6 @@ impl Checkpoint {
         }
     }
 
-    /// The VM state this checkpoint restores.
     pub fn state(&self) -> CheckpointState {
         self.state
     }
@@ -128,7 +126,6 @@ impl CheckpointStack {
         }
     }
 
-    /// Push a checkpoint.
     pub fn push(&mut self, mut checkpoint: Checkpoint) {
         let prev = self.stack.last().and_then(|c| c.running_max);
         checkpoint.running_max = match (checkpoint.state.frame_index, prev) {
@@ -139,7 +136,6 @@ impl CheckpointStack {
         self.stack.push(checkpoint);
     }
 
-    /// Pop and return the most recent checkpoint.
     pub fn pop(&mut self) -> Option<Checkpoint> {
         let cp = self.stack.pop()?;
         self.max_frame_ref = self.stack.last().and_then(|c| c.running_max);

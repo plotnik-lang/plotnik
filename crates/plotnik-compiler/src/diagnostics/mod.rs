@@ -14,7 +14,6 @@ use printer::DiagnosticsPrinter;
 
 use message::{DiagnosticMessage, Fix, RelatedInfo};
 
-// Re-export from query module
 pub use crate::query::{SourceId, SourceMap};
 
 /// A location that knows which source it belongs to.
@@ -48,9 +47,7 @@ impl Diagnostics {
         }
     }
 
-    /// Create a diagnostic with the given kind and span.
-    ///
-    /// Uses the kind's default message. Call `.message()` on the builder to override.
+    /// Uses the kind's default message; call `.message()` on the builder to override.
     pub fn report(
         &mut self,
         source: SourceId,
@@ -172,24 +169,24 @@ impl Diagnostics {
         &self.messages
     }
 
-    /// Render for users: cascading errors are suppressed.
+    /// Cascading errors are suppressed; see [`Self::render_unfiltered`] for raw output.
     pub fn render(&self, sources: &SourceMap) -> String {
         DiagnosticsPrinter::new(self.filtered(), sources).render()
     }
 
-    /// Render for users with optional colors: cascading errors are suppressed.
+    /// Cascading errors are suppressed; `colored` controls ANSI escape codes.
     pub fn render_colored(&self, sources: &SourceMap, colored: bool) -> String {
         DiagnosticsPrinter::new(self.filtered(), sources)
             .colored(colored)
             .render()
     }
 
-    /// Render every recorded diagnostic, including suppressed cascades (debugging).
+    /// Render every diagnostic including suppressed cascades; for debugging only.
     pub fn render_unfiltered(&self, sources: &SourceMap) -> String {
         DiagnosticsPrinter::new(self.messages.clone(), sources).render()
     }
 
-    /// Canonical serializable form: cascading errors are suppressed, same as `render`.
+    /// Cascading errors are suppressed, same as `render`.
     pub fn to_json(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
         self.filtered()
             .iter()
@@ -197,7 +194,6 @@ impl Diagnostics {
             .collect()
     }
 
-    /// Render as a compact JSON array, one object per diagnostic.
     pub fn render_json(&self, sources: &SourceMap) -> String {
         serde_json::to_string(&self.to_json(sources)).expect("diagnostics serialize to JSON")
     }
@@ -208,7 +204,7 @@ impl Diagnostics {
 }
 
 impl<'d> DiagnosticBuilder<'d> {
-    /// Provide custom detail for this diagnostic, rendered using the kind's template.
+    /// Override the default message; rendered using the kind's template.
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         let detail = msg.into();
         self.message.message = self.message.kind.message(Some(&detail));
@@ -250,7 +246,6 @@ impl<'d> DiagnosticBuilder<'d> {
     }
 
     pub fn emit(mut self) {
-        // Prepend default hint if one exists for this kind
         if let Some(default_hint) = self.message.kind.default_hint() {
             self.message.hints.insert(0, default_hint.to_string());
         }

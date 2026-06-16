@@ -24,7 +24,6 @@ pub struct NodeHandle {
 }
 
 impl NodeHandle {
-    /// Create from a tree-sitter node and source text.
     pub fn from_node(node: Node<'_>, source: &str) -> Self {
         let text = node
             .utf8_text(source.as_bytes())
@@ -158,7 +157,6 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
 
     let field_indent = if pretty { indent + 2 } else { 0 };
 
-    // Field 1: "kind"
     if pretty {
         out.push('\n');
         push_indent(out, field_indent);
@@ -178,7 +176,6 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push('"');
     out.push_str(c.reset);
 
-    // Field 2: "text"
     out.push_str(c.dim);
     out.push(',');
     out.push_str(c.reset);
@@ -201,7 +198,6 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push('"');
     out.push_str(c.reset);
 
-    // Field 3: "span"
     out.push_str(c.dim);
     out.push(',');
     out.push_str(c.reset);
@@ -311,7 +307,6 @@ fn format_object(
             push_indent(out, field_indent);
         }
 
-        // Key in blue
         out.push_str(c.blue);
         out.push('"');
         escape_json_into(out, key);
@@ -358,7 +353,6 @@ fn format_tagged(
         push_indent(out, field_indent);
     }
 
-    // $tag key in blue
     out.push_str(c.blue);
     out.push_str("\"$tag\"");
     out.push_str(c.reset);
@@ -371,14 +365,13 @@ fn format_tagged(
         out.push(' ');
     }
 
-    // Tag value is green (string)
     out.push_str(c.green);
     out.push('"');
     escape_json_into(out, tag);
     out.push('"');
     out.push_str(c.reset);
 
-    // Only emit $data if present (Void payloads omit it)
+    // Void payloads have no $data field.
     if let Some(d) = data {
         out.push_str(c.dim);
         out.push(',');
@@ -389,7 +382,6 @@ fn format_tagged(
             push_indent(out, field_indent);
         }
 
-        // $data key in blue
         out.push_str(c.blue);
         out.push_str("\"$data\"");
         out.push_str(c.reset);
@@ -442,7 +434,6 @@ fn escape_json_into(out: &mut String, s: &str) {
     }
 }
 
-/// Append `n` spaces to `out`.
 fn push_indent(out: &mut String, n: usize) {
     for _ in 0..n {
         out.push(' ');

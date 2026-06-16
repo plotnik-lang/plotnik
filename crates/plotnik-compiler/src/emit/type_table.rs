@@ -123,7 +123,6 @@ impl TypeTableBuilder {
             self.emit_type_at_slot(slot_index, type_id, type_shape, type_ctx, interner, strings)?;
         }
 
-        // Collect TypeName entries for named definitions
         for (def_id, type_id) in type_ctx.iter_def_types() {
             let name_sym = type_ctx.def_name_sym(def_id);
             let name = strings.get_or_intern(name_sym, interner)?;
@@ -153,7 +152,6 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Fill in a TypeDef at a pre-allocated slot.
     fn emit_type_at_slot(
         &mut self,
         slot_index: usize,
@@ -165,7 +163,6 @@ impl TypeTableBuilder {
     ) -> Result<(), EmitError> {
         match type_shape {
             TypeShape::Void | TypeShape::Node | TypeShape::String => {
-                // Builtins - should not reach here
                 unreachable!("builtins should be handled separately")
             }
 
@@ -173,7 +170,6 @@ impl TypeTableBuilder {
                 // Custom type annotation: @x :: Identifier → type Identifier = Node
                 let bc_type_id = BytecodeTypeId(slot_index as u16);
 
-                // Add TypeName entry for the custom type
                 let name = strings.get_or_intern(*sym, interner)?;
                 self.type_names.push(TypeName::new(name, bc_type_id));
 
@@ -214,7 +210,6 @@ impl TypeTableBuilder {
                     resolved_fields.push((field_name, field_type));
                 }
 
-                // Emit members contiguously for this struct
                 let member_start = self.type_members.len() as u16;
                 for (field_name, field_type) in resolved_fields {
                     self.type_members
@@ -236,7 +231,6 @@ impl TypeTableBuilder {
                     resolved_variants.push((variant_name, variant_type));
                 }
 
-                // Now emit the members and update the placeholder
                 let member_start = self.type_members.len() as u16;
                 for (variant_name, variant_type) in resolved_variants {
                     self.type_members
@@ -288,7 +282,6 @@ impl TypeTableBuilder {
         self.resolve_underlying_type_id(target, type_ctx)
     }
 
-    /// Resolve a field's type, handling optionality.
     fn resolve_field_type(
         &mut self,
         field_info: &FieldInfo,
@@ -296,7 +289,6 @@ impl TypeTableBuilder {
     ) -> Result<BytecodeTypeId, EmitError> {
         let base_type = self.resolve_type(field_info.type_id, type_ctx)?;
 
-        // If the field is optional, wrap it in Optional
         if field_info.optional {
             self.get_or_create_optional(base_type)
         } else {
@@ -304,17 +296,14 @@ impl TypeTableBuilder {
         }
     }
 
-    /// Get or create an Optional wrapper for a base type.
     fn get_or_create_optional(
         &mut self,
         base_type: BytecodeTypeId,
     ) -> Result<BytecodeTypeId, EmitError> {
-        // Check cache first
         if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
             return Ok(optional_id);
         }
 
-        // Create new Optional wrapper at the next available index
         let optional_id = BytecodeTypeId(self.type_defs.len() as u16);
         self.type_defs.push(TypeDef::optional(base_type));
         self.optional_wrappers.insert(base_type, optional_id);
@@ -332,7 +321,6 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Get the bytecode BytecodeTypeId for a query TypeId.
     pub fn get(&self, type_id: TypeId) -> Option<BytecodeTypeId> {
         self.mapping.get(&type_id).copied()
     }
@@ -350,9 +338,7 @@ impl TypeTableBuilder {
         }
     }
 
-    /// Emit type definitions, members, and names as bytes.
-    ///
-    /// Returns (type_defs_bytes, type_members_bytes, type_names_bytes).
+    /// Returns `(type_defs_bytes, type_members_bytes, type_names_bytes)`.
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut defs_bytes = Vec::with_capacity(self.type_defs.len() * TypeDef::SIZE);
         for def in &self.type_defs {
@@ -394,14 +380,12 @@ impl Default for TypeTableBuilder {
     }
 }
 
-/// Collect types depth-first starting from a root type.
 fn collect_types_dfs(
     type_id: TypeId,
     type_ctx: &TypeContext,
     out: &mut Vec<TypeId>,
     seen: &mut HashSet<TypeId>,
 ) {
-    // Skip builtins and already-seen types
     if type_id.is_builtin() || seen.contains(&type_id) {
         return;
     }
@@ -410,7 +394,6 @@ fn collect_types_dfs(
         return;
     };
 
-    // Resolve Ref types to their target
     if let TypeShape::Ref(def_id) = type_shape {
         if let Some(target_id) = type_ctx.get_def_type(*def_id) {
             collect_types_dfs(target_id, type_ctx, out, seen);
@@ -435,12 +418,10 @@ fn collect_types_dfs(
             out.push(type_id);
         }
         TypeShape::Array { element, .. } => {
-            // Collect element type first, then add the Array itself
             collect_types_dfs(*element, type_ctx, out, seen);
             out.push(type_id);
         }
         TypeShape::Optional(inner) => {
-            // Collect inner type first, then add the Optional itself
             collect_types_dfs(*inner, type_ctx, out, seen);
             out.push(type_id);
         }
@@ -452,7 +433,6 @@ fn collect_types_dfs(
     }
 }
 
-/// Collect which builtin types are referenced by a type.
 fn collect_builtin_refs(
     type_id: TypeId,
     type_ctx: &TypeContext,

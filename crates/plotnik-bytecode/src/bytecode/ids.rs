@@ -17,7 +17,6 @@ impl StringId {
         Self(NonZeroU16::new(n).expect("StringId cannot be 0"))
     }
 
-    /// Get the raw u16 value.
     #[inline]
     pub fn get(self) -> u16 {
         self.0.get()

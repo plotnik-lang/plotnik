@@ -16,7 +16,6 @@ use plotnik_bytecode::EffectOpcode;
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
 use crate::compile::error::CompileResult;
 
-/// Build label → index map for quick instruction lookup.
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions
         .iter()
@@ -25,7 +24,6 @@ fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize>
         .collect()
 }
 
-/// Build predecessor map: label → labels that transition to it.
 fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<Label>> {
     let mut preds: HashMap<Label, Vec<Label>> = HashMap::new();
     for instr in instructions {
@@ -37,7 +35,6 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
     preds
 }
 
-/// Get a Match instruction by label.
 fn get_match<'a>(
     label: Label,
     instructions: &'a [InstructionIR],
@@ -49,7 +46,6 @@ fn get_match<'a>(
     }
 }
 
-/// Get a mutable Match instruction by label.
 fn get_match_mut<'a>(
     label: Label,
     instructions: &'a mut [InstructionIR],
@@ -77,7 +73,7 @@ fn see_through(
 
     loop {
         if !visited.insert(current) {
-            return None; // Cycle
+            return None;
         }
 
         let Some(m) = get_match(current, instructions, idx) else {
@@ -85,14 +81,13 @@ fn see_through(
         };
 
         if !m.is_epsilon() {
-            return Some((current, effects)); // Visible: non-epsilon Match
+            return Some((current, effects));
         }
 
         if m.successors.len() != 1 {
             return Some((current, effects)); // Branching epsilon: visible but can't see through
         }
 
-        // Single-succ epsilon: absorb effects, continue looking
         effects.extend(m.pre_effects.iter().cloned());
         effects.extend(m.post_effects.iter().cloned());
         current = m.successors[0];
@@ -123,19 +118,16 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             _ => continue,
         };
 
-        // Skip effectless epsilons
         if eps.pre_effects.is_empty() && eps.post_effects.is_empty() {
             continue;
         }
 
-        // Must have single successor
         if eps.successors.len() != 1 {
             continue;
         }
 
         let succ_label = eps.successors[0];
 
-        // Successor must be a non-epsilon Match
         let Some(succ) = get_match(succ_label, instructions, &idx) else {
             continue;
         };
@@ -164,13 +156,15 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         let eps_pre = eps.pre_effects.clone();
         let eps_post = eps.post_effects.clone();
 
-        let succ = get_match_mut(succ_label, instructions, &idx).unwrap();
+        let succ = get_match_mut(succ_label, instructions, &idx)
+            .expect("succ_label resolved via get_match above, so it indexes a Match instruction");
         let mut new_pre = eps_pre;
         new_pre.extend(eps_post);
         new_pre.append(&mut succ.pre_effects);
         succ.pre_effects = new_pre;
 
-        let eps = get_match_mut(eps_label, instructions, &idx).unwrap();
+        let eps = get_match_mut(eps_label, instructions, &idx)
+            .expect("eps_label is the current epsilon Match instruction at index i");
         eps.pre_effects.clear();
         eps.post_effects.clear();
 
@@ -189,8 +183,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     let mut changed = false;
     let idx = build_label_to_index(&result.instructions);
 
-    // Entry points: resolve through effectless chains
-    // Track old->new mappings to update Call targets
+    // Track old→new entry remaps to fix up Call targets referencing them.
     let mut entry_remaps: HashMap<Label, Label> = HashMap::new();
     for entry in result.def_entries.values_mut() {
         if let Some((target, effects)) = see_through(*entry, &result.instructions, &idx)
@@ -203,7 +196,6 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         }
     }
 
-    // Update Call targets to match updated def_entries
     for instr in &mut result.instructions {
         if let InstructionIR::Call(c) = instr
             && let Some(&new) = entry_remaps.get(&c.target)
@@ -212,7 +204,6 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         }
     }
 
-    // Preamble entry
     if let Some((target, effects)) = see_through(result.preamble_entry, &result.instructions, &idx)
         && effects.is_empty()
         && target != result.preamble_entry
@@ -221,7 +212,6 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         changed = true;
     }
 
-    // Non-epsilon Match instructions: resolve successors
     for i in 0..result.instructions.len() {
         let m = match &result.instructions[i] {
             InstructionIR::Match(m) if !m.is_epsilon() => m,
@@ -238,7 +228,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
             };
 
             if target == succ {
-                continue; // Nothing to see through
+                continue;
             }
 
             // Effects require single successor (can't execute for all paths)
@@ -269,7 +259,6 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         }
     }
 
-    // Call/Trampoline: resolve next (effectless only)
     for i in 0..result.instructions.len() {
         let next_label = match &result.instructions[i] {
             InstructionIR::Call(c) => Some(c.next),
@@ -315,7 +304,6 @@ fn expand_branching_epsilons(result: &mut CompileResult) -> bool {
             _ => continue,
         };
 
-        // Must be effectless epsilon with multiple successors
         if !m.is_epsilon() {
             continue;
         }
@@ -329,7 +317,6 @@ fn expand_branching_epsilons(result: &mut CompileResult) -> bool {
         let eps_label = m.label;
         let eps_succs = m.successors.clone();
 
-        // Expand into each predecessor
         if let Some(pred_labels) = preds.get(&eps_label) {
             for &pred_label in pred_labels {
                 let pred_idx = idx[&pred_label];
@@ -465,7 +452,6 @@ mod tests {
 
         forward_migrate(&mut instructions);
 
-        // Effects moved to 1.pre
         let eps = match &instructions[0] {
             InstructionIR::Match(m) => m,
             _ => panic!(),
@@ -574,7 +560,6 @@ mod tests {
             preamble_entry: Label(0),
         };
 
-        // Phase A
         forward_migrate(&mut result.instructions);
 
         // 1 should now be effectless, 2 has the effect
@@ -590,7 +575,6 @@ mod tests {
         };
         assert_eq!(m2.pre_effects.len(), 1);
 
-        // Phase B
         laser_vision(&mut result);
 
         // 0 should now point directly to 2

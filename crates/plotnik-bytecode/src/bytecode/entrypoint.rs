@@ -22,7 +22,6 @@ impl Entrypoint {
     /// Serialized size in bytes.
     pub const SIZE: usize = 8;
 
-    /// Create a new entrypoint.
     pub fn new(name: StringId, target: StepAddr, result_type: TypeId) -> Self {
         Self {
             name,
@@ -32,7 +31,6 @@ impl Entrypoint {
         }
     }
 
-    /// Decode from 8 bytes (crate-internal deserialization).
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             name: StringId::new(u16::from_le_bytes([bytes[0], bytes[1]])),

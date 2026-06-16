@@ -5,7 +5,6 @@ use plotnik_core::grammar::raw::{RawGrammar, RawRule};
 use crate::error::CliResult;
 use plotnik::language_registry;
 
-/// List all supported languages with aliases.
 pub fn run_list() -> CliResult {
     for lang in language_registry::all() {
         let aliases: Vec<_> = lang.aliases().iter().skip(1).copied().collect();
@@ -19,7 +18,6 @@ pub fn run_list() -> CliResult {
     Ok(())
 }
 
-/// Dump grammar for a language.
 pub fn run_dump(lang_name: &str) -> CliResult {
     let lang = super::lang_resolver::resolve_named_lang(lang_name)?;
 

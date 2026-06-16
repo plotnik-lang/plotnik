@@ -73,9 +73,7 @@ impl LayoutIR {
         self.label_to_offset.insert(label, offset);
     }
 
-    /// Move an instruction from its current block to a new block.
     fn move_to(&mut self, label: Label, new_block_idx: usize, size: u8) {
-        // Remove from old block
         if let Some(&old_block_idx) = self.label_to_block.get(&label)
             && let block = &mut self.blocks[old_block_idx]
             && let Some(pos) = block.placements.iter().position(|p| p.label == label)
@@ -83,7 +81,6 @@ impl LayoutIR {
             let old_placement = block.placements.remove(pos);
             block.used -= old_placement.size;
 
-            // Compact remaining placements
             let mut offset = 0u8;
             for p in &mut block.placements {
                 p.offset = offset;
@@ -91,7 +88,6 @@ impl LayoutIR {
             }
         }
 
-        // Add to new block
         let offset = self.blocks[new_block_idx].place(label, size);
         self.label_to_block.insert(label, new_block_idx);
         self.label_to_offset.insert(label, offset);
@@ -248,7 +244,6 @@ impl CacheAligned {
     }
 }
 
-/// Build initial LayoutIR from ordered chains.
 fn build_layout_ir(
     chains: &[Vec<Label>],
     label_to_instr: &BTreeMap<Label, &InstructionIR>,
@@ -262,8 +257,13 @@ fn build_layout_ir(
             };
             let size = instr.size() as u8;
 
-            // Ensure current block can fit, or create new one
-            if ir.blocks.is_empty() || !ir.blocks.last().unwrap().can_fit(size) {
+            if ir.blocks.is_empty()
+                || !ir
+                    .blocks
+                    .last()
+                    .expect("blocks is non-empty by the guard above")
+                    .can_fit(size)
+            {
                 ir.blocks.push(Block::new());
             }
             let block_idx = ir.blocks.len() - 1;
@@ -275,7 +275,6 @@ fn build_layout_ir(
     ir
 }
 
-/// Build block reference counts from current layout.
 fn build_block_refs(ir: &LayoutIR, label_to_instr: &BTreeMap<Label, &InstructionIR>) -> BlockRefs {
     let mut refs = BlockRefs::new();
 
@@ -304,8 +303,6 @@ fn pack_successors(
     refs: &BlockRefs,
     label_to_instr: &BTreeMap<Label, &InstructionIR>,
 ) {
-    // Collect candidates: (successor_label, successor_block, predecessor_block)
-    // We want to move successors to earlier blocks with free space
     let mut candidates: Vec<(Label, usize, usize)> = Vec::new();
 
     for (&label, &block_idx) in &ir.label_to_block {
@@ -313,13 +310,11 @@ fn pack_successors(
             continue;
         };
 
-        // For each successor of this instruction
         for &succ in instr.successors() {
-            if let Some(&succ_block) = ir.label_to_block.get(&succ) {
-                // Only consider moving if successor is in a later block
-                if succ_block > block_idx {
-                    candidates.push((succ, succ_block, block_idx));
-                }
+            if let Some(&succ_block) = ir.label_to_block.get(&succ)
+                && succ_block > block_idx
+            {
+                candidates.push((succ, succ_block, block_idx));
             }
         }
     }
@@ -327,7 +322,6 @@ fn pack_successors(
     // Sort by successor block descending (process later blocks first)
     candidates.sort_by_key(|(_, succ_block, _)| std::cmp::Reverse(*succ_block));
 
-    // Try to move each successor to an earlier block
     for (succ_label, _succ_block, pred_block) in candidates {
         // Re-check current block (might have changed)
         let Some(&current_block) = ir.label_to_block.get(&succ_label) else {
@@ -339,7 +333,6 @@ fn pack_successors(
         };
         let size = instr.size() as u8;
 
-        // Find the best earlier block with free space
         // Prefer blocks that reference the predecessor block (cache locality)
         let scores: Vec<_> = (0..current_block)
             .map(|c| block_score(pred_block, c, refs))
@@ -358,7 +351,6 @@ fn pack_successors(
     }
 }
 
-/// Extract linear chains from the control flow graph.
 fn extract_chains(
     graph: &Graph,
     instructions: &[InstructionIR],
@@ -375,7 +367,6 @@ fn extract_chains(
         chains.push(build_chain(entry, graph, &mut visited));
     }
 
-    // Then remaining unvisited instructions
     for instr in instructions {
         let label = instr.label();
         if visited.contains(&label) {
@@ -411,7 +402,6 @@ fn build_chain(start: Label, graph: &Graph, visited: &mut HashSet<Label>) -> Vec
 fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label>> {
     let entry_set: HashSet<Label> = entries.iter().copied().collect();
 
-    // Partition into entry chains and non-entry chains
     let (mut entry_chains, mut other_chains): (Vec<_>, Vec<_>) =
         chains.drain(..).partition(|chain| {
             chain
@@ -423,7 +413,6 @@ fn order_chains(mut chains: Vec<Vec<Label>>, entries: &[Label]) -> Vec<Vec<Label
     // Sort other chains by size (descending) for better locality
     other_chains.sort_by_key(|chain| std::cmp::Reverse(chain.len()));
 
-    // Entry chains first, then others
     entry_chains.extend(other_chains);
     entry_chains
 }

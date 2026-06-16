@@ -22,7 +22,6 @@ pub fn run(args: CheckArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    // Parse and analyze
     let query = QueryBuilder::new(loaded.sources)
         .parse()
         .map_err(|e| CliError::fatal(e.to_string()))?

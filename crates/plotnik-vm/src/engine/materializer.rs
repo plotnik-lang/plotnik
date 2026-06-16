@@ -5,14 +5,12 @@ use plotnik_bytecode::{StringsView, TypeData, TypeId, TypeKind, TypesView};
 use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
 
-/// Materializer transforms effect logs into output values.
 pub trait Materializer<'t> {
     type Output;
 
     fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Self::Output;
 }
 
-/// Materializer that produces Value with resolved strings.
 pub struct ValueMaterializer<'a> {
     source: &'a str,
     types: TypesView<'a>,
@@ -43,7 +41,6 @@ impl<'a> ValueMaterializer<'a> {
             .is_some_and(|def| matches!(def.classify(), TypeData::Primitive(TypeKind::Void)))
     }
 
-    /// Create initial builder based on result type.
     fn builder_for_type(&self, type_id: TypeId) -> Builder {
         let def = self
             .types
@@ -108,10 +105,8 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
     type Output = Value;
 
     fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
-        // Stack of containers being built
         let mut stack: Vec<Builder> = vec![];
 
-        // Initialize with result type container
         let result_builder = self.builder_for_type(result_type);
         stack.push(result_builder);
 
@@ -180,7 +175,6 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                         );
                     };
                     if !fields.is_empty() {
-                        // Non-empty object: always produce the object value
                         pending = Some(Value::Object(fields));
                     } else if pending.is_none() {
                         // Empty object with no pending value:
@@ -233,7 +227,6 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
             }
         }
 
-        // Result: pending value takes precedence, otherwise pop the result container
         pending
             .or_else(|| stack.pop().map(Builder::build))
             .unwrap_or(Value::Null)

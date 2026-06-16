@@ -1,6 +1,3 @@
-//! Grammar loading errors.
-
-/// Error during grammar parsing or analysis.
 #[derive(Debug)]
 pub enum GrammarError {
     Json(serde_json::Error),

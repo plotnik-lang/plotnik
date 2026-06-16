@@ -9,7 +9,6 @@ use arborium_tree_sitter::{Node, TreeCursor};
 
 use plotnik_bytecode::Nav;
 
-/// Skip policy for navigation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipPolicy {
     /// Skip any nodes until match.
@@ -46,7 +45,6 @@ pub struct CursorWrapper<'t> {
 }
 
 impl<'t> CursorWrapper<'t> {
-    /// Create a wrapper around a tree cursor.
     pub fn new(cursor: TreeCursor<'t>) -> Self {
         Self { cursor }
     }
@@ -69,7 +67,6 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_descendant(index as usize);
     }
 
-    /// Get the field ID of the current node (if any).
     #[inline]
     pub fn field_id(&self) -> Option<NonZeroU16> {
         self.cursor.field_id()
@@ -81,17 +78,14 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.depth()
     }
 
-    /// Move cursor to parent node.
     #[inline]
     pub fn goto_parent(&mut self) -> bool {
         self.cursor.goto_parent()
     }
 
-    /// Check if a node is trivia.
-    ///
-    /// TODO: when extracting common tree-sitter API wrapper (arborium vs vanilla tre-sitter),
-    ///       make sure is_trivia() is just a method on the wrapper around `Node`,
-    ///       such that n.is_trivia(), n.is_named(), and n.is_extra() are uniform.
+    /// TODO: when extracting a common tree-sitter wrapper (arborium vs vanilla tree-sitter),
+    ///       give `Node` an `is_trivia()` method so n.is_trivia(), n.is_named(), and
+    ///       n.is_extra() are uniform.
     #[inline]
     pub fn is_trivia(node: &Node<'_>) -> bool {
         // Anonymous skipping is documented anchor semantics; `is_extra` is the
@@ -131,12 +125,10 @@ impl<'t> CursorWrapper<'t> {
         }
     }
 
-    /// Move to first child.
     fn go_first_child(&mut self) -> bool {
         self.cursor.goto_first_child()
     }
 
-    /// Move to next sibling.
     fn go_next_sibling(&mut self) -> bool {
         self.cursor.goto_next_sibling()
     }
@@ -212,7 +204,6 @@ impl<'t> CursorWrapper<'t> {
         match policy {
             SkipPolicy::Exact => false,
             SkipPolicy::Trivia => {
-                // Fail if current node is non-trivia (we'd have to skip it)
                 if !Self::is_trivia(&self.cursor.node()) {
                     return false;
                 }

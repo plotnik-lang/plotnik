@@ -62,7 +62,6 @@ pub struct EffectOp {
 }
 
 impl EffectOp {
-    /// Create a new effect operation.
     pub fn new(opcode: EffectOpcode, payload: usize) -> Self {
         Self { opcode, payload }
     }

@@ -21,10 +21,6 @@ enum PostChain {
     Successors(Vec<Label>),
 }
 
-/// Lower IR to bytecode-compatible form.
-///
-/// Transforms instructions that exceed bytecode encoding limits into
-/// equivalent cascades of smaller instructions.
 pub fn lower(result: &mut CompileResult) {
     let mut next_label = result
         .instructions
@@ -54,7 +50,6 @@ fn fresh_label(next: &mut u32) -> Label {
 }
 
 fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u32) {
-    // Step 1: Handle pre_effects overflow → epsilon chain before the match
     if m.pre_effects.len() > MAX_PRE_EFFECTS {
         let all_pre = std::mem::take(&mut m.pre_effects);
         let entry = m.label;
@@ -62,7 +57,6 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
         emit_effects_chain(entry, m.label, all_pre, out, next_label);
     }
 
-    // Collect overflow chains to emit after the match
     let mut post_chains: Vec<PostChain> = Vec::new();
 
     if m.neg_fields.len() > MAX_NEG_FIELDS {
@@ -94,7 +88,6 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
         return;
     }
 
-    // Build chain: match → chain1 → chain2 → ... → final_succs
     let mut current_succs = std::mem::take(&mut m.successors);
 
     for chain in post_chains.into_iter().rev() {

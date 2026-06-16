@@ -127,10 +127,8 @@ impl QueryParsed {
 
 impl QueryParsed {
     pub fn analyze(mut self) -> QueryAnalyzed {
-        // Create shared interner for all phases
         let mut interner = Interner::new();
 
-        // Use reference-based structures for processing
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
@@ -141,7 +139,6 @@ impl QueryParsed {
             &mut self.diag,
         );
 
-        // Unified type checking pass
         let type_context = type_check::infer_types(
             &mut interner,
             &self.ast_map,
@@ -196,7 +193,6 @@ impl QueryAnalyzed {
         !self.diag.has_errors()
     }
 
-    /// Returns a unified context view for downstream modules.
     pub fn context(&self) -> QueryContext<'_> {
         QueryContext {
             interner: &self.interner,
@@ -208,12 +204,10 @@ impl QueryAnalyzed {
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {
         use crate::parser::ast;
 
-        // Try casting to Expr first as it's the most common query
         if let Some(expr) = ast::Expr::cast(node.clone()) {
             return self.type_context.get_arity(&expr);
         }
 
-        // Root: arity based on definition count
         if let Some(root) = ast::Root::cast(node.clone()) {
             return Some(if root.defs().nth(1).is_some() {
                 Arity::Many
@@ -222,12 +216,10 @@ impl QueryAnalyzed {
             });
         }
 
-        // Def: delegate to body's arity
         if let Some(def) = ast::Def::cast(node.clone()) {
             return def.body().and_then(|b| self.type_context.get_arity(&b));
         }
 
-        // Branch: delegate to body's arity
         if let Some(branch) = ast::Branch::cast(node.clone()) {
             return branch.body().and_then(|b| self.type_context.get_arity(&b));
         }

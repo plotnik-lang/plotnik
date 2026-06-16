@@ -17,15 +17,9 @@ use crate::query::{SourceId, SourceMap};
 /// Code generators can emit whatever name they want for this.
 pub const UNNAMED_DEF: &str = "_";
 
-/// Registry of named definitions in a query.
-///
-/// Stores the mapping from definition names to their AST expressions,
-/// along with source file information for diagnostics.
 #[derive(Clone, Debug, Default)]
 pub struct SymbolTable {
-    /// Maps symbol name to its AST expression.
     table: IndexMap<String, ast::Expr>,
-    /// Maps symbol name to the source file where it's defined.
     files: IndexMap<String, SourceId>,
 }
 
@@ -45,29 +39,24 @@ impl SymbolTable {
         is_new
     }
 
-    /// Remove a symbol definition.
     pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Expr)> {
         let expr = self.table.shift_remove(name)?;
         let source_id = self.files.shift_remove(name)?;
         Some((source_id, expr))
     }
 
-    /// Check if a symbol is defined.
     pub fn contains(&self, name: &str) -> bool {
         self.table.contains_key(name)
     }
 
-    /// Get the expression for a symbol.
     pub fn get(&self, name: &str) -> Option<&ast::Expr> {
         self.table.get(name)
     }
 
-    /// Get the source file where a symbol is defined.
     pub fn source_id(&self, name: &str) -> Option<SourceId> {
         self.files.get(name).copied()
     }
 
-    /// Get both the source ID and expression for a symbol.
     pub fn get_full(&self, name: &str) -> Option<(SourceId, &ast::Expr)> {
         let expr = self.table.get(name)?;
         let source_id = self.files.get(name).copied()?;
@@ -116,7 +105,6 @@ pub fn resolve_names(
 ) -> SymbolTable {
     let mut symbol_table = SymbolTable::new();
 
-    // Pass 1: collect definitions from all sources
     for (&source_id, ast) in ast_map {
         let src = source_map.content(source_id);
         let mut resolver = ReferenceResolver {
@@ -128,7 +116,6 @@ pub fn resolve_names(
         resolver.visit(ast);
     }
 
-    // Pass 2: validate references from all sources
     for (&source_id, ast) in ast_map {
         let mut validator = ReferenceValidator {
             source_id,
@@ -153,7 +140,6 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
         let Some(body) = def.body() else { return };
 
         if let Some(token) = def.name() {
-            // Named definition: `Name = ...`
             let name = token_src(&token, self.src);
             if self.symbol_table.contains(name) {
                 self.diag
@@ -168,7 +154,6 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
                 self.symbol_table.insert(name, self.source_id, body);
             }
         } else {
-            // Unnamed definition: `...` (root expression)
             // Parser already validates multiple unnamed defs; we keep the last one.
             if self.symbol_table.contains(UNNAMED_DEF) {
                 self.symbol_table.remove(UNNAMED_DEF);

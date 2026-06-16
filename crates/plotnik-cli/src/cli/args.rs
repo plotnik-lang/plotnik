@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 use clap::{Arg, ArgAction, value_parser};
 
-/// Query file or workspace directory (positional).
 pub fn query_path_arg() -> Arg {
     Arg::new("query_path")
         .value_name("QUERY")
@@ -16,7 +15,6 @@ pub fn query_path_arg() -> Arg {
         .help("Query file or workspace directory")
 }
 
-/// Inline query text (-q/--query).
 pub fn query_text_arg() -> Arg {
     Arg::new("query_text")
         .short('q')
@@ -25,7 +23,6 @@ pub fn query_text_arg() -> Arg {
         .help("Inline query text")
 }
 
-/// Source file to parse/execute against (positional).
 pub fn source_path_arg() -> Arg {
     Arg::new("source_path")
         .value_name("SOURCE")
@@ -33,7 +30,6 @@ pub fn source_path_arg() -> Arg {
         .help("Source file to parse")
 }
 
-/// Inline source text (-s/--source).
 pub fn source_text_arg() -> Arg {
     Arg::new("source_text")
         .short('s')
@@ -42,7 +38,6 @@ pub fn source_text_arg() -> Arg {
         .help("Inline source text")
 }
 
-/// Language flag (-l/--lang).
 pub fn lang_arg() -> Arg {
     Arg::new("lang")
         .short('l')
@@ -51,7 +46,6 @@ pub fn lang_arg() -> Arg {
         .help("Language (inferred from extension if not specified)")
 }
 
-/// Color output control (--color).
 pub fn color_arg() -> Arg {
     Arg::new("color")
         .long("color")
@@ -61,7 +55,6 @@ pub fn color_arg() -> Arg {
         .help("Colorize output")
 }
 
-/// Output diagnostics as JSON (--json).
 pub fn json_arg() -> Arg {
     Arg::new("json")
         .long("json")
@@ -69,7 +62,6 @@ pub fn json_arg() -> Arg {
         .help("Output diagnostics as JSON")
 }
 
-/// Include anonymous nodes (--raw).
 pub fn raw_arg() -> Arg {
     Arg::new("raw")
         .long("raw")
@@ -77,7 +69,6 @@ pub fn raw_arg() -> Arg {
         .help("Include anonymous nodes (literals, punctuation)")
 }
 
-/// Treat warnings as errors (--strict).
 pub fn strict_arg() -> Arg {
     Arg::new("strict")
         .long("strict")
@@ -85,7 +76,6 @@ pub fn strict_arg() -> Arg {
         .help("Treat warnings as errors")
 }
 
-/// Output format (--format).
 pub fn format_arg() -> Arg {
     Arg::new("format")
         .long("format")
@@ -94,8 +84,6 @@ pub fn format_arg() -> Arg {
         .help("Output format (typescript, ts)")
 }
 
-/// Use verbose node shape (--verbose-nodes).
-/// Also used by exec command.
 pub fn verbose_nodes_arg() -> Arg {
     Arg::new("verbose_nodes")
         .long("verbose-nodes")
@@ -103,7 +91,6 @@ pub fn verbose_nodes_arg() -> Arg {
         .help("Include verbose node information (line/column positions)")
 }
 
-/// Don't emit Node/Point type definitions (--no-node-type).
 pub fn no_node_type_arg() -> Arg {
     Arg::new("no_node_type")
         .long("no-node-type")
@@ -111,7 +98,6 @@ pub fn no_node_type_arg() -> Arg {
         .help("Don't emit Node/Point type definitions")
 }
 
-/// Don't export types (--no-export).
 pub fn no_export_arg() -> Arg {
     Arg::new("no_export")
         .long("no-export")
@@ -119,7 +105,6 @@ pub fn no_export_arg() -> Arg {
         .help("Don't export types")
 }
 
-/// Type for void results (--void-type).
 pub fn void_type_arg() -> Arg {
     Arg::new("void_type")
         .long("void-type")
@@ -127,7 +112,6 @@ pub fn void_type_arg() -> Arg {
         .help("Type for void results: undefined (default) or null")
 }
 
-/// Write output to file (-o/--output).
 pub fn output_file_arg() -> Arg {
     Arg::new("output")
         .short('o')
@@ -137,7 +121,6 @@ pub fn output_file_arg() -> Arg {
         .help("Write output to file")
 }
 
-/// Output compact JSON (--compact).
 pub fn compact_arg() -> Arg {
     Arg::new("compact")
         .long("compact")
@@ -145,8 +128,6 @@ pub fn compact_arg() -> Arg {
         .help("Output compact JSON (default: pretty when stdout is a TTY)")
 }
 
-/// Entry point name (--entry).
-/// Used by both exec and trace.
 pub fn entry_arg() -> Arg {
     Arg::new("entry")
         .long("entry")
@@ -154,7 +135,6 @@ pub fn entry_arg() -> Arg {
         .help("Entry point name (definition to match from)")
 }
 
-/// Verbosity level (-v, -vv).
 pub fn verbose_arg() -> Arg {
     Arg::new("verbose")
         .short('v')
@@ -162,7 +142,6 @@ pub fn verbose_arg() -> Arg {
         .help("Verbosity level (-v for verbose, -vv for very verbose)")
 }
 
-/// Skip materialization (--no-result).
 pub fn no_result_arg() -> Arg {
     Arg::new("no_result")
         .long("no-result")
@@ -170,7 +149,6 @@ pub fn no_result_arg() -> Arg {
         .help("Skip materialization, show effects only")
 }
 
-/// Execution fuel limit (--fuel).
 pub fn fuel_arg() -> Arg {
     Arg::new("fuel")
         .long("fuel")

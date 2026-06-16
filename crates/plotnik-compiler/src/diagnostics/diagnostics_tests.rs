@@ -398,7 +398,6 @@ fn filtered_no_suppression_disjoint_spans() {
     let id = map.add_one_liner("0123456789012345");
 
     let mut diagnostics = Diagnostics::new();
-    // Two errors at different positions - both should show
     diagnostics
         .report(
             id,
@@ -468,7 +467,6 @@ fn filtered_consequence_suppressed_by_structural() {
         .emit();
 
     let filtered = diagnostics.filtered();
-    // Only UnclosedTree remains - consequence errors suppressed when primary errors exist
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
 }
@@ -479,7 +477,6 @@ fn filtered_same_span_higher_priority_wins() {
     let id = map.add_one_liner("0123456789");
 
     let mut diagnostics = Diagnostics::new();
-    // Two errors at exact same span
     diagnostics
         .report(
             id,
@@ -513,7 +510,6 @@ fn render_filtered() {
     let id = map.add_one_liner("(function_declaration");
 
     let mut diagnostics = Diagnostics::new();
-    // Add overlapping errors where one should be suppressed
     diagnostics
         .report(
             id,
@@ -532,12 +528,9 @@ fn render_filtered() {
         .emit();
 
     let result = diagnostics.render(&map);
-    // Should only show the unclosed tree error
     assert!(result.contains("unclosed tree"));
     assert!(!result.contains("unnamed def"));
 }
-
-// Multi-file diagnostics tests
 
 #[test]
 fn multi_file_cross_file_related() {

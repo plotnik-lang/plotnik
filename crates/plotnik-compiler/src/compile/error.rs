@@ -1,16 +1,11 @@
-//! Compilation error types and results.
-
 use indexmap::IndexMap;
 
 use crate::analyze::type_check::DefId;
 use crate::bytecode::{InstructionIR, Label};
 
-/// Error during compilation.
 #[derive(Clone, Debug)]
 pub enum CompileError {
-    /// Definition not found in symbol table.
     DefinitionNotFound(String),
-    /// Expression body missing.
     MissingBody(String),
 }
 
@@ -25,10 +20,8 @@ impl std::fmt::Display for CompileError {
 
 impl std::error::Error for CompileError {}
 
-/// Result of compilation.
 #[derive(Clone, Debug)]
 pub struct CompileResult {
-    /// All generated instructions.
     pub instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub def_entries: IndexMap<DefId, Label>,

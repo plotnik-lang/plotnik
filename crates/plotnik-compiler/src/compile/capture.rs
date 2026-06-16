@@ -28,25 +28,20 @@ use super::Compiler;
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
     /// Effects to place as pre_effects on the entry instruction.
-    /// Used for: Enum(variant) in tagged alternations.
     pub pre: Vec<EffectIR>,
     /// Effects to place as post_effects on the exit instruction.
-    /// Typically: [Node/Text, Set(member)], [Push], or [EndEnum].
     pub post: Vec<EffectIR>,
 }
 
 impl CaptureEffects {
-    /// Create with explicit pre and post effects.
     pub fn new(pre: Vec<EffectIR>, post: Vec<EffectIR>) -> Self {
         Self { pre, post }
     }
 
-    /// Create with only pre effects.
     pub fn new_pre(pre: Vec<EffectIR>) -> Self {
         Self { pre, post: vec![] }
     }
 
-    /// Create with only post effects.
     pub fn new_post(post: Vec<EffectIR>) -> Self {
         Self { pre: vec![], post }
     }
@@ -140,7 +135,7 @@ impl Compiler<'_> {
         // Always look up in the current scope - bubble captures don't create new scopes,
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
-            let capture_name = &name_token.text()[1..]; // Strip @ prefix
+            let capture_name = &name_token.text()[1..];
             let member_ref = self.lookup_member_in_scope(capture_name);
             if let Some(member_ref) = member_ref {
                 effects.push(EffectIR::with_member(EffectOpcode::Set, member_ref));
@@ -164,7 +159,6 @@ impl Compiler<'_> {
             return true;
         };
 
-        // Refs returning structured types don't need Node
         if self.is_ref_returning_structured(&inner) {
             return false;
         }
@@ -174,8 +168,6 @@ impl Compiler<'_> {
             return true;
         };
 
-        // If type is Struct or Enum, EndObj/EndEnum produces the value
-        // Otherwise (Node, String, Void, etc.), we need Node effect
         !info
             .flow
             .type_id()
@@ -203,11 +195,6 @@ impl Compiler<'_> {
         }
     }
 
-    /// Check if a Ref points to a definition returning a structured type.
-    ///
-    /// All refs now use Call/Return. If the definition returns a structured type
-    /// (Enum/Struct/Array), Return leaves that result pending for Set to consume.
-    /// In this case, we skip emitting Node/Text effects in captures.
     fn ref_returns_structured(&self, r: &ast::Ref) -> bool {
         r.name()
             .and_then(|name| self.ctx.type_ctx.get_def_id(self.ctx.interner, name.text()))
@@ -221,13 +208,12 @@ impl Compiler<'_> {
             })
     }
 
-    /// Collect all capture names from an expression recursively.
     pub(super) fn collect_captures(expr: &Expr) -> HashSet<String> {
         fn collect(expr: &Expr, names: &mut HashSet<String>) {
             if let Expr::CapturedExpr(cap) = expr
                 && let Some(name) = cap.name()
             {
-                names.insert(name.text()[1..].to_string()); // Strip @ prefix
+                names.insert(name.text()[1..].to_string());
             }
             for child in expr.children() {
                 collect(&child, names);
@@ -257,7 +243,6 @@ pub fn check_needs_struct_wrapper(inner: &Expr, type_ctx: &TypeContext) -> bool 
         return false;
     }
 
-    // Check the actual type - if it's a Struct, we need Obj/EndObj wrapper
     info.flow
         .type_id()
         .and_then(|id| type_ctx.get_type(id))

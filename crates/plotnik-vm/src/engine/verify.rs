@@ -10,12 +10,9 @@ use plotnik_core::Colors;
 
 use super::Value;
 
-/// Debug-only type verification.
-///
 /// Panics with a pretty diagnostic if the value doesn't match the declared type.
-/// This is a no-op in release builds.
-///
 /// `declared_type` should be the `result_type` from the entrypoint that was executed.
+/// No-op in release builds.
 #[cfg(debug_assertions)]
 pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, colors: Colors) {
     let types = module.types();
@@ -35,7 +32,6 @@ pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, 
     }
 }
 
-/// No-op in release builds.
 #[cfg(not(debug_assertions))]
 #[inline(always)]
 pub fn debug_verify_type(
@@ -46,7 +42,6 @@ pub fn debug_verify_type(
 ) {
 }
 
-/// Recursive type verification. Collects mismatch paths into `errors`.
 #[cfg(debug_assertions)]
 fn verify_type(
     value: &Value,
@@ -252,7 +247,6 @@ fn verify_type(
     }
 }
 
-/// Get a display name for the value's kind.
 #[cfg(debug_assertions)]
 fn value_kind_name(value: &Value) -> &'static str {
     match value {
@@ -265,13 +259,12 @@ fn value_kind_name(value: &Value) -> &'static str {
     }
 }
 
-/// Format path for error message. Leading dot is stripped.
+/// Strips leading `.` so the root path prints as empty rather than `.`.
 #[cfg(debug_assertions)]
 fn format_path(path: &str) -> String {
     path.strip_prefix('.').unwrap_or(path).to_string()
 }
 
-/// Format error with optional path prefix.
 #[cfg(debug_assertions)]
 fn format_error(path: &str, msg: &str) -> String {
     let p = format_path(path);
@@ -282,7 +275,6 @@ fn format_error(path: &str, msg: &str) -> String {
     }
 }
 
-/// Append a suffix to a path, handling empty path case.
 #[cfg(debug_assertions)]
 fn append_path(path: &str, suffix: &str) -> String {
     let p = format_path(path);
@@ -293,7 +285,6 @@ fn append_path(path: &str, suffix: &str) -> String {
     }
 }
 
-/// Create a centered header line with dashes.
 #[cfg(debug_assertions)]
 fn centered_header(label: &str, width: usize) -> String {
     let label_with_spaces = format!(" {} ", label);
@@ -312,7 +303,6 @@ fn centered_header(label: &str, width: usize) -> String {
     )
 }
 
-/// Panic with a pretty diagnostic showing the type mismatch.
 #[cfg(debug_assertions)]
 fn panic_with_mismatch(
     value: &Value,
@@ -327,7 +317,6 @@ fn panic_with_mismatch(
     let entrypoints = module.entrypoints();
     let strings = module.strings();
 
-    // Find the entrypoint name by matching result_type
     let type_name = (0..entrypoints.len())
         .find_map(|i| {
             let e = entrypoints.get(i);

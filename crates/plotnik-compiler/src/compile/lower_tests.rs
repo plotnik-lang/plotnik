@@ -1,5 +1,3 @@
-//! Unit tests for the lowering pass.
-
 use plotnik_bytecode::{EffectOpcode, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
 use super::CompileResult;
@@ -47,10 +45,8 @@ fn lower_pre_effects_overflow() {
 
     lower(&mut result);
 
-    // Should split into: epsilon chain (2 steps) + actual match
     assert!(result.instructions.len() >= 2);
 
-    // First instruction should be epsilon with effects
     let first = result.instructions.first().unwrap();
     if let InstructionIR::Match(m) = first {
         assert!(m.nav == Nav::Epsilon);
@@ -76,10 +72,8 @@ fn lower_post_effects_overflow() {
 
     lower(&mut result);
 
-    // Should split: match + epsilon chain for overflow post_effects
     assert!(result.instructions.len() >= 2);
 
-    // All post_effects should be within limits
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {
             assert!(
@@ -108,10 +102,8 @@ fn lower_neg_fields_overflow() {
 
     lower(&mut result);
 
-    // Should split: match + epsilon chain for overflow neg_fields
     assert!(result.instructions.len() >= 2);
 
-    // All neg_fields should be within limits
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {
             assert!(
@@ -135,10 +127,8 @@ fn lower_successors_overflow() {
 
     lower(&mut result);
 
-    // Should cascade into multiple epsilon instructions
     assert!(result.instructions.len() >= 2);
 
-    // All successors should be within limits
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {
             assert!(
@@ -219,7 +209,6 @@ fn lower_successors_with_payload_respect_combined_limit() {
         }
     }
 
-    // And no successor is dropped by the budgeting/cascade.
     let by_label: std::collections::HashMap<Label, &InstructionIR> =
         result.instructions.iter().map(|i| (i.label(), i)).collect();
     let mut seen = std::collections::HashSet::new();
@@ -255,7 +244,6 @@ fn lower_combined_overflow() {
 
     lower(&mut result);
 
-    // Should handle all overflows
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {
             assert!(m.pre_effects.len() <= MAX_PRE_EFFECTS);

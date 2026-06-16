@@ -7,7 +7,6 @@
 
 pub mod engine;
 
-// Re-export commonly used items at crate root
 pub use engine::{
     EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
     Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type,

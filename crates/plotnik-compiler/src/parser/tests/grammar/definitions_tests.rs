@@ -1,5 +1,3 @@
-//! Definition parsing tests.
-
 use crate::{shot_cst, shot_error};
 
 #[test]

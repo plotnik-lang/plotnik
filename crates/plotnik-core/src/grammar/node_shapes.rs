@@ -245,9 +245,6 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
         for (i, variable) in syntax_grammar.variables.iter().enumerate() {
             let mut variable_info = result[i].clone();
 
-            // Examine each of the variable's productions. The variable's child types can be
-            // immediately combined across all productions, but the child quantities must be
-            // recorded separately for each production.
             for production in &variable.productions {
                 let mut production_field_quantities = FxHashMap::default();
                 let mut production_children_quantity = ChildQuantity::zero();
@@ -267,16 +264,12 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                     let child_is_hidden = !child_type_is_visible(&child_type)
                         && !syntax_grammar.supertype_symbols.contains(&child_symbol);
 
-                    // Maintain the set of all child types for this variable, and the quantity of
-                    // visible children in this production.
                     did_change |=
                         extend_sorted(&mut variable_info.children.types, Some(&child_type));
                     if !child_is_hidden {
                         production_children_quantity.append(ChildQuantity::one());
                     }
 
-                    // Maintain the set of child types associated with each field, and the quantity
-                    // of children associated with each field in this production.
                     if let Some(field_name) = &step.field_name {
                         let field_info = variable_info
                             .fields
@@ -288,8 +281,6 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                             .entry(field_name)
                             .or_insert_with(ChildQuantity::zero);
 
-                        // Inherit the types and quantities of hidden children associated with
-                        // fields.
                         if child_is_hidden && child_symbol.is_non_terminal() {
                             let child_variable_info = &result[child_symbol.index];
                             did_change |= extend_sorted(
@@ -300,9 +291,7 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                         } else {
                             production_field_quantity.append(ChildQuantity::one());
                         }
-                    }
-                    // Maintain the set of named children without fields within this variable.
-                    else if child_type_is_named(&child_type) {
+                    } else if child_type_is_named(&child_type) {
                         production_children_without_fields_quantity.append(ChildQuantity::one());
                         did_change |= extend_sorted(
                             &mut variable_info.children_without_fields.types,
@@ -310,18 +299,13 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                         );
                     }
 
-                    // Inherit all child information from hidden children.
                     if child_is_hidden && child_symbol.is_non_terminal() {
                         let child_variable_info = &result[child_symbol.index];
 
-                        // If a hidden child can have multiple children, then its parent node can
-                        // appear to have multiple children.
                         if child_variable_info.has_multi_step_production {
                             variable_info.has_multi_step_production = true;
                         }
 
-                        // If a hidden child has fields, then the parent node can appear to have
-                        // those same fields.
                         for (field_name, child_field_info) in &child_variable_info.fields {
                             production_field_quantities
                                 .entry(field_name)
@@ -337,16 +321,12 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                             );
                         }
 
-                        // If a hidden child has children, then the parent node can appear to have
-                        // those same children.
                         production_children_quantity.append(child_variable_info.children.quantity);
                         did_change |= extend_sorted(
                             &mut variable_info.children.types,
                             &child_variable_info.children.types,
                         );
 
-                        // If a hidden child can have named children without fields, then the parent
-                        // node can appear to have those same children.
                         if step.field_name.is_none() {
                             let grandchildren_info = &child_variable_info.children_without_fields;
                             if !grandchildren_info.types.is_empty() {
@@ -360,16 +340,11 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                         }
                     }
 
-                    // Note whether or not this production contains children whose summaries
-                    // have not yet been computed.
                     if child_symbol.index >= i && !all_initialized {
                         production_has_uninitialized_invisible_children = true;
                     }
                 }
 
-                // If this production's children all have had their summaries initialized,
-                // then expand the quantity information with all of the possibilities introduced
-                // by this production.
                 if !production_has_uninitialized_invisible_children {
                     did_change |= variable_info
                         .children
@@ -423,7 +398,6 @@ fn retain_visible_child_types(
     syntax_grammar: &SyntaxGrammar,
     child_type_is_visible: &impl Fn(&ChildType) -> bool,
 ) {
-    // Update all of the node type lists to eliminate hidden nodes.
     for supertype_symbol in &syntax_grammar.supertype_symbols {
         variable_info[supertype_symbol.index]
             .children
@@ -559,7 +533,7 @@ pub fn generate_node_shapes_json(
                     }
                 });
 
-                let fields_json = node_shape_json.fields.as_mut().unwrap();
+                let fields_json = node_shape_json.fields.get_or_insert_with(BTreeMap::new);
                 for (new_field, field_info) in &info.fields {
                     let field_json = fields_json.entry(new_field.clone()).or_insert_with(|| {
                         // If another rule is aliased with the same name, and does *not* have this
@@ -891,8 +865,8 @@ fn sort_subtypes_topologically(
     }
 
     subtype_map.sort_by(|a, b| {
-        let a_idx = sorted_kinds.iter().position(|n| n.eq(&a.0.kind)).unwrap();
-        let b_idx = sorted_kinds.iter().position(|n| n.eq(&b.0.kind)).unwrap();
+        let a_idx = sorted_kinds.iter().position(|n| n.eq(&a.0.kind)).expect("every supertype kind was registered in the topological sort and is present in sorted_kinds");
+        let b_idx = sorted_kinds.iter().position(|n| n.eq(&b.0.kind)).expect("every supertype kind was registered in the topological sort and is present in sorted_kinds");
         a_idx.cmp(&b_idx)
     });
     Ok(())

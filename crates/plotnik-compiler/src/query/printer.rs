@@ -12,7 +12,6 @@ use super::Query;
 use super::SourceKind;
 use crate::analyze::type_check::Arity;
 
-/// Returns indentation string for the given level.
 fn indent(level: usize) -> String {
     "  ".repeat(level)
 }
@@ -287,7 +286,7 @@ impl<'q> QueryPrinter<'q> {
             ast::Expr::CapturedExpr(c) => {
                 let name = c
                     .name()
-                    .map(|t| t.text()[1..].to_string()) // Strip @ prefix
+                    .map(|t| t.text()[1..].to_string())
                     .unwrap_or_default();
                 let type_ann = c
                     .type_annotation()
@@ -338,9 +337,18 @@ impl<'q> QueryPrinter<'q> {
         use crate::parser::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
-                self.mark_anchor(&ast::Anchor::cast(child).unwrap(), depth, w)?;
+                self.mark_anchor(
+                    &ast::Anchor::cast(child).expect("child is an Anchor by the matched kind"),
+                    depth,
+                    w,
+                )?;
             } else if child.kind() == SyntaxKind::NegatedField {
-                self.format_negated_field(&ast::NegatedField::cast(child).unwrap(), depth, w)?;
+                self.format_negated_field(
+                    &ast::NegatedField::cast(child)
+                        .expect("child is a NegatedField by the matched kind"),
+                    depth,
+                    w,
+                )?;
             } else if let Some(expr) = ast::Expr::cast(child) {
                 self.format_expr(&expr, depth, w)?;
             }

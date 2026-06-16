@@ -15,7 +15,6 @@ use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
 use crate::query::SourceId;
 
-/// Validate recursion using the pre-computed dependency analysis.
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
     ast_map: &IndexMap<SourceId, Root>,
@@ -44,8 +43,6 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
     }
 
     fn validate_scc(&mut self, scc: &[String]) {
-        // Filter out trivial non-recursive components.
-        // A component is recursive if it has >1 node, or 1 node that references itself.
         if scc.len() == 1 {
             let name = &scc[0];
             let body = self
@@ -59,17 +56,13 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         let scc_set: IndexSet<&str> = scc.iter().map(String::as_str).collect();
 
-        // 1. Check for infinite tree structure (Escape Analysis)
-        // A valid recursive definition must have a non-recursive path.
-        // If NO definition in the SCC has an escape path, the whole group is invalid.
         let has_escape = scc
             .iter()
             .filter_map(|name| self.symbol_table.get(name))
             .any(|body| expr_has_escape(body, &scc_set));
 
         if !has_escape {
-            // Find a cycle to report. Any cycle within the SCC is an infinite recursion loop
-            // because there are no escape paths.
+            // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
             if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
                 find_ref_range(expr, target)
             }) {
@@ -79,9 +72,6 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             return;
         }
 
-        // 2. Check for infinite loops (Guarded Recursion Analysis)
-        // Even if there is an escape, every recursive cycle must consume input (be guarded).
-        // We look for a cycle composed entirely of unguarded references.
         if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
             find_unguarded_ref_range(expr, target)
         }) {
@@ -327,12 +317,10 @@ fn expr_guarantees_consumption(expr: &Expr) -> bool {
     }
 }
 
-/// Whether to search for any reference or only unguarded ones.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RefSearchMode {
-    /// Find any reference to the target.
     Any,
-    /// Find only unguarded references (not inside a NamedNode/AnonymousNode).
+    /// Not inside a `NamedNode`/`AnonymousNode` (those consume input, so the cycle is guarded).
     Unguarded,
 }
 

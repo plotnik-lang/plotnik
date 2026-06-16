@@ -38,18 +38,15 @@ impl Visitor for AnchorValidator<'_> {
         let prev = self.in_named_node;
         self.in_named_node = true;
 
-        // Check for anchors in the named node's items
         self.check_items(node.items());
 
-        // Anchors inside named node children are always valid
-        // (the node provides first/last/adjacent context)
+        // Named node provides first/last/adjacent context, so any anchor inside is valid.
         walk_named_node(self, node);
 
         self.in_named_node = prev;
     }
 
     fn visit_seq_expr(&mut self, seq: &SeqExpr) {
-        // Check for boundary anchors without context
         self.check_items(seq.items());
 
         walk_seq_expr(self, seq);

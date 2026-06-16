@@ -119,7 +119,6 @@ impl InlinedProductionMapBuilder {
         step_id: ProductionStepId,
         grammar: &'a SyntaxGrammar,
     ) -> &'a [usize] {
-        // Build a list of productions produced by inlining rules.
         let mut i = 0;
         let step_index = step_id.step;
         let mut productions_to_add = vec![self.production_for_id(step_id, grammar).clone()];
@@ -127,13 +126,13 @@ impl InlinedProductionMapBuilder {
             if let Some(step) = productions_to_add[i].steps.get(step_index) {
                 let symbol = step.symbol;
                 if grammar.variables_to_inline.contains(&symbol) {
-                    // Remove the production from the vector, replacing it with a placeholder.
                     let production = productions_to_add
                         .splice(i..=i, std::iter::once(Production::default()))
                         .next()
-                        .unwrap();
+                        .expect(
+                            "splice removes exactly one element at index i, which is within bounds",
+                        );
 
-                    // Replace the placeholder with the inlined productions.
                     productions_to_add.splice(
                         i..=i,
                         grammar.variables[symbol.index]
@@ -148,7 +147,6 @@ impl InlinedProductionMapBuilder {
             i += 1;
         }
 
-        // Store all the computed productions.
         let result = productions_to_add
             .into_iter()
             .map(|production| {
@@ -162,7 +160,6 @@ impl InlinedProductionMapBuilder {
             })
             .collect();
 
-        // Cache these productions based on the original production step.
         self.production_indices_by_step_id
             .entry(step_id)
             .or_insert(result)
@@ -198,7 +195,7 @@ fn inline_production(
         .steps
         .splice(step_index..=step_index, inlined.steps.iter().cloned())
         .next()
-        .unwrap();
+        .expect("splice removes exactly one step at step_index, which is within bounds by the caller's guard");
     let inserted_steps = &mut production.steps[step_index..(step_index + inlined.steps.len())];
     for inserted_step in inserted_steps {
         inserted_step.inherit_inline_metadata_from(&removed_step);

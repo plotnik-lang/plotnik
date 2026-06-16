@@ -159,7 +159,6 @@ impl StructureTable {
         &self.variables
     }
 
-    /// The variable a [`VarId`] refers to.
     pub fn variable(&self, id: VarId) -> Option<&StructVariable> {
         self.variables.get(id.index())
     }

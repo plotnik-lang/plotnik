@@ -6,8 +6,8 @@ license.workspace = true
 repository.workspace = true
 description = "Runtime VM for executing compiled Plotnik queries"
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+[lints]
+workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true

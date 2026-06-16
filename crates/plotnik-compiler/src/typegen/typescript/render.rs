@@ -8,14 +8,13 @@ use super::Emitter;
 
 impl Emitter<'_> {
     pub(super) fn prepare_emission(&mut self) {
-        // Reserve entrypoint names to avoid collisions
+        // Entrypoint names are reserved first so generated names don't collide with them.
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
             let name = self.strings.get(ep.name());
             self.used_names.insert(to_pascal_case(name));
         }
 
-        // Assign names to named types from TypeNames section
         for i in 0..self.types.names_count() {
             let type_name = self.types.get_name(i);
             let name = self.strings.get(type_name.name);
@@ -23,13 +22,10 @@ impl Emitter<'_> {
                 .insert(type_name.type_id, to_pascal_case(name));
         }
 
-        // Assign names to struct/enum types that need them but don't have names
         self.assign_generated_names();
 
-        // Collect builtin references
         self.collect_builtin_references();
 
-        // Emit Node interface if referenced
         if self.config.emit_node_type && self.node_referenced {
             self.emit_node_interface();
         }
@@ -89,7 +85,6 @@ impl Emitter<'_> {
         let type_name = to_pascal_case(name);
 
         let Some(type_def) = self.types.get(type_id) else {
-            // Builtin type - emit as alias
             let ts_type = self.type_to_ts(type_id);
             self.emit_type_decl(&type_name, &ts_type);
             return;
@@ -128,7 +123,6 @@ impl Emitter<'_> {
     fn emit_interface(&mut self, name: &str, type_def: &TypeDef) {
         let c = self.c();
 
-        // Header: export interface Name {
         if self.config.export {
             self.output
                 .push_str(&format!("{}export{} ", c.dim, c.reset));
@@ -138,7 +132,6 @@ impl Emitter<'_> {
             c.dim, c.reset, c.blue, name, c.reset, c.dim
         ));
 
-        // Collect fields and sort by name
         let mut fields: Vec<(String, TypeId)> = self
             .types
             .members_of(type_def)
@@ -171,7 +164,6 @@ impl Emitter<'_> {
 
             let is_void = self.is_void_type(member.type_id);
 
-            // Header: export interface NameVariant {
             if self.config.export {
                 self.output
                     .push_str(&format!("{}export{} ", c.dim, c.reset));
@@ -180,12 +172,10 @@ impl Emitter<'_> {
                 "{}interface{} {}{}{} {}{{\n",
                 c.dim, c.reset, c.blue, variant_type_name, c.reset, c.dim
             ));
-            // $tag field with green string
             self.output.push_str(&format!(
                 "{}  $tag{}:{} {}\"{}\"{}{};{}\n",
                 c.reset, c.dim, c.reset, c.green, variant_name, c.reset, c.dim, c.reset
             ));
-            // $data field (omit for Void payloads)
             if !is_void {
                 let data_str = self.inline_data_type(member.type_id);
                 self.output.push_str(&format!(
@@ -196,7 +186,6 @@ impl Emitter<'_> {
             self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
         }
 
-        // Union type declaration
         let union = variant_types
             .iter()
             .map(|v| format!("{}{}{}", c.blue, v, c.reset))
@@ -217,7 +206,6 @@ impl Emitter<'_> {
     fn emit_node_interface(&mut self) {
         let c = self.c();
 
-        // Header: export interface Node {
         if self.config.export {
             self.output
                 .push_str(&format!("{}export{} ", c.dim, c.reset));
@@ -227,7 +215,6 @@ impl Emitter<'_> {
             c.dim, c.reset, c.blue, c.reset, c.dim
         ));
 
-        // kind, text, span fields
         self.output.push_str(&format!(
             "{}  kind{}:{} string{};\n",
             c.reset, c.dim, c.reset, c.dim

@@ -5,10 +5,6 @@
 
 use arborium_tree_sitter::Node;
 
-/// Runtime effect produced by VM execution.
-///
-/// Unlike bytecode `EffectOp`, runtime effects carry actual node references
-/// for materialization. Lifetime `'t` denotes the parsed tree-sitter tree.
 #[derive(Debug)]
 pub enum RuntimeEffect<'t> {
     /// Capture a node reference.
@@ -47,7 +43,6 @@ impl<'t> EffectLog<'t> {
         Self(Vec::new())
     }
 
-    /// Push an effect to the log.
     #[inline]
     pub fn push(&mut self, effect: RuntimeEffect<'t>) {
         self.0.push(effect);
@@ -66,7 +61,7 @@ impl<'t> EffectLog<'t> {
         self.0.is_empty()
     }
 
-    /// Truncate to watermark (for backtracking).
+    /// Truncate to a saved watermark, rolling back effects on backtrack.
     #[inline]
     pub fn truncate(&mut self, watermark: usize) {
         self.0.truncate(watermark);

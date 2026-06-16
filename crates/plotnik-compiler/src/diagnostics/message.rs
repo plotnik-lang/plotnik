@@ -17,22 +17,19 @@ use super::{SourceId, Span};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
-    // These cause cascading errors throughout the rest of the file.
-    // A missing quote swallows closing delimiters, so it outranks them all.
+    // UnclosedString ranks first: an unterminated string swallows subsequent closing delimiters.
     UnclosedString,
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
     UnclosedRegex,
 
-    // User omitted something required - root cause errors
     ExpectedExpression,
     ExpectedTypeName,
     ExpectedFieldName,
     ExpectedSubtype,
     ExpectedPredicateValue,
 
-    // User wrote something that doesn't belong
     EmptyTree,
     EmptyAnonymousNode,
     EmptySequence,
@@ -52,7 +49,6 @@ pub enum DiagnosticKind {
     UnexpectedToken,
     CaptureWithoutTarget,
 
-    // Convention violations - fixable with suggestions
     CaptureNameInvalid,
     DefNameInvalid,
     BranchLabelInvalid,
@@ -62,7 +58,6 @@ pub enum DiagnosticKind {
     NegationSyntaxDeprecated,
     SupertypeSlashDeprecated,
 
-    // Valid syntax, invalid semantics
     DuplicateDefinition,
     UndefinedReference,
     MixedAltBranches,
@@ -72,7 +67,6 @@ pub enum DiagnosticKind {
     FieldSequenceValue,
     AnchorWithoutContext,
 
-    // Type inference errors
     IncompatibleTypes,
     UnusedBranchLabels,
     StrictDimensionalityViolation,
@@ -84,7 +78,6 @@ pub enum DiagnosticKind {
     IncompatibleStructShapes,
     InvalidTypeAnnotation,
 
-    // Predicate validation
     PredicateOnNonLeaf,
     EmptyRegex,
     RegexBackreference,
@@ -92,7 +85,6 @@ pub enum DiagnosticKind {
     RegexNamedCapture,
     RegexSyntaxError,
 
-    // Link pass - grammar validation
     UnknownNodeType,
     UnknownField,
     FieldNotOnNodeType,
@@ -102,7 +94,6 @@ pub enum DiagnosticKind {
     ChildUnderLeafToken,
     NegatedRequiredField,
 
-    // Often consequences of earlier errors
     UnnamedDef,
 }
 
@@ -261,24 +252,18 @@ impl DiagnosticKind {
         }
     }
 
-    /// Base message for this diagnostic kind, used when no custom message is provided.
     pub fn fallback_message(&self) -> &'static str {
         match self {
-            // Unclosed delimiters
             Self::UnclosedTree => "missing closing `)`",
             Self::UnclosedSequence => "missing closing `}`",
             Self::UnclosedAlternation => "missing closing `]`",
             Self::UnclosedRegex => "missing closing `/` for regex",
             Self::UnclosedString => "unterminated string",
-
-            // Expected token errors
             Self::ExpectedExpression => "expected an expression",
             Self::ExpectedTypeName => "expected a type name after `::`",
             Self::ExpectedFieldName => "expected a field name",
             Self::ExpectedSubtype => "expected a subtype after `/`",
             Self::ExpectedPredicateValue => "expected a string or regex after the operator",
-
-            // Invalid syntax
             Self::EmptyTree => "empty `()` matches nothing",
             Self::EmptyAnonymousNode => "empty string matches nothing",
             Self::EmptySequence => "empty `{}` matches nothing",
@@ -297,8 +282,6 @@ impl DiagnosticKind {
             Self::UnsupportedPredicate => "tree-sitter predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
             Self::CaptureWithoutTarget => "expected a capture name after `@`",
-
-            // Naming convention violations
             Self::CaptureNameInvalid => "capture names must be snake_case",
             Self::DefNameInvalid => "definition names must be PascalCase",
             Self::BranchLabelInvalid => "branch labels must be PascalCase",
@@ -307,8 +290,6 @@ impl DiagnosticKind {
             Self::TreeSitterSequenceSyntax => "parenthesized sequences are tree-sitter syntax",
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
-
-            // Semantic errors
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
@@ -317,8 +298,6 @@ impl DiagnosticKind {
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field cannot match a sequence",
             Self::AnchorWithoutContext => "boundary anchor requires parent node context",
-
-            // Type inference
             Self::IncompatibleTypes => "incompatible types",
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
             Self::StrictDimensionalityViolation => {
@@ -337,8 +316,6 @@ impl DiagnosticKind {
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
             Self::InvalidTypeAnnotation => "invalid type annotation",
-
-            // Predicate validation
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
@@ -347,8 +324,6 @@ impl DiagnosticKind {
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",
             Self::RegexNamedCapture => "named captures are not supported in regex",
             Self::RegexSyntaxError => "invalid regex syntax",
-
-            // Link pass - grammar validation
             Self::UnknownNodeType => "unknown node type",
             Self::UnknownField => "unknown field",
             Self::FieldNotOnNodeType => "field not valid on this node type",
@@ -357,33 +332,25 @@ impl DiagnosticKind {
             Self::InvalidSubtype => "node type is not a subtype of this type",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
-
-            // Structural
             Self::UnnamedDef => "definition must be named",
         }
     }
 
-    /// Template for custom messages. Contains `{}` placeholder for caller-provided detail.
+    /// Template for custom messages; `{}` is replaced by the caller-provided detail.
     pub fn custom_message(&self) -> String {
         match self {
-            // The detail is a full message: "expected closing `)` for tree"
+            // The detail IS the full message.
             Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
 
-            // Special formatting for references
             Self::RefCannotHaveChildren => {
                 "`{}` is a reference and cannot have children".to_string()
             }
             Self::FieldSequenceValue => "field `{}` cannot match a sequence".to_string(),
-
-            // Semantic errors with name context
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
             Self::IncompatibleTypes => "incompatible types: {}".to_string(),
-
-            // Type inference errors with context
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
-            // The detail is the full message; the fallback would double it.
             Self::AmbiguousUncapturedOutputs => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
@@ -395,26 +362,18 @@ impl DiagnosticKind {
                 "capture `@{}` has incompatible struct fields across branches".to_string()
             }
             Self::InvalidTypeAnnotation => "{}".to_string(),
-
-            // Link pass errors with context
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
             Self::UnknownField => "`{}` is not a valid field".to_string(),
             Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
-            // The detail is the full message: "`number` can't be the value of `name`".
             Self::InvalidFieldChildType => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
-            // The detail is the full message: "`statement_block` is not a kind of `expression`".
             Self::InvalidSubtype => "{}".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
-
-            // Alternation mixing
             Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()
             }
-
-            // Standard pattern: fallback + context
             _ => format!("{}: {{}}", self.fallback_message()),
         }
     }

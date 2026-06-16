@@ -1,5 +1,3 @@
-//! Tests for the bytecode module.
-
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::Header;
 use crate::bytecode::{AlignedVec, STEP_SIZE};

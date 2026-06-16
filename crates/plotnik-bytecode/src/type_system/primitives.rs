@@ -15,10 +15,7 @@ pub const TYPE_STRING: u16 = 2;
 /// First index available for user-defined/composite types.
 pub const TYPE_CUSTOM_START: u16 = 3;
 
-/// Primitive type enumeration.
-///
-/// These are the builtin scalar types that don't require
-/// additional metadata in the type table.
+/// Builtin scalar types; no additional metadata in the type table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum PrimitiveType {

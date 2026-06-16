@@ -48,23 +48,16 @@ impl SymbolStatuses {
     }
 }
 
-// Update the grammar by finding symbols that always are aliased, and for each such symbol,
-// promoting one of its aliases to a "default alias", which is applied globally instead
-// of in a context-specific way.
-//
-// This has two benefits:
-// * It reduces the overhead of storing production-specific alias info in the parse table.
-// * Within an `ERROR` node, no context-specific aliases will be applied. This transformation
-//   ensures that the children of an `ERROR` node have symbols that are consistent with the way that
-//   they would appear in a valid syntax tree.
+// Promotes a "default alias" for any symbol that appears exclusively under aliases.
+// Two reasons: (1) avoids storing per-production alias info in the parse table, and
+// (2) `ERROR` nodes skip context-specific aliases, so without a default alias those
+// children would have no alias at all — a visible inconsistency.
 pub(super) fn extract_default_aliases(
     syntax_grammar: &mut SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
 ) -> AliasMap {
     let mut statuses = SymbolStatuses::new(syntax_grammar, lexical_grammar);
 
-    // For each grammar symbol, find all of the aliases under which the symbol appears,
-    // and determine whether or not the symbol ever appears *unaliased*.
     for variable in &syntax_grammar.variables {
         for production in &variable.productions {
             for step in &production.steps {
@@ -96,9 +89,6 @@ pub(super) fn extract_default_aliases(
         statuses.get_mut(*symbol).appears_unaliased = true;
     }
 
-    // For each symbol that always appears aliased, find the alias that occurs most often,
-    // and designate that alias as the symbol's "default alias". Store all of these
-    // default aliases in a map that will be returned.
     let mut result = AliasMap::new();
     statuses.for_each_mut(|symbol, status| {
         if status.appears_unaliased {
@@ -106,8 +96,7 @@ pub(super) fn extract_default_aliases(
             return;
         }
 
-        // Prefer the highest alias count; on ties, keep the earliest discovered alias
-        // so default alias selection stays stable.
+        // On ties, keep the earliest alias so selection is deterministic across grammars.
         if let Some(default_entry) = status
             .aliases
             .iter()
@@ -121,8 +110,7 @@ pub(super) fn extract_default_aliases(
         }
     });
 
-    // Wherever a symbol is aliased as its default alias, remove the usage of the alias,
-    // because it will now be redundant.
+    // The default alias is now implicit, so remove the per-step alias where it matches.
     let mut alias_positions_to_clear = Vec::new();
     for variable in &mut syntax_grammar.variables {
         alias_positions_to_clear.clear();

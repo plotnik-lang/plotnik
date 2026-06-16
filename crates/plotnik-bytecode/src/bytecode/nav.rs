@@ -93,7 +93,6 @@ impl Nav {
         Some(nav)
     }
 
-    /// Encode to a bytecode byte.
     pub fn to_byte(self) -> u8 {
         match self {
             Self::Epsilon => 0,
@@ -193,19 +192,16 @@ impl Nav {
         }
     }
 
-    /// Convert navigation to its exact variant (no search loop).
-    ///
-    /// Used by alternation branches which should match at their exact
-    /// cursor position only - the search among positions is owned by
-    /// the parent context (quantifier's skip-retry, sequence advancement).
+    /// Alternation branches match at their exact cursor position; the search
+    /// among positions is owned by the parent (quantifier skip-retry, sequence
+    /// advancement). Strips the search loop from any nav variant.
     pub fn to_exact(self) -> Self {
         match self {
-            Self::Epsilon => Self::Epsilon, // Epsilon stays epsilon
+            Self::Epsilon => Self::Epsilon,
             Self::Down | Self::DownSkip | Self::DownSkipExtras => Self::DownExact,
             Self::Next | Self::NextSkip | Self::NextSkipExtras => Self::NextExact,
             Self::Stay => Self::StayExact,
             Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) => Self::UpExact(n),
-            // Already exact variants
             Self::DownExact | Self::NextExact | Self::StayExact | Self::UpExact(_) => self,
         }
     }

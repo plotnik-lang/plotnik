@@ -1,12 +1,9 @@
 //! Canonical type kind definitions.
-//!
-//! This enum represents the semantic type kinds shared across the system.
-//! Different modules may have their own representations that map to/from this.
 
-/// Semantic type kinds.
+/// Semantic type kind.
 ///
-/// This is the canonical enumeration of all type kinds, including primitives.
-/// Primitive types (Void, Node, String) are stored as TypeDefs like any other type.
+/// Primitive types (Void, Node, String) are stored as `TypeDef`s like any other
+/// type — the kind field is the only thing that distinguishes them.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum TypeKind {
@@ -68,7 +65,6 @@ impl TypeKind {
         matches!(self, Self::Struct | Self::Enum)
     }
 
-    /// Whether this is an array type.
     pub fn is_array(self) -> bool {
         matches!(self, Self::ArrayZeroOrMore | Self::ArrayOneOrMore)
     }
@@ -78,12 +74,10 @@ impl TypeKind {
         matches!(self, Self::ArrayOneOrMore)
     }
 
-    /// Whether this is an alias type.
     pub fn is_alias(self) -> bool {
         matches!(self, Self::Alias)
     }
 
-    /// Get the display name for primitive types.
     pub fn primitive_name(self) -> Option<&'static str> {
         match self {
             Self::Void => Some("Void"),

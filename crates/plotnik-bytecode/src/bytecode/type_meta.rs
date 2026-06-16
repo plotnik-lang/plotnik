@@ -2,7 +2,6 @@
 
 use super::{StringId, TypeId};
 
-// Re-export the shared TypeKind
 pub use crate::type_system::TypeKind;
 
 /// Convenience aliases for bytecode-specific naming (ArrayStar/ArrayPlus).
@@ -88,12 +87,10 @@ impl TypeDef {
         }
     }
 
-    /// Create an optional wrapper type.
     pub fn optional(inner: TypeId) -> Self {
         Self::wrapper(TypeKind::Optional, inner)
     }
 
-    /// Create an alias type.
     pub fn alias(target: TypeId) -> Self {
         Self::wrapper(TypeKind::Alias, target)
     }
@@ -108,17 +105,14 @@ impl TypeDef {
         Self::wrapper(TypeKind::ARRAY_PLUS, element)
     }
 
-    /// Create a struct type.
     pub fn struct_type(member_start: u16, member_count: u8) -> Self {
         Self::composite(TypeKind::Struct, member_start, member_count)
     }
 
-    /// Create an enum type.
     pub fn enum_type(member_start: u16, member_count: u8) -> Self {
         Self::composite(TypeKind::Enum, member_start, member_count)
     }
 
-    /// Decode from 4 bytes (crate-internal deserialization).
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             data: u16::from_le_bytes([bytes[0], bytes[1]]),
@@ -127,7 +121,6 @@ impl TypeDef {
         }
     }
 
-    /// Encode to 4 bytes.
     pub fn to_bytes(&self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&self.data.to_le_bytes());
@@ -203,12 +196,10 @@ impl TypeName {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    /// Create a new type name entry.
     pub fn new(name: StringId, type_id: TypeId) -> Self {
         Self { name, type_id }
     }
 
-    /// Encode to 4 bytes.
     pub fn to_bytes(&self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&self.name.get().to_le_bytes());
@@ -233,12 +224,10 @@ impl TypeMember {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    /// Create a new type member entry.
     pub fn new(name: StringId, type_id: TypeId) -> Self {
         Self { name, type_id }
     }
 
-    /// Encode to 4 bytes.
     pub fn to_bytes(&self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&self.name.get().to_le_bytes());

@@ -46,7 +46,6 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    /// Create a new compiler with the given context.
     pub fn new(ctx: &'a CompileCtx<'a>) -> Self {
         Self {
             ctx,
@@ -57,7 +56,6 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    /// Compile all definitions in the query.
     pub fn compile(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
         let mut compiler = Compiler::new(ctx);
 
@@ -65,13 +63,11 @@ impl<'a> Compiler<'a> {
         // This wraps any entrypoint to create the top-level scope.
         let preamble_entry = compiler.emit_preamble();
 
-        // Pre-allocate entry labels for all definitions
         for (def_id, _) in ctx.type_ctx.iter_def_types() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
         }
 
-        // Compile each definition
         for (def_id, _) in ctx.type_ctx.iter_def_types() {
             compiler.compile_def(def_id)?;
         }
@@ -103,7 +99,6 @@ impl<'a> Compiler<'a> {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
-        // Chain: Obj -> Trampoline -> EndObj -> Return
         let endobj_label = self.emit_endobj_step(return_label);
 
         let trampoline_label = self.fresh_label();
@@ -120,7 +115,6 @@ impl<'a> Compiler<'a> {
         l
     }
 
-    /// Compile a single definition.
     fn compile_def(&mut self, def_id: DefId) -> Result<(), CompileError> {
         let name_sym = self.ctx.type_ctx.def_name_sym(def_id);
         let name = self.ctx.interner.resolve(name_sym);
@@ -131,9 +125,7 @@ impl<'a> Compiler<'a> {
 
         let entry_label = self.def_entries[&def_id];
 
-        // Create Return instruction at definition exit.
-        // When stack is empty, Return means Accept (top-level match completed).
-        // When stack is non-empty, Return pops frame and jumps to return address.
+        // Return when stack is empty means Accept; when non-empty, pops frame to caller.
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
@@ -154,7 +146,6 @@ impl<'a> Compiler<'a> {
             self.compile_expr_with_nav(body, return_label, body_nav)
         };
 
-        // If body_entry differs from our pre-allocated entry, emit an epsilon jump
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
@@ -162,7 +153,6 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    /// Compile an expression with an optional navigation override.
     pub(super) fn compile_expr_with_nav(
         &mut self,
         expr: &Expr,
@@ -187,16 +177,12 @@ impl<'a> Compiler<'a> {
         capture: CaptureEffects,
     ) -> Label {
         match expr {
-            // Leaf nodes: attach capture effects directly
             Expr::NamedNode(n) => self.compile_named_node_inner(n, exit, nav_override, capture),
             Expr::AnonymousNode(n) => {
                 self.compile_anonymous_node_inner(n, exit, nav_override, capture)
             }
-            // Sequences: pass capture to last item
             Expr::SeqExpr(s) => self.compile_seq_inner(s, exit, nav_override, capture),
-            // Alternations: pass capture to each branch
             Expr::AltExpr(a) => self.compile_alt_inner(a, exit, nav_override, capture),
-            // Wrappers: propagate capture through
             Expr::CapturedExpr(c) => self.compile_captured(
                 c,
                 c.inner(),
@@ -208,7 +194,6 @@ impl<'a> Compiler<'a> {
                 self.compile_quantified_inner(q, exit, nav_override, capture)
             }
             Expr::FieldExpr(f) => self.compile_field_inner(f, exit, nav_override, capture),
-            // Refs: special handling for Call
             Expr::Ref(r) => self.compile_ref_inner(r, exit, nav_override, None, capture),
         }
     }

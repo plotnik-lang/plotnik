@@ -105,7 +105,6 @@ pub enum SyntaxKind {
 
     DoubleQuote,
     SingleQuote,
-    /// String content between quotes
     StrVal,
 
     #[token("ERROR")]
@@ -156,23 +155,19 @@ pub enum SyntaxKind {
     #[regex(r"#![^\n]*", allow_greedy = true)]
     Shebang,
 
-    /// `==` for predicate equals
     #[token("==")]
     OpEq,
 
-    /// `!=` for predicate not equals
     #[token("!=")]
     OpNe,
 
-    /// `^=` for predicate starts-with
     #[token("^=")]
     OpStartsWith,
 
-    /// `$=` for predicate ends-with
     #[token("$=")]
     OpEndsWith,
 
-    /// `*=` for predicate contains. Longest match wins over `Star`.
+    /// Longest match wins over `Star`.
     #[token("*=")]
     OpContains,
 
@@ -217,7 +212,6 @@ pub enum SyntaxKind {
     Def,
     /// Predicate on a node: `(identifier == "foo")`
     NodePredicate,
-    /// Regex literal: `/pattern/`
     Regex,
 
     // Must be last - used for bounds checking in `kind_from_raw`
@@ -235,7 +229,6 @@ fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
 
     for (i, c) in remaining.char_indices() {
         if c == '/' && backslash_count % 2 == 0 {
-            // Found unescaped closing slash
             lexer.bump(i + 1);
             return true;
         }
@@ -287,7 +280,6 @@ impl Language for QLang {
     }
 }
 
-/// Type aliases for Rowan types parameterized by our language.
 pub type SyntaxNode = rowan::SyntaxNode<QLang>;
 pub type SyntaxToken = rowan::SyntaxToken<QLang>;
 

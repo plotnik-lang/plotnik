@@ -1,24 +1,17 @@
 //! Predicate operators for bytecode.
 //!
-//! Extracted from parser for use by both compiler and runtime.
-//! The runtime needs to decode predicate operators from bytecode.
+//! Shared between compiler and runtime so the VM can decode operators
+//! from bytecode without depending on the parser.
 
 /// Predicate operator for node text filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PredicateOp {
-    /// `==` - equals
     Eq,
-    /// `!=` - not equals
     Ne,
-    /// `^=` - starts with
     StartsWith,
-    /// `$=` - ends with
     EndsWith,
-    /// `*=` - contains
     Contains,
-    /// `=~` - regex match
     RegexMatch,
-    /// `!~` - regex no match
     RegexNoMatch,
 }
 
@@ -70,7 +63,6 @@ impl PredicateOp {
         }
     }
 
-    /// Check if this is a regex operator.
     pub fn is_regex_op(&self) -> bool {
         matches!(self, Self::RegexMatch | Self::RegexNoMatch)
     }

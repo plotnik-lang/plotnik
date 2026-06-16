@@ -3,7 +3,6 @@
 //! Implements the cactus stack pattern: frames are append-only,
 //! with a current pointer that can be restored for backtracking.
 
-/// Call frame for recursion support.
 #[derive(Clone, Copy, Debug)]
 pub struct Frame {
     /// Where to jump on Return (raw step index).
@@ -62,7 +61,6 @@ impl FrameArena {
         self.current = frame_index;
     }
 
-    /// Get current frame index.
     #[inline]
     pub fn current(&self) -> Option<u32> {
         self.current
@@ -74,7 +72,6 @@ impl FrameArena {
         self.current.is_none()
     }
 
-    /// Get current call depth.
     #[allow(dead_code)]
     pub fn depth(&self) -> u32 {
         let mut depth = 0;
@@ -92,7 +89,6 @@ impl FrameArena {
     /// references them. The `max_referenced` is the highest frame index
     /// still referenced by any active checkpoint.
     pub fn prune(&mut self, max_referenced: Option<u32>) {
-        // Keep frames up to max(current, max_referenced)
         let keep = match (self.current, max_referenced) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
