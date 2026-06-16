@@ -24,6 +24,12 @@ pub const HEADER_SIZE: usize = SECTION_ALIGN;
 /// Step size in bytes (all instructions are 8-byte aligned).
 pub const STEP_SIZE: usize = 8;
 
+/// String offset table entry size: one little-endian `u32` offset per string.
+pub const STRING_TABLE_ENTRY_SIZE: usize = size_of::<u32>();
+
+/// Regex table entry size: `string_id (u16) | reserved (u16) | offset (u32)`.
+pub const REGEX_TABLE_ENTRY_SIZE: usize = 8;
+
 /// Maximum payload slots for Match instructions.
 ///
 /// Match64 (the largest variant) supports up to 28 u16 slots for

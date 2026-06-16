@@ -16,9 +16,12 @@ pub struct Entrypoint {
     _pad: u16,
 }
 
-const _: () = assert!(std::mem::size_of::<Entrypoint>() == 8);
+const _: () = assert!(std::mem::size_of::<Entrypoint>() == Entrypoint::SIZE);
 
 impl Entrypoint {
+    /// Serialized size in bytes.
+    pub const SIZE: usize = 8;
+
     /// Create a new entrypoint.
     pub fn new(name: StringId, target: StepAddr, result_type: TypeId) -> Self {
         Self {

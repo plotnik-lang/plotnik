@@ -463,51 +463,51 @@ impl Module {
             Ok(())
         };
 
-        // entrypoint name: u16 at entry+0 (8-byte entries)
+        // entrypoint name: u16 at entry+0
         check(
             self.offsets.entrypoints,
-            8,
+            Entrypoint::SIZE,
             0,
             0,
             self.header.entrypoints_count as usize,
         )?;
-        // node/field symbol name: u16 at entry+2 (4-byte entries)
+        // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_types,
-            4,
+            NodeSymbol::SIZE,
             2,
             0,
             self.header.node_types_count as usize,
         )?;
         check(
             self.offsets.node_fields,
-            4,
+            FieldSymbol::SIZE,
             2,
             0,
             self.header.node_fields_count as usize,
         )?;
-        // type name / member name: u16 at entry+0 (4-byte entries)
+        // type name / member name: u16 at entry+0
         check(
             self.offsets.type_names,
-            4,
+            TypeName::SIZE,
             0,
             0,
             self.header.type_names_count as usize,
         )?;
         check(
             self.offsets.type_members,
-            4,
+            TypeMember::SIZE,
             0,
             0,
             self.header.type_members_count as usize,
         )?;
-        // regex pattern name: u16 at entry+0 (8-byte entries). Index 0 is the
-        // reserved sentinel — never resolved — so start at 1; `dump`/`trace`
-        // resolve `string_id` for every real entry through the panicking
-        // `RegexView::get_string_id` (and then index the string blob).
+        // regex pattern name: u16 at entry+0. Index 0 is the reserved sentinel —
+        // never resolved — so start at 1; `dump`/`trace` resolve `string_id` for
+        // every real entry through the panicking `RegexView::get_string_id` (and
+        // then index the string blob).
         check(
             self.offsets.regex_table,
-            8,
+            REGEX_TABLE_ENTRY_SIZE,
             0,
             1,
             self.header.regex_table_count as usize,

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use regex_automata::dfa::dense;
 use regex_automata::dfa::sparse::DFA;
 
-use plotnik_bytecode::StringId;
+use plotnik_bytecode::{REGEX_TABLE_ENTRY_SIZE, StringId};
 
 use super::EmitError;
 
@@ -111,7 +111,8 @@ impl RegexTableBuilder {
     /// This allows looking up both the pattern string (via StringTable) and DFA bytes.
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>) {
         let mut blob = Vec::new();
-        let mut table = Vec::with_capacity(self.entries.len() * 8 + 4);
+        // One entry per pattern plus the trailing sentinel.
+        let mut table = Vec::with_capacity((self.entries.len() + 1) * REGEX_TABLE_ENTRY_SIZE);
 
         for entry in &self.entries {
             // Pad blob to 4-byte alignment before each DFA

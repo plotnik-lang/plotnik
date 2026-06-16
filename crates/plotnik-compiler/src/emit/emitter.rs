@@ -249,7 +249,7 @@ fn emit_section(output: &mut Vec<u8>, data: &[u8]) {
 }
 
 fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * 4);
+    let mut bytes = Vec::with_capacity(symbols.len() * NodeSymbol::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
         bytes.extend_from_slice(&sym.name.get().to_le_bytes());
@@ -258,7 +258,7 @@ fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
 }
 
 fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * 4);
+    let mut bytes = Vec::with_capacity(symbols.len() * FieldSymbol::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.id.to_le_bytes());
         bytes.extend_from_slice(&sym.name.get().to_le_bytes());
@@ -267,7 +267,7 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
 }
 
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entrypoints.len() * 8);
+    let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
     for ep in entrypoints {
         bytes.extend_from_slice(&ep.name().get().to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());

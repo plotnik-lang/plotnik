@@ -354,17 +354,17 @@ impl TypeTableBuilder {
     ///
     /// Returns (type_defs_bytes, type_members_bytes, type_names_bytes).
     pub fn emit(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-        let mut defs_bytes = Vec::with_capacity(self.type_defs.len() * 4);
+        let mut defs_bytes = Vec::with_capacity(self.type_defs.len() * TypeDef::SIZE);
         for def in &self.type_defs {
             defs_bytes.extend_from_slice(&def.to_bytes());
         }
 
-        let mut members_bytes = Vec::with_capacity(self.type_members.len() * 4);
+        let mut members_bytes = Vec::with_capacity(self.type_members.len() * TypeMember::SIZE);
         for member in &self.type_members {
             members_bytes.extend_from_slice(&member.to_bytes());
         }
 
-        let mut names_bytes = Vec::with_capacity(self.type_names.len() * 4);
+        let mut names_bytes = Vec::with_capacity(self.type_names.len() * TypeName::SIZE);
         for type_name in &self.type_names {
             names_bytes.extend_from_slice(&type_name.to_bytes());
         }

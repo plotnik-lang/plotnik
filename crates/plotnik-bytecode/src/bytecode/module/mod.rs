@@ -13,7 +13,9 @@ use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline};
 use super::sections::{FieldSymbol, NodeSymbol};
 use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
-use super::{Entrypoint, SECTION_ALIGN, STEP_SIZE};
+use super::{
+    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+};
 use crate::dfa::RegexDfas;
 
 mod effect_stack;
@@ -252,7 +254,7 @@ impl Module {
         let offset = self.offsets.node_types as usize;
         let count = self.header.node_types_count as usize;
         SymbolsView {
-            bytes: &self.storage[offset..offset + count * 4],
+            bytes: &self.storage[offset..offset + count * NodeSymbol::SIZE],
             count,
             _marker: std::marker::PhantomData,
         }
@@ -263,7 +265,7 @@ impl Module {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
         SymbolsView {
-            bytes: &self.storage[offset..offset + count * 4],
+            bytes: &self.storage[offset..offset + count * FieldSymbol::SIZE],
             count,
             _marker: std::marker::PhantomData,
         }
@@ -295,9 +297,10 @@ impl Module {
         let names_count = self.header.type_names_count as usize;
 
         TypesView {
-            defs_bytes: &self.storage[defs_offset..defs_offset + defs_count * 4],
-            members_bytes: &self.storage[members_offset..members_offset + members_count * 4],
-            names_bytes: &self.storage[names_offset..names_offset + names_count * 4],
+            defs_bytes: &self.storage[defs_offset..defs_offset + defs_count * TypeDef::SIZE],
+            members_bytes: &self.storage
+                [members_offset..members_offset + members_count * TypeMember::SIZE],
+            names_bytes: &self.storage[names_offset..names_offset + names_count * TypeName::SIZE],
             defs_count,
             members_count,
             names_count,
@@ -309,7 +312,7 @@ impl Module {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntrypointsView {
-            bytes: &self.storage[offset..offset + count * 8],
+            bytes: &self.storage[offset..offset + count * Entrypoint::SIZE],
             count,
         }
     }
@@ -319,7 +322,7 @@ impl Module {
     fn string_table_slice(&self) -> &[u8] {
         let offset = self.offsets.str_table as usize;
         let count = self.header.str_table_count as usize;
-        &self.storage[offset..offset + (count + 1) * 4]
+        &self.storage[offset..offset + (count + 1) * STRING_TABLE_ENTRY_SIZE]
     }
 
     /// Helper to get regex table as bytes.
@@ -327,7 +330,7 @@ impl Module {
     fn regex_table_slice(&self) -> &[u8] {
         let offset = self.offsets.regex_table as usize;
         let count = self.header.regex_table_count as usize;
-        &self.storage[offset..offset + (count + 1) * 8]
+        &self.storage[offset..offset + (count + 1) * REGEX_TABLE_ENTRY_SIZE]
     }
 }
 
@@ -348,8 +351,8 @@ impl<'a> StringsView<'a> {
     /// The string table contains sequential u32 offsets. To get string i:
     /// `start = table[i]`, `end = table[i+1]`, `length = end - start`.
     pub fn get_by_index(&self, idx: usize) -> &'a str {
-        let start = read_u32_le(self.table, idx * 4) as usize;
-        let end = read_u32_le(self.table, (idx + 1) * 4) as usize;
+        let start = read_u32_le(self.table, idx * STRING_TABLE_ENTRY_SIZE) as usize;
+        let end = read_u32_le(self.table, (idx + 1) * STRING_TABLE_ENTRY_SIZE) as usize;
         std::str::from_utf8(&self.blob[start..end]).expect("invalid UTF-8 in string table")
     }
 }
@@ -365,7 +368,7 @@ impl<'a> SymbolsView<'a, NodeSymbol> {
     /// Get a node symbol by index.
     pub fn get(&self, idx: usize) -> NodeSymbol {
         assert!(idx < self.count, "node symbol index out of bounds");
-        let offset = idx * 4;
+        let offset = idx * NodeSymbol::SIZE;
         NodeSymbol::new(
             read_u16_le(self.bytes, offset),
             StringId::new(read_u16_le(self.bytes, offset + 2)),
@@ -387,7 +390,7 @@ impl<'a> SymbolsView<'a, FieldSymbol> {
     /// Get a field symbol by index.
     pub fn get(&self, idx: usize) -> FieldSymbol {
         assert!(idx < self.count, "field symbol index out of bounds");
-        let offset = idx * 4;
+        let offset = idx * FieldSymbol::SIZE;
         FieldSymbol::new(
             read_u16_le(self.bytes, offset),
             StringId::new(read_u16_le(self.bytes, offset + 2)),
@@ -416,7 +419,7 @@ pub struct RegexView<'a> {
 
 impl<'a> RegexView<'a> {
     /// Entry size in bytes: string_id (u16) + reserved (u16) + offset (u32).
-    const ENTRY_SIZE: usize = 8;
+    const ENTRY_SIZE: usize = REGEX_TABLE_ENTRY_SIZE;
 
     /// Get regex DFA bytes by index.
     ///
@@ -460,7 +463,7 @@ impl<'a> TypesView<'a> {
     /// Get a type definition by index.
     pub fn get_def(&self, idx: usize) -> TypeDef {
         assert!(idx < self.defs_count, "type def index out of bounds");
-        let offset = idx * 4;
+        let offset = idx * TypeDef::SIZE;
         TypeDef::from_bytes(&self.defs_bytes[offset..])
     }
 
@@ -477,7 +480,7 @@ impl<'a> TypesView<'a> {
     /// Get a type member by index.
     pub fn get_member(&self, idx: usize) -> TypeMember {
         assert!(idx < self.members_count, "type member index out of bounds");
-        let offset = idx * 4;
+        let offset = idx * TypeMember::SIZE;
         TypeMember::new(
             StringId::new(read_u16_le(self.members_bytes, offset)),
             TypeId(read_u16_le(self.members_bytes, offset + 2)),
@@ -489,13 +492,13 @@ impl<'a> TypesView<'a> {
     /// validator before `validate_string_ids` rejects it.
     pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.members_count, "type member index out of bounds");
-        TypeId(read_u16_le(self.members_bytes, idx * 4 + 2))
+        TypeId(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
     }
 
     /// Get a type name entry by index.
     pub fn get_name(&self, idx: usize) -> TypeName {
         assert!(idx < self.names_count, "type name index out of bounds");
-        let offset = idx * 4;
+        let offset = idx * TypeName::SIZE;
         TypeName::new(
             StringId::new(read_u16_le(self.names_bytes, offset)),
             TypeId(read_u16_le(self.names_bytes, offset + 2)),
@@ -506,7 +509,7 @@ impl<'a> TypesView<'a> {
     /// `StringId` — same boundary reason as [`member_type_id`](Self::member_type_id).
     pub(crate) fn name_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.names_count, "type name index out of bounds");
-        TypeId(read_u16_le(self.names_bytes, idx * 4 + 2))
+        TypeId(read_u16_le(self.names_bytes, idx * TypeName::SIZE + 2))
     }
 
     /// Number of type definitions.
@@ -563,7 +566,7 @@ impl<'a> EntrypointsView<'a> {
     /// Get an entrypoint by index.
     pub fn get(&self, idx: usize) -> Entrypoint {
         assert!(idx < self.count, "entrypoint index out of bounds");
-        let offset = idx * 8;
+        let offset = idx * Entrypoint::SIZE;
         Entrypoint::from_bytes(&self.bytes[offset..])
     }
 
