@@ -264,6 +264,53 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
         .expect("no matching effect slot in transitions")
 }
 
+/// Byte offset of the first non-empty inter-section alignment gap — the padding
+/// the emitter zero-fills before each aligned section (or the final tail).
+fn first_section_gap(bytes: &[u8]) -> usize {
+    let m = Module::load(bytes).expect("module loads before tampering");
+    let o = m.offsets();
+    let h = m.header();
+    // (section start, data length) in layout order, terminated by the file end.
+    let sections = [
+        (o.str_blob, h.str_blob_size),
+        (o.regex_blob, h.regex_blob_size),
+        (o.str_table, (h.str_table_count as u32 + 1) * 4),
+        (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
+        (o.node_types, h.node_types_count as u32 * 4),
+        (o.node_fields, h.node_fields_count as u32 * 4),
+        (o.type_defs, h.type_defs_count as u32 * 4),
+        (o.type_members, h.type_members_count as u32 * 4),
+        (o.type_names, h.type_names_count as u32 * 4),
+        (o.entrypoints, h.entrypoints_count as u32 * 8),
+        (o.transitions, h.transitions_count as u32 * 8),
+        (h.total_size, 0),
+    ];
+    sections
+        .windows(2)
+        .find_map(|w| {
+            let end = w[0].0 + w[0].1;
+            (end < w[1].0).then_some(end as usize)
+        })
+        .expect("query must leave at least one alignment gap")
+}
+
+#[test]
+fn forged_nonzero_section_padding_is_rejected() {
+    // The emitter zero-fills the alignment gap before every aligned section; a
+    // non-zero byte in any gap is smuggled state at a section boundary that the
+    // CRC alone would carry along, so the loader must reject it.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let pad_off = first_section_gap(&bytes);
+    bytes[pad_off] = 1;
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged section padding must be rejected");
+    assert!(
+        matches!(err, ModuleError::NonZeroSectionPadding),
+        "expected NonZeroSectionPadding, got {err:?}"
+    );
+}
+
 #[test]
 fn forged_unknown_opcode_is_rejected() {
     // `9` is past the 0x0..=0x8 opcode range; the VM's `decode_step` would

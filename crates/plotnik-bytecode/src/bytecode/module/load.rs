@@ -32,6 +32,8 @@ pub enum ModuleError {
     MalformedHeader,
     #[error("section out of bounds: header counts exceed the {total}-byte file")]
     SectionOutOfBounds { total: u32 },
+    #[error("non-zero section padding")]
+    NonZeroSectionPadding,
     #[error("checksum mismatch: header {expected:#010x}, computed {actual:#010x}")]
     ChecksumMismatch { expected: u32, actual: u32 },
     #[error("malformed string table")]
@@ -148,6 +150,7 @@ impl Module {
             });
         }
 
+        self.validate_section_padding()?;
         self.validate_string_table()?;
         self.validate_regex_table()?;
         let regex_dfas = self.load_regex_dfas()?;
@@ -197,6 +200,42 @@ impl Module {
 
         if transitions_end > total as u64 {
             return Err(oob());
+        }
+        Ok(())
+    }
+
+    /// Every inter-section alignment gap and the final tail up to `total_size`
+    /// must be zero. The emitter aligns each section to `SECTION_ALIGN` by
+    /// zero-filling the gap before it (`pad_to_section`), so a non-zero byte at a
+    /// section boundary is smuggled state riding a gap the CRC alone would carry.
+    /// Section bounds are already proven by [`Self::validate_section_bounds`], so
+    /// the slicing here stays in range.
+    fn validate_section_padding(&self) -> Result<(), ModuleError> {
+        let h = &self.header;
+        let o = &self.offsets;
+        // (section start, data length) in layout order, terminated by a
+        // zero-length sentinel at the file end so the trailing gap is checked too.
+        let sections = [
+            (o.str_blob, h.str_blob_size),
+            (o.regex_blob, h.regex_blob_size),
+            (o.str_table, (h.str_table_count as u32 + 1) * 4),
+            (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
+            (o.node_types, h.node_types_count as u32 * 4),
+            (o.node_fields, h.node_fields_count as u32 * 4),
+            (o.type_defs, h.type_defs_count as u32 * 4),
+            (o.type_members, h.type_members_count as u32 * 4),
+            (o.type_names, h.type_names_count as u32 * 4),
+            (o.entrypoints, h.entrypoints_count as u32 * 8),
+            (o.transitions, h.transitions_count as u32 * STEP_SIZE as u32),
+            (h.total_size, 0),
+        ];
+
+        for win in sections.windows(2) {
+            let gap_start = (win[0].0 + win[0].1) as usize;
+            let gap_end = win[1].0 as usize;
+            if self.storage[gap_start..gap_end].iter().any(|&b| b != 0) {
+                return Err(ModuleError::NonZeroSectionPadding);
+            }
         }
         Ok(())
     }
