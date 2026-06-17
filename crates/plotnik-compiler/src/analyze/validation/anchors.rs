@@ -17,7 +17,6 @@ pub fn validate_anchors(input: ValidateInput) {
         source_id,
         ast,
         diag,
-        ..
     } = input;
     let mut visitor = AnchorValidator {
         reporter: Reporter::new(source_id, diag),

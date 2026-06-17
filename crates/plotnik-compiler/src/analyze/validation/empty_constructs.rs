@@ -13,7 +13,6 @@ pub fn validate_empty_constructs(input: ValidateInput) {
         source_id,
         ast,
         diag,
-        ..
     } = input;
     let mut visitor = EmptyConstructsValidator {
         reporter: Reporter::new(source_id, diag),

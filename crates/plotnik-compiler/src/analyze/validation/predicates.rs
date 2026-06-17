@@ -8,23 +8,22 @@
 use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
 use rowan::TextRange;
 
-use super::ValidateInput;
+use super::PredicateInput;
 use crate::analyze::Reporter;
 use crate::analyze::visitor::{Visitor, walk_named_node};
 use crate::diagnostics::DiagnosticKind;
 use crate::parser::NamedNode;
 
-pub fn validate_predicates(input: ValidateInput) {
-    let ValidateInput {
+pub fn validate_predicates(input: PredicateInput) {
+    let PredicateInput {
         source_id,
         ast,
         source_content,
         diag,
     } = input;
-    let source = source_content.expect("predicate validation requires source content");
     let mut validator = PredicateValidator {
         reporter: Reporter::new(source_id, diag),
-        source,
+        source: source_content,
     };
     validator.visit(ast);
 }

@@ -15,7 +15,6 @@ pub fn validate_alt_kinds(input: ValidateInput) {
         source_id,
         ast,
         diag,
-        ..
     } = input;
     let mut visitor = AltKindsValidator {
         reporter: Reporter::new(source_id, diag),
