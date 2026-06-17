@@ -1,0 +1,22 @@
+Q = (function_declaration) @fn :: FunctionDecl
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "function_declaration"
+        ParenClose ")"
+      CaptureToken "@fn"
+      Type
+        DoubleColon "::"
+        Id "FunctionDecl"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @fn :: FunctionDecl
+      NamedNode function_declaration

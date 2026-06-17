@@ -1,0 +1,25 @@
+[(a), (b), (c)]
+==== diagnostics ====
+error: patterns are separated by whitespace
+ --> query.ptk:1:5
+  |
+1 | [(a), (b), (c)]
+  |     ^
+  |
+help: remove the `,`
+  |
+1 - [(a), (b), (c)]
+1 + [(a) (b), (c)]
+  |
+
+error: patterns are separated by whitespace
+ --> query.ptk:1:10
+  |
+1 | [(a), (b), (c)]
+  |          ^
+  |
+help: remove the `,`
+  |
+1 - [(a), (b), (c)]
+1 + [(a), (b) (c)]
+  |

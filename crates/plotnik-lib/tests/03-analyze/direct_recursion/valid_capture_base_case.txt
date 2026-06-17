@@ -1,0 +1,7 @@
+A = [
+  (x) @cap
+  (foo (A))
+]
+==== symbols ====
+A
+  A (cycle)

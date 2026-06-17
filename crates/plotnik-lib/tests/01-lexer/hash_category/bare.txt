@@ -1,0 +1,6 @@
+(value#)
+==== tokens ====
+ParenOpen "("
+Id "value"
+Hash "#"
+ParenClose ")"

@@ -1,0 +1,16 @@
+A = [(x) (a (B))]
+B = (b (C))
+C = (c (A))
+==== symbols ====
+A
+  B
+    C
+      A (cycle)
+B
+  C
+    A
+      B (cycle)
+C
+  A
+    B
+      C (cycle)

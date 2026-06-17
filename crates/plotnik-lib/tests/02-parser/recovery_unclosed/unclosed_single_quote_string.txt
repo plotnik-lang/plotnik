@@ -1,0 +1,9 @@
+(call 'foo)
+==== diagnostics ====
+error: unterminated string
+ --> query.ptk:1:7
+  |
+1 | (call 'foo)
+  |       ^^^^^
+  |
+help: anonymous nodes match literal tokens; close the quote: `"foo"`

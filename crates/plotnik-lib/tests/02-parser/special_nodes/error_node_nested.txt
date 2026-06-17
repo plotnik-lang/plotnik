@@ -1,0 +1,30 @@
+Q = (function_definition body: (block (ERROR)))
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function_definition"
+      Field
+        Id "body"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "block"
+          Tree
+            ParenOpen "("
+            KwError "ERROR"
+            ParenClose ")"
+          ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode function_definition
+      FieldExpr body:
+        NamedNode block
+          NamedNode ERROR

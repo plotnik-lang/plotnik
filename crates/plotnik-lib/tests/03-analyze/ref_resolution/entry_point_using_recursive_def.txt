@@ -1,0 +1,8 @@
+E = [(x) (call (E))]
+Q = (program (E))
+==== symbols ====
+E
+  E (cycle)
+Q
+  E
+    E (cycle)

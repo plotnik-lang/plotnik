@@ -1,0 +1,32 @@
+Q = (break_statement -label) @brk
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "brk"
+S2 "Q"
+S3 "break_statement"
+S4 "label"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { brk }
+
+[type_members]
+M0: S1 → T0  ; brk: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 6 :: T1
+
+[transitions]
+_ObjWrap:
+  0  -ε-  [Obj]                             2
+  2       Trampoline                        3
+  3  -ε-  [EndObj]                          5
+  5                                         ▶
+
+Q:
+  6   !   -label (break_statement) [Node Set(M0)]  8
+  8                                         ▶

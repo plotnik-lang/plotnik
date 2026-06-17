@@ -1,0 +1,7 @@
+[a | b]
+==== tokens ====
+BracketOpen "["
+Id "a"
+Pipe "|"
+Id "b"
+BracketClose "]"

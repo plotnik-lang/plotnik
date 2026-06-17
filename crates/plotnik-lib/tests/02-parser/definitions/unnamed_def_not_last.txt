@@ -1,0 +1,14 @@
+Expr = [
+  (identifier)
+  (number)
+]
+
+(program (Expr) @value)
+==== diagnostics ====
+error: definition must be named
+ --> query.ptk:6:1
+  |
+6 | (program (Expr) @value)
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: give it a name like `Name = (program (Expr) @value)`

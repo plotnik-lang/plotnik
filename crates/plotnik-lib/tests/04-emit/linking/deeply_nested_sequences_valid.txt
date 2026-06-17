@@ -1,0 +1,34 @@
+Q = (statement_block {{{(function_declaration)}}}) @block
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "block"
+S2 "Q"
+S3 "statement_block"
+S4 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { block }
+
+[type_members]
+M0: S1 → T0  ; block: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (statement_block) [Node Set(M0)]  08
+  08  └‣─  (function_declaration)           09
+  09  ─‣┘  _                                10
+  10                                        ▶

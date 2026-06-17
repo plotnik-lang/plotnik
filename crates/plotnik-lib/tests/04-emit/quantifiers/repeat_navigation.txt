@@ -1,0 +1,43 @@
+Q = (function_declaration (decorator)* @decs)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "decs"
+S2 "Q"
+S3 "function_declaration"
+S4 "decorator"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { decs }
+
+[type_members]
+M0: S1 → T1  ; decs: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (function_declaration)           08
+  07  ...  
+  08  -ε-  [Arr]                            18, 11
+  10                                        ▶
+  11  -ε-  [EndArr Set(M0)]                 10
+  13   !   (decorator) [Node Push]          22, 24
+  15  ...  
+  16  ─‣─  _                                13, 16
+  18  └‣─  _                                13, 16
+  20  ─‣─  _                                13, 20
+  22  ─‣─  _                                13, 20
+  24  ─‣┘  [EndArr Set(M0)] _               10

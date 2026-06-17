@@ -1,0 +1,14 @@
+(call foo.bar: (x))
+==== diagnostics ====
+error: field names must be snake_case
+ --> query.ptk:1:7
+  |
+1 | (call foo.bar: (x))
+  |       ^^^^^^^
+  |
+help: use `foo_bar`
+  |
+1 - (call foo.bar: (x))
+1 + (call foo_bar: (x))
+  |
+help: fields come from the grammar and are snake_case

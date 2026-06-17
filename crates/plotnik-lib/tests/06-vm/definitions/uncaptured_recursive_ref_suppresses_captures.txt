@@ -1,0 +1,132 @@
+Nested = (call_expression
+  function: [
+    (identifier) @name
+    (Nested)
+  ]
+)
+
+Q = (program (expression_statement (Nested) @c))
+==== input ====
+a()()
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "c"
+S3 "Nested"
+S4 "Q"
+S5 "call_expression"
+S6 "identifier"
+S7 "program"
+S8 "expression_statement"
+S9 "function"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { c }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T3  ; name: T3
+M1: S2 → T1  ; c: Nested
+
+[type_names]
+N0: S3 → T1  ; Nested
+N1: S4 → T2  ; Q
+
+[entrypoints]
+Nested = 06 :: T1
+Q      = 10 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Nested:
+  06   !   (call_expression)                08
+  07  -ε-                                   16
+  08  └‣─  function: _                      20, 29
+
+Q:
+  10   !   (program)                        11
+  11  └‣─  (expression_statement) [Obj]     13
+  13  └‣─  (Nested)                         06 : 14
+  14  -ε-  [EndObj]                         07
+  16  ─‣┘² [Set(M1)] _                      18
+  18                                        ▶
+  19                                        ▶
+  20   !   (identifier) [Node Set(M0)]      22
+  22  ─‣┘  _                                19
+  23  ...  
+  24  -ε-  [SuppressEnd]                    22
+  26   !   (Nested)                         06 : 24
+  27  -ε-  [SuppressBegin]                  26
+  29  -ε-  [Null Set(M0)]                   27
+==== types ====
+export interface Nested {
+  name: Node | null;
+}
+
+export interface Q {
+  c: Nested;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  10       (program)                        11
+       ●   program
+  11       (expression_statement) [Obj]     13
+       ●   expression_statement
+  13       (Nested)                         06 : 14
+       ▶   (Nested)
+
+Nested:
+  06       (call_expression)                08
+       ●   call_expression
+  08       function: _                      20, 29
+       ●   call_expression
+  20       (identifier) [Node Set(M0)]      22
+       ○   call_expression
+  08  ❮❮❮ 
+  29  -ε-  [Null Set(M0)]                   27
+  27  -ε-  [SuppressBegin]                  26
+  26       (Nested)                         06 : 24
+       ▶   (Nested)
+
+Nested:
+  06       (call_expression)                08
+       ●   call_expression
+  08       function: _                      20, 29
+       ●   identifier
+  20       (identifier) [Node Set(M0)]      22
+       ●   identifier
+  22       _                                19
+       ●   call_expression
+  19   ◀   (Nested)                         
+
+Nested:
+  24  -ε-  [SuppressEnd]                    22
+  22       _                                19
+       ●   call_expression
+  19   ◀   (Nested)                         
+
+Q:
+  14  -ε-  [EndObj]                         07
+  07  -ε-                                   16
+  16       [Set(M1)] _                      18
+       ●   program
+  18   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"c":{"name":null}}

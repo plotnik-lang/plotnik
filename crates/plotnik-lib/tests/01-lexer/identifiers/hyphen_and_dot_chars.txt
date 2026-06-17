@@ -1,0 +1,5 @@
+(member-expr.node)
+==== tokens ====
+ParenOpen "("
+Id "member-expr.node"
+ParenClose ")"

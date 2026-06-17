@@ -1,0 +1,12 @@
+Q = (function_declaration
+  name: (identifier) @name :: string
+  body: (statement_block) @body
+) @func :: FunctionInfo
+==== types ====
+export type FunctionInfo = Node;
+
+export interface Q {
+  body: Node;
+  func: FunctionInfo;
+  name: string;
+}

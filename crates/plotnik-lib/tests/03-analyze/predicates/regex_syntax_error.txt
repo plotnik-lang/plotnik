@@ -1,0 +1,9 @@
+Q = (identifier =~ /[/)
+==== diagnostics ====
+error: invalid regex syntax: unclosed character class
+ --> query.ptk:1:21
+  |
+1 | Q = (identifier =~ /[/)
+  |                     ^
+==== symbols ====
+Q

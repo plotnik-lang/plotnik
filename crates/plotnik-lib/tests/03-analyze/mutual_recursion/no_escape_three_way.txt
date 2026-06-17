@@ -1,0 +1,31 @@
+A = (a (B))
+B = (b (C))
+C = (c (A))
+==== diagnostics ====
+error: infinite recursion: no escape path
+ --> query.ptk:3:9
+  |
+1 | A = (a (B))
+  |         - references B
+2 | B = (b (C))
+  |         - references C (completing cycle)
+3 | C = (c (A))
+  | -       ^
+  | |       |
+  | |       references A
+  | C is defined here
+  |
+help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+==== symbols ====
+A
+  B
+    C
+      A (cycle)
+B
+  C
+    A
+      B (cycle)
+C
+  A
+    B
+      C (cycle)

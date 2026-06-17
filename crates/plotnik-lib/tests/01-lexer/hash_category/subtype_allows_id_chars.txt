@@ -1,0 +1,7 @@
+(expression#member-expression)
+==== tokens ====
+ParenOpen "("
+Id "expression"
+Hash "#"
+Id "member-expression"
+ParenClose ")"

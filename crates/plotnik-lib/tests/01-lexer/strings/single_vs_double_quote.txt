@@ -1,0 +1,8 @@
+'single' "double"
+==== tokens ====
+SingleQuote "'"
+StrVal "single"
+SingleQuote "'"
+DoubleQuote "\""
+StrVal "double"
+DoubleQuote "\""

@@ -1,0 +1,10 @@
+{ (a) (b) }
+==== tokens ====
+BraceOpen "{"
+ParenOpen "("
+Id "a"
+ParenClose ")"
+ParenOpen "("
+Id "b"
+ParenClose ")"
+BraceClose "}"

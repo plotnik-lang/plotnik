@@ -1,0 +1,9 @@
+Q = {
+  (identifier) @mod
+  (decorator) @dec
+}?
+==== types ====
+export interface Q {
+  dec: Node | null;
+  mod: Node | null;
+}

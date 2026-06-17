@@ -1,0 +1,19 @@
+Q = "foo" @keyword
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Str
+        DoubleQuote "\""
+        StrVal "foo"
+        DoubleQuote "\""
+      CaptureToken "@keyword"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @keyword
+      AnonymousNode "foo"

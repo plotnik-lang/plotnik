@@ -1,0 +1,28 @@
+Test = ((a))
+==== diagnostics ====
+warning: parenthesized sequences are tree-sitter syntax
+ --> query.ptk:1:8
+  |
+1 | Test = ((a))
+  |        ^
+  |
+help: use `{(a) (b)}` to match a sequence of siblings
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Test"
+    Equals "="
+    Seq
+      ParenOpen "("
+      Tree
+        ParenOpen "("
+        Id "a"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Test
+    Seq
+      NamedNode a

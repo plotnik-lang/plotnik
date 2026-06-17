@@ -1,0 +1,46 @@
+A = (a [(B) (C)])
+B = (b (D))
+C = (c (D))
+D = (d (A))
+==== diagnostics ====
+error: infinite recursion: no escape path
+ --> query.ptk:3:9
+  |
+1 | A = (a [(B) (C)])
+  |              - references C (completing cycle)
+2 | B = (b (D))
+3 | C = (c (D))
+  | -       ^
+  | |       |
+  | |       references D
+  | C is defined here
+4 | D = (d (A))
+  |         - references A
+  |
+help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+==== symbols ====
+A
+  B
+    D
+      A (cycle)
+  C
+    D
+      A (cycle)
+B
+  D
+    A
+      B (cycle)
+      C
+        D (cycle)
+C
+  D
+    A
+      B
+        D (cycle)
+      C (cycle)
+D
+  A
+    B
+      D (cycle)
+    C
+      D (cycle)

@@ -1,0 +1,19 @@
+Q = (ERROR) @err
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        KwError "ERROR"
+        ParenClose ")"
+      CaptureToken "@err"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @err
+      NamedNode ERROR

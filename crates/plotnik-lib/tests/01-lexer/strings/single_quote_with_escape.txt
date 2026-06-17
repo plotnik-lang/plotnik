@@ -1,0 +1,5 @@
+'it\'s'
+==== tokens ====
+SingleQuote "'"
+StrVal "it\\'s"
+SingleQuote "'"

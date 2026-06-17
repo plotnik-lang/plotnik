@@ -1,0 +1,16 @@
+[
+    (a)
+    (b)
+==== diagnostics ====
+error: missing closing `]`
+ --> query.ptk:1:1
+  |
+1 |   [
+  |   ^ alternation started here
+  |  _|
+  | |
+2 | |     (a)
+3 | |     (b)
+  | |_______^
+  |
+help: add `]` to close the alternation

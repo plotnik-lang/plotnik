@@ -1,0 +1,11 @@
+Q = (function_declaration name: (identifier) @name
+==== diagnostics ====
+error: missing closing `)`
+ --> query.ptk:1:5
+  |
+1 | Q = (function_declaration name: (identifier) @name
+  |     -^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     |
+  |     node started here
+  |
+help: add `)` to close the node

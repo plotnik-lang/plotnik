@@ -1,0 +1,116 @@
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .
+    (debugger_statement)* @b
+    .
+    (expression_statement (identifier == "foo")) @c
+  }
+)
+==== input ====
+let x; debugger; debugger; foo;
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "foo"
+S02 "a"
+S03 "b"
+S04 "c"
+S05 "Q"
+S06 "program"
+S07 "lexical_declaration"
+S08 "debugger_statement"
+S09 "expression_statement"
+S10 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:3  ; { a, b, c }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S02 → T3  ; a: T3
+M1: S03 → T1  ; b: T1
+M2: S04 → T0  ; c: <Node>
+
+[type_names]
+N0: S05 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        48, 42
+  08  └‣─  (identifier) == "foo"            10
+  10  ─‣┘  _                                31
+  11  └‣─  (identifier) == "foo"            13
+  13  ─‣┘  _                                31
+  14  └‣─  (identifier) == "foo"            16
+  16  ─‣┘  _                                31
+  17                                        ▶
+  18  └•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  08
+  21  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  11
+  24  -ε-                                   18
+  25  └•─  (debugger_statement) [Node Push]  27, 21
+  27  ─•─  (debugger_statement) [Node Push]  27, 21
+  29  -ε-  [Arr]                            25, 24
+  31  ─‣┘  _                                17
+  32  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  14
+  35  -ε-                                   32
+  36  ─•─  (debugger_statement) [Node Push]  38, 32
+  38  ─•─  (debugger_statement) [Node Push]  38, 32
+  40  -ε-  [Arr]                            36, 35
+  42  -ε-  [Null Set(M0)]                   29
+  44   !   (lexical_declaration) [Node Set(M0)]  40
+  46  ─‣─  _                                44, 46
+  48  └‣─  _                                44, 46
+==== types ====
+export interface Q {
+  a: Node | null;
+  b: Node[];
+  c: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        48, 42
+       ●   program
+  48       _                                44, 46
+       ●   lexical_declaration
+  44       (lexical_declaration) [Node Set(M0)]  40
+       ●   lexical_declaration
+  40  -ε-  [Arr]                            36, 35
+  36       (debugger_statement) [Node Push]  38, 32
+       ●   debugger_statement
+  38       (debugger_statement) [Node Push]  38, 32
+       ●   debugger_statement
+  38       (debugger_statement) [Node Push]  38, 32
+       ○   expression_statement
+  38  ❮❮❮ 
+  32       [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  14
+       ●   expression_statement
+  14       (identifier) == "foo"            16
+       ●   identifier
+  16       _                                31
+       ●   expression_statement
+  31       _                                17
+       ●   program
+  17   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]},"b":[{"kind":"debugger_statement","text":"debugger;","span":[7, 16]},{"kind":"debugger_statement","text":"debugger;","span":[17, 26]}],"c":{"kind":"expression_statement","text":"foo;","span":[27, 31]}}

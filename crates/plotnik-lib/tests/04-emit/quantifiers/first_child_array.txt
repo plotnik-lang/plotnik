@@ -1,0 +1,46 @@
+Q = (array (identifier)* @ids (number) @n)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "ids"
+S2 "n"
+S3 "Q"
+S4 "array"
+S5 "identifier"
+S6 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:2  ; { ids, n }
+
+[type_members]
+M0: S1 → T1  ; ids: T1
+M1: S2 → T0  ; n: <Node>
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (array)                          08
+  07  ─‣┘  _                                10
+  08  -ε-  [Arr]                            24, 19
+  10                                        ▶
+  11  └‣─  [EndArr Set(M0)] (number) [Node Set(M1)]  07
+  14  ─‣─  _                                20, 26
+  16  ─‣─  [EndArr Set(M0)] (number) [Node Set(M1)]  07
+  19  -ε-                                   11
+  20   !   (identifier) [Node Push]         14, 16
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣─  _                                20, 26

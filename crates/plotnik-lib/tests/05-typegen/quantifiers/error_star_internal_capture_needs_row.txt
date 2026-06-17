@@ -1,0 +1,16 @@
+Bad = {
+  (identifier) @a
+  (number) @b
+}*
+==== diagnostics ====
+error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
+ --> query.ptk:1:7
+  |
+1 |   Bad = {
+  |  _______^
+2 | |   (identifier) @a
+3 | |   (number) @b
+4 | | }*
+  | |__^
+  |
+help: add a struct capture: `{...}* @name`

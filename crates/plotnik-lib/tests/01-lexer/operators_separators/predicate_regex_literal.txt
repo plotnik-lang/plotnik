@@ -1,0 +1,7 @@
+(identifier) =~ /foo.*bar/
+==== tokens ====
+ParenOpen "("
+Id "identifier"
+ParenClose ")"
+OpRegexMatch "=~"
+RegexLiteral "/foo.*bar/"

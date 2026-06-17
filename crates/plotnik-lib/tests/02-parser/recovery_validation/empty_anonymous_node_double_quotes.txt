@@ -1,0 +1,9 @@
+(node "")
+==== diagnostics ====
+error: empty string matches nothing
+ --> query.ptk:1:7
+  |
+1 | (node "")
+  |       ^^
+  |
+help: anonymous nodes match literal tokens, like `"+"` or `";"`

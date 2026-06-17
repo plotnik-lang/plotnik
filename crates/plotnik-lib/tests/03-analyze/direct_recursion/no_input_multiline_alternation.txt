@@ -1,0 +1,17 @@
+A = [
+  (foo)
+  (A)
+]
+==== diagnostics ====
+error: infinite recursion: cycle consumes no input
+ --> query.ptk:3:4
+  |
+3 |   (A)
+  |    ^
+  |    |
+  |    references itself
+  |
+help: recursive references must consume input before recursing
+==== symbols ====
+A
+  A (cycle)

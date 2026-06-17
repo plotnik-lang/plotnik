@@ -1,0 +1,12 @@
+Main = (array (Missing) @item)
+==== diagnostics ====
+error: `Missing` is not defined
+ --> query.ptk:1:16
+  |
+1 | Main = (array (Missing) @item)
+  |                ^^^^^^^
+  |
+help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+==== symbols ====
+Main
+  Missing?

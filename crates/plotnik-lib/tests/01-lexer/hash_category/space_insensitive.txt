@@ -1,0 +1,7 @@
+(expression #binary_expression)
+==== tokens ====
+ParenOpen "("
+Id "expression"
+Hash "#"
+Id "binary_expression"
+ParenClose ")"

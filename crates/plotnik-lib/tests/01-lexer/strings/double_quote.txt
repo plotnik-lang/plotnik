@@ -1,0 +1,8 @@
+"hello" "world"
+==== tokens ====
+DoubleQuote "\""
+StrVal "hello"
+DoubleQuote "\""
+DoubleQuote "\""
+StrVal "world"
+DoubleQuote "\""

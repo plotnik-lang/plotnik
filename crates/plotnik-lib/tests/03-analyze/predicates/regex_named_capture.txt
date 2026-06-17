@@ -1,0 +1,16 @@
+Q = (identifier =~ /(?P<name>foo)/)
+==== diagnostics ====
+error: named captures are not supported in regex
+ --> query.ptk:1:22
+  |
+1 | Q = (identifier =~ /(?P<name>foo)/)
+  |                      ^^^^^^^^
+  |
+help: remove the named-capture marker
+  |
+1 - Q = (identifier =~ /(?P<name>foo)/)
+1 + Q = (identifier =~ /(foo)/)
+  |
+help: regex captures are inert in plotnik; capture nodes with `@name` outside the regex
+==== symbols ====
+Q

@@ -1,0 +1,21 @@
+Bad = [
+  (identifier)
+  {
+    (number)
+    (string)
+  }
+]* @items
+==== diagnostics ====
+error: sequence with `*` matches multiple nodes but has no internal captures
+ --> query.ptk:1:7
+  |
+1 |   Bad = [
+  |  _______^
+2 | |   (identifier)
+3 | |   {
+4 | |     (number)
+... |
+7 | | ]* @items
+  | |__^
+  |
+help: add internal captures: `{(a) @a (b) @b}* @items`

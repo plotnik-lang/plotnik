@@ -1,0 +1,4 @@
+E = [(x) (call (a) (E))]
+==== symbols ====
+E
+  E (cycle)

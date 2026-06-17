@@ -1,0 +1,43 @@
+Q = (tuple . (a) . (b) . (c) .)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "tuple"
+      Anchor
+        Dot "."
+      Tree
+        ParenOpen "("
+        Id "a"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      Tree
+        ParenOpen "("
+        Id "b"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      Tree
+        ParenOpen "("
+        Id "c"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode tuple
+      .
+      NamedNode a
+      .
+      NamedNode b
+      .
+      NamedNode c
+      .

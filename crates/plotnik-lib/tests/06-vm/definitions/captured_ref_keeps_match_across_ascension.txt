@@ -1,0 +1,80 @@
+A = (lexical_declaration)
+Q = (program (A) @a)
+==== input ====
+let x;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "A"
+S3 "Q"
+S4 "lexical_declaration"
+S5 "program"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { a }
+
+[type_members]
+M0: S1 → T1  ; a: <Node>
+
+[type_names]
+N0: S2 → T0  ; A
+N1: S3 → T2  ; Q
+
+[entrypoints]
+A = 06 :: T0
+Q = 08 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+A:
+  06   !   (lexical_declaration)            07
+  07                                        ▶
+
+Q:
+  08   !   (program)                        09
+  09  └‣─  (A)                              06 : 10
+  10  -ε-  [Node Set(M0)]                   12
+  12  ─‣┘  _                                13
+  13                                        ▶
+==== types ====
+export interface Q {
+  a: Node;
+}
+
+export type A = undefined;
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  08       (program)                        09
+       ●   program
+  09       (A)                              06 : 10
+       ▶   (A)
+
+A:
+  06       (lexical_declaration)            07
+       ●   lexical_declaration
+  07   ◀   (A)                              
+
+Q:
+  10  -ε-  [Node Set(M0)]                   12
+  12       _                                13
+       ●   program
+  13   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]}}

@@ -1,0 +1,33 @@
+Q = (call // inline
+    name: (identifier))
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    Tree
+      ParenOpen "("
+      Id "call"
+      Whitespace " "
+      LineComment "// inline"
+      Newline "\n"
+      Whitespace "    "
+      Field
+        Id "name"
+        Colon ":"
+        Whitespace " "
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      FieldExpr name:
+        NamedNode identifier

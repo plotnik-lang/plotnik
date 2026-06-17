@@ -1,0 +1,52 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      (identifier) @left
+      .
+      [(identifier) @right]
+    )
+  )
+)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "left"
+S2 "right"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "binary_expression"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { left, right }
+
+[type_members]
+M0: S1 → T0  ; left: <Node>
+M1: S2 → T0  ; right: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (binary_expression)              09
+  09  └‣─  _                                16, 18
+  11  ─•─  (identifier) [Node Set(M1)]      13
+  13  ─‣┘³ _                                14
+  14                                        ▶
+  15  ...  
+  16   !   (identifier) [Node Set(M0)]      11
+  18  ─‣─  _                                16, 18

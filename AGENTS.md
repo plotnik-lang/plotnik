@@ -318,34 +318,19 @@ cargo run -p plotnik -- lang dump typescript       # Dump TypeScript grammar
 
 # Testing Rules
 
-Code: `foo.rs` → tests: `foo_tests.rs` (include via `#[cfg(test)] mod foo_tests;`)
+Behavioral tests are golden fixtures under `crates/plotnik-lib/tests/0N-stage/`, not
+Rust: author a query (+ `==== input ====` source for `06-vm`), then `make shot` fills the
+generated sections. Rust `*_tests.rs` are unit-logic only — `foo.rs` → `foo_tests.rs`
+(`#[cfg(test)] mod foo_tests;`).
 
 ```sh
 make test  # Run tests
-make shot  # Accept insta snapshots
+make shot  # Accept fixtures + insta snapshots
 ```
 
 - AAA sections separated by blank lines (unless ≤3 lines)
 - Single-line input: literal; Multi-line: `indoc!`
 - Never write snapshots manually — use `@""` then `cargo insta accept`
-
-```rust
-#[test]
-fn valid_query() {
-    let input = indoc! {r#"
-      (function_declaration name: (identifier) @name)
-    "#};
-
-    let res = Query::expect_valid_ast(input).unwrap();
-
-    insta::assert_snapshot!(res, @"");
-}
-```
-
-| Test Type      | Pattern                                                      |
-| -------------- | ------------------------------------------------------------ |
-| Valid parsing  | `assert!(query.is_valid())` + snapshot `dump_*()`            |
-| Error recovery | `assert!(!query.is_valid())` + snapshot `dump_diagnostics()` |
 
 Coverage: `make coverage-lines | grep recursion`
 

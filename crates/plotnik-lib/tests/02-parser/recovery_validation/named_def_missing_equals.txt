@@ -1,0 +1,13 @@
+Expr (identifier)
+==== diagnostics ====
+error: references must be parenthesized
+ --> query.ptk:1:1
+  |
+1 | Expr (identifier)
+  | ^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Expr (identifier)
+1 + (Expr) (identifier)
+  |

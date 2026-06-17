@@ -1,0 +1,28 @@
+Q = ((expression_statement))
+==== diagnostics ====
+warning: parenthesized sequences are tree-sitter syntax
+ --> query.ptk:1:5
+  |
+1 | Q = ((expression_statement))
+  |     ^
+  |
+help: use `{(a) (b)}` to match a sequence of siblings
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      ParenOpen "("
+      Tree
+        ParenOpen "("
+        Id "expression_statement"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Seq
+      NamedNode expression_statement

@@ -1,0 +1,8 @@
+(MISSING ";")
+==== tokens ====
+ParenOpen "("
+KwMissing "MISSING"
+DoubleQuote "\""
+StrVal ";"
+DoubleQuote "\""
+ParenClose ")"

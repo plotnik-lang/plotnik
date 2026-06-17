@@ -1,0 +1,13 @@
+Q = (expression#_private)
+==== diagnostics ====
+error: node types must be parenthesized
+ --> query.ptk:1:18
+  |
+1 | Q = (expression#_private)
+  |                  ^^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (expression#_private)
+1 + Q = (expression#_(private))
+  |

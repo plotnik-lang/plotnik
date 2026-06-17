@@ -1,0 +1,109 @@
+Q = (program
+  (expression_statement
+    (call_expression
+      arguments: (arguments
+        [
+          (identifier) @x
+          ";"
+        ]
+        .
+        (identifier) @y
+      )
+    )
+  )
+)
+==== input ====
+f(a, b)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "x"
+S2 "y"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "call_expression"
+S7 "arguments"
+S8 "identifier"
+S9 ";"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { x, y }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; x: T2
+M1: S2 → T0  ; y: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (call_expression)                09
+  09  └‣─  arguments: (arguments)           10
+  10  └‣─  _                                18, 20, 22
+  12                                        ▶
+  13  ─◦─  (identifier) [Node Set(M1)]      15
+  15  ─‣┘⁴ _                                12
+  16  ─•─  (identifier) [Node Set(M1)]      15
+  18   !   (identifier) [Node Set(M0)]      16
+  20   !   [Null Set(M0)] ";"               13
+  22  ─‣─  _                                18, 20, 22
+==== types ====
+export interface Q {
+  x: Node | null;
+  y: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (call_expression)                09
+       ●   call_expression
+  09       arguments: (arguments)           10
+       ○   identifier
+       ●   arguments
+  10       _                                18, 20, 22
+       ●   (
+  18       (identifier) [Node Set(M0)]      16
+       ○   (
+  10  ❮❮❮ 
+  20       [Null Set(M0)] ";"               13
+       ○   (
+  10  ❮❮❮ 
+  22       _                                18, 20, 22
+       ●   identifier
+  18       (identifier) [Node Set(M0)]      16
+       ●   identifier
+  16       (identifier) [Node Set(M1)]      15
+       ○   ,
+       ●   identifier
+  15       _                                12
+       ●   program
+  12   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"x":{"kind":"identifier","text":"a","span":[2, 3]},"y":{"kind":"identifier","text":"b","span":[5, 6]}}

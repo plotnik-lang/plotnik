@@ -1,0 +1,111 @@
+Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
+==== input ====
+x1; ax; x3;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "^x"
+S2 "id"
+S3 "rows"
+S4 "Q"
+S5 "program"
+S6 "expression_statement"
+S7 "identifier"
+
+[regex]
+R1 /^x/
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+T2 = ArrayStar(T1)  ; T1*
+T3 = Struct  M1:1  ; { rows }
+
+[type_members]
+M0: S2 → T0  ; id: <Node>
+M1: S3 → T2  ; rows: T2
+
+[type_names]
+N0: S4 → T3  ; Q
+
+[entrypoints]
+Q = 06 :: T3
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07                                        ▶
+  08  -ε-  [Arr]                            26, 17
+  10  -ε-                                   11
+  11  ─‣┘  [EndArr Set(M1)] _               07
+  13  └‣─  (identifier) =~ /^x/ [Node Set(M0)]  16
+  16  ─‣┘  _                                19
+  17  -ε-  [EndArr Set(M1)]                 07
+  19  -ε-  [EndObj Push]                    30, 10
+  21   !   [Obj] (expression_statement)     13
+  23  ...  
+  24  ─‣─  _                                21, 24
+  26  └‣─  _                                21, 24
+  28  ─‣─  _                                21, 28
+  30  ─‣─  _                                21, 28
+==== types ====
+export interface QRows {
+  id: Node;
+}
+
+export interface Q {
+  rows: QRows[];
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08  -ε-  [Arr]                            26, 17
+  26       _                                21, 24
+       ●   expression_statement
+  21       [Obj] (expression_statement)     13
+       ●   expression_statement
+  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+       ●   identifier
+  16       _                                19
+       ●   expression_statement
+  19  -ε-  [EndObj Push]                    30, 10
+  30       _                                21, 28
+       ●   expression_statement
+  21       [Obj] (expression_statement)     13
+       ●   expression_statement
+  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+       ○   ;
+  30  ❮❮❮ 
+  28       _                                21, 28
+       ●   expression_statement
+  21       [Obj] (expression_statement)     13
+       ●   expression_statement
+  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+       ●   identifier
+  16       _                                19
+       ●   expression_statement
+  19  -ε-  [EndObj Push]                    30, 10
+  30       _                                21, 28
+  19  ❮❮❮ 
+  10  -ε-                                   11
+  11       [EndArr Set(M1)] _               07
+       ●   program
+  07   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"rows":[{"id":{"kind":"identifier","text":"x1","span":[0, 2]}},{"id":{"kind":"identifier","text":"x3","span":[8, 10]}}]}

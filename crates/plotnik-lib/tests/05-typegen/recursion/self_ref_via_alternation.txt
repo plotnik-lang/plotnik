@@ -1,0 +1,19 @@
+Expr = [
+  Lit: (number) @value :: string
+  Binary: (binary_expression
+    left: (Expr) @left
+    right: (Expr) @right
+  )
+]
+==== types ====
+export interface ExprLit {
+  $tag: "Lit";
+  $data: { value: string };
+}
+
+export interface ExprBinary {
+  $tag: "Binary";
+  $data: { left: Expr; right: Expr };
+}
+
+export type Expr = ExprLit | ExprBinary;

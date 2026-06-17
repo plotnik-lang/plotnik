@@ -1,0 +1,13 @@
+Q = {
+  (identifier) @k
+  (number) @v
+}* @rows
+==== types ====
+export interface QRows {
+  k: Node;
+  v: Node;
+}
+
+export interface Q {
+  rows: QRows[];
+}

@@ -1,0 +1,22 @@
+A = (foo (B)+)
+B = (bar (A))
+==== diagnostics ====
+error: infinite recursion: no escape path
+ --> query.ptk:2:11
+  |
+1 | A = (foo (B)+)
+  |           - references B (completing cycle)
+2 | B = (bar (A))
+  | -         ^
+  | |         |
+  | |         references A
+  | B is defined here
+  |
+help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+==== symbols ====
+A
+  B
+    A (cycle)
+B
+  A
+    B (cycle)

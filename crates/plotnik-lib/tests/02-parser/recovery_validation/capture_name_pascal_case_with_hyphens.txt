@@ -1,0 +1,14 @@
+(a) @My-Name
+==== diagnostics ====
+error: capture names must be snake_case
+ --> query.ptk:1:5
+  |
+1 | (a) @My-Name
+  |     ^^^^^^^^
+  |
+help: use `@my_name`
+  |
+1 - (a) @My-Name
+1 + (a) @my_name
+  |
+help: captures become fields in the output

@@ -1,0 +1,5 @@
+'hello'
+==== tokens ====
+SingleQuote "'"
+StrVal "hello"
+SingleQuote "'"

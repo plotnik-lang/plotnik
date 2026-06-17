@@ -1,0 +1,14 @@
+(call Name: (a))
+==== diagnostics ====
+error: field names must be snake_case
+ --> query.ptk:1:7
+  |
+1 | (call Name: (a))
+  |       ^^^^
+  |
+help: use `name`
+  |
+1 - (call Name: (a))
+1 + (call name: (a))
+  |
+help: fields come from the grammar and are snake_case

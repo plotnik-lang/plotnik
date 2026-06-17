@@ -1,0 +1,9 @@
+(a : (b))
+==== diagnostics ====
+error: unexpected token
+ --> query.ptk:1:4
+  |
+1 | (a : (b))
+  |    ^
+  |
+help: expected a child node, or `)` to close

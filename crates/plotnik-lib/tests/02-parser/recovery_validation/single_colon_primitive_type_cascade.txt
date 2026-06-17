@@ -1,0 +1,21 @@
+@val : string
+==== diagnostics ====
+error: unexpected token
+ --> query.ptk:1:1
+  |
+1 | @val : string
+  | ^^^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+
+error: node types must be parenthesized
+ --> query.ptk:1:8
+  |
+1 | @val : string
+  |        ^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - @val : string
+1 + @val : (string)
+  |

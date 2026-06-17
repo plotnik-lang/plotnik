@@ -1,0 +1,5 @@
+@_ @_name @name
+==== tokens ====
+SuppressiveCapture "@_"
+SuppressiveCapture "@_name"
+CaptureToken "@name"

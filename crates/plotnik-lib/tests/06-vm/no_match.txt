@@ -1,0 +1,54 @@
+Q = (program (class_declaration) @cls)
+==== input ====
+function foo() {}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "cls"
+S2 "Q"
+S3 "program"
+S4 "class_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { cls }
+
+[type_members]
+M0: S1 → T0  ; cls: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  (class_declaration) [Node Set(M0)]  10
+  10  ─‣┘  _                                11
+  11                                        ▶
+==== types ====
+export interface Q {
+  cls: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       (class_declaration) [Node Set(M0)]  10
+       ○   function_declaration
+==== output ====
+<no match>

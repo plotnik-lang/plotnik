@@ -1,0 +1,21 @@
+(a (#eq? @x "foo") b)
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:5
+  |
+1 | (a (#eq? @x "foo") b)
+  |     ^^^^
+  |
+help: use `(node == "x")`
+
+error: node types must be parenthesized
+ --> query.ptk:1:20
+  |
+1 | (a (#eq? @x "foo") b)
+  |                    ^
+  |
+help: wrap in parentheses
+  |
+1 - (a (#eq? @x "foo") b)
+1 + (a (#eq? @x "foo") (b))
+  |

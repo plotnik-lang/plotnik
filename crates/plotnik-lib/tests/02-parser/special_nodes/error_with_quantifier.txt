@@ -1,0 +1,19 @@
+Q = (ERROR)*
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      Tree
+        ParenOpen "("
+        KwError "ERROR"
+        ParenClose ")"
+      Star "*"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    QuantifiedExpr *
+      NamedNode ERROR

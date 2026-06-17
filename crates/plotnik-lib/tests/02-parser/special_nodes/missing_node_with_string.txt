@@ -1,0 +1,19 @@
+Q = (MISSING ";")
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      KwMissing "MISSING"
+      DoubleQuote "\""
+      StrVal ";"
+      DoubleQuote "\""
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode MISSING

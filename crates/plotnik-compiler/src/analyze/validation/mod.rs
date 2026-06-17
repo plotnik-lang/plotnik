@@ -32,15 +32,6 @@ pub struct PredicateInput<'q, 'd> {
     pub diag: &'d mut Diagnostics,
 }
 
-#[cfg(test)]
-mod alt_kinds_tests;
-#[cfg(test)]
-mod anchors_tests;
-#[cfg(test)]
-mod empty_constructs_tests;
-#[cfg(test)]
-mod predicates_tests;
-
 pub use alt_kinds::validate_alt_kinds;
 pub use anchors::validate_anchors;
 pub use empty_constructs::validate_empty_constructs;

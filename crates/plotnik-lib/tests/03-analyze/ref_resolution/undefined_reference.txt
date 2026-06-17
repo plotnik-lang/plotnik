@@ -1,0 +1,12 @@
+Call = (call_expression function: (Undefined))
+==== diagnostics ====
+error: `Undefined` is not defined
+ --> query.ptk:1:36
+  |
+1 | Call = (call_expression function: (Undefined))
+  |                                    ^^^^^^^^^
+  |
+help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+==== symbols ====
+Call
+  Undefined?

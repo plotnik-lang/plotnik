@@ -1,0 +1,8 @@
+// just a comment
+==== cst ====
+# query.ptk
+Root
+  LineComment "// just a comment"
+==== ast ====
+# query.ptk
+Root

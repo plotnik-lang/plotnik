@@ -34,8 +34,6 @@ mod ast_tests;
 #[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
-mod lexer_tests;
-#[cfg(test)]
 mod tests;
 
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
@@ -48,4 +46,4 @@ pub use ast::{
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};
 
-pub use lexer::{Token, lex, token_text};
+pub use lexer::{Token, dump_tokens, lex, token_text};

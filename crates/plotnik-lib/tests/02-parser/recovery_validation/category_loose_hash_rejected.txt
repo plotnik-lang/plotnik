@@ -1,0 +1,21 @@
+Q = (expression # binary_expression)
+==== diagnostics ====
+error: unexpected token
+ --> query.ptk:1:17
+  |
+1 | Q = (expression # binary_expression)
+  |                 ^
+  |
+help: expected a child node, or `)` to close
+
+error: node types must be parenthesized
+ --> query.ptk:1:19
+  |
+1 | Q = (expression # binary_expression)
+  |                   ^^^^^^^^^^^^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (expression # binary_expression)
+1 + Q = (expression # (binary_expression))
+  |

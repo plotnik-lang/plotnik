@@ -1,0 +1,21 @@
+(call name = )
+==== diagnostics ====
+error: fields use `:`, not `=`
+ --> query.ptk:1:12
+  |
+1 | (call name = )
+  |            ^
+  |
+help: use `:`
+  |
+1 - (call name = )
+1 + (call name : )
+  |
+
+error: expected an expression
+ --> query.ptk:1:14
+  |
+1 | (call name = )
+  |              ^
+  |
+help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

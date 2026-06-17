@@ -1,0 +1,7 @@
+(a)
+#!/usr/bin/env plotnik
+==== tokens ====
+ParenOpen "("
+Id "a"
+ParenClose ")"
+Garbage "#!/usr/bin/env plotnik"

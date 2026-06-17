@@ -1,0 +1,92 @@
+Q = (program
+  (expression_statement
+    [
+      (number) @x
+      {(identifier) @x} @row
+    ]
+  )
+)
+==== input ====
+foo
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "x"
+S2 "row"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "number"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { x }
+T2 = Struct  M1:2  ; { x, row }
+T3 = Optional(T0)  ; <Node>?
+T4 = Optional(T1)  ; T1?
+
+[type_members]
+M0: S1 → T0  ; x: <Node>
+M1: S1 → T3  ; x: T3
+M2: S2 → T4  ; row: T4
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  _                                11, 16, 19
+  10                                        ▶
+  11   !   [Null Set(M2)] (number) [Node Set(M1)]  14
+  14  ─‣┘² _                                10
+  15  ...  
+  16   !   [Null Set(M1) Obj] (identifier) [Node Set(M0) EndObj Set(M2)]  14
+  19  ─‣─  _                                11, 16, 19
+==== types ====
+export interface QRow {
+  x: Node;
+}
+
+export interface Q {
+  row: QRow | null;
+  x: Node | null;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       _                                11, 16, 19
+       ●   identifier
+  11       [Null Set(M2)] (number) [Node Set(M1)]  14
+       ○   identifier
+  08  ❮❮❮ 
+  16       [Null Set(M1) Obj] (identifier) [Node Set(M0) EndObj Set(M2)]  14
+       ●   identifier
+  14       _                                10
+       ●   program
+  10   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"x":null,"row":{"x":{"kind":"identifier","text":"foo","span":[0, 3]}}}

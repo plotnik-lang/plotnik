@@ -1,0 +1,9 @@
+(RefName#subtype)
+==== diagnostics ====
+error: references cannot have supertypes
+ --> query.ptk:1:9
+  |
+1 | (RefName#subtype)
+  |         ^
+  |
+help: supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`

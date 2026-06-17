@@ -1,0 +1,14 @@
+(call -Arguments)
+==== diagnostics ====
+error: field names must be snake_case
+ --> query.ptk:1:8
+  |
+1 | (call -Arguments)
+  |        ^^^^^^^^^
+  |
+help: use `arguments`
+  |
+1 - (call -Arguments)
+1 + (call -arguments)
+  |
+help: fields come from the grammar and are snake_case

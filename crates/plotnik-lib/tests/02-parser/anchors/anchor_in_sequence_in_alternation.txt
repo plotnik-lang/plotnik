@@ -1,0 +1,41 @@
+Q = [{(a) . (b)} (c)]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Seq
+          BraceOpen "{"
+          Tree
+            ParenOpen "("
+            Id "a"
+            ParenClose ")"
+          Anchor
+            Dot "."
+          Tree
+            ParenOpen "("
+            Id "b"
+            ParenClose ")"
+          BraceClose "}"
+      Branch
+        Tree
+          ParenOpen "("
+          Id "c"
+          ParenClose ")"
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Alt
+      Branch
+        Seq
+          NamedNode a
+          .
+          NamedNode b
+      Branch
+        NamedNode c

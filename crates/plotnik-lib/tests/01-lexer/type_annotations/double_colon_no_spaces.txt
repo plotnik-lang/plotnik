@@ -1,0 +1,5 @@
+@name::Type
+==== tokens ====
+CaptureToken "@name"
+DoubleColon "::"
+Id "Type"

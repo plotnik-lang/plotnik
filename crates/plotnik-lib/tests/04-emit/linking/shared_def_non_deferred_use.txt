@@ -1,0 +1,17 @@
+Bad = arguments: (identifier)
+
+Q = (binary_expression
+  [(Bad) (identifier)]
+  (Bad)
+)
+==== diagnostics ====
+error: field `arguments` is not valid on this node type
+ --> query.ptk:1:7
+  |
+1 | Bad = arguments: (identifier)
+  |       ^^^^^^^^^
+2 |
+3 | Q = (binary_expression
+  |      ----------------- on `binary_expression`
+  |
+help: valid fields for `binary_expression`: `left`, `operator`, `right`

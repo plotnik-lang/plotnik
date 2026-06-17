@@ -1,0 +1,9 @@
+(a) @ok @ @name
+==== diagnostics ====
+error: expected a capture name after `@`
+ --> query.ptk:1:9
+  |
+1 | (a) @ok @ @name
+  |         ^
+  |
+help: captures attach to the pattern before them: `(node) @name`

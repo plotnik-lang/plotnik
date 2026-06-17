@@ -1,0 +1,14 @@
+Q = (function_declaration
+  nme: (identifier) @name
+) @fn
+==== diagnostics ====
+error: `nme` is not a valid field
+ --> query.ptk:2:3
+  |
+2 |   nme: (identifier) @name
+  |   ^^^
+  |
+help: did you mean `name`?
+  |
+2 |   name: (identifier) @name
+  |    +

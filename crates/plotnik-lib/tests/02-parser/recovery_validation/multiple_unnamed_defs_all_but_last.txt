@@ -1,0 +1,27 @@
+(first)
+(second)
+(third)
+==== diagnostics ====
+error: definition must be named
+ --> query.ptk:1:1
+  |
+1 | (first)
+  | ^^^^^^^
+  |
+help: give it a name like `Name = (first)`
+
+error: definition must be named
+ --> query.ptk:2:1
+  |
+2 | (second)
+  | ^^^^^^^^
+  |
+help: give it a name like `Name = (second)`
+
+error: definition must be named
+ --> query.ptk:3:1
+  |
+3 | (third)
+  | ^^^^^^^
+  |
+help: give it a name like `Name = (third)`

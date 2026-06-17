@@ -1,0 +1,83 @@
+Q = (program (lexical_declaration)* @decls)
+==== input ====
+let a; foo; let b;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "decls"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { decls }
+
+[type_members]
+M0: S1 → T1  ; decls: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  -ε-  [Arr]                            18, 11
+  10                                        ▶
+  11  -ε-  [EndArr Set(M0)]                 10
+  13   !   (lexical_declaration) [Node Push]  22, 24
+  15  ...  
+  16  ─‣─  _                                13, 16
+  18  └‣─  _                                13, 16
+  20  ─‣─  _                                13, 20
+  22  ─‣─  _                                13, 20
+  24  ─‣┘  [EndArr Set(M0)] _               10
+==== types ====
+export interface Q {
+  decls: Node[];
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08  -ε-  [Arr]                            18, 11
+  18       _                                13, 16
+       ●   lexical_declaration
+  13       (lexical_declaration) [Node Push]  22, 24
+       ●   lexical_declaration
+  22       _                                13, 20
+       ●   expression_statement
+  13       (lexical_declaration) [Node Push]  22, 24
+       ○   expression_statement
+  22  ❮❮❮ 
+  20       _                                13, 20
+       ●   lexical_declaration
+  13       (lexical_declaration) [Node Push]  22, 24
+       ●   lexical_declaration
+  22       _                                13, 20
+  13  ❮❮❮ 
+  24       [EndArr Set(M0)] _               10
+       ●   program
+  10   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"decls":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]},{"kind":"lexical_declaration","text":"let b;","span":[12, 18]}]}

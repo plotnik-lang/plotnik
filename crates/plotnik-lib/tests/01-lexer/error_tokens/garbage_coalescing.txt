@@ -1,0 +1,9 @@
+(foo) ^$%& (bar)
+==== tokens ====
+ParenOpen "("
+Id "foo"
+ParenClose ")"
+Garbage "^$%&"
+ParenOpen "("
+Id "bar"
+ParenClose ")"

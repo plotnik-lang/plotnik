@@ -1,0 +1,11 @@
+Q = (expression#statement_block)
+==== diagnostics ====
+error: `statement_block` is not a subtype of `expression`
+ --> query.ptk:1:17
+  |
+1 | Q = (expression#statement_block)
+  |      ---------- ^^^^^^^^^^^^^^^
+  |      |
+  |      base type `expression`
+  |
+help: subtypes of `expression` include: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)

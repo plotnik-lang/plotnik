@@ -1,0 +1,3 @@
+@_foo_bar123
+==== tokens ====
+SuppressiveCapture "@_foo_bar123"

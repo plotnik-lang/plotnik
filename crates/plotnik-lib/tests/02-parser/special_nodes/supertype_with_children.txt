@@ -1,0 +1,58 @@
+Q = (expression/binary_expression
+  left: (_) @left
+  right: (_) @right
+)
+==== diagnostics ====
+warning: `supertype/subtype` paths are tree-sitter syntax
+ --> query.ptk:1:16
+  |
+1 | Q = (expression/binary_expression
+  |                ^
+  |
+help: use `#`
+  |
+1 - Q = (expression/binary_expression
+1 + Q = (expression#binary_expression
+  |
+help: use `supertype#subtype` instead of `supertype/subtype`
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expression"
+      Slash "/"
+      Id "binary_expression"
+      Capture
+        Field
+          Id "left"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        CaptureToken "@left"
+      Capture
+        Field
+          Id "right"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Underscore "_"
+            ParenClose ")"
+        CaptureToken "@right"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode expression
+      CapturedExpr @left
+        FieldExpr left:
+          NamedNode (any)
+      CapturedExpr @right
+        FieldExpr right:
+          NamedNode (any)

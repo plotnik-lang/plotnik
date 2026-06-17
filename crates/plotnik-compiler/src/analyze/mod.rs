@@ -20,13 +20,9 @@ pub mod validation;
 pub mod visitor;
 
 #[cfg(test)]
-mod dependencies_tests;
-#[cfg(test)]
 mod link_tests;
 #[cfg(test)]
 mod refs_tests;
-#[cfg(test)]
-mod symbol_table_tests;
 
 pub use dependencies::DependencyAnalysis;
 pub use link::LinkOutput;

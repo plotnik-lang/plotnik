@@ -1,0 +1,14 @@
+lowercase = (x)
+==== diagnostics ====
+error: definition names must be PascalCase
+ --> query.ptk:1:1
+  |
+1 | lowercase = (x)
+  | ^^^^^^^^^
+  |
+help: use `Lowercase`
+  |
+1 - lowercase = (x)
+1 + Lowercase = (x)
+  |
+help: definitions become types in the output

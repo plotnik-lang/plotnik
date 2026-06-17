@@ -1,0 +1,9 @@
+(identifier) @name :: (
+==== diagnostics ====
+error: expected a type name after `::`
+ --> query.ptk:1:23
+  |
+1 | (identifier) @name :: (
+  |                       ^
+  |
+help: e.g., `::MyType` or `::string`

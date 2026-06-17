@@ -1,0 +1,17 @@
+Q = (MISSING identifier)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      KwMissing "MISSING"
+      Id "identifier"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode MISSING

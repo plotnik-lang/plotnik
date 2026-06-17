@@ -1,0 +1,22 @@
+Q = (statement)* @statements
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+        Star "*"
+      CaptureToken "@statements"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @statements
+      QuantifiedExpr *
+        NamedNode statement

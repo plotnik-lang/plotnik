@@ -1,0 +1,27 @@
+Q = (array . (element) .)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "array"
+      Anchor
+        Dot "."
+      Tree
+        ParenOpen "("
+        Id "element"
+        ParenClose ")"
+      Anchor
+        Dot "."
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode array
+      .
+      NamedNode element
+      .

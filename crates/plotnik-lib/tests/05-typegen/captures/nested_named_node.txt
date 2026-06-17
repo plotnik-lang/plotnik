@@ -1,0 +1,9 @@
+Q = (call_expression
+  function: (member_expression
+    object: (identifier) @target
+  )
+)
+==== types ====
+export interface Q {
+  target: Node;
+}

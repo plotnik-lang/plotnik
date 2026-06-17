@@ -1,0 +1,17 @@
+E = [
+  (E)
+  (x)
+]
+==== diagnostics ====
+error: infinite recursion: cycle consumes no input
+ --> query.ptk:2:4
+  |
+2 |   (E)
+  |    ^
+  |    |
+  |    references itself
+  |
+help: recursive references must consume input before recursing
+==== symbols ====
+E
+  E (cycle)

@@ -1,0 +1,5 @@
+Q = (identifier) @name
+==== types ====
+export interface Q {
+  name: Node;
+}

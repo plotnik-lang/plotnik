@@ -1,0 +1,13 @@
+(a) @x :: My.Type
+==== diagnostics ====
+error: type names cannot contain `.` or `-`
+ --> query.ptk:1:11
+  |
+1 | (a) @x :: My.Type
+  |           ^^^^^^^
+  |
+help: use `::MyType`
+  |
+1 - (a) @x :: My.Type
+1 + (a) @x :: MyType
+  |

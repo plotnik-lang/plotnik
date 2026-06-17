@@ -1,0 +1,16 @@
+Q = [
+  (identifier) @x :: string
+  (number) @x
+]
+==== diagnostics ====
+error: capture `@x` has incompatible types across branches
+ --> query.ptk:1:5
+  |
+1 |   Q = [
+  |  _____^
+2 | |   (identifier) @x :: string
+3 | |   (number) @x
+4 | | ]
+  | |_^
+  |
+help: make every branch produce the same type, or label the branches for a tagged union

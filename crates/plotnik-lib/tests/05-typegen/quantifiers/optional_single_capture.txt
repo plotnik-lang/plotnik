@@ -1,0 +1,5 @@
+Q = (decorator)? @dec
+==== types ====
+export interface Q {
+  dec: Node | null;
+}

@@ -1,0 +1,28 @@
+Q = (call function: (identifier) @func)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call"
+      Capture
+        Field
+          Id "function"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+        CaptureToken "@func"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      CapturedExpr @func
+        FieldExpr function:
+          NamedNode identifier

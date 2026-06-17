@@ -1,0 +1,35 @@
+Q = (dotted_name (identifier) @a . (identifier) @b)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "dotted_name"
+      Capture
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+        CaptureToken "@a"
+      Anchor
+        Dot "."
+      Capture
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+        CaptureToken "@b"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode dotted_name
+      CapturedExpr @a
+        NamedNode identifier
+      .
+      CapturedExpr @b
+        NamedNode identifier

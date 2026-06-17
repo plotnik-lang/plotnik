@@ -1,0 +1,9 @@
+(identifier) #match? @name "test"
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:14
+  |
+1 | (identifier) #match? @name "test"
+  |              ^^^^^^^
+  |
+help: use `(node =~ /re/)`

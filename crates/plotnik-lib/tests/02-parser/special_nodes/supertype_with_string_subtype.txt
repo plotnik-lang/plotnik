@@ -1,0 +1,33 @@
+Q = (expression/"()")
+==== diagnostics ====
+warning: `supertype/subtype` paths are tree-sitter syntax
+ --> query.ptk:1:16
+  |
+1 | Q = (expression/"()")
+  |                ^
+  |
+help: use `#`
+  |
+1 - Q = (expression/"()")
+1 + Q = (expression#"()")
+  |
+help: use `supertype#subtype` instead of `supertype/subtype`
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expression"
+      Slash "/"
+      DoubleQuote "\""
+      StrVal "()"
+      DoubleQuote "\""
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode expression

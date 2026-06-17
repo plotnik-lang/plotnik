@@ -1,0 +1,14 @@
+(a) @_fooBar
+==== diagnostics ====
+error: capture names must be snake_case
+ --> query.ptk:1:5
+  |
+1 | (a) @_fooBar
+  |     ^^^^^^^^
+  |
+help: use `@_foo_bar`
+  |
+1 - (a) @_fooBar
+1 + (a) @_foo_bar
+  |
+help: captures become fields in the output

@@ -1,0 +1,59 @@
+NestedCall = (call_expression
+  function: [
+    (identifier) @name
+    (NestedCall) @inner
+  ]
+  arguments: (arguments)
+)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "NestedCall"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call_expression"
+      Field
+        Id "function"
+        Colon ":"
+        Alt
+          BracketOpen "["
+          Branch
+            Capture
+              Tree
+                ParenOpen "("
+                Id "identifier"
+                ParenClose ")"
+              CaptureToken "@name"
+          Branch
+            Capture
+              Ref
+                ParenOpen "("
+                Id "NestedCall"
+                ParenClose ")"
+              CaptureToken "@inner"
+          BracketClose "]"
+      Field
+        Id "arguments"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "arguments"
+          ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def NestedCall
+    NamedNode call_expression
+      FieldExpr function:
+        Alt
+          Branch
+            CapturedExpr @name
+              NamedNode identifier
+          Branch
+            CapturedExpr @inner
+              Ref NestedCall
+      FieldExpr arguments:
+        NamedNode arguments

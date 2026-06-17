@@ -1,0 +1,13 @@
+(node (a), (b))
+==== diagnostics ====
+error: patterns are separated by whitespace
+ --> query.ptk:1:10
+  |
+1 | (node (a), (b))
+  |          ^
+  |
+help: remove the `,`
+  |
+1 - (node (a), (b))
+1 + (node (a) (b))
+  |

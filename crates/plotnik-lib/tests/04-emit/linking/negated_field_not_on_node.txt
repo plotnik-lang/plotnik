@@ -1,0 +1,11 @@
+Q = (function_declaration -condition) @fn
+==== diagnostics ====
+error: field `condition` is not valid on this node type
+ --> query.ptk:1:28
+  |
+1 | Q = (function_declaration -condition) @fn
+  |      --------------------  ^^^^^^^^^
+  |      |
+  |      on `function_declaration`
+  |
+help: valid fields for `function_declaration`: `body`, `name`, `parameters`

@@ -1,0 +1,7 @@
+a, b, c
+==== tokens ====
+Id "a"
+Comma ","
+Id "b"
+Comma ","
+Id "c"

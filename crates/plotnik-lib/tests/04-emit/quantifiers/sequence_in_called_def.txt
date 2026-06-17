@@ -1,0 +1,69 @@
+Item = (identifier) @name
+Collect = {(Item) @item}* @items
+Test = (array (Collect))
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "items"
+S4 "Item"
+S5 "Collect"
+S6 "Test"
+S7 "identifier"
+S8 "array"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { item }
+T3 = ArrayStar(T2)  ; T2*
+T4 = Struct  M2:1  ; { items }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; item: Item
+M2: S3 → T3  ; items: T3
+
+[type_names]
+N0: S4 → T1  ; Item
+N1: S5 → T4  ; Collect
+N2: S6 → T4  ; Test
+
+[entrypoints]
+Collect = 09 :: T4
+Item    = 06 :: T1
+Test    = 11 :: T4
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Item:
+  06   !   (identifier) [Node Set(M0)]      08
+  08                                        ▶
+
+Collect:
+  09  -ε-  [Arr]                            32, 16
+
+Test:
+  11   !   (array)                          12
+  12  └‣─  (Collect)                        09 : 13
+  13  ─‣┘  _                                14
+  14                                        ▶
+  15                                        ▶
+  16  -ε-  [EndArr Set(M2)]                 15
+  18  -ε-  [EndObj Push]                    36, 16
+  20  -ε-  [Set(M1)]                        18
+  22  -ε-  [EndObj]                         20
+  24   !   (Item)                           06 : 22
+  25  -ε-  [Obj]                            24
+  27  -ε-  [Obj]                            25
+  29  ─‣─  _                                27, 29
+  31  ...  
+  32   !   _                                27, 29
+  34  ─‣─  _                                27, 34
+  36  ─‣─  _                                27, 34

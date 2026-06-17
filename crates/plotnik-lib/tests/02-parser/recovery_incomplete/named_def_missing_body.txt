@@ -1,0 +1,9 @@
+Expr =
+==== diagnostics ====
+error: expected an expression
+ --> query.ptk:1:7
+  |
+1 | Expr =
+  |       ^
+  |
+help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

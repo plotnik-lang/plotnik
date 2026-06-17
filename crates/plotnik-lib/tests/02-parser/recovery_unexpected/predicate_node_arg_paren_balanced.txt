@@ -1,0 +1,9 @@
+(call_expression (#eq? (identifier) @x))
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:19
+  |
+1 | (call_expression (#eq? (identifier) @x))
+  |                   ^^^^
+  |
+help: use `(node == "x")`

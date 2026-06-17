@@ -1,0 +1,18 @@
+Q = (call
+  [
+    A: (a)
+    (b)
+  ]
+)
+==== diagnostics ====
+error: cannot mix labeled and unlabeled branches
+ --> query.ptk:4:5
+  |
+3 |     A: (a)
+  |     - tagged branch here
+4 |     (b)
+  |     ^^^
+  |
+help: use all labels for a tagged union, or none for a merged struct
+==== symbols ====
+Q

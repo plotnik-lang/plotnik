@@ -1,0 +1,5 @@
+Foo BarBaz Test123
+==== tokens ====
+Id "Foo"
+Id "BarBaz"
+Id "Test123"

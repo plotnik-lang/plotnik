@@ -1,0 +1,11 @@
+Q = (function_declaration name: (number))
+==== diagnostics ====
+error: `number` can't be the value of `name`
+ --> query.ptk:1:34
+  |
+1 | Q = (function_declaration name: (number))
+  |                           ----   ^^^^^^
+  |                           |
+  |                           field `name`
+  |
+help: `name` accepts: `identifier`

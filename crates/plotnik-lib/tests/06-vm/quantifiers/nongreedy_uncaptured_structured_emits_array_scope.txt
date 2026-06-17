@@ -1,0 +1,124 @@
+A = [X: (expression_statement)]
+
+Q = (program
+  (A)*?
+  .
+  (debugger_statement)
+)
+==== input ====
+a; b; debugger;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "X"
+S2 "A"
+S3 "Q"
+S4 "expression_statement"
+S5 "program"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Void>
+T1 = Enum    M0:1  ; X
+T2 = ArrayStar(T1)  ; A*
+
+[type_members]
+M0: S1 → T0  ; X: <Void>
+
+[type_names]
+N0: S2 → T1  ; A
+N1: S3 → T2  ; Q
+
+[entrypoints]
+A = 06 :: T1
+Q = 09 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+A:
+  06   !   [Enum(M0)] (expression_statement) [EndEnum]  08
+  08                                        ▶
+
+Q:
+  09   !   (program)                        10
+  10  -ε-  [Arr]                            19, 26
+  12                                        ▶
+  13  └•─  [EndArr] (debugger_statement)    15
+  15  ─‣┘  _                                12
+  16  ─•─  [EndArr] (debugger_statement)    15
+  18  -ε-                                   16
+  19  -ε-                                   13
+  20  -ε-  [Push]                           18, 30
+  22   !   (A)                              06 : 20
+  23  ...  
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28  ─‣─  _                                22, 28
+  30  ─‣─  _                                22, 28
+==== types ====
+export interface AX {
+  $tag: "X";
+}
+
+export type A = AX;
+
+export type Q = A[];
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  09       (program)                        10
+       ●   program
+  10  -ε-  [Arr]                            19, 26
+  19  -ε-                                   13
+  13       [EndArr] (debugger_statement)    15
+       ○   expression_statement
+  10  ❮❮❮ 
+  26       _                                22, 24
+       ●   expression_statement
+  22       (A)                              06 : 20
+       ▶   (A)
+
+A:
+  06       [Enum(M0)] (expression_statement) [EndEnum]  08
+       ●   expression_statement
+  08   ◀   (A)                              
+
+Q:
+  20  -ε-  [Push]                           18, 30
+  18  -ε-                                   16
+  16       [EndArr] (debugger_statement)    15
+       ○   expression_statement
+  20  ❮❮❮ 
+  30       _                                22, 28
+       ●   expression_statement
+  22       (A)                              06 : 20
+       ▶   (A)
+
+A:
+  06       [Enum(M0)] (expression_statement) [EndEnum]  08
+       ●   expression_statement
+  08   ◀   (A)                              
+
+Q:
+  20  -ε-  [Push]                           18, 30
+  18  -ε-                                   16
+  16       [EndArr] (debugger_statement)    15
+       ●   debugger_statement
+  15       _                                12
+       ●   program
+  12   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+[{"$tag":"X"},{"$tag":"X"}]

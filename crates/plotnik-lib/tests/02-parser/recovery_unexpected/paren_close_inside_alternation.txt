@@ -1,0 +1,15 @@
+[(a) ) (b)]
+==== diagnostics ====
+error: expected closing ']' for alternation
+ --> query.ptk:1:6
+  |
+1 | [(a) ) (b)]
+  |      ^
+
+error: unexpected token
+ --> query.ptk:1:11
+  |
+1 | [(a) ) (b)]
+  |           ^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

@@ -1,0 +1,24 @@
+A = [
+  X: (identifier)
+  Y: (number)
+]
+
+Q = (program
+  (A) @a
+  (debugger_statement) @name
+)
+==== types ====
+export interface AX {
+  $tag: "X";
+}
+
+export interface AY {
+  $tag: "Y";
+}
+
+export type A = AX | AY;
+
+export interface Q {
+  a: A;
+  name: Node;
+}

@@ -1,0 +1,72 @@
+Expr = [
+  Lit: (number) @value :: string
+  Nested: (call_expression
+    function: (identifier) @fn
+    arguments: (Expr) @inner
+  )
+]
+
+Test = (program (Expr) @expr)
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "value"
+S02 "fn"
+S03 "inner"
+S04 "Lit"
+S05 "Nested"
+S06 "expr"
+S07 "Expr"
+S08 "Test"
+S09 "number"
+S10 "call_expression"
+S11 "identifier"
+S12 "program"
+S13 "function"
+S14 "arguments"
+
+[type_defs]
+T0 = <Node>
+T1 = <String>
+T2 = Struct  M0:1  ; { value }
+T3 = Struct  M1:2  ; { fn, inner }
+T4 = Enum    M3:2  ; Lit | Nested
+T5 = Struct  M5:1  ; { expr }
+
+[type_members]
+M0: S01 → T1  ; value: <String>
+M1: S02 → T0  ; fn: <Node>
+M2: S03 → T4  ; inner: Expr
+M3: S04 → T2  ; Lit: T2
+M4: S05 → T3  ; Nested: T3
+M5: S06 → T4  ; expr: Expr
+
+[type_names]
+N0: S07 → T4  ; Expr
+N1: S08 → T5  ; Test
+
+[entrypoints]
+Expr = 06 :: T4
+Test = 08 :: T5
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Expr:
+  06  -ε-                                   17, 22
+
+Test:
+  08   !   (program)                        09
+  09  └‣─  (Expr)                           06 : 10
+  10  ─‣┘  [Set(M5)] _                      12
+  12                                        ▶
+  13  ─‣─  arguments: (Expr)                06 : 14
+  14  ─‣┘  [Set(M2)] _ [EndEnum]            16
+  16                                        ▶
+  17   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  16
+  20  └‣─  function: (identifier) [Node Set(M1)]  13
+  22   !   [Enum(M4)] (call_expression)     20

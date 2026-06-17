@@ -1,0 +1,32 @@
+Q = [
+  "true"
+  "false"
+]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Str
+          DoubleQuote "\""
+          StrVal "true"
+          DoubleQuote "\""
+      Branch
+        Str
+          DoubleQuote "\""
+          StrVal "false"
+          DoubleQuote "\""
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Alt
+      Branch
+        AnonymousNode "true"
+      Branch
+        AnonymousNode "false"

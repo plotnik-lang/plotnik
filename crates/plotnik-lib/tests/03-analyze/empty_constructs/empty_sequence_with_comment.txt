@@ -1,0 +1,11 @@
+Q = { /* comment */ }
+==== diagnostics ====
+error: empty `{}` matches nothing
+ --> query.ptk:1:5
+  |
+1 | Q = { /* comment */ }
+  |     ^^^^^^^^^^^^^^^^^
+  |
+help: sequences must contain at least one expression
+==== symbols ====
+Q

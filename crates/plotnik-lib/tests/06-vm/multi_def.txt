@@ -1,0 +1,82 @@
+Other = (program (function_declaration) @fn)
+Q = (program (expression_statement (identifier) @name))
+==== input ====
+foo;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "name"
+S3 "Other"
+S4 "Q"
+S5 "program"
+S6 "function_declaration"
+S7 "expression_statement"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { fn }
+T2 = Struct  M1:1  ; { name }
+
+[type_members]
+M0: S1 → T0  ; fn: <Node>
+M1: S2 → T0  ; name: <Node>
+
+[type_names]
+N0: S3 → T1  ; Other
+N1: S4 → T2  ; Q
+
+[entrypoints]
+Other = 06 :: T1
+Q     = 12 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Other:
+  06   !   (program)                        08
+  07  ─‣┘² _                                16
+  08  └‣─  (function_declaration) [Node Set(M0)]  10
+  10  ─‣┘  _                                11
+  11                                        ▶
+
+Q:
+  12   !   (program)                        13
+  13  └‣─  (expression_statement)           14
+  14  └‣─  (identifier) [Node Set(M1)]      07
+  16                                        ▶
+==== types ====
+export interface Q {
+  name: Node;
+}
+
+export interface Other {
+  fn: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  12       (program)                        13
+       ●   program
+  13       (expression_statement)           14
+       ●   expression_statement
+  14       (identifier) [Node Set(M1)]      07
+       ●   identifier
+  07       _                                16
+       ●   program
+  16   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"name":{"kind":"identifier","text":"foo","span":[0, 3]}}

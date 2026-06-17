@@ -1,0 +1,44 @@
+Q = {{(identifier) @id} @inner}? @outer
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "inner"
+S3 "outer"
+S4 "Q"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+T2 = Struct  M1:1  ; { inner }
+T3 = Struct  M2:1  ; { outer }
+T4 = Optional(T1)  ; T1?
+T5 = Optional(T2)  ; T2?
+
+[type_members]
+M0: S1 → T0  ; id: <Node>
+M1: S2 → T4  ; inner: T4
+M2: S3 → T5  ; outer: T5
+
+[type_names]
+N0: S4 → T3  ; Q
+
+[entrypoints]
+Q = 06 :: T3
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06  -ε-  [Obj]                            18, 11
+  08                                        ▶
+  09  -ε-  [EndObj Set(M2)]                 08
+  11  -ε-  [Null Set(M1)]                   09
+  13   !   [Obj] (identifier) [Node Set(M0) EndObj Set(M1) EndObj Set(M2)]  08
+  16  ─‣─  _                                13, 16
+  18   !   _                                13, 16

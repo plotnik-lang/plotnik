@@ -1,0 +1,56 @@
+Expression = [
+  (identifier) @name
+  (number) @value
+]
+
+Root = (function_declaration name: (identifier) @name)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "value"
+S3 "Expression"
+S4 "Root"
+S5 "identifier"
+S6 "number"
+S7 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { name, value }
+T2 = Struct  M2:1  ; { name }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T3  ; name: T3
+M1: S2 → T3  ; value: T3
+M2: S1 → T0  ; name: <Node>
+
+[type_names]
+N0: S3 → T1  ; Expression
+N1: S4 → T2  ; Root
+
+[entrypoints]
+Expression = 06 :: T1
+Root       = 08 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Expression:
+  06  -ε-                                   16, 19
+
+Root:
+  08   !   (function_declaration)           09
+  09  └‣─  name: (identifier) [Node Set(M2)]  11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13                                        ▶
+  14  ...  
+  15  ...  
+  16   !   [Null Set(M1)] (identifier) [Node Set(M0)]  13
+  19   !   [Null Set(M0)] (number) [Node Set(M1)]  13

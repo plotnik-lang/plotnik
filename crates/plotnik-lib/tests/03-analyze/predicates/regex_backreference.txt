@@ -1,0 +1,11 @@
+Q = (identifier =~ /(.)\1/)
+==== diagnostics ====
+error: backreferences are not supported in regex
+ --> query.ptk:1:24
+  |
+1 | Q = (identifier =~ /(.)\1/)
+  |                        ^^
+  |
+help: the regex engine is linear-time and cannot match backreferences; rewrite without `\1`
+==== symbols ====
+Q

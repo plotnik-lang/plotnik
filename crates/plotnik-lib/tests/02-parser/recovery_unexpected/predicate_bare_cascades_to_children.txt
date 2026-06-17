@@ -1,0 +1,17 @@
+(function #eq? @name "test")
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:11
+  |
+1 | (function #eq? @name "test")
+  |           ^^^^
+  |
+help: use `(node == "x")`
+
+error: unexpected token
+ --> query.ptk:1:16
+  |
+1 | (function #eq? @name "test")
+  |                ^^^^^
+  |
+help: expected a child node, or `)` to close

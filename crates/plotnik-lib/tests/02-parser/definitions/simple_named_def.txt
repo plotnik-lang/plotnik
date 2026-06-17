@@ -1,0 +1,16 @@
+Expr = (identifier)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Expr"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Expr
+    NamedNode identifier

@@ -1,0 +1,16 @@
+Q = "+="
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Str
+      DoubleQuote "\""
+      StrVal "+="
+      DoubleQuote "\""
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    AnonymousNode "+="

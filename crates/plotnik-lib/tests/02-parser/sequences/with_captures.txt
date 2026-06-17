@@ -1,0 +1,37 @@
+Q = {
+  (comment)* @comments
+  (function) @fn
+}
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Capture
+        Quantifier
+          Tree
+            ParenOpen "("
+            Id "comment"
+            ParenClose ")"
+          Star "*"
+        CaptureToken "@comments"
+      Capture
+        Tree
+          ParenOpen "("
+          Id "function"
+          ParenClose ")"
+        CaptureToken "@fn"
+      BraceClose "}"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Seq
+      CapturedExpr @comments
+        QuantifiedExpr *
+          NamedNode comment
+      CapturedExpr @fn
+        NamedNode function

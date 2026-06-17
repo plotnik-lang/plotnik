@@ -1,0 +1,9 @@
+Q = (function_declaration == 'foo')
+==== diagnostics ====
+error: predicates match text content, but this node can contain children
+ --> query.ptk:1:27
+  |
+1 | Q = (function_declaration == 'foo')
+  |                           ^^^^^^^^
+  |
+help: predicates match text content; apply them to a leaf node or an anonymous node like `"foo"`

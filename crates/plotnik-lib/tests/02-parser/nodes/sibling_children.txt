@@ -1,0 +1,35 @@
+Q = (block
+  (statement)
+  (statement)
+  (statement)
+)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "block"
+      Tree
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode block
+      NamedNode statement
+      NamedNode statement
+      NamedNode statement

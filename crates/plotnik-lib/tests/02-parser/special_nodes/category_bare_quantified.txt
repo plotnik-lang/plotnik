@@ -1,0 +1,20 @@
+Q = (value#)*
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      Tree
+        ParenOpen "("
+        Id "value"
+        Hash "#"
+        ParenClose ")"
+      Star "*"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    QuantifiedExpr *
+      NamedNode value

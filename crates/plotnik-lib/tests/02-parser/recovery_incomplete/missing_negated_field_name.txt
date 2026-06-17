@@ -1,0 +1,9 @@
+(call -)
+==== diagnostics ====
+error: expected a field name
+ --> query.ptk:1:8
+  |
+1 | (call -)
+  |        ^
+  |
+help: e.g., `-value`

@@ -1,0 +1,15 @@
+Q = [
+  (a)
+  .!
+  (b)
+]
+==== diagnostics ====
+error: anchors cannot appear directly in alternations
+ --> query.ptk:3:3
+  |
+3 |   .!
+  |   ^^
+  |
+help: use `[{(a) . (b)} (c)]` to anchor within a branch
+==== symbols ====
+Q

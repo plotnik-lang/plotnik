@@ -1,0 +1,25 @@
+Q = (statement)+ @stmts :: Statement
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+        Plus "+"
+      CaptureToken "@stmts"
+      Type
+        DoubleColon "::"
+        Id "Statement"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @stmts :: Statement
+      QuantifiedExpr +
+        NamedNode statement

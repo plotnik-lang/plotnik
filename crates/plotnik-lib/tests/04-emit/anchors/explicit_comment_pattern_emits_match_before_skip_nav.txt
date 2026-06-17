@@ -1,0 +1,46 @@
+Q = (program
+  {
+    (comment) @c .
+    (function_declaration) @f
+  }
+)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "c"
+S2 "f"
+S3 "Q"
+S4 "program"
+S5 "comment"
+S6 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { c, f }
+
+[type_members]
+M0: S1 → T0  ; c: <Node>
+M1: S2 → T0  ; f: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  _                                14, 16
+  10  ─•─  (function_declaration) [Node Set(M1)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14   !   (comment) [Node Set(M0)]         10
+  16  ─‣─  _                                14, 16

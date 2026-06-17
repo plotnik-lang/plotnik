@@ -1,0 +1,4 @@
+foo /* comment */ bar
+==== tokens ====
+Id "foo"
+Id "bar"

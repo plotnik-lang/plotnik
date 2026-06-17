@@ -1,0 +1,9 @@
+ERROR
+==== diagnostics ====
+error: `ERROR` and `MISSING` must be parenthesized
+ --> query.ptk:1:1
+  |
+1 | ERROR
+  | ^^^^^
+  |
+help: write `(ERROR)` or `(MISSING ";")`

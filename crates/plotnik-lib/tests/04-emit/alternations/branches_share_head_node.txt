@@ -1,0 +1,39 @@
+Q = [
+  (object (pair))
+  (object (spread_element))
+]
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "object"
+S3 "pair"
+S4 "spread_element"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06  -ε-                                   13, 14
+  08  └‣─  (pair)                           09
+  09  ─‣┘  _                                12
+  10  └‣─  (spread_element)                 11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   (object)                         08
+  14   !   (object)                         10

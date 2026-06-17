@@ -1,0 +1,16 @@
+Q = [
+  Str: (string) @s
+  Num: (number) @n
+]
+==== types ====
+export interface QStr {
+  $tag: "Str";
+  $data: { s: Node };
+}
+
+export interface QNum {
+  $tag: "Num";
+  $data: { n: Node };
+}
+
+export type Q = QStr | QNum;

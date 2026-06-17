@@ -1,0 +1,43 @@
+Q = (expr
+  [
+    Binary: (binary_expression)
+    Unary: (unary_expression)
+  ]
+)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expr"
+      Alt
+        BracketOpen "["
+        Branch
+          Id "Binary"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "binary_expression"
+            ParenClose ")"
+        Branch
+          Id "Unary"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "unary_expression"
+            ParenClose ")"
+        BracketClose "]"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode expr
+      Alt
+        Branch Binary:
+          NamedNode binary_expression
+        Branch Unary:
+          NamedNode unary_expression

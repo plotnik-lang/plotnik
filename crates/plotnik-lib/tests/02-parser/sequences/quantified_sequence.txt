@@ -1,0 +1,40 @@
+Q = {
+  (a) @a
+  (b) @b
+}+ @rows
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Seq
+          BraceOpen "{"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "a"
+              ParenClose ")"
+            CaptureToken "@a"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "b"
+              ParenClose ")"
+            CaptureToken "@b"
+          BraceClose "}"
+        Plus "+"
+      CaptureToken "@rows"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @rows
+      QuantifiedExpr +
+        Seq
+          CapturedExpr @a
+            NamedNode a
+          CapturedExpr @b
+            NamedNode b

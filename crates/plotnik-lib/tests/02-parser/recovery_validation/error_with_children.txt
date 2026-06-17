@@ -1,0 +1,14 @@
+(ERROR (something))
+==== diagnostics ====
+error: `(ERROR)` cannot have children
+ --> query.ptk:1:8
+  |
+1 | (ERROR (something))
+  |        ^^^^^^^^^^^
+  |
+help: remove the children
+  |
+1 - (ERROR (something))
+1 + (ERROR )
+  |
+help: `(ERROR)` matches any error node as a leaf; use `(MISSING "x")` to match a missing token

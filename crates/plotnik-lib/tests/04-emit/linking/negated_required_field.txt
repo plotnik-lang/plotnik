@@ -1,0 +1,11 @@
+Q = (function_declaration -name) @fn
+==== diagnostics ====
+error: `-name` can never match
+ --> query.ptk:1:28
+  |
+1 | Q = (function_declaration -name) @fn
+  |      --------------------  ^^^^
+  |      |
+  |      on `function_declaration`
+  |
+help: `-name` requires `name` to be absent, but every `function_declaration` has one — drop `-name`

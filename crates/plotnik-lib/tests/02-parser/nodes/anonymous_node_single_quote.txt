@@ -1,0 +1,21 @@
+Q = (node 'if')
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "node"
+      Str
+        SingleQuote "'"
+        StrVal "if"
+        SingleQuote "'"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode node
+      AnonymousNode "if"

@@ -1,0 +1,13 @@
+{(a), (b)}
+==== diagnostics ====
+error: patterns are separated by whitespace
+ --> query.ptk:1:5
+  |
+1 | {(a), (b)}
+  |     ^
+  |
+help: remove the `,`
+  |
+1 - {(a), (b)}
+1 + {(a) (b)}
+  |

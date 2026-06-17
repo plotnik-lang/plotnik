@@ -1,0 +1,14 @@
+my.expr = (identifier)
+==== diagnostics ====
+error: definition names must be PascalCase
+ --> query.ptk:1:1
+  |
+1 | my.expr = (identifier)
+  | ^^^^^^^
+  |
+help: use `MyExpr`
+  |
+1 - my.expr = (identifier)
+1 + MyExpr = (identifier)
+  |
+help: definitions become types in the output

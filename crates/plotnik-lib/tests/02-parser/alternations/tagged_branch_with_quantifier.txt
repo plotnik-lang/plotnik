@@ -1,0 +1,39 @@
+Q = [
+  Single: (statement)
+  Multiple: (statement)+
+]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Id "Single"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "statement"
+          ParenClose ")"
+      Branch
+        Id "Multiple"
+        Colon ":"
+        Quantifier
+          Tree
+            ParenOpen "("
+            Id "statement"
+            ParenClose ")"
+          Plus "+"
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Alt
+      Branch Single:
+        NamedNode statement
+      Branch Multiple:
+        QuantifiedExpr +
+          NamedNode statement
