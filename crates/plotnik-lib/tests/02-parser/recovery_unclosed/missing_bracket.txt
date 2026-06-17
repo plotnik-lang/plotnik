@@ -1,0 +1,11 @@
+[(identifier) (string)
+==== diagnostics ====
+error: missing closing `]`
+ --> query.ptk:1:1
+  |
+1 | [(identifier) (string)
+  | -^^^^^^^^^^^^^^^^^^^^^
+  | |
+  | alternation started here
+  |
+help: add `]` to close the alternation

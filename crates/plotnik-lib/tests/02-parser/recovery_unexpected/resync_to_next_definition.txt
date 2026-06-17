@@ -1,0 +1,21 @@
+A = (a)
+^^^
+B = (b)
+$$$
+C = (c)
+==== diagnostics ====
+error: unexpected token
+ --> query.ptk:2:1
+  |
+2 | ^^^
+  | ^^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+
+error: unexpected token
+ --> query.ptk:4:1
+  |
+4 | $$$
+  | ^^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

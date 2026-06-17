@@ -1,0 +1,9 @@
+Q = #eq?
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:5
+  |
+1 | Q = #eq?
+  |     ^^^^
+  |
+help: use `(node == "x")`

@@ -1,0 +1,11 @@
+(identifier
+==== diagnostics ====
+error: missing closing `)`
+ --> query.ptk:1:1
+  |
+1 | (identifier
+  | -^^^^^^^^^^
+  | |
+  | node started here
+  |
+help: add `)` to close the node

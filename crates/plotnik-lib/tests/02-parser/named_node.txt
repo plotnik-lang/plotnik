@@ -1,5 +1,5 @@
 Q = (function_declaration name: (identifier) @name)
---- cst ---
+==== cst ====
 # query.ptk
 Root
   Def
@@ -18,7 +18,7 @@ Root
             ParenClose ")"
         CaptureToken "@name"
       ParenClose ")"
---- ast ---
+==== ast ====
 # query.ptk
 Root
   Def Q

@@ -1,0 +1,9 @@
+(a) @x : (b)
+==== diagnostics ====
+error: unexpected token
+ --> query.ptk:1:8
+  |
+1 | (a) @x : (b)
+  |        ^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

@@ -1,0 +1,22 @@
+[label:]
+==== diagnostics ====
+error: branch labels must be PascalCase
+ --> query.ptk:1:2
+  |
+1 | [label:]
+  |  ^^^^^
+  |
+help: use `Label`
+  |
+1 - [label:]
+1 + [Label:]
+  |
+help: branch labels become variants of a tagged union in the output
+
+error: expected an expression
+ --> query.ptk:1:8
+  |
+1 | [label:]
+  |        ^
+  |
+help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

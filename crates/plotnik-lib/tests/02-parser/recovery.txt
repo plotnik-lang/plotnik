@@ -1,5 +1,5 @@
 Q = (function_declaration name: (identifier) @name
---- diagnostics ---
+==== diagnostics ====
 error: missing closing `)`
  --> query.ptk:1:5
   |

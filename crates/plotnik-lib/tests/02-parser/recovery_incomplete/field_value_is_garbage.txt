@@ -1,0 +1,9 @@
+(call name: %%%)
+==== diagnostics ====
+error: expected an expression
+ --> query.ptk:1:13
+  |
+1 | (call name: %%%)
+  |             ^^^
+  |
+help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

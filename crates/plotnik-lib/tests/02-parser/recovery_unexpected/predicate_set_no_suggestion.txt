@@ -1,0 +1,7 @@
+{(a) #set! (b)}
+==== diagnostics ====
+error: tree-sitter predicates are not supported
+ --> query.ptk:1:6
+  |
+1 | {(a) #set! (b)}
+  |      ^^^^^

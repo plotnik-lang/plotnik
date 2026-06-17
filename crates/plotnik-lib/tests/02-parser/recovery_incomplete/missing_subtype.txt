@@ -1,0 +1,9 @@
+(expression/)
+==== diagnostics ====
+error: expected a subtype after `/`
+ --> query.ptk:1:13
+  |
+1 | (expression/)
+  |             ^
+  |
+help: e.g., `expression#binary_expression`
