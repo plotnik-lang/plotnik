@@ -236,7 +236,7 @@ impl<'d> DiagnosticBuilder<'d> {
     }
 
     pub fn fix(mut self, description: impl Into<String>, replacement: impl Into<String>) -> Self {
-        self.message.fix = Some(Fix::new(replacement, description));
+        self.message.fix = Some(Fix::new(description, replacement));
         self
     }
 

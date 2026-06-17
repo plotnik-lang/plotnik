@@ -120,7 +120,7 @@ impl TypeTableBuilder {
             let type_shape = type_ctx
                 .get_type(type_id)
                 .expect("collected type must exist");
-            self.emit_type_at_slot(slot_index, type_id, type_shape, type_ctx, interner, strings)?;
+            self.emit_type_at_slot(slot_index, type_shape, type_ctx, interner, strings)?;
         }
 
         for (def_id, type_id) in type_ctx.iter_def_types() {
@@ -155,7 +155,6 @@ impl TypeTableBuilder {
     fn emit_type_at_slot(
         &mut self,
         slot_index: usize,
-        _type_id: TypeId,
         type_shape: &TypeShape,
         type_ctx: &TypeContext,
         interner: &Interner,

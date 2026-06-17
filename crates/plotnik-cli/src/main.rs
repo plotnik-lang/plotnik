@@ -8,8 +8,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstParams, CheckParams, DumpParams, InferParams, LangDumpParams, LangListParams, RunParams,
-    TraceParams, build_cli, route_default_subcommand,
+    AstParams, CheckParams, DumpParams, InferParams, LangDumpParams, RunParams, TraceParams,
+    build_cli, route_default_subcommand,
 };
 use error::CliResult;
 
@@ -57,10 +57,7 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             commands::trace::run(params.into())
         }
         Some(("lang", m)) => match m.subcommand() {
-            Some(("list", sub_m)) => {
-                let _params = LangListParams::from_matches(sub_m);
-                commands::lang::run_list()
-            }
+            Some(("list", _)) => commands::lang::run_list(),
             Some(("dump", sub_m)) => {
                 let params = LangDumpParams::from_matches(sub_m);
                 commands::lang::run_dump(&params.lang)

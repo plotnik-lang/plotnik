@@ -409,15 +409,15 @@ impl std::fmt::Display for Severity {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fix {
-    pub(crate) replacement: String,
     pub(crate) description: String,
+    pub(crate) replacement: String,
 }
 
 impl Fix {
-    pub fn new(replacement: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(description: impl Into<String>, replacement: impl Into<String>) -> Self {
         Self {
-            replacement: replacement.into(),
             description: description.into(),
+            replacement: replacement.into(),
         }
     }
 }
