@@ -1,6 +1,0 @@
-Q = (function_declaration name: (identifier) @name) @fn
---- types ---
-export interface Q {
-  fn: Node;
-  name: Node;
-}

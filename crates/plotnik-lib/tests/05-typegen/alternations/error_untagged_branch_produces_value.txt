@@ -1,0 +1,10 @@
+A = [X: (identifier) @x Y: (number) @y]
+Q = [(A) (number) @b]
+==== diagnostics ====
+error: incompatible types: a branch produces a value but the alternation is unlabeled
+ --> query.ptk:2:5
+  |
+2 | Q = [(A) (number) @b]
+  |     ^^^^^^^^^^^^^^^^^
+  |
+help: give every branch a branch label for a tagged union, e.g. `[A: ... B: ...]`

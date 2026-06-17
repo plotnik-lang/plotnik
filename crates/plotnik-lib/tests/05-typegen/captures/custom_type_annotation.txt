@@ -1,0 +1,7 @@
+Q = (identifier) @name :: Identifier
+==== types ====
+export type Identifier = Node;
+
+export interface Q {
+  name: Identifier;
+}

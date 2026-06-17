@@ -1,0 +1,5 @@
+Q = (identifier)+ @names
+==== types ====
+export interface Q {
+  names: [Node, ...Node[]];
+}

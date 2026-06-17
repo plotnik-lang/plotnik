@@ -1,0 +1,10 @@
+Q = {(identifier) @a (number) @b} @row
+==== types ====
+export interface QRow {
+  a: Node;
+  b: Node;
+}
+
+export interface Q {
+  row: QRow;
+}

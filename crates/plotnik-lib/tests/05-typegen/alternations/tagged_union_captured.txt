@@ -1,0 +1,20 @@
+Q = [
+  Str: (string) @s
+  Num: (number) @n
+] @result
+==== types ====
+export interface QResultStr {
+  $tag: "Str";
+  $data: { s: Node };
+}
+
+export interface QResultNum {
+  $tag: "Num";
+  $data: { n: Node };
+}
+
+export type QResult = QResultStr | QResultNum;
+
+export interface Q {
+  result: QResult;
+}

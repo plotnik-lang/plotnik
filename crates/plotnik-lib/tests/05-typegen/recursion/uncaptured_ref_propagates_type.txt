@@ -1,0 +1,16 @@
+Rec = [A: (program (expression_statement (Rec) @inner)) B: (identifier) @id]
+Q = (Rec)
+==== types ====
+export interface RecA {
+  $tag: "A";
+  $data: { inner: Rec };
+}
+
+export interface RecB {
+  $tag: "B";
+  $data: { id: Node };
+}
+
+export type Rec = RecA | RecB;
+
+export type Q = Rec;

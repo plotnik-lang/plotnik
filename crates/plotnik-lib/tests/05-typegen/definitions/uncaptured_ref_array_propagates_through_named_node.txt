@@ -1,0 +1,16 @@
+A = [X: (identifier) @x Y: (number) @y]
+Q = (program (A)+)
+==== types ====
+export interface AX {
+  $tag: "X";
+  $data: { x: Node };
+}
+
+export interface AY {
+  $tag: "Y";
+  $data: { y: Node };
+}
+
+export type A = AX | AY;
+
+export type Q = [A, ...A[]];

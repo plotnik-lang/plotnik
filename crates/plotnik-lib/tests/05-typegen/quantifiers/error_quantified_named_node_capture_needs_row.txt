@@ -1,0 +1,9 @@
+Bad = (array (identifier) @name)*
+==== diagnostics ====
+error: quantifier `*` contains captures (`@name`) but has no struct capture
+ --> query.ptk:1:7
+  |
+1 | Bad = (array (identifier) @name)*
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: add a struct capture: `{...}* @name`

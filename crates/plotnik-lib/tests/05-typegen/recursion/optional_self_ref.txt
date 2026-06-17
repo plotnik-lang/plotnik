@@ -1,0 +1,11 @@
+NestedCall = (call_expression
+  function: [
+    (identifier) @name
+    (NestedCall) @inner
+  ]
+)
+==== types ====
+export interface NestedCall {
+  inner: NestedCall | null;
+  name: Node | null;
+}

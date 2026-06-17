@@ -1,0 +1,9 @@
+Q = [
+  {(identifier) @x (number) @y}
+  {(identifier) @x}
+]
+==== types ====
+export interface Q {
+  x: Node;
+  y: Node | null;
+}

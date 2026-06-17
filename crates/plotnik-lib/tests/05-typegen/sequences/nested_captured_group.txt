@@ -1,0 +1,14 @@
+Q = {
+  (identifier) @name
+  {(string) @k (number) @v} @pair
+}
+==== types ====
+export interface QPair {
+  k: Node;
+  v: Node;
+}
+
+export interface Q {
+  name: Node;
+  pair: QPair;
+}
