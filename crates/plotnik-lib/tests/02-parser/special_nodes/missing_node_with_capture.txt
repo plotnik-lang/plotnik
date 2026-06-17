@@ -1,0 +1,22 @@
+Q = (MISSING ";") @missing_semi
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        KwMissing "MISSING"
+        DoubleQuote "\""
+        StrVal ";"
+        DoubleQuote "\""
+        ParenClose ")"
+      CaptureToken "@missing_semi"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @missing_semi
+      NamedNode MISSING

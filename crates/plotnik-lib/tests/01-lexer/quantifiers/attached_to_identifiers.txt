@@ -1,0 +1,14 @@
+foo* bar+ baz? qux*? lazy+? greedy??
+==== tokens ====
+Id "foo"
+Star "*"
+Id "bar"
+Plus "+"
+Id "baz"
+Question "?"
+Id "qux"
+StarQuestion "*?"
+Id "lazy"
+PlusQuestion "+?"
+Id "greedy"
+QuestionQuestion "??"

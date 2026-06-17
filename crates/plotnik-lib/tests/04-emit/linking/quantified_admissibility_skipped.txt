@@ -1,0 +1,33 @@
+Q = (statement_block (identifier)?)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "statement_block"
+S3 "identifier"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (statement_block)                13, 10
+  08   !   (identifier)                     09
+  09  ─‣┘  _                                10
+  10                                        ▶
+  11  ─‣─  _                                08, 11
+  13  └‣─  _                                08, 11

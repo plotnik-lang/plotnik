@@ -1,0 +1,22 @@
+Q = "return" @kw :: string
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Str
+        DoubleQuote "\""
+        StrVal "return"
+        DoubleQuote "\""
+      CaptureToken "@kw"
+      Type
+        DoubleColon "::"
+        Id "string"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @kw :: string
+      AnonymousNode "return"

@@ -1,0 +1,40 @@
+Q = (call
+    arguments: [(string) (number)]
+)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call"
+      Field
+        Id "arguments"
+        Colon ":"
+        Alt
+          BracketOpen "["
+          Branch
+            Tree
+              ParenOpen "("
+              Id "string"
+              ParenClose ")"
+          Branch
+            Tree
+              ParenOpen "("
+              Id "number"
+              ParenClose ")"
+          BracketClose "]"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      FieldExpr arguments:
+        Alt
+          Branch
+            NamedNode string
+          Branch
+            NamedNode number

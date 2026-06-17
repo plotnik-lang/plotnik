@@ -1,0 +1,28 @@
+Q = (expression#pattern)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "expression"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 6 :: T0
+
+[transitions]
+_ObjWrap:
+  0  -ε-  [Obj]                             2
+  2       Trampoline                        3
+  3  -ε-  [EndObj]                          5
+  5                                         ▶
+
+Q:
+  6   !   (expression)                      7
+  7                                         ▶

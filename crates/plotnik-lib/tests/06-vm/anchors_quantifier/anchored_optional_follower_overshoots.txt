@@ -1,0 +1,104 @@
+Q = (program {(lexical_declaration)? @a . (debugger_statement)? @b . (expression_statement (identifier == "foo")) @c})
+==== input ====
+bar; debugger; foo;
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "foo"
+S02 "a"
+S03 "b"
+S04 "c"
+S05 "Q"
+S06 "program"
+S07 "lexical_declaration"
+S08 "debugger_statement"
+S09 "expression_statement"
+S10 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:3  ; { a, b, c }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S02 → T2  ; a: T2
+M1: S03 → T2  ; b: T2
+M2: S04 → T0  ; c: <Node>
+
+[type_names]
+N0: S05 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        38, 32
+  08  └‣─  (identifier) == "foo"            10
+  10  ─‣┘  _                                40
+  11  └‣─  (identifier) == "foo"            13
+  13  ─‣┘  _                                40
+  14  └‣─  (identifier) == "foo"            16
+  16  ─‣┘  _                                40
+  17                                        ▶
+  18  └•─  [Null Set(M1)] (expression_statement) [Node Set(M2)]  08
+  21  ─•─  (expression_statement) [Node Set(M2)]  11
+  23  -ε-                                   18
+  24  └•─  (debugger_statement) [Node Set(M1)]  21
+  26  ─•─  (expression_statement) [Node Set(M2)]  14
+  28  -ε-  [Null Set(M1)]                   26
+  30  ─•─  (debugger_statement) [Node Set(M1)]  26
+  32  -ε-  [Null Set(M0)]                   24, 23
+  34   !   (lexical_declaration) [Node Set(M0)]  30, 28
+  36  ─‣─  _                                34, 36
+  38  └‣─  _                                34, 36
+  40  ─‣┘  _                                17
+==== types ====
+export interface Q {
+  a: Node | null;
+  b: Node | null;
+  c: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        38, 32
+       ●   program
+  38       _                                34, 36
+       ●   expression_statement
+  34       (lexical_declaration) [Node Set(M0)]  30, 28
+       ○   expression_statement
+  38  ❮❮❮ 
+  36       _                                34, 36
+       ●   debugger_statement
+  34       (lexical_declaration) [Node Set(M0)]  30, 28
+       ○   debugger_statement
+  36  ❮❮❮ 
+  36       _                                34, 36
+       ●   expression_statement
+  34       (lexical_declaration) [Node Set(M0)]  30, 28
+       ○   expression_statement
+  36  ❮❮❮ 
+  36       _                                34, 36
+  06  ❮❮❮ 
+  32  -ε-  [Null Set(M0)]                   24, 23
+  24       (debugger_statement) [Node Set(M1)]  21
+       ○   expression_statement
+  32  ❮❮❮ 
+  23  -ε-                                   18
+  18       [Null Set(M1)] (expression_statement) [Node Set(M2)]  08
+       ●   expression_statement
+  08       (identifier) == "foo"            10
+       ○   ;
+==== output ====
+<no match>

@@ -1,0 +1,10 @@
+Expr = (expression)
+Expr = (other)
+==== diagnostics ====
+error: `Expr` is already defined
+ --> query.ptk:2:1
+  |
+2 | Expr = (other)
+  | ^^^^
+==== symbols ====
+Expr

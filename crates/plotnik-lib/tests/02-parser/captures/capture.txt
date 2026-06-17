@@ -1,0 +1,19 @@
+Q = (identifier) @name
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      CaptureToken "@name"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @name
+      NamedNode identifier

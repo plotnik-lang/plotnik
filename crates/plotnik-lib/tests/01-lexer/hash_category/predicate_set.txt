@@ -1,0 +1,5 @@
+#set!
+==== tokens ====
+Hash "#"
+Id "set"
+Negation "!"

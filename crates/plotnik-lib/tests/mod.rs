@@ -19,6 +19,10 @@
 //! suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
 //! tests. Warnings coexist with the normal sections.
 //!
+//! The `02-parser/trivia` folder renders its CST with trivia (whitespace/comments)
+//! included — that attachment is exactly what those fixtures pin; every other
+//! parser fixture omits trivia for a leaner tree.
+//!
 //! Run:   `cargo nextest run --test snapshots`
 //! Accept: `SHOT=1 cargo nextest run --test snapshots`  (also wired into `make shot`)
 //!
@@ -135,7 +139,7 @@ fn check(fx: &Fixture) -> Result<(), String> {
     let raw = fs::read_to_string(&fx.path)
         .map_err(|e| format!("read {}: {e}", fx.path.display()))?;
     let parsed = parse_fixture(&raw)?;
-    let generated = render(&fx.stage, &parsed.query, parsed.input.as_ref())?;
+    let generated = render(&fx.stage, &fx.name, &parsed.query, parsed.input.as_ref())?;
     if generated.is_empty() {
         return Err(format!("stage `{}` produced no sections", fx.stage));
     }
@@ -228,12 +232,20 @@ fn parse_section_header(line: &str) -> Option<&str> {
 
 fn render(
     stage: &str,
+    name: &str,
     query: &str,
     input: Option<&Input>,
 ) -> Result<Vec<(String, String)>, String> {
     match stage.split('-').next().unwrap_or("") {
         "01" => Ok(vec![("tokens".into(), dump_tokens(query))]),
-        "02" => Ok(render_frontend(query, Front::Parser)),
+        // The `trivia` folder pins how whitespace/comments attach to the CST, so it
+        // renders the trivia-inclusive CST; every other parser fixture omits trivia.
+        "02" => Ok(render_frontend(
+            query,
+            Front::Parser {
+                trivia: name.contains("/trivia/"),
+            },
+        )),
         "03" => Ok(render_frontend(query, Front::Analyze)),
         "04" => render_compile(query, input, Compile::Bytecode),
         "05" => render_compile(query, input, Compile::Types),
@@ -243,7 +255,7 @@ fn render(
 }
 
 enum Front {
-    Parser,
+    Parser { trivia: bool },
     Analyze,
 }
 
@@ -261,11 +273,12 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     }
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
-        Front::Parser if !has_errors => {
-            out.push(("cst".into(), analyzed.printer().raw(true).dump()));
+        Front::Parser { trivia } if !has_errors => {
+            let cst = analyzed.printer().raw(true).with_trivia(trivia).dump();
+            out.push(("cst".into(), cst));
             out.push(("ast".into(), analyzed.printer().dump()));
         }
-        Front::Parser => {}
+        Front::Parser { .. } => {}
         // The symbol table is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
         Front::Analyze => {

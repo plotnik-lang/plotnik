@@ -1,0 +1,63 @@
+Q = (program (expression_statement)? @_)
+==== input ====
+a;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "program"
+S3 "expression_statement"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  -ε-  [SuppressBegin]                  18, 14
+  10   !   (expression_statement)           11
+  11  ─‣┘  [SuppressEnd] _                  13
+  13                                        ▶
+  14  -ε-  [SuppressEnd]                    13
+  16  ─‣─  _                                10, 16
+  18  └‣─  _                                10, 16
+==== types ====
+export type Q = undefined;
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08  -ε-  [SuppressBegin]                  18, 14
+  18       _                                10, 16
+       ●   expression_statement
+  10       (expression_statement)           11
+       ●   expression_statement
+  11       [SuppressEnd] _                  13
+       ●   program
+  13   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+null

@@ -1,0 +1,9 @@
+A = (foo (B)?)
+B = (bar (A))
+==== symbols ====
+A
+  B
+    A (cycle)
+B
+  A
+    B (cycle)

@@ -1,0 +1,52 @@
+Literal = [(number) (string)]
+Expr = [(identifier) (Literal)]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Literal"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          Id "number"
+          ParenClose ")"
+      Branch
+        Tree
+          ParenOpen "("
+          Id "string"
+          ParenClose ")"
+      BracketClose "]"
+  Def
+    Id "Expr"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Branch
+        Ref
+          ParenOpen "("
+          Id "Literal"
+          ParenClose ")"
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Literal
+    Alt
+      Branch
+        NamedNode number
+      Branch
+        NamedNode string
+  Def Expr
+    Alt
+      Branch
+        NamedNode identifier
+      Branch
+        Ref Literal

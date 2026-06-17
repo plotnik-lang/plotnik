@@ -1,0 +1,24 @@
+Q = [(function_declaraton)
+ (class_declaraton)] @decl
+==== diagnostics ====
+error: `function_declaraton` is not a valid node type
+ --> query.ptk:1:7
+  |
+1 | Q = [(function_declaraton)
+  |       ^^^^^^^^^^^^^^^^^^^
+  |
+help: did you mean `function_declaration`?
+  |
+1 | Q = [(function_declaration)
+  |                        +
+
+error: `class_declaraton` is not a valid node type
+ --> query.ptk:2:3
+  |
+2 |  (class_declaraton)] @decl
+  |   ^^^^^^^^^^^^^^^^
+  |
+help: did you mean `class_declaration`?
+  |
+2 |  (class_declaration)] @decl
+  |                 +

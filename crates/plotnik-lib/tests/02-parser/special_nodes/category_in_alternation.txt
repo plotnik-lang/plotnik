@@ -1,0 +1,33 @@
+Q = [(expression#identifier) (expression#number)]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Tree
+          ParenOpen "("
+          Id "expression"
+          Hash "#"
+          Id "identifier"
+          ParenClose ")"
+      Branch
+        Tree
+          ParenOpen "("
+          Id "expression"
+          Hash "#"
+          Id "number"
+          ParenClose ")"
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Alt
+      Branch
+        NamedNode expression
+      Branch
+        NamedNode expression

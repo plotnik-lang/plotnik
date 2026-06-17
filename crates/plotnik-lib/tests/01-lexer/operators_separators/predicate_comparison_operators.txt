@@ -1,0 +1,7 @@
+== != ^= $= *=
+==== tokens ====
+OpEq "=="
+OpNe "!="
+OpStartsWith "^="
+OpEndsWith "$="
+OpContains "*="

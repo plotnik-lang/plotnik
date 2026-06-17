@@ -1,0 +1,137 @@
+Comma = ","
+Q = (program (expression_statement (array (Comma) . (string) @s)))
+==== input ====
+[1, 2, "x"]
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "s"
+S2 "Comma"
+S3 "Q"
+S4 ","
+S5 "program"
+S6 "expression_statement"
+S7 "array"
+S8 "string"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { s }
+
+[type_members]
+M0: S1 → T1  ; s: <Node>
+
+[type_names]
+N0: S2 → T0  ; Comma
+N1: S3 → T2  ; Q
+
+[entrypoints]
+Comma = 06 :: T0
+Q     = 08 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Comma:
+  06   !   ","                              07
+  07                                        ▶
+
+Q:
+  08   !   (program)                        09
+  09  └‣─  (expression_statement)           10
+  10  └‣─  (array)                          11
+  11  └‣─  _                                17, 18
+  13  ─◦─  (string) [Node Set(M0)]          15
+  15  ─‣┘³ _                                16
+  16                                        ▶
+  17   !   (Comma)                          06 : 13
+  18  ─‣─  _                                17, 18
+==== types ====
+export interface Q {
+  s: Node;
+}
+
+export type Comma = undefined;
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  08       (program)                        09
+       ●   program
+  09       (expression_statement)           10
+       ●   expression_statement
+  10       (array)                          11
+       ●   array
+  11       _                                17, 18
+       ●   [
+  17       (Comma)                          06 : 13
+       ▶   (Comma)
+
+Comma:
+  06       ","                              07
+       ○   [
+  11  ❮❮❮ 
+  18       _                                17, 18
+       ●   number
+  17       (Comma)                          06 : 13
+       ▶   (Comma)
+
+Comma:
+  06       ","                              07
+       ○   number
+  18  ❮❮❮ 
+  18       _                                17, 18
+       ●   ,
+  17       (Comma)                          06 : 13
+       ▶   (Comma)
+
+Comma:
+  06       ","                              07
+       ●   ,
+  07   ◀   (Comma)                          
+
+Comma:
+  13       (string) [Node Set(M0)]          15
+       ○   number
+  18  ❮❮❮ 
+  18       _                                17, 18
+       ●   number
+  17       (Comma)                          06 : 13
+       ▶   (Comma)
+
+Comma:
+  06       ","                              07
+       ○   number
+  18  ❮❮❮ 
+  18       _                                17, 18
+       ●   ,
+  17       (Comma)                          06 : 13
+       ▶   (Comma)
+
+Comma:
+  06       ","                              07
+       ●   ,
+  07   ◀   (Comma)                          
+
+Comma:
+  13       (string) [Node Set(M0)]          15
+       ●   string
+  15       _                                16
+       ●   program
+  16   ◀   (Comma)                          
+
+Comma:
+  03  -ε-  [EndObj]                         05
+  05   ◀   (Comma)                          
+
+Comma:
+==== output ====
+{"s":{"kind":"string","text":"\"x\"","span":[7, 10]}}

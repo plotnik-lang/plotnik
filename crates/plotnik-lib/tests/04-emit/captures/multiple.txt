@@ -1,0 +1,39 @@
+Q = (binary_expression (identifier) @a (number) @b)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "binary_expression"
+S5 "identifier"
+S6 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { a, b }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (binary_expression)              08
+  07  ...  
+  08  └‣─  (identifier) [Node Set(M0)]      10
+  10  ─‣─  (number) [Node Set(M1)]          12
+  12  ─‣┘  _                                13
+  13                                        ▶

@@ -1,0 +1,89 @@
+Q = (program {(lexical_declaration)* @decls (_) @x})
+==== input ====
+let a; foo; bar;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "decls"
+S2 "x"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:2  ; { decls, x }
+
+[type_members]
+M0: S1 → T1  ; decls: T1
+M1: S2 → T0  ; x: <Node>
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ─‣┘  _                                10
+  08  -ε-  [Arr]                            24, 19
+  10                                        ▶
+  11  └‣─  [EndArr Set(M0)] (_) [Node Set(M1)]  07
+  14  ─‣─  _                                20, 26
+  16  ─‣─  [EndArr Set(M0)] (_) [Node Set(M1)]  07
+  19  -ε-                                   11
+  20   !   (lexical_declaration) [Node Push]  14, 16
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣─  _                                20, 26
+==== types ====
+export interface Q {
+  decls: Node[];
+  x: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08  -ε-  [Arr]                            24, 19
+  24       _                                20, 22
+       ●   lexical_declaration
+  20       (lexical_declaration) [Node Push]  14, 16
+       ●   lexical_declaration
+  14       _                                20, 26
+       ●   expression_statement
+  20       (lexical_declaration) [Node Push]  14, 16
+       ○   expression_statement
+  14  ❮❮❮ 
+  26       _                                20, 26
+       ●   expression_statement
+  20       (lexical_declaration) [Node Push]  14, 16
+       ○   expression_statement
+  26  ❮❮❮ 
+  26       _                                20, 26
+  20  ❮❮❮ 
+  16       [EndArr Set(M0)] (_) [Node Set(M1)]  07
+       ●   expression_statement
+  07       _                                10
+       ●   program
+  10   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"decls":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]}],"x":{"kind":"expression_statement","text":"foo;","span":[7, 11]}}

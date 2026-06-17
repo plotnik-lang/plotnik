@@ -1,0 +1,11 @@
+Q = ()
+==== diagnostics ====
+error: empty `()` matches nothing
+ --> query.ptk:1:5
+  |
+1 | Q = ()
+  |     ^^
+  |
+help: use `(_)` to match any named node, or `_` for any node
+==== symbols ====
+Q

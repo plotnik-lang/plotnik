@@ -1,8 +1,8 @@
 Other = (program (function_declaration) @fn)
 Q = (program (expression_statement (identifier) @name))
---- input ---
+==== input ====
 foo;
---- bytecode ---
+==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
 S1 "fn"
@@ -50,7 +50,7 @@ Q:
   13  └‣─  (expression_statement)           14
   14  └‣─  (identifier) [Node Set(M1)]      07
   16                                        ▶
---- types ---
+==== types ====
 export interface Q {
   name: Node;
 }
@@ -58,7 +58,7 @@ export interface Q {
 export interface Other {
   fn: Node;
 }
---- trace ---
+==== trace ====
 _ObjWrap:
   00  -ε-  [Obj]                            02
   02       Trampoline                       03
@@ -78,5 +78,5 @@ Q:
 _ObjWrap:
   03  -ε-  [EndObj]                         05
   05   ◀   _ObjWrap                         ◼
---- output ---
+==== output ====
 {"name":{"kind":"identifier","text":"foo","span":[0, 3]}}

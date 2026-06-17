@@ -1,0 +1,30 @@
+Q = (foo (X) (Y) (Z))
+==== diagnostics ====
+error: `X` is not defined
+ --> query.ptk:1:11
+  |
+1 | Q = (foo (X) (Y) (Z))
+  |           ^
+  |
+help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+
+error: `Y` is not defined
+ --> query.ptk:1:15
+  |
+1 | Q = (foo (X) (Y) (Z))
+  |               ^
+  |
+help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+
+error: `Z` is not defined
+ --> query.ptk:1:19
+  |
+1 | Q = (foo (X) (Y) (Z))
+  |                   ^
+  |
+help: `(Name)` uses a definition; define `Name = ...` or check the spelling
+==== symbols ====
+Q
+  X?
+  Y?
+  Z?

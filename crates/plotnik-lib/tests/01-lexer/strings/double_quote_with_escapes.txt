@@ -1,0 +1,8 @@
+"hello\nworld" "tab\there"
+==== tokens ====
+DoubleQuote "\""
+StrVal "hello\\nworld"
+DoubleQuote "\""
+DoubleQuote "\""
+StrVal "tab\\there"
+DoubleQuote "\""

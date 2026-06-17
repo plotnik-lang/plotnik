@@ -1,5 +1,5 @@
 Q = (identifier) @id
---- bytecode ---
+==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -29,7 +29,7 @@ _ObjWrap:
 Q:
   6   !   (identifier) [Node Set(M0)]       8
   8                                         ▶
---- types ---
+==== types ====
 export interface Q {
   id: Node;
 }

@@ -1,0 +1,79 @@
+Q = (program {(lexical_declaration) @a . (expression_statement) @b})
+==== input ====
+let x; let y; foo;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+S6 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { a, b }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  _                                14, 16
+  10  ─•─  (expression_statement) [Node Set(M1)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14   !   (lexical_declaration) [Node Set(M0)]  10
+  16  ─‣─  _                                14, 16
+==== types ====
+export interface Q {
+  a: Node;
+  b: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       _                                14, 16
+       ●   lexical_declaration
+  14       (lexical_declaration) [Node Set(M0)]  10
+       ●   lexical_declaration
+  10       (expression_statement) [Node Set(M1)]  12
+       ○   lexical_declaration
+  08  ❮❮❮ 
+  16       _                                14, 16
+       ●   lexical_declaration
+  14       (lexical_declaration) [Node Set(M0)]  10
+       ●   lexical_declaration
+  10       (expression_statement) [Node Set(M1)]  12
+       ●   expression_statement
+  12       _                                13
+       ●   program
+  13   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"a":{"kind":"lexical_declaration","text":"let y;","span":[7, 13]},"b":{"kind":"expression_statement","text":"foo;","span":[14, 18]}}

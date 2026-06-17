@@ -1,0 +1,31 @@
+Q = (node foo: (bar)* @baz)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "node"
+      Capture
+        Quantifier
+          Field
+            Id "foo"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Id "bar"
+              ParenClose ")"
+          Star "*"
+        CaptureToken "@baz"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode node
+      CapturedExpr @baz
+        QuantifiedExpr *
+          FieldExpr foo:
+            NamedNode bar

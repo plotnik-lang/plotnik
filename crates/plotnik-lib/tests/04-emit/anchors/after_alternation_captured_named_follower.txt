@@ -1,0 +1,37 @@
+Q = {[(number) "+"] . (identifier) @id}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "Q"
+S3 "number"
+S4 "+"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+
+[type_members]
+M0: S1 → T0  ; id: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06  -ε-                                   13, 14
+  08                                        ▶
+  09  ─◦─  (identifier) [Node Set(M0)]      08
+  11  ─•─  (identifier) [Node Set(M0)]      08
+  13   !   (number)                         11
+  14   !   "+"                              09

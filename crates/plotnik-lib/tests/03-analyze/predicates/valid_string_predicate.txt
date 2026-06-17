@@ -1,0 +1,3 @@
+Q = (identifier == "foo")
+==== symbols ====
+Q

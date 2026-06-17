@@ -1,0 +1,10 @@
+[ (a) (b) ]
+==== tokens ====
+BracketOpen "["
+ParenOpen "("
+Id "a"
+ParenClose ")"
+ParenOpen "("
+Id "b"
+ParenClose ")"
+BracketClose "]"

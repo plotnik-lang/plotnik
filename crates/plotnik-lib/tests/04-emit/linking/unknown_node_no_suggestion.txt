@@ -1,0 +1,7 @@
+Q = (xyzzy_foobar_baz) @fn
+==== diagnostics ====
+error: `xyzzy_foobar_baz` is not a valid node type
+ --> query.ptk:1:6
+  |
+1 | Q = (xyzzy_foobar_baz) @fn
+  |      ^^^^^^^^^^^^^^^^

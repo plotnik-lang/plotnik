@@ -1,0 +1,7 @@
+Expr = (identifier)
+==== tokens ====
+Id "Expr"
+Equals "="
+ParenOpen "("
+Id "identifier"
+ParenClose ")"

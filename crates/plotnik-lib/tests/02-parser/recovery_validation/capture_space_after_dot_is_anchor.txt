@@ -1,0 +1,25 @@
+(identifier) @foo . (other)
+==== diagnostics ====
+error: definition must be named
+ --> query.ptk:1:1
+  |
+1 | (identifier) @foo . (other)
+  | ^^^^^^^^^^^^^^^^^
+  |
+help: give it a name like `Name = (identifier) @foo`
+
+error: definition must be named
+ --> query.ptk:1:19
+  |
+1 | (identifier) @foo . (other)
+  |                   ^
+  |
+help: give it a name like `Name = .`
+
+error: definition must be named
+ --> query.ptk:1:21
+  |
+1 | (identifier) @foo . (other)
+  |                     ^^^^^^^
+  |
+help: give it a name like `Name = (other)`

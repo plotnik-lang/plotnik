@@ -1,0 +1,15 @@
+( ) [ ] { } : = ! ~ _ . .!
+==== tokens ====
+ParenOpen "("
+ParenClose ")"
+BracketOpen "["
+BracketClose "]"
+BraceOpen "{"
+BraceClose "}"
+Colon ":"
+Equals "="
+Negation "!"
+Tilde "~"
+Underscore "_"
+Dot "."
+DotBang ".!"

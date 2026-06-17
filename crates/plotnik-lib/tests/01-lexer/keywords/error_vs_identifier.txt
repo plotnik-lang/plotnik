@@ -1,0 +1,5 @@
+ERROR ERRORx Errors
+==== tokens ====
+KwError "ERROR"
+Id "ERRORx"
+Id "Errors"

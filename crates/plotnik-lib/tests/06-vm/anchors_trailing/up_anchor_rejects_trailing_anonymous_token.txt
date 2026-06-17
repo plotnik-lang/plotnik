@@ -1,0 +1,65 @@
+Q = (program (debugger_statement "debugger" .))
+==== input ====
+debugger;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "program"
+S3 "debugger_statement"
+S4 "debugger"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (debugger_statement)             08
+  08  └‣─  _                                10, 14
+  10   !   "debugger"                       11
+  11  ─◦┘  _                                12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14  ─‣─  _                                10, 14
+==== types ====
+export type Q = undefined;
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (debugger_statement)             08
+       ●   debugger_statement
+  08       _                                10, 14
+       ●   debugger
+  10       "debugger"                       11
+       ●   debugger
+  11       _                                12
+  08  ❮❮❮ 
+  14       _                                10, 14
+       ●   ;
+  10       "debugger"                       11
+       ○   ;
+  14  ❮❮❮ 
+  14       _                                10, 14
+==== output ====
+<no match>

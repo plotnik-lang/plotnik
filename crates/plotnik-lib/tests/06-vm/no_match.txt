@@ -1,7 +1,7 @@
 Q = (program (class_declaration) @cls)
---- input ---
+==== input ====
 function foo() {}
---- bytecode ---
+==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
 S1 "cls"
@@ -35,11 +35,11 @@ Q:
   08  └‣─  (class_declaration) [Node Set(M0)]  10
   10  ─‣┘  _                                11
   11                                        ▶
---- types ---
+==== types ====
 export interface Q {
   cls: Node;
 }
---- trace ---
+==== trace ====
 _ObjWrap:
   00  -ε-  [Obj]                            02
   02       Trampoline                       03
@@ -50,5 +50,5 @@ Q:
        ●   program
   08       (class_declaration) [Node Set(M0)]  10
        ○   function_declaration
---- output ---
+==== output ====
 <no match>

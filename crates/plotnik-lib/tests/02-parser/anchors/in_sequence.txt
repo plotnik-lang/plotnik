@@ -1,0 +1,36 @@
+Q = (parent {. (first) (second) .})
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "parent"
+      Seq
+        BraceOpen "{"
+        Anchor
+          Dot "."
+        Tree
+          ParenOpen "("
+          Id "first"
+          ParenClose ")"
+        Tree
+          ParenOpen "("
+          Id "second"
+          ParenClose ")"
+        Anchor
+          Dot "."
+        BraceClose "}"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode parent
+      Seq
+        .
+        NamedNode first
+        NamedNode second
+        .

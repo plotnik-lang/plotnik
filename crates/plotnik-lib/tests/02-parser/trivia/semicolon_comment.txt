@@ -1,0 +1,21 @@
+; semicolon comment
+Q = (identifier)
+==== cst ====
+# query.ptk
+Root
+  LineComment "; semicolon comment"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    Tree
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

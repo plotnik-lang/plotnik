@@ -1,0 +1,84 @@
+Q = (program [Tag: [In: (expression_statement) @a] @y])
+==== input ====
+a;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "In"
+S3 "y"
+S4 "Tag"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Enum    M1:1  ; In
+T3 = Struct  M2:1  ; { y }
+T4 = Enum    M3:1  ; Tag
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T1  ; In: T1
+M2: S3 → T2  ; y: T2
+M3: S4 → T3  ; Tag: T3
+
+[type_names]
+N0: S5 → T4  ; Q
+
+[entrypoints]
+Q = 06 :: T4
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  _                                10, 16
+  10   !   [Enum(M3) Enum(M1)] (expression_statement) [Node Set(M0) EndEnum]  13
+  13  ─‣┘  [Set(M2) EndEnum] _              15
+  15                                        ▶
+  16  ─‣─  _                                10, 16
+==== types ====
+export interface QTag {
+  $tag: "Tag";
+  $data: { y: Enum };
+}
+
+export type Q = QTag;
+
+export interface EnumIn {
+  $tag: "In";
+  $data: { a: Node };
+}
+
+export type Enum = EnumIn;
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       _                                10, 16
+       ●   expression_statement
+  10       [Enum(M3) Enum(M1)] (expression_statement) [Node Set(M0) EndEnum]  13
+       ●   expression_statement
+  13       [Set(M2) EndEnum] _              15
+       ●   program
+  15   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"$tag":"Tag","$data":{"y":{"$tag":"In","$data":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}}

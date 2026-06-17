@@ -1,0 +1,5 @@
+a/b /* comment */
+==== tokens ====
+Id "a"
+Slash "/"
+Id "b"

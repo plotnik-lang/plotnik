@@ -1,0 +1,127 @@
+Q = (program (expression_statement (array (array (array (number) @n .) .) .)))
+==== input ====
+[[[1]], x]
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "array"
+S6 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (array)                          09
+  09  └‣─  _                                23, 26
+  11   !   (number) [Node Set(M0)]          13
+  13  ─•┘³ _                                14
+  14  ─‣┘² _                                15
+  15                                        ▶
+  16  ─‣─  _                                11, 16
+  18  └‣─  _                                11, 16
+  20   !   (array)                          18
+  21  ─‣─  _                                20, 21
+  23   !   (array)                          24
+  24  └‣─  _                                20, 21
+  26  ─‣─  _                                23, 26
+==== types ====
+export interface Q {
+  n: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (array)                          09
+       ●   array
+  09       _                                23, 26
+       ●   [
+  23       (array)                          24
+       ○   [
+  09  ❮❮❮ 
+  26       _                                23, 26
+       ●   array
+  23       (array)                          24
+       ●   array
+  24       _                                20, 21
+       ●   [
+  20       (array)                          18
+       ○   [
+  24  ❮❮❮ 
+  21       _                                20, 21
+       ●   array
+  20       (array)                          18
+       ●   array
+  18       _                                11, 16
+       ●   [
+  11       (number) [Node Set(M0)]          13
+       ○   [
+  18  ❮❮❮ 
+  16       _                                11, 16
+       ●   number
+  11       (number) [Node Set(M0)]          13
+       ●   number
+  13       _                                14
+  16  ❮❮❮ 
+  16       _                                11, 16
+       ●   ]
+  11       (number) [Node Set(M0)]          13
+       ○   ]
+  16  ❮❮❮ 
+  16       _                                11, 16
+  21  ❮❮❮ 
+  21       _                                20, 21
+       ●   ]
+  20       (array)                          18
+       ○   ]
+  21  ❮❮❮ 
+  21       _                                20, 21
+  26  ❮❮❮ 
+  26       _                                23, 26
+       ●   ,
+  23       (array)                          24
+       ○   ,
+  26  ❮❮❮ 
+  26       _                                23, 26
+       ●   identifier
+  23       (array)                          24
+       ○   identifier
+  26  ❮❮❮ 
+  26       _                                23, 26
+       ●   ]
+  23       (array)                          24
+       ○   ]
+  26  ❮❮❮ 
+  26       _                                23, 26
+==== output ====
+<no match>

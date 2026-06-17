@@ -1,0 +1,7 @@
+"abc
+(x)
+==== tokens ====
+UnterminatedString "\"abc"
+ParenOpen "("
+Id "x"
+ParenClose ")"

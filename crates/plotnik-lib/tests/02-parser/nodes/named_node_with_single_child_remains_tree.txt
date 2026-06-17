@@ -1,0 +1,21 @@
+Q = (foo (bar))
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "foo"
+      Tree
+        ParenOpen "("
+        Id "bar"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode foo
+      NamedNode bar

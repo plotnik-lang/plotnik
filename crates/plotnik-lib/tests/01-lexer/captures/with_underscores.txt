@@ -1,0 +1,3 @@
+@my_capture_name
+==== tokens ====
+CaptureToken "@my_capture_name"

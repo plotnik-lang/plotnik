@@ -1,0 +1,33 @@
+Q = [Ident: (identifier) Num: (number)]
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Alt
+      BracketOpen "["
+      Branch
+        Id "Ident"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      Branch
+        Id "Num"
+        Colon ":"
+        Tree
+          ParenOpen "("
+          Id "number"
+          ParenClose ")"
+      BracketClose "]"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Alt
+      Branch Ident:
+        NamedNode identifier
+      Branch Num:
+        NamedNode number

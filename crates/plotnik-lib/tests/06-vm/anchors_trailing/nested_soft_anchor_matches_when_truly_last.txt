@@ -1,0 +1,93 @@
+Q = (program (expression_statement (array (object (pair) @p .) .)))
+==== input ====
+[{a:1}]
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "p"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "array"
+S6 "object"
+S7 "pair"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { p }
+
+[type_members]
+M0: S1 → T0  ; p: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (array)                          09
+  09  └‣─  _                                20, 21
+  11   !   (pair) [Node Set(M0)]            13
+  13  ─•┘² _                                14
+  14  ─‣┘² _                                15
+  15                                        ▶
+  16  ─‣─  _                                11, 16
+  18  └‣─  _                                11, 16
+  20   !   (object)                         18
+  21  ─‣─  _                                20, 21
+==== types ====
+export interface Q {
+  p: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (array)                          09
+       ●   array
+  09       _                                20, 21
+       ●   [
+  20       (object)                         18
+       ○   [
+  09  ❮❮❮ 
+  21       _                                20, 21
+       ●   object
+  20       (object)                         18
+       ●   object
+  18       _                                11, 16
+       ●   {
+  11       (pair) [Node Set(M0)]            13
+       ○   {
+  18  ❮❮❮ 
+  16       _                                11, 16
+       ●   pair
+  11       (pair) [Node Set(M0)]            13
+       ●   pair
+  13       _                                14
+       ●   array
+  14       _                                15
+       ●   program
+  15   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"p":{"kind":"pair","text":"a:1","span":[2, 5]}}

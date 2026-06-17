@@ -1,0 +1,22 @@
+Broken ^^^
+Valid = (ok)
+==== diagnostics ====
+error: references must be parenthesized
+ --> query.ptk:1:1
+  |
+1 | Broken ^^^
+  | ^^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Broken ^^^
+1 + (Broken) ^^^
+  |
+
+error: unexpected token
+ --> query.ptk:1:8
+  |
+1 | Broken ^^^
+  |        ^^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

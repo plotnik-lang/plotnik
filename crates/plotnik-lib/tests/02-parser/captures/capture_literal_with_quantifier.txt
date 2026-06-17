@@ -1,0 +1,22 @@
+Q = ","* @commas
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Quantifier
+        Str
+          DoubleQuote "\""
+          StrVal ","
+          DoubleQuote "\""
+        Star "*"
+      CaptureToken "@commas"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @commas
+      QuantifiedExpr *
+        AnonymousNode ","

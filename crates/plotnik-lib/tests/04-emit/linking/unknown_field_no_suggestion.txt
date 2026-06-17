@@ -1,0 +1,8 @@
+Q = (function_declaration
+    xyzzy: (identifier) @name) @fn
+==== diagnostics ====
+error: `xyzzy` is not a valid field
+ --> query.ptk:2:5
+  |
+2 |     xyzzy: (identifier) @name) @fn
+  |     ^^^^^

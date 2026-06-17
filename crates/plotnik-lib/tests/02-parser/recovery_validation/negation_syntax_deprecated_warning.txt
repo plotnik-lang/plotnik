@@ -1,0 +1,33 @@
+Test = (call !name)
+==== diagnostics ====
+warning: `!field` negation is deprecated
+ --> query.ptk:1:14
+  |
+1 | Test = (call !name)
+  |              ^
+  |
+help: use `-`
+  |
+1 - Test = (call !name)
+1 + Test = (call -name)
+  |
+help: use `-field` instead of `!field`
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Test"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "call"
+      NegatedField
+        Negation "!"
+        Id "name"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Test
+    NamedNode call
+      NegatedField -name

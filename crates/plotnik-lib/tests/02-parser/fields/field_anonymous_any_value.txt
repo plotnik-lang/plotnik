@@ -1,0 +1,56 @@
+Q = (binary_expression
+    left: (_) @left
+    operator: _ @op
+    right: (_) @right) @expr
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Tree
+        ParenOpen "("
+        Id "binary_expression"
+        Capture
+          Field
+            Id "left"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@left"
+        Capture
+          Field
+            Id "operator"
+            Colon ":"
+            Wildcard
+              Underscore "_"
+          CaptureToken "@op"
+        Capture
+          Field
+            Id "right"
+            Colon ":"
+            Tree
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@right"
+        ParenClose ")"
+      CaptureToken "@expr"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @expr
+      NamedNode binary_expression
+        CapturedExpr @left
+          FieldExpr left:
+            NamedNode (any)
+        CapturedExpr @op
+          FieldExpr operator:
+            AnonymousNode (any)
+        CapturedExpr @right
+          FieldExpr right:
+            NamedNode (any)

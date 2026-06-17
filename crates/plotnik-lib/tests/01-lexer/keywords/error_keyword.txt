@@ -1,0 +1,5 @@
+(ERROR)
+==== tokens ====
+ParenOpen "("
+KwError "ERROR"
+ParenClose ")"

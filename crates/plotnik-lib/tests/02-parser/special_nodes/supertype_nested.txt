@@ -1,0 +1,52 @@
+Q = (statement/expression_statement
+    (expression/call_expression))
+==== diagnostics ====
+warning: `supertype/subtype` paths are tree-sitter syntax
+ --> query.ptk:1:15
+  |
+1 | Q = (statement/expression_statement
+  |               ^
+  |
+help: use `#`
+  |
+1 - Q = (statement/expression_statement
+1 + Q = (statement#expression_statement
+  |
+help: use `supertype#subtype` instead of `supertype/subtype`
+
+warning: `supertype/subtype` paths are tree-sitter syntax
+ --> query.ptk:2:16
+  |
+2 |     (expression/call_expression))
+  |                ^
+  |
+help: use `#`
+  |
+2 -     (expression/call_expression))
+2 +     (expression#call_expression))
+  |
+help: use `supertype#subtype` instead of `supertype/subtype`
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "statement"
+      Slash "/"
+      Id "expression_statement"
+      Tree
+        ParenOpen "("
+        Id "expression"
+        Slash "/"
+        Id "call_expression"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode statement
+      NamedNode expression

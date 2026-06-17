@@ -1,0 +1,21 @@
+Q = Expr ^^^ (identifier)
+==== diagnostics ====
+error: references must be parenthesized
+ --> query.ptk:1:5
+  |
+1 | Q = Expr ^^^ (identifier)
+  |     ^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = Expr ^^^ (identifier)
+1 + Q = (Expr) ^^^ (identifier)
+  |
+
+error: unexpected token
+ --> query.ptk:1:10
+  |
+1 | Q = Expr ^^^ (identifier)
+  |          ^^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

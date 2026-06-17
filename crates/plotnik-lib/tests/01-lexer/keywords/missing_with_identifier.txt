@@ -1,0 +1,6 @@
+(MISSING identifier)
+==== tokens ====
+ParenOpen "("
+KwMissing "MISSING"
+Id "identifier"
+ParenClose ")"

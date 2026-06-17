@@ -1,0 +1,13 @@
+(identifier) @foo. bar
+==== diagnostics ====
+error: node types must be parenthesized
+ --> query.ptk:1:20
+  |
+1 | (identifier) @foo. bar
+  |                    ^^^
+  |
+help: wrap in parentheses
+  |
+1 - (identifier) @foo. bar
+1 + (identifier) @foo. (bar)
+  |

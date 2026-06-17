@@ -1,0 +1,40 @@
+Args = arguments: (identifier)
+Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+==== diagnostics ====
+error: field `arguments` is not valid on this node type
+ --> query.ptk:1:8
+  |
+1 | Args = arguments: (identifier)
+  |        ^^^^^^^^^
+2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+  |                                                ----------------- on `binary_expression`
+  |
+help: valid fields for `binary_expression`: `left`, `operator`, `right`
+
+error: `identifier` can't be the value of `arguments`
+ --> query.ptk:1:20
+  |
+1 | Args = arguments: (identifier)
+  |        ---------   ^^^^^^^^^^
+  |        |
+  |        field `arguments`
+  |
+help: `arguments` accepts: `arguments`, `template_string`
+
+error: `call_expression` cannot be a child of this node
+ --> query.ptk:2:23
+  |
+2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+  |      ---------------  ^^^^^^^^^^^^^^^
+  |      |
+  |      on `statement_block`
+  |
+help: valid children of `statement_block`: `statement`
+
+error: `binary_expression` cannot be a child of this node
+ --> query.ptk:2:48
+  |
+2 | Q = (statement_block (call_expression (Args)) (binary_expression (Args)))
+  |      --------------- on `statement_block`      ^^^^^^^^^^^^^^^^^
+  |
+help: valid children of `statement_block`: `statement`

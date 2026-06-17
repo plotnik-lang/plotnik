@@ -1,0 +1,47 @@
+Q = (program (function_declaration (class_declaration))* @x)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "x"
+S2 "Q"
+S3 "program"
+S4 "function_declaration"
+S5 "class_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { x }
+
+[type_members]
+M0: S1 → T1  ; x: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  -ε-  [Arr]                            24, 16
+  10  -ε-                                   11
+  11  ─‣┘  [EndArr Set(M0)] _               15
+  13  └‣─  (class_declaration)              14
+  14  ─‣┘  _                                18
+  15                                        ▶
+  16  -ε-  [EndArr Set(M0)]                 15
+  18  -ε-  [Push]                           28, 10
+  20   !   (function_declaration) [Node]    13
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣─  _                                20, 26
+  28  ─‣─  _                                20, 26

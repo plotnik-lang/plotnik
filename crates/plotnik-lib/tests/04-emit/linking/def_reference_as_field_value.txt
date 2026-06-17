@@ -1,0 +1,40 @@
+Foo = (identifier)
+Q = (function_declaration name: (Foo))
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Foo"
+S2 "Q"
+S3 "identifier"
+S4 "function_declaration"
+S5 "name"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Foo
+N1: S2 → T0  ; Q
+
+[entrypoints]
+Foo = 06 :: T0
+Q   = 08 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Foo:
+  06   !   (identifier)                     07
+  07                                        ▶
+
+Q:
+  08   !   (function_declaration)           09
+  09  └‣─  name: (Foo)                      06 : 10
+  10  ─‣┘  _                                11
+  11                                        ▶

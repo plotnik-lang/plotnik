@@ -1,0 +1,31 @@
+Q = {(a) (b)} @seq :: MySequence
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Seq
+        BraceOpen "{"
+        Tree
+          ParenOpen "("
+          Id "a"
+          ParenClose ")"
+        Tree
+          ParenOpen "("
+          Id "b"
+          ParenClose ")"
+        BraceClose "}"
+      CaptureToken "@seq"
+      Type
+        DoubleColon "::"
+        Id "MySequence"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @seq :: MySequence
+      Seq
+        NamedNode a
+        NamedNode b

@@ -1,0 +1,36 @@
+Q = (binary_expression (identifier) . ["+"])
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "binary_expression"
+S3 "identifier"
+S4 "+"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (binary_expression)              08
+  07  ...  
+  08  └‣─  _                                13, 14
+  10  ─◦─  "+"                              11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   (identifier)                     10
+  14  ─‣─  _                                13, 14

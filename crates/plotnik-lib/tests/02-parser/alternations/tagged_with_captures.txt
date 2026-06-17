@@ -1,0 +1,63 @@
+Q = [
+    Assign: (assignment_expression left: (identifier) @left)
+    Call: (call_expression function: (identifier) @func)
+] @stmt
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Id "Assign"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "assignment_expression"
+            Capture
+              Field
+                Id "left"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Id "identifier"
+                  ParenClose ")"
+              CaptureToken "@left"
+            ParenClose ")"
+        Branch
+          Id "Call"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "call_expression"
+            Capture
+              Field
+                Id "function"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Id "identifier"
+                  ParenClose ")"
+              CaptureToken "@func"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@stmt"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedExpr @stmt
+      Alt
+        Branch Assign:
+          NamedNode assignment_expression
+            CapturedExpr @left
+              FieldExpr left:
+                NamedNode identifier
+        Branch Call:
+          NamedNode call_expression
+            CapturedExpr @func
+              FieldExpr function:
+                NamedNode identifier

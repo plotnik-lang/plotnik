@@ -1,0 +1,12 @@
+Q = (identifier
+    name: (identifier) @inner) @id
+==== diagnostics ====
+error: field `name` is not valid on this node type
+ --> query.ptk:2:5
+  |
+1 | Q = (identifier
+  |      ---------- on `identifier`
+2 |     name: (identifier) @inner) @id
+  |     ^^^^
+  |
+help: `identifier` has no fields

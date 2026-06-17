@@ -1,0 +1,25 @@
+Q = {(a) (b)}
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Seq
+      BraceOpen "{"
+      Tree
+        ParenOpen "("
+        Id "a"
+        ParenClose ")"
+      Tree
+        ParenOpen "("
+        Id "b"
+        ParenClose ")"
+      BraceClose "}"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    Seq
+      NamedNode a
+      NamedNode b

@@ -1,0 +1,20 @@
+Q = (function -async)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "function"
+      NegatedField
+        Minus "-"
+        Id "async"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode function
+      NegatedField -async

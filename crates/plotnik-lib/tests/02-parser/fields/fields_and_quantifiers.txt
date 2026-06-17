@@ -1,0 +1,94 @@
+Q = (node
+    foo: (foo)?
+    foo: (foo)??
+    bar: (bar)*
+    bar: (bar)*?
+    baz: (baz)+?
+    baz: (baz)+?)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "node"
+      Quantifier
+        Field
+          Id "foo"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "foo"
+            ParenClose ")"
+        Question "?"
+      Quantifier
+        Field
+          Id "foo"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "foo"
+            ParenClose ")"
+        QuestionQuestion "??"
+      Quantifier
+        Field
+          Id "bar"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "bar"
+            ParenClose ")"
+        Star "*"
+      Quantifier
+        Field
+          Id "bar"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "bar"
+            ParenClose ")"
+        StarQuestion "*?"
+      Quantifier
+        Field
+          Id "baz"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "baz"
+            ParenClose ")"
+        PlusQuestion "+?"
+      Quantifier
+        Field
+          Id "baz"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "baz"
+            ParenClose ")"
+        PlusQuestion "+?"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode node
+      QuantifiedExpr ?
+        FieldExpr foo:
+          NamedNode foo
+      QuantifiedExpr ??
+        FieldExpr foo:
+          NamedNode foo
+      QuantifiedExpr *
+        FieldExpr bar:
+          NamedNode bar
+      QuantifiedExpr *?
+        FieldExpr bar:
+          NamedNode bar
+      QuantifiedExpr +?
+        FieldExpr baz:
+          NamedNode baz
+      QuantifiedExpr +?
+        FieldExpr baz:
+          NamedNode baz

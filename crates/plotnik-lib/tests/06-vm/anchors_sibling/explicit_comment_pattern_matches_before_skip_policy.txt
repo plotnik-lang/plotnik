@@ -1,0 +1,73 @@
+Q = (program {(comment) @doc . (function_declaration) @fn})
+==== input ====
+// doc
+function f() {}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "doc"
+S2 "fn"
+S3 "Q"
+S4 "program"
+S5 "comment"
+S6 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { doc, fn }
+
+[type_members]
+M0: S1 → T0  ; doc: <Node>
+M1: S2 → T0  ; fn: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  _                                14, 16
+  10  ─•─  (function_declaration) [Node Set(M1)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14   !   (comment) [Node Set(M0)]         10
+  16  ─‣─  _                                14, 16
+==== types ====
+export interface Q {
+  doc: Node;
+  fn: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       _                                14, 16
+       ●   comment
+  14       (comment) [Node Set(M0)]         10
+       ●   comment
+  10       (function_declaration) [Node Set(M1)]  12
+       ●   function_declaration
+  12       _                                13
+       ●   program
+  13   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"doc":{"kind":"comment","text":"// doc","span":[0, 6]},"fn":{"kind":"function_declaration","text":"function f() {}","span":[7, 22]}}

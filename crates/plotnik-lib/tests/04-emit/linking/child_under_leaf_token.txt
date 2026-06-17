@@ -1,0 +1,11 @@
+Q = (identifier (_))
+==== diagnostics ====
+error: `identifier` is a leaf token — it has no child nodes
+ --> query.ptk:1:17
+  |
+1 | Q = (identifier (_))
+  |      ---------- ^^^
+  |      |
+  |      `identifier`
+  |
+help: a leaf token's content is its text — match it directly `(identifier)` or by value `(identifier == "foo")`

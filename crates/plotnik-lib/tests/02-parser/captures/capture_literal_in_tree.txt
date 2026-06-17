@@ -1,0 +1,24 @@
+Q = (binary_expression "+" @op)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "binary_expression"
+      Capture
+        Str
+          DoubleQuote "\""
+          StrVal "+"
+          DoubleQuote "\""
+        CaptureToken "@op"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode binary_expression
+      CapturedExpr @op
+        AnonymousNode "+"

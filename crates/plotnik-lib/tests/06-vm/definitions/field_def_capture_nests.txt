@@ -1,0 +1,91 @@
+Name = (identifier) @text
+Q = (program (function_declaration name: (Name) @fn))
+==== input ====
+function foo(){}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "text"
+S2 "fn"
+S3 "Name"
+S4 "Q"
+S5 "identifier"
+S6 "program"
+S7 "function_declaration"
+S8 "name"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { text }
+T2 = Struct  M1:1  ; { fn }
+
+[type_members]
+M0: S1 → T0  ; text: <Node>
+M1: S2 → T1  ; fn: Name
+
+[type_names]
+N0: S3 → T1  ; Name
+N1: S4 → T2  ; Q
+
+[entrypoints]
+Name = 06 :: T1
+Q    = 09 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Name:
+  06   !   (identifier) [Node Set(M0)]      08
+  08                                        ▶
+
+Q:
+  09   !   (program)                        10
+  10  └‣─  (function_declaration) [Obj]     12
+  12  └‣─  name: (Name)                     06 : 13
+  13  -ε-  [EndObj]                         15
+  15  -ε-                                   16
+  16  ─‣┘² [Set(M1)] _                      18
+  18                                        ▶
+==== types ====
+export interface Name {
+  text: Node;
+}
+
+export interface Q {
+  fn: Name;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  09       (program)                        10
+       ●   program
+  10       (function_declaration) [Obj]     12
+       ●   function_declaration
+  12       (Name)                           06 : 13
+       ▶   (Name)
+
+Name:
+  06       (identifier) [Node Set(M0)]      08
+       ●   identifier
+  08   ◀   (Name)                           
+
+Q:
+  13  -ε-  [EndObj]                         15
+  15  -ε-                                   16
+  16       [Set(M1)] _                      18
+       ●   program
+  18   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"fn":{"text":{"kind":"identifier","text":"foo","span":[9, 12]}}}

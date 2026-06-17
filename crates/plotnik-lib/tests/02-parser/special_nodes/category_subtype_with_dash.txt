@@ -1,0 +1,18 @@
+Q = (expression#member-expression)
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "expression"
+      Hash "#"
+      Id "member-expression"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode expression

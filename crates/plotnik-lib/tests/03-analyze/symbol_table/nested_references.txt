@@ -1,0 +1,16 @@
+A = (a)
+B = (b (A))
+C = (c (B))
+D = (d (C) (A))
+==== symbols ====
+A
+B
+  A
+C
+  B
+    A
+D
+  A
+  C
+    B
+      A

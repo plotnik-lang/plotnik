@@ -1,0 +1,37 @@
+Q = (pair key: (property_identifier) . value: _)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "pair"
+S3 "property_identifier"
+S4 "key"
+S5 "value"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 06 :: T0
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (pair)                           08
+  07  ...  
+  08  └‣─  _                                13, 14
+  10  ─◦─  value: _                         11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   key: (property_identifier)       10
+  14  ─‣─  _                                13, 14

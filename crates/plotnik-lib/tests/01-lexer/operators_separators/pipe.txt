@@ -1,0 +1,7 @@
+a | b | c
+==== tokens ====
+Id "a"
+Pipe "|"
+Id "b"
+Pipe "|"
+Id "c"

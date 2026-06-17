@@ -1,0 +1,84 @@
+Q = (program (expression_statement (binary_expression [(identifier) @left ";"] . (identifier) @right)))
+==== input ====
+a + /* c */ b
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "left"
+S2 "right"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "binary_expression"
+S7 "identifier"
+S8 ";"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { left, right }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; left: T2
+M1: S2 → T0  ; right: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (binary_expression)              09
+  09  └‣─  _                                16, 18, 20
+  11                                        ▶
+  12  ─◦─  (identifier) [Node Set(M1)]      22
+  14  ─•─  (identifier) [Node Set(M1)]      22
+  16   !   (identifier) [Node Set(M0)]      14
+  18   !   [Null Set(M0)] ";"               12
+  20  ─‣─  _                                16, 18, 20
+  22  ─‣┘³ _                                11
+==== types ====
+export interface Q {
+  left: Node | null;
+  right: Node;
+}
+==== trace ====
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (binary_expression)              09
+       ●   binary_expression
+  09       _                                16, 18, 20
+       ●   identifier
+  16       (identifier) [Node Set(M0)]      14
+       ●   identifier
+  14       (identifier) [Node Set(M1)]      22
+       ○   +
+       ○   comment
+       ●   identifier
+  22       _                                11
+       ●   program
+  11   ◀   (Q)                              
+
+_ObjWrap:
+  03  -ε-  [EndObj]                         05
+  05   ◀   _ObjWrap                         ◼
+==== output ====
+{"left":{"kind":"identifier","text":"a","span":[0, 1]},"right":{"kind":"identifier","text":"b","span":[12, 13]}}

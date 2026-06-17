@@ -1,0 +1,12 @@
+(identifier) @name : Type
+==== diagnostics ====
+error: type annotations use `::`, not `:`
+ --> query.ptk:1:20
+  |
+1 | (identifier) @name : Type
+  |                    ^
+  |
+help: use `::`
+  |
+1 | (identifier) @name :: Type
+  |                     +

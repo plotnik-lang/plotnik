@@ -1,0 +1,34 @@
+Q = (a
+    (b
+    (c
+        (d))))
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Tree
+      ParenOpen "("
+      Id "a"
+      Tree
+        ParenOpen "("
+        Id "b"
+        Tree
+          ParenOpen "("
+          Id "c"
+          Tree
+            ParenOpen "("
+            Id "d"
+            ParenClose ")"
+          ParenClose ")"
+        ParenClose ")"
+      ParenClose ")"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    NamedNode a
+      NamedNode b
+        NamedNode c
+          NamedNode d

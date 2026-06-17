@@ -1,0 +1,78 @@
+Ident = (identifier) @name :: string
+Expression = [
+    Literal: (number) @value
+    Variable: (identifier) @name
+]
+Assignment = (assignment_expression
+    left: (identifier) @target
+    right: (Expression) @value)
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "value"
+S03 "Literal"
+S04 "Variable"
+S05 "target"
+S06 "Ident"
+S07 "Expression"
+S08 "Assignment"
+S09 "identifier"
+S10 "number"
+S11 "assignment_expression"
+S12 "left"
+S13 "right"
+
+[type_defs]
+T0 = <Node>
+T1 = <String>
+T2 = Struct  M0:1  ; { name }
+T3 = Struct  M1:1  ; { value }
+T4 = Struct  M2:1  ; { name }
+T5 = Enum    M3:2  ; Literal | Variable
+T6 = Struct  M5:2  ; { value, target }
+
+[type_members]
+M0: S01 → T1  ; name: <String>
+M1: S02 → T0  ; value: <Node>
+M2: S01 → T0  ; name: <Node>
+M3: S03 → T3  ; Literal: T3
+M4: S04 → T4  ; Variable: T4
+M5: S02 → T5  ; value: Expression
+M6: S05 → T0  ; target: <Node>
+
+[type_names]
+N0: S06 → T2  ; Ident
+N1: S07 → T5  ; Expression
+N2: S08 → T6  ; Assignment
+
+[entrypoints]
+Assignment = 11 :: T6
+Expression = 09 :: T5
+Ident      = 06 :: T2
+
+[transitions]
+_ObjWrap:
+  00  -ε-  [Obj]                            02
+  02       Trampoline                       03
+  03  -ε-  [EndObj]                         05
+  05                                        ▶
+
+Ident:
+  06   !   (identifier) [Text Set(M0)]      08
+  08                                        ▶
+
+Expression:
+  09  -ε-                                   20, 24
+
+Assignment:
+  11   !   (assignment_expression)          12
+  12  └‣─  left: (identifier) [Node Set(M6)]  14
+  14  ─‣─  right: (Expression)              09 : 16
+  15  ...  
+  16  ─‣┘  [Set(M5)] _                      18
+  18                                        ▶
+  19                                        ▶
+  20   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  19
+  23  ...  
+  24   !   [Enum(M4)] (identifier) [Node Set(M2) EndEnum]  19

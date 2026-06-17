@@ -1,0 +1,4 @@
+foo ^^^
+==== tokens ====
+Id "foo"
+Garbage "^^^"

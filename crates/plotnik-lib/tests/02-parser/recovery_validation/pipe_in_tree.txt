@@ -1,0 +1,25 @@
+(a | b)
+==== diagnostics ====
+error: patterns are separated by whitespace
+ --> query.ptk:1:4
+  |
+1 | (a | b)
+  |    ^
+  |
+help: remove the `|`
+  |
+1 - (a | b)
+1 + (a  b)
+  |
+
+error: node types must be parenthesized
+ --> query.ptk:1:6
+  |
+1 | (a | b)
+  |      ^
+  |
+help: wrap in parentheses
+  |
+1 - (a | b)
+1 + (a | (b))
+  |
