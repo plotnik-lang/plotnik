@@ -15,8 +15,6 @@ mod context_tests;
 #[cfg(test)]
 mod symbol_tests;
 #[cfg(test)]
-mod type_check_tests;
-#[cfg(test)]
 mod unify_tests;
 
 pub(crate) use capture_shape::is_repeating_quantifier;

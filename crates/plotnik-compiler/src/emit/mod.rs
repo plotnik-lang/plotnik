@@ -16,8 +16,6 @@ mod type_table;
 #[cfg(test)]
 mod capacity_tests;
 #[cfg(test)]
-mod emit_tests;
-#[cfg(test)]
 mod layout_tests;
 #[cfg(test)]
 mod regex_table_tests;

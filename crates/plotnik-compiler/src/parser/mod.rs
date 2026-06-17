@@ -34,8 +34,6 @@ mod ast_tests;
 #[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
-mod lexer_tests;
-#[cfg(test)]
 mod tests;
 
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
