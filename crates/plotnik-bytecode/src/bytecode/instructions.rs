@@ -241,15 +241,24 @@ pub struct Match<'a> {
     pub node_type: NodeTypeIR,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
-    is_match8: bool,
-    /// For Match8: the single successor (0 = terminal).
-    match8_next: u16,
-    pre_count: u8,
-    neg_count: u8,
-    post_count: u8,
-    succ_count: u8,
-    /// Whether this instruction has a predicate (4-byte payload).
-    has_predicate: bool,
+    layout: MatchLayout,
+}
+
+/// The two payload shapes of a [`Match`], discriminated by the opcode: the
+/// `Match8` fast path carries a single inline successor, while `Extended`
+/// (`Match16`-`Match64`) packs the counts addressing the effect slots,
+/// successors, and optional predicate.
+#[derive(Clone, Copy, Debug)]
+enum MatchLayout {
+    /// `next == 0` means terminal.
+    Match8 { next: u16 },
+    Extended {
+        pre_count: u8,
+        neg_count: u8,
+        post_count: u8,
+        succ_count: u8,
+        has_predicate: bool,
+    },
 }
 
 impl<'a> Match<'a> {
@@ -275,14 +284,19 @@ impl<'a> Match<'a> {
         let node_type = NodeTypeIR::from_bytes(node_kind, node_type_val);
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
-        let (is_match8, match8_next, pre_count, neg_count, post_count, succ_count, has_predicate) =
-            if opcode == Opcode::Match8 {
-                let next = u16::from_le_bytes([bytes[6], bytes[7]]);
-                (true, next, 0, 0, 0, if next == 0 { 0 } else { 1 }, false)
-            } else {
-                let c = Counts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
-                (false, 0, c.pre, c.neg, c.post, c.succ, c.has_predicate)
-            };
+        let layout = if opcode == Opcode::Match8 {
+            let next = u16::from_le_bytes([bytes[6], bytes[7]]);
+            MatchLayout::Match8 { next }
+        } else {
+            let c = Counts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
+            MatchLayout::Extended {
+                pre_count: c.pre,
+                neg_count: c.neg,
+                post_count: c.post,
+                succ_count: c.succ,
+                has_predicate: c.has_predicate,
+            }
+        };
 
         Self {
             bytes,
@@ -290,19 +304,13 @@ impl<'a> Match<'a> {
             nav,
             node_type,
             node_field,
-            is_match8,
-            match8_next,
-            pre_count,
-            neg_count,
-            post_count,
-            succ_count,
-            has_predicate,
+            layout,
         }
     }
 
     #[inline]
     pub fn is_terminal(&self) -> bool {
-        self.succ_count == 0
+        self.succ_count() == 0
     }
 
     #[inline]
@@ -313,7 +321,7 @@ impl<'a> Match<'a> {
     /// Check if this is a Match8 (8-byte fast-path instruction).
     #[inline]
     pub fn is_match8(&self) -> bool {
-        self.is_match8
+        matches!(self.layout, MatchLayout::Match8 { .. })
     }
 
     /// Steps (8-byte slots) this instruction occupies, read from its opcode.
@@ -327,25 +335,28 @@ impl<'a> Match<'a> {
     /// Number of successors.
     #[inline]
     pub fn succ_count(&self) -> usize {
-        self.succ_count as usize
+        match self.layout {
+            MatchLayout::Match8 { next } => (next != 0) as usize,
+            MatchLayout::Extended { succ_count, .. } => succ_count as usize,
+        }
     }
 
     #[inline]
     pub fn successor(&self, idx: usize) -> StepId {
-        debug_assert!(
-            idx < self.succ_count as usize,
-            "successor index out of bounds"
-        );
-        if self.is_match8 {
-            debug_assert!(idx == 0);
-            debug_assert!(self.match8_next != 0, "terminal has no successors");
-            StepId::new(self.match8_next)
-        } else {
-            let offset = self.succ_offset() + idx * PAYLOAD_SLOT_SIZE;
-            StepId::new(u16::from_le_bytes([
-                self.bytes[offset],
-                self.bytes[offset + 1],
-            ]))
+        debug_assert!(idx < self.succ_count(), "successor index out of bounds");
+        match self.layout {
+            MatchLayout::Match8 { next } => {
+                debug_assert!(idx == 0);
+                debug_assert!(next != 0, "terminal has no successors");
+                StepId::new(next)
+            }
+            MatchLayout::Extended { .. } => {
+                let offset = self.succ_offset() + idx * PAYLOAD_SLOT_SIZE;
+                StepId::new(u16::from_le_bytes([
+                    self.bytes[offset],
+                    self.bytes[offset + 1],
+                ]))
+            }
         }
     }
 
@@ -353,7 +364,7 @@ impl<'a> Match<'a> {
     #[inline]
     pub fn pre_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
         let start = MATCH_PAYLOAD_START;
-        (0..self.pre_count as usize).map(move |i| {
+        (0..self.pre_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
             EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
@@ -362,8 +373,8 @@ impl<'a> Match<'a> {
     /// Iterate over negated fields (must NOT be present on matched node).
     #[inline]
     pub fn neg_fields(&self) -> impl Iterator<Item = u16> + '_ {
-        let start = MATCH_PAYLOAD_START + (self.pre_count as usize) * PAYLOAD_SLOT_SIZE;
-        (0..self.neg_count as usize).map(move |i| {
+        let start = MATCH_PAYLOAD_START + self.pre_count() * PAYLOAD_SLOT_SIZE;
+        (0..self.neg_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
             u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
@@ -372,9 +383,8 @@ impl<'a> Match<'a> {
     /// Iterate over post-effects (executed after successful match).
     #[inline]
     pub fn post_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
-        let start = MATCH_PAYLOAD_START
-            + (self.pre_count as usize + self.neg_count as usize) * PAYLOAD_SLOT_SIZE;
-        (0..self.post_count as usize).map(move |i| {
+        let start = MATCH_PAYLOAD_START + (self.pre_count() + self.neg_count()) * PAYLOAD_SLOT_SIZE;
+        (0..self.post_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
             EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
@@ -382,12 +392,18 @@ impl<'a> Match<'a> {
 
     #[inline]
     pub fn successors(&self) -> impl Iterator<Item = StepId> + '_ {
-        (0..self.succ_count as usize).map(move |i| self.successor(i))
+        (0..self.succ_count()).map(move |i| self.successor(i))
     }
 
     #[inline]
     pub fn has_predicate(&self) -> bool {
-        self.has_predicate
+        matches!(
+            self.layout,
+            MatchLayout::Extended {
+                has_predicate: true,
+                ..
+            }
+        )
     }
 
     /// Get predicate data if present: (op, is_regex, value_ref).
@@ -396,7 +412,7 @@ impl<'a> Match<'a> {
     /// - `is_regex`: true if value_ref is a RegexTable index, false if StringTable index
     /// - `value_ref`: index into the appropriate table
     pub fn predicate(&self) -> Option<(u8, bool, u16)> {
-        if !self.has_predicate {
+        if !self.has_predicate() {
             return None;
         }
 
@@ -411,18 +427,41 @@ impl<'a> Match<'a> {
         Some((op, is_regex, value_ref))
     }
 
+    #[inline]
+    fn pre_count(&self) -> usize {
+        match self.layout {
+            MatchLayout::Extended { pre_count, .. } => pre_count as usize,
+            MatchLayout::Match8 { .. } => 0,
+        }
+    }
+
+    #[inline]
+    fn neg_count(&self) -> usize {
+        match self.layout {
+            MatchLayout::Extended { neg_count, .. } => neg_count as usize,
+            MatchLayout::Match8 { .. } => 0,
+        }
+    }
+
+    #[inline]
+    fn post_count(&self) -> usize {
+        match self.layout {
+            MatchLayout::Extended { post_count, .. } => post_count as usize,
+            MatchLayout::Match8 { .. } => 0,
+        }
+    }
+
     /// Bytes occupied by the pre/neg/post payload slots.
     #[inline]
     fn effects_size(&self) -> usize {
-        (self.pre_count as usize + self.neg_count as usize + self.post_count as usize)
-            * PAYLOAD_SLOT_SIZE
+        (self.pre_count() + self.neg_count() + self.post_count()) * PAYLOAD_SLOT_SIZE
     }
 
     /// Byte offset where successors start in the payload.
     /// Accounts for the predicate slots if present.
     #[inline]
     fn succ_offset(&self) -> usize {
-        let predicate_size = if self.has_predicate {
+        let predicate_size = if self.has_predicate() {
             PREDICATE_SIZE
         } else {
             0

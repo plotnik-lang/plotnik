@@ -4,10 +4,10 @@
 //! - Mixed tagged/untagged alternations
 
 use super::ValidateInput;
-use crate::SourceId;
+use crate::analyze::Reporter;
 use crate::analyze::invariants::ensure_both_branch_kinds;
 use crate::analyze::visitor::{Visitor, walk, walk_alt_expr};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{AltExpr, AltKind, Branch, Root};
 
 pub fn validate_alt_kinds(input: ValidateInput) {
@@ -17,13 +17,14 @@ pub fn validate_alt_kinds(input: ValidateInput) {
         diag,
         ..
     } = input;
-    let mut visitor = AltKindsValidator { diag, source_id };
+    let mut visitor = AltKindsValidator {
+        reporter: Reporter::new(source_id, diag),
+    };
     visitor.visit(ast);
 }
 
 struct AltKindsValidator<'a> {
-    diag: &'a mut Diagnostics,
-    source_id: SourceId,
+    reporter: Reporter<'a>,
 }
 
 impl Visitor for AltKindsValidator<'_> {
@@ -63,13 +64,13 @@ impl AltKindsValidator<'_> {
             .expect("tagged branch found via filter must have label")
             .text_range();
 
-        self.diag
+        let source = self.reporter.source();
+        self.reporter
             .report(
-                self.source_id,
                 DiagnosticKind::MixedAltBranches,
                 untagged_branch.text_range(),
             )
-            .related_to(self.source_id, tagged_range, "tagged branch here")
+            .related_to(source, tagged_range, "tagged branch here")
             .emit();
     }
 }

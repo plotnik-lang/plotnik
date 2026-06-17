@@ -9,9 +9,9 @@ use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
 use rowan::TextRange;
 
 use super::ValidateInput;
-use crate::SourceId;
+use crate::analyze::Reporter;
 use crate::analyze::visitor::{Visitor, walk_named_node};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::NamedNode;
 
 pub fn validate_predicates(input: ValidateInput) {
@@ -23,16 +23,14 @@ pub fn validate_predicates(input: ValidateInput) {
     } = input;
     let source = source_content.expect("predicate validation requires source content");
     let mut validator = PredicateValidator {
-        diag,
-        source_id,
+        reporter: Reporter::new(source_id, diag),
         source,
     };
     validator.visit(ast);
 }
 
 struct PredicateValidator<'q, 'd> {
-    diag: &'d mut Diagnostics,
-    source_id: SourceId,
+    reporter: Reporter<'d>,
     source: &'q str,
 }
 
@@ -52,8 +50,8 @@ impl Visitor for PredicateValidator<'_, '_> {
 impl PredicateValidator<'_, '_> {
     fn validate_regex(&mut self, pattern: &str, regex_range: TextRange) {
         if pattern.is_empty() {
-            self.diag
-                .report(self.source_id, DiagnosticKind::EmptyRegex, regex_range)
+            self.reporter
+                .report(DiagnosticKind::EmptyRegex, regex_range)
                 .emit();
             return;
         }
@@ -69,21 +67,20 @@ impl PredicateValidator<'_, '_> {
             Err(e) => {
                 let span = self.map_regex_span(e.span(), regex_range);
                 let report = match e.kind() {
-                    ast::ErrorKind::UnsupportedBackreference => {
-                        self.diag
-                            .report(self.source_id, DiagnosticKind::RegexBackreference, span)
-                    }
+                    ast::ErrorKind::UnsupportedBackreference => self
+                        .reporter
+                        .report(DiagnosticKind::RegexBackreference, span),
                     ast::ErrorKind::UnsupportedLookAround => {
                         // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
                         use rowan::TextSize;
                         let adjusted =
                             TextRange::new(span.start() + TextSize::from(1u32), span.end());
-                        self.diag
-                            .report(self.source_id, DiagnosticKind::RegexLookaround, adjusted)
+                        self.reporter
+                            .report(DiagnosticKind::RegexLookaround, adjusted)
                     }
                     _ => self
-                        .diag
-                        .report(self.source_id, DiagnosticKind::RegexSyntaxError, span)
+                        .reporter
+                        .report(DiagnosticKind::RegexSyntaxError, span)
                         .message(format!("{}", e.kind())),
                 };
                 report.emit();
@@ -100,8 +97,8 @@ impl PredicateValidator<'_, '_> {
             let span = self.map_regex_span(&capture_span, regex_range);
             // The span covers `?P<name>` / `?<name>` (the `(` is excluded), so deleting it
             // turns `(?P<name>foo)` into a plain group `(foo)`.
-            self.diag
-                .report(self.source_id, DiagnosticKind::RegexNamedCapture, span)
+            self.reporter
+                .report(DiagnosticKind::RegexNamedCapture, span)
                 .fix("remove the named-capture marker", "")
                 .emit();
         }

@@ -88,10 +88,15 @@ impl MemberRef {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectIR {
     opcode: EffectOpcode,
-    /// Payload for effects that don't use member indices.
-    payload: usize,
-    /// Member reference for Set/Enum effects (None for all other effects).
-    member_ref: Option<MemberRef>,
+    payload: EffectPayload,
+}
+
+/// An effect's payload: a raw value, or a symbolic member reference — used by
+/// Set/Enum effects — resolved to a member index during emission.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum EffectPayload {
+    Raw(usize),
+    Member(MemberRef),
 }
 
 impl EffectIR {
@@ -101,25 +106,18 @@ impl EffectIR {
         self.opcode
     }
 
-    /// The raw payload for effects that don't use member indices.
-    #[inline]
-    pub fn payload(&self) -> usize {
-        self.payload
-    }
-
+    /// Create a simple effect without member reference.
     pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
         Self {
             opcode,
-            payload,
-            member_ref: None,
+            payload: EffectPayload::Raw(payload),
         }
     }
 
     pub fn with_member(opcode: EffectOpcode, member_ref: MemberRef) -> Self {
         Self {
             opcode,
-            payload: 0,
-            member_ref: Some(member_ref),
+            payload: EffectPayload::Member(member_ref),
         }
     }
 
@@ -184,10 +182,9 @@ impl EffectIR {
     }
 
     pub fn resolve(&self, ctx: &EmitContext) -> EffectOp {
-        let payload = if let Some(member_ref) = self.member_ref {
-            member_ref.resolve(ctx) as usize
-        } else {
-            self.payload
+        let payload = match &self.payload {
+            EffectPayload::Member(member_ref) => member_ref.resolve(ctx) as usize,
+            EffectPayload::Raw(payload) => *payload,
         };
         EffectOp::new(self.opcode, payload)
     }
