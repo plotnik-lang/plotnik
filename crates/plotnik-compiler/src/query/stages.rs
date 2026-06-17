@@ -167,17 +167,6 @@ impl QueryParsed {
 
 pub type Query = QueryAnalyzed;
 
-/// A unified view of the core analysis context.
-///
-/// Bundles references to the three main analysis artifacts that downstream
-/// modules (compile, emit) commonly need together.
-#[derive(Clone, Copy)]
-pub struct QueryContext<'q> {
-    pub interner: &'q Interner,
-    pub type_ctx: &'q TypeContext,
-    pub symbol_table: &'q SymbolTable,
-}
-
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     interner: Interner,
@@ -188,14 +177,6 @@ pub struct QueryAnalyzed {
 impl QueryAnalyzed {
     pub fn is_valid(&self) -> bool {
         !self.diag.has_errors()
-    }
-
-    pub fn context(&self) -> QueryContext<'_> {
-        QueryContext {
-            interner: &self.interner,
-            type_ctx: &self.type_context,
-            symbol_table: &self.symbol_table,
-        }
     }
 
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {

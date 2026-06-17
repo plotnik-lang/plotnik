@@ -15,5 +15,5 @@ mod source_map_tests;
 pub use printer::QueryPrinter;
 pub use source_map::{Source, SourceId, SourceKind, SourceMap};
 pub use stages::{
-    AstMap, LinkedQuery, Query, QueryAnalyzed, QueryBuilder, QueryConfig, QueryContext, QueryParsed,
+    AstMap, LinkedQuery, Query, QueryAnalyzed, QueryBuilder, QueryConfig, QueryParsed,
 };
