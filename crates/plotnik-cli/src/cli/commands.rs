@@ -145,9 +145,8 @@ pub fn dump_command() -> Command {
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik dump query.ptk             # unlinked bytecode
-  plotnik dump query.ptk -l ts       # linked (resolved node types)
-  plotnik dump -q 'Q = ...'          # inline query"#,
+  plotnik dump query.ptk -l ts       # resolved node types
+  plotnik dump -q 'Q = ...' -l ts    # inline query"#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")

@@ -34,13 +34,14 @@ fn resolve_anonymous_node_type_uses_anonymous_namespace() {
     let type_ctx = TypeContext::new();
     let symbol_table = SymbolTable::new();
     let strings = RefCell::new(StringTableBuilder::new());
+    let node_fields = IndexMap::new();
     let ctx = CompileCtx {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,
         strings: &strings,
-        node_types: Some(&node_types),
-        node_fields: None,
+        node_types: &node_types,
+        node_fields: &node_fields,
     };
     let mut compiler = Compiler::new(&ctx);
 

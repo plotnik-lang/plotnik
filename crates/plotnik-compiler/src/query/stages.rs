@@ -11,7 +11,7 @@ use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{
-    ValidateInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
+    PredicateInput, ValidateInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
     validate_predicates,
 };
 use crate::analyze::{dependencies, validate_recursion};
@@ -77,25 +77,22 @@ impl QueryBuilder {
             validate_alt_kinds(ValidateInput {
                 source_id: source.id,
                 ast: res.ast(),
-                source_content: None,
                 diag: &mut diag,
             });
             validate_anchors(ValidateInput {
                 source_id: source.id,
                 ast: res.ast(),
-                source_content: None,
                 diag: &mut diag,
             });
             validate_empty_constructs(ValidateInput {
                 source_id: source.id,
                 ast: res.ast(),
-                source_content: None,
                 diag: &mut diag,
             });
-            validate_predicates(ValidateInput {
+            validate_predicates(PredicateInput {
                 source_id: source.id,
                 ast: res.ast(),
-                source_content: Some(source.content),
+                source_content: source.content,
                 diag: &mut diag,
             });
             total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed());
@@ -170,17 +167,6 @@ impl QueryParsed {
 
 pub type Query = QueryAnalyzed;
 
-/// A unified view of the core analysis context.
-///
-/// Bundles references to the three main analysis artifacts that downstream
-/// modules (compile, emit) commonly need together.
-#[derive(Clone, Copy)]
-pub struct QueryContext<'q> {
-    pub interner: &'q Interner,
-    pub type_ctx: &'q TypeContext,
-    pub symbol_table: &'q SymbolTable,
-}
-
 pub struct QueryAnalyzed {
     query_parsed: QueryParsed,
     interner: Interner,
@@ -191,14 +177,6 @@ pub struct QueryAnalyzed {
 impl QueryAnalyzed {
     pub fn is_valid(&self) -> bool {
         !self.diag.has_errors()
-    }
-
-    pub fn context(&self) -> QueryContext<'_> {
-        QueryContext {
-            interner: &self.interner,
-            type_ctx: &self.type_context,
-            symbol_table: &self.symbol_table,
-        }
     }
 
     pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {

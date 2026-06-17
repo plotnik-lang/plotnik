@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::engine::{Materializer, RuntimeError, VM, ValueMaterializer, debug_verify_type};
+use plotnik_lib::engine::{RuntimeError, VM, materialize_verified};
 
 use super::run_common::{self, PreparedQuery, QueryInput};
 use crate::error::{CliError, CliResult};
@@ -46,13 +46,14 @@ pub fn run(args: RunArgs) -> CliResult {
         Err(e) => return Err(CliError::fatal(format!("runtime error: {}", e))),
     };
 
-    let materializer = ValueMaterializer::new(&source_code, module.types(), module.strings());
-    let value = materializer.materialize(effects.as_slice(), entrypoint.result_type());
-
     let colors = Colors::new(args.color);
-
-    // Debug-only: verify output matches declared type
-    debug_verify_type(&value, entrypoint.result_type(), &module, colors);
+    let value = materialize_verified(
+        &source_code,
+        &module,
+        &entrypoint,
+        effects.as_slice(),
+        colors,
+    );
 
     let output = value.format(args.pretty, colors);
     println!("{}", output);

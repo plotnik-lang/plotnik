@@ -19,6 +19,7 @@ use super::types::{
 };
 use super::unify::{UnifyError, unify_flows};
 
+use crate::analyze::Reporter;
 use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
@@ -43,15 +44,11 @@ enum AnnotationKind {
 }
 
 /// Shared state for a single inference pass over the AST.
-///
-/// `source_id` tracks the file currently being walked; it is restored after the
-/// visitor descends through a cross-file reference.
 pub struct InferenceContext<'a, 'd> {
     pub type_ctx: &'a mut TypeContext,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
-    pub source_id: SourceId,
-    pub diag: &'d mut Diagnostics,
+    pub(crate) reporter: Reporter<'d>,
 }
 
 /// Inference visitor for a single pass over the AST.
@@ -62,6 +59,15 @@ pub struct InferenceVisitor<'a, 'd> {
 impl<'a, 'd> InferenceVisitor<'a, 'd> {
     pub fn new(ctx: InferenceContext<'a, 'd>) -> Self {
         Self { ctx }
+    }
+
+    /// Switch the active source for the cross-file descent in `f`, so the
+    /// diagnostics it emits resolve against the referenced file's content.
+    fn with_source<R>(&mut self, source: SourceId, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = self.ctx.reporter.swap_source(source);
+        let result = f(self);
+        self.ctx.reporter.swap_source(saved);
+        result
     }
 
     /// Infer the TermInfo for an expression, caching the result.
@@ -153,11 +159,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // workspace file, so expand it under its own source — otherwise any
         // diagnostic emitted here carries this file's source id with a foreign
         // text range (out-of-bounds when slicing the wrong content).
-        let saved_source = self.ctx.source_id;
-        self.ctx.source_id = ref_source;
-        let info = self.infer_expr(body);
-        self.ctx.source_id = saved_source;
-        info
+        self.with_source(ref_source, |this| this.infer_expr(body))
     }
 
     /// Check if an expression body will produce an Enum type (Scalar flow).
@@ -225,12 +227,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 }
                 Entry::Occupied(_) => {
                     self.ctx
-                        .diag
-                        .report(
-                            self.ctx.source_id,
-                            DiagnosticKind::DuplicateCaptureInScope,
-                            range,
-                        )
+                        .reporter
+                        .report(DiagnosticKind::DuplicateCaptureInScope, range)
                         .message(self.ctx.interner.resolve(name))
                         .emit();
                 }
@@ -260,9 +258,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             // with fewer variants than the emitter expects. Reject them instead.
             if variants.contains_key(&label_sym) {
                 self.ctx
-                    .diag
+                    .reporter
                     .report(
-                        self.ctx.source_id,
                         DiagnosticKind::DuplicateAlternationLabel,
                         label.text_range(),
                     )
@@ -481,12 +478,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     fn report_invalid_annotation(&mut self, range: TextRange, message: &str) {
         self.ctx
-            .diag
-            .report(
-                self.ctx.source_id,
-                DiagnosticKind::InvalidTypeAnnotation,
-                range,
-            )
+            .reporter
+            .report(DiagnosticKind::InvalidTypeAnnotation, range)
             .message(message)
             .emit();
     }
@@ -666,11 +659,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "field".to_string());
 
-        let mut builder = self.ctx.diag.report(
-            self.ctx.source_id,
-            DiagnosticKind::FieldSequenceValue,
-            value.text_range(),
-        );
+        let mut builder = self
+            .ctx
+            .reporter
+            .report(DiagnosticKind::FieldSequenceValue, value.text_range());
         builder = builder.message(field_name);
 
         if let Expr::Ref(r) = value
@@ -708,9 +700,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // multiple nodes per iteration as a scalar
         if inner_info.arity == Arity::Many && inner_info.flow.is_void() {
             self.ctx
-                .diag
+                .reporter
                 .report(
-                    self.ctx.source_id,
                     DiagnosticKind::MultiElementScalarCapture,
                     quant.text_range(),
                 )
@@ -743,9 +734,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let captures_str = capture_names.join(", ");
 
         self.ctx
-            .diag
+            .reporter
             .report(
-                self.ctx.source_id,
                 DiagnosticKind::StrictDimensionalityViolation,
                 quant.text_range(),
             )
@@ -825,15 +815,11 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         parent_range: TextRange,
         outputs: &[(TextRange, TypeId)],
     ) {
-        let source_id = self.ctx.source_id;
+        let source_id = self.ctx.reporter.source();
         let mut builder = self
             .ctx
-            .diag
-            .report(
-                source_id,
-                DiagnosticKind::AmbiguousUncapturedOutputs,
-                parent_range,
-            )
+            .reporter
+            .report(DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
             .message(format!(
                 "{} expressions here produce a value but none is captured",
                 outputs.len()
@@ -847,12 +833,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     fn report_uncaptured_output_with_captures(&mut self, outputs: &[(TextRange, TypeId)]) {
         for (range, _) in outputs {
             self.ctx
-                .diag
-                .report(
-                    self.ctx.source_id,
-                    DiagnosticKind::UncapturedOutputWithCaptures,
-                    *range,
-                )
+                .reporter
+                .report(DiagnosticKind::UncapturedOutputWithCaptures, *range)
                 .emit();
         }
     }
@@ -883,11 +865,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             ),
         };
 
-        let mut builder = self
-            .ctx
-            .diag
-            .report(self.ctx.source_id, kind, range)
-            .message(msg);
+        let mut builder = self.ctx.reporter.report(kind, range).message(msg);
         if let Some(h) = hint {
             builder = builder.hint(h);
         }
@@ -1014,8 +992,7 @@ impl<'a> InferencePass<'a> {
                 type_ctx: &mut self.ctx,
                 interner: self.interner,
                 symbol_table: self.symbol_table,
-                source_id,
-                diag: self.diag,
+                reporter: Reporter::new(source_id, self.diag),
             },
             root,
         );

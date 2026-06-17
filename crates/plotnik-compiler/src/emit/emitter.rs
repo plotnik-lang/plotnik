@@ -32,8 +32,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         type_ctx,
         symbol_table,
         strings: &strings,
-        node_types: Some(node_type_ids),
-        node_fields: Some(node_field_ids),
+        node_types: node_type_ids,
+        node_fields: node_field_ids,
     };
     let compile_result = Compiler::compile(&ctx).map_err(EmitError::Compile)?;
 

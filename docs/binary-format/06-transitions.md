@@ -164,17 +164,9 @@ struct Match8 {
 | `01` (Named) | Check `is_named()`  | Check `kind_id() == value` |
 | `10` (Anon)  | Check `!is_named()` | Check `kind_id() == value` |
 
-**Linked vs Unlinked Interpretation**:
+**node_type / node_field**:
 
-Bytes 2-5 (`node_type` and `node_field`) have different meanings based on the header's `linked` flag:
-
-| Mode     | `node_type` (bytes 2-3)          | `node_field` (bytes 4-5)          |
-| -------- | -------------------------------- | --------------------------------- |
-| Linked   | `NodeTypeId` from tree-sitter    | `NodeFieldId` from tree-sitter    |
-| Unlinked | `StringId` pointing to type name | `StringId` pointing to field name |
-
-In **linked mode**, the runtime can directly compare against tree-sitter node types/fields.
-In **unlinked mode**, a linking step must first resolve the `StringId` references to grammar IDs before execution.
+Bytes 2-3 (`node_type`) hold a tree-sitter `NodeTypeId`; bytes 4-5 (`node_field`) hold a `NodeFieldId`. The runtime compares these directly against the tree-sitter node.
 
 ### 4.2. Match16–Match64
 

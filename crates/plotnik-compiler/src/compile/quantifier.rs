@@ -89,7 +89,7 @@ fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
 }
 
 /// Configuration for unified quantifier compilation.
-pub struct QuantifierConfig<'a> {
+pub(super) struct QuantifierConfig<'a> {
     pub inner: &'a Expr,
     pub kind: QuantifierKind,
     /// Navigation for the first iteration.
@@ -97,9 +97,9 @@ pub struct QuantifierConfig<'a> {
     /// Inside an array capture context — each matched element gets a Push.
     pub in_array_context: bool,
     pub element_capture: CaptureEffects,
-    pub needs_split_exits: bool,
-    pub match_exit: Label,
-    pub skip_exit: Option<Label>,
+    /// `Split` carries both the match and skip labels, so a skippable
+    /// quantifier cannot be requested without a skip exit.
+    pub exits: CaptureExits,
 }
 
 impl Compiler<'_> {
@@ -143,9 +143,7 @@ impl Compiler<'_> {
             first_nav: nav_override,
             in_array_context: false,
             element_capture: capture,
-            needs_split_exits: false,
-            match_exit: exit,
-            skip_exit: None,
+            exits: CaptureExits::Single(exit),
         };
 
         self.compile_quantified_unified(config)
@@ -175,9 +173,7 @@ impl Compiler<'_> {
             first_nav: nav_override,
             in_array_context: true,
             element_capture,
-            needs_split_exits: false,
-            match_exit: exit,
-            skip_exit: None,
+            exits: CaptureExits::Single(exit),
         };
 
         self.compile_quantified_unified(config)
@@ -254,9 +250,10 @@ impl Compiler<'_> {
             first_nav: nav_override,
             in_array_context: false,
             element_capture: capture,
-            needs_split_exits: true,
-            match_exit,
-            skip_exit: Some(skip_with_internal_null),
+            exits: CaptureExits::Split {
+                match_exit,
+                skip_exit: skip_with_internal_null,
+            },
         };
 
         self.compile_quantified_unified(config)
@@ -348,9 +345,10 @@ impl Compiler<'_> {
             first_nav: nav_override,
             in_array_context: true,
             element_capture: capture,
-            needs_split_exits: true,
-            match_exit,
-            skip_exit: Some(skip_exit),
+            exits: CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            },
         };
 
         self.compile_quantified_unified(config)
@@ -422,10 +420,10 @@ impl Compiler<'_> {
             first_nav,
             in_array_context,
             element_capture,
-            needs_split_exits,
-            match_exit,
-            skip_exit,
+            exits,
         } = config;
+
+        let match_exit = exits.match_exit();
 
         let needs_struct_wrapper =
             in_array_context && check_needs_struct_wrapper(inner, self.ctx.type_ctx);
@@ -463,20 +461,21 @@ impl Compiler<'_> {
                 first_iterate
             }
 
-            QuantifierKind::Star | QuantifierKind::StarNonGreedy => {
-                if needs_split_exits {
-                    let skip = skip_exit.expect("split exits requires skip_exit");
-                    self.compile_star_with_skip_retry_split_exits(
-                        inner,
-                        match_exit,
-                        skip,
-                        first_nav,
-                        element_capture,
-                        is_greedy,
-                        needs_struct_wrapper,
-                        row_type_id,
-                    )
-                } else {
+            QuantifierKind::Star | QuantifierKind::StarNonGreedy => match exits {
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit,
+                } => self.compile_star_with_skip_retry_split_exits(
+                    inner,
+                    match_exit,
+                    skip_exit,
+                    first_nav,
+                    element_capture,
+                    is_greedy,
+                    needs_struct_wrapper,
+                    row_type_id,
+                ),
+                CaptureExits::Single(_) => {
                     let loop_entry = self.fresh_label();
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
@@ -484,14 +483,15 @@ impl Compiler<'_> {
                     self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
                     self.emit_branch_epsilon(first_iterate, match_exit, is_greedy)
                 }
-            }
+            },
 
             QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
-                let skip_with_null = if needs_split_exits {
-                    skip_exit.expect("split exits requires skip_exit")
-                } else {
-                    let null_exit = self.emit_null_for_skip_path(match_exit, &element_capture);
-                    self.emit_null_for_internal_captures(null_exit, inner)
+                let skip_with_null = match exits {
+                    CaptureExits::Split { skip_exit, .. } => skip_exit,
+                    CaptureExits::Single(_) => {
+                        let null_exit = self.emit_null_for_skip_path(match_exit, &element_capture);
+                        self.emit_null_for_internal_captures(null_exit, inner)
+                    }
                 };
 
                 // Any failure backtracks to the entry epsilon's checkpoint, restoring

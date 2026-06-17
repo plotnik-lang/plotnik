@@ -297,14 +297,6 @@ impl From<TraceParams> for TraceArgs {
     }
 }
 
-pub struct LangListParams;
-
-impl LangListParams {
-    pub fn from_matches(_m: &ArgMatches) -> Self {
-        Self
-    }
-}
-
 pub struct LangDumpParams {
     pub lang: String,
 }

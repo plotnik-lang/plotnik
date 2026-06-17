@@ -665,11 +665,10 @@ mod debug_impl {
 
     fn resolve_node_type_name(
         id: NonZeroU16,
-        node_types: Option<&IndexMap<NodeType<Symbol>, plotnik_core::NodeTypeId>>,
+        node_types: &IndexMap<NodeType<Symbol>, plotnik_core::NodeTypeId>,
         interner: &plotnik_core::Interner,
     ) -> Option<String> {
-        let types = node_types?;
-        for (node_type, type_id) in types {
+        for (node_type, type_id) in node_types {
             if type_id.get() != id.get() {
                 continue;
             }
@@ -683,12 +682,11 @@ mod debug_impl {
 
     fn resolve_field_name(
         id: Option<NonZeroU16>,
-        node_fields: Option<&IndexMap<Symbol, plotnik_core::NodeFieldId>>,
+        node_fields: &IndexMap<Symbol, plotnik_core::NodeFieldId>,
         interner: &plotnik_core::Interner,
     ) -> Option<String> {
         let id = id?;
-        let fields = node_fields?;
-        for (sym, field_id) in fields {
+        for (sym, field_id) in node_fields {
             if field_id.get() == id.get() {
                 return interner.try_resolve(*sym).map(|s| s.to_string());
             }

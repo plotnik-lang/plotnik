@@ -7,9 +7,9 @@
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
 use super::ValidateInput;
-use crate::SourceId;
+use crate::analyze::Reporter;
 use crate::analyze::visitor::{Visitor, walk_named_node, walk_seq_expr};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::diagnostics::DiagnosticKind;
 use crate::parser::{NamedNode, SeqExpr, SeqItem};
 
 pub fn validate_anchors(input: ValidateInput) {
@@ -17,19 +17,16 @@ pub fn validate_anchors(input: ValidateInput) {
         source_id,
         ast,
         diag,
-        ..
     } = input;
     let mut visitor = AnchorValidator {
-        diag,
-        source_id,
+        reporter: Reporter::new(source_id, diag),
         in_named_node: false,
     };
     visitor.visit(ast);
 }
 
 struct AnchorValidator<'a> {
-    diag: &'a mut Diagnostics,
-    source_id: SourceId,
+    reporter: Reporter<'a>,
     in_named_node: bool,
 }
 
@@ -63,12 +60,8 @@ impl AnchorValidator<'_> {
                 let is_boundary = i == 0 || i == len - 1;
 
                 if is_boundary && !self.in_named_node {
-                    self.diag
-                        .report(
-                            self.source_id,
-                            DiagnosticKind::AnchorWithoutContext,
-                            anchor.text_range(),
-                        )
+                    self.reporter
+                        .report(DiagnosticKind::AnchorWithoutContext, anchor.text_range())
                         .emit();
                 }
             }
