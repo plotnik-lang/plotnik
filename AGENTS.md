@@ -233,9 +233,8 @@ cargo run -p plotnik -- check -q '(identifier) @id' -l javascript
 Show compiled bytecode.
 
 ```sh
-cargo run -p plotnik -- dump query.ptk                 # unlinked
-cargo run -p plotnik -- dump query.ptk -l typescript   # linked
-cargo run -p plotnik -- dump -q '(identifier) @id'
+cargo run -p plotnik -- dump query.ptk -l typescript
+cargo run -p plotnik -- dump -q '(identifier) @id' -l typescript
 ```
 
 ## infer

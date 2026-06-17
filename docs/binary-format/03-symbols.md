@@ -55,7 +55,7 @@ struct NodeSymbol {
 }
 ```
 
-In **linked** bytecode, this table enables name lookup for debugging and error messages. In **unlinked** bytecode, this section is empty.
+This table enables name lookup for debugging and error messages.
 
 ## 3. Node Fields
 

@@ -565,21 +565,16 @@ impl Compiler<'_> {
     }
 
     pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
-        if let Some(ids) = self.ctx.node_types {
-            // Linked mode: resolve to NodeTypeId from grammar
-            let Some(sym) = self.ctx.interner.get(text) else {
-                return NodeTypeIR::Anonymous(None);
-            };
-            ids.get(&NodeType::Anonymous(sym))
-                .and_then(|id| NonZeroU16::new(id.get()))
-                .map_or(NodeTypeIR::Anonymous(None), |id| {
-                    NodeTypeIR::Anonymous(Some(id))
-                })
-        } else {
-            // Unlinked mode: store StringId referencing the literal text
-            let string_id = self.ctx.strings.borrow_mut().intern_str(text);
-            NodeTypeIR::Anonymous(Some(string_id.0))
-        }
+        let Some(sym) = self.ctx.interner.get(text) else {
+            return NodeTypeIR::Anonymous(None);
+        };
+        self.ctx
+            .node_types
+            .get(&NodeType::Anonymous(sym))
+            .and_then(|id| NonZeroU16::new(id.get()))
+            .map_or(NodeTypeIR::Anonymous(None), |id| {
+                NodeTypeIR::Anonymous(Some(id))
+            })
     }
 
     /// Resolve a NamedNode to its node type constraint.
@@ -597,48 +592,32 @@ impl Compiler<'_> {
         };
         let type_name = type_token.text();
 
-        if let Some(ids) = self.ctx.node_types {
-            // Linked mode: resolve to NodeTypeId from grammar
-            let Some(sym) = self.ctx.interner.get(type_name) else {
-                return NodeTypeIR::Named(None);
-            };
-            ids.get(&NodeType::Named(sym))
-                .and_then(|id| NonZeroU16::new(id.get()))
-                .map_or(NodeTypeIR::Named(None), |id| NodeTypeIR::Named(Some(id)))
-        } else {
-            // Unlinked mode: store StringId referencing the type name
-            let string_id = self.ctx.strings.borrow_mut().intern_str(type_name);
-            NodeTypeIR::Named(Some(string_id.0))
-        }
+        let Some(sym) = self.ctx.interner.get(type_name) else {
+            return NodeTypeIR::Named(None);
+        };
+        self.ctx
+            .node_types
+            .get(&NodeType::Named(sym))
+            .and_then(|id| NonZeroU16::new(id.get()))
+            .map_or(NodeTypeIR::Named(None), |id| NodeTypeIR::Named(Some(id)))
     }
 
-    /// Resolve a field expression to its field ID.
-    ///
-    /// In linked mode, returns the grammar NodeFieldId.
-    /// In unlinked mode, returns the StringId of the field name.
+    /// Resolve a field expression to its grammar `NodeFieldId`.
     pub(super) fn resolve_field(&mut self, field: &ast::FieldExpr) -> Option<NonZeroU16> {
         let name_token = field.name()?;
         let field_name = name_token.text();
         self.resolve_field_by_name(field_name)
     }
 
-    /// Resolve a field name to its field ID.
+    /// Resolve a field name to its grammar `NodeFieldId`.
     ///
-    /// In linked mode, returns the grammar NodeFieldId.
-    /// In unlinked mode, returns the StringId of the field name.
+    /// An unknown field is left unconstrained (`None`).
     pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> Option<NonZeroU16> {
-        if let Some(ids) = self.ctx.node_fields {
-            // Linked mode: an unknown field is left unconstrained.
-            self.ctx
-                .interner
-                .get(field_name)
-                .and_then(|sym| ids.get(&sym))
-                .and_then(|id| NonZeroU16::new(id.get()))
-        } else {
-            // Unlinked mode: store StringId referencing the field name
-            let string_id = self.ctx.strings.borrow_mut().intern_str(field_name);
-            Some(string_id.0)
-        }
+        self.ctx
+            .interner
+            .get(field_name)
+            .and_then(|sym| self.ctx.node_fields.get(&sym))
+            .and_then(|id| NonZeroU16::new(id.get()))
     }
 
     pub(super) fn collect_neg_fields(&mut self, node: &ast::NamedNode) -> Vec<u16> {

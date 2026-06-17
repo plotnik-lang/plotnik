@@ -77,15 +77,11 @@ plotnik ast app.ts --raw
 Show compiled bytecode. For debugging the compiler.
 
 ```sh
-# Unlinked bytecode (parse + analyze + emit)
-plotnik dump -q 'Q = (identifier) @id'
-
-# Linked bytecode (+ link against grammar)
 plotnik dump -q 'Q = (identifier) @id' -l typescript
+plotnik dump query.ptk -l typescript
 ```
 
-Without `-l`: node kinds are unresolved symbols.
-With `-l`: node kinds are resolved to grammar IDs.
+Requires a language via `-l` or a shebang; node kinds are resolved to grammar IDs.
 
 ---
 

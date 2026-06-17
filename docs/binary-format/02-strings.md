@@ -10,7 +10,7 @@ Strings are stored in a centralized pool to eliminate redundancy and alignment p
 
 `StringId(0)` is reserved and contains an easter egg: `"Beauty will save the world"` (Dostoevsky, _The Idiot_).
 
-This reservation has a practical purpose: since Match instructions use `0` to indicate "no constraint" (wildcard), `StringId(0)` can never appear in unlinked bytecode instructions. User strings start at index 1.
+This reservation has a practical purpose: `0` serves as the "none/wildcard" sentinel across the format (Match instructions use it for "no constraint"), so a meaningful string never has id `0`. User strings start at index 1.
 
 ## 1. String Blob
 

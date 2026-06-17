@@ -30,8 +30,8 @@ pub struct CompileCtx<'a> {
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
     pub strings: &'a RefCell<StringTableBuilder>,
-    pub node_types: Option<&'a IndexMap<NodeType<Symbol>, NodeTypeId>>,
-    pub node_fields: Option<&'a IndexMap<Symbol, NodeFieldId>>,
+    pub node_types: &'a IndexMap<NodeType<Symbol>, NodeTypeId>,
+    pub node_fields: &'a IndexMap<Symbol, NodeFieldId>,
 }
 
 /// Compiler state for Thompson construction.

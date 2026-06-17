@@ -5,7 +5,7 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 
 /// Current bytecode format version.
 /// v2: Removed explicit offsets (computed from counts), added regex section.
-/// v3: Removed flags field (unlinked mode).
+/// v3: Removed flags field.
 /// v4: Removed the trivia section.
 /// v5: Added extras-only anchor navigation modes.
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
