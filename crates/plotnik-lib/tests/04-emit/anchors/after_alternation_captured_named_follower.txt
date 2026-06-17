@@ -1,4 +1,11 @@
-Q = {[(number) "+"] . (identifier) @id}
+Q = {
+  [
+    (number)
+    "+"
+  ]
+  .
+  (identifier) @id
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

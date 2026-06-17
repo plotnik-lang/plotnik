@@ -1,6 +1,9 @@
 Expr = [
   Lit: (number) @value :: string
-  Nested: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+  Nested: (call_expression
+    function: (identifier) @fn
+    arguments: (Expr) @inner
+  )
 ]
 
 Test = (program (Expr) @expr)

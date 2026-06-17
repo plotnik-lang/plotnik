@@ -1,4 +1,11 @@
-Q = (program {(lexical_declaration)? @a .! (debugger_statement) @b .!})
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .!
+    (debugger_statement) @b
+    .!
+  }
+)
 ==== input ====
 debugger;
 ==== bytecode ====

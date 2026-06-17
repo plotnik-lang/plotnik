@@ -1,4 +1,7 @@
-Q = [(identifier) @a (number) @b]
+Q = [
+  (identifier) @a
+  (number) @b
+]
 ==== types ====
 export interface Q {
   a: Node | null;

@@ -1,4 +1,7 @@
-Q = [Ident: (identifier) Num: (number)]
+Q = [
+  Ident: (identifier)
+  Num: (number)
+]
 ==== cst ====
 # query.ptk
 Root

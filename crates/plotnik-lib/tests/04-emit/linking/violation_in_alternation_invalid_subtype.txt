@@ -1,4 +1,7 @@
-Q = [(expression#statement_block) (identifier)]
+Q = [
+  (expression#statement_block)
+  (identifier)
+]
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

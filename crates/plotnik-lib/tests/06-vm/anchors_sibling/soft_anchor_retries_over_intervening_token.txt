@@ -1,4 +1,12 @@
-Q = (program (expression_statement (array "," . (number) @n)))
+Q = (program
+  (expression_statement
+    (array
+      ","
+      .
+      (number) @n
+    )
+  )
+)
 ==== input ====
 [1,,2]
 ==== bytecode ====

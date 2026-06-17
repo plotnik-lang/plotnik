@@ -1,4 +1,9 @@
-Q = {{(identifier) @id (number) @num} @row}* @rows
+Q = {
+  {
+    (identifier) @id
+    (number) @num
+  } @row
+}* @rows
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

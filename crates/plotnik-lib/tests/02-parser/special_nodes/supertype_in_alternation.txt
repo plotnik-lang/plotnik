@@ -1,28 +1,31 @@
-Q = [(expression/identifier) (expression/number)]
+Q = [
+  (expression/identifier)
+  (expression/number)
+]
 ==== diagnostics ====
 warning: `supertype/subtype` paths are tree-sitter syntax
- --> query.ptk:1:17
+ --> query.ptk:2:14
   |
-1 | Q = [(expression/identifier) (expression/number)]
-  |                 ^
+2 |   (expression/identifier)
+  |              ^
   |
 help: use `#`
   |
-1 - Q = [(expression/identifier) (expression/number)]
-1 + Q = [(expression#identifier) (expression/number)]
+2 -   (expression/identifier)
+2 +   (expression#identifier)
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
 
 warning: `supertype/subtype` paths are tree-sitter syntax
- --> query.ptk:1:41
+ --> query.ptk:3:14
   |
-1 | Q = [(expression/identifier) (expression/number)]
-  |                                         ^
+3 |   (expression/number)
+  |              ^
   |
 help: use `#`
   |
-1 - Q = [(expression/identifier) (expression/number)]
-1 + Q = [(expression/identifier) (expression#number)]
+3 -   (expression/number)
+3 +   (expression#number)
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
 ==== cst ====

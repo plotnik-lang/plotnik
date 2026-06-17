@@ -1,4 +1,7 @@
-Q = [(identifier) @id (string) @str]
+Q = [
+  (identifier) @id
+  (string) @str
+]
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

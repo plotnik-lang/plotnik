@@ -1,7 +1,7 @@
 Q = (function
-    name: (identifier) @name :: string
-    body: (block
-        (statement)* @body_stmts :: Statement)) @func :: Function
+  name: (identifier) @name :: string
+  body: (block (statement)* @body_stmts :: Statement)
+) @func :: Function
 ==== cst ====
 # query.ptk
 Root

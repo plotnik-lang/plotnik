@@ -1,6 +1,7 @@
 Q = (binary
-    left: (_) @left :: Node
-    right: (_) @right :: string) @expr :: BinaryExpr
+  left: (_) @left :: Node
+  right: (_) @right :: string
+) @expr :: BinaryExpr
 ==== cst ====
 # query.ptk
 Root

@@ -1,4 +1,9 @@
-Q = (call_expression function: [(identifier) @fn (number) @num])
+Q = (call_expression function:
+  [
+    (identifier) @fn
+    (number) @num
+  ]
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

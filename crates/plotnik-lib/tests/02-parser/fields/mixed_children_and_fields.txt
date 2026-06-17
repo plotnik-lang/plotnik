@@ -1,7 +1,8 @@
 Q = (if
-    condition: (expr)
-    (then_block)
-    else: (else_block))
+  condition: (expr)
+  (then_block)
+  else: (else_block)
+)
 ==== cst ====
 # query.ptk
 Root

@@ -1,12 +1,15 @@
-A = [(A) (leaf)]
+A = [
+  (A)
+  (leaf)
+]
 ==== diagnostics ====
 error: infinite recursion: cycle consumes no input
- --> query.ptk:1:7
+ --> query.ptk:2:4
   |
-1 | A = [(A) (leaf)]
-  |       ^
-  |       |
-  |       references itself
+2 |   (A)
+  |    ^
+  |    |
+  |    references itself
   |
 help: recursive references must consume input before recursing
 ==== symbols ====

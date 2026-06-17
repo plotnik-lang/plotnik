@@ -1,29 +1,28 @@
-Q = (statement/expression_statement
-    (expression/call_expression))
+Q = (statement/expression_statement (expression/call_expression))
 ==== diagnostics ====
 warning: `supertype/subtype` paths are tree-sitter syntax
  --> query.ptk:1:15
   |
-1 | Q = (statement/expression_statement
+1 | Q = (statement/expression_statement (expression/call_expression))
   |               ^
   |
 help: use `#`
   |
-1 - Q = (statement/expression_statement
-1 + Q = (statement#expression_statement
+1 - Q = (statement/expression_statement (expression/call_expression))
+1 + Q = (statement#expression_statement (expression/call_expression))
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
 
 warning: `supertype/subtype` paths are tree-sitter syntax
- --> query.ptk:2:16
+ --> query.ptk:1:48
   |
-2 |     (expression/call_expression))
-  |                ^
+1 | Q = (statement/expression_statement (expression/call_expression))
+  |                                                ^
   |
 help: use `#`
   |
-2 -     (expression/call_expression))
-2 +     (expression#call_expression))
+1 - Q = (statement/expression_statement (expression/call_expression))
+1 + Q = (statement/expression_statement (expression#call_expression))
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
 ==== cst ====

@@ -1,4 +1,7 @@
-Q = (import_specifier name: (identifier) @key -alias)
+Q = (import_specifier
+  name: (identifier) @key
+  -alias
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

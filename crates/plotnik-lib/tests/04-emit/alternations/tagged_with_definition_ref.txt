@@ -1,5 +1,9 @@
 Inner = (identifier) @name
-Test = [A: (Inner)  B: (number) @b] @item
+
+Test = [
+  A: (Inner)
+  B: (number) @b
+] @item
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

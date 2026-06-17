@@ -1,6 +1,9 @@
 Q = [
-    Pair: {(key) (value)}
-    Single: (value)
+  Pair: {
+    (key)
+    (value)
+  }
+  Single: (value)
 ]
 ==== cst ====
 # query.ptk

@@ -1,4 +1,10 @@
-Q = (program {(lexical_declaration) @a .! (expression_statement) @b})
+Q = (program
+  {
+    (lexical_declaration) @a
+    .!
+    (expression_statement) @b
+  }
+)
 ==== input ====
 let x; /* c */ foo;
 ==== bytecode ====

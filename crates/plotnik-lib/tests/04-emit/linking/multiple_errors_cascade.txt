@@ -1,5 +1,6 @@
 Q = (function_declaraton
-    nme: (identifer) @name) @fn
+  nme: (identifer) @name
+) @fn
 ==== diagnostics ====
 error: `function_declaraton` is not a valid node type
  --> query.ptk:1:6
@@ -13,23 +14,23 @@ help: did you mean `function_declaration`?
   |                       +
 
 error: `nme` is not a valid field
- --> query.ptk:2:5
+ --> query.ptk:2:3
   |
-2 |     nme: (identifer) @name) @fn
-  |     ^^^
+2 |   nme: (identifer) @name
+  |   ^^^
   |
 help: did you mean `name`?
   |
-2 |     name: (identifer) @name) @fn
-  |      +
+2 |   name: (identifer) @name
+  |    +
 
 error: `identifer` is not a valid node type
- --> query.ptk:2:11
+ --> query.ptk:2:9
   |
-2 |     nme: (identifer) @name) @fn
-  |           ^^^^^^^^^
+2 |   nme: (identifer) @name
+  |         ^^^^^^^^^
   |
 help: did you mean `identifier`?
   |
-2 |     nme: (identifier) @name) @fn
-  |                  +
+2 |   nme: (identifier) @name
+  |                +

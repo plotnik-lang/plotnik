@@ -1,4 +1,8 @@
-A = [X: (identifier) @x Y: (number) @y]
+A = [
+  X: (identifier) @x
+  Y: (number) @y
+]
+
 Q = (program (A)+)
 ==== types ====
 export interface AX {

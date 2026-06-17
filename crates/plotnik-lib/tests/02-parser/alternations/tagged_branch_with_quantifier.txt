@@ -1,6 +1,6 @@
 Q = [
-    Single: (statement)
-    Multiple: (statement)+
+  Single: (statement)
+  Multiple: (statement)+
 ]
 ==== cst ====
 # query.ptk

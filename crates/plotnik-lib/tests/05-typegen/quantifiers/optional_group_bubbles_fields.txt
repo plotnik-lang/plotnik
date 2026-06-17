@@ -1,4 +1,7 @@
-Q = {(identifier) @mod (decorator) @dec}?
+Q = {
+  (identifier) @mod
+  (decorator) @dec
+}?
 ==== types ====
 export interface Q {
   dec: Node | null;

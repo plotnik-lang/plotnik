@@ -1,4 +1,10 @@
-Q = (program {(comment) @doc . (function_declaration) @fn})
+Q = (program
+  {
+    (comment) @doc
+    .
+    (function_declaration) @fn
+  }
+)
 ==== input ====
 // doc
 function f() {}

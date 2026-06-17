@@ -1,6 +1,10 @@
 NestedCall = (call_expression
-    function: [(identifier) @name (NestedCall) @inner]
-    arguments: (arguments))
+  function: [
+    (identifier) @name
+    (NestedCall) @inner
+  ]
+  arguments: (arguments)
+)
 ==== cst ====
 # query.ptk
 Root

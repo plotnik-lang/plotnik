@@ -1,5 +1,12 @@
-Literal = [(number) (string)]
-Expr = [(identifier) (Literal)]
+Literal = [
+  (number)
+  (string)
+]
+
+Expr = [
+  (identifier)
+  (Literal)
+]
 ==== cst ====
 # query.ptk
 Root

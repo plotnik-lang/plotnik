@@ -1,10 +1,11 @@
 Expression = [
-    Ident: (identifier) @name :: string
-    Num: (number) @value :: string
-    Str: (string) @value :: string
-    Binary: (binary_expression
-        left: (Expression) @left
-        right: (Expression) @right)
+  Ident: (identifier) @name :: string
+  Num: (number) @value :: string
+  Str: (string) @value :: string
+  Binary: (binary_expression
+    left: (Expression) @left
+    right: (Expression) @right
+  )
 ]
 ==== cst ====
 # query.ptk

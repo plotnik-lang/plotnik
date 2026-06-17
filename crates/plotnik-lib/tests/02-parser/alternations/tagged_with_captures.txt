@@ -1,6 +1,6 @@
 Q = [
-    Assign: (assignment_expression left: (identifier) @left)
-    Call: (call_expression function: (identifier) @func)
+  Assign: (assignment_expression left: (identifier) @left)
+  Call: (call_expression function: (identifier) @func)
 ] @stmt
 ==== cst ====
 # query.ptk

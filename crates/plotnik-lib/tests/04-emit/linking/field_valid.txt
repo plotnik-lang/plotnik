@@ -1,5 +1,6 @@
 Q = (function_declaration
-    name: (identifier) @name) @fn
+  name: (identifier) @name
+) @fn
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

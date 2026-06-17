@@ -1,6 +1,7 @@
 Q = (function
-    -async
-    name: (identifier))
+  -async
+  name: (identifier)
+)
 ==== cst ====
 # query.ptk
 Root

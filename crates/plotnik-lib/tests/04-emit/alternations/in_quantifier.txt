@@ -1,4 +1,11 @@
-Q = (object { [A: (pair) @a  B: (shorthand_property_identifier) @b] @item }* @items)
+Q = (object
+  {
+    [
+      A: (pair) @a
+      B: (shorthand_property_identifier) @b
+    ] @item
+  }* @items
+)
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"

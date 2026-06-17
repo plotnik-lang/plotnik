@@ -1,5 +1,8 @@
 Q = (call
-    arguments: [(string) (number)]
+  arguments: [
+    (string)
+    (number)
+  ]
 )
 ==== cst ====
 # query.ptk

@@ -1,4 +1,12 @@
-Q = (program (expression_statement (binary_expression (identifier) @left . [(identifier) @right])))
+Q = (program
+  (expression_statement
+    (binary_expression
+      (identifier) @left
+      .
+      [(identifier) @right]
+    )
+  )
+)
 ==== input ====
 a + b
 ==== bytecode ====

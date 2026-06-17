@@ -1,4 +1,9 @@
-Q = (program {(comment) @c . (function_declaration) @f})
+Q = (program
+  {
+    (comment) @c .
+    (function_declaration) @f
+  }
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

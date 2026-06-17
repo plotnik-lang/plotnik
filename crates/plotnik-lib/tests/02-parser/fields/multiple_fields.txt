@@ -1,6 +1,7 @@
 Q = (assignment
-    left: (identifier)
-    right: (expression))
+  left: (identifier)
+  right: (expression)
+)
 ==== cst ====
 # query.ptk
 Root

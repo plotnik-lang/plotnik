@@ -1,7 +1,4 @@
-Q = (a
-    (b
-    (c
-        (d))))
+Q = (a (b (c (d))))
 ==== cst ====
 # query.ptk
 Root

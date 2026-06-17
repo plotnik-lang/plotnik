@@ -1,8 +1,9 @@
 Q = (expr
-    [
-        Binary: (binary_expression)
-        Unary: (unary_expression)
-    ])
+  [
+    Binary: (binary_expression)
+    Unary: (unary_expression)
+  ]
+)
 ==== cst ====
 # query.ptk
 Root

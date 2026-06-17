@@ -1,4 +1,11 @@
-Q = (program (expression_statement [A: (identifier) @a  B: (number) @b] @e))
+Q = (program
+  (expression_statement
+    [
+      A: (identifier) @a
+      B: (number) @b
+    ] @e
+  )
+)
 ==== input ====
 foo
 ==== bytecode ====

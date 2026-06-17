@@ -1,4 +1,7 @@
-Q = {(comment)* @comments (function) @fn}
+Q = {
+  (comment)* @comments
+  (function) @fn
+}
 ==== cst ====
 # query.ptk
 Root

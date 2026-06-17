@@ -1,12 +1,17 @@
-E = (call {(a) (E)})
+E = (call
+  {
+    (a)
+    (E)
+  }
+)
 ==== diagnostics ====
 error: infinite recursion: no escape path
- --> query.ptk:1:17
+ --> query.ptk:4:6
   |
-1 | E = (call {(a) (E)})
-  |                 ^
-  |                 |
-  |                 E references itself
+4 |     (E)
+  |      ^
+  |      |
+  |      E references itself
   |
 help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
 ==== symbols ====

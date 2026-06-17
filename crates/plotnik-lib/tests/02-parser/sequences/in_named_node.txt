@@ -1,4 +1,9 @@
-Q = (block {(statement) (statement)})
+Q = (block
+  {
+    (statement)
+    (statement)
+  }
+)
 ==== cst ====
 # query.ptk
 Root

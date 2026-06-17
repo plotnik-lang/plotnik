@@ -1,4 +1,7 @@
-Q = {(identifier) @a (number) @b} @item
+Q = {
+  (identifier) @a
+  (number) @b
+} @item
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

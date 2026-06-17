@@ -1,10 +1,13 @@
-Q = {(a) .}
+Q = {
+  (a)
+  .
+}
 ==== diagnostics ====
 error: boundary anchor requires parent node context
- --> query.ptk:1:10
+ --> query.ptk:3:3
   |
-1 | Q = {(a) .}
-  |          ^
+3 |   .
+  |   ^
   |
 help: wrap in a named node: `(parent . (child))`
 ==== symbols ====

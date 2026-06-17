@@ -1,5 +1,8 @@
 Q = [
-  {(identifier) @x (number) @y}
+  {
+    (identifier) @x
+    (number) @y
+  }
   {(identifier) @x}
 ]
 ==== types ====

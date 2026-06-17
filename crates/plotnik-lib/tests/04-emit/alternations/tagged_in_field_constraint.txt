@@ -1,4 +1,9 @@
-Q = (pair key: [A: (identifier) @a B: (number)] @kind)
+Q = (pair
+  key: [
+    A: (identifier) @a
+    B: (number)
+  ] @kind
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

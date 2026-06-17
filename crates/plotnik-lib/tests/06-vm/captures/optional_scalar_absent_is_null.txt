@@ -1,4 +1,7 @@
-Q = (program (lexical_declaration)? @decl (expression_statement) @stmt)
+Q = (program
+  (lexical_declaration)? @decl
+  (expression_statement) @stmt
+)
 ==== input ====
 foo;
 ==== bytecode ====

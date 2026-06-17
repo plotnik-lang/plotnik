@@ -1,14 +1,15 @@
-Q = (program ([Tag: {(expression_statement) @a (comment)?}])* @items)
+Q = (program
+  {
+    [
+      Tag: {
+        (expression_statement) @a
+        (comment)?
+      }
+    ]
+  }* @items
+)
 ==== input ====
 a; b;
-==== diagnostics ====
-warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:1:14
-  |
-1 | Q = (program ([Tag: {(expression_statement) @a (comment)?}])* @items)
-  |              ^
-  |
-help: use `{(a) (b)}` to match a sequence of siblings
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

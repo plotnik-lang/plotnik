@@ -1,4 +1,7 @@
-Rec = [A: (program (expression_statement (Rec) @inner)) B: (identifier) @id]
+Rec = [
+  A: (program (expression_statement (Rec) @inner))
+  B: (identifier) @id
+]
 Q = (Rec)
 ==== bytecode ====
 [strings]

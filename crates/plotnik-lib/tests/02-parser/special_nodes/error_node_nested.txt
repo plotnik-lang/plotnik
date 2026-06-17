@@ -1,5 +1,4 @@
-Q = (function_definition
-    body: (block (ERROR)))
+Q = (function_definition body: (block (ERROR)))
 ==== cst ====
 # query.ptk
 Root

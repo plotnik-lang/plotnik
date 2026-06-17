@@ -1,4 +1,7 @@
-A = [(x)@cap (foo (A))]
+A = [
+  (x) @cap
+  (foo (A))
+]
 ==== symbols ====
 A
   A (cycle)

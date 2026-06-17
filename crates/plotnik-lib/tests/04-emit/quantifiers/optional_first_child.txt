@@ -1,4 +1,7 @@
-Q = (program (lexical_declaration)? @id (debugger_statement) @n)
+Q = (program
+  (lexical_declaration)? @id
+  (debugger_statement) @n
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

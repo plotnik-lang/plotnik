@@ -1,4 +1,10 @@
-Q = (program {(lexical_declaration)? @a . (debugger_statement) @b})
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .
+    (debugger_statement) @b
+  }
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

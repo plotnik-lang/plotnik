@@ -1,4 +1,8 @@
-Expression = [(identifier) @name (number) @value]
+Expression = [
+  (identifier) @name
+  (number) @value
+]
+
 Root = (function_declaration name: (identifier) @name)
 ==== bytecode ====
 [strings]

@@ -1,4 +1,7 @@
-Q = ["true" "false"]
+Q = [
+  "true"
+  "false"
+]
 ==== cst ====
 # query.ptk
 Root

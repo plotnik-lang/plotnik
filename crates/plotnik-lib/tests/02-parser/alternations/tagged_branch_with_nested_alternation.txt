@@ -1,6 +1,9 @@
 Q = [
-    Literal: [(number) (string)]
-    Ident: (identifier)
+  Literal: [
+    (number)
+    (string)
+  ]
+  Ident: (identifier)
 ]
 ==== cst ====
 # query.ptk

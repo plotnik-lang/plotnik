@@ -1,10 +1,13 @@
-Q = [A: (a) @x  A: (b) @y]
+Q = [
+  A: (a) @x
+  A: (b) @y
+]
 ==== diagnostics ====
 error: branch label `A` is already used in this alternation
- --> query.ptk:1:17
+ --> query.ptk:3:3
   |
-1 | Q = [A: (a) @x  A: (b) @y]
-  |                 ^
+3 |   A: (b) @y
+  |   ^
   |
 help: each branch label must be unique within an alternation
 ==== symbols ====

@@ -1,5 +1,14 @@
 Comma = ","
-Q = (program (expression_statement (array (Comma) . (string) @s)))
+
+Q = (program
+  (expression_statement
+    (array
+      (Comma)
+      .
+      (string) @s
+    )
+  )
+)
 ==== input ====
 [1, 2, "x"]
 ==== bytecode ====

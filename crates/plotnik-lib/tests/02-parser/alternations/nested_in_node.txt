@@ -1,5 +1,8 @@
 Q = (expr
-    [(binary) (unary)]
+  [
+    (binary)
+    (unary)
+  ]
 )
 ==== cst ====
 # query.ptk

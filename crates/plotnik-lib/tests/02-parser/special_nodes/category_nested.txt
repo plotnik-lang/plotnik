@@ -1,5 +1,6 @@
 Q = (statement#expression_statement
-    (expression#call_expression))
+  (expression#call_expression)
+)
 ==== cst ====
 # query.ptk
 Root

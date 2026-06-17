@@ -1,6 +1,10 @@
 Name = (identifier) @name
 Value = (number) @value
-Both = (pair (identifier) @key (number) @val)
+
+Both = (pair
+  (identifier) @key
+  (number) @val
+)
 ==== types ====
 export interface Both {
   key: Node;

@@ -1,5 +1,6 @@
 Q = (statement_block
-    (function_declaration)+ @fns) @block
+  (function_declaration)+ @fns
+) @block
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

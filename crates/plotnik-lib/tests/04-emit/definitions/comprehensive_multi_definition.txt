@@ -1,11 +1,14 @@
 Ident = (identifier) @name :: string
+
 Expression = [
-    Literal: (number) @value
-    Variable: (identifier) @name
+  Literal: (number) @value
+  Variable: (identifier) @name
 ]
+
 Assignment = (assignment_expression
-    left: (identifier) @target
-    right: (Expression) @value)
+  left: (identifier) @target
+  right: (Expression) @value
+)
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"

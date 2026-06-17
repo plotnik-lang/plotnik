@@ -1,10 +1,13 @@
-Q = (node (a) @x (b) @x)
+Q = (node
+  (a) @x
+  (b) @x
+)
 ==== diagnostics ====
 error: capture `@x` already defined in this scope
- --> query.ptk:1:18
+ --> query.ptk:3:3
   |
-1 | Q = (node (a) @x (b) @x)
-  |                  ^^^^^^
+3 |   (b) @x
+  |   ^^^^^^
   |
 help: rename one capture, or use a labeled alternation if they are mutually exclusive branches
 ==== symbols ====

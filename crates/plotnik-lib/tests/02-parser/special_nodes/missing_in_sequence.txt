@@ -1,4 +1,7 @@
-Q = {(MISSING ";") (identifier)}
+Q = {
+  (MISSING ";")
+  (identifier)
+}
 ==== cst ====
 # query.ptk
 Root

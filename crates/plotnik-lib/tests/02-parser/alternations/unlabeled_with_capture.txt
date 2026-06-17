@@ -1,4 +1,7 @@
-Q = [(identifier) (string)] @value
+Q = [
+  (identifier)
+  (string)
+] @value
 ==== cst ====
 # query.ptk
 Root

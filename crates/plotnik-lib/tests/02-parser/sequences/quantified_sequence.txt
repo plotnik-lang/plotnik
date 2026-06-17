@@ -1,4 +1,7 @@
-Q = {(a) @a (b) @b}+ @rows
+Q = {
+  (a) @a
+  (b) @b
+}+ @rows
 ==== cst ====
 # query.ptk
 Root

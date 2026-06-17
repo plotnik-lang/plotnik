@@ -2,7 +2,8 @@ Expr = [
   Lit: (number) @value :: string
   Binary: (binary_expression
     left: (Expr) @left
-    right: (Expr) @right)
+    right: (Expr) @right
+  )
 ]
 ==== types ====
 export interface ExprLit {

@@ -1,22 +1,31 @@
-Q = (foo [A: (a) (b)] [C: (c) (d)])
+Q = (foo
+  [
+    A: (a)
+    (b)
+  ]
+  [
+    C: (c)
+    (d)
+  ]
+)
 ==== diagnostics ====
 error: cannot mix labeled and unlabeled branches
- --> query.ptk:1:18
+ --> query.ptk:4:5
   |
-1 | Q = (foo [A: (a) (b)] [C: (c) (d)])
-  |           -      ^^^
-  |           |
-  |           tagged branch here
+3 |     A: (a)
+  |     - tagged branch here
+4 |     (b)
+  |     ^^^
   |
 help: use all labels for a tagged union, or none for a merged struct
 
 error: cannot mix labeled and unlabeled branches
- --> query.ptk:1:31
+ --> query.ptk:8:5
   |
-1 | Q = (foo [A: (a) (b)] [C: (c) (d)])
-  |                        -      ^^^
-  |                        |
-  |                        tagged branch here
+7 |     C: (c)
+  |     - tagged branch here
+8 |     (d)
+  |     ^^^
   |
 help: use all labels for a tagged union, or none for a merged struct
 ==== symbols ====

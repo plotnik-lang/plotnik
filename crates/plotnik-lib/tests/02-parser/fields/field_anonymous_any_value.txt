@@ -1,7 +1,8 @@
 Q = (binary_expression
-    left: (_) @left
-    operator: _ @op
-    right: (_) @right) @expr
+  left: (_) @left
+  operator: _ @op
+  right: (_) @right
+) @expr
 ==== cst ====
 # query.ptk
 Root

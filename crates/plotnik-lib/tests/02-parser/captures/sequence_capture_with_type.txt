@@ -1,4 +1,7 @@
-Q = {(a) (b)} @seq :: MySequence
+Q = {
+  (a)
+  (b)
+} @seq :: MySequence
 ==== cst ====
 # query.ptk
 Root

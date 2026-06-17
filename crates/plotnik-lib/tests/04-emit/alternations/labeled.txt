@@ -1,6 +1,6 @@
 Q = [
-    A: (identifier) @a
-    B: (number) @b
+  A: (identifier) @a
+  B: (number) @b
 ]
 ==== bytecode ====
 [strings]

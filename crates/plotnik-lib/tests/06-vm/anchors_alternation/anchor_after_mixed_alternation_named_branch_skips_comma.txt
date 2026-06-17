@@ -1,4 +1,17 @@
-Q = (program (expression_statement (call_expression arguments: (arguments [(identifier) @x ";"] . (identifier) @y))))
+Q = (program
+  (expression_statement
+    (call_expression
+      arguments: (arguments
+        [
+          (identifier) @x
+          ";"
+        ]
+        .
+        (identifier) @y
+      )
+    )
+  )
+)
 ==== input ====
 f(a, b)
 ==== bytecode ====

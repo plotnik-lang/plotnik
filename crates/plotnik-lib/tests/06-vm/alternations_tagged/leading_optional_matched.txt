@@ -1,4 +1,12 @@
-Q = (program [Tag: {(comment)? (expression_statement) @a (expression_statement) @b}])
+Q = (program
+  [
+    Tag: {
+      (comment)?
+      (expression_statement) @a
+      (expression_statement) @b
+    }
+  ]
+)
 ==== input ====
 /* c */ a; b;
 ==== bytecode ====

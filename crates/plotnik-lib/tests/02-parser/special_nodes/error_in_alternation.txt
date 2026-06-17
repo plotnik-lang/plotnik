@@ -1,4 +1,7 @@
-Q = [(ERROR) (identifier)]
+Q = [
+  (ERROR)
+  (identifier)
+]
 ==== cst ====
 # query.ptk
 Root

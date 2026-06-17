@@ -1,4 +1,9 @@
-Q = (array {(identifier) (number)})
+Q = (array
+  {
+    (identifier)
+    (number)
+  }
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

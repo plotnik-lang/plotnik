@@ -1,20 +1,25 @@
-Q = (program [(((expression_statement) @a) @grp) ((comment) @b)] @w)
+Q = (program
+  [
+    (((expression_statement) @a) @grp)
+    ((comment) @b)
+  ] @w
+)
 ==== input ====
 a;
 ==== diagnostics ====
 warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:1:15
+ --> query.ptk:3:5
   |
-1 | Q = (program [(((expression_statement) @a) @grp) ((comment) @b)] @w)
-  |               ^
+3 |     (((expression_statement) @a) @grp)
+  |     ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
 
 warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:1:50
+ --> query.ptk:4:5
   |
-1 | Q = (program [(((expression_statement) @a) @grp) ((comment) @b)] @w)
-  |                                                  ^
+4 |     ((comment) @b)
+  |     ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
 ==== bytecode ====

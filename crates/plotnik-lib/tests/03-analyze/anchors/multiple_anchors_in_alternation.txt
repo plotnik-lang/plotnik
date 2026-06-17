@@ -1,26 +1,32 @@
-Q = [. (a) . (b) .]
+Q = [
+  .
+  (a)
+  .
+  (b)
+  .
+]
 ==== diagnostics ====
 error: anchors cannot appear directly in alternations
- --> query.ptk:1:6
+ --> query.ptk:2:3
   |
-1 | Q = [. (a) . (b) .]
-  |      ^
-  |
-help: use `[{(a) . (b)} (c)]` to anchor within a branch
-
-error: anchors cannot appear directly in alternations
- --> query.ptk:1:12
-  |
-1 | Q = [. (a) . (b) .]
-  |            ^
+2 |   .
+  |   ^
   |
 help: use `[{(a) . (b)} (c)]` to anchor within a branch
 
 error: anchors cannot appear directly in alternations
- --> query.ptk:1:18
+ --> query.ptk:4:3
   |
-1 | Q = [. (a) . (b) .]
-  |                  ^
+4 |   .
+  |   ^
+  |
+help: use `[{(a) . (b)} (c)]` to anchor within a branch
+
+error: anchors cannot appear directly in alternations
+ --> query.ptk:6:3
+  |
+6 |   .
+  |   ^
   |
 help: use `[{(a) . (b)} (c)]` to anchor within a branch
 ==== symbols ====

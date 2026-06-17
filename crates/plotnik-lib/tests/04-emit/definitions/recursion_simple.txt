@@ -1,6 +1,9 @@
 Expr = [
-    Lit: (number) @value :: string
-    Rec: (call_expression function: (identifier) @fn arguments: (Expr) @inner)
+  Lit: (number) @value :: string
+  Rec: (call_expression
+    function: (identifier) @fn
+    arguments: (Expr) @inner
+  )
 ]
 ==== bytecode ====
 [strings]

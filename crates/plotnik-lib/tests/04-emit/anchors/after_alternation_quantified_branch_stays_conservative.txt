@@ -1,4 +1,11 @@
-Q = (array [(identifier)? @x ";"] . (identifier) @y)
+Q = (array
+  [
+    (identifier)? @x
+    ";"
+  ]
+  .
+  (identifier) @y
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

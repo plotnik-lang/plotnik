@@ -1,4 +1,9 @@
-Q = (function_declaration body: [(statement_block) @a (class_declaration) @b])
+Q = (function_declaration body:
+  [
+    (statement_block) @a
+    (class_declaration) @b
+  ]
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

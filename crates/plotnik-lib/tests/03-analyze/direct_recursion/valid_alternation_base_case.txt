@@ -1,4 +1,7 @@
-Expr = [(identifier) (call (Expr))]
+Expr = [
+  (identifier)
+  (call (Expr))
+]
 ==== symbols ====
 Expr
   Expr (cycle)

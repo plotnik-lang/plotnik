@@ -1,4 +1,7 @@
-Q = [(function_declaration -name) (identifier)]
+Q = [
+  (function_declaration -name)
+  (identifier)
+]
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

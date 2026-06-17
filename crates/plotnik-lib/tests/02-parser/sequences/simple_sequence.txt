@@ -1,4 +1,7 @@
-Q = {(a) (b)}
+Q = {
+  (a)
+  (b)
+}
 ==== cst ====
 # query.ptk
 Root

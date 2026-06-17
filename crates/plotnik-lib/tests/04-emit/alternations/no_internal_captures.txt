@@ -1,4 +1,9 @@
-Q = (program [(identifier) (number)] @x)
+Q = (program
+  [
+    (identifier)
+    (number)
+  ] @x
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

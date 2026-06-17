@@ -1,12 +1,11 @@
-Q = (function_declaration
-    condition: (identifier) @name) @fn
+Q = (function_declaration condition: (identifier) @name) @fn
 ==== diagnostics ====
 error: field `condition` is not valid on this node type
- --> query.ptk:2:5
+ --> query.ptk:1:27
   |
-1 | Q = (function_declaration
-  |      -------------------- on `function_declaration`
-2 |     condition: (identifier) @name) @fn
-  |     ^^^^^^^^^
+1 | Q = (function_declaration condition: (identifier) @name) @fn
+  |      -------------------- ^^^^^^^^^
+  |      |
+  |      on `function_declaration`
   |
 help: valid fields for `function_declaration`: `body`, `name`, `parameters`

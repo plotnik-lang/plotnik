@@ -1,4 +1,7 @@
-Q = [(expression#identifier) (expression#number)]
+Q = [
+  (expression#identifier)
+  (expression#number)
+]
 ==== cst ====
 # query.ptk
 Root

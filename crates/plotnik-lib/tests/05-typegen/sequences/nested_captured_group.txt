@@ -1,6 +1,9 @@
 Q = {
   (identifier) @name
-  {(string) @k (number) @v} @pair
+  {
+    (string) @k
+    (number) @v
+  } @pair
 }
 ==== types ====
 export interface QPair {

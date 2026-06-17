@@ -1,4 +1,7 @@
-Q = [(identifier) (number)] @value :: Value
+Q = [
+  (identifier)
+  (number)
+] @value :: Value
 ==== cst ====
 # query.ptk
 Root

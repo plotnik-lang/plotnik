@@ -1,4 +1,7 @@
-Q = (binary_expression (identifier) @a (number) @b)
+Q = (binary_expression
+  (identifier) @a
+  (number) @b
+)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"

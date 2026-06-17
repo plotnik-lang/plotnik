@@ -1,4 +1,9 @@
-Q = (program [(lexical_declaration (variable_declarator)+ @vs)  (expression_statement) @s])
+Q = (program
+  [
+    (lexical_declaration (variable_declarator)+ @vs)
+    (expression_statement) @s
+  ]
+)
 ==== input ====
 foo;
 ==== bytecode ====

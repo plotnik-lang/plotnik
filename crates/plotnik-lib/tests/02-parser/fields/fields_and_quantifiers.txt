@@ -1,10 +1,11 @@
 Q = (node
-    foo: (foo)?
-    foo: (foo)??
-    bar: (bar)*
-    bar: (bar)*?
-    baz: (baz)+?
-    baz: (baz)+?)
+  foo: (foo)?
+  foo: (foo)??
+  bar: (bar)*
+  bar: (bar)*?
+  baz: (baz)+?
+  baz: (baz)+?
+)
 ==== cst ====
 # query.ptk
 Root

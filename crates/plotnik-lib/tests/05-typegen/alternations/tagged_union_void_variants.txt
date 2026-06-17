@@ -1,5 +1,12 @@
-A = [X: (identifier) Y: (number)]
-Q = (program (A) @a (debugger_statement) @name)
+A = [
+  X: (identifier)
+  Y: (number)
+]
+
+Q = (program
+  (A) @a
+  (debugger_statement) @name
+)
 ==== types ====
 export interface AX {
   $tag: "X";

@@ -1,4 +1,10 @@
-Nested = (call_expression function: [(identifier) @name (Nested)])
+Nested = (call_expression
+  function: [
+    (identifier) @name
+    (Nested)
+  ]
+)
+
 Q = (program (expression_statement (Nested) @c))
 ==== input ====
 a()()
