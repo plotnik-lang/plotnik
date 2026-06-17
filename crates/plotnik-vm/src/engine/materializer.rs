@@ -1,9 +1,11 @@
 //! Materializer transforms effect logs into output values.
 
-use plotnik_bytecode::{StringsView, TypeData, TypeId, TypeKind, TypesView};
+use plotnik_bytecode::{Entrypoint, Module, StringsView, TypeData, TypeId, TypeKind, TypesView};
+use plotnik_core::Colors;
 
 use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
+use super::verify::debug_verify_type;
 
 pub trait Materializer<'t> {
     type Output;
@@ -18,11 +20,11 @@ pub struct ValueMaterializer<'a> {
 }
 
 impl<'a> ValueMaterializer<'a> {
-    pub fn new(source: &'a str, types: TypesView<'a>, strings: StringsView<'a>) -> Self {
+    pub fn new(source: &'a str, module: &'a Module) -> Self {
         Self {
             source,
-            types,
-            strings,
+            types: module.types(),
+            strings: module.strings(),
         }
     }
 
@@ -64,6 +66,26 @@ impl<'a> ValueMaterializer<'a> {
             _ => Builder::Scalar(None),
         }
     }
+}
+
+/// Materialize the effect log into a [`Value`], then check it against the
+/// entrypoint's declared type.
+///
+/// The type check is the trailing half of materialization, not an optional
+/// follow-up: it catches materializer/typegen drift and compiles to a no-op in
+/// release. Folding it in here keeps each call site from re-threading
+/// `result_type` and from materializing a value that silently skips the check.
+pub fn materialize_verified<'t>(
+    source: &'t str,
+    module: &Module,
+    entrypoint: &Entrypoint,
+    effects: &[RuntimeEffect<'t>],
+    colors: Colors,
+) -> Value {
+    let materializer = ValueMaterializer::new(source, module);
+    let value = materializer.materialize(effects, entrypoint.result_type());
+    debug_verify_type(&value, entrypoint.result_type(), module, colors);
+    value
 }
 
 /// Value builder for stack-based materialization.

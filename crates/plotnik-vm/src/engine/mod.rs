@@ -23,7 +23,7 @@ mod verify_tests;
 
 pub use effect::{EffectLog, RuntimeEffect};
 pub use error::RuntimeError;
-pub use materializer::{Materializer, ValueMaterializer};
+pub use materializer::{Materializer, ValueMaterializer, materialize_verified};
 pub use trace::{PrintTracer, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
 pub use verify::debug_verify_type;

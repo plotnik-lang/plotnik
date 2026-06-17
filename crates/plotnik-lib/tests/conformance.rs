@@ -19,10 +19,7 @@ use arborium_tree_sitter::{Parser, Tree};
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::typegen::typescript;
-use plotnik_lib::{
-    Colors, Materializer, QueryBuilder, RuntimeError, SourceMap, VM, ValueMaterializer,
-    debug_verify_type,
-};
+use plotnik_lib::{Colors, QueryBuilder, RuntimeError, SourceMap, VM, materialize_verified};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -72,19 +69,13 @@ fn run_pipeline(query_src: &str, source_src: &str, entry: &str) -> String {
 
     let result = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => {
-            let materializer = ValueMaterializer::new(source_src, module.types(), module.strings());
-            let value = materializer.materialize(effects.as_slice(), entrypoint.result_type());
-
-            // Verify the emitted value against its declared type. In the (debug)
-            // test build a mismatch panics and fails the case; in release this is
-            // a no-op, so production stays zero-cost.
-            debug_verify_type(
-                &value,
-                entrypoint.result_type(),
+            let value = materialize_verified(
+                source_src,
                 &module,
+                &entrypoint,
+                effects.as_slice(),
                 Colors::new(false),
             );
-
             value.format(false, Colors::new(false))
         }
         Err(RuntimeError::NoMatch) => "<no match>".to_string(),

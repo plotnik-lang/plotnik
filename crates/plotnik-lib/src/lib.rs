@@ -39,7 +39,7 @@ pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
 pub use plotnik_vm::{
     EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
-    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type,
+    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).
