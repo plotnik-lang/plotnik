@@ -1,0 +1,6 @@
+Value = (string) @text
+Main = (array (Value) @item)
+--- symbols ---
+Value
+Main
+  Value

@@ -1,0 +1,14 @@
+Q = (function_declaration name: (identifier) @name)+
+--- tokens ---
+Id "Q"
+Equals "="
+ParenOpen "("
+Id "function_declaration"
+Id "name"
+Colon ":"
+ParenOpen "("
+Id "identifier"
+ParenClose ")"
+CaptureToken "@name"
+ParenClose ")"
+Plus "+"

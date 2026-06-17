@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 // Locate the JavaScript `grammar.json` that ships inside the `arborium-javascript`
-// dev-dependency and expose its path to the conformance corpus via an env var.
-// Mirrors `plotnik-compiler/build.rs`; the corpus is the only consumer.
+// dev-dependency and expose its path to the test suites via an env var.
+// Mirrors `plotnik-compiler/build.rs`.
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let manifest_path = PathBuf::from(&manifest_dir).join("Cargo.toml");

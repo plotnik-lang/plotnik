@@ -169,3 +169,16 @@ fn split_regex_predicate(
 pub fn token_text<'q>(source: &'q str, token: &Token) -> &'q str {
     &source[std::ops::Range::<usize>::from(token.span)]
 }
+
+/// Render the non-trivia token stream as one `Kind "text"` line per token.
+///
+/// `Token.kind` is `pub(crate)`, so a downstream test cannot format the stream itself.
+pub fn dump_tokens(source: &str) -> String {
+    let mut out = String::new();
+    for token in lex(source) {
+        if !token.kind.is_trivia() {
+            out.push_str(&format!("{:?} {:?}\n", token.kind, token_text(source, &token)));
+        }
+    }
+    out
+}

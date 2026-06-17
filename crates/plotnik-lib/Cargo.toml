@@ -9,6 +9,9 @@ documentation = "https://docs.rs/plotnik-lib"
 readme = "../../README.md"
 keywords = ["tree-sitter", "query", "ast", "parser"]
 categories = ["parsing", "development-tools"]
+# The golden-fixture suite owns its own target wiring (`harness = false`), so we
+# declare every test target by hand instead of letting Cargo autodiscover them.
+autotests = false
 
 [lints]
 workspace = true
@@ -31,5 +34,19 @@ arborium-javascript = "2.18.0"
 arborium-tree-sitter = "2.18.0"
 insta = { version = "=1.48.0", features = ["yaml"] }
 indoc = "=2.0.7"
+libtest-mimic = "=0.8.2"
 serde_json = "=1.0.150"
+similar = "=2.7.0"
 tempfile = "=3.27.0"
+
+# Golden-fixture suite: a custom libtest-mimic harness that discovers fixtures at runtime.
+[[test]]
+name = "snapshots"
+path = "tests/mod.rs"
+harness = false
+
+# The legacy conformance tests; declared explicitly because `autotests = false`
+# disables autodiscovery.
+[[test]]
+name = "conformance"
+path = "tests/conformance.rs"

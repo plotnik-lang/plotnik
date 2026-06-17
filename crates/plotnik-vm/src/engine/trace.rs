@@ -466,6 +466,12 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
+    /// Render the accumulated trace as a single string — the buffer analogue of
+    /// [`print`](Self::print).
+    pub fn render(&self) -> String {
+        self.lines.join("\n")
+    }
+
     fn add_instruction(&mut self, ip: u16, symbol: Symbol, content: &str, successors: &str) {
         let prefix = format!("  {:0sw$} {} ", ip, symbol.format(), sw = self.step_width);
         let line = self
