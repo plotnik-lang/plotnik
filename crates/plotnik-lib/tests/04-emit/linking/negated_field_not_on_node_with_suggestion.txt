@@ -1,6 +1,6 @@
 Q = (function_declaration -parameter) @fn
 ==== diagnostics ====
-error: field `parameter` is not valid on this node type
+error: field `parameter` is not valid on this node kind
  --> query.ptk:1:28
   |
 1 | Q = (function_declaration -parameter) @fn

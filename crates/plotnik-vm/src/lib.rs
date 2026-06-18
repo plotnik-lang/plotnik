@@ -8,6 +8,6 @@
 pub mod engine;
 
 pub use engine::{
-    EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
+    EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
     Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };

@@ -6,8 +6,8 @@ use super::*;
 fn builtin_types_have_correct_ids() {
     let ctx = TypeContext::new();
 
-    assert_eq!(ctx.get_type(TYPE_VOID), Some(&TypeShape::Void));
-    assert_eq!(ctx.get_type(TYPE_NODE), Some(&TypeShape::Node));
+    assert_eq!(ctx.type_shape(TYPE_VOID), Some(&TypeShape::Void));
+    assert_eq!(ctx.type_shape(TYPE_NODE), Some(&TypeShape::Node));
 }
 
 #[test]
@@ -57,10 +57,10 @@ fn def_type_by_name() {
 
     ctx.set_def_type_by_name(&mut interner, "Query", TYPE_NODE);
     assert_eq!(
-        ctx.get_def_type_by_name(&interner, "Query"),
+        ctx.def_type_for_name(&interner, "Query"),
         Some(TYPE_NODE)
     );
-    assert_eq!(ctx.get_def_type_by_name(&interner, "Missing"), None);
+    assert_eq!(ctx.def_type_for_name(&interner, "Missing"), None);
 }
 
 #[test]
@@ -84,6 +84,6 @@ fn def_id_lookup() {
     let mut interner = Interner::new();
 
     ctx.register_def(&mut interner, "Query");
-    assert!(ctx.get_def_id(&interner, "Query").is_some());
-    assert!(ctx.get_def_id(&interner, "Missing").is_none());
+    assert!(ctx.def_id_for_name(&interner, "Query").is_some());
+    assert!(ctx.def_id_for_name(&interner, "Missing").is_none());
 }

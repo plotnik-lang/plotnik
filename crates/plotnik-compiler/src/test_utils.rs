@@ -2,7 +2,7 @@
 
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
-pub fn colliding_node_type_grammar() -> Grammar {
+pub fn colliding_node_kind_grammar() -> Grammar {
     let raw = RawGrammar::from_json(
         r#"{
         "name": "collision",

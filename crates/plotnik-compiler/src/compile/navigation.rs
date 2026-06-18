@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use crate::analyze::symbol_table::SymbolTable;
-use crate::parser::{Expr, Ref, SeqItem};
+use crate::parser::{Pattern, Ref, SeqItem};
 use plotnik_bytecode::Nav;
 
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
@@ -14,10 +14,10 @@ pub struct AnonymousClassifier<'a> {
     symbol_table: &'a SymbolTable,
 }
 
-fn expr_has_direct_alt_branch_nav(expr: &Expr) -> bool {
-    match expr {
-        Expr::AltExpr(_) => true,
-        Expr::CapturedExpr(cap) => cap
+fn expr_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::AltPattern(_) => true,
+        Pattern::CapturedPattern(cap) => cap
             .inner()
             .as_ref()
             .is_some_and(expr_has_direct_alt_branch_nav),
@@ -30,35 +30,35 @@ impl<'a> AnonymousClassifier<'a> {
         Self { symbol_table }
     }
 
-    pub fn expr_may_match_anonymous(&self, expr: Option<&Expr>) -> bool {
+    pub fn expr_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
         let mut visited = HashSet::new();
-        expr.is_some_and(|expr| self.expr_may_match_anonymous_inner(expr, &mut visited))
+        pattern.is_some_and(|pattern| self.expr_may_match_anonymous_inner(pattern, &mut visited))
     }
 
-    fn expr_may_match_anonymous_inner(&self, expr: &Expr, visited: &mut HashSet<String>) -> bool {
-        match expr {
-            Expr::AnonymousNode(_) => true,
-            Expr::CapturedExpr(cap) => cap
+    fn expr_may_match_anonymous_inner(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> bool {
+        match pattern {
+            Pattern::TokenPattern(_) => true,
+            Pattern::CapturedPattern(cap) => cap
                 .inner()
                 .as_ref()
                 .is_some_and(|inner| self.expr_may_match_anonymous_inner(inner, visited)),
-            Expr::QuantifiedExpr(q) => q
+            Pattern::QuantifiedPattern(q) => q
                 .inner()
                 .as_ref()
                 .is_some_and(|inner| self.expr_may_match_anonymous_inner(inner, visited)),
-            Expr::FieldExpr(field) => field
+            Pattern::FieldPattern(field) => field
                 .value()
                 .as_ref()
                 .is_some_and(|value| self.expr_may_match_anonymous_inner(value, visited)),
-            Expr::AltExpr(alt) => alt
+            Pattern::AltPattern(alt) => alt
                 .branches()
                 .filter_map(|branch| branch.body())
                 .any(|body| self.expr_may_match_anonymous_inner(&body, visited)),
-            Expr::SeqExpr(seq) => seq
+            Pattern::SeqPattern(seq) => seq
                 .children()
                 .any(|child| self.expr_may_match_anonymous_inner(&child, visited)),
-            Expr::Ref(r) => self.ref_may_match_anonymous(r, visited),
-            Expr::NamedNode(_) => false,
+            Pattern::Ref(r) => self.ref_may_match_anonymous(r, visited),
+            Pattern::NodePattern(_) => false,
         }
     }
 
@@ -74,7 +74,7 @@ impl<'a> AnonymousClassifier<'a> {
 
         let result = self
             .symbol_table
-            .get(name)
+            .body(name)
             .is_some_and(|body| self.expr_may_match_anonymous_inner(body, visited));
 
         visited.remove(name);
@@ -89,8 +89,8 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
             return (true, Some(Nav::UpExact(1)));
         }
 
-        let prev_expr = items.iter().rev().skip(1).find_map(|item| {
-            if let SeqItem::Expr(e) = item {
+        let prev_pattern = items.iter().rev().skip(1).find_map(|item| {
+            if let SeqItem::Pattern(e) = item {
                 Some(e)
             } else {
                 None
@@ -98,7 +98,7 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
         });
 
         let classifier = AnonymousClassifier::new(symbol_table);
-        let nav = if classifier.expr_may_match_anonymous(prev_expr) {
+        let nav = if classifier.expr_may_match_anonymous(prev_pattern) {
             Nav::UpSkipExtras(1)
         } else {
             Nav::UpSkipTrivia(1)
@@ -107,7 +107,7 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
     }
 
     if items.len() == 1
-        && let Some(SeqItem::Expr(Expr::SeqExpr(seq))) = items.first()
+        && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
     {
         let seq_items: Vec<_> = seq.items().collect();
         return check_trailing_anchor(&seq_items, symbol_table);
@@ -124,7 +124,7 @@ pub fn compute_nav_modes(
     let mut result = Vec::new();
     let mut pending_anchor_strict = None;
     let mut prev_is_anonymous = false;
-    let mut is_first_expr = true;
+    let mut is_first_pattern = true;
     let classifier = AnonymousClassifier::new(symbol_table);
 
     for (idx, item) in items.iter().enumerate() {
@@ -132,17 +132,17 @@ pub fn compute_nav_modes(
             SeqItem::Anchor(anchor) => {
                 pending_anchor_strict = Some(anchor.is_strict());
             }
-            SeqItem::Expr(expr) => {
-                let current_is_anonymous = classifier.expr_may_match_anonymous(Some(expr));
+            SeqItem::Pattern(pattern) => {
+                let current_is_anonymous = classifier.expr_may_match_anonymous(Some(pattern));
                 // Alternation branches compile their own entry nav, so the branch body—not
                 // the whole alternation—decides whether soft anchors use extras-only nav.
-                let current_is_anonymous_for_anchor = if expr_has_direct_alt_branch_nav(expr) {
+                let current_is_anonymous_for_anchor = if expr_has_direct_alt_branch_nav(pattern) {
                     false
                 } else {
                     current_is_anonymous
                 };
                 let nav = if let Some(is_exact) = pending_anchor_strict {
-                    if is_first_expr && is_inside_node {
+                    if is_first_pattern && is_inside_node {
                         Some(if is_exact {
                             Nav::DownExact
                         } else if current_is_anonymous_for_anchor {
@@ -150,7 +150,7 @@ pub fn compute_nav_modes(
                         } else {
                             Nav::DownSkip
                         })
-                    } else if !is_first_expr {
+                    } else if !is_first_pattern {
                         Some(if is_exact {
                             Nav::NextExact
                         } else if prev_is_anonymous || current_is_anonymous_for_anchor {
@@ -161,7 +161,7 @@ pub fn compute_nav_modes(
                     } else {
                         None
                     }
-                } else if !is_first_expr {
+                } else if !is_first_pattern {
                     Some(Nav::Next)
                 } else {
                     None
@@ -170,7 +170,7 @@ pub fn compute_nav_modes(
                 result.push((idx, nav));
                 pending_anchor_strict = None;
                 prev_is_anonymous = current_is_anonymous;
-                is_first_expr = false;
+                is_first_pattern = false;
             }
         }
     }
@@ -189,8 +189,8 @@ pub fn compute_nav_modes(
 /// and a `StayExact` body, so the wrapper — not the item — owns the resumable
 /// search. This is the single ownership rule that replaced the old
 /// per-form classification.
-pub fn expr_owns_iteration(expr: &Expr) -> bool {
-    quantifier_operator_kind(expr).is_some()
+pub fn expr_owns_iteration(pattern: &Pattern) -> bool {
+    quantifier_operator_kind(pattern).is_some()
 }
 
 /// Extract the navigation if a *match-once* item under it owns a resumable
@@ -224,22 +224,22 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
     )
 }
 
-/// Unwraps CapturedExpr wrappers before testing for a quantifier operator.
-fn quantifier_operator_kind(expr: &Expr) -> Option<crate::parser::SyntaxKind> {
-    let expr = match expr {
-        Expr::CapturedExpr(cap) => cap.inner()?,
+/// Unwraps CapturedPattern wrappers before testing for a quantifier operator.
+fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::parser::SyntaxKind> {
+    let pattern = match pattern {
+        Pattern::CapturedPattern(cap) => cap.inner()?,
         e => e.clone(),
     };
 
-    let Expr::QuantifiedExpr(q) = &expr else {
+    let Pattern::QuantifiedPattern(q) = &pattern else {
         return None;
     };
     Some(q.operator()?.kind())
 }
 
-pub fn is_skippable_quantifier(expr: &Expr) -> bool {
+pub fn is_skippable_quantifier(pattern: &Pattern) -> bool {
     use crate::parser::SyntaxKind;
-    quantifier_operator_kind(expr).is_some_and(|k| {
+    quantifier_operator_kind(pattern).is_some_and(|k| {
         matches!(
             k,
             SyntaxKind::Question

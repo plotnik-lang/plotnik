@@ -10,9 +10,9 @@ use rowan::TextRange;
 
 use super::PredicateInput;
 use crate::analyze::Reporter;
-use crate::analyze::visitor::{Visitor, walk_named_node};
+use crate::analyze::visitor::{Visitor, walk_node_pattern};
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::NamedNode;
+use crate::parser::NodePattern;
 
 pub fn validate_predicates(input: PredicateInput) {
     let PredicateInput {
@@ -34,7 +34,7 @@ struct PredicateValidator<'q, 'd> {
 }
 
 impl Visitor for PredicateValidator<'_, '_> {
-    fn visit_named_node(&mut self, node: &NamedNode) {
+    fn visit_node_pattern(&mut self, node: &NodePattern) {
         if let Some(pred) = node.predicate()
             && let Some(op) = pred.operator()
             && op.is_regex_op()
@@ -42,7 +42,7 @@ impl Visitor for PredicateValidator<'_, '_> {
         {
             self.validate_regex(regex.pattern(self.source), regex.text_range());
         }
-        walk_named_node(self, node);
+        walk_node_pattern(self, node);
     }
 }
 
@@ -80,7 +80,7 @@ impl PredicateValidator<'_, '_> {
                     _ => self
                         .reporter
                         .report(DiagnosticKind::RegexSyntaxError, span)
-                        .message(format!("{}", e.kind())),
+                        .detail(format!("{}", e.kind())),
                 };
                 report.emit();
                 return;

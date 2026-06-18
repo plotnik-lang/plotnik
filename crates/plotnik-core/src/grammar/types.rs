@@ -4,20 +4,20 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Cardinality, NodeFieldId, NodeType, NodeTypeId};
+use crate::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::structure::StructureTable;
 
-pub(super) struct GrammarMetadata {
+pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
-    pub(super) symbols: Vec<NodeSymbol>,
-    pub(super) fields: Vec<FieldSymbol>,
+    pub(super) symbols: Vec<NodeKindEntry>,
+    pub(super) fields: Vec<FieldEntry>,
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct NodeSymbol {
+pub(super) struct NodeKindEntry {
     pub(super) id: u16,
     pub(super) type_name: String,
     pub(super) named: bool,
@@ -31,7 +31,7 @@ pub(super) struct NodeSymbol {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct FieldSymbol {
+pub(super) struct FieldEntry {
     pub(super) id: u16,
     pub(super) name: String,
 }
@@ -40,21 +40,21 @@ pub(super) struct FieldSymbol {
 #[derive(Debug, Clone)]
 pub struct Grammar {
     name: String,
-    node_constraints: HashMap<NodeTypeId, NodeConstraints>,
-    extra_node_types: Vec<NodeTypeId>,
-    root_node_type: Option<NodeTypeId>,
-    named_node_ids: HashMap<String, NodeTypeId>,
-    anonymous_node_ids: HashMap<String, NodeTypeId>,
-    node_names: HashMap<NodeTypeId, String>,
+    node_constraints: HashMap<NodeKindId, NodeConstraints>,
+    extra_node_kinds: Vec<NodeKindId>,
+    root_node_kind: Option<NodeKindId>,
+    named_node_ids: HashMap<String, NodeKindId>,
+    anonymous_node_ids: HashMap<String, NodeKindId>,
+    node_names: HashMap<NodeKindId, String>,
     field_ids: HashMap<String, NodeFieldId>,
     field_names: HashMap<NodeFieldId, String>,
-    supertype_ids: HashSet<NodeTypeId>,
-    subtypes: HashMap<NodeTypeId, Vec<NodeTypeId>>,
+    supertype_ids: HashSet<NodeKindId>,
+    subtypes: HashMap<NodeKindId, Vec<NodeKindId>>,
     /// Public node kinds that are leaf tokens (no child nodes are derivable).
-    token_node_ids: HashSet<NodeTypeId>,
+    token_node_ids: HashSet<NodeKindId>,
     /// Public node ids that name anonymous (literal-token) kinds.
-    anonymous_node_id_set: HashSet<NodeTypeId>,
-    fields_by_node: HashMap<NodeTypeId, Vec<String>>,
+    anonymous_node_id_set: HashSet<NodeKindId>,
+    fields_by_node: HashMap<NodeKindId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
@@ -69,7 +69,7 @@ impl Grammar {
             lower::{LoweredGrammar, derive_fields, derive_symbols},
             node_shapes,
             productions::{expand_repeats, flatten_grammar, process_inlines},
-            symbols::resolve_symbols,
+            symbols::intern_symbols,
             tokens::{expand_tokens, extract_tokens},
             validation::{validate_indirect_recursion, validate_precedences},
         };
@@ -82,7 +82,7 @@ impl Grammar {
         validate_indirect_recursion(&lowered.variables)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
 
-        let resolved_grammar = resolve_symbols(lowered.pre_resolve())
+        let resolved_grammar = intern_symbols(lowered.as_uninterned())
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
         let (syntax_grammar, lexical_grammar) = extract_tokens(resolved_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
@@ -100,25 +100,25 @@ impl Grammar {
             lexical: &lexical_grammar,
             aliases: &aliases,
         };
-        let variable_info = node_shapes::get_variable_info(grammar_ctx)
+        let variable_summaries = node_shapes::derive_variable_summaries(grammar_ctx)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
-        let node_shapes = node_shapes::generate_node_shapes(grammar_ctx, &variable_info)
+        let node_shapes = node_shapes::generate_node_shapes(grammar_ctx, &variable_summaries)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
-        let metadata = GrammarMetadata {
+        let tables = GrammarTables {
             node_shapes,
             symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
-            fields: derive_fields(&syntax_grammar, &inlines, &variable_info),
+            fields: derive_fields(&syntax_grammar, &inlines, &variable_summaries),
         };
 
         let mut grammar =
-            Self::from_metadata(raw.name.clone(), metadata).map_err(GrammarError::Analysis)?;
+            Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
         Ok(grammar)
     }
 
-    pub(super) fn from_metadata(name: String, metadata: GrammarMetadata) -> Result<Self, String> {
-        let mut node_ids = HashMap::<NodeType<&str>, NodeTypeId>::new();
+    pub(super) fn from_tables(name: String, tables: GrammarTables) -> Result<Self, String> {
+        let mut node_ids = HashMap::<NodeKind<&str>, NodeKindId>::new();
         let mut named_node_ids = HashMap::new();
         let mut anonymous_node_ids = HashMap::new();
         let mut node_names = HashMap::new();
@@ -128,10 +128,10 @@ impl Grammar {
         // token only when every contributing symbol is terminal, so this accumulates per kind with
         // AND: a single non-terminal contributor (like `debugger_statement` = `"debugger" ";"`)
         // keeps the kind out of the token set even when it otherwise looks childless.
-        let mut all_terminal: HashMap<NodeTypeId, bool> = HashMap::new();
+        let mut all_terminal: HashMap<NodeKindId, bool> = HashMap::new();
 
-        for symbol in &metadata.symbols {
-            let node_id = node_type_id(symbol.id);
+        for symbol in &tables.symbols {
+            let node_id = node_kind_id(symbol.id);
             node_names.insert(node_id, symbol.type_name.clone());
 
             all_terminal
@@ -147,12 +147,12 @@ impl Grammar {
                 continue;
             }
 
-            let node_type = if symbol.named {
-                NodeType::Named(symbol.type_name.as_str())
+            let node_kind = if symbol.named {
+                NodeKind::Named(symbol.type_name.as_str())
             } else {
-                NodeType::Anonymous(symbol.type_name.as_str())
+                NodeKind::Anonymous(symbol.type_name.as_str())
             };
-            node_ids.entry(node_type).or_insert(node_id);
+            node_ids.entry(node_kind).or_insert(node_id);
 
             if symbol.named {
                 named_node_ids
@@ -167,38 +167,38 @@ impl Grammar {
 
         let mut field_ids = HashMap::new();
         let mut field_names = HashMap::new();
-        for field in &metadata.fields {
+        for field in &tables.fields {
             let field_id = node_field_id(field.id);
             field_ids.insert(field.name.clone(), field_id);
             field_names.insert(field_id, field.name.clone());
         }
 
-        let (node_constraints, extra_node_types, root_node_type) = build_node_constraints(
-            &metadata.node_shapes,
-            |node_type| node_ids.get(&node_type).copied(),
+        let (node_constraints, extra_node_kinds, root_node_kind) = build_node_constraints(
+            &tables.node_shapes,
+            |node_kind| node_ids.get(&node_kind).copied(),
             |name| field_ids.get(name).copied(),
         )
         .map_err(format_node_shape_error)?;
 
         let mut subtypes = HashMap::new();
-        for shape in &metadata.node_shapes {
+        for shape in &tables.node_shapes {
             let Some(shape_subtypes) = &shape.subtypes else {
                 continue;
             };
-            let Some(supertype) = node_ids.get(&shape.node_type()) else {
+            let Some(supertype) = node_ids.get(&shape.node_kind()) else {
                 continue;
             };
 
             let resolved = shape_subtypes
                 .iter()
-                .filter_map(|subtype| node_ids.get(&subtype.node_type()).copied())
+                .filter_map(|subtype| node_ids.get(&subtype.node_kind()).copied())
                 .collect::<Vec<_>>();
             subtypes.insert(*supertype, resolved);
         }
 
         let mut fields_by_node = HashMap::new();
-        for shape in &metadata.node_shapes {
-            let Some(node_id) = node_ids.get(&shape.node_type()) else {
+        for shape in &tables.node_shapes {
+            let Some(node_id) = node_ids.get(&shape.node_kind()) else {
                 continue;
             };
             let mut fields = shape.fields.keys().cloned().collect::<Vec<_>>();
@@ -240,8 +240,8 @@ impl Grammar {
         Ok(Self {
             name,
             node_constraints,
-            extra_node_types,
-            root_node_type,
+            extra_node_kinds,
+            root_node_kind,
             named_node_ids,
             anonymous_node_ids,
             node_names,
@@ -255,7 +255,7 @@ impl Grammar {
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
-            // Populated only on the `from_raw` path: `GrammarMetadata` has already
+            // Populated only on the `from_raw` path: `GrammarTables` has already
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
         })
@@ -269,17 +269,17 @@ impl Grammar {
     /// Distilled structural skeleton of the grammar's productions — ordered,
     /// visibility-classified step sequences retained from the flattened grammar
     /// before it is discarded. Empty for grammars built directly from metadata:
-    /// the flattened productions it distills do not survive into `GrammarMetadata`,
+    /// the flattened productions it distills do not survive into `GrammarTables`,
     /// so only the `from_raw` path can populate it.
     pub fn structure(&self) -> &StructureTable {
         &self.structure
     }
 
-    pub fn resolve_named_node(&self, kind: &str) -> Option<NodeTypeId> {
+    pub fn resolve_named_node(&self, kind: &str) -> Option<NodeKindId> {
         self.named_node_ids.get(kind).copied()
     }
 
-    pub fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeTypeId> {
+    pub fn resolve_anonymous_node(&self, kind: &str) -> Option<NodeKindId> {
         self.anonymous_node_ids.get(kind).copied()
     }
 
@@ -288,8 +288,8 @@ impl Grammar {
     }
 
     /// Human-readable node kind for diagnostics/debugging.
-    pub fn node_type_name(&self, node_type_id: NodeTypeId) -> Option<&str> {
-        self.node_names.get(&node_type_id).map(String::as_str)
+    pub fn node_kind(&self, node_kind_id: NodeKindId) -> Option<&str> {
+        self.node_names.get(&node_kind_id).map(String::as_str)
     }
 
     /// Human-readable field name for diagnostics/debugging.
@@ -315,18 +315,18 @@ impl Grammar {
         self.all_field_names.iter().map(String::as_str).collect()
     }
 
-    pub fn fields_for_node_type(&self, node_type_id: NodeTypeId) -> Vec<&str> {
+    pub fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
         self.fields_by_node
-            .get(&node_type_id)
+            .get(&node_kind_id)
             .map(|fields| fields.iter().map(String::as_str).collect())
             .unwrap_or_default()
     }
 
-    pub fn is_supertype(&self, node_type_id: NodeTypeId) -> bool {
-        self.supertype_ids.contains(&node_type_id)
+    pub fn is_supertype(&self, node_kind_id: NodeKindId) -> bool {
+        self.supertype_ids.contains(&node_kind_id)
     }
 
-    pub fn subtypes(&self, supertype: NodeTypeId) -> &[NodeTypeId] {
+    pub fn subtypes(&self, supertype: NodeKindId) -> &[NodeKindId] {
         self.subtypes
             .get(&supertype)
             .map(Vec::as_slice)
@@ -336,7 +336,7 @@ impl Grammar {
     /// Transitive closure of a supertype's subtypes (direct and indirect), excluding the
     /// supertype itself. `subtypes` is direct-only, so structural validation expands it here.
     /// Sequence validation calls it too; centralized here to avoid duplicating the traversal.
-    pub fn collect_subtypes(&self, supertype: NodeTypeId) -> HashSet<NodeTypeId> {
+    pub fn collect_subtypes(&self, supertype: NodeKindId) -> HashSet<NodeKindId> {
         let mut closure = HashSet::new();
         let mut stack = vec![supertype];
         while let Some(node) = stack.pop() {
@@ -349,92 +349,92 @@ impl Grammar {
         closure
     }
 
-    /// Whether `node_type_id` is a leaf token kind — a node whose content is its own text and
+    /// Whether `node_kind_id` is a leaf token kind — a node whose content is its own text and
     /// which never has child nodes (e.g. `identifier`). Childless *syntax* nodes such as
     /// `debugger_statement` are not tokens: extras like comments can still attach beneath them.
-    pub fn is_token(&self, node_type_id: NodeTypeId) -> bool {
-        self.token_node_ids.contains(&node_type_id)
+    pub fn is_token(&self, node_kind_id: NodeKindId) -> bool {
+        self.token_node_ids.contains(&node_kind_id)
     }
 
-    /// Whether `node_type_id` names an anonymous (literal-token) kind, e.g. `"+"`. Used to
+    /// Whether `node_kind_id` names an anonymous (literal-token) kind, e.g. `"+"`. Used to
     /// distinguish fields that only accept literal tokens (where a `(_)` value is impossible).
-    pub fn is_anonymous_node(&self, node_type_id: NodeTypeId) -> bool {
-        self.anonymous_node_id_set.contains(&node_type_id)
+    pub fn is_anonymous_node(&self, node_kind_id: NodeKindId) -> bool {
+        self.anonymous_node_id_set.contains(&node_kind_id)
     }
 
-    pub fn root(&self) -> Option<NodeTypeId> {
-        self.root_node_type
+    pub fn root(&self) -> Option<NodeKindId> {
+        self.root_node_kind
     }
 
-    pub fn is_extra(&self, node_type_id: NodeTypeId) -> bool {
-        self.extra_node_types.contains(&node_type_id)
+    pub fn is_extra(&self, node_kind_id: NodeKindId) -> bool {
+        self.extra_node_kinds.contains(&node_kind_id)
     }
 
-    pub fn has_field(&self, node_type_id: NodeTypeId, node_field_id: NodeFieldId) -> bool {
+    pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
         self.node_constraints
-            .get(&node_type_id)
+            .get(&node_kind_id)
             .is_some_and(|constraints| constraints.fields.contains_key(&node_field_id))
     }
 
     pub fn field_cardinality(
         &self,
-        node_type_id: NodeTypeId,
+        node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> Option<Cardinality> {
-        self.field_constraints(node_type_id, node_field_id)
+        self.field_constraints(node_kind_id, node_field_id)
             .map(|field| field.cardinality)
     }
 
     pub fn valid_field_types(
         &self,
-        node_type_id: NodeTypeId,
+        node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
-    ) -> &[NodeTypeId] {
-        self.field_constraints(node_type_id, node_field_id)
+    ) -> &[NodeKindId] {
+        self.field_constraints(node_kind_id, node_field_id)
             .map(|field| field.valid_types.as_slice())
             .unwrap_or(&[])
     }
 
     pub fn is_valid_field_type(
         &self,
-        node_type_id: NodeTypeId,
+        node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
-        child: NodeTypeId,
+        child: NodeKindId,
     ) -> bool {
-        self.valid_field_types(node_type_id, node_field_id)
+        self.valid_field_types(node_kind_id, node_field_id)
             .contains(&child)
     }
 
-    pub fn children_cardinality(&self, node_type_id: NodeTypeId) -> Option<Cardinality> {
-        self.children_constraints(node_type_id)
+    pub fn children_cardinality(&self, node_kind_id: NodeKindId) -> Option<Cardinality> {
+        self.children_constraints(node_kind_id)
             .map(|children| children.cardinality)
     }
 
-    pub fn valid_child_types(&self, node_type_id: NodeTypeId) -> &[NodeTypeId] {
-        self.children_constraints(node_type_id)
+    pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
+        self.children_constraints(node_kind_id)
             .map(|children| children.valid_types.as_slice())
             .unwrap_or(&[])
     }
 
-    pub fn is_valid_child_type(&self, node_type_id: NodeTypeId, child: NodeTypeId) -> bool {
-        self.valid_child_types(node_type_id).contains(&child)
+    pub fn is_valid_child_type(&self, node_kind_id: NodeKindId, child: NodeKindId) -> bool {
+        self.valid_child_types(node_kind_id).contains(&child)
     }
 
     fn field_constraints(
         &self,
-        node_type_id: NodeTypeId,
+        node_kind_id: NodeKindId,
         field_id: NodeFieldId,
     ) -> Option<&FieldConstraints> {
-        self.node_constraints_for(node_type_id)
+        self.node_constraints_for(node_kind_id)
             .fields
             .get(&field_id)
     }
 
-    fn children_constraints(&self, node_type_id: NodeTypeId) -> Option<&ChildrenConstraints> {
-        self.node_constraints_for(node_type_id).children.as_ref()
+    fn children_constraints(&self, node_kind_id: NodeKindId) -> Option<&ChildrenConstraints> {
+        self.node_constraints_for(node_kind_id).children.as_ref()
     }
 
-    fn node_constraints_for(&self, node_type_id: NodeTypeId) -> &NodeConstraints {
+    fn node_constraints_for(&self, node_kind_id: NodeKindId) -> &NodeConstraints {
         // Leaf-token kinds (and some alias-produced ids) carry no node shape, so they have no
         // constraints entry. Treat them as having no children/fields rather than panicking: a
         // token has no children, so an empty view is correct, and any named child under it is
@@ -444,11 +444,11 @@ impl Grammar {
             fields: HashMap::new(),
             children: None,
         });
-        self.node_constraints.get(&node_type_id).unwrap_or(&EMPTY)
+        self.node_constraints.get(&node_kind_id).unwrap_or(&EMPTY)
     }
 }
 
-fn node_type_id(id: u16) -> NodeTypeId {
+fn node_kind_id(id: u16) -> NodeKindId {
     NonZeroU16::new(id).expect("lowered node symbol id must be non-zero in production grammar")
 }
 
@@ -476,11 +476,11 @@ pub(crate) struct NodeShape {
 }
 
 impl NodeShape {
-    fn node_type(&self) -> NodeType<&str> {
+    fn node_kind(&self) -> NodeKind<&str> {
         if self.named {
-            NodeType::Named(self.type_name.as_str())
+            NodeKind::Named(self.type_name.as_str())
         } else {
-            NodeType::Anonymous(self.type_name.as_str())
+            NodeKind::Anonymous(self.type_name.as_str())
         }
     }
 }
@@ -501,11 +501,11 @@ pub(crate) struct NodeKindRef {
 }
 
 impl NodeKindRef {
-    fn node_type(&self) -> NodeType<&str> {
+    fn node_kind(&self) -> NodeKind<&str> {
         if self.named {
-            NodeType::Named(self.type_name.as_str())
+            NodeKind::Named(self.type_name.as_str())
         } else {
-            NodeType::Anonymous(self.type_name.as_str())
+            NodeKind::Anonymous(self.type_name.as_str())
         }
     }
 }
@@ -561,13 +561,13 @@ impl std::error::Error for NodeShapeBuildError {}
 #[derive(Debug, Clone)]
 pub(crate) struct FieldConstraints {
     pub(crate) cardinality: Cardinality,
-    pub(crate) valid_types: Vec<NodeTypeId>,
+    pub(crate) valid_types: Vec<NodeKindId>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ChildrenConstraints {
     pub(crate) cardinality: Cardinality,
-    pub(crate) valid_types: Vec<NodeTypeId>,
+    pub(crate) valid_types: Vec<NodeKindId>,
 }
 
 #[derive(Debug, Clone)]
@@ -577,9 +577,9 @@ pub(crate) struct NodeConstraints {
 }
 
 type NodeConstraintBuild = (
-    HashMap<NodeTypeId, NodeConstraints>,
-    Vec<NodeTypeId>,
-    Option<NodeTypeId>,
+    HashMap<NodeKindId, NodeConstraints>,
+    Vec<NodeKindId>,
+    Option<NodeKindId>,
 );
 
 pub(crate) fn build_node_constraints<F, G>(
@@ -588,28 +588,28 @@ pub(crate) fn build_node_constraints<F, G>(
     field_id_for_name: G,
 ) -> Result<NodeConstraintBuild, NodeShapeBuildError>
 where
-    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
+    F: Fn(NodeKind<&str>) -> Option<NodeKindId>,
     G: Fn(&str) -> Option<NodeFieldId>,
 {
     let mut node_constraints = HashMap::new();
-    let mut extra_node_types = Vec::new();
-    let mut root_node_type = None;
+    let mut extra_node_kinds = Vec::new();
+    let mut root_node_kind = None;
     let known_shapes = node_shapes
         .iter()
-        .map(NodeShape::node_type)
+        .map(NodeShape::node_kind)
         .collect::<HashSet<_>>();
 
     for shape in node_shapes {
-        let Some(node_id) = node_id_for_type(shape.node_type()) else {
+        let Some(node_id) = node_id_for_type(shape.node_kind()) else {
             continue;
         };
 
         if shape.root {
-            root_node_type = Some(node_id);
+            root_node_kind = Some(node_id);
         }
 
         if shape.extra {
-            extra_node_types.push(node_id);
+            extra_node_kinds.push(node_id);
         }
 
         let fields =
@@ -619,17 +619,17 @@ where
         node_constraints.insert(node_id, NodeConstraints { fields, children });
     }
 
-    Ok((node_constraints, extra_node_types, root_node_type))
+    Ok((node_constraints, extra_node_kinds, root_node_kind))
 }
 
 fn build_field_constraints<F, G>(
     shape: &NodeShape,
-    known_shapes: &HashSet<NodeType<&str>>,
+    known_shapes: &HashSet<NodeKind<&str>>,
     node_id_for_type: &F,
     field_id_for_name: &G,
 ) -> Result<HashMap<NodeFieldId, FieldConstraints>, NodeShapeBuildError>
 where
-    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
+    F: Fn(NodeKind<&str>) -> Option<NodeKindId>,
     G: Fn(&str) -> Option<NodeFieldId>,
 {
     let mut fields = HashMap::new();
@@ -662,11 +662,11 @@ where
 
 fn build_children_constraints<F>(
     shape: &NodeShape,
-    known_shapes: &HashSet<NodeType<&str>>,
+    known_shapes: &HashSet<NodeKind<&str>>,
     node_id_for_type: &F,
 ) -> Result<Option<ChildrenConstraints>, NodeShapeBuildError>
 where
-    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
+    F: Fn(NodeKind<&str>) -> Option<NodeKindId>,
 {
     shape
         .children
@@ -691,23 +691,23 @@ where
 
 fn resolve_slot_types<F, E>(
     slot: &NodeSlot,
-    known_shapes: &HashSet<NodeType<&str>>,
+    known_shapes: &HashSet<NodeKind<&str>>,
     node_id_for_type: &F,
     error: E,
-) -> Result<Vec<NodeTypeId>, NodeShapeBuildError>
+) -> Result<Vec<NodeKindId>, NodeShapeBuildError>
 where
-    F: Fn(NodeType<&str>) -> Option<NodeTypeId>,
+    F: Fn(NodeKind<&str>) -> Option<NodeKindId>,
     E: Fn(&NodeKindRef) -> NodeShapeBuildError,
 {
     let mut resolved = Vec::new();
     for kind_ref in &slot.types {
-        let node_type = kind_ref.node_type();
-        if let Some(node_id) = node_id_for_type(node_type) {
+        let node_kind = kind_ref.node_kind();
+        if let Some(node_id) = node_id_for_type(node_kind) {
             resolved.push(node_id);
             continue;
         }
 
-        if known_shapes.contains(&node_type) {
+        if known_shapes.contains(&node_kind) {
             continue;
         }
 

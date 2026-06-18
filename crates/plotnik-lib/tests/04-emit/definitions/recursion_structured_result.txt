@@ -50,9 +50,9 @@ Test = 08 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Expr:
@@ -64,8 +64,8 @@ Test:
   10  ─‣┘  [Set(M5)] _                      12
   12                                        ▶
   13  ─‣─  arguments: (Expr)                06 : 14
-  14  ─‣┘  [Set(M2)] _ [EndEnum]            16
+  14  ─‣┘  [Set(M2)] _ [EnumClose]          16
   16                                        ▶
-  17   !   [Enum(M3)] (number) [Node Set(M0) EndEnum]  16
+  17   !   [EnumOpen(M3)] (number) [Node Set(M0) EnumClose]  16
   20  └‣─  function: (identifier) [Node Set(M1)]  13
-  22   !   [Enum(M4)] (call_expression)     20
+  22   !   [EnumOpen(M4)] (call_expression)  20

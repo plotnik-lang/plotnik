@@ -56,18 +56,18 @@ Q = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
-  08  └‣─  [Obj] _                          11, 16, 19
+  08  └‣─  [ObjectOpen] _                   11, 16, 19
   10                                        ▶
-  11   !   [Null Set(M2) Obj] (expression_statement) [Node Set(M0) EndObj Set(M1)]  14
-  14  ─‣┘  [EndObj Set(M3)] _               10
+  11   !   [Null Set(M2) ObjectOpen] (expression_statement) [Node Set(M0) ObjectClose Set(M1)]  14
+  14  ─‣┘  [ObjectClose Set(M3)] _          10
   16   !   [Null Set(M1)] (comment) [Node Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
 ==== types ====
@@ -85,23 +85,23 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
 Q:
   06       (program)                        08
        ●   program
-  08       [Obj] _                          11, 16, 19
+  08       [ObjectOpen] _                   11, 16, 19
        ●   expression_statement
-  11       [Null Set(M2) Obj] (expression_statement) [Node Set(M0) EndObj Set(M1)]  14
+  11       [Null Set(M2) ObjectOpen] (expression_statement) [Node Set(M0) ObjectClose Set(M1)]  14
        ●   expression_statement
-  14       [EndObj Set(M3)] _               10
+  14       [ObjectClose Set(M3)] _          10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"w":{"b":null,"grp":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}

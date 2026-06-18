@@ -8,10 +8,10 @@ use std::collections::{BTreeMap, HashSet};
 
 use plotnik_bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE};
 
-use crate::bytecode::{InstructionIR, Label, LayoutResult};
+use crate::bytecode::{InstructionIR, Label, LayoutMap};
 
 /// Intermediate representation for layout optimization.
-struct LayoutIR {
+struct BlockArena {
     blocks: Vec<Block>,
     label_to_block: BTreeMap<Label, usize>,
     label_to_offset: BTreeMap<Label, u8>,
@@ -58,7 +58,7 @@ impl Block {
     }
 }
 
-impl LayoutIR {
+impl BlockArena {
     fn new() -> Self {
         Self {
             blocks: Vec::new(),
@@ -93,7 +93,7 @@ impl LayoutIR {
         self.label_to_offset.insert(label, offset);
     }
 
-    fn finalize(self) -> LayoutResult {
+    fn finalize(self) -> LayoutMap {
         let mut mapping = BTreeMap::new();
         // Accumulate in u32 so the step count never wraps; the emitter rejects a
         // layout exceeding the u16 address space before any `step as u16` (which
@@ -110,19 +110,19 @@ impl LayoutIR {
             }
         }
 
-        LayoutResult::new(mapping, max_step_end)
+        LayoutMap::new(mapping, max_step_end)
     }
 }
 
 /// Block-to-block reference counts for scoring.
-struct BlockRefs {
+struct BlockEdges {
     /// (from_block, to_block) -> reference count
     direct: BTreeMap<(usize, usize), usize>,
     /// block -> list of predecessor blocks
     predecessors: BTreeMap<usize, Vec<usize>>,
 }
 
-impl BlockRefs {
+impl BlockEdges {
     fn new() -> Self {
         Self {
             direct: BTreeMap::new(),
@@ -130,7 +130,7 @@ impl BlockRefs {
         }
     }
 
-    fn add_ref(&mut self, from_block: usize, to_block: usize) {
+    fn add_edge(&mut self, from_block: usize, to_block: usize) {
         *self.direct.entry((from_block, to_block)).or_default() += 1;
         let preds = self.predecessors.entry(to_block).or_default();
         if !preds.contains(&from_block) {
@@ -155,7 +155,7 @@ impl BlockRefs {
 
 /// Score a candidate block for packing based on reference distance.
 /// Direct refs count 1.0, 1-hop = 0.5, 2-hop = 0.25, capped at 3 hops.
-fn block_score(target_block: usize, candidate_block: usize, refs: &BlockRefs) -> f32 {
+fn block_score(target_block: usize, candidate_block: usize, refs: &BlockEdges) -> f32 {
     let mut score = 0.0f32;
     let mut frontier = vec![(candidate_block, 0u8)];
     let mut visited = HashSet::new();
@@ -224,9 +224,9 @@ impl CacheAligned {
     /// Compute layout for instructions with given entry points.
     ///
     /// Returns mapping from labels to step IDs and total step count.
-    pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutResult {
+    pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutMap {
         if instructions.is_empty() {
-            return LayoutResult::empty();
+            return LayoutMap::empty();
         }
 
         let graph = Graph::build(instructions);
@@ -236,26 +236,26 @@ impl CacheAligned {
         let chains = extract_chains(&graph, instructions, entries);
         let ordered = order_chains(chains, entries);
 
-        let mut layout = Layout::new(&label_to_instr);
+        let mut layout = LayoutBuilder::new(&label_to_instr);
         layout.place_chains(&ordered);
         layout.pack_successors();
         layout.finish()
     }
 }
 
-/// Cache-aligned placement of instructions into blocks. Owns the `LayoutIR`
+/// Cache-aligned placement of instructions into blocks. Owns the `BlockArena`
 /// under construction so the passes hand it off through `self` rather than
 /// threading `ir`/`refs` between free functions.
-struct Layout<'a> {
+struct LayoutBuilder<'a> {
     label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>,
-    ir: LayoutIR,
+    ir: BlockArena,
 }
 
-impl<'a> Layout<'a> {
+impl<'a> LayoutBuilder<'a> {
     fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>) -> Self {
         Self {
             label_to_instr,
-            ir: LayoutIR::new(),
+            ir: BlockArena::new(),
         }
     }
 
@@ -284,8 +284,8 @@ impl<'a> Layout<'a> {
         }
     }
 
-    fn block_refs(&self) -> BlockRefs {
-        let mut refs = BlockRefs::new();
+    fn block_refs(&self) -> BlockEdges {
+        let mut refs = BlockEdges::new();
 
         for (&label, &block_idx) in &self.ir.label_to_block {
             let Some(instr) = self.label_to_instr.get(&label) else {
@@ -295,7 +295,7 @@ impl<'a> Layout<'a> {
                 if let Some(&succ_block) = self.ir.label_to_block.get(&succ)
                     && succ_block != block_idx
                 {
-                    refs.add_ref(block_idx, succ_block);
+                    refs.add_edge(block_idx, succ_block);
                 }
             }
         }
@@ -356,7 +356,7 @@ impl<'a> Layout<'a> {
         }
     }
 
-    fn finish(self) -> LayoutResult {
+    fn finish(self) -> LayoutMap {
         self.ir.finalize()
     }
 }

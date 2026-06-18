@@ -9,7 +9,7 @@
 
 use plotnik_core::Interner;
 
-use crate::parser::{Expr, QuantifiedExpr, SyntaxKind, is_truly_empty_scope};
+use crate::parser::{Pattern, QuantifiedPattern, SyntaxKind, is_empty_group};
 
 use super::context::TypeContext;
 use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
@@ -17,7 +17,7 @@ use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CaptureMechanism {
+pub enum CaptureKind {
     /// The matched tree-sitter node itself (`Node` effect). If the inner has
     /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
@@ -28,7 +28,7 @@ pub enum CaptureMechanism {
     /// the `Call`/`Return` (with an `Obj`/`EndObj` scope when the definition
     /// returns a struct) and consumes the result — the capture emits no `Node`.
     Ref,
-    /// The inner expression itself leaves the captured value pending — a tagged
+    /// The inner expression itself leaves the captured value pending — an enum
     /// alternation (`Enum … EndEnum`) or a named node forwarding a single
     /// structured output child. Emit the inner, then a trailing `Set`; the capture
     /// contributes no `Node` and no wrapper.
@@ -42,57 +42,57 @@ pub enum CaptureMechanism {
 /// Reads the inner's cached type info, so it is valid both during bottom-up
 /// inference (a capture's inner is inferred before the capture itself) and
 /// during emission (all type info is available).
-pub fn capture_mechanism(inner: &Expr, ctx: &TypeContext, interner: &Interner) -> CaptureMechanism {
+pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> CaptureKind {
     // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
     // constraint, so the value mechanism is that of `x`.
-    let expr = unwrap_field(inner);
+    let pattern = unwrap_field(inner);
 
-    if let Expr::QuantifiedExpr(quant) = &expr {
+    if let Pattern::QuantifiedPattern(quant) = &pattern {
         return match quantifier_arity(quant) {
             // `*` / `+` collect into an array regardless of element shape.
-            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureMechanism::Array,
+            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureKind::Array,
             // `?` only adds optionality; the value mechanism is the inner's.
             Some(QuantifierKind::Optional) => quant
                 .inner()
-                .map(|i| capture_mechanism(&i, ctx, interner))
-                .unwrap_or(CaptureMechanism::Node),
-            None => CaptureMechanism::Array,
+                .map(|i| capture_kind(&i, ctx, interner))
+                .unwrap_or(CaptureKind::Node),
+            None => CaptureKind::Array,
         };
     }
 
     // A reference whose definition returns a structured type: the call site does
     // its own Call/Return (and Obj/EndObj) scoping. A reference to a node/void
     // definition falls through to `Node` — its matched node is captured directly.
-    if ref_returns_structured(&expr, ctx, interner) {
-        return CaptureMechanism::Ref;
+    if ref_returns_structured(&pattern, ctx, interner) {
+        return CaptureKind::Ref;
     }
 
     // An empty `{}` is an empty struct scope.
-    if is_truly_empty_scope(&expr) {
-        return CaptureMechanism::StructScope;
+    if is_empty_group(&pattern) {
+        return CaptureKind::StructScope;
     }
 
     // Everything else is decided by the inner's inferred data flow, so the type
     // and the emitted effects can't disagree.
-    match ctx.get_term_info(&expr).map(|info| &info.flow) {
+    match ctx.term_info(&pattern).map(|info| &info.flow) {
         // Bubbling captures: a sequence/alternation wraps them in a fresh struct
         // scope; a named node instead captures its matched node and lets the
         // children bubble alongside as sibling fields.
-        Some(TypeFlow::Bubble(_)) => {
-            if matches!(expr, Expr::SeqExpr(_) | Expr::AltExpr(_)) {
-                CaptureMechanism::StructScope
+        Some(TypeFlow::Fields(_)) => {
+            if matches!(pattern, Pattern::SeqPattern(_) | Pattern::AltPattern(_)) {
+                CaptureKind::StructScope
             } else {
-                CaptureMechanism::Node
+                CaptureKind::Node
             }
         }
-        // A structured scalar is left pending by the inner itself — a tagged
+        // A structured scalar is left pending by the inner itself — an enum
         // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
         // output child.
         Some(TypeFlow::Scalar(type_id)) if produces_output(*type_id, ctx) => {
-            CaptureMechanism::SetAfter
+            CaptureKind::SetAfter
         }
         // Void, or a plain scalar node: the matched node is captured directly.
-        _ => CaptureMechanism::Node,
+        _ => CaptureKind::Node,
     }
 }
 
@@ -100,7 +100,7 @@ pub fn capture_mechanism(inner: &Expr, ctx: &TypeContext, interner: &Interner) -
 /// array/optional thereof). Plain `Node` is not — it is the matched node,
 /// captured directly.
 pub fn produces_output(type_id: TypeId, ctx: &TypeContext) -> bool {
-    match ctx.get_type(type_id) {
+    match ctx.type_shape(type_id) {
         Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,
         Some(TypeShape::Array { element, .. }) => {
             *element != TYPE_NODE && produces_output(*element, ctx)
@@ -111,20 +111,20 @@ pub fn produces_output(type_id: TypeId, ctx: &TypeContext) -> bool {
 }
 
 /// Look through a `field: x` wrapper to the value it constrains.
-fn unwrap_field(expr: &Expr) -> Expr {
-    match expr {
-        Expr::FieldExpr(f) => f.value().unwrap_or_else(|| expr.clone()),
+fn unwrap_field(pattern: &Pattern) -> Pattern {
+    match pattern {
+        Pattern::FieldPattern(f) => f.value().unwrap_or_else(|| pattern.clone()),
         other => other.clone(),
     }
 }
 
 /// Classify a quantifier operator into its arity — the single source of truth for
-/// which quantifier `SyntaxKind`s repeat. `capture_mechanism` (here), the arity
+/// which quantifier `SyntaxKind`s repeat. `capture_kind` (here), the arity
 /// inference in `infer.rs`, and the implicit-array gate in `compile/quantifier.rs`
 /// all read this, so the type system and the emitter can never disagree on whether
 /// a quantifier collects an array. `None` only for a malformed quantifier with no
-/// operator (the parser guarantees a valid `QuantifiedExpr` carries one).
-pub(crate) fn quantifier_arity(quant: &QuantifiedExpr) -> Option<QuantifierKind> {
+/// operator (the parser guarantees a valid `QuantifiedPattern` carries one).
+pub(crate) fn quantifier_arity(quant: &QuantifiedPattern) -> Option<QuantifierKind> {
     Some(match quant.operator()?.kind() {
         SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
         SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
@@ -137,30 +137,30 @@ pub(crate) fn quantifier_arity(quant: &QuantifiedExpr) -> Option<QuantifierKind>
 /// as opposed to `?`. Gating an implicit array scope on the greedy kinds alone
 /// drops it for the non-greedy twins (#469), so this reads [`quantifier_arity`]
 /// rather than re-listing the operators.
-pub(crate) fn is_repeating_quantifier(quant: &QuantifiedExpr) -> bool {
+pub(crate) fn is_repeating_quantifier(quant: &QuantifiedPattern) -> bool {
     matches!(
         quantifier_arity(quant),
         Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
     )
 }
 
-/// Whether `expr` is a reference to a definition that returns a structured type.
-fn ref_returns_structured(expr: &Expr, ctx: &TypeContext, interner: &Interner) -> bool {
-    let Expr::Ref(r) = expr else {
+/// Whether `pattern` is a reference to a definition that returns a structured type.
+fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Interner) -> bool {
+    let Pattern::Ref(r) = pattern else {
         return false;
     };
     let Some(name) = r.name() else {
         return false;
     };
-    let Some(def_id) = ctx.get_def_id(interner, name.text()) else {
+    let Some(def_id) = ctx.def_id_for_name(interner, name.text()) else {
         return false;
     };
 
     // After inference the definition's registered output type is authoritative;
     // this is the path emission always takes.
-    if let Some(def_type) = ctx.get_def_type(def_id) {
+    if let Some(def_type) = ctx.def_type(def_id) {
         return matches!(
-            ctx.get_type(def_type),
+            ctx.type_shape(def_type),
             Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
         );
     }
@@ -169,8 +169,8 @@ fn ref_returns_structured(expr: &Expr, ctx: &TypeContext, interner: &Interner) -
     // walks every definition in a file before any output type is set. Fall back to
     // the reference's own transparently-inferred flow: a structured result either
     // bubbles its fields (struct) or is a structured scalar (enum/array).
-    match ctx.get_term_info(expr).map(|info| &info.flow) {
-        Some(TypeFlow::Bubble(_)) => true,
+    match ctx.term_info(pattern).map(|info| &info.flow) {
+        Some(TypeFlow::Fields(_)) => true,
         Some(TypeFlow::Scalar(t)) => produces_output(*t, ctx),
         _ => false,
     }

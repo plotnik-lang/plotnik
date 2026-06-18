@@ -31,21 +31,21 @@ pub enum ChildType {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FieldInfo {
-    pub quantity: ChildQuantity,
+pub struct FieldSummary {
+    pub quantity: ChildCardinality,
     pub types: Vec<ChildType>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct VariableInfo {
-    pub fields: FxHashMap<String, FieldInfo>,
-    pub children: FieldInfo,
-    pub children_without_fields: FieldInfo,
+pub struct VariableSummary {
+    pub fields: FxHashMap<String, FieldSummary>,
+    pub children: FieldSummary,
+    pub children_without_fields: FieldSummary,
     pub has_multi_step_production: bool,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Default, PartialOrd, Ord)]
-pub struct NodeShapeJSON {
+pub struct NodeShapeRecord {
     #[serde(rename = "type")]
     kind: String,
     named: bool,
@@ -54,35 +54,35 @@ pub struct NodeShapeJSON {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     extra: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    fields: Option<BTreeMap<String, FieldInfoJSON>>,
+    fields: Option<BTreeMap<String, SlotRecord>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    children: Option<FieldInfoJSON>,
+    children: Option<SlotRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    subtypes: Option<Vec<NodeTypeJSON>>,
+    subtypes: Option<Vec<NodeKindRecord>>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NodeTypeJSON {
+pub struct NodeKindRecord {
     #[serde(rename = "type")]
     kind: String,
     named: bool,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FieldInfoJSON {
+pub struct SlotRecord {
     multiple: bool,
     required: bool,
-    types: Vec<NodeTypeJSON>,
+    types: Vec<NodeKindRecord>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ChildQuantity {
+pub struct ChildCardinality {
     exists: bool,
     required: bool,
     multiple: bool,
 }
 
-impl Default for FieldInfoJSON {
+impl Default for SlotRecord {
     fn default() -> Self {
         Self {
             multiple: false,
@@ -92,8 +92,8 @@ impl Default for FieldInfoJSON {
     }
 }
 
-impl From<NodeTypeJSON> for NodeKindRef {
-    fn from(value: NodeTypeJSON) -> Self {
+impl From<NodeKindRecord> for NodeKindRef {
+    fn from(value: NodeKindRecord) -> Self {
         Self {
             type_name: value.kind,
             named: value.named,
@@ -101,8 +101,8 @@ impl From<NodeTypeJSON> for NodeKindRef {
     }
 }
 
-impl From<FieldInfoJSON> for NodeSlot {
-    fn from(value: FieldInfoJSON) -> Self {
+impl From<SlotRecord> for NodeSlot {
+    fn from(value: SlotRecord) -> Self {
         Self {
             multiple: value.multiple,
             required: value.required,
@@ -111,8 +111,8 @@ impl From<FieldInfoJSON> for NodeSlot {
     }
 }
 
-impl From<NodeShapeJSON> for NodeShape {
-    fn from(value: NodeShapeJSON) -> Self {
+impl From<NodeShapeRecord> for NodeShape {
+    fn from(value: NodeShapeRecord) -> Self {
         Self {
             type_name: value.kind,
             named: value.named,
@@ -132,13 +132,13 @@ impl From<NodeShapeJSON> for NodeShape {
     }
 }
 
-impl Default for ChildQuantity {
+impl Default for ChildCardinality {
     fn default() -> Self {
         Self::one()
     }
 }
 
-impl ChildQuantity {
+impl ChildCardinality {
     #[must_use]
     const fn zero() -> Self {
         Self {
@@ -187,10 +187,8 @@ impl ChildQuantity {
     }
 }
 
-pub type VariableInfoResult<T> = Result<T, VariableInfoError>;
-
 #[derive(Debug, Error, Serialize, Deserialize)]
-pub enum VariableInfoError {
+pub enum VariableSummaryError {
     #[error(
         "Grammar error: Supertype symbols must always have a single visible child, but `{0}` can have multiple"
     )]
@@ -199,9 +197,9 @@ pub enum VariableInfoError {
 
 /// Compute a summary of the public-facing structure of each variable in the
 /// grammar. Each variable in the grammar corresponds to a distinct public-facing
-/// node type.
+/// node kind.
 ///
-/// The information collected about each node type `N` is:
+/// The information collected about each node kind `N` is:
 /// 1. `child_types` - The types of visible children that can appear within `N`.
 /// 2. `fields` - The fields that `N` can have. Data regarding each field:
 ///    * `types` - The types of visible children the field can contain.
@@ -216,9 +214,9 @@ pub enum VariableInfoError {
 /// Each summary must account for some indirect factors:
 /// 1. hidden nodes. When a parent node `N` has a hidden child `C`, the visible children of `C`
 ///    *appear* to be direct children of `N`.
-/// 2. aliases. If a parent node type `M` is aliased as some other type `N`, then nodes which
-///    *appear* to have type `N` may have internal structure based on `M`.
-pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<VariableInfo>> {
+/// 2. aliases. If a parent node kind `M` is aliased as some other kind `N`, then nodes which
+///    *appear* to have kind `N` may have internal structure based on `M`.
+pub fn derive_variable_summaries(ctx: GrammarContext<'_>) -> Result<Vec<VariableSummary>, VariableSummaryError> {
     let GrammarContext {
         syntax: syntax_grammar,
         lexical: lexical_grammar,
@@ -238,7 +236,7 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
     // iteratively, in a loop that terminates only when no more changes are possible.
     let mut did_change = true;
     let mut all_initialized = false;
-    let mut result = vec![VariableInfo::default(); syntax_grammar.variables.len()];
+    let mut result = vec![VariableSummary::default(); syntax_grammar.variables.len()];
     while did_change {
         did_change = false;
 
@@ -247,8 +245,8 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
 
             for production in &variable.productions {
                 let mut production_field_quantities = FxHashMap::default();
-                let mut production_children_quantity = ChildQuantity::zero();
-                let mut production_children_without_fields_quantity = ChildQuantity::zero();
+                let mut production_children_quantity = ChildCardinality::zero();
+                let mut production_children_without_fields_quantity = ChildCardinality::zero();
                 let mut production_has_uninitialized_invisible_children = false;
 
                 if production.steps.len() > 1 {
@@ -267,19 +265,19 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                     did_change |=
                         extend_sorted(&mut variable_info.children.types, Some(&child_type));
                     if !child_is_hidden {
-                        production_children_quantity.append(ChildQuantity::one());
+                        production_children_quantity.append(ChildCardinality::one());
                     }
 
                     if let Some(field_name) = &step.field_name {
                         let field_info = variable_info
                             .fields
                             .entry(field_name.clone())
-                            .or_insert_with(FieldInfo::default);
+                            .or_insert_with(FieldSummary::default);
                         did_change |= extend_sorted(&mut field_info.types, Some(&child_type));
 
                         let production_field_quantity = production_field_quantities
                             .entry(field_name)
-                            .or_insert_with(ChildQuantity::zero);
+                            .or_insert_with(ChildCardinality::zero);
 
                         if child_is_hidden && child_symbol.is_non_terminal() {
                             let child_variable_info = &result[child_symbol.index];
@@ -289,10 +287,10 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                             );
                             production_field_quantity.append(child_variable_info.children.quantity);
                         } else {
-                            production_field_quantity.append(ChildQuantity::one());
+                            production_field_quantity.append(ChildCardinality::one());
                         }
                     } else if child_type_is_named(&child_type) {
-                        production_children_without_fields_quantity.append(ChildQuantity::one());
+                        production_children_without_fields_quantity.append(ChildCardinality::one());
                         did_change |= extend_sorted(
                             &mut variable_info.children_without_fields.types,
                             Some(&child_type),
@@ -309,13 +307,13 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                         for (field_name, child_field_info) in &child_variable_info.fields {
                             production_field_quantities
                                 .entry(field_name)
-                                .or_insert_with(ChildQuantity::zero)
+                                .or_insert_with(ChildCardinality::zero)
                                 .append(child_field_info.quantity);
                             did_change |= extend_sorted(
                                 &mut variable_info
                                     .fields
                                     .entry(field_name.clone())
-                                    .or_insert_with(FieldInfo::default)
+                                    .or_insert_with(FieldSummary::default)
                                     .types,
                                 &child_field_info.types,
                             );
@@ -361,7 +359,7 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
                             production_field_quantities
                                 .get(field_name)
                                 .copied()
-                                .unwrap_or_else(ChildQuantity::zero),
+                                .unwrap_or_else(ChildCardinality::zero),
                         );
                     }
                 }
@@ -380,13 +378,13 @@ pub fn get_variable_info(ctx: GrammarContext<'_>) -> VariableInfoResult<Vec<Vari
 }
 
 fn validate_supertype_info(
-    variable_info: &[VariableInfo],
+    variable_info: &[VariableSummary],
     syntax_grammar: &SyntaxGrammar,
-) -> VariableInfoResult<()> {
+) -> Result<(), VariableSummaryError> {
     for supertype_symbol in &syntax_grammar.supertype_symbols {
         if variable_info[supertype_symbol.index].has_multi_step_production {
             let variable = &syntax_grammar.variables[supertype_symbol.index];
-            Err(VariableInfoError::InvalidSupertype(variable.name.clone()))?;
+            Err(VariableSummaryError::InvalidSupertype(variable.name.clone()))?;
         }
     }
 
@@ -394,7 +392,7 @@ fn validate_supertype_info(
 }
 
 fn retain_visible_child_types(
-    variable_info: &mut [VariableInfo],
+    variable_info: &mut [VariableSummary],
     syntax_grammar: &SyntaxGrammar,
     child_type_is_visible: &impl Fn(&ChildType) -> bool,
 ) {
@@ -416,19 +414,17 @@ fn retain_visible_child_types(
     }
 }
 
-pub type SuperTypeCycleResult<T> = Result<T, SuperTypeCycleError>;
-
 #[derive(Debug, Error, Serialize, Deserialize)]
-pub struct SuperTypeCycleError {
-    items: Vec<String>,
+pub struct SupertypeCycleError {
+    cycle: Vec<String>,
 }
 
-impl std::fmt::Display for SuperTypeCycleError {
+impl std::fmt::Display for SupertypeCycleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Dependency cycle detected in node types:")?;
-        for (i, item) in self.items.iter().enumerate() {
+        write!(f, "Dependency cycle detected in node kinds:")?;
+        for (i, item) in self.cycle.iter().enumerate() {
             write!(f, " {item}")?;
-            if i < self.items.len() - 1 {
+            if i < self.cycle.len() - 1 {
                 write!(f, ",")?;
             }
         }
@@ -439,8 +435,8 @@ impl std::fmt::Display for SuperTypeCycleError {
 
 pub fn generate_node_shapes_json(
     ctx: GrammarContext<'_>,
-    variable_info: &[VariableInfo],
-) -> SuperTypeCycleResult<Vec<NodeShapeJSON>> {
+    variable_info: &[VariableSummary],
+) -> Result<Vec<NodeShapeRecord>, SupertypeCycleError> {
     let GrammarContext {
         syntax: syntax_grammar,
         lexical: lexical_grammar,
@@ -449,7 +445,7 @@ pub fn generate_node_shapes_json(
 
     let mut node_shapes_json = BTreeMap::new();
 
-    let populate_field_info_json = |json: &mut FieldInfoJSON, info: &FieldInfo| {
+    let populate_field_info_json = |json: &mut SlotRecord, info: &FieldSummary| {
         if info.types.is_empty() {
             json.required = false;
         } else {
@@ -458,7 +454,7 @@ pub fn generate_node_shapes_json(
             json.types.extend(
                 info.types
                     .iter()
-                    .map(|child_type| child_type_to_node_type(child_type, ctx)),
+                    .map(|child_type| child_type_to_node_kind(child_type, ctx)),
             );
             json.types.sort_unstable();
             json.types.dedup();
@@ -476,7 +472,7 @@ pub fn generate_node_shapes_json(
         if syntax_grammar.supertype_symbols.contains(&symbol) {
             let node_shape_json = node_shapes_json
                 .entry(variable.name.clone())
-                .or_insert_with(|| NodeShapeJSON {
+                .or_insert_with(|| NodeShapeRecord {
                     kind: variable.name.clone(),
                     named: true,
                     root: false,
@@ -489,11 +485,11 @@ pub fn generate_node_shapes_json(
                 .children
                 .types
                 .iter()
-                .map(|child_type| child_type_to_node_type(child_type, ctx))
+                .map(|child_type| child_type_to_node_kind(child_type, ctx))
                 .collect::<Vec<_>>();
             subtypes.sort_unstable();
             subtypes.dedup();
-            let supertype = NodeTypeJSON {
+            let supertype = NodeKindRecord {
                 kind: node_shape_json.kind.clone(),
                 named: true,
             };
@@ -519,10 +515,10 @@ pub fn generate_node_shapes_json(
 
                 // There may already be an entry with this name, because multiple
                 // rules may be aliased with the same name.
-                let mut node_type_existed = true;
+                let mut node_kind_existed = true;
                 let node_shape_json = node_shapes_json.entry(kind.clone()).or_insert_with(|| {
-                    node_type_existed = false;
-                    NodeShapeJSON {
+                    node_kind_existed = false;
+                    NodeShapeRecord {
                         kind: kind.clone(),
                         named: is_named,
                         root: i == START_RULE_INDEX,
@@ -538,8 +534,8 @@ pub fn generate_node_shapes_json(
                     let field_json = fields_json.entry(new_field.clone()).or_insert_with(|| {
                         // If another rule is aliased with the same name, and does *not* have this
                         // field, then this field cannot be required.
-                        let mut field_json = FieldInfoJSON::default();
-                        if node_type_existed {
+                        let mut field_json = SlotRecord::default();
+                        if node_kind_existed {
                             field_json.required = false;
                         }
                         field_json
@@ -558,7 +554,7 @@ pub fn generate_node_shapes_json(
                 populate_field_info_json(
                     node_shape_json
                         .children
-                        .get_or_insert_with(FieldInfoJSON::default),
+                        .get_or_insert_with(SlotRecord::default),
                     &info.children_without_fields,
                 );
             }
@@ -599,7 +595,7 @@ pub fn generate_node_shapes_json(
         .map(|e| e.1)
         .collect::<Vec<_>>();
     result.extend(anonymous_node_shapes);
-    let is_leaf = |node: &NodeShapeJSON| node.children.is_none() && node.fields.is_none();
+    let is_leaf = |node: &NodeShapeRecord| node.children.is_none() && node.fields.is_none();
     // Keep output deterministic and close to Tree-sitter's node metadata: supertypes first,
     // structured concrete nodes next, leaf tokens last, then stable scalar tie-breakers.
     result.sort_unstable_by(|a, b| {
@@ -618,8 +614,8 @@ pub fn generate_node_shapes_json(
 
 pub fn generate_node_shapes(
     ctx: GrammarContext<'_>,
-    variable_info: &[VariableInfo],
-) -> SuperTypeCycleResult<Vec<NodeShape>> {
+    variable_info: &[VariableSummary],
+) -> Result<Vec<NodeShape>, SupertypeCycleError> {
     generate_node_shapes_json(ctx, variable_info)
         .map(|shapes| shapes.into_iter().map(Into::into).collect())
 }
@@ -670,30 +666,30 @@ pub(super) fn effective_step_alias<'a>(
         .or_else(|| default_aliases.get(&step.symbol))
 }
 
-fn child_type_to_node_type(child_type: &ChildType, ctx: GrammarContext<'_>) -> NodeTypeJSON {
+fn child_type_to_node_kind(child_type: &ChildType, ctx: GrammarContext<'_>) -> NodeKindRecord {
     match child_type {
-        ChildType::Aliased(alias) => alias_to_node_type(alias),
+        ChildType::Aliased(alias) => alias_to_node_kind(alias),
         ChildType::Normal(symbol) => ctx.aliases.get(symbol).map_or_else(
-            || symbol_to_node_type(*symbol, ctx.syntax, ctx.lexical),
-            alias_to_node_type,
+            || symbol_to_node_kind(*symbol, ctx.syntax, ctx.lexical),
+            alias_to_node_kind,
         ),
     }
 }
 
-fn alias_to_node_type(alias: &Alias) -> NodeTypeJSON {
-    NodeTypeJSON {
+fn alias_to_node_kind(alias: &Alias) -> NodeKindRecord {
+    NodeKindRecord {
         kind: alias.value.clone(),
         named: alias.is_named,
     }
 }
 
-fn symbol_to_node_type(
+fn symbol_to_node_kind(
     symbol: Symbol,
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
-) -> NodeTypeJSON {
+) -> NodeKindRecord {
     let (name, kind) = symbol_node_metadata(symbol, syntax_grammar, lexical_grammar);
-    NodeTypeJSON {
+    NodeKindRecord {
         kind: name.to_string(),
         named: kind != VariableType::Anonymous,
     }
@@ -721,12 +717,12 @@ fn collect_extra_names<'a>(
 }
 
 fn add_token_node_shapes(
-    node_shapes_json: &mut BTreeMap<String, NodeShapeJSON>,
+    node_shapes_json: &mut BTreeMap<String, NodeShapeRecord>,
     syntax_grammar: &SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
     aliases_by_symbol: &FxHashMap<Symbol, BTreeSet<Option<Alias>>>,
     extra_names: &FxHashSet<&str>,
-) -> Vec<NodeShapeJSON> {
+) -> Vec<NodeShapeRecord> {
     let empty = BTreeSet::new();
     let mut anonymous_node_shapes = Vec::new();
 
@@ -772,8 +768,8 @@ fn add_token_node_shapes(
 }
 
 fn add_token_node_shape(
-    node_shapes_json: &mut BTreeMap<String, NodeShapeJSON>,
-    anonymous_node_shapes: &mut Vec<NodeShapeJSON>,
+    node_shapes_json: &mut BTreeMap<String, NodeShapeRecord>,
+    anonymous_node_shapes: &mut Vec<NodeShapeRecord>,
     name: &str,
     kind: VariableType,
     extra_names: &FxHashSet<&str>,
@@ -783,7 +779,7 @@ fn add_token_node_shape(
             let node_shape_json =
                 node_shapes_json
                     .entry(name.to_string())
-                    .or_insert_with(|| NodeShapeJSON {
+                    .or_insert_with(|| NodeShapeRecord {
                         kind: name.to_string(),
                         named: true,
                         root: false,
@@ -801,7 +797,7 @@ fn add_token_node_shape(
                 }
             }
         }
-        VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeJSON {
+        VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeRecord {
             kind: name.to_string(),
             named: false,
             root: false,
@@ -837,8 +833,8 @@ pub(super) fn symbol_node_metadata<'a>(
 }
 
 fn sort_subtypes_topologically(
-    subtype_map: &mut [(NodeTypeJSON, Vec<NodeTypeJSON>)],
-) -> SuperTypeCycleResult<()> {
+    subtype_map: &mut [(NodeKindRecord, Vec<NodeKindRecord>)],
+) -> Result<(), SupertypeCycleError> {
     let mut sorted_kinds = Vec::with_capacity(subtype_map.len());
     let mut top_sort = topological_sort::TopologicalSort::<String>::new();
     for (supertype, subtypes) in subtype_map.iter() {
@@ -852,9 +848,9 @@ fn sort_subtypes_topologically(
         match (next_kinds.is_empty(), top_sort.is_empty()) {
             (true, true) => break,
             (true, false) => {
-                let mut items = top_sort.collect::<Vec<String>>();
-                items.sort();
-                return Err(SuperTypeCycleError { items });
+                let mut cycle = top_sort.collect::<Vec<String>>();
+                cycle.sort();
+                return Err(SupertypeCycleError { cycle });
             }
             (false, _) => {
                 next_kinds.sort();
@@ -871,7 +867,7 @@ fn sort_subtypes_topologically(
     Ok(())
 }
 
-fn process_supertypes(info: &mut FieldInfoJSON, subtype_map: &[(NodeTypeJSON, Vec<NodeTypeJSON>)]) {
+fn process_supertypes(info: &mut SlotRecord, subtype_map: &[(NodeKindRecord, Vec<NodeKindRecord>)]) {
     for (supertype, subtypes) in subtype_map {
         if info.types.contains(supertype) {
             info.types.retain(|t| !subtypes.contains(t));

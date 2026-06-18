@@ -2,7 +2,7 @@ Q = (function_declaration
   parameter: (formal_parameters) @params
 ) @fn
 ==== diagnostics ====
-error: field `parameter` is not valid on this node type
+error: field `parameter` is not valid on this node kind
  --> query.ptk:2:3
   |
 1 | Q = (function_declaration

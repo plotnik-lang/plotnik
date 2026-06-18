@@ -15,5 +15,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @keyword
+    CapturedPattern @keyword
       AnonymousNode "foo"

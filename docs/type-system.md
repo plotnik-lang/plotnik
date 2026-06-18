@@ -143,8 +143,8 @@ This enables reusable pattern fragments that contribute fields directly to paren
 New data structures are created only when explicitly requested:
 
 1. **Captured Sequences**: `{...} @name` → Struct
-2. **Captured Alternations**: `[...] @name` → Union
-3. **Tagged Alternations**: `[ L: ... ] @name` → Tagged Union
+2. **Captured Alternations** (unlabeled): `[...] @name` → Union
+3. **Enum Alternations** (labeled): `[ L: ... ] @name` → Enum
 
 In case of using quantifiers with captures, compiler forces you to create scope boundaries.
 
@@ -163,12 +163,12 @@ Created by `{ ... } @name`:
 
 **Empty Structs**: `{ ... } @x` with no internal captures produces `{ x: {} }`. This ensures `x` is always an object, so adding fields later is non-breaking.
 
-### Unions
+### Unions and Enums
 
 Created by `[ ... ]`:
 
-- **Tagged**: `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
-- **Untagged**: `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
+- **Enum** (labeled): `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
+- **Union** (unlabeled): `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
 
 ### Enum Variants
 
@@ -228,7 +228,7 @@ Each struct has its own `decs` array — no cross-struct mixing.
 
 ## 5. Type Unification in Alternations
 
-Shallow unification across untagged branches:
+Shallow unification across union branches:
 
 | Scenario                    | Result               |
 | --------------------------- | -------------------- |
@@ -253,7 +253,7 @@ Shallow unification across untagged branches:
 ]  // ERROR: Foo vs Bar
 ```
 
-The choice of shallow unification is intentional. For more precision, users should use tagged unions.
+The choice of shallow unification is intentional. For more precision, users should use enums.
 
 ### Array Captures in Alternations
 
@@ -268,7 +268,7 @@ When a quantified capture appears in some branches but not others, the missing b
 
 Untagged alternations are "I don't care which branch matched" — so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
 
-When types start to conflict, use tagged alternations:
+When types start to conflict, use enum alternations:
 
 ```
 [

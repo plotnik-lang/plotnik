@@ -45,23 +45,23 @@ Q = 06 :: T6
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (object)                         08
   07  ...  
-  08  -ε-  [Arr]                            28, 14
+  08  -ε-  [ArrayOpen]                      28, 14
   10  -ε-                                   11
-  11  ─‣┘  [EndArr Set(M5)] _               13
+  11  ─‣┘  [ArrayClose Set(M5)] _           13
   13                                        ▶
-  14  -ε-  [EndArr Set(M5)]                 13
-  16  -ε-  [EndObj Push]                    32, 10
-  18   !   [Enum(M2)] (pair) [Node Set(M0) EndEnum Set(M4)]  16
-  21   !   [Enum(M3)] (shorthand_property_identifier) [Node Set(M1) EndEnum Set(M4)]  16
-  24  -ε-  [Obj]                            18, 21
+  14  -ε-  [ArrayClose Set(M5)]             13
+  16  -ε-  [ObjectClose Push]               32, 10
+  18   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  16
+  21   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  16
+  24  -ε-  [ObjectOpen]                     18, 21
   26  ─‣─  _                                24, 26
   28  └‣─  _                                24, 26
   30  ─‣─  _                                24, 30

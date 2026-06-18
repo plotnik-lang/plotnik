@@ -49,15 +49,15 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @stmt
+    CapturedPattern @stmt
       Alt
         Branch Assign:
           NamedNode assignment_expression
-            CapturedExpr @left
-              FieldExpr left:
+            CapturedPattern @left
+              FieldPattern left:
                 NamedNode identifier
         Branch Call:
           NamedNode call_expression
-            CapturedExpr @func
-              FieldExpr function:
+            CapturedPattern @func
+              FieldPattern function:
                 NamedNode identifier

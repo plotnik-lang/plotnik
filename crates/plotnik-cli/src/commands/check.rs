@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use plotnik_lib::QueryBuilder;
 
-use super::lang_resolver::{infer_lang_from_dir, merge_lang};
-use super::query_loader::load_query_source;
+use super::lang_resolver::{infer_lang_from_dir, reconcile_lang};
+use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
 
 pub struct CheckArgs {
@@ -16,7 +16,7 @@ pub struct CheckArgs {
 }
 
 pub fn run(args: CheckArgs) -> CliResult {
-    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
+    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
 
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));
@@ -28,7 +28,7 @@ pub fn run(args: CheckArgs) -> CliResult {
         .analyze();
 
     // Resolve language: explicit -l (must agree with shebang) > shebang > dir inference
-    let lang = match merge_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())? {
+    let lang = match reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())? {
         Some(lang) => Some(lang),
         None => infer_lang_from_dir(args.query_path.as_deref()),
     };

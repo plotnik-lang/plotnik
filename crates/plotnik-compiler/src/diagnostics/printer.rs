@@ -5,16 +5,16 @@ use std::fmt::Write;
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 
 use super::SourceMap;
-use super::message::{DiagnosticMessage, Severity};
+use super::message::{Diagnostic, Severity};
 
 pub struct DiagnosticsPrinter<'q> {
-    diagnostics: Vec<DiagnosticMessage>,
+    diagnostics: Vec<Diagnostic>,
     sources: &'q SourceMap,
     colored: bool,
 }
 
 impl<'q> DiagnosticsPrinter<'q> {
-    pub(crate) fn new(diagnostics: Vec<DiagnosticMessage>, sources: &'q SourceMap) -> Self {
+    pub(crate) fn new(diagnostics: Vec<Diagnostic>, sources: &'q SourceMap) -> Self {
         Self {
             diagnostics,
             sources,
@@ -29,11 +29,11 @@ impl<'q> DiagnosticsPrinter<'q> {
 
     pub fn render(&self) -> String {
         let mut out = String::new();
-        self.format(&mut out).expect("String write never fails");
+        self.write_to(&mut out).expect("String write never fails");
         out
     }
 
-    pub fn format(&self, w: &mut impl Write) -> std::fmt::Result {
+    pub fn write_to(&self, w: &mut impl Write) -> std::fmt::Result {
         let renderer = if self.colored {
             Renderer::styled()
         } else {

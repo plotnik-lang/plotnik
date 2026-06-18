@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use plotnik_bytecode::EffectOpcode;
+use plotnik_bytecode::EffectKind;
 
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
 use crate::compile::error::CompileResult;
@@ -39,17 +39,17 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
 ///
 /// Bundles the `(instructions, idx)` clump every lookup threads, so a label is
 /// always resolved against the index built for that exact list.
-struct InstrIndex<'a> {
+struct InstrTable<'a> {
     instructions: &'a [InstructionIR],
     idx: &'a HashMap<Label, usize>,
 }
 
-impl<'a> InstrIndex<'a> {
+impl<'a> InstrTable<'a> {
     fn new(instructions: &'a [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
         Self { instructions, idx }
     }
 
-    fn get_match(&self, label: Label) -> Option<&'a MatchIR> {
+    fn match_at(&self, label: Label) -> Option<&'a MatchIR> {
         match &self.instructions[*self.idx.get(&label)?] {
             InstructionIR::Match(m) => Some(m),
             _ => None,
@@ -71,7 +71,7 @@ impl<'a> InstrIndex<'a> {
                 return None;
             }
 
-            let Some(m) = self.get_match(current) else {
+            let Some(m) = self.match_at(current) else {
                 return Some((current, effects)); // Non-Match target (Call/Return/Trampoline)
             };
 
@@ -90,17 +90,17 @@ impl<'a> InstrIndex<'a> {
     }
 }
 
-struct InstrIndexMut<'a> {
+struct InstrTableMut<'a> {
     instructions: &'a mut [InstructionIR],
     idx: &'a HashMap<Label, usize>,
 }
 
-impl<'a> InstrIndexMut<'a> {
+impl<'a> InstrTableMut<'a> {
     fn new(instructions: &'a mut [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
         Self { instructions, idx }
     }
 
-    fn get_match_mut(&mut self, label: Label) -> Option<&mut MatchIR> {
+    fn match_at_mut(&mut self, label: Label) -> Option<&mut MatchIR> {
         match &mut self.instructions[*self.idx.get(&label)?] {
             InstructionIR::Match(m) => Some(m),
             _ => None,
@@ -112,7 +112,7 @@ impl<'a> InstrIndexMut<'a> {
 /// effects are position-sensitive: their meaning depends on which node was
 /// most recently matched, so they cannot be reordered across a navigation.
 fn reads_matched_node(effects: &[EffectIR]) -> bool {
-    effects.iter().any(|e| e.opcode() == EffectOpcode::Node)
+    effects.iter().any(|e| e.kind() == EffectKind::Node)
 }
 
 /// Phase A: Forward migration.
@@ -140,7 +140,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 
         let succ_label = eps.successors[0];
 
-        let Some(succ) = InstrIndex::new(instructions, &idx).get_match(succ_label) else {
+        let Some(succ) = InstrTable::new(instructions, &idx).match_at(succ_label) else {
             continue;
         };
         if succ.is_epsilon() {
@@ -168,18 +168,18 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         let eps_pre = eps.pre_effects.clone();
         let eps_post = eps.post_effects.clone();
 
-        let mut view = InstrIndexMut::new(instructions, &idx);
+        let mut view = InstrTableMut::new(instructions, &idx);
 
         let succ = view
-            .get_match_mut(succ_label)
-            .expect("succ_label resolved via get_match above, so it indexes a Match instruction");
+            .match_at_mut(succ_label)
+            .expect("succ_label resolved via match_at above, so it indexes a Match instruction");
         let mut new_pre = eps_pre;
         new_pre.extend(eps_post);
         new_pre.append(&mut succ.pre_effects);
         succ.pre_effects = new_pre;
 
         let eps = view
-            .get_match_mut(eps_label)
+            .match_at_mut(eps_label)
             .expect("eps_label is the current epsilon Match instruction at index i");
         eps.pre_effects.clear();
         eps.post_effects.clear();
@@ -203,7 +203,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     let mut entry_remaps: HashMap<Label, Label> = HashMap::new();
     for entry in result.def_entries.values_mut() {
         if let Some((target, effects)) =
-            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
+            InstrTable::new(&result.instructions, &idx).see_through(*entry)
             && effects.is_empty()
             && target != *entry
         {
@@ -222,7 +222,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     }
 
     if let Some((target, effects)) =
-        InstrIndex::new(&result.instructions, &idx).see_through(result.preamble_entry)
+        InstrTable::new(&result.instructions, &idx).see_through(result.preamble_entry)
         && effects.is_empty()
         && target != result.preamble_entry
     {
@@ -242,7 +242,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
 
         for (j, &succ) in m.successors.iter().enumerate() {
             let Some((target, effects)) =
-                InstrIndex::new(&result.instructions, &idx).see_through(succ)
+                InstrTable::new(&result.instructions, &idx).see_through(succ)
             else {
                 continue;
             };
@@ -287,7 +287,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         };
 
         let Some(next) = next_label else { continue };
-        let Some((target, effects)) = InstrIndex::new(&result.instructions, &idx).see_through(next)
+        let Some((target, effects)) = InstrTable::new(&result.instructions, &idx).see_through(next)
         else {
             continue;
         };
@@ -379,35 +379,35 @@ mod tests {
 
     fn make_epsilon(label: u32, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(
-            MatchIR::at(Label(label))
+            MatchIR::terminal(Label(label))
                 .nav(Nav::Epsilon)
-                .next_many(succs.into_iter().map(Label).collect()),
+                .successors(succs.into_iter().map(Label).collect()),
         )
     }
 
     fn make_match(label: u32, nav: Nav, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(
-            MatchIR::at(Label(label))
+            MatchIR::terminal(Label(label))
                 .nav(nav)
-                .next_many(succs.into_iter().map(Label).collect()),
+                .successors(succs.into_iter().map(Label).collect()),
         )
     }
 
     fn make_epsilon_with_pre(label: u32, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(
-            MatchIR::at(Label(label))
+            MatchIR::terminal(Label(label))
                 .nav(Nav::Epsilon)
                 .pre_effect(EffectIR::start_obj())
-                .next_many(succs.into_iter().map(Label).collect()),
+                .successors(succs.into_iter().map(Label).collect()),
         )
     }
 
     fn make_epsilon_with_post(label: u32, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(
-            MatchIR::at(Label(label))
+            MatchIR::terminal(Label(label))
                 .nav(Nav::Epsilon)
                 .post_effect(EffectIR::end_obj())
-                .next_many(succs.into_iter().map(Label).collect()),
+                .successors(succs.into_iter().map(Label).collect()),
         )
     }
 
@@ -421,7 +421,7 @@ mod tests {
         ];
         let idx = build_label_to_index(&instructions);
 
-        let (target, effects) = InstrIndex::new(&instructions, &idx)
+        let (target, effects) = InstrTable::new(&instructions, &idx)
             .see_through(Label(0))
             .unwrap();
         assert_eq!(target, Label(2));
@@ -438,7 +438,7 @@ mod tests {
         ];
         let idx = build_label_to_index(&instructions);
 
-        let (target, effects) = InstrIndex::new(&instructions, &idx)
+        let (target, effects) = InstrTable::new(&instructions, &idx)
             .see_through(Label(0))
             .unwrap();
         assert_eq!(target, Label(2));
@@ -457,14 +457,14 @@ mod tests {
         let idx = build_label_to_index(&instructions);
 
         // Can see through 0 to 1, but 1 is branching
-        let (target, effects) = InstrIndex::new(&instructions, &idx)
+        let (target, effects) = InstrTable::new(&instructions, &idx)
             .see_through(Label(0))
             .unwrap();
         assert_eq!(target, Label(1)); // Stops at branching epsilon
         assert!(effects.is_empty());
 
         // Starting from branching epsilon returns itself
-        let (target, effects) = InstrIndex::new(&instructions, &idx)
+        let (target, effects) = InstrTable::new(&instructions, &idx)
             .see_through(Label(1))
             .unwrap();
         assert_eq!(target, Label(1));

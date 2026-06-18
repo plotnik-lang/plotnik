@@ -44,7 +44,7 @@ use similar::TextDiff;
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::parser::dump_tokens;
-use plotnik_lib::query::LinkedQuery;
+use plotnik_lib::query::GrammarBoundQuery;
 use plotnik_lib::typegen::typescript;
 use plotnik_lib::{
     Colors, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity, materialize_verified,
@@ -314,7 +314,7 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
         Front::Parser { trivia } if !has_errors => {
-            let cst = analyzed.printer().raw(true).with_trivia(trivia).dump();
+            let cst = analyzed.printer().cst(true).with_trivia(trivia).dump();
             out.push(("cst".into(), cst));
             out.push(("ast".into(), analyzed.printer().dump()));
         }
@@ -324,7 +324,7 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
         Front::Analyze => {
             out.push((
                 "symbols".into(),
-                analyzed.printer().only_symbols(true).dump(),
+                analyzed.printer().definitions_only(true).dump(),
             ));
         }
     }
@@ -393,14 +393,14 @@ fn render_compile(
 }
 
 fn render_types(module: &Module) -> String {
-    typescript::emit_with_config(module, typescript::Config::new().emit_node_type(false))
+    typescript::emit(module, typescript::Config::builder().emit_node_interface(false))
 }
 
 /// VM fixtures run the source-last named definition. Entrypoints in the module
 /// are ordered by dependency (SCC), not source, so resolve that definition by name.
-fn last_def_name(query: &LinkedQuery) -> String {
+fn last_def_name(query: &GrammarBoundQuery) -> String {
     query
-        .asts()
+        .ast_map()
         .values()
         .last()
         .and_then(|root| root.defs().filter_map(|def| def.name()).last())

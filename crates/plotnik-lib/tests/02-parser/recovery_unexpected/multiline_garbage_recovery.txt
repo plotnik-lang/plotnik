@@ -10,7 +10,7 @@ error: unexpected token
   |
 help: expected a child node, or `)` to close
 
-error: node types must be parenthesized
+error: node kinds must be parenthesized
  --> query.ptk:3:1
   |
 3 | b)

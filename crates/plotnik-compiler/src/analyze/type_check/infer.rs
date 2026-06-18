@@ -10,9 +10,9 @@ use indexmap::IndexMap;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureMechanism, capture_mechanism, quantifier_arity};
+use super::capture_shape::{CaptureKind, capture_kind, quantifier_arity};
 use super::context::TypeContext;
-use super::symbol::Symbol;
+use super::def_id::Symbol;
 use super::types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, TermInfo, TypeFlow, TypeId, TypeShape,
 };
@@ -21,16 +21,16 @@ use super::unify::{UnifyError, unify_flows};
 use crate::analyze::Reporter;
 use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_def, walk_named_node, walk_seq_expr};
+use crate::analyze::visitor::{Visitor, walk_alt_pattern, walk_def, walk_node_pattern, walk_seq_pattern};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{
-    AltExpr, AltKind, AnonymousNode, CapturedExpr, Def, Expr, FieldExpr, NamedNode, QuantifiedExpr,
-    Ref, Root, SeqExpr, is_truly_empty_scope,
+    AltPattern, AltKind, TokenPattern, CapturedPattern, Def, Pattern, FieldPattern, NodePattern, QuantifiedPattern,
+    Ref, Root, SeqPattern, is_empty_group,
 };
 use crate::query::SourceId;
 
 /// Shared state for a single inference pass over the AST.
-pub struct InferenceContext<'a, 'd> {
+pub struct InferCtx<'a, 'd> {
     pub type_ctx: &'a mut TypeContext,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
@@ -38,12 +38,12 @@ pub struct InferenceContext<'a, 'd> {
 }
 
 /// Inference visitor for a single pass over the AST.
-pub struct InferenceVisitor<'a, 'd> {
-    ctx: InferenceContext<'a, 'd>,
+pub struct InferVisitor<'a, 'd> {
+    ctx: InferCtx<'a, 'd>,
 }
 
-impl<'a, 'd> InferenceVisitor<'a, 'd> {
-    pub fn new(ctx: InferenceContext<'a, 'd>) -> Self {
+impl<'a, 'd> InferVisitor<'a, 'd> {
+    pub fn new(ctx: InferCtx<'a, 'd>) -> Self {
         Self { ctx }
     }
 
@@ -57,44 +57,44 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Infer the TermInfo for an expression, caching the result.
-    pub fn infer_expr(&mut self, expr: &Expr) -> TermInfo {
-        if let Some(info) = self.ctx.type_ctx.get_term_info(expr) {
+    pub fn infer_pattern(&mut self, pattern: &Pattern) -> TermInfo {
+        if let Some(info) = self.ctx.type_ctx.term_info(pattern) {
             return info.clone();
         }
 
         // Sentinel to break recursion cycles
         self.ctx
             .type_ctx
-            .set_term_info(expr.clone(), TermInfo::void());
+            .cache_term_info(pattern.clone(), TermInfo::void());
 
-        let info = self.compute_expr(expr);
-        self.ctx.type_ctx.set_term_info(expr.clone(), info.clone());
+        let info = self.compute_pattern(pattern);
+        self.ctx.type_ctx.cache_term_info(pattern.clone(), info.clone());
         info
     }
 
-    fn compute_expr(&mut self, expr: &Expr) -> TermInfo {
-        match expr {
-            Expr::NamedNode(n) => self.infer_named_node(n),
-            Expr::AnonymousNode(n) => self.infer_anonymous_node(n),
-            Expr::Ref(r) => self.infer_ref(r),
-            Expr::SeqExpr(s) => self.infer_seq_expr(s),
-            Expr::AltExpr(a) => self.infer_alt_expr(a),
-            Expr::CapturedExpr(c) => self.infer_captured_expr(c),
-            Expr::QuantifiedExpr(q) => self.infer_quantified_expr(q),
-            Expr::FieldExpr(f) => self.infer_field_expr(f),
+    fn compute_pattern(&mut self, pattern: &Pattern) -> TermInfo {
+        match pattern {
+            Pattern::NodePattern(n) => self.infer_named_node(n),
+            Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
+            Pattern::Ref(r) => self.infer_ref(r),
+            Pattern::SeqPattern(s) => self.infer_seq_pattern(s),
+            Pattern::AltPattern(a) => self.infer_alt_pattern(a),
+            Pattern::CapturedPattern(c) => self.infer_captured_pattern(c),
+            Pattern::QuantifiedPattern(q) => self.infer_quantified_pattern(q),
+            Pattern::FieldPattern(f) => self.infer_field_pattern(f),
         }
     }
 
     /// Named node: matches one position, bubbles up child captures or propagates output.
-    fn infer_named_node(&mut self, node: &NamedNode) -> TermInfo {
+    fn infer_named_node(&mut self, node: &NodePattern) -> TermInfo {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
         let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
         for child in node.children() {
-            let child_info = self.infer_expr(&child);
+            let child_info = self.infer_pattern(&child);
 
             match &child_info.flow {
-                TypeFlow::Bubble(type_id) => {
+                TypeFlow::Fields(type_id) => {
                     let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
                     self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
@@ -112,7 +112,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing.
-    fn infer_anonymous_node(&mut self, _node: &AnonymousNode) -> TermInfo {
+    fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> TermInfo {
         TermInfo::new(Arity::One, TypeFlow::Void)
     }
 
@@ -124,14 +124,14 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let name = name_tok.text();
         let name_sym = self.ctx.interner.intern(name);
 
-        let Some((ref_source, body)) = self.ctx.symbol_table.get_full(name) else {
+        let Some((ref_source, body)) = self.ctx.symbol_table.definition(name) else {
             return TermInfo::void();
         };
 
         // Recursive refs are opaque boundaries - they don't bubble captures.
-        // For tagged alternations, return Scalar(Ref) since they always produce Enum output.
-        // For other definitions, return Void to avoid type errors in untagged alternation contexts.
-        if let Some(def_id) = self.ctx.type_ctx.get_def_id_sym(name_sym)
+        // For enum alternations, return Scalar(Ref) since they always produce Enum output.
+        // For other definitions, return Void to avoid type errors in union alternation contexts.
+        if let Some(def_id) = self.ctx.type_ctx.def_id_for_sym(name_sym)
             && self.ctx.type_ctx.is_recursive(def_id)
         {
             if self.body_produces_enum(body) {
@@ -145,30 +145,30 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // workspace file, so expand it under its own source — otherwise any
         // diagnostic emitted here carries this file's source id with a foreign
         // text range (out-of-bounds when slicing the wrong content).
-        self.with_source(ref_source, |this| this.infer_expr(body))
+        self.with_source(ref_source, |this| this.infer_pattern(body))
     }
 
     /// Check if an expression body will produce an Enum type (Scalar flow).
     ///
-    /// This is a syntactic check for tagged alternations at the root of a definition.
-    /// Tagged alternations always produce Enum types, making them safe to reference
+    /// This is a syntactic check for enum alternations at the root of a definition.
+    /// Enum alternations always produce Enum types, making them safe to reference
     /// as Scalar(Ref) in uncaptured contexts.
-    fn body_produces_enum(&self, body: &Expr) -> bool {
-        if let Expr::AltExpr(alt) = body {
-            matches!(alt.kind(), AltKind::Tagged | AltKind::Mixed)
+    fn body_produces_enum(&self, body: &Pattern) -> bool {
+        if let Pattern::AltPattern(alt) = body {
+            matches!(alt.kind(), AltKind::Enum | AltKind::Mixed)
         } else {
             false
         }
     }
 
     /// Sequence: Arity aggregation, strict field merging, and output propagation.
-    fn infer_seq_expr(&mut self, seq: &SeqExpr) -> TermInfo {
+    fn infer_seq_pattern(&mut self, seq: &SeqPattern) -> TermInfo {
         let children: Vec<_> = seq.children().collect();
 
         let arity = match children.len() {
             0 | 1 => children
                 .first()
-                .map(|c| self.infer_expr(c).arity)
+                .map(|c| self.infer_pattern(c).arity)
                 .unwrap_or(Arity::One),
             _ => Arity::Many,
         };
@@ -177,10 +177,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
         for child in &children {
-            let child_info = self.infer_expr(child);
+            let child_info = self.infer_pattern(child);
 
             match &child_info.flow {
-                TypeFlow::Bubble(type_id) => {
+                TypeFlow::Fields(type_id) => {
                     let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
                     self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
@@ -215,7 +215,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                     self.ctx
                         .reporter
                         .report(DiagnosticKind::DuplicateCaptureInScope, range)
-                        .message(self.ctx.interner.resolve(name))
+                        .detail(self.ctx.interner.resolve(name))
                         .emit();
                 }
             }
@@ -223,14 +223,14 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Alternation: arity is Many if ANY branch is Many.
-    fn infer_alt_expr(&mut self, alt: &AltExpr) -> TermInfo {
+    fn infer_alt_pattern(&mut self, alt: &AltPattern) -> TermInfo {
         match alt.kind() {
-            AltKind::Tagged => self.infer_tagged_alt(alt),
-            AltKind::Untagged | AltKind::Mixed => self.infer_untagged_alt(alt),
+            AltKind::Enum => self.infer_enum_alt(alt),
+            AltKind::Union | AltKind::Mixed => self.infer_union_alt(alt),
         }
     }
 
-    fn infer_tagged_alt(&mut self, alt: &AltExpr) -> TermInfo {
+    fn infer_enum_alt(&mut self, alt: &AltPattern) -> TermInfo {
         let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
@@ -249,10 +249,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                         DiagnosticKind::DuplicateAlternationLabel,
                         label.text_range(),
                     )
-                    .message(label.text())
+                    .detail(label.text())
                     .emit();
                 if let Some(body) = branch.body() {
-                    let body_info = self.infer_expr(&body);
+                    let body_info = self.infer_pattern(&body);
                     combined_arity = combined_arity.combine(body_info.arity);
                 }
                 continue;
@@ -264,7 +264,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 continue;
             };
 
-            let body_info = self.infer_expr(&body);
+            let body_info = self.infer_pattern(&body);
             combined_arity = combined_arity.combine(body_info.arity);
             variants.insert(label_sym, self.flow_to_type(&body_info.flow));
         }
@@ -273,20 +273,20 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(combined_arity, TypeFlow::Scalar(enum_type))
     }
 
-    fn infer_untagged_alt(&mut self, alt: &AltExpr) -> TermInfo {
+    fn infer_union_alt(&mut self, alt: &AltPattern) -> TermInfo {
         let mut flows: Vec<TypeFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
         for branch in alt.branches() {
             if let Some(body) = branch.body() {
-                let info = self.infer_expr(&body);
+                let info = self.infer_pattern(&body);
                 combined_arity = combined_arity.combine(info.arity);
                 flows.push(info.flow);
             }
         }
 
-        for expr in alt.exprs() {
-            let info = self.infer_expr(&expr);
+        for pattern in alt.patterns() {
+            let info = self.infer_pattern(&pattern);
             combined_arity = combined_arity.combine(info.arity);
             flows.push(info.flow);
         }
@@ -309,13 +309,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     ///   Inner fields become the captured type's fields.
     /// - Other expressions (named nodes, refs) don't create scopes.
     ///   Inner fields bubble up alongside the capture field.
-    fn infer_captured_expr(&mut self, cap: &CapturedExpr) -> TermInfo {
+    fn infer_captured_pattern(&mut self, cap: &CapturedPattern) -> TermInfo {
         // Suppressive captures don't contribute to output type
         if cap.is_suppressive() {
             // Still infer inner for structural validation, but don't create fields
             return cap
                 .inner()
-                .map(|i| self.infer_expr(&i))
+                .map(|i| self.infer_pattern(&i))
                 .map(|info| TermInfo::new(info.arity, TypeFlow::Void))
                 .unwrap_or_else(TermInfo::void);
         }
@@ -324,7 +324,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             // Recover gracefully
             return cap
                 .inner()
-                .map(|i| self.infer_expr(&i))
+                .map(|i| self.infer_pattern(&i))
                 .unwrap_or_else(TermInfo::void);
         };
         let capture_name = self.ctx.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
@@ -337,7 +337,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             let field = FieldInfo::required(type_id);
             return TermInfo::new(
                 Arity::One,
-                TypeFlow::Bubble(self.ctx.type_ctx.intern_single_field(capture_name, field)),
+                TypeFlow::Fields(self.ctx.type_ctx.intern_single_field(capture_name, field)),
             );
         };
 
@@ -349,15 +349,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = capture_mechanism(&inner, self.ctx.type_ctx, self.ctx.interner);
+        let mechanism = capture_kind(&inner, self.ctx.type_ctx, self.ctx.interner);
         let should_merge_fields =
-            mechanism == CaptureMechanism::Node && matches!(&inner_info.flow, TypeFlow::Bubble(_));
+            mechanism == CaptureKind::Node && matches!(&inner_info.flow, TypeFlow::Fields(_));
 
         // The capture's base type, before its `:: …` annotation is applied.
         let base = if should_merge_fields {
             // Named node with bubbling children: the capture takes the matched node,
             // and the children bubble up alongside it.
-            self.get_recursive_ref_type(&inner).unwrap_or(TYPE_NODE)
+            self.recursive_ref_type(&inner).unwrap_or(TYPE_NODE)
         } else {
             self.determine_captured_base_type(&inner, &inner_info)
         };
@@ -369,7 +369,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         };
 
         if should_merge_fields {
-            let TypeFlow::Bubble(type_id) = &inner_info.flow else {
+            let TypeFlow::Fields(type_id) = &inner_info.flow else {
                 unreachable!()
             };
             let mut fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
@@ -377,12 +377,12 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
             TermInfo::new(
                 inner_info.arity,
-                TypeFlow::Bubble(self.ctx.type_ctx.intern_struct(fields)),
+                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(fields)),
             )
         } else {
             TermInfo::new(
                 inner_info.arity,
-                TypeFlow::Bubble(
+                TypeFlow::Fields(
                     self.ctx
                         .type_ctx
                         .intern_single_field(capture_name, field_info),
@@ -394,7 +394,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// `:: TypeName` — name a structured capture (struct/enum) or alias a node.
     /// Recurses into arrays and optionals so the name lands on the element.
     fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
-        match self.ctx.type_ctx.get_type(type_id).cloned() {
+        match self.ctx.type_ctx.type_shape(type_id).cloned() {
             Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
                 self.ctx.type_ctx.set_type_name(type_id, name);
                 type_id
@@ -416,7 +416,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Resolves an explicit type annotation like `@foo :: TypeName` into the
     /// interned type name. Returns `None` when the capture has no annotation.
-    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<Symbol> {
+    fn resolve_annotation(&mut self, cap: &CapturedPattern) -> Option<Symbol> {
         cap.type_annotation()
             .and_then(|t| t.name())
             .map(|n| self.ctx.interner.intern(n.text()))
@@ -424,66 +424,66 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Logic for how quantifier on the inner expression affects the capture field.
     /// Returns (Info, is_optional).
-    fn resolve_capture_inner(&mut self, inner: &Expr) -> (TermInfo, bool) {
-        if let Expr::QuantifiedExpr(q) = inner {
-            let quantifier = self.parse_quantifier(q);
+    fn resolve_capture_inner(&mut self, inner: &Pattern) -> (TermInfo, bool) {
+        if let Pattern::QuantifiedPattern(q) = inner {
+            let quantifier = self.quantifier_kind(q);
             match quantifier {
                 // * or + acts as row capture here (skipping strict dimensionality)
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                    (self.infer_quantified_expr_as_row(q), false)
+                    (self.infer_quantified_pattern_as_row(q), false)
                 }
                 // ? makes the resulting capture field optional
-                QuantifierKind::Optional => (self.infer_expr(inner), true),
+                QuantifierKind::Optional => (self.infer_pattern(inner), true),
             }
         } else {
-            (self.infer_expr(inner), false)
+            (self.infer_pattern(inner), false)
         }
     }
 
     /// The capture's base type from the inner flow, before any annotation.
-    fn determine_captured_base_type(&mut self, inner: &Expr, inner_info: &TermInfo) -> TypeId {
+    fn determine_captured_base_type(&mut self, inner: &Pattern, inner_info: &TermInfo) -> TypeId {
         match &inner_info.flow {
             // A truly empty scope (`{}`) captures an empty struct; any other void
             // capture is the matched node (or a recursive reference's type).
             TypeFlow::Void => {
-                if is_truly_empty_scope(inner) {
+                if is_empty_group(inner) {
                     self.ctx.type_ctx.intern_struct(BTreeMap::new())
                 } else {
-                    self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE)
+                    self.recursive_ref_type(inner).unwrap_or(TYPE_NODE)
                 }
             }
-            TypeFlow::Scalar(type_id) | TypeFlow::Bubble(type_id) => *type_id,
+            TypeFlow::Scalar(type_id) | TypeFlow::Fields(type_id) => *type_id,
         }
     }
 
-    /// If expr is (or contains) a recursive Ref, return its Ref type.
-    fn get_recursive_ref_type(&mut self, expr: &Expr) -> Option<TypeId> {
-        match expr {
-            Expr::Ref(r) => {
+    /// If pattern is (or contains) a recursive Ref, return its Ref type.
+    fn recursive_ref_type(&mut self, pattern: &Pattern) -> Option<TypeId> {
+        match pattern {
+            Pattern::Ref(r) => {
                 let name_tok = r.name()?;
                 let name = name_tok.text();
                 let sym = self.ctx.interner.intern(name);
-                let def_id = self.ctx.type_ctx.get_def_id_sym(sym)?;
+                let def_id = self.ctx.type_ctx.def_id_for_sym(sym)?;
                 if self.ctx.type_ctx.is_recursive(def_id) {
                     Some(self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id)))
                 } else {
                     None
                 }
             }
-            Expr::QuantifiedExpr(q) => self.get_recursive_ref_type(&q.inner()?),
-            Expr::CapturedExpr(c) => self.get_recursive_ref_type(&c.inner()?),
-            Expr::FieldExpr(f) => self.get_recursive_ref_type(&f.value()?),
+            Pattern::QuantifiedPattern(q) => self.recursive_ref_type(&q.inner()?),
+            Pattern::CapturedPattern(c) => self.recursive_ref_type(&c.inner()?),
+            Pattern::FieldPattern(f) => self.recursive_ref_type(&f.value()?),
             _ => None,
         }
     }
 
-    fn infer_quantified_expr(&mut self, quant: &QuantifiedExpr) -> TermInfo {
+    fn infer_quantified_pattern(&mut self, quant: &QuantifiedPattern) -> TermInfo {
         let Some(inner) = quant.inner() else {
             return TermInfo::void();
         };
 
-        let inner_info = self.infer_expr(&inner);
-        let quantifier = self.parse_quantifier(quant);
+        let inner_info = self.infer_pattern(&inner);
+        let quantifier = self.quantifier_kind(quant);
 
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
@@ -501,13 +501,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(inner_info.arity, flow)
     }
 
-    fn infer_quantified_expr_as_row(&mut self, quant: &QuantifiedExpr) -> TermInfo {
+    fn infer_quantified_pattern_as_row(&mut self, quant: &QuantifiedPattern) -> TermInfo {
         let Some(inner) = quant.inner() else {
             return TermInfo::void();
         };
 
-        let inner_info = self.infer_expr(&inner);
-        let quantifier = self.parse_quantifier(quant);
+        let inner_info = self.infer_pattern(&inner);
+        let quantifier = self.quantifier_kind(quant);
 
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
@@ -529,22 +529,22 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             TypeFlow::Scalar(t) => {
                 TypeFlow::Scalar(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
             }
-            TypeFlow::Bubble(type_id) => {
+            TypeFlow::Fields(type_id) => {
                 let fields = self.ctx.type_ctx.expect_struct_fields(type_id).clone();
                 let optional_fields = fields
                     .into_iter()
                     .map(|(k, v)| (k, v.make_optional()))
                     .collect();
-                TypeFlow::Bubble(self.ctx.type_ctx.intern_struct(optional_fields))
+                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
             }
         }
     }
 
-    fn make_flow_array(&mut self, flow: TypeFlow, inner: &Expr, non_empty: bool) -> TypeFlow {
+    fn make_flow_array(&mut self, flow: TypeFlow, inner: &Pattern, non_empty: bool) -> TypeFlow {
         match flow {
             TypeFlow::Void => {
                 // Scalar list: void inner -> array of Node (or Ref)
-                let element = self.get_recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+                let element = self.recursive_ref_type(inner).unwrap_or(TYPE_NODE);
                 let array_type = self
                     .ctx
                     .type_ctx
@@ -558,9 +558,9 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 });
                 TypeFlow::Scalar(array_type)
             }
-            TypeFlow::Bubble(struct_type) => {
+            TypeFlow::Fields(struct_type) => {
                 // `check_internal_capture_dimensionality` already emitted an error for
-                // this case (Bubble under * or + without a row capture). We still
+                // this case (Fields under * or + without a row capture). We still
                 // produce a plausible array type so downstream inference isn't poisoned
                 // by void.
                 let array_type = self.ctx.type_ctx.intern_type(TypeShape::Array {
@@ -573,12 +573,12 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     /// Field expression: arity One, delegates type to value.
-    fn infer_field_expr(&mut self, field: &FieldExpr) -> TermInfo {
+    fn infer_field_pattern(&mut self, field: &FieldPattern) -> TermInfo {
         let Some(value) = field.value() else {
             return TermInfo::void();
         };
 
-        let value_info = self.infer_expr(&value);
+        let value_info = self.infer_pattern(&value);
 
         // Validation: Fields cannot be assigned 'Many' arity values directly
         if value_info.arity == Arity::Many {
@@ -588,7 +588,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(Arity::One, value_info.flow)
     }
 
-    fn report_field_arity_error(&mut self, field: &FieldExpr, value: &Expr) {
+    fn report_field_arity_error(&mut self, field: &FieldPattern, value: &Pattern) {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
@@ -598,13 +598,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             .ctx
             .reporter
             .report(DiagnosticKind::FieldSequenceValue, value.text_range());
-        builder = builder.message(field_name);
+        builder = builder.detail(field_name);
 
-        if let Expr::Ref(r) = value
+        if let Pattern::Ref(r) = value
             && let Some(name_tok) = r.name()
         {
             let name = name_tok.text();
-            if let Some((src, body)) = self.ctx.symbol_table.get_full(name) {
+            if let Some((src, body)) = self.ctx.symbol_table.definition(name) {
                 builder = builder.related_to(src, body.text_range(), "defined here");
             }
         }
@@ -619,7 +619,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// the internal-capture check (the original short-circuit).
     fn check_multi_element_scalar(
         &mut self,
-        quant: &QuantifiedExpr,
+        quant: &QuantifiedPattern,
         inner_info: &TermInfo,
     ) -> bool {
         if !(inner_info.arity == Arity::Many && inner_info.flow.is_void()) {
@@ -633,7 +633,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 DiagnosticKind::MultiElementScalarCapture,
                 quant.text_range(),
             )
-            .message(format!(
+            .detail(format!(
                 "sequence with `{}` matches multiple nodes but has no internal captures",
                 op
             ))
@@ -643,13 +643,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     /// Strict-dimensionality check 2: internal captures require a row capture on
     /// the quantifier. Skipped when the quantifier already sits under a row
-    /// capture (see `infer_quantified_expr_as_row`).
+    /// capture (see `infer_quantified_pattern_as_row`).
     fn check_internal_capture_dimensionality(
         &mut self,
-        quant: &QuantifiedExpr,
+        quant: &QuantifiedPattern,
         inner_info: &TermInfo,
     ) {
-        let TypeFlow::Bubble(type_id) = &inner_info.flow else {
+        let TypeFlow::Fields(type_id) = &inner_info.flow else {
             return;
         };
 
@@ -671,7 +671,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 DiagnosticKind::StrictDimensionalityViolation,
                 quant.text_range(),
             )
-            .message(format!(
+            .detail(format!(
                 "quantifier `{}` contains captures ({}) but has no struct capture",
                 op, captures_str
             ))
@@ -679,15 +679,15 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             .emit();
     }
 
-    fn quantifier_operator(&self, quant: &QuantifiedExpr) -> String {
+    fn quantifier_operator(&self, quant: &QuantifiedPattern) -> String {
         quant
             .operator()
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "*".to_string())
     }
 
-    fn parse_quantifier(&self, quant: &QuantifiedExpr) -> QuantifierKind {
-        // Shared with `capture_mechanism` and `compile`'s implicit-array gate so the
+    fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
+        // Shared with `capture_kind` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
         // quantifier can't reach inference, so the fallback is unreachable in practice.
         quantifier_arity(quant).unwrap_or(QuantifierKind::ZeroOrMore)
@@ -696,7 +696,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
             TypeFlow::Void => TYPE_VOID,
-            TypeFlow::Scalar(t) | TypeFlow::Bubble(t) => *t,
+            TypeFlow::Scalar(t) | TypeFlow::Fields(t) => *t,
         }
     }
 
@@ -705,7 +705,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// Meaningful outputs are structured types (enums, structs, refs) or arrays/optionals
     /// of such types. Simple `Node[]` from quantified named nodes is NOT meaningful.
     fn produces_output(&self, type_id: TypeId) -> bool {
-        let Some(shape) = self.ctx.type_ctx.get_type(type_id) else {
+        let Some(shape) = self.ctx.type_ctx.type_shape(type_id) else {
             return false;
         };
         match shape {
@@ -724,7 +724,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     /// - No bubbles, 0 outputs → Void
     /// - No bubbles, 1 output → Forward output (propagate)
     /// - No bubbles, 2+ outputs → Error (ambiguous)
-    /// - Bubbles, 0 outputs → Bubble(struct)
+    /// - Bubbles, 0 outputs → Fields(struct)
     /// - Bubbles, 1+ outputs → Error (require capture)
     fn compute_merged_flow(
         &mut self,
@@ -741,10 +741,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 self.report_ambiguous_outputs(parent_range, &output_children);
                 TypeFlow::Void
             }
-            (true, 0) => TypeFlow::Bubble(self.ctx.type_ctx.intern_struct(merged_fields)),
+            (true, 0) => TypeFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields)),
             (true, _) => {
                 self.report_uncaptured_output_with_captures(&output_children);
-                TypeFlow::Bubble(self.ctx.type_ctx.intern_struct(merged_fields))
+                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields))
             }
         }
     }
@@ -759,7 +759,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             .ctx
             .reporter
             .report(DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
-            .message(format!(
+            .detail(format!(
                 "{} expressions here produce a value but none is captured",
                 outputs.len()
             ));
@@ -780,22 +780,22 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
 
     fn report_unify_error(&mut self, range: TextRange, err: &UnifyError) {
         let (kind, msg, hint) = match err {
-            UnifyError::ScalarInUntagged => (
+            UnifyError::ScalarInUnion => (
                 DiagnosticKind::IncompatibleTypes,
                 "a branch produces a value but the alternation is unlabeled".to_string(),
-                Some("give every branch a branch label for a tagged union, e.g. `[A: ... B: ...]`"),
+                Some("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`"),
             ),
             UnifyError::IncompatibleTypes { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
                 self.ctx.interner.resolve(*field).to_string(),
                 Some(
-                    "make every branch produce the same type, or label the branches for a tagged union",
+                    "make every branch produce the same type, or label the branches for an enum",
                 ),
             ),
             UnifyError::IncompatibleStructs { field } => (
                 DiagnosticKind::IncompatibleStructShapes,
                 self.ctx.interner.resolve(*field).to_string(),
-                Some("use a tagged union if branches need different fields"),
+                Some("use an enum if branches need different fields"),
             ),
             UnifyError::IncompatibleArrayElements { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
@@ -804,7 +804,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             ),
         };
 
-        let mut builder = self.ctx.reporter.report(kind, range).message(msg);
+        let mut builder = self.ctx.reporter.report(kind, range).detail(msg);
         if let Some(h) = hint {
             builder = builder.hint(h);
         }
@@ -812,36 +812,36 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 }
 
-impl Visitor for InferenceVisitor<'_, '_> {
+impl Visitor for InferVisitor<'_, '_> {
     fn visit_def(&mut self, def: &Def) {
         walk_def(self, def);
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
-        self.infer_expr(expr);
+    fn visit_pattern(&mut self, pattern: &Pattern) {
+        self.infer_pattern(pattern);
     }
 
-    fn visit_named_node(&mut self, node: &NamedNode) {
+    fn visit_node_pattern(&mut self, node: &NodePattern) {
         // Bottom-up traversal
-        walk_named_node(self, node);
+        walk_node_pattern(self, node);
     }
 
-    fn visit_seq_expr(&mut self, seq: &SeqExpr) {
-        walk_seq_expr(self, seq);
+    fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
+        walk_seq_pattern(self, seq);
     }
 
-    fn visit_alt_expr(&mut self, alt: &AltExpr) {
-        walk_alt_expr(self, alt);
+    fn visit_alt_pattern(&mut self, alt: &AltPattern) {
+        walk_alt_pattern(self, alt);
     }
 }
 
 /// Run inference on all definitions in a root.
-fn infer_root(ctx: InferenceContext, root: &Root) {
-    let mut visitor = InferenceVisitor::new(ctx);
+fn infer_root(ctx: InferCtx, root: &Root) {
+    let mut visitor = InferVisitor::new(ctx);
     visitor.visit(root);
 }
 
-pub(super) struct AnalysisCtx<'a, 'd> {
+pub(super) struct InferPassInput<'a, 'd> {
     pub interner: &'a mut Interner,
     pub ast_map: &'a IndexMap<SourceId, Root>,
     pub symbol_table: &'a SymbolTable,
@@ -852,11 +852,11 @@ pub(super) struct AnalysisCtx<'a, 'd> {
 /// Orchestrates type inference across all definitions in dependency order.
 pub(super) struct InferencePass<'a, 'd> {
     ctx: TypeContext,
-    analysis: AnalysisCtx<'a, 'd>,
+    analysis: InferPassInput<'a, 'd>,
 }
 
 impl<'a, 'd> InferencePass<'a, 'd> {
-    pub fn new(analysis: AnalysisCtx<'a, 'd>) -> Self {
+    pub fn new(analysis: InferPassInput<'a, 'd>) -> Self {
         Self {
             ctx: TypeContext::new(),
             analysis,
@@ -867,7 +867,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         // Avoid re-registration of definitions
         self.ctx.seed_defs(
             self.analysis.dependency_analysis.def_names(),
-            self.analysis.dependency_analysis.name_to_def(),
+            self.analysis.dependency_analysis.def_ids_by_sym(),
         );
 
         self.mark_recursion();
@@ -885,7 +885,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
                     continue;
                 }
                 let sym = self.analysis.interner.intern(def_name);
-                let Some(def_id) = self.ctx.get_def_id_sym(sym) else {
+                let Some(def_id) = self.ctx.def_id_for_sym(sym) else {
                     continue;
                 };
                 self.ctx.mark_recursive(def_id);
@@ -906,10 +906,10 @@ impl<'a, 'd> InferencePass<'a, 'd> {
 
     /// Handle any definitions not in an SCC (safety net).
     fn process_orphans(&mut self) {
-        for (name, source_id, _body) in self.analysis.symbol_table.iter_full() {
+        for (name, source_id, _body) in self.analysis.symbol_table.definitions() {
             if self
                 .ctx
-                .get_def_type_by_name(self.analysis.interner, name)
+                .def_type_for_name(self.analysis.interner, name)
                 .is_some()
             {
                 continue;
@@ -924,7 +924,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         };
 
         infer_root(
-            InferenceContext {
+            InferCtx {
                 type_ctx: &mut self.ctx,
                 interner: self.analysis.interner,
                 symbol_table: self.analysis.symbol_table,
@@ -933,8 +933,8 @@ impl<'a, 'd> InferencePass<'a, 'd> {
             root,
         );
 
-        if let Some(body) = self.analysis.symbol_table.get(def_name)
-            && let Some(info) = self.ctx.get_term_info(body).cloned()
+        if let Some(body) = self.analysis.symbol_table.body(def_name)
+            && let Some(info) = self.ctx.term_info(body).cloned()
         {
             let type_id = self.flow_to_type_id(&info.flow);
             self.ctx
@@ -945,7 +945,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
     fn flow_to_type_id(&mut self, flow: &TypeFlow) -> TypeId {
         match flow {
             TypeFlow::Void => TYPE_VOID,
-            TypeFlow::Scalar(id) | TypeFlow::Bubble(id) => *id,
+            TypeFlow::Scalar(id) | TypeFlow::Fields(id) => *id,
         }
     }
 }

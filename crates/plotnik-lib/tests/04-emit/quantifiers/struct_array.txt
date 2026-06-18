@@ -34,22 +34,22 @@ Q = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (array)                          08
   07  ...  
-  08  -ε-  [Arr]                            24, 14
+  08  -ε-  [ArrayOpen]                      24, 14
   10  -ε-                                   11
-  11  ─‣┘  [EndArr Set(M2)] _               13
+  11  ─‣┘  [ArrayClose Set(M2)] _           13
   13                                        ▶
-  14  -ε-  [EndArr Set(M2)]                 13
-  16  -ε-  [EndObj Push]                    28, 10
+  14  -ε-  [ArrayClose Set(M2)]             13
+  16  -ε-  [ObjectClose Push]               28, 10
   18  ─‣─  (number) [Node Set(M1)]          16
-  20   !   [Obj] (identifier) [Node Set(M0)]  18
+  20   !   [ObjectOpen] (identifier) [Node Set(M0)]  18
   22  ─‣─  _                                20, 22
   24  └‣─  _                                20, 22
   26  ─‣─  _                                20, 26

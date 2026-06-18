@@ -36,23 +36,23 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        32, 26
   08                                        ▶
-  09  -ε-  [EndArr Set(M1)]                 15
+  09  -ε-  [ArrayClose Set(M1)]             15
   11  └•─  (debugger_statement) [Node Push]  13, 09
   13  ─•─  (debugger_statement) [Node Push]  13, 09
   15  ─•┘  _                                08
-  16  -ε-  [Arr]                            11, 09
-  18  -ε-  [EndArr Set(M1)]                 15
+  16  -ε-  [ArrayOpen]                      11, 09
+  18  -ε-  [ArrayClose Set(M1)]             15
   20  ─•─  (debugger_statement) [Node Push]  22, 18
   22  ─•─  (debugger_statement) [Node Push]  22, 18
-  24  -ε-  [Arr]                            20, 18
+  24  -ε-  [ArrayOpen]                      20, 18
   26  -ε-  [Null Set(M0)]                   16
   28   !   (lexical_declaration) [Node Set(M0)]  24
   30  ─‣─  _                                28, 30
@@ -64,7 +64,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -84,16 +84,16 @@ Q:
   30       _                                28, 30
   06  ❮❮❮ 
   26  -ε-  [Null Set(M0)]                   16
-  16  -ε-  [Arr]                            11, 09
+  16  -ε-  [ArrayOpen]                      11, 09
   11       (debugger_statement) [Node Push]  13, 09
        ●   debugger_statement
   13       (debugger_statement) [Node Push]  13, 09
        ○   expression_statement
   11  ❮❮❮ 
-  09  -ε-  [EndArr Set(M1)]                 15
+  09  -ε-  [ArrayClose Set(M1)]             15
   15       _                                08
   16  ❮❮❮ 
-  09  -ε-  [EndArr Set(M1)]                 15
+  09  -ε-  [ArrayClose Set(M1)]             15
   15       _                                08
 ==== output ====
 <no match>

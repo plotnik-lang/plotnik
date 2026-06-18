@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use super::symbol::{DefId, Symbol};
+use super::def_id::{DefId, Symbol};
 
 // Re-export shared type system components
 pub use plotnik_bytecode::type_system::{Arity, QuantifierKind};
@@ -43,7 +43,7 @@ pub enum TypeShape {
     Custom(Symbol),
     /// Object with named fields.
     Struct(BTreeMap<Symbol, FieldInfo>),
-    /// Tagged union from labeled alternations.
+    /// Enum from labeled alternations.
     Enum(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
     Array { element: TypeId, non_empty: bool },
@@ -103,7 +103,7 @@ pub enum TypeFlow {
     /// Opaque single value that doesn't bubble (scope boundary).
     Scalar(TypeId),
     /// Struct type whose fields bubble to parent scope.
-    Bubble(TypeId),
+    Fields(TypeId),
 }
 
 impl TypeFlow {
@@ -115,14 +115,14 @@ impl TypeFlow {
         matches!(self, Self::Scalar(_))
     }
 
-    pub fn is_bubble(&self) -> bool {
-        matches!(self, Self::Bubble(_))
+    pub fn has_fields(&self) -> bool {
+        matches!(self, Self::Fields(_))
     }
 
     pub fn type_id(&self) -> Option<TypeId> {
         match self {
             Self::Void => None,
-            Self::Scalar(id) | Self::Bubble(id) => Some(*id),
+            Self::Scalar(id) | Self::Fields(id) => Some(*id),
         }
     }
 }
@@ -148,13 +148,6 @@ impl TermInfo {
         }
     }
 
-    pub fn node() -> Self {
-        Self {
-            arity: Arity::One,
-            flow: TypeFlow::Void,
-        }
-    }
-
     pub fn scalar(arity: Arity, type_id: TypeId) -> Self {
         Self {
             arity,
@@ -165,7 +158,7 @@ impl TermInfo {
     pub fn bubble(arity: Arity, struct_type_id: TypeId) -> Self {
         Self {
             arity,
-            flow: TypeFlow::Bubble(struct_type_id),
+            flow: TypeFlow::Fields(struct_type_id),
         }
     }
 }

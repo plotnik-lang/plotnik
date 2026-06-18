@@ -24,7 +24,7 @@ pub enum PrecedenceEntry {
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct ReservedWordContext<T> {
+pub struct ReservedWordSet<T> {
     pub name: String,
     pub reserved_words: Vec<T>,
 }
@@ -37,14 +37,14 @@ pub struct ExternalToken {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ResolvedGrammar {
+pub struct InternedGrammar {
     pub variables: Vec<Variable>,
     pub extra_symbols: Vec<Rule>,
     pub external_tokens: Vec<Variable>,
     pub variables_to_inline: Vec<Symbol>,
     pub supertype_symbols: Vec<Symbol>,
     pub word_token: Option<Symbol>,
-    pub reserved_word_sets: Vec<ReservedWordContext<Rule>>,
+    pub reserved_word_sets: Vec<ReservedWordSet<Rule>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -55,7 +55,7 @@ pub struct ExtractedSyntaxGrammar {
     pub variables_to_inline: Vec<Symbol>,
     pub supertype_symbols: Vec<Symbol>,
     pub word_token: Option<Symbol>,
-    pub reserved_word_sets: Vec<ReservedWordContext<Symbol>>,
+    pub reserved_word_sets: Vec<ReservedWordSet<Symbol>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

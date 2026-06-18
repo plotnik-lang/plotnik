@@ -6,27 +6,27 @@ use super::{
 };
 
 #[derive(Clone, Default)]
-struct SymbolStatus {
+struct AliasUsage {
     aliases: Vec<(Alias, usize)>,
     appears_unaliased: bool,
 }
 
-struct SymbolStatuses {
-    terminals: Vec<SymbolStatus>,
-    non_terminals: Vec<SymbolStatus>,
-    externals: Vec<SymbolStatus>,
+struct AliasUsageTable {
+    terminals: Vec<AliasUsage>,
+    non_terminals: Vec<AliasUsage>,
+    externals: Vec<AliasUsage>,
 }
 
-impl SymbolStatuses {
+impl AliasUsageTable {
     fn new(syntax_grammar: &SyntaxGrammar, lexical_grammar: &LexicalGrammar) -> Self {
         Self {
-            terminals: vec![SymbolStatus::default(); lexical_grammar.variables.len()],
-            non_terminals: vec![SymbolStatus::default(); syntax_grammar.variables.len()],
-            externals: vec![SymbolStatus::default(); syntax_grammar.external_tokens.len()],
+            terminals: vec![AliasUsage::default(); lexical_grammar.variables.len()],
+            non_terminals: vec![AliasUsage::default(); syntax_grammar.variables.len()],
+            externals: vec![AliasUsage::default(); syntax_grammar.external_tokens.len()],
         }
     }
 
-    fn get_mut(&mut self, symbol: Symbol) -> &mut SymbolStatus {
+    fn get_mut(&mut self, symbol: Symbol) -> &mut AliasUsage {
         match symbol.kind {
             SymbolType::External => &mut self.externals[symbol.index],
             SymbolType::NonTerminal => &mut self.non_terminals[symbol.index],
@@ -35,7 +35,7 @@ impl SymbolStatuses {
         }
     }
 
-    fn for_each_mut(&mut self, mut visit: impl FnMut(Symbol, &mut SymbolStatus)) {
+    fn for_each_mut(&mut self, mut visit: impl FnMut(Symbol, &mut AliasUsage)) {
         for (i, status) in self.terminals.iter_mut().enumerate() {
             visit(Symbol::terminal(i), status);
         }
@@ -56,7 +56,7 @@ pub(super) fn extract_default_aliases(
     syntax_grammar: &mut SyntaxGrammar,
     lexical_grammar: &LexicalGrammar,
 ) -> AliasMap {
-    let mut statuses = SymbolStatuses::new(syntax_grammar, lexical_grammar);
+    let mut statuses = AliasUsageTable::new(syntax_grammar, lexical_grammar);
 
     for variable in &syntax_grammar.variables {
         for production in &variable.productions {

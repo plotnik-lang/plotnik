@@ -47,13 +47,13 @@ Root
 Root
   Def NestedCall
     NamedNode call_expression
-      FieldExpr function:
+      FieldPattern function:
         Alt
           Branch
-            CapturedExpr @name
+            CapturedPattern @name
               NamedNode identifier
           Branch
-            CapturedExpr @inner
+            CapturedPattern @inner
               Ref NestedCall
-      FieldExpr arguments:
+      FieldPattern arguments:
         NamedNode arguments

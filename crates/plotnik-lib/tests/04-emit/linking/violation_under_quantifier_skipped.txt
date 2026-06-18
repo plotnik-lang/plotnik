@@ -24,21 +24,21 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
-  08  -ε-  [Arr]                            24, 16
+  08  -ε-  [ArrayOpen]                      24, 16
   10  -ε-                                   11
-  11  ─‣┘  [EndArr Set(M0)] _               15
+  11  ─‣┘  [ArrayClose Set(M0)] _           15
   13  └‣─  (class_declaration)              14
   14  ─‣┘  _                                18
   15                                        ▶
-  16  -ε-  [EndArr Set(M0)]                 15
+  16  -ε-  [ArrayClose Set(M0)]             15
   18  -ε-  [Push]                           28, 10
   20   !   (function_declaration) [Node]    13
   22  ─‣─  _                                20, 22

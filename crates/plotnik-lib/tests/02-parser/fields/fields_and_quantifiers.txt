@@ -75,21 +75,21 @@ Root
 Root
   Def Q
     NamedNode node
-      QuantifiedExpr ?
-        FieldExpr foo:
+      QuantifiedPattern ?
+        FieldPattern foo:
           NamedNode foo
-      QuantifiedExpr ??
-        FieldExpr foo:
+      QuantifiedPattern ??
+        FieldPattern foo:
           NamedNode foo
-      QuantifiedExpr *
-        FieldExpr bar:
+      QuantifiedPattern *
+        FieldPattern bar:
           NamedNode bar
-      QuantifiedExpr *?
-        FieldExpr bar:
+      QuantifiedPattern *?
+        FieldPattern bar:
           NamedNode bar
-      QuantifiedExpr +?
-        FieldExpr baz:
+      QuantifiedPattern +?
+        FieldPattern baz:
           NamedNode baz
-      QuantifiedExpr +?
-        FieldExpr baz:
+      QuantifiedPattern +?
+        FieldPattern baz:
           NamedNode baz

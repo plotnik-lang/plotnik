@@ -48,9 +48,9 @@ fn intern_different_symbols_returns_different_ids() {
 fn intern_str_deduplicates() {
     let mut builder = StringTableBuilder::new();
 
-    let id1 = builder.intern_str("test");
-    let id2 = builder.intern_str("test");
-    let id3 = builder.intern_str("other");
+    let id1 = builder.get_or_intern_str("test");
+    let id2 = builder.get_or_intern_str("test");
+    let id3 = builder.get_or_intern_str("other");
 
     assert_eq!(id1, id2);
     assert_ne!(id1, id3);
@@ -66,8 +66,8 @@ fn get_returns_none_for_unknown_symbol() {
     let mut builder = StringTableBuilder::new();
     builder.get_or_intern(known, &interner).unwrap();
 
-    assert!(builder.get(known).is_some());
-    assert!(builder.get(unknown).is_none());
+    assert!(builder.lookup(known).is_some());
+    assert!(builder.lookup(unknown).is_none());
 }
 
 #[test]
@@ -80,8 +80,8 @@ fn validate_passes_for_normal_counts() {
 #[test]
 fn emit_produces_correct_format() {
     let mut builder = StringTableBuilder::new();
-    builder.intern_str("abc");
-    builder.intern_str("defgh");
+    builder.get_or_intern_str("abc");
+    builder.get_or_intern_str("defgh");
 
     let (blob, table) = builder.emit();
 

@@ -28,8 +28,8 @@ Root
 Root
   Def Q
     NamedNode dotted_name
-      CapturedExpr @a
+      CapturedPattern @a
         NamedNode identifier
       .
-      CapturedExpr @b
+      CapturedPattern @b
         NamedNode identifier

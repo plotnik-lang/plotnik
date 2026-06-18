@@ -1,10 +1,10 @@
 use std::num::NonZeroU16;
 
 use super::types::{
-    Grammar, GrammarMetadata, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, NodeSymbol,
+    Grammar, GrammarTables, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, NodeKindEntry,
     build_node_constraints,
 };
-use crate::{NodeType, NodeTypeId};
+use crate::{NodeKind, NodeKindId};
 
 impl NodeShape {
     /// A named node kind: non-root, no fields, no children.
@@ -39,10 +39,10 @@ impl NodeShape {
     }
 }
 
-fn node_id_for_type(node_type: NodeType<&str>) -> Option<NodeTypeId> {
-    match node_type {
-        NodeType::Named("root") => NonZeroU16::new(1),
-        NodeType::Named("child") => NonZeroU16::new(2),
+fn node_id_for_type(node_kind: NodeKind<&str>) -> Option<NodeKindId> {
+    match node_kind {
+        NodeKind::Named("root") => NonZeroU16::new(1),
+        NodeKind::Named("child") => NonZeroU16::new(2),
         _ => None,
     }
 }
@@ -62,11 +62,11 @@ fn builds_node_constraints_from_node_shapes() {
             .with_children(child_slot(true, false)),
     ];
 
-    let (node_constraints, _, root_node_type) =
+    let (node_constraints, _, root_node_kind) =
         build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
             .expect("node shapes should resolve");
 
-    assert_eq!(root_node_type, NonZeroU16::new(1));
+    assert_eq!(root_node_kind, NonZeroU16::new(1));
     assert_eq!(node_constraints.len(), 1);
 }
 
@@ -114,8 +114,8 @@ fn child_slot(multiple: bool, required: bool) -> NodeSlot {
     }
 }
 
-fn named_symbol(id: u16, name: &str, terminal: bool) -> NodeSymbol {
-    NodeSymbol {
+fn named_symbol(id: u16, name: &str, terminal: bool) -> NodeKindEntry {
+    NodeKindEntry {
         id,
         type_name: name.to_string(),
         named: true,
@@ -143,7 +143,7 @@ fn alias_token_with_children_is_not_a_leaf_token() {
     // marks it as terminal — yet its node shape declares a real children slot. `is_token` must
     // consult the shape and return false, so a named child under it (`(leafy (child))`, a structure
     // real trees produce) is not rejected.
-    let metadata = GrammarMetadata {
+    let metadata = GrammarTables {
         node_shapes: vec![
             NodeShape::root("root").with_children(slot_of("leafy")),
             NodeShape::named("leafy").with_children(slot_of("child")),
@@ -157,7 +157,7 @@ fn alias_token_with_children_is_not_a_leaf_token() {
         fields: Vec::new(),
     };
 
-    let grammar = Grammar::from_metadata("test".to_string(), metadata).expect("metadata builds");
+    let grammar = Grammar::from_tables("test".to_string(), metadata).expect("metadata builds");
     let leafy = grammar
         .resolve_named_node("leafy")
         .expect("leafy is a node kind");
@@ -173,7 +173,7 @@ fn alias_token_with_children_is_not_a_leaf_token() {
 fn terminal_kind_without_children_is_a_leaf_token() {
     // A genuinely childless terminal kind must still classify as a leaf token, so named children
     // under it are still rejected.
-    let metadata = GrammarMetadata {
+    let metadata = GrammarTables {
         node_shapes: vec![
             NodeShape::root("root").with_children(slot_of("leaf")),
             NodeShape::named("leaf"),
@@ -185,7 +185,7 @@ fn terminal_kind_without_children_is_a_leaf_token() {
         fields: Vec::new(),
     };
 
-    let grammar = Grammar::from_metadata("test".to_string(), metadata).expect("metadata builds");
+    let grammar = Grammar::from_tables("test".to_string(), metadata).expect("metadata builds");
     let leaf = grammar
         .resolve_named_node("leaf")
         .expect("leaf is a node kind");
@@ -198,7 +198,7 @@ fn constraint_lookup_on_shapeless_kind_is_empty_not_panic() {
     // A token-like kind can have a symbol but no node shape (e.g. typescript `jsx_text`). Constraint
     // lookups for it must return empty instead of panicking, so the linker never crashes on a query
     // such as `(jsx_text (comment))`.
-    let metadata = GrammarMetadata {
+    let metadata = GrammarTables {
         node_shapes: vec![NodeShape::root("root")],
         symbols: vec![
             named_symbol(1, "root", false),
@@ -207,7 +207,7 @@ fn constraint_lookup_on_shapeless_kind_is_empty_not_panic() {
         fields: Vec::new(),
     };
 
-    let grammar = Grammar::from_metadata("test".to_string(), metadata).expect("metadata builds");
+    let grammar = Grammar::from_tables("test".to_string(), metadata).expect("metadata builds");
     let bare = grammar
         .resolve_named_node("bare")
         .expect("bare is a node kind");

@@ -1,25 +1,25 @@
 //! Type to TypeScript string conversion.
 
-use plotnik_bytecode::{TypeData, TypeDef, TypeId, TypeKind};
+use plotnik_bytecode::{TypeDefKind, TypeDef, TypeId, TypeKind};
 
 use super::Emitter;
 use super::config::VoidType;
 
 impl Emitter<'_> {
-    pub(super) fn type_to_ts(&self, type_id: TypeId) -> String {
-        let c = self.c();
+    pub(super) fn render_ty(&self, type_id: TypeId) -> String {
+        let c = self.colors();
         let Some(type_def) = self.types.get(type_id) else {
             return "unknown".to_string();
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(TypeKind::Void) => match self.config.void_type {
+        match type_def.decode() {
+            TypeDefKind::Primitive(TypeKind::Void) => match self.config.void_type {
                 VoidType::Undefined => "undefined".to_string(),
                 VoidType::Null => "null".to_string(),
             },
-            TypeData::Primitive(TypeKind::Node) => "Node".to_string(),
-            TypeData::Primitive(_) => "unknown".to_string(),
-            TypeData::Wrapper {
+            TypeDefKind::Primitive(TypeKind::Node) => "Node".to_string(),
+            TypeDefKind::Primitive(_) => "unknown".to_string(),
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => {
@@ -29,32 +29,32 @@ impl Emitter<'_> {
                     "Node".to_string()
                 }
             }
-            TypeData::Wrapper {
+            TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayZeroOrMore,
                 inner,
             } => {
-                let elem_type = self.type_to_ts(inner);
+                let elem_type = self.render_ty(inner);
                 format!("{}{}[]{}", elem_type, c.dim, c.reset)
             }
-            TypeData::Wrapper {
+            TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayOneOrMore,
                 inner,
             } => {
-                let elem_type = self.type_to_ts(inner);
+                let elem_type = self.render_ty(inner);
                 format!(
                     "{}[{}{}{}, ...{}{}{}[]]{}",
                     c.dim, c.reset, elem_type, c.dim, c.reset, elem_type, c.dim, c.reset
                 )
             }
-            TypeData::Wrapper {
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Optional,
                 inner,
             } => {
-                let inner_type = self.type_to_ts(inner);
+                let inner_type = self.render_ty(inner);
                 format!("{} {}|{} null", inner_type, c.dim, c.reset)
             }
-            TypeData::Wrapper { .. } => "unknown".to_string(),
-            TypeData::Composite { kind, .. } => {
+            TypeDefKind::Wrapper { .. } => "unknown".to_string(),
+            TypeDefKind::Composite { kind, .. } => {
                 if let Some(name) = self.type_names.get(&type_id) {
                     format!("{}{}{}", c.blue, name, c.reset)
                 } else {
@@ -73,9 +73,9 @@ impl Emitter<'_> {
     }
 
     pub(super) fn inline_struct(&self, type_def: &TypeDef) -> String {
-        let c = self.c();
-        let member_count = match type_def.classify() {
-            TypeData::Composite { member_count, .. } => member_count,
+        let c = self.colors();
+        let member_count = match type_def.decode() {
+            TypeDefKind::Composite { member_count, .. } => member_count,
             _ => 0,
         };
         if member_count == 0 {
@@ -85,7 +85,7 @@ impl Emitter<'_> {
         let mut fields: Vec<(String, TypeId)> = self
             .types
             .members_of(type_def)
-            .map(|member| (self.strings.get(member.name).to_string(), member.type_id))
+            .map(|member| (self.strings.get(member.name_id).to_string(), member.type_id))
             .collect();
         fields.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -94,7 +94,7 @@ impl Emitter<'_> {
         let field_strs: Vec<String> = fields
             .iter()
             .map(|(name, ty)| {
-                let ts_type = self.type_to_ts(*ty);
+                let ts_type = self.render_ty(*ty);
                 format!("{}{}:{} {}", name, c.dim, c.reset, ts_type)
             })
             .collect();
@@ -110,12 +110,12 @@ impl Emitter<'_> {
     }
 
     fn inline_enum(&self, type_def: &TypeDef) -> String {
-        let c = self.c();
+        let c = self.colors();
         let variant_strs: Vec<String> = self
             .types
             .members_of(type_def)
             .map(|member| {
-                let name = self.strings.get(member.name);
+                let name = self.strings.get(member.name_id);
                 if self.is_void_type(member.type_id) {
                     // Void payload: omit $data
                     format!(
@@ -123,7 +123,7 @@ impl Emitter<'_> {
                         c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.reset
                     )
                 } else {
-                    let data_type = self.type_to_ts(member.type_id);
+                    let data_type = self.render_ty(member.type_id);
                     format!(
                         "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
                         c.dim,
@@ -147,25 +147,25 @@ impl Emitter<'_> {
         variant_strs.join(&format!(" {}|{} ", c.dim, c.reset))
     }
 
-    pub(super) fn inline_data_type(&self, type_id: TypeId) -> String {
-        let c = self.c();
+    pub(super) fn inline_variant_payload(&self, type_id: TypeId) -> String {
+        let c = self.colors();
         let Some(type_def) = self.types.get(type_id) else {
-            return self.type_to_ts(type_id);
+            return self.render_ty(type_id);
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(TypeKind::Void) => format!("{}{{}}{}", c.dim, c.reset),
-            TypeData::Composite {
+        match type_def.decode() {
+            TypeDefKind::Primitive(TypeKind::Void) => format!("{}{{}}{}", c.dim, c.reset),
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 ..
             } => self.inline_struct(&type_def),
-            _ => self.type_to_ts(type_id),
+            _ => self.render_ty(type_id),
         }
     }
 
     pub(super) fn is_void_type(&self, type_id: TypeId) -> bool {
         self.types
             .get(type_id)
-            .is_some_and(|def| matches!(def.classify(), TypeData::Primitive(TypeKind::Void)))
+            .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
     }
 }

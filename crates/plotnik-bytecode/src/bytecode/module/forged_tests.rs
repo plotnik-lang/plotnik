@@ -22,7 +22,7 @@ use plotnik_compiler::{QueryBuilder, SourceMap};
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
 use super::{Module, ModuleError};
-use crate::bytecode::type_meta::TypeData;
+use crate::bytecode::type_meta::TypeDefKind;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -341,7 +341,7 @@ fn forged_nonzero_segment_is_rejected() {
 
 #[test]
 fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
-    // node_kind (header bits 4-5) is meaningful only for Match variants; the
+    // node_class_bits (header bits 4-5) is meaningful only for Match variants; the
     // Call/Return/Trampoline decoders ignore it, so the format pins those bits to
     // zero. This query emits all three: a `(Leaf)` reference (Call), definition
     // Returns, and the preamble Trampoline.
@@ -349,10 +349,10 @@ fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
     for opcode in [6u8, 7, 8] {
         let mut bytes = emit_bytes(REF_QUERY);
         let off = first_instr(&bytes, |o| o == opcode);
-        bytes[off] |= 0x10; // set node_kind bit 4
+        bytes[off] |= 0x10; // set node_class_bits bit 4
         reseal(&mut bytes);
 
-        let err = Module::load(&bytes).expect_err("forged node_kind must be rejected");
+        let err = Module::load(&bytes).expect_err("forged node_class_bits must be rejected");
         assert!(
             matches!(err, ModuleError::MalformedTransitions),
             "opcode {opcode}: expected MalformedTransitions, got {err:?}"
@@ -362,14 +362,14 @@ fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
 
 #[test]
 fn forged_reserved_node_kind_is_rejected() {
-    // node_kind `0b11` (header bits 4-5) is reserved; `NodeTypeIR::from_bytes`
+    // node_class_bits `0b11` (header bits 4-5) is reserved; `NodeKindConstraint::from_bytes`
     // would panic on it.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |o| o <= 5);
     bytes[off] |= 0x30;
     reseal(&mut bytes);
 
-    let err = Module::load(&bytes).expect_err("forged node_kind must be rejected");
+    let err = Module::load(&bytes).expect_err("forged node_class_bits must be rejected");
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
@@ -394,7 +394,7 @@ fn forged_invalid_nav_is_rejected() {
 
 #[test]
 fn forged_invalid_effect_opcode_is_rejected() {
-    // `13` is past the 0..=12 effect range; `EffectOpcode::from_u8` would panic
+    // `13` is past the 0..=12 effect range; `EffectKind::from_u8` would panic
     // when the VM emits this effect.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
@@ -412,7 +412,7 @@ fn forged_invalid_effect_opcode_is_rejected() {
 
 #[test]
 fn forged_oob_member_operand_is_rejected() {
-    // A `Set`/`Enum` payload indexes the type-member table via the materializer's
+    // A `Set`/`EnumOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let members = Module::load(&bytes)
@@ -423,9 +423,9 @@ fn forged_oob_member_operand_is_rejected() {
         .into_iter()
         .find(|&off| {
             let e = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
-            matches!(e >> 10, 6 | 7) // Set | Enum
+            matches!(e >> 10, 6 | 7) // Set | EnumOpen
         })
-        .expect("struct query must emit a Set/Enum effect");
+        .expect("struct query must emit a Set/EnumOpen effect");
     let opcode_bits = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & 0xFC00;
     let forged = opcode_bits | (members & 0x3FF);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
@@ -472,7 +472,7 @@ fn forged_out_of_range_successor_is_rejected() {
 #[test]
 fn forged_regex_pattern_string_id_is_rejected() {
     // A regex entry's `string_id` is display metadata that `dump`/`trace` resolve
-    // through the panicking `get_string_id` (StringId::new) and then index the
+    // through the panicking `pattern_string_id` (StringId::new) and then index the
     // string blob; `0` (reserved) and an out-of-range id must be rejected at load.
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
@@ -621,8 +621,8 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn an `EndObj` (opcode 5) into a no-op `Node` (opcode 0): the struct's
-    // `Obj` is never closed, so the body returns with an open frame — the
+    // Turn an `ObjectClose` (opcode 5) into a no-op `Node` (opcode 0): the struct's
+    // `ObjectOpen` is never closed, so the body returns with an open frame — the
     // materializer would leave the builder stack unbalanced. Rejected as a
     // non-neutral body.
     let mut bytes = emit_bytes(STRUCT_QUERY);
@@ -630,7 +630,7 @@ fn forged_dropped_scope_close_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load(&bytes).expect_err("forged dropped EndObj must be rejected");
+    let err = Module::load(&bytes).expect_err("forged dropped ObjectClose must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -656,9 +656,9 @@ fn forged_suppress_underflow_is_rejected() {
 
 #[test]
 fn forged_preamble_without_root_object_is_rejected() {
-    // The shared preamble opens a root `Obj` before trampolining into the entry
-    // body, so the body always has an Object to `Set` into. Neutralize that `Obj`
-    // and its matching `EndObj` (turn both into no-op `Clear`s) and lie that the
+    // The shared preamble opens a root `ObjectOpen` before trampolining into the entry
+    // body, so the body always has an Object to `Set` into. Neutralize that `ObjectOpen`
+    // and its matching `ObjectClose` (turn both into no-op `Clear`s) and lie that the
     // result type is scalar: the entry's `Set` would then hit the materializer's
     // scalar root frame and panic. The preamble has no caller, so a requirement
     // bubbling out of it must be rejected, not silently dropped.
@@ -667,8 +667,8 @@ fn forged_preamble_without_root_object_is_rejected() {
         .expect("module loads before tampering")
         .offsets()
         .entrypoints as usize;
-    let obj_slot = first_effect_op(&bytes, |op| op == 4); // preamble Obj
-    let endobj_slot = first_effect_op(&bytes, |op| op == 5); // preamble EndObj
+    let obj_slot = first_effect_op(&bytes, |op| op == 4); // preamble ObjectOpen
+    let endobj_slot = first_effect_op(&bytes, |op| op == 5); // preamble ObjectClose
 
     bytes[obj_slot..obj_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
     bytes[endobj_slot..endobj_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
@@ -810,7 +810,7 @@ fn forged_predicate_regex_flag_mismatch_is_rejected() {
 #[test]
 fn forged_unknown_type_def_kind_is_rejected() {
     // A TypeDef's kind byte (byte 3 of the 4-byte entry) must be a known TypeKind;
-    // an unknown kind would panic the materializer's `get_def`/`TypeData` decode.
+    // an unknown kind would panic the materializer's `def`/`TypeDefKind` decode.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let type_defs_off = Module::load(&bytes)
         .expect("module loads before tampering")
@@ -938,7 +938,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
         let m = Module::load(&bytes).expect("module loads before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
-            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
             .expect("array query must emit a wrapper type def");
         (
             m.offsets().type_defs as usize,
@@ -969,7 +969,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
             let m = Module::load(&bytes).expect("module loads before tampering");
             let types = m.types();
             let idx = (0..types.defs_count())
-                .find(|&i| matches!(types.get_def(i).classify(), TypeData::Primitive(_)))
+                .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Primitive(_)))
                 .expect("struct query must emit a primitive type def");
             (m.offsets().type_defs as usize, idx)
         };
@@ -995,7 +995,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
         let m = Module::load(&bytes).expect("module loads before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
-            .find(|&i| matches!(types.get_def(i).classify(), TypeData::Wrapper { .. }))
+            .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
             .expect("array query must emit a wrapper type def");
         (m.offsets().type_defs as usize, idx)
     };
@@ -1012,7 +1012,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
 
 #[test]
 fn forged_oob_type_name_type_id_is_rejected() {
-    // A TypeName's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
+    // A TypeNameEntry's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
     // real TypeDef; a named definition emits at least one entry.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let (names_off, type_defs) = {

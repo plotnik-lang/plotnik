@@ -7,11 +7,11 @@
 use crate::analyze::type_check::is_repeating_quantifier;
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::SyntaxKind;
-use crate::parser::ast::{self, Expr};
+use crate::parser::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx, check_needs_struct_wrapper, get_row_type_id};
+use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
 use super::navigation::resumable_search_nav;
 use super::scope::{BranchTargets, CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
 
@@ -64,27 +64,27 @@ impl QuantifierKind {
 }
 
 /// Result of parsing a quantified expression.
-enum QuantifierParse {
+enum QuantifierForm {
     /// No inner expression found.
     Empty,
     /// Inner expression exists but no valid quantifier operator.
-    Plain(Expr),
+    Plain(Pattern),
     /// Valid quantified expression with inner and kind.
-    Quantified { inner: Expr, kind: QuantifierKind },
+    Quantified { inner: Pattern, kind: QuantifierKind },
 }
 
-fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
+fn classify_quantifier(quant: &ast::QuantifiedPattern) -> QuantifierForm {
     let Some(inner) = quant.inner() else {
-        return QuantifierParse::Empty;
+        return QuantifierForm::Empty;
     };
 
     let Some(op) = quant.operator() else {
-        return QuantifierParse::Plain(inner);
+        return QuantifierForm::Plain(inner);
     };
 
     match QuantifierKind::from_syntax(op.kind()) {
-        Some(kind) => QuantifierParse::Quantified { inner, kind },
-        None => QuantifierParse::Plain(inner),
+        Some(kind) => QuantifierForm::Quantified { inner, kind },
+        None => QuantifierForm::Plain(inner),
     }
 }
 
@@ -105,7 +105,7 @@ impl ArrayContext {
 
 /// Configuration for unified quantifier compilation.
 pub(super) struct QuantifierConfig<'a> {
-    pub inner: &'a Expr,
+    pub inner: &'a Pattern,
     pub kind: QuantifierKind,
     /// Navigation for the first iteration.
     pub first_nav: Option<Nav>,
@@ -118,15 +118,15 @@ pub(super) struct QuantifierConfig<'a> {
 
 impl Compiler<'_> {
     /// Compile a quantified expression with capture effects (passed to body).
-    pub(super) fn compile_quantified_inner(
+    pub(super) fn compile_quantified(
         &mut self,
-        quant: &ast::QuantifiedExpr,
+        quant: &ast::QuantifiedPattern,
         ctx: ExprCtx,
     ) -> Label {
-        let (inner, kind) = match parse_quantifier(quant) {
-            QuantifierParse::Empty => return ctx.exit,
-            QuantifierParse::Plain(inner) => return self.compile_expr_inner(&inner, ctx),
-            QuantifierParse::Quantified { inner, kind } => (inner, kind),
+        let (inner, kind) = match classify_quantifier(quant) {
+            QuantifierForm::Empty => return ctx.exit,
+            QuantifierForm::Plain(inner) => return self.dispatch_pattern(&inner, ctx),
+            QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
         let ExprCtx {
@@ -143,10 +143,10 @@ impl Compiler<'_> {
 
         if needs_implicit_array {
             // No Set on the array itself — collect structured values via Push only.
-            let quant_expr = Expr::QuantifiedExpr(quant.clone());
+            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
             return self.compile_array_capture(
                 CaptureRequest {
-                    inner: &quant_expr,
+                    inner: &quant_pattern,
                     nav: nav_override,
                     capture_effects: vec![],
                     outer_capture: capture,
@@ -172,15 +172,15 @@ impl Compiler<'_> {
     /// The element_capture effects (typically [Push]) are placed on each iteration.
     pub(super) fn compile_quantified_for_array(
         &mut self,
-        quant: &ast::QuantifiedExpr,
+        quant: &ast::QuantifiedPattern,
         exit: Label,
         nav_override: Option<Nav>,
         element_capture: CaptureEffects,
     ) -> Label {
-        let (inner, kind) = match parse_quantifier(quant) {
-            QuantifierParse::Empty => return exit,
-            QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(
+        let (inner, kind) = match classify_quantifier(quant) {
+            QuantifierForm::Empty => return exit,
+            QuantifierForm::Plain(inner) => {
+                return self.dispatch_pattern(
                     &inner,
                     ExprCtx {
                         exit,
@@ -189,7 +189,7 @@ impl Compiler<'_> {
                     },
                 );
             }
-            QuantifierParse::Quantified { inner, kind } => (inner, kind),
+            QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
         let config = QuantifierConfig {
@@ -207,7 +207,7 @@ impl Compiler<'_> {
     /// Compile a skippable expression (optional/star) with separate exits for skip/match paths.
     pub(super) fn compile_skippable_with_exits(
         &mut self,
-        expr: &Expr,
+        pattern: &Pattern,
         exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
@@ -221,7 +221,7 @@ impl Compiler<'_> {
         // split exits and all, so the two can never drift — the gap behind both
         // #470 and the suppressive `@_` panic. It emits the scope that matches the
         // declared type (`Obj`/`Arr`/`Suppress`), closing it on both exits.
-        if let Expr::CapturedExpr(cap) = expr
+        if let Pattern::CapturedPattern(cap) = pattern
             && let Some(inner) = cap.inner()
         {
             return self.compile_captured(
@@ -236,10 +236,10 @@ impl Compiler<'_> {
             );
         }
 
-        // Must be a QuantifiedExpr at this point
-        let Expr::QuantifiedExpr(quant) = expr else {
-            return self.compile_expr_inner(
-                expr,
+        // Must be a QuantifiedPattern at this point
+        let Pattern::QuantifiedPattern(quant) = pattern else {
+            return self.dispatch_pattern(
+                pattern,
                 ExprCtx {
                     exit: match_exit,
                     nav: nav_override,
@@ -248,10 +248,10 @@ impl Compiler<'_> {
             );
         };
 
-        let (inner, kind) = match parse_quantifier(quant) {
-            QuantifierParse::Empty => return match_exit,
-            QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(
+        let (inner, kind) = match classify_quantifier(quant) {
+            QuantifierForm::Empty => return match_exit,
+            QuantifierForm::Plain(inner) => {
+                return self.dispatch_pattern(
                     &inner,
                     ExprCtx {
                         exit: match_exit,
@@ -260,7 +260,7 @@ impl Compiler<'_> {
                     },
                 );
             }
-            QuantifierParse::Quantified { inner, kind } => (inner, kind),
+            QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
         // When the inner returns a structured type (enum/struct) and this is a star/plus
@@ -270,10 +270,10 @@ impl Compiler<'_> {
             is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
-            let quant_expr = Expr::QuantifiedExpr(quant.clone());
+            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
             return self.compile_array_capture(
                 CaptureRequest {
-                    inner: &quant_expr,
+                    inner: &quant_pattern,
                     nav: nav_override,
                     capture_effects: vec![],
                     outer_capture: capture,
@@ -336,10 +336,10 @@ impl Compiler<'_> {
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
                 let endarr = self.emit_endarr_step(end_effects, exit);
-                if let Expr::QuantifiedExpr(quant) = inner {
+                if let Pattern::QuantifiedPattern(quant) = inner {
                     self.compile_quantified_for_array(quant, endarr, nav, push_effects)
                 } else {
-                    self.compile_expr_with_nav(inner, endarr, nav)
+                    self.compile_pattern(inner, endarr, nav)
                 }
             }
             CaptureExits::Split {
@@ -366,7 +366,7 @@ impl Compiler<'_> {
 
     fn compile_star_for_array_with_exits(
         &mut self,
-        expr: &Expr,
+        pattern: &Pattern,
         exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
@@ -375,9 +375,9 @@ impl Compiler<'_> {
             match_exit,
             skip_exit,
         } = exits;
-        let Expr::QuantifiedExpr(quant) = expr else {
-            return self.compile_expr_inner(
-                expr,
+        let Pattern::QuantifiedPattern(quant) = pattern else {
+            return self.dispatch_pattern(
+                pattern,
                 ExprCtx {
                     exit: match_exit,
                     nav: nav_override,
@@ -386,10 +386,10 @@ impl Compiler<'_> {
             );
         };
 
-        let (inner, kind) = match parse_quantifier(quant) {
-            QuantifierParse::Empty => return match_exit,
-            QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(
+        let (inner, kind) = match classify_quantifier(quant) {
+            QuantifierForm::Empty => return match_exit,
+            QuantifierForm::Plain(inner) => {
+                return self.dispatch_pattern(
                     &inner,
                     ExprCtx {
                         exit: match_exit,
@@ -398,7 +398,7 @@ impl Compiler<'_> {
                     },
                 );
             }
-            QuantifierParse::Quantified { inner, kind } => (inner, kind),
+            QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
         let config = QuantifierConfig {
@@ -488,20 +488,20 @@ impl Compiler<'_> {
         let match_exit = exits.match_exit();
 
         let in_array_context = array_context.is_in_array();
-        let needs_struct_wrapper =
-            in_array_context && check_needs_struct_wrapper(inner, self.ctx.type_ctx);
-        let row_type_id = if in_array_context {
-            get_row_type_id(inner, self.ctx.type_ctx)
+        let has_struct_wrapper =
+            in_array_context && needs_struct_wrapper(inner, self.ctx.type_ctx);
+        let element_row_type_id = if in_array_context {
+            row_type_id(inner, self.ctx.type_ctx)
         } else {
             None
         };
 
         let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-            if needs_struct_wrapper {
-                this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+            if has_struct_wrapper {
+                this.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id)
             } else if in_array_context {
-                this.compile_with_optional_scope(row_type_id, |t| {
-                    t.compile_expr_inner(
+                this.compile_with_optional_scope(element_row_type_id, |t| {
+                    t.dispatch_pattern(
                         inner,
                         ExprCtx {
                             exit,
@@ -511,7 +511,7 @@ impl Compiler<'_> {
                     )
                 })
             } else {
-                this.compile_expr_inner(
+                this.dispatch_pattern(
                     inner,
                     ExprCtx {
                         exit,
@@ -555,10 +555,10 @@ impl Compiler<'_> {
                     // its element scope is owned by the EndArr step on each exit, not
                     // per-iteration. Use a dedicated body closure to keep that intact.
                     let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-                        if needs_struct_wrapper {
-                            this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+                        if has_struct_wrapper {
+                            this.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id)
                         } else {
-                            this.compile_expr_inner(
+                            this.dispatch_pattern(
                                 inner,
                                 ExprCtx {
                                     exit,

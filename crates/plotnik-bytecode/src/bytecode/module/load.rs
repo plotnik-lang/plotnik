@@ -7,13 +7,15 @@
 
 use std::io;
 
-use super::super::effects::{EffectOp, EffectOpcode};
+use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
-    Counts, MATCH_PAYLOAD_START, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
+    MatchCounts, MATCH_PAYLOAD_START, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
     PREDICATE_SLOTS, header_byte,
 };
 use super::super::nav::Nav;
-use super::super::node_type_ir::NodeTypeIR;
+use super::super::node_kind_constraint::NodeKindConstraint;
+use super::super::sections::{FieldEntry, NodeKindEntry};
+use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
 use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
 use crate::predicate_op::PredicateOp;
@@ -85,10 +87,10 @@ impl Module {
 
         let header = Header::from_bytes(&storage[..HEADER_SIZE]);
 
-        if !header.validate_magic() {
+        if !header.has_valid_magic() {
             return Err(ModuleError::InvalidMagic);
         }
-        if !header.validate_version() {
+        if !header.is_supported_version() {
             return Err(ModuleError::UnsupportedVersion(header.version));
         }
         if header.total_size as usize != storage.len() {
@@ -113,7 +115,7 @@ impl Module {
             offsets,
             regex_dfas: RegexDfas::default(),
             #[cfg(debug_assertions)]
-            is_start: Vec::new(),
+            instr_start_bitmap: Vec::new(),
         };
         // Validation deserializes every regex DFA to prove it well-formed and
         // builds the instruction-start bitmap; it hands the owned automata back so
@@ -124,7 +126,7 @@ impl Module {
         // pre-decode IP assertion; release carries no extra per-module memory.
         #[cfg(debug_assertions)]
         {
-            module.is_start = is_start;
+            module.instr_start_bitmap = is_start;
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
@@ -270,7 +272,7 @@ impl Module {
     }
 
     /// The regex table is `count + 1` entries whose DFA offsets ascend and end
-    /// at the blob length, so [`RegexView::get_by_index`] never slices OOB.
+    /// at the blob length, so [`RegexView::at`] never slices OOB.
     fn validate_regex_table(&self) -> Result<(), ModuleError> {
         let table = self.regex_table_slice();
         let blob_len = self.header.regex_blob_size;
@@ -308,7 +310,7 @@ impl Module {
     /// the cache lives in `Module` without a self-referential borrow. Index 0 is
     /// the reserved sentinel — never evaluated — so it stays `None` and the scan
     /// starts at 1. The offset table is already bounded by
-    /// [`Self::validate_regex_table`], so `get_by_index` here cannot slice out of
+    /// [`Self::validate_regex_table`], so `at` here cannot slice out of
     /// range.
     fn load_regex_dfas(&self) -> Result<RegexDfas, ModuleError> {
         let regexes = self.regexes();
@@ -316,7 +318,7 @@ impl Module {
         let mut dfas = Vec::with_capacity(count);
         dfas.push(None); // index 0: reserved sentinel, never evaluated
         for i in 1..count {
-            let bytes = regexes.get_by_index(i);
+            let bytes = regexes.at(i);
             let dfa = crate::deserialize_dfa(bytes)
                 .map_err(|_| ModuleError::InvalidRegexDfa(i))?
                 .to_owned();
@@ -337,26 +339,26 @@ impl Module {
 
         for i in 0..types.defs_count() {
             let invalid = || ModuleError::InvalidTypeDef(i);
-            let def = types.get_def(i);
+            let def = types.def(i);
             // Reject an unknown kind here, so the typed reads below cannot panic.
-            let Some(data) = def.try_classify() else {
+            let Some(data) = def.try_decode() else {
                 return Err(invalid());
             };
             // Fields the kind does not name are reserved-zero
             // (docs/binary-format/04-types.md); smuggled state there must not load.
             let (raw_data, raw_count) = def.member_range();
             match data {
-                TypeData::Primitive(_) => {
+                TypeDefKind::Primitive(_) => {
                     if raw_data != 0 || raw_count != 0 {
                         return Err(invalid());
                     }
                 }
-                TypeData::Wrapper { inner, .. } => {
+                TypeDefKind::Wrapper { inner, .. } => {
                     if raw_count != 0 || inner.0 >= type_defs {
                         return Err(invalid());
                     }
                 }
-                TypeData::Composite {
+                TypeDefKind::Composite {
                     member_start,
                     member_count,
                     ..
@@ -377,7 +379,7 @@ impl Module {
         Ok(())
     }
 
-    /// Every TypeName must target a real TypeDef; its name `StringId` is checked
+    /// Every TypeNameEntry must target a real TypeDef; its name `StringId` is checked
     /// separately by [`validate_string_ids`](Self::validate_string_ids).
     fn validate_type_names(&self) -> Result<(), ModuleError> {
         let types = self.types();
@@ -467,14 +469,14 @@ impl Module {
         // node/field symbol name: u16 at entry+2
         check(
             self.offsets.node_types,
-            NodeSymbol::SIZE,
+            NodeKindEntry::SIZE,
             2,
             0,
             self.header.node_types_count as usize,
         )?;
         check(
             self.offsets.node_fields,
-            FieldSymbol::SIZE,
+            FieldEntry::SIZE,
             2,
             0,
             self.header.node_fields_count as usize,
@@ -482,7 +484,7 @@ impl Module {
         // type name / member name: u16 at entry+0
         check(
             self.offsets.type_names,
-            TypeName::SIZE,
+            TypeNameEntry::SIZE,
             0,
             0,
             self.header.type_names_count as usize,
@@ -496,7 +498,7 @@ impl Module {
         )?;
         // regex pattern name: u16 at entry+0. Index 0 is the reserved sentinel —
         // never resolved — so start at 1; `dump`/`trace` resolve `string_id` for
-        // every real entry through the panicking `RegexView::get_string_id` (and
+        // every real entry through the panicking `RegexView::pattern_string_id` (and
         // then index the string blob).
         check(
             self.offsets.regex_table,
@@ -517,8 +519,8 @@ impl Module {
     /// per-opcode decoders, the effect/predicate iterators, and the materializer
     /// all build `NonZero`/enum values and index tables straight from
     /// instruction bytes. Each is a panic site on crafted input — `Opcode`,
-    /// `Nav`, `NodeTypeIR`, `EffectOpcode`, and `StepId::new` decoding, plus
-    /// `get_member` / `get_by_index` table lookups. This walk rejects every such
+    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `StepId::new` decoding, plus
+    /// `get_member` / `at` table lookups. This walk rejects every such
     /// input up front, reading only through checked slicing so it never panics
     /// itself.
     ///
@@ -584,11 +586,11 @@ impl Module {
             if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedTransitions);
             }
-            // node_kind (header bits 4-5) is meaningful only for Match variants;
+            // node_class_bits (header bits 4-5) is meaningful only for Match variants;
             // Call/Return/Trampoline ignore it, so the format pins those bits to
-            // zero — a forged non-zero node_kind there is smuggled state.
+            // zero — a forged non-zero node_class_bits there is smuggled state.
             if matches!(opcode, Opcode::Call | Opcode::Return | Opcode::Trampoline)
-                && header_byte::node_kind(header) != 0
+                && header_byte::node_class_bits(header) != 0
             {
                 return Err(ModuleError::MalformedTransitions);
             }
@@ -625,8 +627,8 @@ impl Module {
                 }
                 _ => {
                     // A Match variant (`Match8` or extended).
-                    let node_kind = header_byte::node_kind(header);
-                    if NodeTypeIR::try_from_bytes(node_kind, read_u16(instr_off + 2)?).is_none() {
+                    let node_kind = header_byte::node_class_bits(header);
+                    if NodeKindConstraint::try_from_bytes(node_kind, read_u16(instr_off + 2)?).is_none() {
                         return Err(ModuleError::MalformedTransitions);
                     }
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
@@ -686,10 +688,10 @@ impl Module {
         let counts = read_u16(instr_off + 6)?;
         // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
         // the decoder never reads it, so a forged set bit would load unnoticed.
-        if Counts::reserved_bit_set(counts) {
+        if MatchCounts::reserved_bit_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }
-        let c = Counts::unpack(counts);
+        let c = MatchCounts::unpack(counts);
         let (pre, neg, post, succ) = (
             c.pre as usize,
             c.neg as usize,
@@ -716,8 +718,8 @@ impl Module {
                 .get(off..off + PAYLOAD_SLOT_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
             let op =
-                EffectOp::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
-            if matches!(op.opcode, EffectOpcode::Set | EffectOpcode::Enum)
+                Effect::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
+            if matches!(op.kind, EffectKind::Set | EffectKind::EnumOpen)
                 && op.payload as u16 >= members
             {
                 return Err(ModuleError::MalformedTransitions);
@@ -749,7 +751,7 @@ impl Module {
 
             // The operator must be a known predicate op, the regex flag must agree
             // with the operator's class, and the operand must index its table —
-            // otherwise `PredicateOp::from_byte`, `get_by_index`, or the VM's
+            // otherwise `PredicateOp::from_byte`, `at`, or the VM's
             // op/flag `unreachable!` would panic when this predicate is evaluated
             // or dumped. The regex operand must be a *real* entry (`1..count`):
             // index 0 is the reserved sentinel that `load_regex_dfas` leaves empty,

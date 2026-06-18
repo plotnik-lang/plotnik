@@ -9,8 +9,8 @@ error: cannot mix labeled and unlabeled branches
 2 |   (a)
   |   ^^^
 3 |   B: (b)
-  |   - tagged branch here
+  |   - enum branch here
   |
-help: use all labels for a tagged union, or none for a merged struct
+help: use all labels for an enum, or none for a merged struct
 ==== symbols ====
 Q

@@ -1,9 +1,9 @@
-use crate::test_utils::colliding_node_type_grammar;
+use crate::test_utils::colliding_node_kind_grammar;
 use crate::{Query, QueryBuilder, SourceMap};
-use plotnik_core::NodeType;
+use plotnik_core::NodeKind;
 
 fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
-    let grammar = colliding_node_type_grammar();
+    let grammar = colliding_node_kind_grammar();
     let mut source_map = SourceMap::new();
     for (path, content) in files {
         source_map.add_file(path, content);
@@ -34,11 +34,11 @@ fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
 
     assert_ne!(named_id, anonymous_id);
     assert_eq!(
-        query.node_type_ids().get(&NodeType::Named(sym)),
+        query.node_kind_ids().get(&NodeKind::Named(sym)),
         Some(&named_id)
     );
     assert_eq!(
-        query.node_type_ids().get(&NodeType::Anonymous(sym)),
+        query.node_kind_ids().get(&NodeKind::Anonymous(sym)),
         Some(&anonymous_id)
     );
 }

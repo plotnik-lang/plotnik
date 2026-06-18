@@ -151,7 +151,7 @@ The split fires when the alternation's exit is the follower's own single `Match`
 
 - The follower is itself anonymous (`. ","`) or `_`: both-sides-named never holds, so extras-only is in fact correct.
 - The follower is a ref (`. (Rule)`, a `Call`) or scope-wrapped (`. (a (b) @c) @x`, an epsilon entry): no single named `Match` to clone.
-- The alternation's value is materialized through a trailing effect epsilon rather than inline — a struct/array scope capture, or a tagged alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `Set`/`EndObj`), not the follower's `Match`.
+- The alternation's value is materialized through a trailing effect epsilon rather than inline — a struct/array scope capture, or an enum alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `Set`/`ObjectClose`), not the follower's `Match`.
 - A branch is quantified (`[(b)? ","] . (a)`): its zero-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole branch stays extras-only.
 - A branch is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): branch namedness is classified over the whole branch (matching the before-anchor classifier), so a branch containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
 
@@ -273,7 +273,7 @@ Field constraints are checked during the match attempt within the search loop. T
 ```rust
 pub struct Match {
     pub nav: Nav,
-    pub node_type: Option<NonZeroU16>,   // None = wildcard
+    pub node_kind: NodeKindConstraint,   // Any = wildcard
     pub node_field: Option<NonZeroU16>,  // None = no constraint
     pub neg_fields: Vec<u16>,            // must NOT be present
     // ...
@@ -308,7 +308,7 @@ Both constraints participate in the skip policy — a mismatch triggers retry (f
 
 ## Call Navigation
 
-`Call` instructions handle navigation for recursive patterns. The caller provides nav and field constraint; the callee's first `Match` checks node type:
+`Call` instructions handle navigation for recursive patterns. The caller provides nav and field constraint; the callee's first `Match` checks node kind:
 
 ```rust
 pub struct Call {

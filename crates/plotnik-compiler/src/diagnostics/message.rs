@@ -54,7 +54,7 @@ pub enum DiagnosticKind {
     BranchLabelInvalid,
     FieldNameInvalid,
     TypeNameInvalid,
-    TreeSitterSequenceSyntax,
+    TreeSitterSequenceSyntaxDeprecated,
     NegationSyntaxDeprecated,
     SupertypeSlashDeprecated,
 
@@ -84,24 +84,24 @@ pub enum DiagnosticKind {
     RegexNamedCapture,
     RegexSyntaxError,
 
-    UnknownNodeType,
+    UnknownNodeKind,
     UnknownField,
-    FieldNotOnNodeType,
+    FieldNotOnNodeKind,
     InvalidFieldChildType,
     InvalidChildType,
     InvalidSubtype,
     ChildUnderLeafToken,
     NegatedRequiredField,
 
-    UnnamedDef,
+    MissingDefName,
 }
 
 impl DiagnosticKind {
     /// Severity for this kind.
-    pub fn default_severity(&self) -> Severity {
+    pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedBranchLabels
-            | Self::TreeSitterSequenceSyntax
+            | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
             _ => Severity::Error,
@@ -144,13 +144,13 @@ impl DiagnosticKind {
 
     /// Consequence errors - often caused by earlier parse errors.
     /// These get suppressed when any root-cause or structural error exists.
-    pub fn is_consequence_error(&self) -> bool {
-        matches!(self, Self::UnnamedDef)
+    pub fn is_cascade_consequence(&self) -> bool {
+        matches!(self, Self::MissingDefName)
     }
 
     /// Default hint for this kind, automatically included in diagnostics.
     /// Call sites can add additional hints for context-specific information.
-    pub fn default_hint(&self) -> Option<&'static str> {
+    pub fn hint(&self) -> Option<&'static str> {
         match self {
             Self::ExpectedSubtype => Some("e.g., `expression#binary_expression`"),
             Self::ExpectedTypeName => Some("e.g., `::MyType`"),
@@ -168,10 +168,10 @@ impl DiagnosticKind {
             Self::CaptureNameInvalid => Some("captures become fields in the output"),
             Self::DefNameInvalid => Some("definitions become types in the output"),
             Self::BranchLabelInvalid => {
-                Some("branch labels become variants of a tagged union in the output")
+                Some("branch labels become variants of an enum in the output")
             }
             Self::FieldNameInvalid => Some("fields come from the grammar and are snake_case"),
-            Self::TreeSitterSequenceSyntax => {
+            Self::TreeSitterSequenceSyntaxDeprecated => {
                 Some("use `{(a) (b)}` to match a sequence of siblings")
             }
             Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
@@ -179,7 +179,7 @@ impl DiagnosticKind {
                 Some("use `supertype#subtype` instead of `supertype/subtype`")
             }
             Self::MixedAltBranches => {
-                Some("use all labels for a tagged union, or none for a merged struct")
+                Some("use all labels for an enum, or none for a merged struct")
             }
             Self::DuplicateAlternationLabel => {
                 Some("each branch label must be unique within an alternation")
@@ -251,7 +251,7 @@ impl DiagnosticKind {
         }
     }
 
-    pub fn fallback_message(&self) -> &'static str {
+    pub fn summary(&self) -> &'static str {
         match self {
             Self::UnclosedTree => "missing closing `)`",
             Self::UnclosedSequence => "missing closing `}`",
@@ -267,7 +267,7 @@ impl DiagnosticKind {
             Self::EmptyAnonymousNode => "empty string matches nothing",
             Self::EmptySequence => "empty `{}` matches nothing",
             Self::EmptyAlternation => "empty `[]` matches nothing",
-            Self::BareIdentifier => "node types must be parenthesized",
+            Self::BareIdentifier => "node kinds must be parenthesized",
             Self::InvalidSeparator => "patterns are separated by whitespace",
             Self::AnchorInAlternation => "anchors cannot appear directly in alternations",
             Self::QuantifiedAnchor => "anchors cannot be quantified",
@@ -286,7 +286,9 @@ impl DiagnosticKind {
             Self::BranchLabelInvalid => "branch labels must be PascalCase",
             Self::FieldNameInvalid => "field names must be snake_case",
             Self::TypeNameInvalid => "type names must be PascalCase",
-            Self::TreeSitterSequenceSyntax => "parenthesized sequences are tree-sitter syntax",
+            Self::TreeSitterSequenceSyntaxDeprecated => {
+                "parenthesized sequences are tree-sitter syntax"
+            }
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
@@ -322,20 +324,20 @@ impl DiagnosticKind {
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",
             Self::RegexNamedCapture => "named captures are not supported in regex",
             Self::RegexSyntaxError => "invalid regex syntax",
-            Self::UnknownNodeType => "unknown node type",
+            Self::UnknownNodeKind => "unknown node kind",
             Self::UnknownField => "unknown field",
-            Self::FieldNotOnNodeType => "field not valid on this node type",
-            Self::InvalidFieldChildType => "node type not valid for this field",
-            Self::InvalidChildType => "node type not valid as child",
-            Self::InvalidSubtype => "node type is not a subtype of this type",
+            Self::FieldNotOnNodeKind => "field not valid on this node kind",
+            Self::InvalidFieldChildType => "node kind not valid for this field",
+            Self::InvalidChildType => "node kind not valid as child",
+            Self::InvalidSubtype => "node kind is not a subtype of this kind",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
-            Self::UnnamedDef => "definition must be named",
+            Self::MissingDefName => "definition must be named",
         }
     }
 
     /// Template for custom messages; `{}` is replaced by the caller-provided detail.
-    pub fn custom_message(&self) -> String {
+    pub fn template(&self) -> String {
         match self {
             // The detail IS the full message.
             Self::UnexpectedToken | Self::BareIdentifier => "{}".to_string(),
@@ -359,9 +361,9 @@ impl DiagnosticKind {
             Self::IncompatibleStructShapes => {
                 "capture `@{}` has incompatible struct fields across branches".to_string()
             }
-            Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
+            Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
             Self::UnknownField => "`{}` is not a valid field".to_string(),
-            Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),
+            Self::FieldNotOnNodeKind => "field `{}` is not valid on this node kind".to_string(),
             Self::InvalidFieldChildType => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
             Self::InvalidSubtype => "{}".to_string(),
@@ -371,18 +373,18 @@ impl DiagnosticKind {
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()
             }
-            _ => format!("{}: {{}}", self.fallback_message()),
+            _ => format!("{}: {{}}", self.summary()),
         }
     }
 
     /// Render the final message.
     ///
-    /// - `None` → returns `fallback_message()`
-    /// - `Some(detail)` → returns `custom_message()` with `{}` replaced by detail
-    pub fn message(&self, msg: Option<&str>) -> String {
+    /// - `None` → returns `summary()`
+    /// - `Some(detail)` → returns `template()` with `{}` replaced by detail
+    pub fn render(&self, msg: Option<&str>) -> String {
         match msg {
-            None => self.fallback_message().to_string(),
-            Some(detail) => self.custom_message().replace("{}", detail),
+            None => self.summary().to_string(),
+            Some(detail) => self.template().replace("{}", detail),
         }
     }
 }
@@ -420,12 +422,12 @@ impl Fix {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RelatedInfo {
+pub struct Related {
     pub(crate) span: Span,
     pub(crate) message: String,
 }
 
-impl RelatedInfo {
+impl Related {
     pub fn new(source: SourceId, range: TextRange, message: impl Into<String>) -> Self {
         Self {
             span: Span::new(source, range),
@@ -435,7 +437,7 @@ impl RelatedInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DiagnosticMessage {
+pub(crate) struct Diagnostic {
     pub(crate) kind: DiagnosticKind,
     /// Which source file this diagnostic belongs to.
     pub(crate) source: SourceId,
@@ -448,19 +450,19 @@ pub(crate) struct DiagnosticMessage {
     pub(crate) suppression_range: TextRange,
     pub(crate) message: String,
     pub(crate) fix: Option<Fix>,
-    pub(crate) related: Vec<RelatedInfo>,
+    pub(crate) related: Vec<Related>,
     pub(crate) hints: Vec<String>,
 }
 
-impl DiagnosticMessage {
-    /// New message with the kind's fallback text; `DiagnosticBuilder::message` overrides it.
+impl Diagnostic {
+    /// New message with the kind's fallback text; `DiagnosticBuilder::detail` overrides it.
     pub(crate) fn new(source: SourceId, kind: DiagnosticKind, range: TextRange) -> Self {
         Self {
             kind,
             source,
             range,
             suppression_range: range,
-            message: kind.fallback_message().to_string(),
+            message: kind.summary().to_string(),
             fix: None,
             related: Vec::new(),
             hints: Vec::new(),
@@ -468,7 +470,7 @@ impl DiagnosticMessage {
     }
 
     pub(crate) fn severity(&self) -> Severity {
-        self.kind.default_severity()
+        self.kind.severity()
     }
 
     pub(crate) fn is_error(&self) -> bool {
@@ -480,7 +482,7 @@ impl DiagnosticMessage {
     }
 }
 
-impl std::fmt::Display for DiagnosticMessage {
+impl std::fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

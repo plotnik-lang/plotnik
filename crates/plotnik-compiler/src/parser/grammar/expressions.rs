@@ -13,13 +13,13 @@ enum SuffixMode {
 impl Parser<'_, '_> {
     /// Parse an expression, or emit an error if current token can't start one.
     /// Returns `true` if a valid expression was parsed, `false` on error.
-    pub(crate) fn parse_expr_or_error(&mut self) -> bool {
-        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
-            self.parse_expr();
+    pub(crate) fn parse_pattern_or_error(&mut self) -> bool {
+        if self.at_ts(EXPR_FIRST_TOKENS) {
+            self.parse_pattern();
             return true;
         }
 
-        if self.currently_is(SyntaxKind::At) {
+        if self.at(SyntaxKind::At) {
             self.error_and_bump(DiagnosticKind::CaptureWithoutTarget);
             return false;
         }
@@ -41,22 +41,22 @@ impl Parser<'_, '_> {
     /// On a non-expression token this reports `ExpectedExpression` at the current position,
     /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
     /// instead of the generic one — these are exactly the spots a tree-sitter user pastes them.
-    pub(crate) fn parse_required_expr(&mut self) {
-        self.parse_required_expr_inner(SuffixMode::Apply)
+    pub(crate) fn parse_required_pattern(&mut self) {
+        self.parse_required_pattern_inner(SuffixMode::Apply)
     }
 
-    /// Like [`Self::parse_required_expr`], but without applying a quantifier/capture suffix —
+    /// Like [`Self::parse_required_pattern`], but without applying a quantifier/capture suffix —
     /// for field values, so the suffix wraps the whole field constraint (see
-    /// [`Self::parse_expr_no_suffix`]).
-    pub(crate) fn parse_required_expr_no_suffix(&mut self) {
-        self.parse_required_expr_inner(SuffixMode::Skip)
+    /// [`Self::parse_pattern_no_suffix`]).
+    pub(crate) fn parse_required_pattern_no_suffix(&mut self) {
+        self.parse_required_pattern_inner(SuffixMode::Skip)
     }
 
-    fn parse_required_expr_inner(&mut self, suffix: SuffixMode) {
-        if self.currently_is_one_of(EXPR_FIRST_TOKENS) {
+    fn parse_required_pattern_inner(&mut self, suffix: SuffixMode) {
+        if self.at_ts(EXPR_FIRST_TOKENS) {
             match suffix {
-                SuffixMode::Apply => self.parse_expr(),
-                SuffixMode::Skip => self.parse_expr_no_suffix(),
+                SuffixMode::Apply => self.parse_pattern(),
+                SuffixMode::Skip => self.parse_pattern_no_suffix(),
             }
             return;
         }
@@ -69,8 +69,8 @@ impl Parser<'_, '_> {
         self.error(DiagnosticKind::ExpectedExpression);
     }
 
-    pub(crate) fn parse_expr(&mut self) {
-        self.parse_expr_inner(SuffixMode::Apply)
+    pub(crate) fn parse_pattern(&mut self) {
+        self.parse_pattern_inner(SuffixMode::Apply)
     }
 
     /// Parse expression without applying quantifier/capture suffix.
@@ -80,16 +80,16 @@ impl Parser<'_, '_> {
     /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field expression
     ///
     /// For captures on structured values (enums/structs), the compilation handles this
-    /// by looking through FieldExpr to determine the actual value type. See
+    /// by looking through FieldPattern to determine the actual value type. See
     /// `build_capture_effects` in compile/capture.rs.
-    pub(crate) fn parse_expr_no_suffix(&mut self) {
-        self.parse_expr_inner(SuffixMode::Skip)
+    pub(crate) fn parse_pattern_no_suffix(&mut self) {
+        self.parse_pattern_inner(SuffixMode::Skip)
     }
 
-    fn parse_expr_inner(&mut self, suffix: SuffixMode) {
+    fn parse_pattern_inner(&mut self, suffix: SuffixMode) {
         if !self.enter_recursion() {
             self.start_node(SyntaxKind::Error);
-            while !self.should_stop() {
+            while !self.is_done() {
                 self.bump();
             }
             self.finish_node();
@@ -133,7 +133,7 @@ impl Parser<'_, '_> {
 
     fn reject_anchor_suffixes(&mut self) {
         loop {
-            if self.currently_is_one_of(QUANTIFIERS) {
+            if self.at_ts(QUANTIFIERS) {
                 self.error_and_bump_with_fix(
                     DiagnosticKind::QuantifiedAnchor,
                     "remove the quantifier",

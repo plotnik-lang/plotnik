@@ -15,7 +15,7 @@ pub enum VoidType {
 #[derive(Clone, Debug)]
 pub struct Config {
     pub(crate) export: bool,
-    pub(crate) emit_node_type: bool,
+    pub(crate) emit_node_interface: bool,
     pub(crate) verbose_nodes: bool,
     pub(crate) void_type: VoidType,
     pub(crate) colors: Colors,
@@ -25,7 +25,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             export: true,
-            emit_node_type: true,
+            emit_node_interface: true,
             verbose_nodes: false,
             void_type: VoidType::default(),
             colors: Colors::OFF,
@@ -35,7 +35,7 @@ impl Default for Config {
 
 impl Config {
     /// Create a new Config with default values.
-    pub fn new() -> Self {
+    pub fn builder() -> Self {
         Self::default()
     }
 
@@ -44,8 +44,8 @@ impl Config {
         self
     }
 
-    pub fn emit_node_type(mut self, value: bool) -> Self {
-        self.emit_node_type = value;
+    pub fn emit_node_interface(mut self, value: bool) -> Self {
+        self.emit_node_interface = value;
         self
     }
 

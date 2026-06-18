@@ -7,12 +7,15 @@ mod diagnostics_tests;
 
 use rowan::TextRange;
 
-pub use json::{JsonDiagnostic, JsonFix, JsonPosition, JsonRelated, JsonSpan};
+pub use json::{
+    Diagnostic as JsonDiagnostic, Fix as JsonFix, Position as JsonPosition,
+    Related as JsonRelated, Span as JsonSpan,
+};
 pub use message::{DiagnosticKind, Severity};
 
 use printer::DiagnosticsPrinter;
 
-use message::{DiagnosticMessage, Fix, RelatedInfo};
+use message::{Diagnostic, Fix, Related};
 
 pub use crate::query::{SourceId, SourceMap};
 
@@ -31,13 +34,13 @@ impl Span {
 
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
-    messages: Vec<DiagnosticMessage>,
+    messages: Vec<Diagnostic>,
 }
 
 #[must_use = "diagnostic not emitted, call .emit()"]
 pub struct DiagnosticBuilder<'d> {
     diagnostics: &'d mut Diagnostics,
-    message: DiagnosticMessage,
+    message: Diagnostic,
 }
 
 impl Diagnostics {
@@ -47,7 +50,7 @@ impl Diagnostics {
         }
     }
 
-    /// Uses the kind's default message; call `.message()` on the builder to override.
+    /// Uses the kind's default message; call `.detail()` on the builder to override.
     pub fn report(
         &mut self,
         source: SourceId,
@@ -56,7 +59,7 @@ impl Diagnostics {
     ) -> DiagnosticBuilder<'_> {
         DiagnosticBuilder {
             diagnostics: self,
-            message: DiagnosticMessage::new(source, kind, range),
+            message: Diagnostic::new(source, kind, range),
         }
     }
 
@@ -86,9 +89,9 @@ impl Diagnostics {
     /// 1. Containment: when error A's suppression_range contains error B's display range,
     ///    and A has higher priority, suppress B (only for structural errors)
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
-    /// 3. Consequence errors (UnnamedDef) suppressed when any other error exists
+    /// 3. Consequence errors (MissingDefName) suppressed when any other error exists
     /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
-    pub(crate) fn filtered(&self) -> Vec<DiagnosticMessage> {
+    pub(crate) fn live(&self) -> Vec<Diagnostic> {
         if self.messages.is_empty() {
             return Vec::new();
         }
@@ -96,10 +99,13 @@ impl Diagnostics {
         let mut suppressed = vec![false; self.messages.len()];
 
         // Rule 3: Suppress consequence errors if any non-consequence error exists
-        let has_primary_error = self.messages.iter().any(|m| !m.kind.is_consequence_error());
-        if has_primary_error {
+        let has_root_diagnostic = self
+            .messages
+            .iter()
+            .any(|m| !m.kind.is_cascade_consequence());
+        if has_root_diagnostic {
             for (i, msg) in self.messages.iter().enumerate() {
-                if msg.kind.is_consequence_error() {
+                if msg.kind.is_cascade_consequence() {
                     suppressed[i] = true;
                 }
             }
@@ -165,37 +171,37 @@ impl Diagnostics {
 
     /// Raw access to all diagnostics (for debugging/testing).
     #[allow(dead_code)]
-    pub(crate) fn raw(&self) -> &[DiagnosticMessage] {
+    pub(crate) fn raw(&self) -> &[Diagnostic] {
         &self.messages
     }
 
-    /// Cascading errors are suppressed; see [`Self::render_unfiltered`] for raw output.
+    /// Cascading errors are suppressed; see [`Self::render_raw`] for raw output.
     pub fn render(&self, sources: &SourceMap) -> String {
-        DiagnosticsPrinter::new(self.filtered(), sources).render()
+        DiagnosticsPrinter::new(self.live(), sources).render()
     }
 
     /// Cascading errors are suppressed; `colored` controls ANSI escape codes.
     pub fn render_colored(&self, sources: &SourceMap, colored: bool) -> String {
-        DiagnosticsPrinter::new(self.filtered(), sources)
+        DiagnosticsPrinter::new(self.live(), sources)
             .colored(colored)
             .render()
     }
 
     /// Render every diagnostic including suppressed cascades; for debugging only.
-    pub fn render_unfiltered(&self, sources: &SourceMap) -> String {
+    pub fn render_raw(&self, sources: &SourceMap) -> String {
         DiagnosticsPrinter::new(self.messages.clone(), sources).render()
     }
 
     /// Cascading errors are suppressed, same as `render`.
-    pub fn to_json(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
-        self.filtered()
+    pub fn to_wire(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
+        self.live()
             .iter()
-            .map(|m| JsonDiagnostic::from_message(m, sources))
+            .map(|m| json::Diagnostic::from_diagnostic(m, sources))
             .collect()
     }
 
     pub fn render_json(&self, sources: &SourceMap) -> String {
-        serde_json::to_string(&self.to_json(sources)).expect("diagnostics serialize to JSON")
+        serde_json::to_string(&self.to_wire(sources)).expect("diagnostics serialize to JSON")
     }
 
     pub fn extend(&mut self, other: Diagnostics) {
@@ -205,9 +211,9 @@ impl Diagnostics {
 
 impl<'d> DiagnosticBuilder<'d> {
     /// Override the default message; rendered using the kind's template.
-    pub fn message(mut self, msg: impl Into<String>) -> Self {
+    pub fn detail(mut self, msg: impl Into<String>) -> Self {
         let detail = msg.into();
-        self.message.message = self.message.kind.message(Some(&detail));
+        self.message.message = self.message.kind.render(Some(&detail));
         self
     }
 
@@ -219,7 +225,7 @@ impl<'d> DiagnosticBuilder<'d> {
     ) -> Self {
         self.message
             .related
-            .push(RelatedInfo::new(source, range, msg));
+            .push(Related::new(source, range, msg));
         self
     }
 
@@ -246,7 +252,7 @@ impl<'d> DiagnosticBuilder<'d> {
     }
 
     pub fn emit(mut self) {
-        if let Some(default_hint) = self.message.kind.default_hint() {
+        if let Some(default_hint) = self.message.kind.hint() {
             self.message.hints.insert(0, default_hint.to_string());
         }
         self.diagnostics.messages.push(self.message);

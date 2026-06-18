@@ -18,7 +18,7 @@ use clap::Command;
 use super::args::*;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ShebangOptions {
+pub struct ShebangDecl {
     pub lang: Option<String>,
     pub entry: Option<String>,
 }
@@ -34,7 +34,7 @@ const CANONICAL_FORM: &str = "#!/usr/bin/env -S plotnik run -l <lang>";
 /// Returns `Ok(None)` when the line is not a shebang or doesn't invoke
 /// `plotnik`. Returns `Err` when options after the `plotnik` token are
 /// malformed — that's a loud, line-1 error by design.
-pub fn parse_shebang(source: &str) -> Result<Option<ShebangOptions>, String> {
+pub fn parse_shebang(source: &str) -> Result<Option<ShebangDecl>, String> {
     let first_line = source.lines().next().unwrap_or("");
     let Some(rest) = first_line.strip_prefix("#!") else {
         return Ok(None);
@@ -58,7 +58,7 @@ pub fn parse_shebang(source: &str) -> Result<Option<ShebangOptions>, String> {
         )
     })?;
 
-    Ok(Some(ShebangOptions {
+    Ok(Some(ShebangDecl {
         lang: matches.get_one::<String>("lang").cloned(),
         entry: matches.get_one::<String>("entry").cloned(),
     }))

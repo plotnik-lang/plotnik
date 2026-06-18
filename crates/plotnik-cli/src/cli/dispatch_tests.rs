@@ -24,7 +24,7 @@ fn dump_accepts_trace_flags() {
     );
 
     let m = result.unwrap();
-    let params = DumpParams::from_matches(&m);
+    let params = DumpOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
 }
@@ -47,7 +47,7 @@ fn dump_accepts_run_flags() {
     );
 
     let m = result.unwrap();
-    let params = DumpParams::from_matches(&m);
+    let params = DumpOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
 }
 
@@ -62,7 +62,7 @@ fn dump_accepts_source_positional() {
     );
 
     let m = result.unwrap();
-    let params = DumpParams::from_matches(&m);
+    let params = DumpOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
 }
 
@@ -96,7 +96,7 @@ fn run_accepts_trace_flags() {
     );
 
     let m = result.unwrap();
-    let params = RunParams::from_matches(&m);
+    let params = RunOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -119,7 +119,7 @@ fn trace_accepts_run_flags() {
     );
 
     let m = result.unwrap();
-    let params = TraceParams::from_matches(&m);
+    let params = TraceOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -354,7 +354,7 @@ fn run_shifts_positional_with_inline_query() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = RunParams::from_matches(&m);
+    let params = RunOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
@@ -368,7 +368,7 @@ fn run_no_shift_with_both_positionals() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = RunParams::from_matches(&m);
+    let params = RunOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -381,7 +381,7 @@ fn trace_shifts_positional_with_inline_query() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = TraceParams::from_matches(&m);
+    let params = TraceOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
@@ -409,7 +409,7 @@ fn trace_params_extracts_all_fields() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = TraceParams::from_matches(&m);
+    let params = TraceOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -440,7 +440,7 @@ fn run_params_extracts_all_fields() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = RunParams::from_matches(&m);
+    let params = RunOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -468,7 +468,7 @@ fn dump_params_extracts_only_relevant_fields() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = DumpParams::from_matches(&m);
+    let params = DumpOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.lang, Some("rust".to_string()));
@@ -494,7 +494,7 @@ fn ast_accepts_run_flags() {
     );
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -518,7 +518,7 @@ fn ast_accepts_trace_flags() {
     );
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
 }
@@ -530,7 +530,7 @@ fn ast_shifts_positional_with_inline_query() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(identifier) @id".to_string()));
@@ -544,7 +544,7 @@ fn ast_no_shift_with_both_positionals() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -602,7 +602,7 @@ fn ast_params_extracts_all_fields() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -662,7 +662,7 @@ fn ast_detects_ptk_as_query() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, None);
@@ -675,7 +675,7 @@ fn ast_detects_non_ptk_as_source() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -688,7 +688,7 @@ fn ast_no_extension_detection_with_two_positionals() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
@@ -701,7 +701,7 @@ fn ast_no_extension_detection_with_inline_query() {
     assert!(result.is_ok());
 
     let m = result.unwrap();
-    let params = AstParams::from_matches(&m);
+    let params = AstOpts::from_matches(&m);
 
     assert_eq!(params.query_path, None);
     assert_eq!(params.query_text, Some("(id) @x".to_string()));

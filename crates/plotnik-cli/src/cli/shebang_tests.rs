@@ -1,4 +1,4 @@
-use super::shebang::{ShebangOptions, parse_shebang};
+use super::shebang::{ShebangDecl, parse_shebang};
 
 #[test]
 fn no_shebang() {
@@ -56,7 +56,7 @@ fn entry_option() {
 fn bare_plotnik_declares_nothing() {
     let result = parse_shebang("#!/usr/bin/env plotnik").unwrap().unwrap();
 
-    assert_eq!(result, ShebangOptions::default());
+    assert_eq!(result, ShebangDecl::default());
 }
 
 #[test]

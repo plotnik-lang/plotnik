@@ -38,9 +38,9 @@ Q = 06 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -48,6 +48,6 @@ Q:
   07  ...  
   08  └‣─  key: _                           11, 14
   10                                        ▶
-  11   !   [Enum(M1)] (identifier) [Node Set(M0) EndEnum]  16
-  14   !   [Enum(M2)] (number) [EndEnum]    16
+  11   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose]  16
+  14   !   [EnumOpen(M2)] (number) [EnumClose]  16
   16  ─‣┘  [Set(M3)] _                      10

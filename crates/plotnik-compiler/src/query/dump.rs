@@ -6,11 +6,11 @@ mod test_helpers {
 
     impl Query {
         pub fn dump_cst(&self) -> String {
-            self.printer().raw(true).dump()
+            self.printer().cst(true).dump()
         }
 
         pub fn dump_cst_full(&self) -> String {
-            self.printer().raw(true).with_trivia(true).dump()
+            self.printer().cst(true).with_trivia(true).dump()
         }
 
         pub fn dump_ast(&self) -> String {
@@ -22,11 +22,11 @@ mod test_helpers {
         }
 
         pub fn dump_cst_with_arities(&self) -> String {
-            self.printer().raw(true).with_arities(true).dump()
+            self.printer().cst(true).with_arities(true).dump()
         }
 
         pub fn dump_symbols(&self) -> String {
-            self.printer().only_symbols(true).dump()
+            self.printer().definitions_only(true).dump()
         }
 
         pub fn dump_diagnostics(&self) -> String {
@@ -34,7 +34,7 @@ mod test_helpers {
         }
 
         pub fn dump_diagnostics_raw(&self) -> String {
-            self.diagnostics().render_unfiltered(self.source_map())
+            self.diagnostics().render_raw(self.source_map())
         }
     }
 }

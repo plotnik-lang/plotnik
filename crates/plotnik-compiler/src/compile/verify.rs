@@ -64,11 +64,11 @@ mod debug_impl {
     use std::num::NonZeroU16;
 
     use indexmap::IndexMap;
-    use plotnik_bytecode::{EffectOpcode, Nav};
-    use plotnik_core::{NodeType, Symbol};
+    use plotnik_bytecode::{EffectKind, Nav};
+    use plotnik_core::{NodeKind, Symbol};
 
     use crate::analyze::type_check::DefId;
-    use crate::bytecode::{InstructionIR, Label, MatchIR, NodeTypeIR, PredicateValueIR};
+    use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
     use crate::compile::CompileResult;
     use crate::emit::StringTableBuilder;
 
@@ -87,10 +87,6 @@ mod debug_impl {
     /// Number of paths materialized for the human-readable mismatch diagnostic.
     const DIAG_PATHS: usize = 400;
 
-    const TAG_CYCLE: u64 = 0xC1;
-    const TAG_DANGLING: u64 = 0xDA;
-    const TAG_CUT: u64 = 0xC0;
-
     /// One observable semantic effect along a path.
     ///
     /// Up navigation is recorded as [`SemanticOp::UpNav`] (mode tag, level) so that
@@ -106,11 +102,15 @@ mod debug_impl {
         Field(String),
         NegField(String),
         Predicate(u8, String),
-        Effect(EffectOpcode, Option<String>),
+        Effect(EffectKind, Option<String>),
         Call(String),
         Return,
-        /// Traversal marker (cycle back-reference, dangling label, depth cut).
-        Marker(u64),
+        /// Cycle back-reference detected during traversal.
+        CycleRef,
+        /// Label referenced but not present in the instruction list.
+        DanglingLabel,
+        /// Path cut at the depth limit.
+        DepthCut,
     }
 
     type Path = Vec<SemanticOp>;
@@ -129,13 +129,13 @@ mod debug_impl {
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum Key {
+    enum WalkRoot {
         Preamble,
         Def(DefId),
     }
 
     /// What one node contributes to the walk.
-    struct Step {
+    struct WalkStep {
         /// Effect-free epsilon: contributes no ops and is not marked visited
         /// (laser vision through pure control flow).
         see_through: bool,
@@ -145,13 +145,13 @@ mod debug_impl {
     }
 
     /// Collect the ordered ops a single match contributes.
-    fn match_ops(m: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> {
+    fn collect_match_ops(m: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
 
         // Member names aren't resolved at the IR fingerprint stage (that needs the
-        // type table); the effect opcode alone keys the fingerprint.
+        // type table); the effect kind alone keys the fingerprint.
         for e in &m.pre_effects {
-            ops.push(SemanticOp::Effect(e.opcode(), None));
+            ops.push(SemanticOp::Effect(e.kind(), None));
         }
 
         if m.nav != Nav::Epsilon {
@@ -167,30 +167,30 @@ mod debug_impl {
                 ops.push(SemanticOp::Nav(m.nav));
             }
 
-            match &m.node_type {
-                NodeTypeIR::Any => ops.push(SemanticOp::MatchAny),
-                NodeTypeIR::Named(id) => {
+            match &m.node_kind {
+                NodeKindConstraint::Any => ops.push(SemanticOp::MatchAny),
+                NodeKindConstraint::Named(id) => {
                     let name =
-                        id.and_then(|i| resolve_node_type_name(i, ctx.node_types, ctx.interner));
+                        id.and_then(|i| resolve_node_kind_name(i, ctx.target_node_kinds, ctx.interner));
                     ops.push(SemanticOp::MatchNamed(name));
                 }
-                NodeTypeIR::Anonymous(id) => {
+                NodeKindConstraint::Anonymous(id) => {
                     let name =
-                        id.and_then(|i| resolve_node_type_name(i, ctx.node_types, ctx.interner));
+                        id.and_then(|i| resolve_node_kind_name(i, ctx.target_node_kinds, ctx.interner));
                     ops.push(SemanticOp::MatchAnon(name));
                 }
             }
         }
 
         if let Some(f) = m.node_field {
-            let name = resolve_field_name(Some(f), ctx.node_fields, ctx.interner);
+            let name = resolve_field_name(Some(f), ctx.target_node_fields, ctx.interner);
             ops.push(SemanticOp::Field(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));
         }
 
         for &f in &m.neg_fields {
-            let name = resolve_field_name(NonZeroU16::new(f), ctx.node_fields, ctx.interner);
+            let name = resolve_field_name(NonZeroU16::new(f), ctx.target_node_fields, ctx.interner);
             ops.push(SemanticOp::NegField(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));
@@ -202,7 +202,7 @@ mod debug_impl {
         }
 
         for e in &m.post_effects {
-            ops.push(SemanticOp::Effect(e.opcode(), None));
+            ops.push(SemanticOp::Effect(e.kind(), None));
         }
 
         ops
@@ -224,7 +224,7 @@ mod debug_impl {
 
         while i < ops.len() {
             // An Up node is always `UpNav` immediately followed by `MatchAny`
-            // (pure navigation checks no node type). Only such pairs coalesce.
+            // (pure navigation checks no node kind). Only such pairs coalesce.
             let up_pair = match ops[i] {
                 SemanticOp::UpNav(mode, level)
                     if matches!(ops.get(i + 1), Some(SemanticOp::MatchAny)) =>
@@ -273,11 +273,11 @@ mod debug_impl {
         instr_map: &std::collections::HashMap<Label, &InstructionIR>,
         label_to_def: &std::collections::HashMap<Label, DefId>,
         ctx: &CompileCtx,
-    ) -> Step {
+    ) -> WalkStep {
         let Some(&instr) = instr_map.get(&label) else {
-            return Step {
+            return WalkStep {
                 see_through: false,
-                ops: vec![SemanticOp::Marker(TAG_DANGLING)],
+                ops: vec![SemanticOp::DanglingLabel],
                 succs: vec![],
             };
         };
@@ -285,15 +285,15 @@ mod debug_impl {
         match instr {
             InstructionIR::Match(m) => {
                 if m.is_epsilon() && m.pre_effects.is_empty() && m.post_effects.is_empty() {
-                    return Step {
+                    return WalkStep {
                         see_through: true,
                         ops: vec![],
                         succs: m.successors.clone(),
                     };
                 }
-                Step {
+                WalkStep {
                     see_through: false,
-                    ops: match_ops(m, ctx),
+                    ops: collect_match_ops(m, ctx),
                     succs: m.successors.clone(),
                 }
             }
@@ -304,18 +304,18 @@ mod debug_impl {
                     .get(&c.target)
                     .map(|def_id| format!("def#{}", def_id.as_u32()))
                     .unwrap_or_else(|| format!("label#{}", c.target.0));
-                Step {
+                WalkStep {
                     see_through: false,
                     ops: vec![SemanticOp::Call(name)],
                     succs: vec![c.next],
                 }
             }
-            InstructionIR::Return(_) => Step {
+            InstructionIR::Return(_) => WalkStep {
                 see_through: false,
                 ops: vec![SemanticOp::Return],
                 succs: vec![],
             },
-            InstructionIR::Trampoline(t) => Step {
+            InstructionIR::Trampoline(t) => WalkStep {
                 // Part of the preamble; semantically transparent but still marked
                 // visited so a (hypothetical) cycle through it terminates.
                 see_through: false,
@@ -350,37 +350,37 @@ mod debug_impl {
                 break;
             }
             if depth >= MAX_DEPTH {
-                ops.push(SemanticOp::Marker(TAG_CUT));
+                ops.push(SemanticOp::DepthCut);
                 on_path(coalesce_ups(ops));
                 count += 1;
                 truncated = true;
                 continue;
             }
             if visited.contains(&label) {
-                ops.push(SemanticOp::Marker(TAG_CYCLE));
+                ops.push(SemanticOp::CycleRef);
                 on_path(coalesce_ups(ops));
                 count += 1;
                 continue;
             }
 
-            let step = node_step(label, instr_map, label_to_def, ctx);
+            let walk_step = node_step(label, instr_map, label_to_def, ctx);
 
-            if step.see_through {
+            if walk_step.see_through {
                 // Reversed pushes so successors pop in priority order (pre-order).
-                for &succ in step.succs.iter().rev() {
+                for &succ in walk_step.succs.iter().rev() {
                     stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                 }
                 continue;
             }
 
             visited.insert(label);
-            ops.extend(step.ops);
+            ops.extend(walk_step.ops);
 
-            if step.succs.is_empty() {
+            if walk_step.succs.is_empty() {
                 on_path(coalesce_ups(ops));
                 count += 1;
             } else {
-                for &succ in step.succs.iter().rev() {
+                for &succ in walk_step.succs.iter().rev() {
                     stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                 }
             }
@@ -433,21 +433,21 @@ mod debug_impl {
     }
 
     /// The role an effect plays in value-scope nesting: it opens a scope, closes
-    /// the scope a specific opcode opened, or is scope-neutral. The match is
-    /// exhaustive on purpose — a new `EffectOpcode` cannot compile until it
+    /// the scope a specific kind opened, or is scope-neutral. The match is
+    /// exhaustive on purpose — a new `EffectKind` cannot compile until it
     /// declares its scope behaviour here.
     enum ScopeRole {
         Open,
-        Close(EffectOpcode),
+        Close(EffectKind),
     }
 
-    fn scope_role(op: EffectOpcode) -> Option<ScopeRole> {
-        use EffectOpcode::*;
+    fn scope_role(op: EffectKind) -> Option<ScopeRole> {
+        use EffectKind::*;
         let role = match op {
-            Arr | Obj | Enum | SuppressBegin => ScopeRole::Open,
-            EndArr => ScopeRole::Close(Arr),
-            EndObj => ScopeRole::Close(Obj),
-            EndEnum => ScopeRole::Close(Enum),
+            ArrayOpen | ObjectOpen | EnumOpen | SuppressBegin => ScopeRole::Open,
+            ArrayClose => ScopeRole::Close(ArrayOpen),
+            ObjectClose => ScopeRole::Close(ObjectOpen),
+            EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
             Node | Push | Set | Clear | Null => return None,
         };
@@ -459,7 +459,7 @@ mod debug_impl {
     /// open. Paths cut by a cycle/depth marker are partial, so their leftover opens
     /// are expected and not flagged.
     fn check_path_scopes(path: &Path) -> Result<(), String> {
-        let mut stack: Vec<EffectOpcode> = Vec::new();
+        let mut stack: Vec<EffectKind> = Vec::new();
         for op in path {
             let SemanticOp::Effect(opcode, _) = op else {
                 continue;
@@ -482,7 +482,10 @@ mod debug_impl {
             }
         }
 
-        let truncated = matches!(path.last(), Some(SemanticOp::Marker(_)));
+        let truncated = matches!(
+            path.last(),
+            Some(SemanticOp::CycleRef | SemanticOp::DanglingLabel | SemanticOp::DepthCut)
+        );
         if !truncated && !stack.is_empty() {
             return Err(format!("path ends with unclosed scope(s): {stack:?}"));
         }
@@ -548,15 +551,15 @@ mod debug_impl {
         Ok(())
     }
 
-    fn entries(result: &CompileResult) -> Vec<(Key, Label)> {
-        let mut v = vec![(Key::Preamble, result.preamble_entry)];
+    fn entries(result: &CompileResult) -> Vec<(WalkRoot, Label)> {
+        let mut v = vec![(WalkRoot::Preamble, result.preamble_entry)];
         for (&def_id, &label) in &result.def_entries {
-            v.push((Key::Def(def_id), label));
+            v.push((WalkRoot::Def(def_id), label));
         }
         v
     }
 
-    fn snapshot(result: &CompileResult, ctx: &CompileCtx) -> Vec<(Key, Label, Fingerprint)> {
+    fn snapshot(result: &CompileResult, ctx: &CompileCtx) -> Vec<(WalkRoot, Label, Fingerprint)> {
         entries(result)
             .into_iter()
             .map(|(key, entry)| {
@@ -590,7 +593,7 @@ mod debug_impl {
     fn verify_after_pass(
         name: &str,
         before_instrs: &[InstructionIR],
-        before: &[(Key, Label, Fingerprint)],
+        before: &[(WalkRoot, Label, Fingerprint)],
         result: &CompileResult,
         ctx: &CompileCtx,
     ) {
@@ -648,17 +651,17 @@ mod debug_impl {
         }
     }
 
-    fn resolve_node_type_name(
+    fn resolve_node_kind_name(
         id: NonZeroU16,
-        node_types: &IndexMap<NodeType<Symbol>, plotnik_core::NodeTypeId>,
+        node_kinds: &IndexMap<NodeKind<Symbol>, plotnik_core::NodeKindId>,
         interner: &plotnik_core::Interner,
     ) -> Option<String> {
-        for (node_type, type_id) in node_types {
-            if type_id.get() != id.get() {
+        for (node_kind, kind_id) in node_kinds {
+            if kind_id.get() != id.get() {
                 continue;
             }
-            let sym = match node_type {
-                NodeType::Named(sym) | NodeType::Anonymous(sym) => *sym,
+            let sym = match node_kind {
+                NodeKind::Named(sym) | NodeKind::Anonymous(sym) => *sym,
             };
             return interner.try_resolve(sym).map(|s| s.to_string());
         }

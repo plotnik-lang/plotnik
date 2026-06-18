@@ -9,10 +9,10 @@ impl Parser<'_, '_> {
     #[inline]
     pub(super) fn ensure_progress(&self) {
         assert!(
-            self.debug_fuel.get() != 0,
+            self.stall_guard.get() != 0,
             "parser is stuck: too many lookaheads"
         );
-        self.debug_fuel.set(self.debug_fuel.get() - 1);
+        self.stall_guard.set(self.stall_guard.get() - 1);
     }
 
     #[inline]

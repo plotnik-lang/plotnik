@@ -9,8 +9,8 @@ use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::emit::emit;
 
-use super::lang_resolver::merge_lang;
-use super::query_loader::load_query_source;
+use super::lang_resolver::reconcile_lang;
+use super::query_loader::load_query;
 use crate::error::CliError;
 use plotnik::language_registry::{self, Lang};
 
@@ -43,12 +43,12 @@ pub fn load_source(
 
 /// Resolve the source language.
 /// Priority: explicit `-l` (must agree with shebang) > shebang > source extension.
-pub fn resolve_lang(
+pub fn resolve_run_lang(
     explicit: Option<&str>,
     declared: Option<&str>,
     source_path: Option<&Path>,
 ) -> Result<&'static Lang, CliError> {
-    if let Some(lang) = merge_lang(explicit, declared)? {
+    if let Some(lang) = reconcile_lang(explicit, declared)? {
         return Ok(lang);
     }
 
@@ -93,7 +93,7 @@ pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypo
     }
 }
 
-fn validate(
+fn require_source_input(
     source_text: Option<&str>,
     source_path: Option<&Path>,
     lang: Option<&str>,
@@ -114,7 +114,7 @@ fn validate(
 }
 
 /// Common input parameters for run/trace commands.
-pub struct QueryInput<'a> {
+pub struct ExecRequest<'a> {
     pub query_path: Option<&'a Path>,
     pub query_text: Option<&'a str>,
     pub source_path: Option<&'a Path>,
@@ -125,17 +125,17 @@ pub struct QueryInput<'a> {
 }
 
 /// Prepared query ready for execution.
-pub struct PreparedQuery {
+pub struct ExecPlan {
     pub module: Module,
     pub entrypoint: Entrypoint,
     pub tree: tree_sitter::Tree,
     pub source_code: String,
 }
 
-pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
-    let loaded = load_query_source(input.query_path, input.query_text)?;
+pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
+    let loaded = load_query(input.query_path, input.query_text)?;
 
-    validate(
+    require_source_input(
         input.source_text,
         input.source_path,
         input.lang,
@@ -147,7 +147,7 @@ pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
     }
 
     let source_code = load_source(input.source_text, input.source_path, input.query_path)?;
-    let lang = resolve_lang(
+    let lang = resolve_run_lang(
         input.lang,
         loaded.shebang.lang.as_deref(),
         input.source_path,
@@ -174,9 +174,9 @@ pub fn prepare_query(input: QueryInput) -> Result<PreparedQuery, CliError> {
 
     let entry = input.entry.or(loaded.shebang.entry.as_deref());
     let entrypoint = resolve_entrypoint(&module, entry)?;
-    let tree = lang.parse(&source_code);
+    let tree = lang.parse_source(&source_code);
 
-    Ok(PreparedQuery {
+    Ok(ExecPlan {
         module,
         entrypoint,
         tree,

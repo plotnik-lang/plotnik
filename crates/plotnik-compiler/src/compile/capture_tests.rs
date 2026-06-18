@@ -1,7 +1,7 @@
 use super::capture::CaptureEffects;
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{EffectIR, MemberRef};
-use plotnik_bytecode::EffectOpcode;
+use plotnik_bytecode::EffectKind;
 
 #[test]
 fn nest_scope_preserves_outer_and_nests_inner() {
@@ -10,12 +10,12 @@ fn nest_scope_preserves_outer_and_nests_inner() {
     let result = outer.nest_scope(EffectIR::start_enum(), EffectIR::end_enum());
 
     assert_eq!(result.pre.len(), 2);
-    assert_eq!(result.pre[0].opcode(), EffectOpcode::Obj);
-    assert_eq!(result.pre[1].opcode(), EffectOpcode::Enum);
+    assert_eq!(result.pre[0].kind(), EffectKind::ObjectOpen);
+    assert_eq!(result.pre[1].kind(), EffectKind::EnumOpen);
 
     assert_eq!(result.post.len(), 2);
-    assert_eq!(result.post[0].opcode(), EffectOpcode::EndEnum);
-    assert_eq!(result.post[1].opcode(), EffectOpcode::EndObj);
+    assert_eq!(result.post[0].kind(), EffectKind::EnumClose);
+    assert_eq!(result.post[1].kind(), EffectKind::ObjectClose);
 }
 
 #[test]
@@ -24,13 +24,13 @@ fn with_pre_values_appends_after_scope_opens() {
 
     let result = outer.with_pre_values(vec![
         EffectIR::null(),
-        EffectIR::with_member(EffectOpcode::Set, MemberRef::new(TypeId(0), 0)),
+        EffectIR::with_member(EffectKind::Set, MemberRef::new(TypeId(0), 0)),
     ]);
 
     assert_eq!(result.pre.len(), 3);
-    assert_eq!(result.pre[0].opcode(), EffectOpcode::Obj);
-    assert_eq!(result.pre[1].opcode(), EffectOpcode::Null);
-    assert_eq!(result.pre[2].opcode(), EffectOpcode::Set);
+    assert_eq!(result.pre[0].kind(), EffectKind::ObjectOpen);
+    assert_eq!(result.pre[1].kind(), EffectKind::Null);
+    assert_eq!(result.pre[2].kind(), EffectKind::Set);
 }
 
 #[test]
@@ -39,13 +39,13 @@ fn with_post_values_prepends_before_scope_closes() {
 
     let result = outer.with_post_values(vec![
         EffectIR::node(),
-        EffectIR::with_member(EffectOpcode::Set, MemberRef::new(TypeId(0), 0)),
+        EffectIR::with_member(EffectKind::Set, MemberRef::new(TypeId(0), 0)),
     ]);
 
     assert_eq!(result.post.len(), 3);
-    assert_eq!(result.post[0].opcode(), EffectOpcode::Node);
-    assert_eq!(result.post[1].opcode(), EffectOpcode::Set);
-    assert_eq!(result.post[2].opcode(), EffectOpcode::EndObj);
+    assert_eq!(result.post[0].kind(), EffectKind::Node);
+    assert_eq!(result.post[1].kind(), EffectKind::Set);
+    assert_eq!(result.post[2].kind(), EffectKind::ObjectClose);
 }
 
 #[test]

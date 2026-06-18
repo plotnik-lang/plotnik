@@ -22,9 +22,9 @@ Test = 6 :: T0
 
 [transitions]
 _ObjWrap:
-  0  -ε-  [Obj]                             2
+  0  -ε-  [ObjectOpen]                      2
   2       Trampoline                        3
-  3  -ε-  [EndObj]                          5
+  3  -ε-  [ObjectClose]                     5
   5                                         ▶
 
 Test:

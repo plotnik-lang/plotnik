@@ -150,7 +150,7 @@ fn emit_neg_fields_chain(
     next_label: &mut u32,
 ) {
     if neg_fields.len() <= MAX_NEG_FIELDS {
-        let mut m = MatchIR::at(entry).neg_fields(neg_fields);
+        let mut m = MatchIR::terminal(entry).neg_fields(neg_fields);
         m.successors = final_succs;
         out.push(m.into());
         return;
@@ -159,7 +159,7 @@ fn emit_neg_fields_chain(
     let first_batch: Vec<_> = neg_fields.drain(..MAX_NEG_FIELDS).collect();
     let intermediate = fresh_label(next_label);
     out.push(
-        MatchIR::at(entry)
+        MatchIR::terminal(entry)
             .neg_fields(first_batch)
             .next(intermediate)
             .into(),
@@ -175,7 +175,7 @@ fn emit_effects_chain_to_succs(
     next_label: &mut u32,
 ) {
     if effects.len() <= MAX_POST_EFFECTS {
-        let mut m = MatchIR::at(entry).post_effects(effects);
+        let mut m = MatchIR::terminal(entry).post_effects(effects);
         m.successors = final_succs;
         out.push(m.into());
         return;
@@ -184,7 +184,7 @@ fn emit_effects_chain_to_succs(
     let first_batch: Vec<_> = effects.drain(..MAX_POST_EFFECTS).collect();
     let intermediate = fresh_label(next_label);
     out.push(
-        MatchIR::at(entry)
+        MatchIR::terminal(entry)
             .post_effects(first_batch)
             .next(intermediate)
             .into(),
@@ -199,13 +199,13 @@ fn emit_successors_cascade(
     next_label: &mut u32,
 ) {
     if succs.len() <= MAX_MATCH_PAYLOAD_SLOTS {
-        out.push(MatchIR::at(entry).next_many(succs).into());
+        out.push(MatchIR::terminal(entry).successors(succs).into());
         return;
     }
 
     let overflow: Vec<_> = succs.drain(MAX_MATCH_PAYLOAD_SLOTS - 1..).collect();
     let intermediate = fresh_label(next_label);
     succs.push(intermediate);
-    out.push(MatchIR::at(entry).next_many(succs).into());
+    out.push(MatchIR::terminal(entry).successors(succs).into());
     emit_successors_cascade(intermediate, overflow, out, next_label);
 }

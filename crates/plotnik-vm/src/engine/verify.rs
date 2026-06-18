@@ -5,7 +5,7 @@
 
 use plotnik_bytecode::{Module, TypeId};
 #[cfg(debug_assertions)]
-use plotnik_bytecode::{StringsView, TypeData, TypeKind, TypesView};
+use plotnik_bytecode::{StringsView, TypeDefKind, TypeKind, TypesView};
 use plotnik_core::Colors;
 
 use super::Value;
@@ -63,8 +63,8 @@ impl<'a> TypeVerifier<'a> {
             return;
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(kind) => match kind {
+        match type_def.decode() {
+            TypeDefKind::Primitive(kind) => match kind {
                 TypeKind::Void => {
                     if !matches!(value, Value::Null) {
                         self.errors.push(format_error(
@@ -84,7 +84,7 @@ impl<'a> TypeVerifier<'a> {
                 _ => unreachable!(),
             },
 
-            TypeData::Wrapper { kind, inner } => match kind {
+            TypeDefKind::Wrapper { kind, inner } => match kind {
                 TypeKind::Alias => {
                     if !matches!(value, Value::Node(_)) {
                         self.errors.push(format_error(
@@ -139,14 +139,14 @@ impl<'a> TypeVerifier<'a> {
                 _ => unreachable!(),
             },
 
-            TypeData::Composite { kind, .. } => match kind {
+            TypeDefKind::Composite { kind, .. } => match kind {
                 TypeKind::Struct => match value {
                     Value::Object(fields) => {
                         // Collect first: `members_of` borrows `self.types`, which would
                         // clash with the `&mut self` recursion inside the loop.
                         let members: Vec<_> = self.types.members_of(&type_def).collect();
                         for member in members {
-                            let field_name = self.strings.get(member.name);
+                            let field_name = self.strings.get(member.name_id);
                             let (inner_type, is_optional) =
                                 self.types.unwrap_optional(member.type_id);
 
@@ -182,16 +182,16 @@ impl<'a> TypeVerifier<'a> {
                     }
                 },
                 TypeKind::Enum => match value {
-                    Value::Tagged { tag, data } => {
+                    Value::Enum { tag, data } => {
                         let variant = self
                             .types
                             .members_of(&type_def)
-                            .find(|m| self.strings.get(m.name) == tag);
+                            .find(|m| self.strings.get(m.name_id) == tag);
 
                         match variant {
                             Some(member) => {
                                 let is_void = self.types.get(member.type_id).is_some_and(|d| {
-                                    matches!(d.classify(), TypeData::Primitive(TypeKind::Void))
+                                    matches!(d.decode(), TypeDefKind::Primitive(TypeKind::Void))
                                 });
 
                                 if is_void {
@@ -232,7 +232,7 @@ impl<'a> TypeVerifier<'a> {
                     _ => {
                         self.errors.push(format_error(
                             &self.path,
-                            &format!("type: tagged union, value: {}", value_kind_name(value)),
+                            &format!("type: enum, value: {}", value_kind_name(value)),
                         ));
                     }
                 },
@@ -249,7 +249,7 @@ fn value_kind_name(value: &Value) -> &'static str {
         Value::Node(_) => "Node",
         Value::Array(_) => "array",
         Value::Object(_) => "object",
-        Value::Tagged { .. } => "tagged union",
+        Value::Enum { .. } => "enum",
     }
 }
 

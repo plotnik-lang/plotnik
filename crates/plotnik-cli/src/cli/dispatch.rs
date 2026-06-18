@@ -1,7 +1,7 @@
 //! Dispatch logic: extract params from ArgMatches and convert to command args.
 //!
 //! This module contains:
-//! - `*Params` structs that mirror command `*Args` but are populated from clap
+//! - `*Opts` structs that mirror command `*Args` but are populated from clap
 //! - `from_matches()` extractors that pull relevant fields (ignoring hidden ones)
 //! - `Into<*Args>` impls to bridge dispatch → command handlers
 //! - Positional shifting logic for exec/trace (`-q` shifts first positional to source)
@@ -18,7 +18,7 @@ use crate::commands::infer::InferArgs;
 use crate::commands::run::RunArgs;
 use crate::commands::trace::TraceArgs;
 
-pub struct AstParams {
+pub struct AstOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
@@ -28,7 +28,7 @@ pub struct AstParams {
     pub color: ColorChoice,
 }
 
-impl AstParams {
+impl AstOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         let query_path = m.get_one::<PathBuf>("query_path").cloned();
         let query_text = m.get_one::<String>("query_text").cloned();
@@ -38,7 +38,7 @@ impl AstParams {
             shift_positional_to_source(query_text.is_some(), query_path, source_path);
 
         let (query_path, source_path) =
-            detect_file_type_by_extension(query_path, source_path, query_text.is_some());
+            classify_ast_positional(query_path, source_path, query_text.is_some());
 
         Self {
             query_path,
@@ -52,8 +52,8 @@ impl AstParams {
     }
 }
 
-impl From<AstParams> for AstArgs {
-    fn from(p: AstParams) -> Self {
+impl From<AstOpts> for AstArgs {
+    fn from(p: AstOpts) -> Self {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
@@ -66,7 +66,7 @@ impl From<AstParams> for AstArgs {
     }
 }
 
-pub struct CheckParams {
+pub struct CheckOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub lang: Option<String>,
@@ -75,7 +75,7 @@ pub struct CheckParams {
     pub color: ColorChoice,
 }
 
-impl CheckParams {
+impl CheckOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
@@ -88,8 +88,8 @@ impl CheckParams {
     }
 }
 
-impl From<CheckParams> for CheckArgs {
-    fn from(p: CheckParams) -> Self {
+impl From<CheckOpts> for CheckArgs {
+    fn from(p: CheckOpts) -> Self {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
@@ -101,7 +101,7 @@ impl From<CheckParams> for CheckArgs {
     }
 }
 
-pub struct DumpParams {
+pub struct DumpOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub lang: Option<String>,
@@ -110,7 +110,7 @@ pub struct DumpParams {
     // verbose, no_result, fuel are parsed but not extracted (unified flags)
 }
 
-impl DumpParams {
+impl DumpOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
@@ -121,8 +121,8 @@ impl DumpParams {
     }
 }
 
-impl From<DumpParams> for DumpArgs {
-    fn from(p: DumpParams) -> Self {
+impl From<DumpOpts> for DumpArgs {
+    fn from(p: DumpOpts) -> Self {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
@@ -132,7 +132,7 @@ impl From<DumpParams> for DumpArgs {
     }
 }
 
-pub struct InferParams {
+pub struct InferOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub lang: Option<String>,
@@ -145,7 +145,7 @@ pub struct InferParams {
     pub color: ColorChoice,
 }
 
-impl InferParams {
+impl InferOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
             query_path: m.get_one::<PathBuf>("query_path").cloned(),
@@ -165,8 +165,8 @@ impl InferParams {
     }
 }
 
-impl From<InferParams> for InferArgs {
-    fn from(p: InferParams) -> Self {
+impl From<InferOpts> for InferArgs {
+    fn from(p: InferOpts) -> Self {
         Self {
             query_path: p.query_path,
             query_text: p.query_text,
@@ -182,7 +182,7 @@ impl From<InferParams> for InferArgs {
     }
 }
 
-pub struct RunParams {
+pub struct RunOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
@@ -195,7 +195,7 @@ pub struct RunParams {
     // parsed but not extracted.
 }
 
-impl RunParams {
+impl RunOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         let query_path = m.get_one::<PathBuf>("query_path").cloned();
         let query_text = m.get_one::<String>("query_text").cloned();
@@ -217,8 +217,8 @@ impl RunParams {
     }
 }
 
-impl From<RunParams> for RunArgs {
-    fn from(p: RunParams) -> Self {
+impl From<RunOpts> for RunArgs {
+    fn from(p: RunOpts) -> Self {
         let pretty = !p.compact && std::io::IsTerminal::is_terminal(&std::io::stdout());
 
         Self {
@@ -234,7 +234,7 @@ impl From<RunParams> for RunArgs {
     }
 }
 
-pub struct TraceParams {
+pub struct TraceOpts {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub source_path: Option<PathBuf>,
@@ -248,7 +248,7 @@ pub struct TraceParams {
     // Note: compact, verbose_nodes are parsed but not extracted (unified flags)
 }
 
-impl TraceParams {
+impl TraceOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         let query_path = m.get_one::<PathBuf>("query_path").cloned();
         let query_text = m.get_one::<String>("query_text").cloned();
@@ -272,8 +272,8 @@ impl TraceParams {
     }
 }
 
-impl From<TraceParams> for TraceArgs {
-    fn from(p: TraceParams) -> Self {
+impl From<TraceOpts> for TraceArgs {
+    fn from(p: TraceOpts) -> Self {
         use plotnik_lib::engine::Verbosity;
 
         let verbosity = match p.verbose {
@@ -297,11 +297,11 @@ impl From<TraceParams> for TraceArgs {
     }
 }
 
-pub struct LangDumpParams {
+pub struct LangDumpOpts {
     pub lang: String,
 }
 
-impl LangDumpParams {
+impl LangDumpOpts {
     pub fn from_matches(m: &ArgMatches) -> Self {
         Self {
             lang: m
@@ -326,7 +326,7 @@ fn shift_positional_to_source(
 }
 
 // `ast` takes a single positional for either role; disambiguate by extension.
-fn detect_file_type_by_extension(
+fn classify_ast_positional(
     query_path: Option<PathBuf>,
     source_path: Option<PathBuf>,
     has_query_text: bool,

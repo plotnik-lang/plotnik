@@ -53,9 +53,9 @@ Ident      = 06 :: T1
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Ident:
@@ -73,6 +73,6 @@ Assignment:
   16  ─‣┘  [Set(M4)] _                      18
   18                                        ▶
   19                                        ▶
-  20   !   [Enum(M2)] (number) [Node Set(M1) EndEnum]  19
+  20   !   [EnumOpen(M2)] (number) [Node Set(M1) EnumClose]  19
   23  ...  
-  24   !   [Enum(M3)] (identifier) [Node Set(M0) EndEnum]  19
+  24   !   [EnumOpen(M3)] (identifier) [Node Set(M0) EnumClose]  19

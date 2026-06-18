@@ -2,14 +2,14 @@
 
 use std::cell::RefCell;
 
-use plotnik_core::NodeType;
+use plotnik_core::NodeKind;
 
 use crate::analyze::type_check::TypeId;
-use crate::bytecode::{EmitContext, InstructionIR, Label, PredicateValueIR};
+use crate::bytecode::{EmitResolvers, InstructionIR, Label, PredicateValueIR};
 use crate::compile::{CompileCtx, Compiler};
-use crate::query::LinkedQuery;
+use crate::query::GrammarBoundQuery;
 use plotnik_bytecode::{
-    Entrypoint, FieldSymbol, HEADER_SIZE, Header, NodeSymbol, SECTION_ALIGN, STEP_SIZE,
+    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, STEP_SIZE,
 };
 
 use super::EmitError;
@@ -18,11 +18,11 @@ use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
-pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
+pub fn emit(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
     let type_ctx = query.type_context();
     let interner = query.interner();
     let symbol_table = query.symbol_table();
-    let node_type_ids = query.node_type_ids();
+    let node_kind_ids = query.node_kind_ids();
     let node_field_ids = query.node_field_ids();
 
     let strings = RefCell::new(StringTableBuilder::new());
@@ -32,10 +32,10 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         type_ctx,
         symbol_table,
         strings: &strings,
-        node_types: node_type_ids,
-        node_fields: node_field_ids,
+        target_node_kinds: node_kind_ids,
+        target_node_fields: node_field_ids,
     };
-    let compile_result = Compiler::compile(&ctx).map_err(EmitError::Compile)?;
+    let compile_result = Compiler::build_ir(&ctx).map_err(EmitError::Compile)?;
 
     // Every emitted effect's member ref names a type reachable from an entrypoint
     // result, so dead-type elimination roots at those results alone. Built after
@@ -54,19 +54,19 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         return Err(EmitError::TooManyTransitions(layout.total_steps() as usize));
     }
 
-    let mut node_symbols: Vec<NodeSymbol> = Vec::new();
-    for (node_type, &node_id) in node_type_ids {
-        let sym = match node_type {
-            NodeType::Named(sym) | NodeType::Anonymous(sym) => *sym,
+    let mut node_kinds: Vec<NodeKindEntry> = Vec::new();
+    for (node_kind, &node_id) in node_kind_ids {
+        let sym = match node_kind {
+            NodeKind::Named(sym) | NodeKind::Anonymous(sym) => *sym,
         };
         let name = strings.borrow_mut().get_or_intern(sym, interner)?;
-        node_symbols.push(NodeSymbol::new(node_id.get(), name));
+        node_kinds.push(NodeKindEntry::new(node_id.get(), name));
     }
 
-    let mut field_symbols: Vec<FieldSymbol> = Vec::new();
+    let mut fields: Vec<FieldEntry> = Vec::new();
     for (&sym, &field_id) in node_field_ids {
         let name = strings.borrow_mut().get_or_intern(sym, interner)?;
-        field_symbols.push(FieldSymbol::new(field_id.get(), name));
+        fields.push(FieldEntry::new(field_id.get(), name));
     }
 
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
@@ -78,7 +78,7 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
         let target = compile_result
             .def_entries
             .get(&def_id)
-            .and_then(|label| layout.label_to_step().get(label))
+            .and_then(|label| layout.step_addrs().get(label))
             .copied()
             .expect("entrypoint must have compiled target");
 
@@ -89,11 +89,11 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
     strings.validate()?;
     types.validate()?;
-    if node_symbols.len() > u16::MAX as usize {
-        return Err(EmitError::TooManyNodeTypes(node_symbols.len()));
+    if node_kinds.len() > u16::MAX as usize {
+        return Err(EmitError::TooManyNodeKinds(node_kinds.len()));
     }
-    if field_symbols.len() > u16::MAX as usize {
-        return Err(EmitError::TooManyNodeFields(field_symbols.len()));
+    if fields.len() > u16::MAX as usize {
+        return Err(EmitError::TooManyNodeFields(fields.len()));
     }
     if entrypoints.len() > 65535 {
         return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
@@ -110,8 +110,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
     let (regex_blob, regex_table) = regexes.emit();
     let (type_defs_bytes, type_members_bytes, type_names_bytes) = types.emit();
 
-    let node_types_bytes = emit_node_symbols(&node_symbols);
-    let node_fields_bytes = emit_field_symbols(&field_symbols);
+    let node_types_bytes = emit_node_kinds(&node_kinds);
+    let node_fields_bytes = emit_fields(&fields);
     let entrypoints_bytes = emit_entrypoints(&entrypoints);
 
     // Section order matches the binary format:
@@ -137,8 +137,8 @@ pub fn emit(query: &LinkedQuery) -> Result<Vec<u8>, EmitError> {
 
     let mut header = Header {
         str_table_count: strings.len() as u16,
-        node_types_count: node_symbols.len() as u16,
-        node_fields_count: field_symbols.len() as u16,
+        node_types_count: node_kinds.len() as u16,
+        node_fields_count: fields.len() as u16,
         regex_table_count: regexes.len() as u16,
         type_defs_count: types.type_defs_count() as u16,
         type_members_count: types.type_members_count() as u16,
@@ -179,7 +179,7 @@ fn pad_to_section(buf: &mut Vec<u8>) {
 
 fn emit_transitions(
     instructions: &[crate::bytecode::InstructionIR],
-    layout: &crate::bytecode::LayoutResult,
+    layout: &crate::bytecode::LayoutMap,
     types: &TypeTableBuilder,
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
@@ -187,19 +187,19 @@ fn emit_transitions(
 
     // Member index resolvers: struct fields and enum variants both resolve via
     // parent_type + relative_index (get_member_base); regex predicates index the
-    // RegexTable. Bundled into EmitContext so resolution signatures stay flat.
+    // RegexTable. Bundled into EmitResolvers so resolution signatures stay flat.
     let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
-    let lookup_regex = |string_id: plotnik_bytecode::StringId| regexes.get(string_id);
-    let ctx = EmitContext::new(&get_member_base, &lookup_regex);
+    let lookup_regex = |string_id: plotnik_bytecode::StringId| regexes.lookup(string_id);
+    let ctx = EmitResolvers::new(&get_member_base, &lookup_regex);
 
     for instr in instructions {
         let label = instr.label();
-        let Some(&step_id) = layout.label_to_step().get(&label) else {
+        let Some(&step_id) = layout.step_addrs().get(&label) else {
             continue;
         };
 
         let offset = step_id as usize * STEP_SIZE;
-        let resolved = instr.resolve(layout.label_to_step(), &ctx)?;
+        let resolved = instr.resolve(layout.step_addrs(), &ctx)?;
 
         let end = offset + resolved.len();
         if end <= bytes.len() {
@@ -232,20 +232,20 @@ fn emit_section(output: &mut Vec<u8>, data: &[u8]) {
     output.extend_from_slice(data);
 }
 
-fn emit_node_symbols(symbols: &[NodeSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * NodeSymbol::SIZE);
+fn emit_node_kinds(symbols: &[NodeKindEntry]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(symbols.len() * NodeKindEntry::SIZE);
     for sym in symbols {
-        bytes.extend_from_slice(&sym.id.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.get().to_le_bytes());
+        bytes.extend_from_slice(&sym.symbol.to_le_bytes());
+        bytes.extend_from_slice(&sym.name.as_u16().to_le_bytes());
     }
     bytes
 }
 
-fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * FieldSymbol::SIZE);
+fn emit_fields(symbols: &[FieldEntry]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(symbols.len() * FieldEntry::SIZE);
     for sym in symbols {
-        bytes.extend_from_slice(&sym.id.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.get().to_le_bytes());
+        bytes.extend_from_slice(&sym.symbol.to_le_bytes());
+        bytes.extend_from_slice(&sym.name.as_u16().to_le_bytes());
     }
     bytes
 }
@@ -253,7 +253,7 @@ fn emit_field_symbols(symbols: &[FieldSymbol]) -> Vec<u8> {
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
     for ep in entrypoints {
-        bytes.extend_from_slice(&ep.name().get().to_le_bytes());
+        bytes.extend_from_slice(&ep.name().as_u16().to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
         bytes.extend_from_slice(&ep.result_type().0.to_le_bytes());
         bytes.extend_from_slice(&0u16.to_le_bytes()); // _pad is always 0

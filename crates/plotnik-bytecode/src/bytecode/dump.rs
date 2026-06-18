@@ -15,8 +15,8 @@ use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
 use super::nav::Nav;
-use super::node_type_ir::NodeTypeIR;
-use super::type_meta::{TypeData, TypeKind};
+use super::node_kind_constraint::NodeKindConstraint;
+use super::type_meta::{TypeDefKind, TypeKind};
 use super::{Call, Match, Return, Trampoline};
 use crate::type_system::TYPE_CUSTOM_START;
 
@@ -40,8 +40,8 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 struct DumpContext {
     /// Maps step ID to entrypoint name for labeling.
     step_labels: BTreeMap<u16, String>,
-    /// Maps node type ID to name.
-    node_type_names: BTreeMap<u16, String>,
+    /// Maps node kind ID to name.
+    node_kind_names: BTreeMap<u16, String>,
     /// Maps node field ID to name.
     node_field_names: BTreeMap<u16, String>,
     /// All strings (for predicate values, regex patterns, etc).
@@ -77,21 +77,21 @@ impl DumpContext {
             step_labels.insert(ep.target(), name);
         }
 
-        let mut node_type_names = BTreeMap::new();
+        let mut node_kind_names = BTreeMap::new();
         for i in 0..node_types.len() {
             let t = node_types.get(i);
-            node_type_names.insert(t.id, strings.get(t.name).to_string());
+            node_kind_names.insert(t.symbol, strings.get(t.name).to_string());
         }
 
         let mut node_field_names = BTreeMap::new();
         for i in 0..node_fields.len() {
             let f = node_fields.get(i);
-            node_field_names.insert(f.id, strings.get(f.name).to_string());
+            node_field_names.insert(f.symbol, strings.get(f.name).to_string());
         }
 
         let str_count = header.str_table_count as usize;
         let all_strings: Vec<String> = (0..str_count)
-            .map(|i| strings.get_by_index(i).to_string())
+            .map(|i| strings.at(i).to_string())
             .collect();
 
         let types = module.types();
@@ -105,7 +105,7 @@ impl DumpContext {
 
         Self {
             step_labels,
-            node_type_names,
+            node_kind_names,
             node_field_names,
             all_strings,
             str_width,
@@ -118,11 +118,11 @@ impl DumpContext {
     }
 
     fn label_for(&self, step: StepId) -> Option<&str> {
-        self.step_labels.get(&step.get()).map(|s| s.as_str())
+        self.step_labels.get(&step.as_u16()).map(|s| s.as_str())
     }
 
-    fn node_type_name(&self, id: u16) -> Option<&str> {
-        self.node_type_names.get(&id).map(|s| s.as_str())
+    fn node_kind_name(&self, id: u16) -> Option<&str> {
+        self.node_kind_names.get(&id).map(|s| s.as_str())
     }
 
     fn node_field_name(&self, id: u16) -> Option<&str> {
@@ -138,7 +138,7 @@ fn dump_strings(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[strings]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 0..count {
-        let s = strings.get_by_index(i);
+        let s = strings.at(i);
         writeln!(out, "S{i:0w$} {}{s:?}{}", c.green, c.reset)
             .expect("writing to a String is infallible");
     }
@@ -158,8 +158,8 @@ fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[regex]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 1..count {
-        let string_id = regexes.get_string_id(i);
-        let pattern = &ctx.all_strings[string_id.get() as usize];
+        let string_id = regexes.pattern_string_id(i);
+        let pattern = &ctx.all_strings[string_id.as_u16() as usize];
         writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset)
             .expect("writing to a String is infallible");
     }
@@ -177,10 +177,10 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     // All types are now in type_defs, including builtins
     for i in 0..types.defs_count() {
-        let def = types.get_def(i);
+        let def = types.def(i);
 
-        let (formatted, comment) = match def.classify() {
-            TypeData::Primitive(kind) => {
+        let (formatted, comment) = match def.decode() {
+            TypeDefKind::Primitive(kind) => {
                 let name = match kind {
                     TypeKind::Void => "<Void>",
                     TypeKind::Node => "<Node>",
@@ -188,7 +188,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 };
                 (name.to_string(), String::new())
             }
-            TypeData::Wrapper { kind, inner } => {
+            TypeDefKind::Wrapper { kind, inner } => {
                 let formatted = match kind {
                     TypeKind::Optional => format!("Optional(T{:0tw$})", inner.0),
                     TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", inner.0),
@@ -214,7 +214,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 };
                 (formatted, comment)
             }
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind,
                 member_start,
                 member_count,
@@ -230,14 +230,14 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                     TypeKind::Struct => {
                         let fields: Vec<_> = types
                             .members_of(&def)
-                            .map(|m| strings.get(m.name).to_string())
+                            .map(|m| strings.get(m.name_id).to_string())
                             .collect();
                         format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset)
                     }
                     TypeKind::Enum => {
                         let variants: Vec<_> = types
                             .members_of(&def)
-                            .map(|m| strings.get(m.name).to_string())
+                            .map(|m| strings.get(m.name_id).to_string())
                             .collect();
                         format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
                     }
@@ -265,12 +265,12 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
         .expect("writing to a String is infallible");
     for i in 0..types.members_count() {
         let member = types.get_member(i);
-        let name = strings.get(member.name);
+        let name = strings.get(member.name_id);
         let type_name = format_type_name(member.type_id, module, ctx);
         writeln!(
             out,
             "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
-            member.name.0, member.type_id.0, c.dim, c.reset
+            member.name_id.0, member.type_id.0, c.dim, c.reset
         )
         .expect("writing to a String is infallible");
     }
@@ -288,11 +288,11 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "{}[type_names]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
-        let name = strings.get(entry.name);
+        let name = strings.get(entry.name_id);
         writeln!(
             out,
             "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
-            entry.name.0, entry.type_id.0, c.dim, c.blue, c.reset
+            entry.name_id.0, entry.type_id.0, c.dim, c.blue, c.reset
         )
         .expect("writing to a String is infallible");
     }
@@ -305,7 +305,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     let strings = module.strings();
 
     if let Some(def) = types.get(type_id)
-        && let TypeData::Primitive(kind) = def.classify()
+        && let TypeDefKind::Primitive(kind) = def.decode()
         && let Some(name) = kind.primitive_name()
     {
         return format!("<{}>", name);
@@ -314,7 +314,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     for i in 0..types.names_count() {
         let entry = types.get_name(i);
         if entry.type_id == type_id {
-            return strings.get(entry.name).to_string();
+            return strings.get(entry.name_id).to_string();
         }
     }
 
@@ -359,13 +359,13 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
 /// Check if an instruction is padding (all-zeros Match8).
 ///
 /// Padding slots contain zero bytes which decode as terminal epsilon Match8
-/// with Any node type, no field constraint, and next=0.
+/// with Any node kind, no field constraint, and next=0.
 fn is_padding(instr: &Instruction) -> bool {
     match instr {
         Instruction::Match(m) => {
             m.is_match8()
                 && m.nav == Nav::Epsilon
-                && matches!(m.node_type, NodeTypeIR::Any)
+                && matches!(m.node_kind, NodeKindConstraint::Any)
                 && m.node_field.is_none()
                 && m.is_terminal()
         }
@@ -488,8 +488,8 @@ impl DumpFormatter<'_> {
             if let Some((op, is_regex, value_ref)) = m.predicate() {
                 let op = PredicateOp::from_byte(op);
                 let value = if is_regex {
-                    let string_id = self.module.regexes().get_string_id(value_ref as usize);
-                    let pattern = &ctx.all_strings[string_id.get() as usize];
+                    let string_id = self.module.regexes().pattern_string_id(value_ref as usize);
+                    let pattern = &ctx.all_strings[string_id.as_u16() as usize];
                     format!("/{}/", pattern)
                 } else {
                     let s = &ctx.all_strings[value_ref as usize];
@@ -521,29 +521,29 @@ impl DumpFormatter<'_> {
             result.push_str(": ");
         }
 
-        match m.node_type {
-            NodeTypeIR::Any => {
+        match m.node_kind {
+            NodeKindConstraint::Any => {
                 result.push('_');
             }
-            NodeTypeIR::Named(None) => {
+            NodeKindConstraint::Named(None) => {
                 result.push_str("(_)");
             }
-            NodeTypeIR::Named(Some(type_id)) => {
+            NodeKindConstraint::Named(Some(type_id)) => {
                 let name = ctx
-                    .node_type_name(type_id.get())
+                    .node_kind_name(type_id.get())
                     .map(String::from)
                     .unwrap_or_else(|| format!("node#{}", type_id.get()));
                 result.push('(');
                 result.push_str(&name);
                 result.push(')');
             }
-            NodeTypeIR::Anonymous(None) => {
+            NodeKindConstraint::Anonymous(None) => {
                 // future syntax: anonymous wildcard has no concrete form yet
                 result.push_str("\"_\"");
             }
-            NodeTypeIR::Anonymous(Some(type_id)) => {
+            NodeKindConstraint::Anonymous(Some(type_id)) => {
                 let name = ctx
-                    .node_type_name(type_id.get())
+                    .node_kind_name(type_id.get())
                     .map(String::from)
                     .unwrap_or_else(|| format!("anon#{}", type_id.get()));
                 result.push('"');
@@ -594,8 +594,8 @@ impl DumpFormatter<'_> {
         // Format as "target : return" with numeric IDs
         let successors = format!(
             "{:0w$} : {:0w$}",
-            call.target.get(),
-            call.next.get(),
+            call.target.as_u16(),
+            call.next.as_u16(),
             w = self.step_width
         );
 
@@ -623,7 +623,7 @@ impl DumpFormatter<'_> {
             sw = self.step_width
         );
         let content = "Trampoline";
-        let successors = format!("{:0w$}", t.next.get(), w = self.step_width);
+        let successors = format!("{:0w$}", t.next.as_u16(), w = self.step_width);
         let base = format!("{prefix}{content}");
         builder.pad_successors(base, &successors)
     }
@@ -633,7 +633,7 @@ impl DumpFormatter<'_> {
         if let Some(label) = self.ctx.label_for(step) {
             format!("▶({}{}{})", c.blue, label, c.reset)
         } else {
-            format!("{:0w$}", step.get(), w = self.step_width)
+            format!("{:0w$}", step.as_u16(), w = self.step_width)
         }
     }
 }

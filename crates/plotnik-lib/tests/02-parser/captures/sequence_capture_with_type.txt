@@ -28,7 +28,7 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @seq :: MySequence
+    CapturedPattern @seq :: MySequence
       Seq
         NamedNode a
         NamedNode b

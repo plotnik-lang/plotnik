@@ -135,9 +135,9 @@ Value = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Value:
@@ -145,10 +145,10 @@ Value:
   07  ...
   08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11   !   [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11   !   [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
   14  ─‣┘  _                                10
   15  ...
-  16   !   [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  16   !   [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
   19  ─‣─  _                                11, 16, 19
 ```
 
@@ -167,8 +167,8 @@ Value:
 
 ```
 _ObjWrap:
-  00  -ε-  [Obj]                            02
-       ⬥   Obj
+  00  -ε-  [ObjectOpen]                     02
+       ⬥   ObjectOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -180,13 +180,13 @@ Value:
   08       _                                11, 16, 19
       └‣─  number
        ●   number 42
-  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
        !   number
        ●   number 42
-       ⬥   Enum "Num"
+       ⬥   EnumOpen "Num"
        ⬥   Node
        ⬥   Set "n"
-       ⬥   EndEnum
+       ⬥   EnumClose
   14       _                                10
       ─‣┘  document
        ●   document 42
@@ -194,8 +194,8 @@ Value:
 
 _ObjWrap:
   --------------------------------------------
-  03  -ε-  [EndObj]                         05
-       ⬥   EndObj
+  03  -ε-  [ObjectClose]                    05
+       ⬥   ObjectClose
   05   ◀   _ObjWrap                         ◼
 ```
 
@@ -216,8 +216,8 @@ First branch (`Num`) matches — checkpoints at steps 16 and 19 are never used.
 
 ```
 _ObjWrap:
-  00  -ε-  [Obj]                            02
-       ⬥   Obj
+  00  -ε-  [ObjectOpen]                     02
+       ⬥   ObjectOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -229,18 +229,18 @@ Value:
   08       _                                11, 16, 19
       └‣─  string
        ●   string "hello"
-  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
        !   string
        ○   string "hello"
   08  ❮❮❮
   --------------------------------------------
-  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
        !   string
        ●   string "hello"
-       ⬥   Enum "Str"
+       ⬥   EnumOpen "Str"
        ⬥   Node
        ⬥   Set "s"
-       ⬥   EndEnum
+       ⬥   EnumClose
   --------------------------------------------
   14       _                                10
       ─‣┘  document
@@ -249,14 +249,14 @@ Value:
 
 _ObjWrap:
   --------------------------------------------
-  03  -ε-  [EndObj]                         05
-       ⬥   EndObj
+  03  -ε-  [ObjectClose]                    05
+       ⬥   ObjectClose
   05   ◀   _ObjWrap                         ◼
 ```
 
 ### Execution Summary
 
-1. **00→02**: Preamble starts, emit `Obj`
+1. **00→02**: Preamble starts, emit `ObjectOpen`
 2. **02→Value**: `Trampoline` dispatches to entrypoint
 3. **06→08**: Match `(document)` succeeds
 4. **08**: Search document children, create checkpoints for `Str` (16) and retry (19), try `Num` (11) first
@@ -264,7 +264,7 @@ _ObjWrap:
 6. **08 ❮❮❮**: Backtrack to the `Str` checkpoint
 7. **16**: Try `Str` branch at the same child — match (`●`)
 8. **14→10**: Navigate up, return from `Value`
-9. **03→05**: Preamble cleanup, emit `EndObj`, accept (`◼`)
+9. **03→05**: Preamble cleanup, emit `ObjectClose`, accept (`◼`)
 
 ---
 
@@ -281,8 +281,8 @@ _ObjWrap:
 
 ```
 _ObjWrap:
-  00  -ε-  [Obj]                            02
-       ⬥   Obj
+  00  -ε-  [ObjectOpen]                     02
+       ⬥   ObjectOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -294,12 +294,12 @@ Value:
   08       _                                11, 16, 19
       └‣─  true
        ●   true true
-  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
        !   true
        ○   true true
   08  ❮❮❮
   --------------------------------------------
-  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
        !   true
        ○   true true
   08  ❮❮❮
@@ -317,7 +317,7 @@ Same as Trace 2 but with default verbosity (no `-v` flag). Navigation and effect
 
 ```
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Value)
 
@@ -326,17 +326,17 @@ Value:
        ●   document
   08       _                                11, 16, 19
        ●   string
-  11       [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
        ○   string
   08  ❮❮❮
-  16       [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
        ●   string
   14       _                                10
        ●   document
   10   ◀   (Value)
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ```
 
@@ -368,7 +368,7 @@ Hidden:
 | `  ○  ` | `○   kind`          | `○   string`                 |
 | `  ⬥  ` | `⬥   Effect`        | `⬥   Node`                   |
 | `  ⬥  ` | `⬥   Set "field"`   | `⬥   Set "target"`           |
-| `  ⬥  ` | `⬥   Enum "var"`    | `⬥   Enum "Literal"`         |
+| `  ⬥  ` | `⬥   EnumOpen "var"` | `⬥   EnumOpen "Literal"`    |
 | `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`          |
 | `  ⬥  ` | `⬥   SuppressEnd`   | `⬥   SuppressEnd`            |
 | `  ⬦  ` | `⬦   Effect`        | `⬦   Node` (suppressed)      |
@@ -400,21 +400,21 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 
 ## Effects
 
-| Effect         | Description                    |
-| -------------- | ------------------------------ |
-| Node           | Capture matched node           |
-| Set "field"    | Assign to struct field         |
-| Enum "variant" | Start tagged union variant     |
-| EndEnum        | End tagged union variant       |
-| Arr            | Start array                    |
-| Push           | Push to array                  |
-| EndArr         | End array                      |
-| Obj            | Start object                   |
-| EndObj         | End object                     |
-| Null           | Null value                     |
-| Clear          | Clear pending value            |
-| SuppressBegin  | Enter suppression scope (`@_`) |
-| SuppressEnd    | Exit suppression scope         |
+| Effect              | Description                    |
+| ------------------- | ------------------------------ |
+| Node                | Capture matched node           |
+| Set "field"         | Assign to struct field         |
+| EnumOpen "variant"  | Start enum variant             |
+| EnumClose           | End enum variant               |
+| ArrayOpen           | Start array                    |
+| Push                | Push to array                  |
+| ArrayClose          | End array                      |
+| ObjectOpen          | Start object                   |
+| ObjectClose         | End object                     |
+| Null                | Null value                     |
+| Clear               | Clear pending value            |
+| SuppressBegin       | Enter suppression scope (`@_`) |
+| SuppressEnd         | Exit suppression scope         |
 
 ## Command Options
 

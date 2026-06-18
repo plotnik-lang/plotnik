@@ -16,5 +16,5 @@ Root
 # query.ptk
 Root
   Def Q
-    QuantifiedExpr *
+    QuantifiedPattern *
       NamedNode value

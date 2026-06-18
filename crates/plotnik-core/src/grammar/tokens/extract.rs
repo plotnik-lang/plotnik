@@ -5,8 +5,8 @@ use thiserror::Error;
 
 use super::super::{
     prepared::{
-        ExternalToken, ExtractedLexicalGrammar, ExtractedSyntaxGrammar, ReservedWordContext,
-        ResolvedGrammar, Variable, VariableType,
+        ExternalToken, ExtractedLexicalGrammar, ExtractedSyntaxGrammar, ReservedWordSet,
+        InternedGrammar, Variable, VariableType,
     },
     rules::{MetadataParams, Rule, Symbol, SymbolType},
 };
@@ -60,7 +60,7 @@ impl std::fmt::Display for NonTerminalWordTokenError {
 }
 
 pub(in crate::grammar) fn extract_tokens(
-    mut grammar: ResolvedGrammar,
+    mut grammar: InternedGrammar,
 ) -> ExtractTokensResult<(ExtractedSyntaxGrammar, ExtractedLexicalGrammar)> {
     let mut extractor = TokenExtractor {
         current_variable_name: String::new(),
@@ -196,7 +196,7 @@ pub(in crate::grammar) fn extract_tokens(
                 Err(ExtractTokensError::NonTokenReservedWord(token_name))?;
             }
         }
-        reserved_word_contexts.push(ReservedWordContext {
+        reserved_word_contexts.push(ReservedWordSet {
             name: reserved_word_context.name,
             reserved_words,
         });

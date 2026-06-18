@@ -13,7 +13,7 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
-        if self.currently_is(SyntaxKind::Id) {
+        if self.at(SyntaxKind::Id) {
             let span = self.current_span();
             let text = self.current_text();
             self.bump();
@@ -43,8 +43,8 @@ impl Parser<'_, '_> {
 
         self.bump();
 
-        // `currently_is` skips trivia, so this handles `@x : Type` with space
-        if self.currently_is(SyntaxKind::Id) {
+        // `at` skips trivia, so this handles `@x : Type` with space
+        if self.at(SyntaxKind::Id) {
             self.bump();
         }
 
@@ -57,7 +57,7 @@ impl Parser<'_, '_> {
     pub(crate) fn parse_negated_field(&mut self) {
         self.start_node(SyntaxKind::NegatedField);
 
-        if self.currently_is(SyntaxKind::Negation) {
+        if self.at(SyntaxKind::Negation) {
             let span = self.current_span();
             self.error_with_fix(
                 DiagnosticKind::NegationSyntaxDeprecated,
@@ -70,7 +70,7 @@ impl Parser<'_, '_> {
             self.expect(SyntaxKind::Minus, "'-' for negated field");
         }
 
-        if !self.currently_is(SyntaxKind::Id) {
+        if !self.at(SyntaxKind::Id) {
             self.error(DiagnosticKind::ExpectedFieldName);
             self.finish_node();
             return;
@@ -83,8 +83,8 @@ impl Parser<'_, '_> {
         self.finish_node();
     }
 
-    /// Disambiguate `field: expr` from bare identifier via LL(2) lookahead.
-    /// Also handles `field = expr` typo (should be `field: expr`).
+    /// Disambiguate `field: pattern` from bare identifier via LL(2) lookahead.
+    /// Also handles `field = pattern` typo (should be `field: pattern`).
     pub(crate) fn parse_tree_or_field(&mut self) {
         if self.next_is(SyntaxKind::Colon) {
             self.parse_field();
@@ -104,13 +104,13 @@ impl Parser<'_, '_> {
             .report(self.source_id, DiagnosticKind::BareIdentifier, span)
             .fix("wrap in parentheses", format!("({})", text));
         if starts_uppercase(text) {
-            report = report.message("references must be parenthesized");
+            report = report.detail("references must be parenthesized");
         }
         report.emit();
         self.bump_as_error();
     }
 
-    /// Field constraint: `field_name: expr`
+    /// Field constraint: `field_name: pattern`
     pub(crate) fn parse_field(&mut self) {
         self.start_node(SyntaxKind::Field);
 
@@ -125,12 +125,12 @@ impl Parser<'_, '_> {
             "':' to separate field name from its value",
         );
 
-        self.parse_required_expr_no_suffix();
+        self.parse_required_pattern_no_suffix();
 
         self.finish_node();
     }
 
-    /// Handle `field = expr` typo - parse as Field but emit error.
+    /// Handle `field = pattern` typo - parse as Field but emit error.
     pub(crate) fn parse_field_equals_typo(&mut self) {
         self.start_node(SyntaxKind::Field);
 
@@ -139,13 +139,13 @@ impl Parser<'_, '_> {
         self.error_with_fix(DiagnosticKind::InvalidFieldEquals, span, "use `:`", ":");
         self.bump();
 
-        self.parse_required_expr_no_suffix();
+        self.parse_required_pattern_no_suffix();
 
         self.finish_node();
     }
 
     pub(crate) fn try_parse_quantifier(&mut self, checkpoint: Checkpoint) {
-        if self.currently_is_one_of(QUANTIFIERS) {
+        if self.at_ts(QUANTIFIERS) {
             self.start_node_at(checkpoint, SyntaxKind::Quantifier);
             self.bump();
             self.finish_node();
@@ -153,8 +153,8 @@ impl Parser<'_, '_> {
     }
 
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
-        let is_capture = self.currently_is(SyntaxKind::CaptureToken);
-        let is_suppressive = self.currently_is(SyntaxKind::SuppressiveCapture);
+        let is_capture = self.at(SyntaxKind::CaptureToken);
+        let is_suppressive = self.at(SyntaxKind::SuppressiveCapture);
 
         if !is_capture && !is_suppressive {
             return;
@@ -174,9 +174,9 @@ impl Parser<'_, '_> {
 
         // Type annotation only on regular captures
         if is_capture {
-            if self.currently_is(SyntaxKind::DoubleColon) {
+            if self.at(SyntaxKind::DoubleColon) {
                 self.parse_type_annotation();
-            } else if self.currently_is(SyntaxKind::Colon) {
+            } else if self.at(SyntaxKind::Colon) {
                 self.parse_type_annotation_single_colon();
             }
         }

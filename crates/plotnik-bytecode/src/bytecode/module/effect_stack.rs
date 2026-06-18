@@ -2,8 +2,8 @@
 //!
 //! The runtime `ValueMaterializer` is a stack machine over the flat effect
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
-//! builder stack — `Push`/`EndArr` want an `Array` on top, `Set` an `Object` or
-//! `Tagged`, `EndObj` an `Object`, `EndEnum` a `Tagged`
+//! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` an `Object` or
+//! `Enum`, `ObjectClose` an `Object`, `EnumClose` an `Enum`
 //! (`crates/plotnik-vm/src/engine/materializer.rs`) — and the VM's `emit_effect`
 //! panics if a `SuppressEnd` underflows the suppression counter
 //! (`crates/plotnik-vm/src/engine/vm.rs`). On compiler output these are
@@ -45,24 +45,24 @@
 use std::collections::HashMap;
 
 use super::{Instruction, Module, ModuleError};
-use crate::bytecode::effects::EffectOpcode;
+use crate::bytecode::effects::EffectKind;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
-/// scalar, but the walk starts at the always-`Obj` preamble, so only these three
+/// scalar, but the walk starts at the always-`ObjectOpen` preamble, so only these three
 /// ever reach the abstract stack.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Kind {
+enum FrameKind {
     Array,
     Object,
-    Tagged,
+    Enum,
 }
 
-impl Kind {
+impl FrameKind {
     fn bit(self) -> u8 {
         match self {
-            Kind::Array => KS_ARRAY,
-            Kind::Object => KS_OBJECT,
-            Kind::Tagged => KS_TAGGED,
+            FrameKind::Array => KS_ARRAY,
+            FrameKind::Object => KS_OBJECT,
+            FrameKind::Enum => KS_ENUM,
         }
     }
 }
@@ -70,14 +70,14 @@ impl Kind {
 // `entry_tos` is a set of tolerated caller-top kinds, a 3-bit mask.
 const KS_ARRAY: u8 = 0b001;
 const KS_OBJECT: u8 = 0b010;
-const KS_TAGGED: u8 = 0b100;
+const KS_ENUM: u8 = 0b100;
 /// No constraint (every kind tolerated): the body never reads its caller's top.
-const KS_ANY: u8 = KS_ARRAY | KS_OBJECT | KS_TAGGED;
-/// `Set` targets — an `Object` or a `Tagged` frame.
-const KS_SET: u8 = KS_OBJECT | KS_TAGGED;
+const KS_ANY: u8 = KS_ARRAY | KS_OBJECT | KS_ENUM;
+/// `Set` targets — an `Object` or an `Enum` frame.
+const KS_SET: u8 = KS_OBJECT | KS_ENUM;
 
 /// Summaries keyed by definition-entry step. The value is the `entry_tos` mask.
-type Summaries = HashMap<u16, u8>;
+type DefSummaries = HashMap<u16, u8>;
 
 /// Verify that no path can drive the materializer or the suppression counter
 /// into a panic. Assumes [`Module::validate_transitions`] has already run, so
@@ -90,7 +90,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         push_unique(&mut defs, entrypoints.get(i).target());
     }
 
-    let mut summaries: Summaries = defs.iter().map(|&d| (d, KS_ANY)).collect();
+    let mut summaries: DefSummaries = defs.iter().map(|&d| (d, KS_ANY)).collect();
 
     // Monotone fixpoint: `entry_tos` only ever shrinks (intersection), and the
     // definition set only grows, both within finite bounds, so this terminates.
@@ -127,13 +127,13 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     }
 
     // ...and the preamble per entrypoint. The shared preamble (step 0) opens the
-    // root `Obj`, trampolines into the entrypoint body, then closes it; binding
+    // root `ObjectOpen`, trampolines into the entrypoint body, then closes it; binding
     // the trampoline to this entrypoint's target checks that the body tolerates
     // the `Object` the preamble hands it.
     //
     // The preamble has no caller. A residual constraint on *its* entry means some
     // effect read below the frames the preamble itself opened — with the root
-    // `Obj` intact, every entry read lands on that `Object` and nothing bubbles,
+    // `ObjectOpen` intact, every entry read lands on that `Object` and nothing bubbles,
     // so a non-`KS_ANY` result is a forged preamble that fails to provide the
     // frame. At runtime such a read would hit the materializer's result-type root
     // frame, whose kind is attacker-controlled, and panic. Reject it instead of
@@ -161,14 +161,14 @@ struct Analysis {
 
 /// Per-step abstract state at instruction entry: the builder frames pushed so
 /// far (relative to this body's entry) and the suppression depth.
-type State = (Vec<Kind>, i32);
+type FrameState = (Vec<FrameKind>, i32);
 
 /// Walk one body (a definition entry, or the preamble when `trampoline` is set),
 /// computing its `entry_tos` and verifying its structural invariants. When
 /// `final_check` is set, also verify each call site against `summaries`.
 fn analyze(
     module: &Module,
-    summaries: &Summaries,
+    summaries: &DefSummaries,
     entry: u16,
     trampoline: Option<u16>,
     final_check: bool,
@@ -179,8 +179,8 @@ fn analyze(
     // with a different state is a confluence/back-edge disagreement (forged or
     // not loop-invariant) and is rejected. This bounds the walk to one state per
     // step, so it terminates.
-    let mut memo: HashMap<u16, State> = HashMap::new();
-    let mut work: Vec<(u16, Vec<Kind>, i32)> = vec![(entry, Vec::new(), 0)];
+    let mut memo: HashMap<u16, FrameState> = HashMap::new();
+    let mut work: Vec<(u16, Vec<FrameKind>, i32)> = vec![(entry, Vec::new(), 0)];
 
     while let Some((step, stack, suppress)) = work.pop() {
         if let Some((seen_stack, seen_suppress)) = memo.get(&step) {
@@ -200,7 +200,7 @@ fn analyze(
             }
             Instruction::Match(m) => {
                 for eff in m.pre_effects().chain(m.post_effects()) {
-                    apply_effect(eff.opcode, &mut stack, &mut suppress, &mut entry_tos, step)?;
+                    apply_effect(eff.kind, &mut stack, &mut suppress, &mut entry_tos, step)?;
                 }
                 if m.succ_count() == 0 {
                     // A successor-less match accepts (unwinds to the top); the
@@ -208,12 +208,12 @@ fn analyze(
                     require_neutral(&stack, suppress, step)?;
                 } else {
                     for succ in m.successors() {
-                        work.push((succ.get(), stack.clone(), suppress));
+                        work.push((succ.as_u16(), stack.clone(), suppress));
                     }
                 }
             }
             Instruction::Call(c) => {
-                let target = c.target().get();
+                let target = c.target().as_u16();
                 discovered.push(target);
                 apply_call(
                     summaries,
@@ -224,7 +224,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((c.next().get(), stack, suppress));
+                work.push((c.next().as_u16(), stack, suppress));
             }
             Instruction::Trampoline(t) => {
                 // The trampoline's callee is the entrypoint bound by the caller;
@@ -240,7 +240,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((t.next().get(), stack, suppress));
+                work.push((t.next().as_u16(), stack, suppress));
             }
         }
     }
@@ -255,13 +255,13 @@ fn analyze(
 /// `entry_tos` when a read happens with no own frame on top, and rejects a
 /// frame-kind mismatch, a pop below entry, or a suppression underflow.
 fn apply_effect(
-    op: EffectOpcode,
-    stack: &mut Vec<Kind>,
+    op: EffectKind,
+    stack: &mut Vec<FrameKind>,
     suppress: &mut i32,
     entry_tos: &mut u8,
     step: u16,
 ) -> Result<(), ModuleError> {
-    use EffectOpcode::*;
+    use EffectKind::*;
 
     // Suppression brackets act regardless of depth; everything else is dropped
     // by the VM while suppressed and so must not touch the builder stack here.
@@ -281,29 +281,29 @@ fn apply_effect(
         // At depth 0 a `SuppressEnd` would drive the counter negative — the
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
-        Arr => stack.push(Kind::Array),
-        Obj => stack.push(Kind::Object),
-        Enum => stack.push(Kind::Tagged),
+        ArrayOpen => stack.push(FrameKind::Array),
+        ObjectOpen => stack.push(FrameKind::Object),
+        EnumOpen => stack.push(FrameKind::Enum),
         Push => match stack.last() {
-            Some(Kind::Array) => {}
+            Some(FrameKind::Array) => {}
             Some(_) => return Err(err()),
             None => *entry_tos &= KS_ARRAY,
         },
         Set => match stack.last() {
-            Some(Kind::Object | Kind::Tagged) => {}
-            Some(Kind::Array) => return Err(err()),
+            Some(FrameKind::Object | FrameKind::Enum) => {}
+            Some(FrameKind::Array) => return Err(err()),
             None => *entry_tos &= KS_SET,
         },
-        EndArr => match stack.pop() {
-            Some(Kind::Array) => {}
+        ArrayClose => match stack.pop() {
+            Some(FrameKind::Array) => {}
             _ => return Err(err()),
         },
-        EndObj => match stack.pop() {
-            Some(Kind::Object) => {}
+        ObjectClose => match stack.pop() {
+            Some(FrameKind::Object) => {}
             _ => return Err(err()),
         },
-        EndEnum => match stack.pop() {
-            Some(Kind::Tagged) => {}
+        EnumClose => match stack.pop() {
+            Some(FrameKind::Enum) => {}
             _ => return Err(err()),
         },
     }
@@ -315,9 +315,9 @@ fn apply_effect(
 /// frame on top, check it against the callee's `entry_tos`; with none, the read
 /// reaches this body's caller, so propagate the constraint up.
 fn apply_call(
-    summaries: &Summaries,
+    summaries: &DefSummaries,
     target: u16,
-    stack: &[Kind],
+    stack: &[FrameKind],
     suppress: i32,
     entry_tos: &mut u8,
     final_check: bool,
@@ -342,7 +342,7 @@ fn apply_call(
 
 /// A body must close every frame it opens and balance every suppression bracket
 /// before it returns; otherwise it pops a caller frame or leaks suppression.
-fn require_neutral(stack: &[Kind], suppress: i32, step: u16) -> Result<(), ModuleError> {
+fn require_neutral(stack: &[FrameKind], suppress: i32, step: u16) -> Result<(), ModuleError> {
     if stack.is_empty() && suppress == 0 {
         Ok(())
     } else {

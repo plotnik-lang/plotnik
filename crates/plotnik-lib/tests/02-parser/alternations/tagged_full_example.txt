@@ -83,19 +83,19 @@ Root
   Def Expression
     Alt
       Branch Ident:
-        CapturedExpr @name :: Foo
+        CapturedPattern @name :: Foo
           NamedNode identifier
       Branch Num:
-        CapturedExpr @value :: Foo
+        CapturedPattern @value :: Foo
           NamedNode number
       Branch Str:
-        CapturedExpr @value :: Foo
+        CapturedPattern @value :: Foo
           NamedNode string
       Branch Binary:
         NamedNode binary_expression
-          CapturedExpr @left
-            FieldExpr left:
+          CapturedPattern @left
+            FieldPattern left:
               Ref Expression
-          CapturedExpr @right
-            FieldExpr right:
+          CapturedPattern @right
+            FieldPattern right:
               Ref Expression

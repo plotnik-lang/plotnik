@@ -8,8 +8,8 @@ fn header_size() {
 #[test]
 fn header_default() {
     let h = Header::default();
-    assert!(h.validate_magic());
-    assert!(h.validate_version());
+    assert!(h.has_valid_magic());
+    assert!(h.is_supported_version());
     assert_eq!(h.total_size, 0);
 }
 

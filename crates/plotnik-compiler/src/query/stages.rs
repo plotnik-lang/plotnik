@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use indexmap::IndexMap;
 
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
@@ -11,7 +11,7 @@ use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{
-    PredicateInput, ValidateInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
+    PredicateInput, ValidationInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
     validate_predicates,
 };
 use crate::analyze::{dependencies, validate_recursion};
@@ -20,8 +20,8 @@ use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, 
 pub type AstMap = IndexMap<SourceId, Root>;
 
 pub struct QueryConfig {
-    pub query_parse_fuel: u32,
-    pub query_parse_max_depth: u32,
+    pub parse_fuel: u32,
+    pub parse_max_depth: u32,
 }
 
 pub struct QueryBuilder {
@@ -32,25 +32,25 @@ pub struct QueryBuilder {
 impl QueryBuilder {
     pub fn new(source_map: SourceMap) -> Self {
         let config = QueryConfig {
-            query_parse_fuel: DEFAULT_FUEL,
-            query_parse_max_depth: DEFAULT_MAX_DEPTH,
+            parse_fuel: DEFAULT_FUEL,
+            parse_max_depth: DEFAULT_MAX_DEPTH,
         };
 
         Self { source_map, config }
     }
 
-    pub fn one_liner(src: &str) -> Self {
-        let source_map = SourceMap::one_liner(src);
+    pub fn from_inline(src: &str) -> Self {
+        let source_map = SourceMap::from_inline(src);
         Self::new(source_map)
     }
 
-    pub fn with_query_parse_fuel(mut self, fuel: u32) -> Self {
-        self.config.query_parse_fuel = fuel;
+    pub fn with_parse_fuel(mut self, fuel: u32) -> Self {
+        self.config.parse_fuel = fuel;
         self
     }
 
-    pub fn with_query_parse_recursion_limit(mut self, limit: u32) -> Self {
-        self.config.query_parse_max_depth = limit;
+    pub fn with_parse_max_depth(mut self, limit: u32) -> Self {
+        self.config.parse_max_depth = limit;
         self
     }
 
@@ -67,24 +67,24 @@ impl QueryBuilder {
                 tokens,
                 &mut diag,
                 ParseConfig {
-                    fuel: self.config.query_parse_fuel,
-                    max_depth: self.config.query_parse_max_depth,
+                    fuel: self.config.parse_fuel,
+                    max_depth: self.config.parse_max_depth,
                 },
             );
 
             let res = parser.parse()?;
 
-            validate_alt_kinds(ValidateInput {
+            validate_alt_kinds(ValidationInput {
                 source_id: source.id,
                 ast: res.ast(),
                 diag: &mut diag,
             });
-            validate_anchors(ValidateInput {
+            validate_anchors(ValidationInput {
                 source_id: source.id,
                 ast: res.ast(),
                 diag: &mut diag,
             });
-            validate_empty_constructs(ValidateInput {
+            validate_empty_constructs(ValidationInput {
                 source_id: source.id,
                 ast: res.ast(),
                 diag: &mut diag,
@@ -117,13 +117,13 @@ pub struct QueryParsed {
 }
 
 impl QueryParsed {
-    pub fn query_parser_fuel_consumed(&self) -> u32 {
+    pub fn fuel_consumed(&self) -> u32 {
         self.fuel_consumed
     }
 }
 
 impl QueryParsed {
-    pub fn analyze(mut self) -> QueryAnalyzed {
+    pub fn analyze(mut self) -> Query {
         let mut interner = Interner::new();
 
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
@@ -144,8 +144,8 @@ impl QueryParsed {
             &mut self.diag,
         );
 
-        QueryAnalyzed {
-            query_parsed: self,
+        Query {
+            parsed: self,
             interner,
             symbol_table,
             type_context,
@@ -160,30 +160,28 @@ impl QueryParsed {
         self.diag.clone()
     }
 
-    pub fn asts(&self) -> &AstMap {
+    pub fn ast_map(&self) -> &AstMap {
         &self.ast_map
     }
 }
 
-pub type Query = QueryAnalyzed;
-
-pub struct QueryAnalyzed {
-    query_parsed: QueryParsed,
+pub struct Query {
+    parsed: QueryParsed,
     interner: Interner,
     symbol_table: SymbolTable,
     type_context: TypeContext,
 }
 
-impl QueryAnalyzed {
+impl Query {
     pub fn is_valid(&self) -> bool {
         !self.diag.has_errors()
     }
 
-    pub fn get_arity(&self, node: &SyntaxNode) -> Option<Arity> {
+    pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
         use crate::parser::ast;
 
-        if let Some(expr) = ast::Expr::cast(node.clone()) {
-            return self.type_context.get_arity(&expr);
+        if let Some(pattern) = ast::Pattern::cast(node.clone()) {
+            return self.type_context.arity(&pattern);
         }
 
         if let Some(root) = ast::Root::cast(node.clone()) {
@@ -195,11 +193,11 @@ impl QueryAnalyzed {
         }
 
         if let Some(def) = ast::Def::cast(node.clone()) {
-            return def.body().and_then(|b| self.type_context.get_arity(&b));
+            return def.body().and_then(|b| self.type_context.arity(&b));
         }
 
         if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch.body().and_then(|b| self.type_context.get_arity(&b));
+            return branch.body().and_then(|b| self.type_context.arity(&b));
         }
 
         None
@@ -217,65 +215,65 @@ impl QueryAnalyzed {
         &self.interner
     }
 
-    pub fn link(mut self, grammar: &Grammar) -> LinkedQuery {
-        let mut output = link::LinkOutput::default();
+    pub fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
+        let mut output = link::GrammarBinding::default();
 
-        link::LinkCtx {
+        link::GrammarLinkCtx {
             interner: &mut self.interner,
             grammar,
-            source_map: &self.query_parsed.source_map,
-            ast_map: &self.query_parsed.ast_map,
+            source_map: &self.parsed.source_map,
+            ast_map: &self.parsed.ast_map,
             symbol_table: &self.symbol_table,
         }
-        .link(&mut output, &mut self.query_parsed.diag);
+        .link(&mut output, &mut self.parsed.diag);
 
-        LinkedQuery {
-            inner: self,
-            linking: output,
+        GrammarBoundQuery {
+            analyzed: self,
+            grammar: output,
         }
     }
 }
 
-impl Deref for QueryAnalyzed {
+impl Deref for Query {
     type Target = QueryParsed;
 
     fn deref(&self) -> &Self::Target {
-        &self.query_parsed
+        &self.parsed
     }
 }
 
-impl DerefMut for QueryAnalyzed {
+impl DerefMut for Query {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.query_parsed
+        &mut self.parsed
     }
 }
 
-impl TryFrom<&str> for QueryAnalyzed {
+impl TryFrom<&str> for Query {
     type Error = crate::Error;
 
     fn try_from(src: &str) -> crate::Result<Self> {
-        Ok(QueryBuilder::new(SourceMap::one_liner(src))
+        Ok(QueryBuilder::new(SourceMap::from_inline(src))
             .parse()?
             .analyze())
     }
 }
 
-pub struct LinkedQuery {
-    inner: QueryAnalyzed,
-    linking: link::LinkOutput,
+pub struct GrammarBoundQuery {
+    analyzed: Query,
+    grammar: link::GrammarBinding,
 }
 
-impl LinkedQuery {
+impl GrammarBoundQuery {
     pub fn interner(&self) -> &Interner {
-        &self.inner.interner
+        &self.analyzed.interner
     }
 
-    pub fn node_type_ids(&self) -> &IndexMap<NodeType<Symbol>, NodeTypeId> {
-        self.linking.node_type_ids()
+    pub fn node_kind_ids(&self) -> &IndexMap<NodeKind<Symbol>, NodeKindId> {
+        self.grammar.node_kind_ids()
     }
 
     pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
-        self.linking.node_field_ids()
+        self.grammar.node_field_ids()
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
@@ -287,16 +285,16 @@ impl LinkedQuery {
     }
 }
 
-impl Deref for LinkedQuery {
-    type Target = QueryAnalyzed;
+impl Deref for GrammarBoundQuery {
+    type Target = Query;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.analyzed
     }
 }
 
-impl DerefMut for LinkedQuery {
+impl DerefMut for GrammarBoundQuery {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.analyzed
     }
 }

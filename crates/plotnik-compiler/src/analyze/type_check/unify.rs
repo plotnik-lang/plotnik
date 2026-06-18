@@ -1,19 +1,19 @@
 //! Unification logic for alternation branches.
 //!
-//! Handles merging TypeFlow from different branches of untagged alternations.
-//! Tagged alternations don't unify — they produce Enum types directly.
+//! Handles merging TypeFlow from different branches of union alternations.
+//! Enum alternations don't unify — they produce Enum types directly.
 
 use std::collections::BTreeMap;
 
 use super::context::TypeContext;
-use super::symbol::Symbol;
+use super::def_id::Symbol;
 use super::types::{FieldInfo, TYPE_VOID, TypeFlow, TypeId, TypeShape};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
 pub enum UnifyError {
-    /// Scalar type appeared in untagged alternation (needs tagging)
-    ScalarInUntagged,
+    /// Scalar type appeared in union alternation (needs a label)
+    ScalarInUnion,
     /// Capture has incompatible types across branches
     IncompatibleTypes { field: Symbol },
     /// Capture has incompatible struct shapes across branches
@@ -25,7 +25,7 @@ pub enum UnifyError {
 impl UnifyError {
     pub fn field_symbol(&self) -> Option<Symbol> {
         match self {
-            UnifyError::ScalarInUntagged => None,
+            UnifyError::ScalarInUnion => None,
             UnifyError::IncompatibleTypes { field }
             | UnifyError::IncompatibleStructs { field }
             | UnifyError::IncompatibleArrayElements { field } => Some(*field),
@@ -49,35 +49,35 @@ pub fn unify_flows(
 ///
 /// Rules:
 /// - Void ∪ Void → Void
-/// - Void ∪ Bubble(s) → Bubble(make_all_optional(s))
-/// - Bubble(a) ∪ Bubble(b) → Bubble(merge_fields(a, b))
-/// - Scalar in untagged → Error
+/// - Void ∪ Fields(s) → Fields(make_all_optional(s))
+/// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
+/// - Scalar in union → Error
 pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
-    // Untagged alternations cannot contain scalars.
+    // Union alternations cannot contain scalars.
     if matches!(a, TypeFlow::Scalar(_)) || matches!(b, TypeFlow::Scalar(_)) {
-        return Err(UnifyError::ScalarInUntagged);
+        return Err(UnifyError::ScalarInUnion);
     }
 
     match (a, b) {
         (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
 
-        // Void ∪ Bubble -> Bubble (every field is absent in the Void branch)
-        (TypeFlow::Void, TypeFlow::Bubble(id)) | (TypeFlow::Bubble(id), TypeFlow::Void) => {
+        // Void ∪ Fields -> Fields (every field is absent in the Void branch)
+        (TypeFlow::Void, TypeFlow::Fields(id)) | (TypeFlow::Fields(id), TypeFlow::Void) => {
             let fields = ctx.expect_struct_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
-            Ok(TypeFlow::Bubble(ctx.intern_struct(relaxed)))
+            Ok(TypeFlow::Fields(ctx.intern_struct(relaxed)))
         }
 
-        (TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)) => {
+        (TypeFlow::Fields(a_id), TypeFlow::Fields(b_id)) => {
             let a_fields = ctx.expect_struct_fields(a_id).clone();
             let b_fields = ctx.expect_struct_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
-            Ok(TypeFlow::Bubble(ctx.intern_struct(merged)))
+            Ok(TypeFlow::Fields(ctx.intern_struct(merged)))
         }
 
         // The scalar guard above (`matches!(a|b, Scalar)`) already returns Err.
-        // Every remaining TypeFlow variant (Void, Bubble) is matched explicitly above.
+        // Every remaining TypeFlow variant (Void, Fields) is matched explicitly above.
         _ => unreachable!("unify_flow: unexpected TypeFlow variant after scalar guard"),
     }
 }
@@ -93,7 +93,7 @@ pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<Typ
 /// which keeps inference in lockstep with what the emitter writes.
 fn relax_for_absence(ctx: &mut TypeContext, info: FieldInfo) -> FieldInfo {
     if !info.optional
-        && let Some(TypeShape::Array { element, .. }) = ctx.get_type(info.type_id)
+        && let Some(TypeShape::Array { element, .. }) = ctx.type_shape(info.type_id)
     {
         let element = *element;
         let array = ctx.intern_type(TypeShape::Array {

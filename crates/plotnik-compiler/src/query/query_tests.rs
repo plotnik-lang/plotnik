@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use crate::SourceMap;
 
-use super::{LinkedQuery, QueryAnalyzed, QueryBuilder};
+use super::{GrammarBoundQuery, Query, QueryBuilder};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -31,10 +31,10 @@ macro_rules! expect_invalid {
     }};
 }
 
-impl QueryAnalyzed {
+impl Query {
     #[track_caller]
     fn parse_and_validate(src: &str) -> Self {
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
         if !query.is_valid() {
             panic!(
@@ -50,7 +50,7 @@ impl QueryAnalyzed {
     #[track_caller]
     fn parse_syntax_only(src: &str) -> Self {
         use crate::diagnostics::DiagnosticKind::*;
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
         let diag = query.diagnostics();
         let has_parse_error = diag.raw().iter().any(|d| {
@@ -89,7 +89,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect(src: &str) -> Self {
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         QueryBuilder::new(source_map).parse().unwrap().analyze()
     }
 
@@ -130,7 +130,7 @@ impl QueryAnalyzed {
     }
 
     #[track_caller]
-    pub fn expect_valid_linking(src: &str) -> LinkedQuery {
+    pub fn expect_valid_linking(src: &str) -> GrammarBoundQuery {
         let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(
@@ -162,7 +162,7 @@ impl QueryAnalyzed {
 
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::load(&bytecode).expect("module loading should succeed");
-        crate::typegen::typescript::emit(&module)
+        crate::typegen::typescript::emit(&module, crate::typegen::typescript::Config::default())
     }
 
     #[track_caller]
@@ -193,7 +193,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_invalid(src: &str) -> String {
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
         if query.is_valid() {
             panic!("Expected invalid query, got valid:\n{}", query.dump_cst());
@@ -203,7 +203,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_warning(src: &str) -> String {
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
 
         if !query.is_valid() {
@@ -222,7 +222,7 @@ impl QueryAnalyzed {
 
     #[track_caller]
     pub fn expect_cst_with_warnings(src: &str) -> String {
-        let source_map = SourceMap::one_liner(src);
+        let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
 
         if !query.is_valid() {

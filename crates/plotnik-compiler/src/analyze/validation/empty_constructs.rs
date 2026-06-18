@@ -2,14 +2,14 @@
 //!
 //! Bans empty trees `()`, empty sequences `{}`, and empty alternations `[]`.
 
-use super::ValidateInput;
+use super::ValidationInput;
 use crate::analyze::Reporter;
-use crate::analyze::visitor::{Visitor, walk_alt_expr, walk_named_node, walk_seq_expr};
+use crate::analyze::visitor::{Visitor, walk_alt_pattern, walk_node_pattern, walk_seq_pattern};
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{AltExpr, NamedNode, SeqExpr};
+use crate::parser::{AltPattern, NodePattern, SeqPattern};
 
-pub fn validate_empty_constructs(input: ValidateInput) {
-    let ValidateInput {
+pub fn validate_empty_constructs(input: ValidationInput) {
+    let ValidationInput {
         source_id,
         ast,
         diag,
@@ -25,32 +25,32 @@ struct EmptyConstructsValidator<'a> {
 }
 
 impl Visitor for EmptyConstructsValidator<'_> {
-    fn visit_named_node(&mut self, node: &NamedNode) {
+    fn visit_node_pattern(&mut self, node: &NodePattern) {
         // Check for truly empty tree: no child nodes at all in CST (only tokens like parens)
         // This excludes invalid content like predicates which create Error nodes
-        if node.as_cst().children().next().is_none() && node.node_type().is_none() {
+        if node.syntax().children().next().is_none() && node.kind_token().is_none() {
             self.reporter
                 .report(DiagnosticKind::EmptyTree, node.text_range())
                 .emit();
         }
-        walk_named_node(self, node);
+        walk_node_pattern(self, node);
     }
 
-    fn visit_seq_expr(&mut self, seq: &SeqExpr) {
+    fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
         if seq.children().next().is_none() {
             self.reporter
                 .report(DiagnosticKind::EmptySequence, seq.text_range())
                 .emit();
         }
-        walk_seq_expr(self, seq);
+        walk_seq_pattern(self, seq);
     }
 
-    fn visit_alt_expr(&mut self, alt: &AltExpr) {
+    fn visit_alt_pattern(&mut self, alt: &AltPattern) {
         if alt.branches().next().is_none() {
             self.reporter
                 .report(DiagnosticKind::EmptyAlternation, alt.text_range())
                 .emit();
         }
-        walk_alt_expr(self, alt);
+        walk_alt_pattern(self, alt);
     }
 }

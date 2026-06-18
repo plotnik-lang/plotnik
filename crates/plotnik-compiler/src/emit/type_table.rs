@@ -8,7 +8,7 @@ use plotnik_core::Interner;
 
 use crate::analyze::type_check::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeContext, TypeId, TypeShape};
 use plotnik_bytecode::{
-    TypeData, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeName,
+    TypeDefKind, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry,
 };
 
 use super::{EmitError, StringTableBuilder};
@@ -23,7 +23,7 @@ pub struct TypeTableBuilder {
     /// Type members for structs/enums (4 bytes each).
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
-    type_names: Vec<TypeName>,
+    type_names: Vec<TypeNameEntry>,
     /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
     optional_wrappers: HashMap<BytecodeTypeId, BytecodeTypeId>,
 }
@@ -42,7 +42,7 @@ impl TypeTableBuilder {
     /// Build the type table, remapping query TypeIds to bytecode ids.
     ///
     /// Only types reachable from an entrypoint result are emitted. Dead
-    /// intermediate types produced during inference — an untagged alternation's
+    /// intermediate types produced during inference — a union alternation's
     /// per-branch merge structs, for instance — are pruned. Used builtins are
     /// emitted first, then custom types in definition order, depth-first.
     pub fn build(
@@ -59,7 +59,7 @@ impl TypeTableBuilder {
         for (_def_id, type_id) in type_ctx.iter_def_types() {
             collector.collect(type_id, type_ctx);
 
-            if !matches!(type_ctx.get_type(type_id), Some(TypeShape::Ref(_))) {
+            if !matches!(type_ctx.type_shape(type_id), Some(TypeShape::Ref(_))) {
                 continue;
             }
 
@@ -72,23 +72,23 @@ impl TypeTableBuilder {
         let ordered_types = collector.out;
 
         // Determine which builtins are actually used by scanning all types
-        let mut usage = BuiltinUsage::new();
+        let mut usage = BuiltinUses::new();
         for &type_id in &ordered_types {
             usage.collect(type_id, type_ctx);
         }
         // Also check entrypoint result types directly
         for (_def_id, type_id) in type_ctx.iter_def_types() {
             if type_id == TYPE_VOID {
-                usage.void = true;
+                usage.uses_void = true;
             } else if type_id == TYPE_NODE {
-                usage.node = true;
+                usage.uses_node = true;
             }
         }
 
         // Phase 1: Emit used builtins first (in order: Void, Node)
         let builtin_types = [
-            (TYPE_VOID, TypeKind::Void, usage.void),
-            (TYPE_NODE, TypeKind::Node, usage.node),
+            (TYPE_VOID, TypeKind::Void, usage.uses_void),
+            (TYPE_NODE, TypeKind::Node, usage.uses_node),
         ];
         for &(builtin_id, kind, used) in &builtin_types {
             if used {
@@ -107,8 +107,8 @@ impl TypeTableBuilder {
 
         // Phase 3: Fill in custom type definitions
         // We need to calculate slot index as offset from where custom types start
-        let builtin_count = usage.void as usize + usage.node as usize;
-        let mut ctx = EmitCtx {
+        let builtin_count = usage.uses_void as usize + usage.uses_node as usize;
+        let mut ctx = TypeEmitSlots {
             type_ctx,
             interner,
             strings,
@@ -116,7 +116,7 @@ impl TypeTableBuilder {
         for (i, &type_id) in ordered_types.iter().enumerate() {
             let slot_index = builtin_count + i;
             let type_shape = type_ctx
-                .get_type(type_id)
+                .type_shape(type_id)
                 .expect("collected type must exist");
             self.emit_type_at_slot(slot_index, type_shape, &mut ctx)?;
         }
@@ -129,10 +129,10 @@ impl TypeTableBuilder {
                 .get(&type_id)
                 .copied()
                 .expect("def result type must be mapped");
-            self.type_names.push(TypeName::new(name, bc_type_id));
+            self.type_names.push(TypeNameEntry::new(name, bc_type_id));
         }
 
-        // Collect TypeName entries for explicit type annotations on struct captures,
+        // Collect TypeNameEntry entries for explicit type annotations on struct captures,
         // e.g. `{(fn) @fn} @outer :: FunctionInfo` names the struct "FunctionInfo".
         // A name only attaches to a non-suppressive capture's struct/enum, so the
         // type is reachable from a def result and must survive dead-type elimination;
@@ -144,7 +144,7 @@ impl TypeTableBuilder {
                 .copied()
                 .expect("named type annotation must survive dead-type elimination");
             let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
-            self.type_names.push(TypeName::new(name, bc_type_id));
+            self.type_names.push(TypeNameEntry::new(name, bc_type_id));
         }
 
         Ok(())
@@ -154,7 +154,7 @@ impl TypeTableBuilder {
         &mut self,
         slot_index: usize,
         type_shape: &TypeShape,
-        ctx: &mut EmitCtx,
+        ctx: &mut TypeEmitSlots,
     ) -> Result<(), EmitError> {
         match type_shape {
             TypeShape::Void | TypeShape::Node => {
@@ -166,11 +166,11 @@ impl TypeTableBuilder {
                 let bc_type_id = BytecodeTypeId(slot_index as u16);
 
                 let name = ctx.strings.get_or_intern(*sym, ctx.interner)?;
-                self.type_names.push(TypeName::new(name, bc_type_id));
+                self.type_names.push(TypeNameEntry::new(name, bc_type_id));
 
                 // Custom types alias Node - look up Node's actual bytecode ID.
                 // Reaching a Custom type means it was in `ordered_types`, so
-                // `BuiltinUsage::collect` marked Node used (type_table.rs: `Custom(_) =>
+                // `BuiltinUses::collect` marked Node used (type_table.rs: `Custom(_) =>
                 // usage.node = true`) and Phase 1 emitted it into `mapping`.
                 let node_bc_id =
                     self.mapping.get(&TYPE_NODE).copied().expect(
@@ -213,7 +213,7 @@ impl TypeTableBuilder {
 
                 let member_count = u8::try_from(fields.len())
                     .map_err(|_| EmitError::TooManyFields(fields.len()))?;
-                self.type_defs[slot_index] = TypeDef::struct_type(member_start, member_count);
+                self.type_defs[slot_index] = TypeDef::for_struct(member_start, member_count);
                 Ok(())
             }
 
@@ -234,14 +234,14 @@ impl TypeTableBuilder {
 
                 let member_count = u8::try_from(variants.len())
                     .map_err(|_| EmitError::TooManyVariants(variants.len()))?;
-                self.type_defs[slot_index] = TypeDef::enum_type(member_start, member_count);
+                self.type_defs[slot_index] = TypeDef::for_enum(member_start, member_count);
                 Ok(())
             }
 
             TypeShape::Ref(def_id) => {
                 let target = ctx
                     .type_ctx
-                    .get_def_type(*def_id)
+                    .def_type(*def_id)
                     .expect("alias def target must exist");
                 self.type_defs[slot_index] =
                     TypeDef::alias(self.resolve_type(target, ctx.type_ctx)?);
@@ -269,12 +269,12 @@ impl TypeTableBuilder {
     }
 
     fn resolve_underlying_type_id(&self, type_id: TypeId, type_ctx: &TypeContext) -> TypeId {
-        let Some(TypeShape::Ref(def_id)) = type_ctx.get_type(type_id) else {
+        let Some(TypeShape::Ref(def_id)) = type_ctx.type_shape(type_id) else {
             return type_id;
         };
 
         let target = type_ctx
-            .get_def_type(*def_id)
+            .def_type(*def_id)
             .expect("ref target def type must exist");
         self.resolve_underlying_type_id(target, type_ctx)
     }
@@ -318,7 +318,7 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    pub fn get(&self, type_id: TypeId) -> Option<BytecodeTypeId> {
+    pub fn lookup(&self, type_id: TypeId) -> Option<BytecodeTypeId> {
         self.mapping.get(&type_id).copied()
     }
 
@@ -329,8 +329,8 @@ impl TypeTableBuilder {
     pub fn get_member_base(&self, type_id: TypeId) -> Option<u16> {
         let bc_type_id = self.mapping.get(&type_id)?;
         let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
-        match type_def.classify() {
-            TypeData::Composite { member_start, .. } => Some(member_start),
+        match type_def.decode() {
+            TypeDefKind::Composite { member_start, .. } => Some(member_start),
             _ => None,
         }
     }
@@ -347,7 +347,7 @@ impl TypeTableBuilder {
             members_bytes.extend_from_slice(&member.to_bytes());
         }
 
-        let mut names_bytes = Vec::with_capacity(self.type_names.len() * TypeName::SIZE);
+        let mut names_bytes = Vec::with_capacity(self.type_names.len() * TypeNameEntry::SIZE);
         for type_name in &self.type_names {
             names_bytes.extend_from_slice(&type_name.to_bytes());
         }
@@ -377,7 +377,7 @@ impl Default for TypeTableBuilder {
     }
 }
 
-struct EmitCtx<'a> {
+struct TypeEmitSlots<'a> {
     type_ctx: &'a TypeContext,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
@@ -404,12 +404,12 @@ impl TypeCollector {
             return;
         }
 
-        let Some(type_shape) = type_ctx.get_type(type_id) else {
+        let Some(type_shape) = type_ctx.type_shape(type_id) else {
             return;
         };
 
         if let TypeShape::Ref(def_id) = type_shape {
-            if let Some(target_id) = type_ctx.get_def_type(*def_id) {
+            if let Some(target_id) = type_ctx.def_type(*def_id) {
                 self.collect(target_id, type_ctx);
             }
             return;
@@ -447,17 +447,17 @@ impl TypeCollector {
     }
 }
 
-struct BuiltinUsage {
-    void: bool,
-    node: bool,
+struct BuiltinUses {
+    uses_void: bool,
+    uses_node: bool,
     seen: HashSet<TypeId>,
 }
 
-impl BuiltinUsage {
+impl BuiltinUses {
     fn new() -> Self {
         Self {
-            void: false,
-            node: false,
+            uses_void: false,
+            uses_node: false,
             seen: HashSet::new(),
         }
     }
@@ -467,14 +467,14 @@ impl BuiltinUsage {
             return;
         }
 
-        let Some(type_shape) = type_ctx.get_type(type_id) else {
+        let Some(type_shape) = type_ctx.type_shape(type_id) else {
             return;
         };
 
         match type_shape {
-            TypeShape::Void => self.void = true,
-            TypeShape::Node => self.node = true,
-            TypeShape::Custom(_) => self.node = true, // Custom types alias Node
+            TypeShape::Void => self.uses_void = true,
+            TypeShape::Node => self.uses_node = true,
+            TypeShape::Custom(_) => self.uses_node = true, // Custom types alias Node
             TypeShape::Struct(fields) => {
                 for field_info in fields.values() {
                     self.collect(field_info.type_id, type_ctx);
@@ -492,7 +492,7 @@ impl BuiltinUsage {
                 self.collect(*inner, type_ctx);
             }
             TypeShape::Ref(def_id) => {
-                if let Some(target_id) = type_ctx.get_def_type(*def_id) {
+                if let Some(target_id) = type_ctx.def_type(*def_id) {
                     self.collect(target_id, type_ctx);
                 }
             }

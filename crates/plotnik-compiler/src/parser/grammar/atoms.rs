@@ -19,7 +19,7 @@ impl Parser<'_, '_> {
         let open_quote = self.current();
         self.bump();
 
-        let has_content = self.currently_is(SyntaxKind::StrVal);
+        let has_content = self.at(SyntaxKind::StrVal);
         if has_content {
             self.bump();
         }
@@ -53,7 +53,7 @@ impl Parser<'_, '_> {
         let open_quote = self.current();
         self.bump();
 
-        if self.currently_is(SyntaxKind::StrVal) {
+        if self.at(SyntaxKind::StrVal) {
             self.bump();
         }
 
@@ -70,7 +70,7 @@ impl Parser<'_, '_> {
     /// `.` or `.!` anchor
     pub(crate) fn parse_anchor(&mut self) {
         self.start_node(SyntaxKind::Anchor);
-        if self.currently_is(SyntaxKind::DotBang) {
+        if self.at(SyntaxKind::DotBang) {
             self.bump();
         } else {
             self.expect(SyntaxKind::Dot, "anchor");

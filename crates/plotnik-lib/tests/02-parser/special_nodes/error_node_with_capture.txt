@@ -15,5 +15,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @err
+    CapturedPattern @err
       NamedNode ERROR

@@ -2,7 +2,7 @@
 //!
 //! `SyntaxKind` serves dual roles: token kinds (from lexer) and node kinds (from parser).
 //! Logos derives token recognition; node kinds lack token/regex attributes.
-//! `QLang` implements Rowan's `Language` trait for tree construction.
+//! `QueryLang` implements Rowan's `Language` trait for tree construction.
 
 use logos::Logos;
 use rowan::Language;
@@ -264,9 +264,9 @@ impl From<SyntaxKind> for rowan::SyntaxKind {
 
 /// Language tag for Rowan's tree types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum QLang {}
+pub enum QueryLang {}
 
-impl Language for QLang {
+impl Language for QueryLang {
     type Kind = SyntaxKind;
 
     fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
@@ -280,8 +280,8 @@ impl Language for QLang {
     }
 }
 
-pub type SyntaxNode = rowan::SyntaxNode<QLang>;
-pub type SyntaxToken = rowan::SyntaxToken<QLang>;
+pub type SyntaxNode = rowan::SyntaxNode<QueryLang>;
+pub type SyntaxToken = rowan::SyntaxToken<QueryLang>;
 
 /// 128-bit bitset of `SyntaxKind`s for O(1) membership testing.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -317,7 +317,7 @@ impl std::fmt::Debug for TokenSet {
         let mut list = f.debug_set();
         for i in 0..128u16 {
             if self.0 & (1 << i) != 0 && i < __LAST as u16 {
-                list.entry(&QLang::kind_from_raw(rowan::SyntaxKind(i)));
+                list.entry(&QueryLang::kind_from_raw(rowan::SyntaxKind(i)));
             }
         }
         list.finish()
@@ -328,7 +328,7 @@ impl std::fmt::Debug for TokenSet {
 pub mod token_sets {
     use super::*;
 
-    /// FIRST set of expr. `At` excluded (captures wrap, not start).
+    /// FIRST set of pattern. `At` excluded (captures wrap, not start).
     /// `UnterminatedString` included so every expression position reports
     /// it as an unclosed string instead of a generic unexpected token.
     pub const EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
@@ -372,7 +372,7 @@ pub mod token_sets {
 
     pub const SEPARATORS: TokenSet = TokenSet::new(&[Comma, Pipe]);
 
-    pub const TREE_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
+    pub const NODE_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenOpen, BracketOpen, BraceOpen]);
 
     pub const ALT_RECOVERY_TOKENS: TokenSet = TokenSet::new(&[ParenClose]);
 

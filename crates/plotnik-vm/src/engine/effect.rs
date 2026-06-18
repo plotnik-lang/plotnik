@@ -1,7 +1,7 @@
 //! Runtime effects for VM execution.
 //!
-//! Runtime effects carry actual node references, unlike bytecode EffectOp
-//! which only stores opcode + payload.
+//! Runtime effects carry actual node references, unlike bytecode `Effect`
+//! which only stores kind + payload.
 
 use arborium_tree_sitter::Node;
 
@@ -10,21 +10,21 @@ pub enum RuntimeEffect<'t> {
     /// Capture a node reference.
     Node(Node<'t>),
     /// Begin array scope.
-    Arr,
+    ArrayOpen,
     /// Push current value to array.
     Push,
     /// End array scope.
-    EndArr,
+    ArrayClose,
     /// Begin object scope.
-    Obj,
+    ObjectOpen,
     /// Set field at member index.
     Set(u16),
     /// End object scope.
-    EndObj,
+    ObjectClose,
     /// Begin enum variant at variant index.
-    Enum(u16),
+    EnumOpen(u16),
     /// End enum variant.
-    EndEnum,
+    EnumClose,
     /// Clear current value.
     Clear,
     /// Null placeholder (for optional/alternation).

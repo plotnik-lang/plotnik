@@ -8,8 +8,8 @@
 
 use std::borrow::Cow;
 
-use super::EffectOp;
-use super::effects::EffectOpcode;
+use super::Effect;
+use super::effects::EffectKind;
 use super::nav::Nav;
 
 /// Display label for the bootstrap preamble at step 0. The preamble has no name
@@ -266,20 +266,20 @@ fn display_width(s: &str) -> usize {
     width
 }
 
-pub fn format_effect(effect: &EffectOp) -> String {
-    match effect.opcode {
-        EffectOpcode::Node => "Node".to_string(),
-        EffectOpcode::Arr => "Arr".to_string(),
-        EffectOpcode::Push => "Push".to_string(),
-        EffectOpcode::EndArr => "EndArr".to_string(),
-        EffectOpcode::Obj => "Obj".to_string(),
-        EffectOpcode::EndObj => "EndObj".to_string(),
-        EffectOpcode::Set => format!("Set(M{})", effect.payload),
-        EffectOpcode::Enum => format!("Enum(M{})", effect.payload),
-        EffectOpcode::EndEnum => "EndEnum".to_string(),
-        EffectOpcode::Clear => "Clear".to_string(),
-        EffectOpcode::Null => "Null".to_string(),
-        EffectOpcode::SuppressBegin => "SuppressBegin".to_string(),
-        EffectOpcode::SuppressEnd => "SuppressEnd".to_string(),
+pub fn format_effect(effect: &Effect) -> String {
+    match effect.kind {
+        EffectKind::Node => "Node".to_string(),
+        EffectKind::ArrayOpen => "ArrayOpen".to_string(),
+        EffectKind::Push => "Push".to_string(),
+        EffectKind::ArrayClose => "ArrayClose".to_string(),
+        EffectKind::ObjectOpen => "ObjectOpen".to_string(),
+        EffectKind::ObjectClose => "ObjectClose".to_string(),
+        EffectKind::Set => format!("Set(M{})", effect.payload),
+        EffectKind::EnumOpen => format!("EnumOpen(M{})", effect.payload),
+        EffectKind::EnumClose => "EnumClose".to_string(),
+        EffectKind::Clear => "Clear".to_string(),
+        EffectKind::Null => "Null".to_string(),
+        EffectKind::SuppressBegin => "SuppressBegin".to_string(),
+        EffectKind::SuppressEnd => "SuppressEnd".to_string(),
     }
 }

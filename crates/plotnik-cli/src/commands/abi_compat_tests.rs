@@ -31,7 +31,7 @@ struct NodeKey {
 
 fn compare_lang(lang: &Lang) -> CheckResult {
     let production = lang.grammar();
-    let reference = lang.language();
+    let reference = lang.ts_language();
     let mut differences = Vec::new();
     let mut seen_nodes = HashSet::new();
     let mut seen_fields = HashSet::new();

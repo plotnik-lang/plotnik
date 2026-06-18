@@ -19,8 +19,8 @@ pub enum EmitError {
     TooManyFields(usize),
     /// Enum has more variants than the format's u8 member count allows.
     TooManyVariants(usize),
-    /// Too many distinct node types (exceeds u16 max).
-    TooManyNodeTypes(usize),
+    /// Too many distinct node kinds (exceeds u16 max).
+    TooManyNodeKinds(usize),
     /// Too many distinct node fields (exceeds u16 max).
     TooManyNodeFields(usize),
     /// Too many entrypoints (exceeds u16 max).
@@ -48,7 +48,7 @@ impl std::fmt::Display for EmitError {
             Self::TooManyTypeMembers(n) => write!(f, "too many type members: {n} (max 65535)"),
             Self::TooManyFields(n) => write!(f, "too many struct fields: {n} (max 255)"),
             Self::TooManyVariants(n) => write!(f, "too many enum variants: {n} (max 255)"),
-            Self::TooManyNodeTypes(n) => write!(f, "too many node types: {n} (max 65535)"),
+            Self::TooManyNodeKinds(n) => write!(f, "too many node kinds: {n} (max 65535)"),
             Self::TooManyNodeFields(n) => write!(f, "too many node fields: {n} (max 65535)"),
             Self::TooManyEntrypoints(n) => write!(f, "too many entrypoints: {n} (max 65535)"),
             Self::TooManyTransitions(n) => write!(f, "too many transitions: {n} (max 65535)"),

@@ -17,5 +17,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @expr
+    CapturedPattern @expr
       NamedNode expression

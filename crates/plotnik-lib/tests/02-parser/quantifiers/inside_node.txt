@@ -20,5 +20,5 @@ Root
 Root
   Def Q
     NamedNode block
-      QuantifiedExpr *
+      QuantifiedPattern *
         NamedNode statement

@@ -37,9 +37,9 @@ Root
 Root
   Def Q
     NamedNode expression
-      CapturedExpr @left
-        FieldExpr left:
+      CapturedPattern @left
+        FieldPattern left:
           NamedNode (any)
-      CapturedExpr @right
-        FieldExpr right:
+      CapturedPattern @right
+        FieldPattern right:
           NamedNode (any)

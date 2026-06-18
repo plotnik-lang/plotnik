@@ -17,7 +17,7 @@ pub mod predicates;
 
 /// Inputs for the AST-only validation passes (alt kinds, anchors, empty
 /// constructs).
-pub struct ValidateInput<'q, 'd> {
+pub struct ValidationInput<'q, 'd> {
     pub source_id: SourceId,
     pub ast: &'q Root,
     pub diag: &'d mut Diagnostics,

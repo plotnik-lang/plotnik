@@ -5,7 +5,7 @@ use plotnik::language_registry::{self, Lang};
 use crate::error::CliError;
 
 /// Resolve a language name or alias, with typo suggestions on failure.
-pub fn resolve_named_lang(name: &str) -> Result<&'static Lang, CliError> {
+pub fn resolve_lang_name(name: &str) -> Result<&'static Lang, CliError> {
     language_registry::from_name(name).ok_or_else(|| {
         let mut msg = format!("unknown language: '{}'", name);
         if let Some(suggestion) = suggest_language(name) {
@@ -18,20 +18,20 @@ pub fn resolve_named_lang(name: &str) -> Result<&'static Lang, CliError> {
 
 /// The shebang is the in-file language declaration; an explicit `-l` flag is
 /// allowed but must agree with it.
-pub fn merge_lang(
+pub fn reconcile_lang(
     explicit: Option<&str>,
     declared: Option<&str>,
 ) -> Result<Option<&'static Lang>, CliError> {
     match (explicit, declared) {
         (None, None) => Ok(None),
-        (Some(name), None) => resolve_named_lang(name).map(Some),
-        (None, Some(name)) => resolve_named_lang(name)
-            .map_err(prefix_shebang_context)
+        (Some(name), None) => resolve_lang_name(name).map(Some),
+        (None, Some(name)) => resolve_lang_name(name)
+            .map_err(wrap_shebang_error)
             .map(Some),
         (Some(explicit_name), Some(declared_name)) => {
-            let explicit_lang = resolve_named_lang(explicit_name)?;
+            let explicit_lang = resolve_lang_name(explicit_name)?;
             let declared_lang =
-                resolve_named_lang(declared_name).map_err(prefix_shebang_context)?;
+                resolve_lang_name(declared_name).map_err(wrap_shebang_error)?;
             if !std::ptr::eq(explicit_lang, declared_lang) {
                 return Err(CliError::fatal(format!(
                     "-l {} conflicts with the shebang declaration '{}'",
@@ -43,7 +43,7 @@ pub fn merge_lang(
     }
 }
 
-fn prefix_shebang_context(err: CliError) -> CliError {
+fn wrap_shebang_error(err: CliError) -> CliError {
     match err {
         CliError::Fatal(msg) => CliError::Fatal(format!("in shebang declaration: {}", msg)),
         other => other,
@@ -72,7 +72,7 @@ pub fn require_lang(
     query_path: Option<&Path>,
     command: &str,
 ) -> Result<&'static Lang, CliError> {
-    if let Some(lang) = merge_lang(explicit, declared)? {
+    if let Some(lang) = reconcile_lang(explicit, declared)? {
         return Ok(lang);
     }
 

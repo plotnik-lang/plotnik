@@ -8,7 +8,7 @@ error: tree-sitter predicates are not supported
   |
 help: use `(node == "x")`
 
-error: node types must be parenthesized
+error: node kinds must be parenthesized
  --> query.ptk:1:20
   |
 1 | (a (#eq? @x "foo") b)

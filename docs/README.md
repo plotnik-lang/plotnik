@@ -31,7 +31,7 @@ docs/
 └── binary-format/     # Compiled bytecode specification
     ├── 01-overview.md   # Header, sections, alignment
     ├── 02-strings.md    # String pool and table
-    ├── 03-symbols.md    # Node types, fields, trivia
+    ├── 03-symbols.md    # Node kinds, fields, trivia
     ├── 04-types.md      # Type metadata format
     ├── 05-entrypoints.md # Definition table
     ├── 06-transitions.md # VM instructions and data blocks

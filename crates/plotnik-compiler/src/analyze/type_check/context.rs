@@ -6,9 +6,9 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::parser::Expr;
+use crate::parser::Pattern;
 
-use super::symbol::{DefId, Interner, Symbol};
+use super::def_id::{DefId, Interner, Symbol};
 use super::types::{Arity, FieldInfo, TYPE_NODE, TYPE_VOID, TermInfo, TypeId, TypeShape};
 
 /// Central registry for types, symbols, and expression metadata.
@@ -24,7 +24,7 @@ pub struct TypeContext {
     /// Definitions that are part of a recursive SCC
     recursive_defs: HashSet<DefId>,
 
-    term_info: HashMap<Expr, TermInfo>,
+    term_info: HashMap<Pattern, TermInfo>,
 
     /// Explicit type names from annotations like `{...} @x :: TypeName`.
     /// Maps a struct/enum TypeId to the name it should have in generated code.
@@ -61,9 +61,9 @@ impl TypeContext {
     }
 
     /// Avoids re-registering definitions that DependencyAnalysis already assigned DefIds to.
-    pub fn seed_defs(&mut self, def_names: &[Symbol], name_to_def: &HashMap<Symbol, DefId>) {
+    pub fn seed_defs(&mut self, def_names: &[Symbol], def_ids_by_sym: &HashMap<Symbol, DefId>) {
         self.def_names = def_names.to_vec();
-        self.def_ids = name_to_def.clone();
+        self.def_ids = def_ids_by_sym.clone();
     }
 
     /// Intern a type shape, deduplicating by structural equality.
@@ -78,11 +78,11 @@ impl TypeContext {
         id
     }
 
-    pub fn get_type(&self, id: TypeId) -> Option<&TypeShape> {
+    pub fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
         self.types.get(id.0 as usize)
     }
 
-    pub fn get_or_intern(&mut self, shape: TypeShape) -> (TypeId, &TypeShape) {
+    pub fn intern_type_seen(&mut self, shape: TypeShape) -> (TypeId, &TypeShape) {
         let id = self.intern_type(shape);
         (id, &self.types[id.0 as usize])
     }
@@ -95,31 +95,31 @@ impl TypeContext {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
-    pub fn get_struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
-        match self.get_type(id)? {
+    pub fn struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
+        match self.type_shape(id)? {
             TypeShape::Struct(fields) => Some(fields),
             _ => None,
         }
     }
 
-    /// Fields of the struct a `Bubble` flow points to.
+    /// Fields of the struct a `Fields` flow points to.
     ///
-    /// Every `TypeFlow::Bubble` is constructed by interning a `Struct` (see the
-    /// `intern_struct`/`intern_single_field` calls at every `Bubble` construction
+    /// Every `TypeFlow::Fields` is constructed by interning a `Struct` (see the
+    /// `intern_struct`/`intern_single_field` calls at every `Fields` construction
     /// site), so a non-`Struct` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
     /// fabricating an empty struct that would silently mistype the output.
     pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
-        self.get_struct_fields(id)
-            .expect("Bubble flow must point to a Struct type")
+        self.struct_fields(id)
+            .expect("Fields flow must point to a Struct type")
     }
 
-    pub fn set_term_info(&mut self, expr: Expr, info: TermInfo) {
-        self.term_info.insert(expr, info);
+    pub fn cache_term_info(&mut self, pattern: Pattern, info: TermInfo) {
+        self.term_info.insert(pattern, info);
     }
 
-    pub fn get_term_info(&self, expr: &Expr) -> Option<&TermInfo> {
-        self.term_info.get(expr)
+    pub fn term_info(&self, pattern: &Pattern) -> Option<&TermInfo> {
+        self.term_info.get(pattern)
     }
 
     pub fn register_def(&mut self, interner: &mut Interner, name: &str) -> DefId {
@@ -138,15 +138,15 @@ impl TypeContext {
         def_id
     }
 
-    pub fn get_def_id_sym(&self, sym: Symbol) -> Option<DefId> {
+    pub fn def_id_for_sym(&self, sym: Symbol) -> Option<DefId> {
         self.def_ids.get(&sym).copied()
     }
 
     /// Get DefId for a definition name. `def_ids` is keyed by `Symbol`, so the
     /// name is resolved through the same interner that populated it.
-    pub fn get_def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
+    pub fn def_id_for_name(&self, interner: &Interner, name: &str) -> Option<DefId> {
         let sym = interner.get(name)?;
-        self.get_def_id_sym(sym)
+        self.def_id_for_sym(sym)
     }
 
     pub fn def_name_sym(&self, def_id: DefId) -> Symbol {
@@ -175,17 +175,17 @@ impl TypeContext {
         self.set_def_type(def_id, type_id);
     }
 
-    pub fn get_def_type(&self, def_id: DefId) -> Option<TypeId> {
+    pub fn def_type(&self, def_id: DefId) -> Option<TypeId> {
         self.def_types.get(&def_id).copied()
     }
 
-    pub fn get_def_type_by_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {
-        let id = self.get_def_id(interner, name)?;
-        self.get_def_type(id)
+    pub fn def_type_for_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {
+        let id = self.def_id_for_name(interner, name)?;
+        self.def_type(id)
     }
 
-    pub fn get_arity(&self, expr: &Expr) -> Option<Arity> {
-        self.term_info.get(expr).map(|info| info.arity)
+    pub fn arity(&self, pattern: &Pattern) -> Option<Arity> {
+        self.term_info.get(pattern).map(|info| info.arity)
     }
 
     /// Iterate over all definition types as (DefId, TypeId) in DefId order.

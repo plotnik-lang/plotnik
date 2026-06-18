@@ -23,6 +23,6 @@ Root
 Root
   Def Q
     NamedNode function_declaration
-      CapturedExpr @name
-        FieldExpr name:
+      CapturedPattern @name
+        FieldPattern name:
           NamedNode identifier

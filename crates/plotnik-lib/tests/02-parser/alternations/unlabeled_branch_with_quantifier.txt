@@ -33,6 +33,6 @@ Root
       Branch
         NamedNode identifier
       Branch
-        CapturedExpr @strings
-          QuantifiedExpr *
+        CapturedPattern @strings
+          QuantifiedPattern *
             NamedNode string

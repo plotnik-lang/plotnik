@@ -11,8 +11,8 @@ fn deeply_nested_trees_hit_recursion_limit() {
         input.push(')');
     }
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_recursion_limit(depth)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_max_depth(depth)
         .parse();
 
     assert!(
@@ -33,8 +33,8 @@ fn deeply_nested_sequences_hit_recursion_limit() {
         input.push('}');
     }
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_recursion_limit(depth)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_max_depth(depth)
         .parse();
 
     assert!(
@@ -55,8 +55,8 @@ fn deeply_nested_alternations_hit_recursion_limit() {
         input.push(']');
     }
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_recursion_limit(depth)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_max_depth(depth)
         .parse();
 
     assert!(
@@ -74,13 +74,13 @@ fn many_trees_exhaust_exec_fuel() {
         input.push_str("(a) ");
     }
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_fuel(100)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_fuel(100)
         .parse();
 
     assert!(
-        matches!(result, Err(crate::Error::ExecFuelExhausted)),
-        "expected ExecFuelExhausted error, got {:?}",
+        matches!(result, Err(crate::Error::ParseFuelExhausted)),
+        "expected ParseFuelExhausted error, got {:?}",
         result
     );
 }
@@ -98,13 +98,13 @@ fn many_branches_exhaust_exec_fuel() {
     }
     input.push(']');
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_fuel(100)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_fuel(100)
         .parse();
 
     assert!(
-        matches!(result, Err(crate::Error::ExecFuelExhausted)),
-        "expected ExecFuelExhausted error, got {:?}",
+        matches!(result, Err(crate::Error::ParseFuelExhausted)),
+        "expected ParseFuelExhausted error, got {:?}",
         result
     );
 }
@@ -122,13 +122,13 @@ fn many_fields_exhaust_exec_fuel() {
     }
     input.push(')');
 
-    let result = QueryBuilder::one_liner(&input)
-        .with_query_parse_fuel(100)
+    let result = QueryBuilder::from_inline(&input)
+        .with_parse_fuel(100)
         .parse();
 
     assert!(
-        matches!(result, Err(crate::Error::ExecFuelExhausted)),
-        "expected ExecFuelExhausted error, got {:?}",
+        matches!(result, Err(crate::Error::ParseFuelExhausted)),
+        "expected ParseFuelExhausted error, got {:?}",
         result
     );
 }

@@ -44,7 +44,7 @@ macro_rules! ast_node {
                 matches!(kind, $(SyntaxKind::$kind)|+)
             }
 
-            pub fn as_cst(&self) -> &SyntaxNode {
+            pub fn syntax(&self) -> &SyntaxNode {
                 &self.0
             }
 
@@ -55,57 +55,57 @@ macro_rules! ast_node {
     };
 }
 
-macro_rules! define_expr {
+macro_rules! define_pattern {
     ($($variant:ident),+ $(,)?) => {
-        /// Expression: any pattern that can appear in the tree.
+        /// Pattern: any construct that can appear in the tree.
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-        pub enum Expr {
+        pub enum Pattern {
             $($variant($variant)),+
         }
 
-        impl Expr {
+        impl Pattern {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
                 let kind = node.kind();
-                $(if $variant::can_cast(kind) { return Some(Expr::$variant($variant(node))); })+
+                $(if $variant::can_cast(kind) { return Some(Pattern::$variant($variant(node))); })+
                 None
             }
 
-            pub fn as_cst(&self) -> &SyntaxNode {
-                match self { $(Expr::$variant(n) => n.as_cst()),+ }
+            pub fn syntax(&self) -> &SyntaxNode {
+                match self { $(Pattern::$variant(n) => n.syntax()),+ }
             }
 
             pub fn text_range(&self) -> TextRange {
-                match self { $(Expr::$variant(n) => n.text_range()),+ }
+                match self { $(Pattern::$variant(n) => n.text_range()),+ }
             }
         }
     };
 }
 
-impl Expr {
-    pub fn children(&self) -> Vec<Expr> {
+impl Pattern {
+    pub fn children(&self) -> Vec<Pattern> {
         match self {
-            Expr::NamedNode(n) => n.children().collect(),
-            Expr::SeqExpr(s) => s.children().collect(),
-            Expr::CapturedExpr(c) => c.inner().into_iter().collect(),
-            Expr::QuantifiedExpr(q) => q.inner().into_iter().collect(),
-            Expr::FieldExpr(f) => f.value().into_iter().collect(),
-            Expr::AltExpr(a) => a.branches().filter_map(|b| b.body()).collect(),
-            Expr::Ref(_) | Expr::AnonymousNode(_) => vec![],
+            Pattern::NodePattern(n) => n.children().collect(),
+            Pattern::SeqPattern(s) => s.children().collect(),
+            Pattern::CapturedPattern(c) => c.inner().into_iter().collect(),
+            Pattern::QuantifiedPattern(q) => q.inner().into_iter().collect(),
+            Pattern::FieldPattern(f) => f.value().into_iter().collect(),
+            Pattern::AltPattern(a) => a.branches().filter_map(|b| b.body()).collect(),
+            Pattern::Ref(_) | Pattern::TokenPattern(_) => vec![],
         }
     }
 }
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
-ast_node!(NamedNode, Tree);
+ast_node!(NodePattern, Tree);
 ast_node!(Ref, Ref);
-ast_node!(AltExpr, Alt);
+ast_node!(AltPattern, Alt);
 ast_node!(Branch, Branch);
-ast_node!(SeqExpr, Seq);
-ast_node!(CapturedExpr, Capture);
+ast_node!(SeqPattern, Seq);
+ast_node!(CapturedPattern, Capture);
 ast_node!(Type, Type);
-ast_node!(QuantifiedExpr, Quantifier);
-ast_node!(FieldExpr, Field);
+ast_node!(QuantifiedPattern, Quantifier);
+ast_node!(FieldPattern, Field);
 ast_node!(NegatedField, NegatedField);
 ast_node!(Anchor, Anchor);
 ast_node!(NodePredicate, NodePredicate);
@@ -117,17 +117,17 @@ impl Anchor {
     }
 }
 
-/// Either an expression or an anchor in a sequence.
+/// Either a pattern or an anchor in a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SeqItem {
-    Expr(Expr),
+    Pattern(Pattern),
     Anchor(Anchor),
 }
 
 impl SeqItem {
     pub fn cast(node: SyntaxNode) -> Option<Self> {
-        if let Some(expr) = Expr::cast(node.clone()) {
-            return Some(SeqItem::Expr(expr));
+        if let Some(pattern) = Pattern::cast(node.clone()) {
+            return Some(SeqItem::Pattern(pattern));
         }
         if let Some(anchor) = Anchor::cast(node) {
             return Some(SeqItem::Anchor(anchor));
@@ -142,23 +142,23 @@ impl SeqItem {
         }
     }
 
-    pub fn as_expr(&self) -> Option<&Expr> {
+    pub fn as_pattern(&self) -> Option<&Pattern> {
         match self {
-            SeqItem::Expr(e) => Some(e),
+            SeqItem::Pattern(e) => Some(e),
             _ => None,
         }
     }
 }
 
 ast_node!(
-    /// Anonymous node: string literal (`"+"`) or wildcard (`_`).
+    /// Token pattern: an anonymous token (`"+"`) or the wildcard (`_`).
     /// Maps from CST `Str` or `Wildcard`.
-    AnonymousNode,
+    TokenPattern,
     Str | Wildcard
 );
 
-impl AnonymousNode {
-    /// Returns the string value if this is a literal, `None` if wildcard.
+impl TokenPattern {
+    /// Returns the token's string value, `None` if this is the wildcard.
     pub fn value(&self) -> Option<SyntaxToken> {
         if self.0.kind() == SyntaxKind::Wildcard {
             return None;
@@ -171,14 +171,14 @@ impl AnonymousNode {
     }
 }
 
-/// Whether an alternation uses tagged or untagged branches.
+/// Whether an alternation is an enum, union, or mixed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AltKind {
     /// All branches have labels: `[A: expr1 B: expr2]`
-    Tagged,
+    Enum,
     /// No branches have labels: `[expr1 expr2]`
-    Untagged,
-    /// Mixed tagged and untagged branches (invalid)
+    Union,
+    /// Mixed enum and union branches (invalid)
     Mixed,
 }
 
@@ -206,15 +206,15 @@ pub enum PredicateValue<'q> {
     Regex(&'q str),
 }
 
-define_expr!(
-    NamedNode,
+define_pattern!(
+    NodePattern,
     Ref,
-    AnonymousNode,
-    AltExpr,
-    SeqExpr,
-    CapturedExpr,
-    QuantifiedExpr,
-    FieldExpr,
+    TokenPattern,
+    AltPattern,
+    SeqPattern,
+    CapturedPattern,
+    QuantifiedPattern,
+    FieldPattern,
 );
 
 impl Root {
@@ -222,8 +222,8 @@ impl Root {
         self.0.children().filter_map(Def::cast)
     }
 
-    pub fn exprs(&self) -> impl Iterator<Item = Expr> + '_ {
-        self.0.children().filter_map(Expr::cast)
+    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.children().filter_map(Pattern::cast)
     }
 }
 
@@ -232,13 +232,13 @@ impl Def {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
-    pub fn body(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
+    pub fn body(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 }
 
-impl NamedNode {
-    pub fn node_type(&self) -> Option<SyntaxToken> {
+impl NodePattern {
+    pub fn kind_token(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| {
             matches!(
                 k,
@@ -266,13 +266,13 @@ impl NamedNode {
     }
 
     pub fn is_any(&self) -> bool {
-        self.node_type()
+        self.kind_token()
             .map(|t| t.kind() == SyntaxKind::Underscore)
             .unwrap_or(false)
     }
 
     pub fn is_missing(&self) -> bool {
-        self.node_type()
+        self.kind_token()
             .map(|t| t.kind() == SyntaxKind::KwMissing)
             .unwrap_or(false)
     }
@@ -293,8 +293,8 @@ impl NamedNode {
             .find(|t| matches!(t.kind(), SyntaxKind::Id | SyntaxKind::StrVal))
     }
 
-    pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
-        self.0.children().filter_map(Expr::cast)
+    pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.children().filter_map(Pattern::cast)
     }
 
     pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
@@ -360,25 +360,25 @@ impl Ref {
     }
 }
 
-impl AltExpr {
+impl AltPattern {
     pub fn kind(&self) -> AltKind {
-        let mut tagged = false;
-        let mut untagged = false;
+        let mut is_enum = false;
+        let mut is_union = false;
 
         for child in self.0.children().filter(|c| c.kind() == SyntaxKind::Branch) {
             let has_label = find_token(&child, |k| k == SyntaxKind::Id).is_some();
 
             if has_label {
-                tagged = true;
+                is_enum = true;
             } else {
-                untagged = true;
+                is_union = true;
             }
         }
 
-        match (tagged, untagged) {
+        match (is_enum, is_union) {
             (true, true) => AltKind::Mixed,
-            (true, false) => AltKind::Tagged,
-            _ => AltKind::Untagged,
+            (true, false) => AltKind::Enum,
+            _ => AltKind::Union,
         }
     }
 
@@ -386,8 +386,8 @@ impl AltExpr {
         self.0.children().filter_map(Branch::cast)
     }
 
-    pub fn exprs(&self) -> impl Iterator<Item = Expr> + '_ {
-        self.0.children().filter_map(Expr::cast)
+    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.children().filter_map(Pattern::cast)
     }
 }
 
@@ -396,14 +396,14 @@ impl Branch {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
-    pub fn body(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
+    pub fn body(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 }
 
-impl SeqExpr {
-    pub fn children(&self) -> impl Iterator<Item = Expr> + '_ {
-        self.0.children().filter_map(Expr::cast)
+impl SeqPattern {
+    pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.children().filter_map(Pattern::cast)
     }
 
     pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
@@ -416,7 +416,7 @@ impl SeqExpr {
     }
 }
 
-impl CapturedExpr {
+impl CapturedPattern {
     /// Returns the capture token (@name or @_name).
     /// The token text includes the @ prefix.
     pub fn name(&self) -> Option<SyntaxToken> {
@@ -431,8 +431,8 @@ impl CapturedExpr {
         find_token(&self.0, |k| k == SyntaxKind::SuppressiveCapture).is_some()
     }
 
-    pub fn inner(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
+    pub fn inner(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 
     pub fn type_annotation(&self) -> Option<Type> {
@@ -446,9 +446,9 @@ impl Type {
     }
 }
 
-impl QuantifiedExpr {
-    pub fn inner(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
+impl QuantifiedPattern {
+    pub fn inner(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 
     pub fn operator(&self) -> Option<SyntaxToken> {
@@ -481,13 +481,13 @@ impl QuantifiedExpr {
     }
 }
 
-impl FieldExpr {
+impl FieldPattern {
     pub fn name(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }
 
-    pub fn value(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
+    pub fn value(&self) -> Option<Pattern> {
+        self.0.children().find_map(Pattern::cast)
     }
 }
 
@@ -497,13 +497,13 @@ impl NegatedField {
     }
 }
 
-/// Checks if expression is a truly empty scope (sequence/alternation with no children).
-/// Used to distinguish `{ } @x` (empty struct) from `{(expr) @_} @x` (Node capture).
-pub fn is_truly_empty_scope(inner: &Expr) -> bool {
+/// Checks if pattern is an empty group (sequence/alternation with no children).
+/// Used to distinguish `{ } @x` (empty struct) from `{(pattern) @_} @x` (Node capture).
+pub fn is_empty_group(inner: &Pattern) -> bool {
     match inner {
-        Expr::SeqExpr(seq) => seq.children().next().is_none(),
-        Expr::AltExpr(alt) => alt.branches().next().is_none(),
-        Expr::QuantifiedExpr(q) => q.inner().is_some_and(|i| is_truly_empty_scope(&i)),
+        Pattern::SeqPattern(seq) => seq.children().next().is_none(),
+        Pattern::AltPattern(alt) => alt.branches().next().is_none(),
+        Pattern::QuantifiedPattern(q) => q.inner().is_some_and(|i| is_empty_group(&i)),
         _ => false,
     }
 }

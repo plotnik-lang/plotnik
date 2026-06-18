@@ -4,12 +4,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
-    lower::PreResolveGrammar,
-    prepared::{ReservedWordContext, ResolvedGrammar, Variable, VariableType},
+    lower::UninternedGrammar,
+    prepared::{ReservedWordSet, InternedGrammar, Variable, VariableType},
     rules::{Rule, Symbol},
 };
-
-pub type InternSymbolsResult<T> = Result<T, InternSymbolsError>;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum InternSymbolsError {
@@ -25,8 +23,8 @@ pub enum InternSymbolsError {
     UndefinedWordToken(String),
 }
 
-pub(super) fn resolve_symbols(grammar: PreResolveGrammar<'_>) -> InternSymbolsResult<ResolvedGrammar> {
-    let PreResolveGrammar {
+pub(super) fn intern_symbols(grammar: UninternedGrammar<'_>) -> Result<InternedGrammar, InternSymbolsError> {
+    let UninternedGrammar {
         variables: source_variables,
         extra_symbols: extra_rules,
         expected_conflicts,
@@ -81,7 +79,7 @@ pub(super) fn resolve_symbols(grammar: PreResolveGrammar<'_>) -> InternSymbolsRe
         for rule in &reserved_word_set.reserved_words {
             interned_set.push(interner.intern_rule(rule, None)?);
         }
-        reserved_words.push(ReservedWordContext {
+        reserved_words.push(ReservedWordSet {
             name: reserved_word_set.name.clone(),
             reserved_words: interned_set,
         });
@@ -119,7 +117,7 @@ pub(super) fn resolve_symbols(grammar: PreResolveGrammar<'_>) -> InternSymbolsRe
         }
     }
 
-    Ok(ResolvedGrammar {
+    Ok(InternedGrammar {
         variables,
         extra_symbols,
         external_tokens,
@@ -154,7 +152,7 @@ impl<'a> Interner<'a> {
         Self { name_map }
     }
 
-    fn intern_rule(&self, rule: &Rule, name: Option<&str>) -> InternSymbolsResult<Rule> {
+    fn intern_rule(&self, rule: &Rule, name: Option<&str>) -> Result<Rule, InternSymbolsError> {
         match rule {
             Rule::Choice(elements) => {
                 Self::check_single(elements, name, "choice");
@@ -189,8 +187,8 @@ impl<'a> Interner<'a> {
         }
     }
 
-    fn intern_name(&self, symbol: &str) -> Option<Symbol> {
-        self.name_map.get(symbol).copied()
+    fn intern_name(&self, name: &str) -> Option<Symbol> {
+        self.name_map.get(name).copied()
     }
 
     // In the case of a seq or choice rule of 1 element in a hidden rule, weird

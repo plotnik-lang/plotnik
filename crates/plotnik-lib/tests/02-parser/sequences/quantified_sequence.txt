@@ -31,10 +31,10 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @rows
-      QuantifiedExpr +
+    CapturedPattern @rows
+      QuantifiedPattern +
         Seq
-          CapturedExpr @a
+          CapturedPattern @a
             NamedNode a
-          CapturedExpr @b
+          CapturedPattern @b
             NamedNode b

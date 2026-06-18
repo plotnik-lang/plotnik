@@ -18,4 +18,4 @@ error: incompatible types: a branch produces a value but the alternation is unla
 9 | | ]
   | |_^
   |
-help: give every branch a branch label for a tagged union, e.g. `[A: ... B: ...]`
+help: give every branch a branch label for an enum, e.g. `[A: ... B: ...]`

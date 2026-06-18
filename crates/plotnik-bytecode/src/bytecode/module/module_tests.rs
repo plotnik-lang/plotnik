@@ -30,7 +30,7 @@ fn module_with_transitions(transitions: &[u8], transitions_count: u16) -> Vec<u8
     bytes
 }
 
-/// Header byte for a Match instruction with node_kind = Any (0).
+/// Header byte for a Match instruction with node_class_bits = Any (0).
 fn match_header(opcode: u8) -> u8 {
     opcode & 0xF
 }

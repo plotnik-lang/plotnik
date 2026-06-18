@@ -39,9 +39,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -52,7 +52,7 @@ Q:
   11   !   [Null Set(M2)] (number) [Node Set(M1)]  14
   14  ─‣┘² _                                10
   15  ...  
-  16   !   [Null Set(M1) Obj] (identifier) [Node Set(M0) EndObj Set(M2)]  14
+  16   !   [Null Set(M1) ObjectOpen] (identifier) [Node Set(M0) ObjectClose Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
 ==== types ====
 export interface QRow {
@@ -65,7 +65,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -79,14 +79,14 @@ Q:
   11       [Null Set(M2)] (number) [Node Set(M1)]  14
        ○   identifier
   08  ❮❮❮ 
-  16       [Null Set(M1) Obj] (identifier) [Node Set(M0) EndObj Set(M2)]  14
+  16       [Null Set(M1) ObjectOpen] (identifier) [Node Set(M0) ObjectClose Set(M2)]  14
        ●   identifier
   14       _                                10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"x":null,"row":{"x":{"kind":"identifier","text":"foo","span":[0, 3]}}}

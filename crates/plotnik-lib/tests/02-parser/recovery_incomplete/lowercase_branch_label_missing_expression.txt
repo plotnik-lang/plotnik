@@ -11,7 +11,7 @@ help: use `Label`
 1 - [label:]
 1 + [Label:]
   |
-help: branch labels become variants of a tagged union in the output
+help: branch labels become variants of an enum in the output
 
 error: expected an expression
  --> query.ptk:1:8

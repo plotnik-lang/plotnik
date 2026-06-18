@@ -38,7 +38,7 @@ pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Spa
 pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
 pub use plotnik_vm::{
-    EffectLog, FuelLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
+    EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
     Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };
 

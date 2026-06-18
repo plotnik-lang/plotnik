@@ -44,9 +44,9 @@ Q = 06 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -54,9 +54,9 @@ Q:
   07  └‣─  (expression_statement)           08
   08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11   !   [Enum(M2)] (identifier) [Node Set(M0) EndEnum]  14
+  11   !   [EnumOpen(M2)] (identifier) [Node Set(M0) EnumClose]  14
   14  ─‣┘² [Set(M4)] _                      10
-  16   !   [Enum(M3)] (number) [Node Set(M1) EndEnum]  14
+  16   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose]  14
   19  ─‣─  _                                11, 16, 19
 ==== types ====
 export interface QeA {
@@ -76,7 +76,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -87,14 +87,14 @@ Q:
        ●   expression_statement
   08       _                                11, 16, 19
        ●   identifier
-  11       [Enum(M2)] (identifier) [Node Set(M0) EndEnum]  14
+  11       [EnumOpen(M2)] (identifier) [Node Set(M0) EnumClose]  14
        ●   identifier
   14       [Set(M4)] _                      10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"e":{"$tag":"A","$data":{"a":{"kind":"identifier","text":"foo","span":[0, 3]}}}}

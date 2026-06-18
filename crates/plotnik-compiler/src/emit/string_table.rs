@@ -25,7 +25,7 @@ pub const EASTER_EGG: &str = "Beauty will save the world";
 pub struct StringTableBuilder {
     /// Map from query Symbol to bytecode StringId.
     mapping: HashMap<Symbol, StringId>,
-    /// Reverse lookup from string content to StringId (for intern_str). Shares
+    /// Reverse lookup from string content to StringId (for get_or_intern_str). Shares
     /// each string's allocation with `strings` via `Rc`.
     str_lookup: HashMap<Rc<str>, StringId>,
     /// Ordered strings for the binary.
@@ -66,7 +66,7 @@ impl StringTableBuilder {
     }
 
     /// Intern a string directly (for generated strings not in the query interner).
-    pub fn intern_str(&mut self, s: &str) -> StringId {
+    pub fn get_or_intern_str(&mut self, s: &str) -> StringId {
         if let Some(&id) = self.str_lookup.get(s) {
             return id;
         }
@@ -99,12 +99,12 @@ impl StringTableBuilder {
     }
 
     /// Get the StringId for a Symbol, if it was interned.
-    pub fn get(&self, sym: Symbol) -> Option<StringId> {
+    pub fn lookup(&self, sym: Symbol) -> Option<StringId> {
         self.mapping.get(&sym).copied()
     }
 
     pub fn get_str(&self, id: StringId) -> &str {
-        self.strings[id.get() as usize].as_ref()
+        self.strings[id.as_u16() as usize].as_ref()
     }
 
     /// Returns `(blob_bytes, table_bytes)`.

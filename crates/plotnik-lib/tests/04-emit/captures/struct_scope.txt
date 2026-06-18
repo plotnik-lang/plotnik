@@ -30,12 +30,12 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
-  06   !   [Obj] (identifier) [Node Set(M0)]  08
-  08  ─‣─  (number) [Node Set(M1) EndObj Set(M2)]  11
+  06   !   [ObjectOpen] (identifier) [Node Set(M0)]  08
+  08  ─‣─  (number) [Node Set(M1) ObjectClose Set(M2)]  11
   11                                        ▶

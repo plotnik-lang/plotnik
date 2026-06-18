@@ -35,22 +35,22 @@ Q = 09 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 A:
-  06   !   [Enum(M0)] (expression_statement) [EndEnum]  08
+  06   !   [EnumOpen(M0)] (expression_statement) [EnumClose]  08
   08                                        ▶
 
 Q:
   09   !   (program)                        10
-  10  -ε-  [Arr]                            19, 26
+  10  -ε-  [ArrayOpen]                      19, 26
   12                                        ▶
-  13  └•─  [EndArr] (debugger_statement)    15
+  13  └•─  [ArrayClose] (debugger_statement)  15
   15  ─‣┘  _                                12
-  16  ─•─  [EndArr] (debugger_statement)    15
+  16  ─•─  [ArrayClose] (debugger_statement)  15
   18  -ε-                                   16
   19  -ε-                                   13
   20  -ε-  [Push]                           18, 30
@@ -70,16 +70,16 @@ export type A = AX;
 export type Q = A[];
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
 Q:
   09       (program)                        10
        ●   program
-  10  -ε-  [Arr]                            19, 26
+  10  -ε-  [ArrayOpen]                      19, 26
   19  -ε-                                   13
-  13       [EndArr] (debugger_statement)    15
+  13       [ArrayClose] (debugger_statement)  15
        ○   expression_statement
   10  ❮❮❮ 
   26       _                                22, 24
@@ -88,14 +88,14 @@ Q:
        ▶   (A)
 
 A:
-  06       [Enum(M0)] (expression_statement) [EndEnum]  08
+  06       [EnumOpen(M0)] (expression_statement) [EnumClose]  08
        ●   expression_statement
   08   ◀   (A)                              
 
 Q:
   20  -ε-  [Push]                           18, 30
   18  -ε-                                   16
-  16       [EndArr] (debugger_statement)    15
+  16       [ArrayClose] (debugger_statement)  15
        ○   expression_statement
   20  ❮❮❮ 
   30       _                                22, 28
@@ -104,21 +104,21 @@ Q:
        ▶   (A)
 
 A:
-  06       [Enum(M0)] (expression_statement) [EndEnum]  08
+  06       [EnumOpen(M0)] (expression_statement) [EnumClose]  08
        ●   expression_statement
   08   ◀   (A)                              
 
 Q:
   20  -ε-  [Push]                           18, 30
   18  -ε-                                   16
-  16       [EndArr] (debugger_statement)    15
+  16       [ArrayClose] (debugger_statement)  15
        ●   debugger_statement
   15       _                                12
        ●   program
   12   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 [{"$tag":"X"},{"$tag":"X"}]

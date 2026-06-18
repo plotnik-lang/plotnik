@@ -9,10 +9,10 @@ use rowan::TextRange;
 
 use super::dependencies::{DependencyAnalysis, collect_refs};
 use super::symbol_table::SymbolTable;
-use super::visitor::{Visitor, walk_expr, walk_named_node};
+use super::visitor::{Visitor, walk_pattern, walk_node_pattern};
 use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{AnonymousNode, Def, Expr, NamedNode, Ref, Root, SeqExpr};
+use crate::parser::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
 use crate::query::SourceId;
 
 pub fn validate_recursion(
@@ -47,7 +47,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             let name = &scc[0];
             let body = self
                 .symbol_table
-                .get(name)
+                .body(name)
                 .expect("node in SCC must exist in symbol table");
             if !collect_refs(body, self.symbol_table).contains(name.as_str()) {
                 return;
@@ -58,13 +58,13 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         let has_escape = scc
             .iter()
-            .filter_map(|name| self.symbol_table.get(name))
+            .filter_map(|name| self.symbol_table.body(name))
             .any(|body| expr_has_escape(body, &scc_set));
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
-            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
-                find_ref_range(expr, target)
+            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, pattern, target| {
+                find_ref_range(pattern, target)
             }) {
                 let chain = self.format_chain(raw_chain, false);
                 self.report_cycle(DiagnosticKind::RecursionNoEscape, scc, chain);
@@ -72,8 +72,8 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             return;
         }
 
-        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, expr, target| {
-            find_unguarded_ref_range(expr, target)
+        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, pattern, target| {
+            find_unguarded_ref_range(pattern, target)
         }) {
             let chain = self.format_chain(raw_chain, true);
             self.report_cycle(DiagnosticKind::DirectRecursion, scc, chain);
@@ -81,16 +81,16 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
     }
 
     /// Finds a cycle within the given set of nodes (SCC).
-    /// `get_edge_location` returns the location of a reference from `expr` to `target`.
+    /// `get_edge_location` returns the location of a reference from `pattern` to `target`.
     fn find_cycle<'b>(
         &self,
         nodes: &'b [String],
         domain: &IndexSet<&'b str>,
-        get_edge_location: impl Fn(&Self, SourceId, &Expr, &str) -> Option<TextRange>,
+        get_edge_location: impl Fn(&Self, SourceId, &Pattern, &str) -> Option<TextRange>,
     ) -> Option<Vec<(SourceId, TextRange, &'b str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
-            if let Some((source_id, body)) = self.symbol_table.get_full(name) {
+            if let Some((source_id, body)) = self.symbol_table.definition(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
@@ -173,7 +173,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
     ) -> Option<(SourceId, String, TextRange)> {
         let name = scc.iter().find(|name| {
             self.symbol_table
-                .get(name.as_str())
+                .body(name.as_str())
                 .is_some_and(|body| body.text_range().contains_range(range))
         })?;
         let (source_id, def) = self.find_def_by_name(name)?;
@@ -263,27 +263,27 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
     }
 }
 
-fn expr_has_escape(expr: &Expr, scc_names: &IndexSet<&str>) -> bool {
-    match expr {
-        Expr::Ref(r) => {
+fn expr_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
+    match pattern {
+        Pattern::Ref(r) => {
             let Some(name_token) = r.name() else {
                 return true;
             };
             !scc_names.contains(name_token.text())
         }
-        Expr::NamedNode(node) => {
+        Pattern::NodePattern(node) => {
             let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc_names))
         }
-        Expr::AltExpr(_) => expr
+        Pattern::AltPattern(_) => pattern
             .children()
             .iter()
             .any(|c| expr_has_escape(c, scc_names)),
-        Expr::SeqExpr(_) => expr
+        Pattern::SeqPattern(_) => pattern
             .children()
             .iter()
             .all(|c| expr_has_escape(c, scc_names)),
-        Expr::QuantifiedExpr(q) => {
+        Pattern::QuantifiedPattern(q) => {
             if q.is_optional() {
                 return true;
             }
@@ -291,28 +291,28 @@ fn expr_has_escape(expr: &Expr, scc_names: &IndexSet<&str>) -> bool {
                 .map(|inner| expr_has_escape(&inner, scc_names))
                 .unwrap_or(true)
         }
-        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => expr
+        Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
             .iter()
             .all(|c| expr_has_escape(c, scc_names)),
-        Expr::AnonymousNode(_) => true,
+        Pattern::TokenPattern(_) => true,
     }
 }
 
-fn expr_guarantees_consumption(expr: &Expr) -> bool {
-    match expr {
-        Expr::NamedNode(_) | Expr::AnonymousNode(_) => true,
-        Expr::Ref(_) => false,
-        Expr::AltExpr(_) => expr.children().iter().all(expr_guarantees_consumption),
-        Expr::SeqExpr(_) => expr.children().iter().any(expr_guarantees_consumption),
-        Expr::QuantifiedExpr(q) => {
+fn expr_guarantees_consumption(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
+        Pattern::Ref(_) => false,
+        Pattern::AltPattern(_) => pattern.children().iter().all(expr_guarantees_consumption),
+        Pattern::SeqPattern(_) => pattern.children().iter().any(expr_guarantees_consumption),
+        Pattern::QuantifiedPattern(q) => {
             !q.is_optional()
                 && q.inner()
                     .map(|i| expr_guarantees_consumption(&i))
                     .unwrap_or(false)
         }
-        Expr::CapturedExpr(_) | Expr::FieldExpr(_) => {
-            expr.children().iter().all(expr_guarantees_consumption)
+        Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => {
+            pattern.children().iter().all(expr_guarantees_consumption)
         }
     }
 }
@@ -320,7 +320,7 @@ fn expr_guarantees_consumption(expr: &Expr) -> bool {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RefSearchMode {
     Any,
-    /// Not inside a `NamedNode`/`AnonymousNode` (those consume input, so the cycle is guarded).
+    /// Not inside a `NodePattern`/`TokenPattern` (those consume input, so the cycle is guarded).
     Unguarded,
 }
 
@@ -331,22 +331,22 @@ struct RefFinder<'a> {
 }
 
 impl Visitor for RefFinder<'_> {
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_pattern(&mut self, pattern: &Pattern) {
         if self.found.is_some() {
             return;
         }
-        walk_expr(self, expr);
+        walk_pattern(self, pattern);
     }
 
-    fn visit_named_node(&mut self, node: &NamedNode) {
+    fn visit_node_pattern(&mut self, node: &NodePattern) {
         if self.mode == RefSearchMode::Unguarded {
             return; // Guarded: stop recursion
         }
-        walk_named_node(self, node);
+        walk_node_pattern(self, node);
     }
 
-    fn visit_anonymous_node(&mut self, _node: &AnonymousNode) {
-        // AnonymousNode has no child expressions, so nothing to walk.
+    fn visit_token_pattern(&mut self, _node: &TokenPattern) {
+        // TokenPattern has no child expressions, so nothing to walk.
         // In Unguarded mode this also acts as a guard (stops recursion).
     }
 
@@ -361,9 +361,9 @@ impl Visitor for RefFinder<'_> {
         }
     }
 
-    fn visit_seq_expr(&mut self, seq: &SeqExpr) {
+    fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
         for child in seq.children() {
-            self.visit_expr(&child);
+            self.visit_pattern(&child);
             if self.found.is_some() {
                 return;
             }
@@ -374,22 +374,22 @@ impl Visitor for RefFinder<'_> {
     }
 }
 
-fn find_ref_range(expr: &Expr, target: &str) -> Option<TextRange> {
+fn find_ref_range(pattern: &Pattern, target: &str) -> Option<TextRange> {
     let mut visitor = RefFinder {
         target,
         found: None,
         mode: RefSearchMode::Any,
     };
-    visitor.visit_expr(expr);
+    visitor.visit_pattern(pattern);
     visitor.found
 }
 
-fn find_unguarded_ref_range(expr: &Expr, target: &str) -> Option<TextRange> {
+fn find_unguarded_ref_range(pattern: &Pattern, target: &str) -> Option<TextRange> {
     let mut visitor = RefFinder {
         target,
         found: None,
         mode: RefSearchMode::Unguarded,
     };
-    visitor.visit_expr(expr);
+    visitor.visit_pattern(pattern);
     visitor.found
 }

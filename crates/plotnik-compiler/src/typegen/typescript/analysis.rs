@@ -2,20 +2,20 @@
 
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
-use plotnik_bytecode::{TypeData, TypeId, TypeKind};
+use plotnik_bytecode::{TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 
 impl Emitter<'_> {
-    pub(super) fn collect_builtin_references(&mut self) {
+    pub(super) fn mark_node_reachable(&mut self) {
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            self.collect_refs_recursive(ep.result_type());
+            self.visit_for_node_use(ep.result_type());
         }
     }
 
-    fn collect_refs_recursive(&mut self, type_id: TypeId) {
-        if !self.refs_visited.insert(type_id) {
+    fn visit_for_node_use(&mut self, type_id: TypeId) {
+        if !self.node_scan_visited.insert(type_id) {
             return;
         }
 
@@ -23,28 +23,28 @@ impl Emitter<'_> {
             return;
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(TypeKind::Node) => {
-                self.node_referenced = true;
+        match type_def.decode() {
+            TypeDefKind::Primitive(TypeKind::Node) => {
+                self.node_reachable = true;
             }
-            TypeData::Primitive(_) => {}
-            TypeData::Wrapper {
+            TypeDefKind::Primitive(_) => {}
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => {
-                self.node_referenced = true;
+                self.node_reachable = true;
             }
-            TypeData::Wrapper { inner, .. } => {
-                self.collect_refs_recursive(inner);
+            TypeDefKind::Wrapper { inner, .. } => {
+                self.visit_for_node_use(inner);
             }
-            TypeData::Composite { .. } => {
+            TypeDefKind::Composite { .. } => {
                 let member_types: Vec<_> = self
                     .types
                     .members_of(&type_def)
                     .map(|m| m.type_id)
                     .collect();
                 for ty in member_types {
-                    self.collect_refs_recursive(ty);
+                    self.visit_for_node_use(ty);
                 }
             }
         }
@@ -60,7 +60,7 @@ impl Emitter<'_> {
         }
 
         for &tid in &types {
-            for dep in self.get_direct_deps(tid) {
+            for dep in self.direct_type_deps(tid) {
                 if types.contains(&dep) && dep != tid {
                     deps.entry(tid).or_default().insert(dep);
                     rdeps.entry(dep).or_default().insert(tid);
@@ -96,7 +96,7 @@ impl Emitter<'_> {
         result
     }
 
-    pub(super) fn collect_reachable_types(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
+    pub(super) fn collect_emit_set(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
         if out.contains(&type_id) {
             return;
         }
@@ -105,42 +105,42 @@ impl Emitter<'_> {
             return;
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(_) => {}
-            TypeData::Wrapper {
+        match type_def.decode() {
+            TypeDefKind::Primitive(_) => {}
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => {
                 out.insert(type_id);
             }
-            TypeData::Wrapper { inner, .. } => {
-                self.collect_reachable_types(inner, out);
+            TypeDefKind::Wrapper { inner, .. } => {
+                self.collect_emit_set(inner, out);
             }
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 ..
             } => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
-                    self.collect_reachable_types(member.type_id, out);
+                    self.collect_emit_set(member.type_id, out);
                 }
             }
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind: TypeKind::Enum,
                 ..
             } => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
-                    self.collect_enum_variant_refs(member.type_id, out);
+                    self.collect_variant_payload_types(member.type_id, out);
                 }
             }
-            TypeData::Composite { .. } => {}
+            TypeDefKind::Composite { .. } => {}
         }
     }
 
     /// Collect reachable types from enum variant payloads.
     /// Recurses into struct fields but doesn't add the payload struct itself.
-    fn collect_enum_variant_refs(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
+    fn collect_variant_payload_types(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
         let Some(type_def) = self.types.get(type_id) else {
             return;
         };
@@ -148,54 +148,54 @@ impl Emitter<'_> {
         // For struct payloads, don't add the struct itself (it will be inlined),
         // but recurse into its fields to find named types.
         if matches!(
-            type_def.classify(),
-            TypeData::Composite {
+            type_def.decode(),
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 ..
             }
         ) {
             for member in self.types.members_of(&type_def) {
-                self.collect_reachable_types(member.type_id, out);
+                self.collect_emit_set(member.type_id, out);
             }
         } else {
-            self.collect_reachable_types(type_id, out);
+            self.collect_emit_set(type_id, out);
         }
     }
 
-    pub(super) fn get_direct_deps(&self, type_id: TypeId) -> Vec<TypeId> {
+    pub(super) fn direct_type_deps(&self, type_id: TypeId) -> Vec<TypeId> {
         let Some(type_def) = self.types.get(type_id) else {
             return vec![];
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(_) => vec![],
-            TypeData::Wrapper {
+        match type_def.decode() {
+            TypeDefKind::Primitive(_) => vec![],
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => vec![],
-            TypeData::Wrapper { inner, .. } => self.unwrap_for_deps(inner),
-            TypeData::Composite { .. } => self
+            TypeDefKind::Wrapper { inner, .. } => self.peel_to_named_dep(inner),
+            TypeDefKind::Composite { .. } => self
                 .types
                 .members_of(&type_def)
-                .flat_map(|member| self.unwrap_for_deps(member.type_id))
+                .flat_map(|member| self.peel_to_named_dep(member.type_id))
                 .collect(),
         }
     }
 
-    fn unwrap_for_deps(&self, type_id: TypeId) -> Vec<TypeId> {
+    fn peel_to_named_dep(&self, type_id: TypeId) -> Vec<TypeId> {
         let Some(type_def) = self.types.get(type_id) else {
             return vec![];
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(_) => vec![],
+        match type_def.decode() {
+            TypeDefKind::Primitive(_) => vec![],
             // Alias is a named type, so it's a dependency itself
-            TypeData::Wrapper {
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => vec![type_id],
-            TypeData::Wrapper { inner, .. } => self.unwrap_for_deps(inner),
-            TypeData::Composite { .. } => vec![type_id],
+            TypeDefKind::Wrapper { inner, .. } => self.peel_to_named_dep(inner),
+            TypeDefKind::Composite { .. } => vec![type_id],
         }
     }
 }

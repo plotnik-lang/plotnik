@@ -6,14 +6,14 @@
 //!
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
-use super::ValidateInput;
+use super::ValidationInput;
 use crate::analyze::Reporter;
-use crate::analyze::visitor::{Visitor, walk_named_node, walk_seq_expr};
+use crate::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{NamedNode, SeqExpr, SeqItem};
+use crate::parser::{NodePattern, SeqPattern, SeqItem};
 
-pub fn validate_anchors(input: ValidateInput) {
-    let ValidateInput {
+pub fn validate_anchors(input: ValidationInput) {
+    let ValidationInput {
         source_id,
         ast,
         diag,
@@ -31,22 +31,22 @@ struct AnchorValidator<'a> {
 }
 
 impl Visitor for AnchorValidator<'_> {
-    fn visit_named_node(&mut self, node: &NamedNode) {
+    fn visit_node_pattern(&mut self, node: &NodePattern) {
         let prev = self.in_named_node;
         self.in_named_node = true;
 
         self.check_items(node.items());
 
         // Named node provides first/last/adjacent context, so any anchor inside is valid.
-        walk_named_node(self, node);
+        walk_node_pattern(self, node);
 
         self.in_named_node = prev;
     }
 
-    fn visit_seq_expr(&mut self, seq: &SeqExpr) {
+    fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
         self.check_items(seq.items());
 
-        walk_seq_expr(self, seq);
+        walk_seq_pattern(self, seq);
     }
 }
 

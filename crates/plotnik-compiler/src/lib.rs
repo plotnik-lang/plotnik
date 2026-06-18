@@ -38,7 +38,7 @@ pub use query::{SourceId, SourceMap};
 pub enum Error {
     /// Execution fuel exhausted (too many parser operations).
     #[error("execution limit exceeded")]
-    ExecFuelExhausted,
+    ParseFuelExhausted,
 
     /// Recursion fuel exhausted (input nested too deeply).
     #[error("recursion limit exceeded")]

@@ -39,9 +39,9 @@ To retrieve regex `i`:
 3. `end = table[i+1].offset`
 4. `dfa_bytes = blob[start..end]`
 
-## 2. Node Types
+## 2. Node Kinds
 
-Maps tree-sitter node type IDs to their string names.
+Maps tree-sitter node kind IDs to their string names.
 
 - **Section Offset**: Computed (follows RegexTable)
 - **Record Size**: 4 bytes
@@ -49,8 +49,8 @@ Maps tree-sitter node type IDs to their string names.
 
 ```rust
 #[repr(C)]
-struct NodeSymbol {
-    id: u16,        // Tree-sitter node type ID
+struct NodeKindEntry {
+    symbol: u16,    // Tree-sitter node kind ID
     name: u16,      // StringId
 }
 ```

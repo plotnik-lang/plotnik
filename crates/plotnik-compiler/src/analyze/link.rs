@@ -1,36 +1,36 @@
-//! Link pass: resolve node types and fields against tree-sitter grammar.
+//! Link pass: resolve node kinds and fields against tree-sitter grammar.
 //!
 //! Two-phase approach:
-//! 1. Resolve all symbols (node types and fields) against grammar
-//! 2. Validate structural constraints (field on node type, child type for field)
+//! 1. Resolve all symbols (node kinds and fields) against grammar
+//! 2. Validate structural constraints (field on node kind, child kind for field)
 
 use std::collections::{HashMap, HashSet};
 
 use indexmap::IndexMap;
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 use rowan::TextRange;
 
 #[derive(Default)]
-pub struct LinkOutput {
-    /// Interned named/anonymous node type → NodeTypeId (for binary: StringId → NodeTypeId)
-    node_type_ids: IndexMap<NodeType<Symbol>, NodeTypeId>,
+pub struct GrammarBinding {
+    /// Interned named/anonymous node kind → NodeKindId (for binary: StringId → NodeKindId)
+    node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
     /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
 
-impl LinkOutput {
-    pub fn node_type_ids(&self) -> &IndexMap<NodeType<Symbol>, NodeTypeId> {
-        &self.node_type_ids
+impl GrammarBinding {
+    pub fn node_kind_ids(&self) -> &IndexMap<NodeKind<Symbol>, NodeKindId> {
+        &self.node_kind_ids
     }
 
     pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
         &self.node_field_ids
     }
 
-    /// Record the first NodeTypeId seen for a node type, keeping the existing entry.
-    pub(crate) fn insert_node_type_id(&mut self, key: NodeType<Symbol>, id: NodeTypeId) {
-        self.node_type_ids.entry(key).or_insert(id);
+    /// Record the first NodeKindId seen for a node kind, keeping the existing entry.
+    pub(crate) fn insert_node_kind_id(&mut self, key: NodeKind<Symbol>, id: NodeKindId) {
+        self.node_kind_ids.entry(key).or_insert(id);
     }
 
     /// Record the first NodeFieldId seen for a field, keeping the existing entry.
@@ -44,13 +44,13 @@ use super::symbol_table::SymbolTable;
 use super::utils::find_similar;
 use super::visitor::{Visitor, walk};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::ast::{self, Expr, NamedNode};
+use crate::parser::ast::{self, Pattern, NodePattern};
 use crate::parser::{SyntaxKind, SyntaxToken, token_src};
 use crate::query::{AstMap, SourceId, SourceMap};
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
 /// testing without a full query context.
-pub struct LinkCtx<'a, 'q> {
+pub struct GrammarLinkCtx<'a, 'q> {
     pub interner: &'a mut Interner,
     pub grammar: &'a Grammar,
     pub source_map: &'q SourceMap,
@@ -58,19 +58,19 @@ pub struct LinkCtx<'a, 'q> {
     pub symbol_table: &'a SymbolTable,
 }
 
-impl<'q> LinkCtx<'_, 'q> {
-    pub fn link(self, output: &mut LinkOutput, diagnostics: &mut Diagnostics) {
+impl<'q> GrammarLinkCtx<'_, 'q> {
+    pub fn link(self, output: &mut GrammarBinding, diagnostics: &mut Diagnostics) {
         // Local deduplication maps (not exposed in output)
-        let mut node_type_ids: HashMap<NodeType<&'q str>, Option<NodeTypeId>> = HashMap::new();
+        let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
 
         for (&source_id, root) in self.ast_map {
-            let mut linker = Linker {
+            let mut linker = GrammarLinker {
                 interner: &mut *self.interner,
                 grammar: self.grammar,
                 source_map: self.source_map,
                 symbol_table: self.symbol_table,
-                node_type_ids: &mut node_type_ids,
+                node_kind_ids: &mut node_kind_ids,
                 node_field_ids: &mut node_field_ids,
                 output,
                 reporter: Reporter::new(source_id, diagnostics),
@@ -80,19 +80,19 @@ impl<'q> LinkCtx<'_, 'q> {
     }
 }
 
-struct Linker<'a, 'q> {
+struct GrammarLinker<'a, 'q> {
     // Refs
     interner: &'a mut Interner,
     grammar: &'a Grammar,
     source_map: &'q SourceMap,
     symbol_table: &'a SymbolTable,
-    node_type_ids: &'a mut HashMap<NodeType<&'q str>, Option<NodeTypeId>>,
+    node_kind_ids: &'a mut HashMap<NodeKind<&'q str>, Option<NodeKindId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
-    output: &'a mut LinkOutput,
+    output: &'a mut GrammarBinding,
     reporter: Reporter<'a>,
 }
 
-impl<'a, 'q> Linker<'a, 'q> {
+impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn source(&self) -> &'q str {
         self.source_map.content(self.reporter.source())
     }
@@ -108,7 +108,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     fn link(&mut self, root: &ast::Root) {
         self.resolve_symbols(root);
-        self.validate_structure(root);
+        self.check_grammar(root);
     }
 
     fn resolve_symbols(&mut self, root: &ast::Root) {
@@ -116,11 +116,11 @@ impl<'a, 'q> Linker<'a, 'q> {
         resolver.visit(root);
     }
 
-    fn resolve_named_node(&mut self, node: &NamedNode) {
+    fn resolve_named_node(&mut self, node: &NodePattern) {
         if node.is_any() {
             return;
         }
-        let Some(type_token) = node.node_type() else {
+        let Some(type_token) = node.kind_token() else {
             return;
         };
         if matches!(
@@ -130,15 +130,15 @@ impl<'a, 'q> Linker<'a, 'q> {
             return;
         }
         let type_name = type_token.text();
-        let key = NodeType::Named(token_src(&type_token, self.source()));
-        if self.node_type_ids.contains_key(&key) {
+        let key = NodeKind::Named(token_src(&type_token, self.source()));
+        if self.node_kind_ids.contains_key(&key) {
             return;
         }
         let resolved = self.grammar.resolve_named_node(type_name);
-        self.node_type_ids.insert(key, resolved);
+        self.node_kind_ids.insert(key, resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(type_name);
-            self.output.insert_node_type_id(NodeType::Named(sym), id);
+            self.output.insert_node_kind_id(NodeKind::Named(sym), id);
         }
         if resolved.is_none() {
             let all_types = self.grammar.all_named_node_kinds();
@@ -147,8 +147,8 @@ impl<'a, 'q> Linker<'a, 'q> {
 
             let mut builder = self
                 .reporter
-                .report(DiagnosticKind::UnknownNodeType, type_token.text_range())
-                .message(type_name);
+                .report(DiagnosticKind::UnknownNodeKind, type_token.text_range())
+                .detail(type_name);
 
             if let Some(similar) = suggestion {
                 builder = builder.fix(format!("did you mean `{}`?", similar), similar);
@@ -180,7 +180,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         let mut builder = self
             .reporter
             .report(DiagnosticKind::UnknownField, name_token.text_range())
-            .message(field_name);
+            .detail(field_name);
 
         if let Some(similar) = suggestion {
             builder = builder.fix(format!("did you mean `{}`?", similar), similar);
@@ -188,45 +188,45 @@ impl<'a, 'q> Linker<'a, 'q> {
         builder.emit();
     }
 
-    fn validate_structure(&mut self, root: &ast::Root) {
+    fn check_grammar(&mut self, root: &ast::Root) {
         let defs: Vec<_> = root.defs().collect();
         for def in defs {
             let Some(body) = def.body() else { continue };
-            let mut walk = RefWalk::default();
-            self.validate_expr_structure(&body, None, CheckMode::Immediate, &mut walk);
+            let mut walk = RefCheckState::default();
+            self.check_pattern_grammar(&body, None, GrammarCheckMode::Required, &mut walk);
         }
     }
 
-    /// Walk the query, validating each node's own grammar constraints. See `CheckMode` for why
+    /// Walk the query, validating each node's own grammar constraints. See `GrammarCheckMode` for why
     /// `Deferred` positions skip their checks.
-    fn validate_expr_structure(
+    fn check_pattern_grammar(
         &mut self,
-        expr: &Expr,
-        ctx: Option<ValidationContext>,
-        mode: CheckMode,
-        walk: &mut RefWalk,
+        pattern: &Pattern,
+        ctx: Option<ParentNodeCtx>,
+        mode: GrammarCheckMode,
+        walk: &mut RefCheckState,
     ) {
-        match expr {
-            Expr::NamedNode(node) => {
-                let child_ctx = self.make_node_context(node);
+        match pattern {
+            Pattern::NodePattern(node) => {
+                let child_ctx = self.resolve_node_context(node);
 
                 // A `#subtype` refinement must denote a satisfiable kind of its base type.
-                if mode.is_immediate() {
+                if mode.is_required() {
                     self.validate_subtype(node);
                 }
 
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
-                if mode.is_immediate()
+                if mode.is_required()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
                     && (!self.grammar.valid_child_types(ctx.parent_id).is_empty()
-                        || !self.grammar.fields_for_node_type(ctx.parent_id).is_empty())
+                        || !self.grammar.fields_for_node_kind(ctx.parent_id).is_empty())
                 {
                     self.reporter
                         .report(
                             DiagnosticKind::PredicateOnNonLeaf,
-                            pred.as_cst().text_range(),
+                            pred.syntax().text_range(),
                         )
                         .emit();
                 }
@@ -234,55 +234,55 @@ impl<'a, 'q> Linker<'a, 'q> {
                 let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.parent_id));
 
                 for child in node.children() {
-                    if let Expr::FieldExpr(f) = &child {
-                        self.validate_field_expr(f, child_ctx.as_ref(), mode, walk);
+                    if let Pattern::FieldPattern(f) = &child {
+                        self.validate_field_pattern(f, child_ctx.as_ref(), mode, walk);
                     } else {
-                        if mode.is_immediate()
+                        if mode.is_required()
                             && let (Some(ctx), Some(adm)) =
                                 (child_ctx.as_ref(), admissible.as_ref())
                         {
                             self.check_bare_child(&child, ctx, adm);
                         }
-                        self.validate_expr_structure(&child, child_ctx, mode, walk);
+                        self.check_pattern_grammar(&child, child_ctx, mode, walk);
                     }
                 }
 
                 if let Some(ctx) = child_ctx {
-                    for child in node.as_cst().children() {
+                    for child in node.syntax().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
                             self.validate_negated_field(&neg, &ctx, mode);
                         }
                     }
                 }
             }
-            Expr::AnonymousNode(_) => {}
-            Expr::FieldExpr(f) => {
-                // Normally handled by the parent NamedNode; reached only on a bare field
+            Pattern::TokenPattern(_) => {}
+            Pattern::FieldPattern(f) => {
+                // Normally handled by the parent NodePattern; reached only on a bare field
                 // at root or inside a seq without a named-node parent.
-                self.validate_field_expr(f, ctx.as_ref(), mode, walk);
+                self.validate_field_pattern(f, ctx.as_ref(), mode, walk);
             }
-            Expr::AltExpr(alt) => {
+            Pattern::AltPattern(alt) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx, CheckMode::Deferred, walk);
+                    self.check_pattern_grammar(&body, ctx, GrammarCheckMode::Deferred, walk);
                 }
             }
-            Expr::SeqExpr(seq) => {
+            Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx, mode, walk);
+                    self.check_pattern_grammar(&child, ctx, mode, walk);
                 }
             }
-            Expr::CapturedExpr(cap) => {
+            Pattern::CapturedPattern(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, mode, walk);
+                self.check_pattern_grammar(&inner, ctx, mode, walk);
             }
-            Expr::QuantifiedExpr(q) => {
+            Pattern::QuantifiedPattern(q) => {
                 let Some(inner) = q.inner() else { return };
                 // The body is optional/repeated — zero occurrences can satisfy it, so defer.
-                self.validate_expr_structure(&inner, ctx, CheckMode::Deferred, walk);
+                self.check_pattern_grammar(&inner, ctx, GrammarCheckMode::Deferred, walk);
             }
-            Expr::Ref(r) => {
+            Pattern::Ref(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
                 // Validation is a pure function of `(name, ctx, mode)`, so caching it
@@ -300,7 +300,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 }
                 let Some((ref_source, body)) = self
                     .symbol_table
-                    .get_full(name)
+                    .definition(name)
                     .map(|(s, b)| (s, b.clone()))
                 else {
                     walk.in_progress.remove(name);
@@ -310,7 +310,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 // Validate its body under ITS source so token slicing and
                 // diagnostics resolve against the right content.
                 self.with_source(ref_source, |this| {
-                    this.validate_expr_structure(&body, ctx, mode, walk);
+                    this.check_pattern_grammar(&body, ctx, mode, walk);
                 });
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
@@ -318,33 +318,33 @@ impl<'a, 'q> Linker<'a, 'q> {
         }
     }
 
-    fn make_node_context(&self, node: &NamedNode) -> Option<ValidationContext> {
+    fn resolve_node_context(&self, node: &NodePattern) -> Option<ParentNodeCtx> {
         if node.is_any() {
             return None;
         }
-        let type_token = node.node_type()?;
+        let type_token = node.kind_token()?;
         if matches!(
             type_token.kind(),
             SyntaxKind::KwError | SyntaxKind::KwMissing
         ) {
             return None;
         }
-        let key = NodeType::Named(token_src(&type_token, self.source()));
-        let parent_id = self.node_type_ids.get(&key).copied().flatten()?;
-        self.grammar.node_type_name(parent_id)?;
-        Some(ValidationContext {
+        let key = NodeKind::Named(token_src(&type_token, self.source()));
+        let parent_id = self.node_kind_ids.get(&key).copied().flatten()?;
+        self.grammar.node_kind(parent_id)?;
+        Some(ParentNodeCtx {
             parent_id,
             parent_range: type_token.text_range(),
             parent_source: self.reporter.source(),
         })
     }
 
-    fn validate_field_expr(
+    fn validate_field_pattern(
         &mut self,
-        field: &ast::FieldExpr,
-        ctx: Option<&ValidationContext>,
-        mode: CheckMode,
-        walk: &mut RefWalk,
+        field: &ast::FieldPattern,
+        ctx: Option<&ParentNodeCtx>,
+        mode: GrammarCheckMode,
+        walk: &mut RefCheckState,
     ) {
         let Some(name_token) = field.name() else {
             return;
@@ -362,7 +362,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         if !self.grammar.has_field(ctx.parent_id, field_id) {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
-            if mode.is_immediate() {
+            if mode.is_required() {
                 self.emit_field_not_on_node(name_token.text_range(), name_token.text(), ctx);
             }
             return;
@@ -377,17 +377,17 @@ impl<'a, 'q> Linker<'a, 'q> {
         let Some(value) = field.value() else { return };
         // The field value's kind must be admissible for this field. Skipped under a
         // disjunction/option, where the field constraint need not hold for the query to match.
-        if mode.is_immediate() {
+        if mode.is_required() {
             self.check_field_value(&value, ctx, &field_ref);
         }
-        self.validate_expr_structure(&value, Some(*ctx), mode, walk);
+        self.check_pattern_grammar(&value, Some(*ctx), mode, walk);
     }
 
     fn validate_negated_field(
         &mut self,
         neg: &ast::NegatedField,
-        ctx: &ValidationContext,
-        mode: CheckMode,
+        ctx: &ParentNodeCtx,
+        mode: GrammarCheckMode,
     ) {
         let Some(name_token) = neg.name() else {
             return;
@@ -399,7 +399,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         };
 
         if !self.grammar.has_field(ctx.parent_id, field_id) {
-            if mode.is_immediate() {
+            if mode.is_required() {
                 self.emit_field_not_on_node(name_token.text_range(), field_name, ctx);
             }
             return;
@@ -407,7 +407,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         // A required field is present in every production, so asserting its absence can never
         // match. Skipped under a disjunction/option, where the negation need not hold.
-        if mode.is_immediate()
+        if mode.is_required()
             && self
                 .grammar
                 .field_cardinality(ctx.parent_id, field_id)
@@ -415,14 +415,14 @@ impl<'a, 'q> Linker<'a, 'q> {
         {
             let parent_name = self
                 .grammar
-                .node_type_name(ctx.parent_id)
+                .node_kind(ctx.parent_id)
                 .expect("validated parent_id must have a name");
             self.reporter
                 .report(
                     DiagnosticKind::NegatedRequiredField,
                     name_token.text_range(),
                 )
-                .message(field_name)
+                .detail(field_name)
                 .related_to(
                     ctx.parent_source,
                     ctx.parent_range,
@@ -440,18 +440,18 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         range: TextRange,
         field_name: &str,
-        ctx: &ValidationContext,
+        ctx: &ParentNodeCtx,
     ) {
-        let valid_fields = self.grammar.fields_for_node_type(ctx.parent_id);
+        let valid_fields = self.grammar.fields_for_node_kind(ctx.parent_id);
         let parent_name = self
             .grammar
-            .node_type_name(ctx.parent_id)
+            .node_kind(ctx.parent_id)
             .expect("validated parent_id must have a name");
 
         let mut builder = self
             .reporter
-            .report(DiagnosticKind::FieldNotOnNodeType, range)
-            .message(field_name)
+            .report(DiagnosticKind::FieldNotOnNodeKind, range)
+            .detail(field_name)
             .related_to(
                 ctx.parent_source,
                 ctx.parent_range,
@@ -474,31 +474,31 @@ impl<'a, 'q> Linker<'a, 'q> {
         builder.emit();
     }
 
-    /// Resolve a child/value `NamedNode` to its grammar id, mirroring `make_node_context` but
+    /// Resolve a child/value `NodePattern` to its grammar id, mirroring `resolve_node_context` but
     /// returning just the id. `None` for `(_)`, `ERROR`, `MISSING`, or an unresolved kind
     /// (the latter already reported by the resolution pass) — all of which carry no
     /// admissibility signal and are conservatively accepted.
-    fn resolve_named_node_id(&self, node: &NamedNode) -> Option<NodeTypeId> {
+    fn resolve_named_node_id(&self, node: &NodePattern) -> Option<NodeKindId> {
         if node.is_any() {
             return None;
         }
-        let type_token = node.node_type()?;
+        let type_token = node.kind_token()?;
         if matches!(
             type_token.kind(),
             SyntaxKind::KwError | SyntaxKind::KwMissing
         ) {
             return None;
         }
-        let key = NodeType::Named(token_src(&type_token, self.source()));
-        self.node_type_ids.get(&key).copied().flatten()
+        let key = NodeKind::Named(token_src(&type_token, self.source()));
+        self.node_kind_ids.get(&key).copied().flatten()
     }
 
     /// All child kinds (named children and field values) the grammar can place under `parent`,
     /// expanded through supertype subtyping in both directions. A bare child is admissible iff
     /// it lands in this set (or is an extra / a supertype overlapping it).
-    fn admissible_set(&self, parent: NodeTypeId) -> HashSet<NodeTypeId> {
+    fn admissible_set(&self, parent: NodeKindId) -> HashSet<NodeKindId> {
         let mut seeds = self.grammar.valid_child_types(parent).to_vec();
-        for field_name in self.grammar.fields_for_node_type(parent) {
+        for field_name in self.grammar.fields_for_node_kind(parent) {
             if let Some(field_id) = self.grammar.resolve_field(field_name) {
                 seeds.extend_from_slice(self.grammar.valid_field_types(parent, field_id));
             }
@@ -514,7 +514,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     /// Whether a concrete child kind can occupy a bare child position whose parent admits
     /// `adm`. The parent is already known to be a non-leaf here.
-    fn admissible_child(&self, child: NodeTypeId, adm: &HashSet<NodeTypeId>) -> bool {
+    fn admissible_child(&self, child: NodeKindId, adm: &HashSet<NodeKindId>) -> bool {
         adm.contains(&child)
             || self.grammar.is_extra(child)
             || (self.grammar.is_supertype(child)
@@ -529,36 +529,36 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// wrappers (capture, sequence) and reports at the deepest pinned leaf; alternations,
     /// quantifiers, and references are skipped — their satisfiability is not checked here, and
     /// skipping can only miss a rejection, never reject a valid query.
-    fn check_bare_child(&mut self, expr: &Expr, ctx: &ValidationContext, adm: &HashSet<NodeTypeId>) {
-        match expr {
-            Expr::CapturedExpr(cap) => {
+    fn check_bare_child(&mut self, pattern: &Pattern, ctx: &ParentNodeCtx, adm: &HashSet<NodeKindId>) {
+        match pattern {
+            Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
                     self.check_bare_child(&inner, ctx, adm);
                 }
             }
-            Expr::SeqExpr(seq) => {
+            Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
                     self.check_bare_child(&child, ctx, adm);
                 }
             }
-            Expr::NamedNode(node) => {
+            Pattern::NodePattern(node) => {
                 self.check_bare_named_child(node, ctx, adm);
             }
             // Anonymous children are untracked (grammar children arrays never list anonymous
             // tokens). Alternations, quantifiers, and references are not checked here.
-            Expr::AnonymousNode(_)
-            | Expr::AltExpr(_)
-            | Expr::QuantifiedExpr(_)
-            | Expr::Ref(_)
-            | Expr::FieldExpr(_) => {}
+            Pattern::TokenPattern(_)
+            | Pattern::AltPattern(_)
+            | Pattern::QuantifiedPattern(_)
+            | Pattern::Ref(_)
+            | Pattern::FieldPattern(_) => {}
         }
     }
 
     fn check_bare_named_child(
         &mut self,
-        node: &NamedNode,
-        ctx: &ValidationContext,
-        adm: &HashSet<NodeTypeId>,
+        node: &NodePattern,
+        ctx: &ParentNodeCtx,
+        adm: &HashSet<NodeKindId>,
     ) {
         let parent_is_token = self.grammar.is_token(ctx.parent_id);
 
@@ -573,7 +573,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         let Some(child_id) = self.resolve_named_node_id(node) else {
             return;
         };
-        let Some(type_token) = node.node_type() else {
+        let Some(type_token) = node.kind_token() else {
             return;
         };
 
@@ -590,33 +590,33 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// Validate one field value against the field's admissible types. Mirrors `check_bare_child`
     /// but uses the field's type set and has no extras/leaf-token rescue (fields hold specific
     /// kinds, never comments).
-    fn check_field_value(&mut self, expr: &Expr, ctx: &ValidationContext, field: &FieldRef) {
-        match expr {
-            Expr::CapturedExpr(cap) => {
+    fn check_field_value(&mut self, pattern: &Pattern, ctx: &ParentNodeCtx, field: &FieldRef) {
+        match pattern {
+            Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
                     self.check_field_value(&inner, ctx, field);
                 }
             }
-            Expr::NamedNode(node) => {
+            Pattern::NodePattern(node) => {
                 self.check_field_named_value(node, ctx, field);
             }
-            Expr::AnonymousNode(anon) => {
+            Pattern::TokenPattern(anon) => {
                 self.check_field_anon_value(anon, ctx, field);
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
-            Expr::AltExpr(_)
-            | Expr::QuantifiedExpr(_)
-            | Expr::Ref(_)
-            | Expr::SeqExpr(_)
-            | Expr::FieldExpr(_) => {}
+            Pattern::AltPattern(_)
+            | Pattern::QuantifiedPattern(_)
+            | Pattern::Ref(_)
+            | Pattern::SeqPattern(_)
+            | Pattern::FieldPattern(_) => {}
         }
     }
 
     fn check_field_named_value(
         &mut self,
-        node: &NamedNode,
-        ctx: &ValidationContext,
+        node: &NodePattern,
+        ctx: &ParentNodeCtx,
         field: &FieldRef,
     ) {
         if node.is_any() {
@@ -632,7 +632,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         let Some(value_id) = self.resolve_named_node_id(node) else {
             return;
         };
-        let Some(type_token) = node.node_type() else {
+        let Some(type_token) = node.kind_token() else {
             return;
         };
 
@@ -642,7 +642,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         let value_name = self
             .grammar
-            .node_type_name(value_id)
+            .node_kind(value_id)
             .expect("resolved value must have a name");
         let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
         self.emit_invalid_field_value(type_token.text_range(), message, ctx, field);
@@ -650,8 +650,8 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     fn check_field_anon_value(
         &mut self,
-        anon: &ast::AnonymousNode,
-        ctx: &ValidationContext,
+        anon: &ast::TokenPattern,
+        ctx: &ParentNodeCtx,
         field: &FieldRef,
     ) {
         // The bare `_` matches any node, anonymous tokens included, so it always fits.
@@ -661,8 +661,8 @@ impl<'a, 'q> Linker<'a, 'q> {
         let Some(value_token) = anon.value() else {
             return;
         };
-        let key = NodeType::Anonymous(token_src(&value_token, self.source()));
-        let Some(value_id) = self.node_type_ids.get(&key).copied().flatten() else {
+        let key = NodeKind::Anonymous(token_src(&value_token, self.source()));
+        let Some(value_id) = self.node_kind_ids.get(&key).copied().flatten() else {
             return;
         };
 
@@ -680,9 +680,9 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     fn field_admissible_set(
         &self,
-        parent: NodeTypeId,
+        parent: NodeKindId,
         field_id: NodeFieldId,
-    ) -> HashSet<NodeTypeId> {
+    ) -> HashSet<NodeKindId> {
         let mut admissible = HashSet::new();
         for &seed in self.grammar.valid_field_types(parent, field_id) {
             admissible.insert(seed);
@@ -693,8 +693,8 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     fn field_admissible(
         &self,
-        value: NodeTypeId,
-        parent: NodeTypeId,
+        value: NodeKindId,
+        parent: NodeKindId,
         field_id: NodeFieldId,
     ) -> bool {
         let admissible = self.field_admissible_set(parent, field_id);
@@ -707,10 +707,10 @@ impl<'a, 'q> Linker<'a, 'q> {
                     .any(|kind| admissible.contains(kind)))
     }
 
-    /// True only when every type the field accepts is a literal token — then a `(_)` (named)
-    /// value is impossible. Errs toward `false` (accept) when any type isn't confidently
+    /// True only when every kind the field accepts is a literal token — then a `(_)` (named)
+    /// value is impossible. Errs toward `false` (accept) when any kind isn't confidently
     /// anonymous, keeping rejection sound.
-    fn field_is_anonymous_only(&self, parent: NodeTypeId, field_id: NodeFieldId) -> bool {
+    fn field_is_anonymous_only(&self, parent: NodeKindId, field_id: NodeFieldId) -> bool {
         let types = self.grammar.valid_field_types(parent, field_id);
         !types.is_empty() && types.iter().all(|&id| self.grammar.is_anonymous_node(id))
     }
@@ -718,7 +718,7 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// Whether two kinds can denote the same concrete node — i.e. their subtype closures (each
     /// including the kind itself) intersect. Even sibling supertypes can share a concrete member,
     /// so a non-empty overlap is what makes a `(super#sub)` refinement satisfiable.
-    fn subtypes_overlap(&self, a: NodeTypeId, b: NodeTypeId) -> bool {
+    fn subtypes_overlap(&self, a: NodeKindId, b: NodeKindId) -> bool {
         if a == b {
             return true;
         }
@@ -734,11 +734,11 @@ impl<'a, 'q> Linker<'a, 'q> {
 
     /// A `(supertype#subtype)` refinement must be satisfiable — its base and refinement subtype
     /// closures must overlap.
-    fn validate_subtype(&mut self, node: &NamedNode) {
+    fn validate_subtype(&mut self, node: &NodePattern) {
         let Some(sub_token) = node.subtype() else {
             return;
         };
-        let Some(super_token) = node.node_type() else {
+        let Some(super_token) = node.kind_token() else {
             return;
         };
         if matches!(
@@ -758,8 +758,8 @@ impl<'a, 'q> Linker<'a, 'q> {
             let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
             let mut builder = self
                 .reporter
-                .report(DiagnosticKind::UnknownNodeType, sub_token.text_range())
-                .message(sub_name);
+                .report(DiagnosticKind::UnknownNodeKind, sub_token.text_range())
+                .detail(sub_name);
             if let Some(similar) = suggestion {
                 builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
@@ -778,14 +778,14 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         let super_name = self
             .grammar
-            .node_type_name(super_id)
+            .node_kind(super_id)
             .expect("resolved supertype must have a name")
             .to_string();
         let kinds = self
             .grammar
             .subtypes(super_id)
             .iter()
-            .filter_map(|&id| self.grammar.node_type_name(id))
+            .filter_map(|&id| self.grammar.node_kind(id))
             .collect::<Vec<_>>();
         let kinds_hint = (!kinds.is_empty()).then(|| {
             format!(
@@ -799,7 +799,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         let mut builder = self
             .reporter
             .report(DiagnosticKind::InvalidSubtype, sub_token.text_range())
-            .message(format!(
+            .detail(format!(
                 "`{}` is not a subtype of `{}`",
                 sub_name, super_name
             ))
@@ -817,24 +817,24 @@ impl<'a, 'q> Linker<'a, 'q> {
     fn emit_invalid_child(
         &mut self,
         range: TextRange,
-        child_id: NodeTypeId,
-        ctx: &ValidationContext,
+        child_id: NodeKindId,
+        ctx: &ParentNodeCtx,
     ) {
         let child_name = self
             .grammar
-            .node_type_name(child_id)
+            .node_kind(child_id)
             .expect("resolved child must have a name")
             .to_string();
         let parent_name = self
             .grammar
-            .node_type_name(ctx.parent_id)
+            .node_kind(ctx.parent_id)
             .expect("validated parent_id must have a name")
             .to_string();
         let hint = self.child_hint(ctx.parent_id, &parent_name);
 
         self.reporter
             .report(DiagnosticKind::InvalidChildType, range)
-            .message(child_name)
+            .detail(child_name)
             .related_to(
                 ctx.parent_source,
                 ctx.parent_range,
@@ -844,16 +844,16 @@ impl<'a, 'q> Linker<'a, 'q> {
             .emit();
     }
 
-    fn emit_child_under_leaf_token(&mut self, range: TextRange, ctx: &ValidationContext) {
+    fn emit_child_under_leaf_token(&mut self, range: TextRange, ctx: &ParentNodeCtx) {
         let parent_name = self
             .grammar
-            .node_type_name(ctx.parent_id)
+            .node_kind(ctx.parent_id)
             .expect("validated parent_id must have a name")
             .to_string();
 
         self.reporter
             .report(DiagnosticKind::ChildUnderLeafToken, range)
-            .message(&parent_name)
+            .detail(&parent_name)
             .related_to(
                 ctx.parent_source,
                 ctx.parent_range,
@@ -869,12 +869,12 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// Hint for the inadmissible-child diagnostic: list valid unlabeled children, or — when a
     /// node's only children are field values — surface those as fields so users don't write ghost
     /// bare-child queries.
-    fn child_hint(&self, parent_id: NodeTypeId, parent_name: &str) -> String {
+    fn child_hint(&self, parent_id: NodeKindId, parent_name: &str) -> String {
         let child_types = self.grammar.valid_child_types(parent_id);
         if !child_types.is_empty() {
             let names = child_types
                 .iter()
-                .filter_map(|&id| self.grammar.node_type_name(id))
+                .filter_map(|&id| self.grammar.node_kind(id))
                 .collect::<Vec<_>>();
             return format!(
                 "valid children of `{}`: {}",
@@ -883,7 +883,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             );
         }
 
-        let fields = self.grammar.fields_for_node_type(parent_id);
+        let fields = self.grammar.fields_for_node_kind(parent_id);
         if fields.is_empty() {
             return format!("`{}` has no named children", parent_name);
         }
@@ -898,15 +898,15 @@ impl<'a, 'q> Linker<'a, 'q> {
         )
     }
 
-    /// Render a field as `name: (type)` using its first valid type, for child/field hints.
-    fn render_field(&self, parent_id: NodeTypeId, field_name: &str) -> String {
+    /// Render a field as `name: (kind)` using its first valid kind, for child/field hints.
+    fn render_field(&self, parent_id: NodeKindId, field_name: &str) -> String {
         let type_name = self
             .grammar
             .resolve_field(field_name)
             .map(|field_id| self.grammar.valid_field_types(parent_id, field_id))
             .unwrap_or(&[])
             .iter()
-            .find_map(|&id| self.grammar.node_type_name(id))
+            .find_map(|&id| self.grammar.node_kind(id))
             .unwrap_or("_");
         format!("`{}: ({})`", field_name, type_name)
     }
@@ -915,14 +915,14 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         range: TextRange,
         message: String,
-        ctx: &ValidationContext,
+        ctx: &ParentNodeCtx,
         field: &FieldRef,
     ) {
         let hint = self.field_value_hint(ctx.parent_id, field.id, field.name);
         let source = self.reporter.source();
         self.reporter
             .report(DiagnosticKind::InvalidFieldChildType, range)
-            .message(message)
+            .detail(message)
             .related_to(source, field.range, format!("field `{}`", field.name))
             .hint(hint)
             .emit();
@@ -932,7 +932,7 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// literal-only fields — a concrete `field: "token"` example.
     fn field_value_hint(
         &self,
-        parent_id: NodeTypeId,
+        parent_id: NodeKindId,
         field_id: NodeFieldId,
         field_name: &str,
     ) -> String {
@@ -940,13 +940,13 @@ impl<'a, 'q> Linker<'a, 'q> {
         let named = types
             .iter()
             .filter(|&&id| !self.grammar.is_anonymous_node(id))
-            .filter_map(|&id| self.grammar.node_type_name(id))
+            .filter_map(|&id| self.grammar.node_kind(id))
             .collect::<Vec<_>>();
 
         if named.is_empty() {
             let example = types
                 .iter()
-                .find_map(|&id| self.grammar.node_type_name(id))
+                .find_map(|&id| self.grammar.node_kind(id))
                 .unwrap_or("…");
             return format!(
                 "`{0}` accepts only literal tokens — write `{0}: \"{1}\"`",
@@ -986,14 +986,14 @@ fn format_list(items: &[&str], max_items: usize) -> String {
 /// query), so the grammar checks must NOT fire there — doing so would reject queries that can
 /// match. Skipping a check can only miss a rejection, never reject a valid query.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-enum CheckMode {
-    Immediate,
+enum GrammarCheckMode {
+    Required,
     Deferred,
 }
 
-impl CheckMode {
-    fn is_immediate(self) -> bool {
-        matches!(self, CheckMode::Immediate)
+impl GrammarCheckMode {
+    fn is_required(self) -> bool {
+        matches!(self, GrammarCheckMode::Required)
     }
 }
 
@@ -1004,8 +1004,8 @@ struct FieldRef<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct ValidationContext {
-    parent_id: NodeTypeId,
+struct ParentNodeCtx {
+    parent_id: NodeKindId,
     parent_range: TextRange,
     /// Source the parent node lives in. May differ from the source currently
     /// being walked once validation crosses a reference into another workspace
@@ -1014,17 +1014,17 @@ struct ValidationContext {
 }
 
 #[derive(Default)]
-struct RefWalk {
+struct RefCheckState {
     /// Definitions currently on the recursion stack — guards against cycles.
     in_progress: HashSet<String>,
     /// Definitions already validated under a given context. A definition's
     /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ValidationContext>, CheckMode)>,
+    validated: HashSet<(String, Option<ParentNodeCtx>, GrammarCheckMode)>,
 }
 
 struct SymbolResolver<'l, 'a, 'q> {
-    linker: &'l mut Linker<'a, 'q>,
+    linker: &'l mut GrammarLinker<'a, 'q>,
 }
 
 impl Visitor for SymbolResolver<'_, '_, '_> {
@@ -1032,17 +1032,17 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
         walk(self, root);
     }
 
-    fn visit_named_node(&mut self, node: &ast::NamedNode) {
+    fn visit_node_pattern(&mut self, node: &ast::NodePattern) {
         self.linker.resolve_named_node(node);
 
-        for neg in node.as_cst().children().filter_map(ast::NegatedField::cast) {
+        for neg in node.syntax().children().filter_map(ast::NegatedField::cast) {
             self.linker.resolve_field_by_token(neg.name());
         }
 
-        super::visitor::walk_named_node(self, node);
+        super::visitor::walk_node_pattern(self, node);
     }
 
-    fn visit_anonymous_node(&mut self, node: &ast::AnonymousNode) {
+    fn visit_token_pattern(&mut self, node: &ast::TokenPattern) {
         if node.is_any() {
             return;
         }
@@ -1050,31 +1050,31 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
             return;
         };
         let value = value_token.text();
-        let key = NodeType::Anonymous(token_src(&value_token, self.linker.source()));
-        if self.linker.node_type_ids.contains_key(&key) {
+        let key = NodeKind::Anonymous(token_src(&value_token, self.linker.source()));
+        if self.linker.node_kind_ids.contains_key(&key) {
             return;
         }
 
         let resolved = self.linker.grammar.resolve_anonymous_node(value);
-        self.linker.node_type_ids.insert(key, resolved);
+        self.linker.node_kind_ids.insert(key, resolved);
 
         if let Some(id) = resolved {
             let sym = self.linker.interner.intern(value);
             self.linker
                 .output
-                .insert_node_type_id(NodeType::Anonymous(sym), id);
+                .insert_node_kind_id(NodeKind::Anonymous(sym), id);
             return;
         }
 
         self.linker
             .reporter
-            .report(DiagnosticKind::UnknownNodeType, value_token.text_range())
-            .message(value)
+            .report(DiagnosticKind::UnknownNodeKind, value_token.text_range())
+            .detail(value)
             .emit();
     }
 
-    fn visit_field_expr(&mut self, field: &ast::FieldExpr) {
+    fn visit_field_pattern(&mut self, field: &ast::FieldPattern) {
         self.linker.resolve_field_by_token(field.name());
-        super::visitor::walk_field_expr(self, field);
+        super::visitor::walk_field_pattern(self, field);
     }
 }

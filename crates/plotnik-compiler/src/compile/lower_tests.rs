@@ -1,4 +1,4 @@
-use plotnik_bytecode::{EffectOpcode, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
+use plotnik_bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
 use super::CompileResult;
 use super::lower::lower;
@@ -8,14 +8,14 @@ const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;
 
 fn make_effect(_idx: u16) -> EffectIR {
-    EffectIR::simple(EffectOpcode::Null, 0)
+    EffectIR::literal(EffectKind::Null, 0)
 }
 
 #[test]
 fn lower_no_overflow_unchanged() {
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .pre_effects((0..3).map(make_effect))
                 .next(Label(1))
                 .into(),
@@ -33,7 +33,7 @@ fn lower_no_overflow_unchanged() {
 fn lower_pre_effects_overflow() {
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
                 .pre_effects((0..10).map(make_effect))
                 .next(Label(1))
@@ -60,7 +60,7 @@ fn lower_pre_effects_overflow() {
 fn lower_post_effects_overflow() {
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
                 .post_effects((0..10).map(make_effect))
                 .next(Label(1))
@@ -90,7 +90,7 @@ fn lower_post_effects_overflow() {
 fn lower_neg_fields_overflow() {
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
                 .neg_fields(0..10)
                 .next(Label(1))
@@ -120,7 +120,7 @@ fn lower_neg_fields_overflow() {
 fn lower_successors_overflow() {
     let succs: Vec<_> = (1..=35).map(Label).collect();
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0)).next_many(succs).into()],
+        instructions: vec![MatchIR::terminal(Label(0)).successors(succs).into()],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -145,7 +145,7 @@ fn lower_successors_overflow() {
 fn lower_successors_overflow_preserves_all_successors() {
     let succs: Vec<_> = (1..=35).map(Label).collect();
     let mut result = CompileResult {
-        instructions: vec![MatchIR::at(Label(0)).next_many(succs.clone()).into()],
+        instructions: vec![MatchIR::terminal(Label(0)).successors(succs.clone()).into()],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
@@ -182,10 +182,10 @@ fn lower_successors_with_payload_respect_combined_limit() {
     let succs: Vec<_> = (1..=27).map(Label).collect();
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
                 .post_effects((0..5).map(make_effect))
-                .next_many(succs.clone())
+                .successors(succs.clone())
                 .into(),
         ],
         def_entries: Default::default(),
@@ -230,7 +230,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
 fn lower_combined_overflow() {
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
                 .pre_effects((0..10).map(make_effect))
                 .post_effects((0..10).map(make_effect))

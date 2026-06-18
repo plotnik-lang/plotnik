@@ -26,5 +26,5 @@ mod structure_tests;
 mod types_tests;
 
 pub use json::GrammarError;
-pub use structure::{StepTarget, StructStep, StructVariable, StructureTable, VarId};
+pub use structure::{StepTarget, SkeletonStep, SkeletonVariable, StructureTable, VarId};
 pub use types::Grammar;

@@ -6,8 +6,8 @@ pub struct SourceId(pub(crate) u32);
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceKind {
-    /// A one-liner query passed directly (e.g., CLI `-q` argument).
-    OneLiner,
+    /// An inline query passed directly (e.g., CLI `-q` argument).
+    Inline,
     /// Input read from stdin.
     Stdin,
     /// A file with its path.
@@ -17,7 +17,7 @@ pub enum SourceKind {
 impl SourceKind {
     pub fn display_name(&self) -> &str {
         match self {
-            SourceKind::OneLiner => "<query>",
+            SourceKind::Inline => "<query>",
             SourceKind::Stdin => "<stdin>",
             SourceKind::File(path) => path,
         }
@@ -32,12 +32,6 @@ pub struct Source<'q> {
     pub content: &'q str,
 }
 
-impl<'q> Source<'q> {
-    /// Returns the content string.
-    pub fn as_str(&self) -> &'q str {
-        self.content
-    }
-}
 
 #[derive(Clone, Debug)]
 struct SourceEntry {
@@ -55,9 +49,9 @@ impl SourceMap {
         Self::default()
     }
 
-    /// Add a one-liner source (CLI `-q` argument, REPL, tests).
-    pub fn add_one_liner(&mut self, content: &str) -> SourceId {
-        self.push_entry(SourceKind::OneLiner, content)
+    /// Add an inline source (CLI `-q` argument, REPL, tests).
+    pub fn add_inline(&mut self, content: &str) -> SourceId {
+        self.push_entry(SourceKind::Inline, content)
     }
 
     pub fn add_stdin(&mut self, content: &str) -> SourceId {
@@ -69,9 +63,9 @@ impl SourceMap {
     }
 
     /// Convenience for single-source use cases (CLI, REPL, tests).
-    pub fn one_liner(content: &str) -> Self {
+    pub fn from_inline(content: &str) -> Self {
         let mut map = Self::new();
-        map.add_one_liner(content);
+        map.add_inline(content);
         map
     }
 

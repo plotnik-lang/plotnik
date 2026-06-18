@@ -46,7 +46,7 @@ pub struct ParseConfig {
     pub max_depth: u32,
 }
 /// Lookaheads allowed without consuming a token before the stuck-parser assertion fires.
-const DEBUG_FUEL: u32 = 256;
+const MAX_STALL_LOOKAHEADS: u32 = 256;
 
 /// Trivia tokens are buffered and flushed when starting a new node.
 pub struct Parser<'q, 'd> {
@@ -54,13 +54,13 @@ pub struct Parser<'q, 'd> {
     pub(super) source_id: SourceId,
     pub(super) tokens: Vec<Token>,
     pub(super) pos: usize,
-    pub(super) trivia_buffer: Vec<Token>,
+    pub(super) pending_trivia: Vec<Token>,
     pub(super) builder: GreenNodeBuilder<'static>,
     pub(super) diagnostics: &'d mut Diagnostics,
     pub(super) depth: u32,
     pub(super) last_diagnostic_pos: Option<TextSize>,
     delimiter_stack: Vec<OpenDelimiter>,
-    pub(super) debug_fuel: std::cell::Cell<u32>,
+    pub(super) stall_guard: std::cell::Cell<u32>,
     pub(crate) fuel_initial: u32,
     pub(crate) fuel_remaining: u32,
     pub(crate) max_depth: u32,
@@ -81,13 +81,13 @@ impl<'q, 'd> Parser<'q, 'd> {
             source_id,
             tokens,
             pos: 0,
-            trivia_buffer: Vec::with_capacity(4),
+            pending_trivia: Vec::with_capacity(4),
             builder: GreenNodeBuilder::new(),
             diagnostics,
             depth: 0,
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
-            debug_fuel: std::cell::Cell::new(DEBUG_FUEL),
+            stall_guard: std::cell::Cell::new(MAX_STALL_LOOKAHEADS),
             fuel_initial: config.fuel,
             fuel_remaining: config.fuel,
             max_depth: config.max_depth,
@@ -97,11 +97,11 @@ impl<'q, 'd> Parser<'q, 'd> {
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
         self.parse_root();
-        let (cst, exec_fuel_consumed) = self.finish()?;
+        let (cst, parse_fuel_consumed) = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
         Ok(ParseResult {
             ast: root,
-            fuel_consumed: exec_fuel_consumed,
+            fuel_consumed: parse_fuel_consumed,
         })
     }
 
@@ -123,8 +123,8 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.nth_raw(0)
     }
 
-    fn reset_debug_fuel(&self) {
-        self.debug_fuel.set(DEBUG_FUEL);
+    fn reset_stall_guard(&self) {
+        self.stall_guard.set(MAX_STALL_LOOKAHEADS);
     }
 
     pub(super) fn nth_raw(&self, lookahead: usize) -> SyntaxKind {
@@ -134,14 +134,14 @@ impl<'q, 'd> Parser<'q, 'd> {
             .map_or(SyntaxKind::Error, |t| t.kind)
     }
 
-    fn consume_exec_fuel(&mut self) {
+    fn consume_parse_fuel(&mut self) {
         if self.fuel_remaining > 0 {
             self.fuel_remaining -= 1;
             return;
         }
 
         if self.fatal_error.is_none() {
-            self.fatal_error = Some(Error::ExecFuelExhausted);
+            self.fatal_error = Some(Error::ParseFuelExhausted);
         }
     }
 
@@ -168,15 +168,15 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.pos >= self.tokens.len()
     }
 
-    pub(super) fn should_stop(&self) -> bool {
+    pub(super) fn is_done(&self) -> bool {
         self.eof() || self.has_fatal_error()
     }
 
-    pub(super) fn currently_is(&mut self, kind: SyntaxKind) -> bool {
+    pub(super) fn at(&mut self, kind: SyntaxKind) -> bool {
         self.current() == kind
     }
 
-    pub(super) fn currently_is_one_of(&mut self, set: TokenSet) -> bool {
+    pub(super) fn at_ts(&mut self, set: TokenSet) -> bool {
         set.contains(self.current())
     }
 
@@ -204,13 +204,13 @@ impl<'q, 'd> Parser<'q, 'd> {
 
     pub(super) fn skip_trivia_to_buffer(&mut self) {
         while self.pos < self.tokens.len() && self.tokens[self.pos].kind.is_trivia() {
-            self.trivia_buffer.push(self.tokens[self.pos]);
+            self.pending_trivia.push(self.tokens[self.pos]);
             self.pos += 1;
         }
     }
 
     pub(super) fn drain_trivia(&mut self) {
-        for token in self.trivia_buffer.drain(..) {
+        for token in self.pending_trivia.drain(..) {
             let text = token_text(self.source, &token);
             self.builder.token(token.kind.into(), text);
         }
@@ -241,8 +241,8 @@ impl<'q, 'd> Parser<'q, 'd> {
 
     pub(super) fn bump(&mut self) {
         assert!(!self.eof(), "bump called at EOF");
-        self.reset_debug_fuel();
-        self.consume_exec_fuel();
+        self.reset_stall_guard();
+        self.consume_parse_fuel();
 
         self.drain_trivia();
 
@@ -253,7 +253,7 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn eat_token(&mut self, kind: SyntaxKind) -> bool {
-        if self.currently_is(kind) {
+        if self.at(kind) {
             self.bump();
             true
         } else {
@@ -296,7 +296,7 @@ impl<'q, 'd> Parser<'q, 'd> {
         }
     }
 
-    fn get_error_ranges(&mut self) -> Option<(TextRange, TextRange)> {
+    fn error_ranges(&mut self) -> Option<(TextRange, TextRange)> {
         let range = self.current_span();
         if !self.should_report(range.start()) {
             return None;
@@ -306,7 +306,7 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        let Some((range, suppression)) = self.get_error_ranges() else {
+        let Some((range, suppression)) = self.error_ranges() else {
             return;
         };
         self.diagnostics
@@ -316,18 +316,18 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
-        let Some((range, suppression)) = self.get_error_ranges() else {
+        let Some((range, suppression)) = self.error_ranges() else {
             return;
         };
         self.diagnostics
             .report(self.source_id, kind, range)
-            .message(message)
+            .detail(message)
             .suppression_range(suppression)
             .emit();
     }
 
     pub(super) fn error_with_hint(&mut self, kind: DiagnosticKind, hint: impl Into<String>) {
-        let Some((range, suppression)) = self.get_error_ranges() else {
+        let Some((range, suppression)) = self.error_ranges() else {
             return;
         };
         self.diagnostics
@@ -390,7 +390,7 @@ impl<'q, 'd> Parser<'q, 'd> {
         fix_description: impl Into<String>,
         fix_replacement: impl Into<String>,
     ) {
-        if let Some((range, suppression)) = self.get_error_ranges() {
+        if let Some((range, suppression)) = self.error_ranges() {
             self.diagnostics
                 .report(self.source_id, kind, range)
                 .suppression_range(suppression)
@@ -403,7 +403,7 @@ impl<'q, 'd> Parser<'q, 'd> {
     pub(super) fn enter_recursion(&mut self) -> bool {
         if self.depth < self.max_depth {
             self.depth += 1;
-            self.reset_debug_fuel();
+            self.reset_stall_guard();
             return true;
         }
 
@@ -416,7 +416,7 @@ impl<'q, 'd> Parser<'q, 'd> {
 
     pub(super) fn exit_recursion(&mut self) {
         self.depth = self.depth.saturating_sub(1);
-        self.reset_debug_fuel();
+        self.reset_stall_guard();
     }
 
     pub(super) fn push_delimiter(&mut self) {

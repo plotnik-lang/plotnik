@@ -5,7 +5,7 @@ use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Module, dump};
 
 use super::lang_resolver::require_lang;
-use super::query_loader::load_query_source;
+use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
 
 pub struct DumpArgs {
@@ -16,7 +16,7 @@ pub struct DumpArgs {
 }
 
 pub fn run(args: DumpArgs) -> CliResult {
-    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
+    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
 
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));

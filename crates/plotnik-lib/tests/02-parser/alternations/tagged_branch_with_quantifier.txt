@@ -35,5 +35,5 @@ Root
       Branch Single:
         NamedNode statement
       Branch Multiple:
-        QuantifiedExpr +
+        QuantifiedPattern +
           NamedNode statement
