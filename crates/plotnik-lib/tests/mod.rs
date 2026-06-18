@@ -12,7 +12,7 @@
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
 //! | `05-typegen` | types                                      |
-//! | `06-vm`      | bytecode, types, trace, output (needs input) |
+//! | `06-vm`      | bytecode, types, trace, output (requires input) |
 //!
 //! `==== diagnostics ====` renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/types/trace/output are
@@ -76,7 +76,9 @@ fn discover(root: &Path) -> Vec<Fixture> {
     // An unreadable tests root must fail loudly — silently yielding zero trials
     // would turn a broken checkout into a green run.
     let entries = fs::read_dir(root).expect("tests/ directory must be readable");
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry =
+            entry.unwrap_or_else(|e| panic!("read fixture entry in {}: {e}", root.display()));
         let path = entry.path();
         if path.is_dir()
             && let Some(stage) = path.file_name().and_then(|s| s.to_str())
@@ -92,16 +94,15 @@ fn discover(root: &Path) -> Vec<Fixture> {
 
 fn is_stage_dir(name: &str) -> bool {
     let bytes = name.as_bytes();
-    bytes.len() >= 3
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'-'
+    bytes.len() >= 3 && bytes[0].is_ascii_digit() && bytes[1].is_ascii_digit() && bytes[2] == b'-'
 }
 
 fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
     let entries =
         fs::read_dir(dir).unwrap_or_else(|e| panic!("read fixture dir {}: {e}", dir.display()));
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry =
+            entry.unwrap_or_else(|e| panic!("read fixture entry in {}: {e}", dir.display()));
         let path = entry.path();
         if path.is_dir() {
             walk(&path, stage, root, out);
@@ -110,7 +111,9 @@ fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
                 .strip_prefix(root)
                 .expect("fixture path is under tests root")
                 .with_extension("");
-            let name = rel.to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/");
+            let name = rel
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/");
             out.push(Fixture {
                 path,
                 name,
@@ -136,9 +139,9 @@ fn run_fixture(fx: &Fixture) -> Result<(), Failed> {
 }
 
 fn check(fx: &Fixture) -> Result<(), String> {
-    let raw = fs::read_to_string(&fx.path)
-        .map_err(|e| format!("read {}: {e}", fx.path.display()))?;
-    let parsed = parse_fixture(&raw)?;
+    let raw =
+        fs::read_to_string(&fx.path).map_err(|e| format!("read {}: {e}", fx.path.display()))?;
+    let parsed = parse_fixture(&raw, &fx.stage)?;
     let generated = render(&fx.stage, &fx.name, &parsed.query, parsed.input.as_ref())?;
     if generated.is_empty() {
         return Err(format!("stage `{}` produced no sections", fx.stage));
@@ -163,7 +166,7 @@ fn shot_enabled() -> bool {
     matches!(std::env::var("SHOT").as_deref(), Ok("1") | Ok("true"))
 }
 
-fn parse_fixture(raw: &str) -> Result<Parsed, String> {
+fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
     let normalized = raw.replace("\r\n", "\n");
     let mut query_lines: Vec<&str> = Vec::new();
     let mut sections: Vec<(&str, Vec<&str>)> = Vec::new();
@@ -185,32 +188,66 @@ fn parse_fixture(raw: &str) -> Result<Parsed, String> {
         sections.push(prev);
     }
 
-    let query = query_lines.join("\n").trim().to_string();
-    if query.is_empty() {
+    let query = query_lines.join("\n");
+    if query.trim().is_empty() {
         return Err("fixture has no query (text before the first `==== … ====` section)".into());
     }
 
     // Input is authored only as the first section; an `input`-looking header
     // anywhere later belongs to a regenerated artifact, not to the source.
-    let input = match sections.first() {
+    let (input, generated_start) = match sections.first() {
         Some((name, body)) if *name == "input" || name.starts_with("input.") => {
             let ext = name
                 .strip_prefix("input")
                 .and_then(|rest| rest.strip_prefix('.'))
                 .map(str::to_string);
-            Some(Input {
-                ext,
-                text: body.join("\n").trim_matches('\n').to_string(),
-            })
+            (
+                Some(Input {
+                    ext,
+                    text: body.join("\n"),
+                }),
+                1,
+            )
         }
-        _ => None,
+        _ => (None, 0),
     };
+
+    validate_generated_headers(stage, &sections[generated_start..])?;
+
     Ok(Parsed { query, input })
 }
 
-/// Restricting headers to a known vocabulary keeps a stray `====` line (e.g. inside a
-/// diagnostic) from reading as a boundary; an input line that itself matches a header
-/// is the residual exception.
+fn validate_generated_headers(stage: &str, sections: &[(&str, Vec<&str>)]) -> Result<(), String> {
+    let legal = generated_section_order(stage)
+        .ok_or_else(|| format!("unknown stage directory `{stage}`"))?;
+    let mut cursor = 0;
+
+    for (name, _) in sections {
+        let Some(offset) = legal[cursor..].iter().position(|known| known == name) else {
+            return Err(format!(
+                "section `==== {name} ====` is invalid or out of order for `{stage}`; exact fixture section headers are reserved in authored query/input text"
+            ));
+        };
+        cursor += offset + 1;
+    }
+
+    Ok(())
+}
+
+fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
+    match stage.split('-').next().unwrap_or("") {
+        "01" => Some(&["tokens"]),
+        "02" => Some(&["diagnostics", "cst", "ast"]),
+        "03" => Some(&["diagnostics", "symbols"]),
+        "04" => Some(&["diagnostics", "bytecode"]),
+        "05" => Some(&["diagnostics", "types"]),
+        "06" => Some(&["diagnostics", "bytecode", "types", "trace", "output"]),
+        _ => None,
+    }
+}
+
+/// Only exact fixture section headers become boundaries. Stage-order validation
+/// then rejects headers that look generated but appear in the wrong place.
 fn parse_section_header(line: &str) -> Option<&str> {
     let inner = line.strip_prefix("==== ")?.strip_suffix(" ====")?;
     let known = inner == "input"
@@ -269,7 +306,10 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
 
     let mut out = Vec::new();
     if has_errors || diagnostics.has_warnings() {
-        out.push(("diagnostics".into(), diagnostics.render(analyzed.source_map())));
+        out.push((
+            "diagnostics".into(),
+            diagnostics.render(analyzed.source_map()),
+        ));
     }
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
@@ -282,7 +322,10 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
         // The symbol table is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
         Front::Analyze => {
-            out.push(("symbols".into(), analyzed.printer().only_symbols(true).dump()));
+            out.push((
+                "symbols".into(),
+                analyzed.printer().only_symbols(true).dump(),
+            ));
         }
     }
     out
@@ -309,28 +352,41 @@ fn render_compile(
 
     let mut out = Vec::new();
     if diagnostics.has_errors() {
-        out.push(("diagnostics".into(), diagnostics.render(linked.source_map())));
+        out.push((
+            "diagnostics".into(),
+            diagnostics.render(linked.source_map()),
+        ));
         return Ok(out);
     }
     if diagnostics.has_warnings() {
-        out.push(("diagnostics".into(), diagnostics.render(linked.source_map())));
+        out.push((
+            "diagnostics".into(),
+            diagnostics.render(linked.source_map()),
+        ));
     }
 
     let bytes = linked.emit().expect("valid query should emit");
     let module = Module::load(&bytes).expect("emitted bytecode should load");
 
     match kind {
-        Compile::Bytecode => out.push(("bytecode".into(), dump_bytecode(&module, Colors::new(false)))),
+        Compile::Bytecode => out.push((
+            "bytecode".into(),
+            dump_bytecode(&module, Colors::new(false)),
+        )),
         Compile::Types => out.push(("types".into(), render_types(&module))),
         Compile::Vm => {
-            out.push(("bytecode".into(), dump_bytecode(&module, Colors::new(false))));
+            out.push((
+                "bytecode".into(),
+                dump_bytecode(&module, Colors::new(false)),
+            ));
             out.push(("types".into(), render_types(&module)));
-            if let Some(input) = input {
-                let entry = last_def_name(&linked);
-                let (trace, output) = run_vm(&lang, &module, &entry, &input.text)?;
-                out.push(("trace".into(), trace));
-                out.push(("output".into(), output));
-            }
+            let input = input.ok_or_else(|| {
+                "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
+            })?;
+            let entry = last_def_name(&linked);
+            let (trace, output) = run_vm(&lang, &module, &entry, &input.text)?;
+            out.push(("trace".into(), trace));
+            out.push(("output".into(), output));
         }
     }
     Ok(out)
@@ -340,8 +396,8 @@ fn render_types(module: &Module) -> String {
     typescript::emit_with_config(module, typescript::Config::new().emit_node_type(false))
 }
 
-/// The entrypoint under test is the source-last named definition. Entrypoints in
-/// the module are ordered by dependency (SCC), not source, so resolve by name.
+/// VM fixtures run the source-last named definition. Entrypoints in the module
+/// are ordered by dependency (SCC), not source, so resolve that definition by name.
 fn last_def_name(query: &LinkedQuery) -> String {
     query
         .asts()
@@ -413,7 +469,9 @@ impl Lang {
 
     fn parse(&self, source: &str) -> Tree {
         let mut parser = TsParser::new();
-        parser.set_language(&self.ts).expect("set tree-sitter language");
+        parser
+            .set_language(&self.ts)
+            .expect("set tree-sitter language");
         parser.parse(source, None).expect("parse source")
     }
 }
@@ -438,19 +496,31 @@ fn source_map(query: &str) -> SourceMap {
 /// sections on accept.
 fn canonical(query: &str, input: Option<&Input>, generated: &[(String, String)]) -> String {
     let mut out = String::new();
-    out.push_str(query.trim());
-    out.push('\n');
+    out.push_str(query);
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
     if let Some(input) = input {
         let header = match &input.ext {
             Some(ext) => format!("input.{ext}"),
             None => "input".to_string(),
         };
-        push_section(&mut out, &header, &input.text);
+        push_authored_section(&mut out, &header, &input.text);
     }
     for (name, body) in generated {
         push_section(&mut out, name, body);
     }
     out
+}
+
+fn push_authored_section(out: &mut String, name: &str, body: &str) {
+    out.push_str("==== ");
+    out.push_str(name);
+    out.push_str(" ====\n");
+    out.push_str(body);
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
 }
 
 fn push_section(out: &mut String, name: &str, body: &str) {
