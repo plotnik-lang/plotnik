@@ -12,7 +12,7 @@ use plotnik_core::{Interner, Symbol};
 
 use super::symbol_table::SymbolTable;
 use super::type_check::DefId;
-use crate::parser::{Expr, Ref};
+use crate::parser::{Pattern, Ref};
 
 #[derive(Clone, Debug, Default)]
 pub struct DependencyAnalysis {
@@ -24,7 +24,7 @@ pub struct DependencyAnalysis {
     /// - Every definition in the symbol table appears exactly once.
     sccs: Vec<Vec<String>>,
 
-    name_to_def: HashMap<Symbol, DefId>,
+    def_ids_by_sym: HashMap<Symbol, DefId>,
 
     def_names: Vec<Symbol>,
 
@@ -32,13 +32,13 @@ pub struct DependencyAnalysis {
 }
 
 impl DependencyAnalysis {
-    pub fn def_id_by_symbol(&self, sym: Symbol) -> Option<DefId> {
-        self.name_to_def.get(&sym).copied()
+    pub fn def_id_for_sym(&self, sym: Symbol) -> Option<DefId> {
+        self.def_ids_by_sym.get(&sym).copied()
     }
 
-    pub fn def_id(&self, interner: &Interner, name: &str) -> Option<DefId> {
+    pub fn def_id_for_name(&self, interner: &Interner, name: &str) -> Option<DefId> {
         // Linear scan - only used during analysis, not hot path
-        for (&sym, &def_id) in &self.name_to_def {
+        for (&sym, &def_id) in &self.def_ids_by_sym {
             if interner.resolve(sym) == name {
                 return Some(def_id);
             }
@@ -64,9 +64,9 @@ impl DependencyAnalysis {
         &self.def_names
     }
 
-    /// Get the name_to_def map (for seeding TypeContext).
-    pub fn name_to_def(&self) -> &HashMap<Symbol, DefId> {
-        &self.name_to_def
+    /// Get the def_ids_by_sym map (for seeding TypeContext).
+    pub fn def_ids_by_sym(&self) -> &HashMap<Symbol, DefId> {
+        &self.def_ids_by_sym
     }
 
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
@@ -86,7 +86,7 @@ pub fn analyze_dependencies(
     let sccs = SccFinder::find(symbol_table);
 
     // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
-    let mut name_to_def = HashMap::new();
+    let mut def_ids_by_sym = HashMap::new();
     let mut def_names = Vec::new();
     let mut recursive_defs = HashSet::new();
 
@@ -94,7 +94,7 @@ pub fn analyze_dependencies(
         if scc.len() > 1 {
             recursive_defs.extend(scc.iter().cloned());
         } else if let Some(name) = scc.first()
-            && let Some(body) = symbol_table.get(name)
+            && let Some(body) = symbol_table.body(name)
             && super::refs::contains_ref(body, name)
         {
             recursive_defs.insert(name.clone());
@@ -103,14 +103,14 @@ pub fn analyze_dependencies(
         for name in scc {
             let sym = interner.intern(name);
             let def_id = DefId::from_raw(def_names.len() as u32);
-            name_to_def.insert(sym, def_id);
+            def_ids_by_sym.insert(sym, def_id);
             def_names.push(sym);
         }
     }
 
     DependencyAnalysis {
         sccs,
-        name_to_def,
+        def_ids_by_sym,
         def_names,
         recursive_defs,
     }
@@ -158,7 +158,7 @@ impl<'a> SccFinder<'a> {
         self.stack.push(name);
         self.on_stack.insert(name);
 
-        if let Some(body) = self.symbol_table.get(name) {
+        if let Some(body) = self.symbol_table.body(name) {
             let refs = collect_refs(body, self.symbol_table);
             for ref_name in refs {
                 if !self.indices.contains_key(ref_name) {
@@ -201,10 +201,10 @@ impl<'a> SccFinder<'a> {
 
 /// Collect references to definitions within the symbol table.
 ///
-/// Returns only refs that point to defined names (filters out node type references).
-pub(super) fn collect_refs<'a>(expr: &Expr, symbol_table: &'a SymbolTable) -> IndexSet<&'a str> {
+/// Returns only refs that point to defined names (filters out node kind references).
+pub(super) fn collect_refs<'a>(pattern: &Pattern, symbol_table: &'a SymbolTable) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
-    for descendant in expr.as_cst().descendants() {
+    for descendant in pattern.syntax().descendants() {
         let Some(r) = Ref::cast(descendant) else {
             continue;
         };

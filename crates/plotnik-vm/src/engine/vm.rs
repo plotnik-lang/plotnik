@@ -3,7 +3,7 @@
 use arborium_tree_sitter::{Node, Tree};
 
 use plotnik_bytecode::{
-    Call, EffectOp, EffectOpcode, Entrypoint, Instruction, Match, Module, Nav, NodeTypeIR,
+    Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
     PredicateOp, StepAddr, Trampoline,
 };
 
@@ -42,37 +42,37 @@ impl<'t> MatchedNode<'t> {
     }
 
     /// The matched node, if any.
-    fn get(&self) -> Option<Node<'t>> {
+    fn node(&self) -> Option<Node<'t>> {
         self.0
     }
 }
 
 /// Runtime limits for query execution.
 #[derive(Clone, Copy, Debug)]
-pub struct FuelLimits {
+pub struct ExecLimits {
     /// Maximum total steps (default: 1,000,000).
-    pub(crate) exec_fuel: u32,
+    pub(crate) step_budget: u32,
     /// Maximum call depth (default: 1,024).
     pub(crate) recursion_limit: u32,
 }
 
-impl Default for FuelLimits {
+impl Default for ExecLimits {
     fn default() -> Self {
         Self {
-            exec_fuel: 1_000_000,
+            step_budget: 1_000_000,
             recursion_limit: 1024,
         }
     }
 }
 
-impl FuelLimits {
+impl ExecLimits {
     /// Create new fuel limits with defaults.
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn exec_fuel(mut self, fuel: u32) -> Self {
-        self.exec_fuel = fuel;
+    pub fn step_budget(mut self, fuel: u32) -> Self {
+        self.step_budget = fuel;
         self
     }
 
@@ -81,9 +81,6 @@ impl FuelLimits {
         self
     }
 
-    pub fn get_exec_fuel(&self) -> u32 {
-        self.exec_fuel
-    }
     pub fn get_recursion_limit(&self) -> u32 {
         self.recursion_limit
     }
@@ -99,9 +96,9 @@ pub struct VM<'t> {
     pub(crate) effects: EffectLog<'t>,
     matched_node: MatchedNode<'t>,
 
-    pub(crate) exec_fuel: u32,
+    pub(crate) steps_remaining: u32,
     pub(crate) recursion_depth: u32,
-    pub(crate) limits: FuelLimits,
+    pub(crate) limits: ExecLimits,
 
     /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
     /// Incremented by SuppressBegin, decremented by SuppressEnd.
@@ -109,7 +106,7 @@ pub struct VM<'t> {
 
     /// Target address for Trampoline instruction.
     /// Set from entrypoint before execution; Trampoline jumps to this address.
-    pub(crate) entrypoint_target: u16,
+    pub(crate) trampoline_target: u16,
 
     pub(crate) source: &'t str,
 }
@@ -118,7 +115,7 @@ pub struct VM<'t> {
 pub struct VMBuilder<'t> {
     source: &'t str,
     tree: &'t Tree,
-    limits: FuelLimits,
+    limits: ExecLimits,
 }
 
 impl<'t> VMBuilder<'t> {
@@ -127,17 +124,17 @@ impl<'t> VMBuilder<'t> {
         Self {
             source,
             tree,
-            limits: FuelLimits::default(),
+            limits: ExecLimits::default(),
         }
     }
 
-    pub fn limits(mut self, limits: FuelLimits) -> Self {
+    pub fn limits(mut self, limits: ExecLimits) -> Self {
         self.limits = limits;
         self
     }
 
-    pub fn exec_fuel(mut self, fuel: u32) -> Self {
-        self.limits = self.limits.exec_fuel(fuel);
+    pub fn step_budget(mut self, fuel: u32) -> Self {
+        self.limits = self.limits.step_budget(fuel);
         self
     }
 
@@ -155,11 +152,11 @@ impl<'t> VMBuilder<'t> {
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
             matched_node: MatchedNode::default(),
-            exec_fuel: self.limits.get_exec_fuel(),
+            steps_remaining: self.limits.step_budget,
             recursion_depth: 0,
             limits: self.limits,
             suppress_depth: 0,
-            entrypoint_target: 0,
+            trampoline_target: 0,
             source: self.source,
         }
     }
@@ -173,7 +170,7 @@ impl<'t> VM<'t> {
 
     /// Create a new VM for execution.
     #[deprecated(note = "Use VM::builder(source, tree).build() instead")]
-    pub fn new(source: &'t str, tree: &'t Tree, limits: FuelLimits) -> Self {
+    pub fn new(source: &'t str, tree: &'t Tree, limits: ExecLimits) -> Self {
         Self::builder(source, tree).limits(limits).build()
     }
 
@@ -221,13 +218,13 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _,       // the stack this checkpoint was just popped from
-            matched_node: _,      // intentionally not snapshotted (#383)
-            exec_fuel: _,         // monotonic fuel, never rewound on backtrack
-            limits: _,            // immutable execution config
-            entrypoint_target: _, // set once before the run, never mutated
-            source: _,            // immutable input text
+            ip: _,                  // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _,         // the stack this checkpoint was just popped from
+            matched_node: _,        // intentionally not snapshotted (#383)
+            steps_remaining: _,     // monotonic fuel, never rewound on backtrack
+            limits: _,              // immutable execution config
+            trampoline_target: _,   // set once before the run, never mutated
+            source: _,              // immutable input text
         } = self;
 
         debug_assert_eq!(
@@ -273,10 +270,10 @@ impl<'t> VM<'t> {
     pub fn execute(
         self,
         module: &Module,
-        bootstrap: StepAddr,
+        preamble_addr: StepAddr,
         entrypoint: &Entrypoint,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.execute_with(module, bootstrap, entrypoint, &mut NoopTracer)
+        self.execute_with(module, preamble_addr, entrypoint, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
@@ -284,25 +281,25 @@ impl<'t> VM<'t> {
     /// The tracer is generic, so `NoopTracer` calls are optimized away
     /// while `PrintTracer` calls collect execution trace.
     ///
-    /// `bootstrap` is the preamble entry point - caller decides which preamble to use.
+    /// `preamble_addr` is the preamble entry point - caller decides which preamble to use.
     pub fn execute_with<T: Tracer>(
         mut self,
         module: &Module,
-        bootstrap: StepAddr,
+        preamble_addr: StepAddr,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        // Bootstrap address: where VM starts execution (preamble entry point).
+        // Preamble address: where VM starts execution (preamble entry point).
         // Caller provides this, enabling different preamble types (root-match, recursive, etc.).
-        self.ip = bootstrap;
-        self.entrypoint_target = entrypoint.target();
+        self.ip = preamble_addr;
+        self.trampoline_target = entrypoint.target();
         tracer.trace_enter_preamble();
 
         loop {
-            if self.exec_fuel == 0 {
-                return Err(RuntimeError::ExecFuelExhausted(self.limits.exec_fuel));
+            if self.steps_remaining == 0 {
+                return Err(RuntimeError::ExecFuelExhausted(self.limits.step_budget));
             }
-            self.exec_fuel -= 1;
+            self.steps_remaining -= 1;
 
             // Fetch and dispatch. The IP must address a validated instruction
             // start; a violation localizes a bad jump to the step that wrote `ip`,
@@ -405,7 +402,7 @@ impl<'t> VM<'t> {
                 _ => unreachable!("non-regex op with is_regex=true"),
             }
         } else {
-            let target = module.strings().get_by_index(value_ref as usize);
+            let target = module.strings().at(value_ref as usize);
 
             match op {
                 PredicateOp::Eq => node_text == target,
@@ -421,27 +418,27 @@ impl<'t> VM<'t> {
     fn candidate_matches<T: Tracer>(&self, m: Match<'_>, module: &Module, tracer: &mut T) -> bool {
         let node = self.cursor.node();
 
-        match m.node_type {
-            NodeTypeIR::Any => {}
-            NodeTypeIR::Named(None) => {
+        match m.node_kind {
+            NodeKindConstraint::Any => {}
+            NodeKindConstraint::Named(None) => {
                 if !node.is_named() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
-            NodeTypeIR::Named(Some(expected)) => {
+            NodeKindConstraint::Named(Some(expected)) => {
                 if !node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
-            NodeTypeIR::Anonymous(None) => {
+            NodeKindConstraint::Anonymous(None) => {
                 if node.is_named() {
                     tracer.trace_match_failure(node);
                     return false;
                 }
             }
-            NodeTypeIR::Anonymous(Some(expected)) => {
+            NodeKindConstraint::Anonymous(Some(expected)) => {
                 if node.is_named() || node.kind_id() != expected.get() {
                     tracer.trace_match_failure(node);
                     return false;
@@ -483,11 +480,11 @@ impl<'t> VM<'t> {
         // Push checkpoints for alternate branches (in reverse order)
         for i in (1..m.succ_count()).rev() {
             self.checkpoints
-                .push(self.branch_checkpoint(m.successor(i).get()));
+                .push(self.branch_checkpoint(m.successor(i).as_u16()));
             tracer.trace_checkpoint_created(self.ip);
         }
 
-        self.ip = m.successor(0).get();
+        self.ip = m.successor(0).as_u16();
         Ok(())
     }
 
@@ -510,8 +507,8 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: c.target.get(),
-                next: c.next.get(),
+                target: c.target.as_u16(),
+                next: c.next.as_u16(),
                 field: c.node_field,
                 policy,
             };
@@ -520,7 +517,7 @@ impl<'t> VM<'t> {
             tracer.trace_checkpoint_created(self.ip);
         }
 
-        self.enter_callee(c.target.get(), c.next.get(), tracer);
+        self.enter_callee(c.target.as_u16(), c.next.as_u16(), tracer);
         Ok(())
     }
 
@@ -545,22 +542,22 @@ impl<'t> VM<'t> {
 
     /// Execute a Trampoline instruction.
     ///
-    /// Trampoline is like Call, but the target comes from VM context (entrypoint_target)
+    /// Trampoline is like Call, but the target comes from VM context (`trampoline_target`)
     /// rather than being encoded in the instruction. Used for universal entry preamble.
     fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
         self.check_recursion_limit()?;
 
         // Trampoline doesn't navigate - it's always at root, cursor stays at root
         let saved_depth = self.cursor.depth();
-        tracer.trace_call(self.entrypoint_target);
-        self.frames.push(t.next.get(), saved_depth);
+        tracer.trace_call(self.trampoline_target);
+        self.frames.push(t.next.as_u16(), saved_depth);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
             self.frames.depth(),
             "recursion_depth desynced from frame stack after Trampoline"
         );
-        self.ip = self.entrypoint_target;
+        self.ip = self.trampoline_target;
         Ok(())
     }
 
@@ -635,7 +632,7 @@ impl<'t> VM<'t> {
         );
 
         // Prune frames (O(1) amortized)
-        self.frames.prune(self.checkpoints.max_frame_ref());
+        self.frames.prune(self.checkpoints.max_frame_idx());
 
         // Re-point at the callee's match BEFORE going up so effects after a
         // Call can capture it; `refresh` leaves a zero-width return empty (#383).
@@ -708,10 +705,10 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: EffectOp, tracer: &mut T) -> Result<(), Signal> {
-        use EffectOpcode::*;
+    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) -> Result<(), Signal> {
+        use EffectKind::*;
 
-        let effect = match op.opcode {
+        let effect = match op.kind {
             SuppressBegin => {
                 tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
                 self.suppress_depth += 1;
@@ -728,7 +725,7 @@ impl<'t> VM<'t> {
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
-                tracer.trace_effect_suppressed(op.opcode, op.payload);
+                tracer.trace_effect_suppressed(op.kind, op.payload);
                 return Ok(());
             }
 
@@ -736,19 +733,19 @@ impl<'t> VM<'t> {
             // matched nothing (a zero-width callee return, #383): fail this path
             // rather than fabricate the call-site node.
             Node => {
-                let Some(node) = self.matched_node.get() else {
+                let Some(node) = self.matched_node.node() else {
                     return Err(self.backtrack(tracer));
                 };
                 RuntimeEffect::Node(node)
             }
-            Arr => RuntimeEffect::Arr,
+            ArrayOpen => RuntimeEffect::ArrayOpen,
             Push => RuntimeEffect::Push,
-            EndArr => RuntimeEffect::EndArr,
-            Obj => RuntimeEffect::Obj,
-            EndObj => RuntimeEffect::EndObj,
+            ArrayClose => RuntimeEffect::ArrayClose,
+            ObjectOpen => RuntimeEffect::ObjectOpen,
+            ObjectClose => RuntimeEffect::ObjectClose,
             Set => RuntimeEffect::Set(op.payload as u16),
-            Enum => RuntimeEffect::Enum(op.payload as u16),
-            EndEnum => RuntimeEffect::EndEnum,
+            EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
+            EnumClose => RuntimeEffect::EnumClose,
             Clear => RuntimeEffect::Clear,
             Null => RuntimeEffect::Null,
         };

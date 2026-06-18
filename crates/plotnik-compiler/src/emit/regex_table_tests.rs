@@ -18,9 +18,9 @@ fn intern_and_lookup() {
     assert_eq!(id2, 2);
     assert_eq!(id3, id1); // same StringId returns same regex ID
 
-    assert_eq!(builder.get(str1), Some(1));
-    assert_eq!(builder.get(str2), Some(2));
-    assert_eq!(builder.get(StringId::new(99)), None);
+    assert_eq!(builder.lookup(str1), Some(1));
+    assert_eq!(builder.lookup(str2), Some(2));
+    assert_eq!(builder.lookup(StringId::new(99)), None);
 }
 
 #[test]

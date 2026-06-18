@@ -42,9 +42,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -56,18 +56,18 @@ Q:
   14  └‣─  (identifier) == "foo"            16
   16  ─‣┘  _                                31
   17                                        ▶
-  18  └•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  08
-  21  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  11
+  18  └•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  21  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  11
   24  -ε-                                   18
   25  └•─  (debugger_statement) [Node Push]  27, 21
   27  ─•─  (debugger_statement) [Node Push]  27, 21
-  29  -ε-  [Arr]                            25, 24
+  29  -ε-  [ArrayOpen]                      25, 24
   31  ─‣┘  _                                17
-  32  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  14
+  32  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  14
   35  -ε-                                   32
   36  ─•─  (debugger_statement) [Node Push]  38, 32
   38  ─•─  (debugger_statement) [Node Push]  38, 32
-  40  -ε-  [Arr]                            36, 35
+  40  -ε-  [ArrayOpen]                      36, 35
   42  -ε-  [Null Set(M0)]                   29
   44   !   (lexical_declaration) [Node Set(M0)]  40
   46  ─‣─  _                                44, 46
@@ -80,7 +80,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -105,12 +105,12 @@ Q:
   46       _                                44, 46
   06  ❮❮❮ 
   42  -ε-  [Null Set(M0)]                   29
-  29  -ε-  [Arr]                            25, 24
+  29  -ε-  [ArrayOpen]                      25, 24
   25       (debugger_statement) [Node Push]  27, 21
        ○   expression_statement
   29  ❮❮❮ 
   24  -ε-                                   18
-  18       [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  08
+  18       [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
        ●   expression_statement
   08       (identifier) == "foo"            10
        ○   ;

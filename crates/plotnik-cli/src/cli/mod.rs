@@ -10,7 +10,7 @@ mod shebang_tests;
 
 pub use commands::build_cli;
 pub use dispatch::{
-    AstParams, CheckParams, DumpParams, InferParams, LangDumpParams, RunParams, TraceParams,
+    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts,
 };
 
 /// Bare default subcommand: `plotnik query.ptk …` routes to `run`.

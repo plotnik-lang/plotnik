@@ -20,6 +20,6 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @stmts :: Statement
-      QuantifiedExpr +
+    CapturedPattern @stmts :: Statement
+      QuantifiedPattern +
         NamedNode statement

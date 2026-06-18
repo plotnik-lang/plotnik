@@ -13,7 +13,7 @@ mod ids;
 mod instructions;
 mod module;
 mod nav;
-mod node_type_ir;
+mod node_kind_constraint;
 mod sections;
 mod type_meta;
 
@@ -29,15 +29,15 @@ pub use ids::{StringId, TypeId};
 
 pub use header::{Header, SectionOffsets};
 
-pub use sections::{FieldSymbol, NodeSymbol, Slice};
+pub use sections::{FieldEntry, NodeKindEntry, Slice};
 
 pub use entrypoint::Entrypoint;
 
-pub use type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
+pub use type_meta::{TypeDefKind, TypeDef, TypeKind, TypeMember, TypeNameEntry};
 
 pub use nav::Nav;
 
-pub use effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectOp, EffectOpcode};
+pub use effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, Effect, EffectKind};
 
 pub use instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepAddr, StepId,
@@ -45,8 +45,8 @@ pub use instructions::{
 };
 
 pub use module::{
-    ByteStorage, EntrypointsView, Instruction, Module, ModuleError, RegexView, StringsView,
-    SymbolsView, TypesView,
+    ByteStorage, EntrypointsView, GrammarTableView, Instruction, Module, ModuleError, RegexView,
+    StringsView, TypesView,
 };
 
 pub use dump::dump;
@@ -56,7 +56,7 @@ pub use format::{
     truncate_text, width_for_count,
 };
 
-pub use node_type_ir::NodeTypeIR;
+pub use node_kind_constraint::NodeKindConstraint;
 
 #[cfg(test)]
 mod aligned_vec_tests;
@@ -73,7 +73,7 @@ mod instructions_tests;
 #[cfg(test)]
 mod nav_tests;
 #[cfg(test)]
-mod node_type_ir_tests;
+mod node_kind_constraint_tests;
 #[cfg(test)]
 mod sections_tests;
 #[cfg(test)]

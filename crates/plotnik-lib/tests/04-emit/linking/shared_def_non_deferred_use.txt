@@ -5,7 +5,7 @@ Q = (binary_expression
   (Bad)
 )
 ==== diagnostics ====
-error: field `arguments` is not valid on this node type
+error: field `arguments` is not valid on this node kind
  --> query.ptk:1:7
   |
 1 | Bad = arguments: (identifier)

@@ -28,9 +28,9 @@ Q    = 08 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Func:
@@ -39,9 +39,9 @@ Func:
 
 Q:
   08   !   (program)                        09
-  09  └‣─  [Arr] _                          15, 18
+  09  └‣─  [ArrayOpen] _                    15, 18
   11  -ε-                                   12
-  12  ─‣┘  [EndArr Set(M0)] _               14
+  12  ─‣┘  [ArrayClose Set(M0)] _           14
   14                                        ▶
   15   !   (Func)                           06 : 16
   16  -ε-  [Node Push]                      24, 11

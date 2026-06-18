@@ -37,9 +37,9 @@ Test    = 11 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Item:
@@ -47,7 +47,7 @@ Item:
   08                                        ▶
 
 Collect:
-  09  -ε-  [Arr]                            32, 16
+  09  -ε-  [ArrayOpen]                      32, 16
 
 Test:
   11   !   (array)                          12
@@ -55,13 +55,13 @@ Test:
   13  ─‣┘  _                                14
   14                                        ▶
   15                                        ▶
-  16  -ε-  [EndArr Set(M2)]                 15
-  18  -ε-  [EndObj Push]                    36, 16
+  16  -ε-  [ArrayClose Set(M2)]             15
+  18  -ε-  [ObjectClose Push]               36, 16
   20  -ε-  [Set(M1)]                        18
-  22  -ε-  [EndObj]                         20
+  22  -ε-  [ObjectClose]                    20
   24   !   (Item)                           06 : 22
-  25  -ε-  [Obj]                            24
-  27  -ε-  [Obj]                            25
+  25  -ε-  [ObjectOpen]                     24
+  27  -ε-  [ObjectOpen]                     25
   29  ─‣─  _                                27, 29
   31  ...  
   32   !   _                                27, 29

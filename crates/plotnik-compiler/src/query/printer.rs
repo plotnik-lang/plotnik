@@ -18,27 +18,27 @@ fn indent(level: usize) -> String {
 
 pub struct QueryPrinter<'q> {
     query: &'q Query,
-    raw: bool,
+    cst: bool,
     trivia: bool,
     arities: bool,
     spans: bool,
-    symbols: bool,
+    definitions: bool,
 }
 
 impl<'q> QueryPrinter<'q> {
     pub fn new(query: &'q Query) -> Self {
         Self {
             query,
-            raw: false,
+            cst: false,
             trivia: false,
             arities: false,
             spans: false,
-            symbols: false,
+            definitions: false,
         }
     }
 
-    pub fn raw(mut self, value: bool) -> Self {
-        self.raw = value;
+    pub fn cst(mut self, value: bool) -> Self {
+        self.cst = value;
         self
     }
 
@@ -57,8 +57,8 @@ impl<'q> QueryPrinter<'q> {
         self
     }
 
-    pub fn only_symbols(mut self, value: bool) -> Self {
-        self.symbols = value;
+    pub fn definitions_only(mut self, value: bool) -> Self {
+        self.definitions = value;
         self
     }
 
@@ -69,12 +69,12 @@ impl<'q> QueryPrinter<'q> {
     }
 
     pub fn format(&self, w: &mut impl Write) -> std::fmt::Result {
-        if self.symbols {
+        if self.definitions {
             return self.format_symbols(w);
         }
 
         let source_map = self.query.source_map();
-        let ast_map = self.query.asts();
+        let ast_map = self.query.ast_map();
         let show_headers = self.should_show_headers(source_map);
         let mut first = true;
 
@@ -90,8 +90,8 @@ impl<'q> QueryPrinter<'q> {
                 writeln!(w, "# {}", source.kind.display_name())?;
             }
 
-            if self.raw {
-                self.format_cst(root.as_cst(), 0, w)?;
+            if self.cst {
+                self.format_cst(root.syntax(), 0, w)?;
             } else {
                 self.format_root(root, w)?;
             }
@@ -107,7 +107,7 @@ impl<'q> QueryPrinter<'q> {
             || source_map
                 .iter()
                 .next()
-                .is_some_and(|s| !matches!(s.kind, SourceKind::OneLiner))
+                .is_some_and(|s| !matches!(s.kind, SourceKind::Inline))
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
@@ -120,10 +120,10 @@ impl<'q> QueryPrinter<'q> {
 
         // Collect body nodes from all files
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
-        for root in self.query.asts().values() {
+        for root in self.query.ast_map().values() {
             for def in root.defs() {
                 if let (Some(name_tok), Some(body)) = (def.name(), def.body()) {
-                    body_nodes.insert(name_tok.text().to_string(), body.as_cst().clone());
+                    body_nodes.insert(name_tok.text().to_string(), body.syntax().clone());
                 }
             }
         }
@@ -157,14 +157,14 @@ impl<'q> QueryPrinter<'q> {
             return Ok(());
         }
 
-        let card = body_nodes
+        let arity = body_nodes
             .get(name)
-            .map(|n| self.arity_mark(n))
+            .map(|n| self.arity_glyph(n))
             .unwrap_or("");
-        writeln!(w, "{}{}{}", prefix, name, card)?;
+        writeln!(w, "{}{}{}", prefix, name, arity)?;
         visited.insert(name.to_string());
 
-        if let Some(body) = self.query.symbol_table().get(name) {
+        if let Some(body) = self.query.symbol_table().body(name) {
             let refs_set = crate::analyze::refs::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
@@ -179,10 +179,10 @@ impl<'q> QueryPrinter<'q> {
 
     fn format_cst(&self, node: &SyntaxNode, depth: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = indent(depth);
-        let card = self.arity_mark(node);
+        let arity = self.arity_glyph(node);
         let span = self.span_str(node.text_range());
 
-        writeln!(w, "{}{:?}{}{}", prefix, node.kind(), card, span)?;
+        writeln!(w, "{}{:?}{}{}", prefix, node.kind(), arity, span)?;
 
         for child in node.children_with_tokens() {
             match child {
@@ -208,82 +208,82 @@ impl<'q> QueryPrinter<'q> {
     }
 
     fn format_root(&self, root: &ast::Root, w: &mut impl Write) -> std::fmt::Result {
-        let card = self.arity_mark(root.as_cst());
+        let arity = self.arity_glyph(root.syntax());
         let span = self.span_str(root.text_range());
-        writeln!(w, "Root{}{}", card, span)?;
+        writeln!(w, "Root{}{}", arity, span)?;
 
         for def in root.defs() {
             self.format_def(&def, 1, w)?;
         }
-        // Parser wraps all top-level exprs in Def nodes, so this should be empty
+        // Parser wraps all top-level patterns in Def nodes, so this should be empty
         assert!(
-            root.exprs().next().is_none(),
-            "printer: unexpected bare Expr in Root (parser should wrap in Def)"
+            root.patterns().next().is_none(),
+            "printer: unexpected bare Pattern in Root (parser should wrap in Def)"
         );
         Ok(())
     }
 
     fn format_def(&self, def: &ast::Def, depth: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = indent(depth);
-        let card = self.arity_mark(def.as_cst());
+        let arity = self.arity_glyph(def.syntax());
         let span = self.span_str(def.text_range());
         let name = def.name().map(|t| t.text().to_string());
 
         match name {
-            Some(n) => writeln!(w, "{}Def{}{} {}", prefix, card, span, n)?,
-            None => writeln!(w, "{}Def{}{}", prefix, card, span)?,
+            Some(n) => writeln!(w, "{}Def{}{} {}", prefix, arity, span, n)?,
+            None => writeln!(w, "{}Def{}{}", prefix, arity, span)?,
         }
 
         let Some(body) = def.body() else {
             return Ok(());
         };
-        self.format_expr(&body, depth + 1, w)
+        self.format_pattern(&body, depth + 1, w)
     }
 
-    fn format_expr(&self, expr: &ast::Expr, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+    fn format_pattern(&self, pattern: &ast::Pattern, depth: usize, w: &mut impl Write) -> std::fmt::Result {
         let prefix = indent(depth);
-        let card = self.arity_mark(expr.as_cst());
-        let span = self.span_str(expr.text_range());
+        let arity = self.arity_glyph(pattern.syntax());
+        let span = self.span_str(pattern.text_range());
 
-        match expr {
-            ast::Expr::NamedNode(n) => {
+        match pattern {
+            ast::Pattern::NodePattern(n) => {
                 if n.is_any() {
-                    writeln!(w, "{}NamedNode{}{} (any)", prefix, card, span)?;
+                    writeln!(w, "{}NamedNode{}{} (any)", prefix, arity, span)?;
                 } else {
-                    let node_type = n.node_type().map(|tok| tok.text().to_string());
-                    match node_type {
-                        Some(ty) => writeln!(w, "{}NamedNode{}{} {}", prefix, card, span, ty)?,
-                        None => writeln!(w, "{}NamedNode{}{}", prefix, card, span)?,
+                    let node_kind = n.kind_token().map(|tok| tok.text().to_string());
+                    match node_kind {
+                        Some(ty) => writeln!(w, "{}NamedNode{}{} {}", prefix, arity, span, ty)?,
+                        None => writeln!(w, "{}NamedNode{}{}", prefix, arity, span)?,
                     }
                 }
-                self.format_tree_children(n.as_cst(), depth + 1, w)?;
+                self.format_tree_children(n.syntax(), depth + 1, w)?;
             }
-            ast::Expr::Ref(r) => {
+            ast::Pattern::Ref(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}Ref{}{} {}", prefix, card, span, name)?;
+                writeln!(w, "{}Ref{}{} {}", prefix, arity, span, name)?;
             }
-            ast::Expr::AnonymousNode(a) => {
+            ast::Pattern::TokenPattern(a) => {
                 if a.is_any() {
-                    writeln!(w, "{}AnonymousNode{}{} (any)", prefix, card, span)?;
+                    writeln!(w, "{}AnonymousNode{}{} (any)", prefix, arity, span)?;
                 } else {
                     let value = a.value().map(|t| t.text().to_string()).unwrap_or_default();
-                    writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, card, span, value)?;
+                    writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, arity, span, value)?;
                 }
             }
-            ast::Expr::AltExpr(a) => {
-                writeln!(w, "{}Alt{}{}", prefix, card, span)?;
+            ast::Pattern::AltPattern(a) => {
+                writeln!(w, "{}Alt{}{}", prefix, arity, span)?;
                 for branch in a.branches() {
                     self.format_branch(&branch, depth + 1, w)?;
                 }
-                for expr in a.exprs() {
-                    self.format_expr(&expr, depth + 1, w)?;
+                for pattern in a.patterns() {
+                    self.format_pattern(&pattern, depth + 1, w)?;
                 }
             }
-            ast::Expr::SeqExpr(s) => {
-                writeln!(w, "{}Seq{}{}", prefix, card, span)?;
-                self.format_tree_children(s.as_cst(), depth + 1, w)?;
+            ast::Pattern::SeqPattern(s) => {
+                writeln!(w, "{}Seq{}{}", prefix, arity, span)?;
+                self.format_tree_children(s.syntax(), depth + 1, w)?;
             }
-            ast::Expr::CapturedExpr(c) => {
+            ast::Pattern::CapturedPattern(c) => {
                 let name = c
                     .name()
                     .map(|t| t.text()[1..].to_string())
@@ -295,34 +295,34 @@ impl<'q> QueryPrinter<'q> {
                 match type_ann {
                     Some(ty) => writeln!(
                         w,
-                        "{}CapturedExpr{}{} @{} :: {}",
-                        prefix, card, span, name, ty
+                        "{}CapturedPattern{}{} @{} :: {}",
+                        prefix, arity, span, name, ty
                     )?,
-                    None => writeln!(w, "{}CapturedExpr{}{} @{}", prefix, card, span, name)?,
+                    None => writeln!(w, "{}CapturedPattern{}{} @{}", prefix, arity, span, name)?,
                 }
                 let Some(inner) = c.inner() else {
                     return Ok(());
                 };
-                self.format_expr(&inner, depth + 1, w)?;
+                self.format_pattern(&inner, depth + 1, w)?;
             }
-            ast::Expr::QuantifiedExpr(q) => {
+            ast::Pattern::QuantifiedPattern(q) => {
                 let op = q
                     .operator()
                     .map(|t| t.text().to_string())
                     .unwrap_or_default();
-                writeln!(w, "{}QuantifiedExpr{}{} {}", prefix, card, span, op)?;
+                writeln!(w, "{}QuantifiedPattern{}{} {}", prefix, arity, span, op)?;
                 let Some(inner) = q.inner() else {
                     return Ok(());
                 };
-                self.format_expr(&inner, depth + 1, w)?;
+                self.format_pattern(&inner, depth + 1, w)?;
             }
-            ast::Expr::FieldExpr(f) => {
+            ast::Pattern::FieldPattern(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
-                writeln!(w, "{}FieldExpr{}{} {}:", prefix, card, span, name)?;
+                writeln!(w, "{}FieldPattern{}{} {}:", prefix, arity, span, name)?;
                 let Some(value) = f.value() else {
                     return Ok(());
                 };
-                self.format_expr(&value, depth + 1, w)?;
+                self.format_pattern(&value, depth + 1, w)?;
             }
         }
         Ok(())
@@ -349,8 +349,8 @@ impl<'q> QueryPrinter<'q> {
                     depth,
                     w,
                 )?;
-            } else if let Some(expr) = ast::Expr::cast(child) {
-                self.format_expr(&expr, depth, w)?;
+            } else if let Some(pattern) = ast::Pattern::cast(child) {
+                self.format_pattern(&pattern, depth, w)?;
             }
         }
         Ok(())
@@ -385,26 +385,26 @@ impl<'q> QueryPrinter<'q> {
         w: &mut impl Write,
     ) -> std::fmt::Result {
         let prefix = indent(depth);
-        let card = self.arity_mark(branch.as_cst());
+        let arity = self.arity_glyph(branch.syntax());
         let span = self.span_str(branch.text_range());
         let label = branch.label().map(|t| t.text().to_string());
 
         match label {
-            Some(l) => writeln!(w, "{}Branch{}{} {}:", prefix, card, span, l)?,
-            None => writeln!(w, "{}Branch{}{}", prefix, card, span)?,
+            Some(l) => writeln!(w, "{}Branch{}{} {}:", prefix, arity, span, l)?,
+            None => writeln!(w, "{}Branch{}{}", prefix, arity, span)?,
         }
 
         let Some(body) = branch.body() else {
             return Ok(());
         };
-        self.format_expr(&body, depth + 1, w)
+        self.format_pattern(&body, depth + 1, w)
     }
 
-    fn arity_mark(&self, node: &SyntaxNode) -> &'static str {
+    fn arity_glyph(&self, node: &SyntaxNode) -> &'static str {
         if !self.arities {
             return "";
         }
-        match self.query.get_arity(node) {
+        match self.query.arity(node) {
             Some(Arity::One) => "¹",
             Some(Arity::Many) => "⁺",
             None => "ˣ",

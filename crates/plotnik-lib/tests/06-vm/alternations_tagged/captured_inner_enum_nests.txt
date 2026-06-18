@@ -33,17 +33,17 @@ Q = 06 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
   08  └‣─  _                                10, 16
-  10   !   [Enum(M3) Enum(M1)] (expression_statement) [Node Set(M0) EndEnum]  13
-  13  ─‣┘  [Set(M2) EndEnum] _              15
+  10   !   [EnumOpen(M3) EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
+  13  ─‣┘  [Set(M2) EnumClose] _            15
   15                                        ▶
   16  ─‣─  _                                10, 16
 ==== types ====
@@ -62,7 +62,7 @@ export interface EnumIn {
 export type Enum = EnumIn;
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -71,14 +71,14 @@ Q:
        ●   program
   08       _                                10, 16
        ●   expression_statement
-  10       [Enum(M3) Enum(M1)] (expression_statement) [Node Set(M0) EndEnum]  13
+  10       [EnumOpen(M3) EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
        ●   expression_statement
-  13       [Set(M2) EndEnum] _              15
+  13       [Set(M2) EnumClose] _            15
        ●   program
   15   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"$tag":"Tag","$data":{"y":{"$tag":"In","$data":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}}

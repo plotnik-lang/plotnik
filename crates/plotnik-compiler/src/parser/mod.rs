@@ -19,7 +19,7 @@
 //! 3. Recovery sets define "synchronization points" per production
 //! 4. On recursion limit, remaining input goes into single Error node
 //!
-//! However, fuel exhaustion (exec_fuel, recursion_fuel) returns an actual error immediately.
+//! However, fuel exhaustion (parse_fuel, recursion_fuel) returns an actual error immediately.
 
 pub mod ast;
 mod cst;
@@ -39,9 +39,9 @@ mod tests;
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub use ast::{
-    AltExpr, AltKind, Anchor, AnonymousNode, Branch, CapturedExpr, Def, Expr, FieldExpr, NamedNode,
-    NegatedField, NodePredicate, PredicateOp, PredicateValue, QuantifiedExpr, Ref, RegexLiteral,
-    Root, SeqExpr, SeqItem, Type, is_truly_empty_scope, token_src,
+    AltPattern, AltKind, Anchor, Branch, CapturedPattern, Def, Pattern, FieldPattern, TokenPattern,
+    NegatedField, NodePattern, NodePredicate, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
+    RegexLiteral, Root, SeqPattern, SeqItem, Type, is_empty_group, token_src,
 };
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};

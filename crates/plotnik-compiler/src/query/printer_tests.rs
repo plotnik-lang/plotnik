@@ -34,7 +34,7 @@ fn printer_cst_with_trivia() {
     let input = "Q = {(a) (b)}";
     let q = Query::expect(input);
 
-    let res = q.printer().raw(true).with_trivia(true).dump();
+    let res = q.printer().cst(true).with_trivia(true).dump();
 
     insta::assert_snapshot!(res, @r#"
     Root
@@ -88,7 +88,7 @@ fn printer_capture_with_type() {
     insta::assert_snapshot!(res, @r"
     Root
       Def Q
-        CapturedExpr @x :: T
+        CapturedPattern @x :: T
           NamedNode call
     ");
 }
@@ -104,11 +104,11 @@ fn printer_quantifiers() {
     Root
       Def Q
         Seq
-          QuantifiedExpr *
+          QuantifiedPattern *
             NamedNode a
-          QuantifiedExpr +
+          QuantifiedPattern +
             NamedNode b
-          QuantifiedExpr ?
+          QuantifiedPattern ?
             NamedNode c
     ");
 }
@@ -124,7 +124,7 @@ fn printer_field() {
     Root
       Def Q
         NamedNode call
-          FieldExpr name:
+          FieldPattern name:
             NamedNode id
     ");
 }
@@ -196,8 +196,8 @@ fn printer_string_literal() {
 #[test]
 fn printer_ref() {
     let input = indoc! {r#"
-        Expr = (call)
-        Q = (func (Expr))
+        Pattern = (call)
+        Q = (func (Pattern))
     "#};
     let q = Query::expect(input);
 
@@ -205,11 +205,11 @@ fn printer_ref() {
 
     insta::assert_snapshot!(res, @r"
     Root
-      Def Expr
+      Def Pattern
         NamedNode call
       Def Q
         NamedNode func
-          Ref Expr
+          Ref Pattern
     ");
 }
 
@@ -222,7 +222,7 @@ fn printer_symbols_with_arities() {
     "#};
     let q = Query::expect(input);
 
-    let res = q.printer().only_symbols(true).with_arities(true).dump();
+    let res = q.printer().definitions_only(true).with_arities(true).dump();
 
     insta::assert_snapshot!(res, @r"
     A¹
@@ -242,7 +242,7 @@ fn printer_symbols_with_refs() {
     "#};
     let q = Query::expect(input);
 
-    let res = q.printer().only_symbols(true).dump();
+    let res = q.printer().definitions_only(true).dump();
 
     insta::assert_snapshot!(res, @r"
     A
@@ -263,7 +263,7 @@ fn printer_symbols_cycle() {
     "#};
     let q = Query::expect(input);
 
-    let res = q.printer().only_symbols(true).dump();
+    let res = q.printer().definitions_only(true).dump();
 
     insta::assert_snapshot!(res, @r"
     A
@@ -284,7 +284,7 @@ fn printer_symbols_undefined_ref() {
     let input = "Q = (call (Undefined))";
     let q = Query::expect(input);
 
-    let res = q.printer().only_symbols(true).dump();
+    let res = q.printer().definitions_only(true).dump();
 
     insta::assert_snapshot!(res, @r"
     Q
@@ -297,7 +297,7 @@ fn printer_symbols_broken_ref() {
     let input = "A = (foo (Undefined))";
     let q = Query::expect(input);
 
-    let res = q.printer().only_symbols(true).dump();
+    let res = q.printer().definitions_only(true).dump();
 
     insta::assert_snapshot!(res, @r"
     A
@@ -319,7 +319,7 @@ fn printer_spans_comprehensive() {
     Root [0..43]
       Def [0..28] Foo
         NamedNode [6..28] call
-          FieldExpr [12..22] name:
+          FieldPattern [12..22] name:
             NamedNode [18..22] id
           NegatedField [23..27] -bar
       Def [29..42] Q
@@ -358,9 +358,9 @@ fn printer_spans_quantifiers() {
     Root [0..17]
       Def [0..17] Q
         Seq [4..17]
-          QuantifiedExpr [6..10] *
+          QuantifiedPattern [6..10] *
             NamedNode [6..9] a
-          QuantifiedExpr [11..15] +
+          QuantifiedPattern [11..15] +
             NamedNode [11..14] b
     ");
 }

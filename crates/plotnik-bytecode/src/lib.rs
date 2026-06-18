@@ -15,13 +15,13 @@ pub mod predicate_op;
 pub mod type_system;
 
 pub use bytecode::{
-    AlignedVec, ByteStorage, Call, EffectOp, EffectOpcode, EncodeError, Entrypoint,
-    EntrypointsView, FieldSymbol, HEADER_SIZE, Header, Instruction, LineBuilder, MAGIC,
+    AlignedVec, ByteStorage, Call, Effect, EffectKind, EncodeError, Entrypoint, EntrypointsView,
+    FieldEntry, GrammarTableView, HEADER_SIZE, Header, Instruction, LineBuilder, MAGIC,
     MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
-    Match, MatchInstr, MatchPredicate, Module, ModuleError, Nav, NodeSymbol, NodeTypeIR, Opcode,
-    PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, RegexView, Return, SECTION_ALIGN, STEP_SIZE,
+    Match, MatchInstr, MatchPredicate, Module, ModuleError, Nav, NodeKindConstraint, NodeKindEntry,
+    Opcode, PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, RegexView, Return, SECTION_ALIGN, STEP_SIZE,
     STRING_TABLE_ENTRY_SIZE, SectionOffsets, Slice, StepAddr, StepId, StringId, StringsView,
-    Symbol, SymbolsView, Trampoline, TypeData, TypeDef, TypeId, TypeKind, TypeMember, TypeName,
+    Symbol, Trampoline, TypeDefKind, TypeDef, TypeId, TypeKind, TypeMember, TypeNameEntry,
     TypesView, VERSION, align_to_section, cols, dump, format_effect, nav_symbol,
     select_match_opcode, superscript, trace, truncate_text, width_for_count,
 };

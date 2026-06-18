@@ -59,9 +59,9 @@ fn is_array() {
 }
 
 #[test]
-fn array_is_non_empty() {
-    assert!(!TypeKind::ArrayZeroOrMore.array_is_non_empty());
-    assert!(TypeKind::ArrayOneOrMore.array_is_non_empty());
+fn is_non_empty_array() {
+    assert!(!TypeKind::ArrayZeroOrMore.is_non_empty_array());
+    assert!(TypeKind::ArrayOneOrMore.is_non_empty_array());
 }
 
 #[test]

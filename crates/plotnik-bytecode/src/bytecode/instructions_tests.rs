@@ -4,13 +4,13 @@ use std::num::NonZeroU16;
 
 use proptest::prelude::*;
 
-use super::effects::{EffectOp, EffectOpcode};
+use super::effects::{Effect, EffectKind};
 use super::instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, Trampoline,
     align_to_section, select_match_opcode,
 };
 use super::nav::Nav;
-use super::node_type_ir::NodeTypeIR;
+use super::node_kind_constraint::NodeKindConstraint;
 
 #[test]
 fn from_u8_decodes_known_and_rejects_unknown() {
@@ -120,7 +120,7 @@ fn trampoline_roundtrip() {
 #[test]
 fn encode_rejects_effect_payload_overflow() {
     let instr = MatchInstr {
-        post_effects: vec![EffectOp::new(EffectOpcode::Set, 0x400)],
+        post_effects: vec![Effect::new(EffectKind::Set, 0x400)],
         successors: vec![StepId::new(1)],
         ..Default::default()
     };
@@ -172,33 +172,33 @@ fn arb_nav() -> impl Strategy<Value = Nav> {
     ]
 }
 
-fn arb_node_type() -> impl Strategy<Value = NodeTypeIR> {
+fn arb_node_type() -> impl Strategy<Value = NodeKindConstraint> {
     prop_oneof![
-        Just(NodeTypeIR::Any),
-        Just(NodeTypeIR::Named(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeTypeIR::Named(NonZeroU16::new(n))),
-        Just(NodeTypeIR::Anonymous(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeTypeIR::Anonymous(NonZeroU16::new(n))),
+        Just(NodeKindConstraint::Any),
+        Just(NodeKindConstraint::Named(None)),
+        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Named(NonZeroU16::new(n))),
+        Just(NodeKindConstraint::Anonymous(None)),
+        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Anonymous(NonZeroU16::new(n))),
     ]
 }
 
-fn arb_effect() -> impl Strategy<Value = EffectOp> {
-    let opcode = prop::sample::select(vec![
-        EffectOpcode::Node,
-        EffectOpcode::Arr,
-        EffectOpcode::Push,
-        EffectOpcode::EndArr,
-        EffectOpcode::Obj,
-        EffectOpcode::EndObj,
-        EffectOpcode::Set,
-        EffectOpcode::Enum,
-        EffectOpcode::EndEnum,
-        EffectOpcode::Clear,
-        EffectOpcode::Null,
-        EffectOpcode::SuppressBegin,
-        EffectOpcode::SuppressEnd,
+fn arb_effect() -> impl Strategy<Value = Effect> {
+    let kind = prop::sample::select(vec![
+        EffectKind::Node,
+        EffectKind::ArrayOpen,
+        EffectKind::Push,
+        EffectKind::ArrayClose,
+        EffectKind::ObjectOpen,
+        EffectKind::ObjectClose,
+        EffectKind::Set,
+        EffectKind::EnumOpen,
+        EffectKind::EnumClose,
+        EffectKind::Clear,
+        EffectKind::Null,
+        EffectKind::SuppressBegin,
+        EffectKind::SuppressEnd,
     ]);
-    (opcode, 0usize..=0x3FF).prop_map(|(opcode, payload)| EffectOp::new(opcode, payload))
+    (kind, 0usize..=0x3FF).prop_map(|(kind, payload)| Effect::new(kind, payload))
 }
 
 fn arb_predicate() -> impl Strategy<Value = MatchPredicate> {
@@ -225,7 +225,7 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
         .prop_map(
             |(
                 nav,
-                node_type,
+                node_kind,
                 node_field,
                 pre_effects,
                 neg_fields,
@@ -235,7 +235,7 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
             )| {
                 MatchInstr {
                     nav,
-                    node_type,
+                    node_kind,
                     node_field,
                     pre_effects,
                     neg_fields,

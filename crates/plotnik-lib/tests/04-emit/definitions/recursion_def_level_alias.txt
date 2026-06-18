@@ -39,9 +39,9 @@ Rec = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Rec:
@@ -52,8 +52,8 @@ Q:
   09                                        ▶
   10  └‣─  (Rec)                            06 : 11
   11  ─‣┘  [Set(M0)] _                      13
-  13  ─‣┘  _ [EndEnum]                      15
+  13  ─‣┘  _ [EnumClose]                    15
   15                                        ▶
   16  └‣─  (expression_statement)           10
-  17   !   [Enum(M2)] (program)             16
-  19   !   [Enum(M3)] (identifier) [Node Set(M1) EndEnum]  15
+  17   !   [EnumOpen(M2)] (program)         16
+  19   !   [EnumOpen(M3)] (identifier) [Node Set(M1) EnumClose]  15

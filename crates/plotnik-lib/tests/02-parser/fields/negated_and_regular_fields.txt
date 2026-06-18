@@ -28,5 +28,5 @@ Root
   Def Q
     NamedNode function
       NegatedField -async
-      FieldExpr name:
+      FieldPattern name:
         NamedNode identifier

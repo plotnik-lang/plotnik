@@ -1,6 +1,6 @@
 Q = (function_declaraton) @fn
 ==== diagnostics ====
-error: `function_declaraton` is not a valid node type
+error: `function_declaraton` is not a valid node kind
  --> query.ptk:1:6
   |
 1 | Q = (function_declaraton) @fn

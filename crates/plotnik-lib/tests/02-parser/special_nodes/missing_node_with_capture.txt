@@ -18,5 +18,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @missing_semi
+    CapturedPattern @missing_semi
       NamedNode MISSING

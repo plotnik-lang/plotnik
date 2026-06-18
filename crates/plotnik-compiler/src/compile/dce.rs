@@ -52,7 +52,7 @@ mod tests {
     fn removes_unreachable_instructions() {
         // A -> B (reachable), C (unreachable)
         let instructions = vec![
-            MatchIR::at(Label(0)).nav(Nav::Down).next(Label(1)).into(),
+            MatchIR::terminal(Label(0)).nav(Nav::Down).next(Label(1)).into(),
             MatchIR::terminal(Label(1)).nav(Nav::Down).into(),
             MatchIR::terminal(Label(2)).nav(Nav::Down).into(), // unreachable
         ];
@@ -79,8 +79,8 @@ mod tests {
     fn keeps_all_when_all_reachable() {
         // A -> B -> C (all reachable)
         let instructions = vec![
-            MatchIR::at(Label(0)).nav(Nav::Down).next(Label(1)).into(),
-            MatchIR::at(Label(1)).nav(Nav::Down).next(Label(2)).into(),
+            MatchIR::terminal(Label(0)).nav(Nav::Down).next(Label(1)).into(),
+            MatchIR::terminal(Label(1)).nav(Nav::Down).next(Label(2)).into(),
             MatchIR::terminal(Label(2)).nav(Nav::Down).into(),
         ];
 
@@ -103,9 +103,9 @@ mod tests {
     fn handles_branching() {
         // A -> [B, C] (all reachable via branch)
         let instructions = vec![
-            MatchIR::at(Label(0))
+            MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
-                .next_many(vec![Label(1), Label(2)])
+                .successors(vec![Label(1), Label(2)])
                 .into(),
             MatchIR::terminal(Label(1)).nav(Nav::Down).into(),
             MatchIR::terminal(Label(2)).nav(Nav::Down).into(),

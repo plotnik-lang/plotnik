@@ -11,7 +11,7 @@ fn severity_display() {
 #[test]
 fn report_with_default_message() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello");
+    let id = map.add_inline("hello");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -29,7 +29,7 @@ fn report_with_default_message() {
 #[test]
 fn report_with_custom_message() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello");
+    let id = map.add_inline("hello");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -38,7 +38,7 @@ fn report_with_custom_message() {
             DiagnosticKind::ExpectedTypeName,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("expected type name after '::' (e.g., ::MyType)")
+        .detail("expected type name after '::' (e.g., ::MyType)")
         .emit();
 
     assert_eq!(diagnostics.len(), 1);
@@ -48,7 +48,7 @@ fn report_with_custom_message() {
 #[test]
 fn builder_with_related() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello world!");
+    let id = map.add_inline("hello world!");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -57,12 +57,12 @@ fn builder_with_related() {
             DiagnosticKind::UnclosedTree,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("primary")
+        .detail("primary")
         .related_to(id, TextRange::new(6.into(), 10.into()), "related info")
         .emit();
 
     assert_eq!(diagnostics.len(), 1);
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: missing closing `)`: primary
       |
@@ -76,7 +76,7 @@ fn builder_with_related() {
 #[test]
 fn builder_with_fix() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello world");
+    let id = map.add_inline("hello world");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -85,11 +85,11 @@ fn builder_with_fix() {
             DiagnosticKind::InvalidFieldEquals,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("fixable")
+        .detail("fixable")
         .fix("apply this fix", "fixed")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: fields use `:`, not `=`: fixable
       |
@@ -107,7 +107,7 @@ fn builder_with_fix() {
 #[test]
 fn builder_with_all_options() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello world stuff!");
+    let id = map.add_inline("hello world stuff!");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -116,13 +116,13 @@ fn builder_with_all_options() {
             DiagnosticKind::UnclosedTree,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("main error")
+        .detail("main error")
         .related_to(id, TextRange::new(6.into(), 11.into()), "see also")
         .related_to(id, TextRange::new(12.into(), 17.into()), "and here")
         .fix("try this", "HELLO")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: missing closing `)`: main error
       |
@@ -143,7 +143,7 @@ fn builder_with_all_options() {
 #[test]
 fn printer_colored() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello");
+    let id = map.add_inline("hello");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -152,7 +152,7 @@ fn printer_colored() {
             DiagnosticKind::EmptyTree,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("test")
+        .detail("test")
         .emit();
 
     let result = diagnostics.render_colored(&map, true);
@@ -162,9 +162,9 @@ fn printer_colored() {
 
 #[test]
 fn printer_empty_diagnostics() {
-    let map = SourceMap::one_liner("source");
+    let map = SourceMap::from_inline("source");
     let diagnostics = Diagnostics::new();
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     assert!(result.is_empty());
 }
 
@@ -180,10 +180,10 @@ fn printer_with_custom_path() {
             DiagnosticKind::UndefinedReference,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("test error")
+        .detail("test error")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: `test error` is not defined
      --> test.pql:1:1
@@ -198,7 +198,7 @@ fn printer_with_custom_path() {
 #[test]
 fn printer_zero_width_span() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello");
+    let id = map.add_inline("hello");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -207,10 +207,10 @@ fn printer_zero_width_span() {
             DiagnosticKind::ExpectedExpression,
             TextRange::empty(0.into()),
         )
-        .message("zero width error")
+        .detail("zero width error")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @r#"
     error: expected an expression: zero width error
       |
@@ -224,7 +224,7 @@ fn printer_zero_width_span() {
 #[test]
 fn printer_related_zero_width() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello world!");
+    let id = map.add_inline("hello world!");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -233,11 +233,11 @@ fn printer_related_zero_width() {
             DiagnosticKind::UnclosedTree,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("primary")
+        .detail("primary")
         .related_to(id, TextRange::empty(6.into()), "zero width related")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: missing closing `)`: primary
       |
@@ -251,7 +251,7 @@ fn printer_related_zero_width() {
 #[test]
 fn printer_multiple_diagnostics() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello world!");
+    let id = map.add_inline("hello world!");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -260,7 +260,7 @@ fn printer_multiple_diagnostics() {
             DiagnosticKind::UnclosedTree,
             TextRange::new(0.into(), 5.into()),
         )
-        .message("first error")
+        .detail("first error")
         .emit();
     diagnostics
         .report(
@@ -268,10 +268,10 @@ fn printer_multiple_diagnostics() {
             DiagnosticKind::UndefinedReference,
             TextRange::new(6.into(), 10.into()),
         )
-        .message("second error")
+        .detail("second error")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: missing closing `)`: first error
       |
@@ -292,7 +292,7 @@ fn printer_multiple_diagnostics() {
 #[test]
 fn diagnostics_collection_methods() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("ab");
+    let id = map.add_inline("ab");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -315,11 +315,11 @@ fn diagnostics_collection_methods() {
 #[test]
 fn diagnostic_kind_default_severity() {
     assert_eq!(
-        DiagnosticKind::UnclosedTree.default_severity(),
+        DiagnosticKind::UnclosedTree.severity(),
         Severity::Error
     );
     assert_eq!(
-        DiagnosticKind::UnnamedDef.default_severity(),
+        DiagnosticKind::MissingDefName.severity(),
         Severity::Error
     );
 }
@@ -327,33 +327,33 @@ fn diagnostic_kind_default_severity() {
 #[test]
 fn diagnostic_kind_suppression_order() {
     // Higher priority (earlier in enum) suppresses lower priority (later in enum)
-    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnnamedDef));
+    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::MissingDefName));
     assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UndefinedReference));
-    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::UnnamedDef));
+    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::MissingDefName));
 
     // Same kind doesn't suppress itself
     assert!(!DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnclosedTree));
 
     // Lower priority doesn't suppress higher priority
-    assert!(!DiagnosticKind::UnnamedDef.suppresses(&DiagnosticKind::UnclosedTree));
+    assert!(!DiagnosticKind::MissingDefName.suppresses(&DiagnosticKind::UnclosedTree));
 }
 
 #[test]
 fn diagnostic_kind_fallback_messages() {
     assert_eq!(
-        DiagnosticKind::UnclosedTree.fallback_message(),
+        DiagnosticKind::UnclosedTree.summary(),
         "missing closing `)`"
     );
     assert_eq!(
-        DiagnosticKind::UnclosedSequence.fallback_message(),
+        DiagnosticKind::UnclosedSequence.summary(),
         "missing closing `}`"
     );
     assert_eq!(
-        DiagnosticKind::UnclosedAlternation.fallback_message(),
+        DiagnosticKind::UnclosedAlternation.summary(),
         "missing closing `]`"
     );
     assert_eq!(
-        DiagnosticKind::ExpectedExpression.fallback_message(),
+        DiagnosticKind::ExpectedExpression.summary(),
         "expected an expression"
     );
 }
@@ -361,15 +361,15 @@ fn diagnostic_kind_fallback_messages() {
 #[test]
 fn diagnostic_kind_custom_messages() {
     // Detail replaces the whole message
-    assert_eq!(DiagnosticKind::UnexpectedToken.custom_message(), "{}");
+    assert_eq!(DiagnosticKind::UnexpectedToken.template(), "{}");
     // Detail is interpolated into a template
     assert_eq!(
-        DiagnosticKind::UndefinedReference.custom_message(),
+        DiagnosticKind::UndefinedReference.template(),
         "`{}` is not defined"
     );
     // Default: fallback message plus detail
     assert_eq!(
-        DiagnosticKind::DuplicateCaptureInScope.custom_message(),
+        DiagnosticKind::DuplicateCaptureInScope.template(),
         "capture `@{}` already defined in this scope"
     );
 }
@@ -378,16 +378,16 @@ fn diagnostic_kind_custom_messages() {
 fn diagnostic_kind_message_rendering() {
     // No custom message → fallback
     assert_eq!(
-        DiagnosticKind::UnclosedTree.message(None),
+        DiagnosticKind::UnclosedTree.render(None),
         "missing closing `)`"
     );
     // With custom message → template applied
     assert_eq!(
-        DiagnosticKind::UnexpectedToken.message(Some("expected `)`")),
+        DiagnosticKind::UnexpectedToken.render(Some("expected `)`")),
         "expected `)`"
     );
     assert_eq!(
-        DiagnosticKind::UndefinedReference.message(Some("Foo")),
+        DiagnosticKind::UndefinedReference.render(Some("Foo")),
         "`Foo` is not defined"
     );
 }
@@ -395,7 +395,7 @@ fn diagnostic_kind_message_rendering() {
 #[test]
 fn filtered_no_suppression_disjoint_spans() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("0123456789012345");
+    let id = map.add_inline("0123456789012345");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -413,17 +413,17 @@ fn filtered_no_suppression_disjoint_spans() {
         )
         .emit();
 
-    let filtered = diagnostics.filtered();
+    let filtered = diagnostics.live();
     assert_eq!(filtered.len(), 2);
 }
 
 #[test]
 fn filtered_suppresses_lower_priority_contained() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("01234567890123456789");
+    let id = map.add_inline("01234567890123456789");
 
     let mut diagnostics = Diagnostics::new();
-    // Higher priority error (UnclosedTree) contains lower priority (UnnamedDef)
+    // Higher priority error (UnclosedTree) contains lower priority (MissingDefName)
     diagnostics
         .report(
             id,
@@ -434,12 +434,12 @@ fn filtered_suppresses_lower_priority_contained() {
     diagnostics
         .report(
             id,
-            DiagnosticKind::UnnamedDef,
+            DiagnosticKind::MissingDefName,
             TextRange::new(5.into(), 15.into()),
         )
         .emit();
 
-    let filtered = diagnostics.filtered();
+    let filtered = diagnostics.live();
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
 }
@@ -447,14 +447,14 @@ fn filtered_suppresses_lower_priority_contained() {
 #[test]
 fn filtered_consequence_suppressed_by_structural() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("01234567890123456789");
+    let id = map.add_inline("01234567890123456789");
 
     let mut diagnostics = Diagnostics::new();
-    // Consequence error (UnnamedDef) suppressed when structural error (UnclosedTree) exists
+    // Consequence error (MissingDefName) suppressed when structural error (UnclosedTree) exists
     diagnostics
         .report(
             id,
-            DiagnosticKind::UnnamedDef,
+            DiagnosticKind::MissingDefName,
             TextRange::new(0.into(), 20.into()),
         )
         .emit();
@@ -466,7 +466,7 @@ fn filtered_consequence_suppressed_by_structural() {
         )
         .emit();
 
-    let filtered = diagnostics.filtered();
+    let filtered = diagnostics.live();
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
 }
@@ -474,7 +474,7 @@ fn filtered_consequence_suppressed_by_structural() {
 #[test]
 fn filtered_same_span_higher_priority_wins() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("0123456789");
+    let id = map.add_inline("0123456789");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -487,12 +487,12 @@ fn filtered_same_span_higher_priority_wins() {
     diagnostics
         .report(
             id,
-            DiagnosticKind::UnnamedDef,
+            DiagnosticKind::MissingDefName,
             TextRange::new(0.into(), 10.into()),
         )
         .emit();
 
-    let filtered = diagnostics.filtered();
+    let filtered = diagnostics.live();
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].kind, DiagnosticKind::UnclosedTree);
 }
@@ -500,14 +500,14 @@ fn filtered_same_span_higher_priority_wins() {
 #[test]
 fn filtered_empty_diagnostics() {
     let diagnostics = Diagnostics::new();
-    let filtered = diagnostics.filtered();
+    let filtered = diagnostics.live();
     assert!(filtered.is_empty());
 }
 
 #[test]
 fn render_filtered() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("(function_declaration");
+    let id = map.add_inline("(function_declaration");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -516,15 +516,15 @@ fn render_filtered() {
             DiagnosticKind::UnclosedTree,
             TextRange::new(0.into(), 20.into()),
         )
-        .message("unclosed tree")
+        .detail("unclosed tree")
         .emit();
     diagnostics
         .report(
             id,
-            DiagnosticKind::UnnamedDef,
+            DiagnosticKind::MissingDefName,
             TextRange::new(5.into(), 15.into()),
         )
-        .message("unnamed def")
+        .detail("unnamed def")
         .emit();
 
     let result = diagnostics.render(&map);
@@ -545,11 +545,11 @@ fn multi_file_cross_file_related() {
             DiagnosticKind::UndefinedReference,
             TextRange::new(1.into(), 4.into()),
         )
-        .message("Foo")
+        .detail("Foo")
         .related_to(file_a, TextRange::new(0.into(), 3.into()), "defined here")
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @"
     error: `Foo` is not defined
      --> b.ptk:1:2
@@ -578,7 +578,7 @@ fn multi_file_same_file_related() {
             DiagnosticKind::DuplicateDefinition,
             TextRange::new(12.into(), 15.into()),
         )
-        .message("Foo")
+        .detail("Foo")
         .related_to(
             file_a,
             TextRange::new(0.into(), 3.into()),
@@ -586,7 +586,7 @@ fn multi_file_same_file_related() {
         )
         .emit();
 
-    let result = diagnostics.render_unfiltered(&map);
+    let result = diagnostics.render_raw(&map);
     insta::assert_snapshot!(result, @r"
     error: `Foo` is already defined
      --> main.ptk:1:13
@@ -614,7 +614,7 @@ fn source_map_iteration() {
 #[test]
 fn span_new() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("hello");
+    let id = map.add_inline("hello");
 
     let range = TextRange::new(5.into(), 10.into());
     let span = Span::new(id, range);
@@ -631,10 +631,10 @@ fn render_json_full_shape() {
     diagnostics
         .report(
             id,
-            DiagnosticKind::UnknownNodeType,
+            DiagnosticKind::UnknownNodeKind,
             TextRange::new(7.into(), 10.into()),
         )
-        .message("bar")
+        .detail("bar")
         .related_to(id, TextRange::new(1.into(), 4.into()), "first seen here")
         .fix("replace with `baz`", "baz")
         .hint("check the grammar")
@@ -645,7 +645,7 @@ fn render_json_full_shape() {
     insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
     [
       {
-        "code": "unknown_node_type",
+        "code": "unknown_node_kind",
         "fix": {
           "description": "replace with `baz`",
           "replacement": "baz"
@@ -653,7 +653,7 @@ fn render_json_full_shape() {
         "hints": [
           "check the grammar"
         ],
-        "message": "`bar` is not a valid node type",
+        "message": "`bar` is not a valid node kind",
         "related": [
           {
             "message": "first seen here",
@@ -694,7 +694,7 @@ fn render_json_full_shape() {
 #[test]
 fn render_json_minimal_omits_empty_fields() {
     let mut map = SourceMap::new();
-    let id = map.add_one_liner("(foo");
+    let id = map.add_inline("(foo");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics

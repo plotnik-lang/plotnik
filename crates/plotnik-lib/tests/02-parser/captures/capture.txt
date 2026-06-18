@@ -15,5 +15,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @name
+    CapturedPattern @name
       NamedNode identifier

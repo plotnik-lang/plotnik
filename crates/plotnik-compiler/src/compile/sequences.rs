@@ -9,9 +9,9 @@ use std::collections::{BTreeMap, HashSet};
 use plotnik_core::Symbol;
 
 use crate::analyze::type_check::{TypeId, TypeShape};
-use crate::bytecode::{EffectIR, InstructionIR, Label, MemberRef, NodeTypeIR};
-use crate::parser::ast::{self, Expr, SeqItem};
-use plotnik_bytecode::{EffectOpcode, Nav};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
+use crate::parser::ast::{self, Pattern, SeqItem};
+use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -34,7 +34,7 @@ fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
     match items.last()? {
         SeqItem::Anchor(a) if a.is_strict() => Some(Nav::NextExact),
         SeqItem::Anchor(_) => Some(Nav::NextSkip),
-        SeqItem::Expr(_) => None,
+        SeqItem::Pattern(_) => None,
     }
 }
 
@@ -44,9 +44,9 @@ fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
 /// owns the retry wrapper and each branch matches exactly at the candidate
 /// (`StayExact`).
 #[derive(Clone, Copy)]
-struct SearchNav(Option<Nav>);
+struct AltSearchNav(Option<Nav>);
 
-fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: SearchNav) -> Option<Nav> {
+fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: AltSearchNav) -> Option<Nav> {
     if search_nav.0.is_some() {
         return Some(Nav::StayExact);
     }
@@ -68,8 +68,8 @@ fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: SearchNav) -> Op
 
 fn nav_for_alt_branch(
     first_nav: Option<Nav>,
-    search_nav: SearchNav,
-    body: &Expr,
+    search_nav: AltSearchNav,
+    body: &Pattern,
     classifier: &AnonymousClassifier<'_>,
 ) -> Option<Nav> {
     let nav = exact_nav_for_alt_branch(first_nav, search_nav)?;
@@ -98,11 +98,11 @@ fn nav_for_alt_branch(
 /// and in order.
 fn is_scope_close_effect(e: &EffectIR) -> bool {
     matches!(
-        e.opcode(),
-        EffectOpcode::EndArr
-            | EffectOpcode::EndObj
-            | EffectOpcode::EndEnum
-            | EffectOpcode::SuppressEnd
+        e.kind(),
+        EffectKind::ArrayClose
+            | EffectKind::ObjectClose
+            | EffectKind::EnumClose
+            | EffectKind::SuppressEnd
     )
 }
 
@@ -120,7 +120,7 @@ pub(super) struct SeqItemsCtx<'a> {
 }
 
 impl Compiler<'_> {
-    pub(super) fn compile_seq_inner(&mut self, seq: &ast::SeqExpr, ctx: ExprCtx) -> Label {
+    pub(super) fn compile_seq(&mut self, seq: &ast::SeqPattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
             exit,
             nav: first_nav,
@@ -136,7 +136,7 @@ impl Compiler<'_> {
             Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
         );
 
-        self.compile_seq_items_inner(SeqItemsCtx {
+        self.compile_seq_items(SeqItemsCtx {
             items: &items,
             exit,
             is_inside_node,
@@ -151,7 +151,7 @@ impl Compiler<'_> {
     /// When `skip_exit` is provided, the skip path of the first skippable item
     /// will use this exit instead of `exit`. This is used when inside a node
     /// where skip paths should bypass the Up instruction.
-    pub(super) fn compile_seq_items_inner(&mut self, ctx: SeqItemsCtx<'_>) -> Label {
+    pub(super) fn compile_seq_items(&mut self, ctx: SeqItemsCtx<'_>) -> Label {
         let SeqItemsCtx {
             items,
             exit,
@@ -167,7 +167,7 @@ impl Compiler<'_> {
             return exit;
         }
 
-        let first_expr_nav = if let Some((_, first_mode)) = nav_modes.first_mut()
+        let first_pattern_nav = if let Some((_, first_mode)) = nav_modes.first_mut()
             && first_mode.is_none()
         {
             let nav = first_nav.or_else(|| is_inside_node.then_some(Nav::Down));
@@ -184,15 +184,15 @@ impl Compiler<'_> {
         // leading anchor (e.g. `{. (a)? ...}`) doesn't hide a skippable first item.
         let first_is_skippable = nav_modes
             .first()
-            .and_then(|(idx, _)| items[*idx].as_expr())
+            .and_then(|(idx, _)| items[*idx].as_pattern())
             .is_some_and(is_skippable_quantifier);
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
         // a child, `Stay*` at an alternation branch's search candidate) instead of
         // advancing to a sibling — otherwise the skip path over-advances and never binds.
-        let first_positions = is_down_nav(first_expr_nav)
-            || matches!(first_expr_nav, Some(Nav::Stay | Nav::StayExact));
+        let first_positions = is_down_nav(first_pattern_nav)
+            || matches!(first_pattern_nav, Some(Nav::Stay | Nav::StayExact));
         let needs_skip_exit =
             first_is_skippable && first_positions && (nav_modes.len() > 1 || skip_exit.is_some());
 
@@ -203,7 +203,7 @@ impl Compiler<'_> {
                     items,
                     exit,
                     is_inside_node,
-                    first_nav: first_expr_nav,
+                    first_nav: first_pattern_nav,
                     capture,
                     skip_exit,
                 },
@@ -218,7 +218,7 @@ impl Compiler<'_> {
         // matched_node and its skip-path null injection — so only scope effects move.
         let last_is_skippable = nav_modes
             .last()
-            .and_then(|(idx, _)| items[*idx].as_expr())
+            .and_then(|(idx, _)| items[*idx].as_pattern())
             .is_some_and(is_skippable_quantifier);
 
         // Build chain in reverse: last expression exits to `exit`, each prior exits to next.
@@ -243,20 +243,20 @@ impl Compiler<'_> {
         // lastness retry. Interior items overwrite this with their real follower.
         let mut following_nav: Option<Nav> = trailing_anchor_follow_nav(items);
         for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
-            let expr = items[expr_idx]
-                .as_expr()
-                .expect("nav_modes only contains expr indices");
+            let pattern = items[expr_idx]
+                .as_pattern()
+                .expect("nav_modes only contains pattern indices");
 
-            let is_last_expr = i == 0; // First in reversed loop = last in sequence
-            let is_first_expr = i == count - 1; // Last in reversed loop = first in sequence
+            let is_last_pattern = i == 0; // First in reversed loop = last in sequence
+            let is_first_pattern = i == count - 1; // Last in reversed loop = first in sequence
 
             let item_capture = CaptureEffects {
-                pre: if is_first_expr && !first_is_skippable {
+                pre: if is_first_pattern && !first_is_skippable {
                     capture.pre.clone()
                 } else {
                     vec![]
                 },
-                post: if is_last_expr {
+                post: if is_last_pattern {
                     last_post.clone()
                 } else {
                     vec![]
@@ -273,11 +273,11 @@ impl Compiler<'_> {
                 Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
             );
             let search_nav = resumable_search_nav(nav_override)
-                .filter(|_| followed_by_anchor && !expr_owns_iteration(expr));
+                .filter(|_| followed_by_anchor && !expr_owns_iteration(pattern));
 
             current_exit = if let Some(nav) = search_nav {
-                let body = self.compile_expr_inner(
-                    expr,
+                let body = self.dispatch_pattern(
+                    pattern,
                     ExprCtx {
                         exit: current_exit,
                         nav: Some(Nav::StayExact),
@@ -286,8 +286,8 @@ impl Compiler<'_> {
                 );
                 self.emit_position_search(nav, body)
             } else {
-                self.compile_expr_inner(
-                    expr,
+                self.dispatch_pattern(
+                    pattern,
                     ExprCtx {
                         exit: current_exit,
                         nav: nav_override,
@@ -310,7 +310,7 @@ impl Compiler<'_> {
     /// and must re-derive first-position navigation instead of the sibling `Next` the
     /// match path uses. This requires compiling the continuation twice.
     ///
-    /// Sequence-level scope effects (`capture`: e.g. `Enum`/`EndEnum` for a tagged
+    /// Sequence-level scope effects (`capture`: e.g. `Enum`/`EndEnum` for an enum
     /// variant) wrap the whole body on single dominating epsilons — open before the
     /// skippable item, close after the continuation — so they execute exactly once on
     /// both the skip and match paths. Merging them onto items instead would drop the
@@ -331,9 +331,9 @@ impl Compiler<'_> {
             capture,
             skip_exit: caller_skip_exit,
         } = ctx;
-        let first_expr_idx = nav_modes[0].0;
-        let first_expr = items[first_expr_idx]
-            .as_expr()
+        let first_pattern_idx = nav_modes[0].0;
+        let first_pattern = items[first_pattern_idx]
+            .as_pattern()
             .expect("first item must be expression");
 
         // Close the *scope* on a single exit epsilon every continuation converges to.
@@ -380,8 +380,8 @@ impl Compiler<'_> {
         } else {
             // The follower is the last item; `post_keep` rides its continuation.
             let cont = CaptureEffects::new_post(post_keep);
-            let skip_rest = &items[first_expr_idx + 1..];
-            let skip = self.compile_seq_items_inner(SeqItemsCtx {
+            let skip_rest = &items[first_pattern_idx + 1..];
+            let skip = self.compile_seq_items(SeqItemsCtx {
                 items: skip_rest,
                 exit,
                 is_inside_node,
@@ -392,7 +392,7 @@ impl Compiler<'_> {
 
             let follower_idx = nav_modes[1].0;
             let match_rest = &items[follower_idx..];
-            let mtch = self.compile_seq_items_inner(SeqItemsCtx {
+            let mtch = self.compile_seq_items(SeqItemsCtx {
                 items: match_rest,
                 exit,
                 is_inside_node,
@@ -404,7 +404,7 @@ impl Compiler<'_> {
         };
 
         let entry = self.compile_skippable_with_exits(
-            first_expr,
+            first_pattern,
             SplitExits {
                 match_exit,
                 skip_exit,
@@ -439,7 +439,7 @@ impl Compiler<'_> {
             else {
                 return None;
             };
-            if m.nav != Nav::NextSkipExtras || !matches!(m.node_type, NodeTypeIR::Named(_)) {
+            if m.nav != Nav::NextSkipExtras || !matches!(m.node_kind, NodeKindConstraint::Named(_)) {
                 return None;
             }
             m.clone()
@@ -453,7 +453,7 @@ impl Compiler<'_> {
     }
 
     /// Compile an alternation with capture effects (passed to each branch).
-    pub(super) fn compile_alt_inner(&mut self, alt: &ast::AltExpr, ctx: ExprCtx) -> Label {
+    pub(super) fn compile_alt(&mut self, alt: &ast::AltPattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
             exit,
             nav: first_nav,
@@ -464,20 +464,20 @@ impl Compiler<'_> {
             return exit;
         }
 
-        let alt_expr = Expr::AltExpr(alt.clone());
+        let alt_pattern = Pattern::AltPattern(alt.clone());
         let alt_type_id = self
             .ctx
             .type_ctx
-            .get_term_info(&alt_expr)
+            .term_info(&alt_pattern)
             .and_then(|info| info.flow.type_id());
-        let alt_type_shape = alt_type_id.and_then(|id| self.ctx.type_ctx.get_type(id));
+        let alt_type_shape = alt_type_id.and_then(|id| self.ctx.type_ctx.type_shape(id));
 
-        // Check if THIS alternation is syntactically tagged (all branches have labels).
-        // This is distinct from whether the type is an Enum - a nested untagged alternation
+        // Check if THIS alternation is syntactically an enum (all branches have labels).
+        // This is distinct from whether the type is an Enum - a nested union alternation
         // like `[[A: (x)]]` can inherit an enum type from its inner branch while the outer
         // branches have no labels.
-        let is_tagged_alt = branches.iter().all(|b| b.label().is_some());
-        let is_enum = is_tagged_alt
+        let all_branches_labeled = branches.iter().all(|b| b.label().is_some());
+        let is_enum = all_branches_labeled
             && alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
 
         // BTreeMap order gives stable variant indices independent of AST iteration order.
@@ -489,13 +489,13 @@ impl Compiler<'_> {
                 .collect(),
             _ => BTreeMap::new(),
         };
-        let merged_fields = alt_type_id.and_then(|id| self.ctx.type_ctx.get_struct_fields(id));
+        let merged_fields = alt_type_id.and_then(|id| self.ctx.type_ctx.struct_fields(id));
 
         // Branches match at the current candidate position. For resumable search
         // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
         // wrapper below; otherwise the branch performs the exact navigation.
         let search_nav = resumable_search_nav(first_nav);
-        let branch_search = SearchNav(search_nav);
+        let branch_search = AltSearchNav(search_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
 
         // A branch is "named" (eligible for the soft-skip follower twin) when it
@@ -543,7 +543,7 @@ impl Compiler<'_> {
                 let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
 
                 // Look up variant info by branch label (using BTreeMap order, not AST order)
-                let label = branch.label().expect("tagged branch must have label");
+                let label = branch.label().expect("enum branch must have label");
                 let label_text = label.text();
                 let (variant_idx, payload_type_id) = self
                     .ctx
@@ -554,7 +554,7 @@ impl Compiler<'_> {
                     .expect("variant must exist for labeled branch");
 
                 let e_effect = if let Some(type_id) = alt_type_id {
-                    EffectIR::with_member(EffectOpcode::Enum, MemberRef::new(type_id, variant_idx))
+                    EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))
                 } else {
                     EffectIR::start_enum()
                 };
@@ -562,7 +562,7 @@ impl Compiler<'_> {
                 let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
 
                 let body_entry = self.with_scope(payload_type_id, |this| {
-                    this.compile_expr_inner(
+                    this.dispatch_pattern(
                         &body,
                         ExprCtx {
                             exit: branch_exit,
@@ -574,7 +574,7 @@ impl Compiler<'_> {
 
                 successors.push(body_entry);
             } else {
-                // Untagged branch: inject a default value for every merged field this
+                // Union branch: inject a default value for every merged field this
                 // branch does not itself produce, so the output shape stays stable.
                 // "Produces" means a top-level (bubbling) field — a capture nested in a
                 // child scope (`{...} @row`) belongs to that scope, not here. The
@@ -584,9 +584,9 @@ impl Compiler<'_> {
                     let provided: HashSet<Symbol> = self
                         .ctx
                         .type_ctx
-                        .get_term_info(&body)
+                        .term_info(&body)
                         .and_then(|info| info.flow.type_id())
-                        .and_then(|id| self.ctx.type_ctx.get_struct_fields(id))
+                        .and_then(|id| self.ctx.type_ctx.struct_fields(id))
                         .map(|f| f.keys().copied().collect())
                         .unwrap_or_default();
                     fields
@@ -603,7 +603,7 @@ impl Compiler<'_> {
                             let member_ref = self.lookup_member_in_scope(name).expect(
                                 "alternation bubbling field must resolve in enclosing scope",
                             );
-                            let set = EffectIR::with_member(EffectOpcode::Set, member_ref);
+                            let set = EffectIR::with_member(EffectKind::Set, member_ref);
                             // A non-optional list defaults to `[]`; everything else
                             // — scalars, and optional lists like `((x)+ @a)?` —
                             // defaults to null. The `optional` flag, not the array
@@ -611,7 +611,7 @@ impl Compiler<'_> {
                             // type from `relax_for_absence`.
                             let is_required_list = !field_info.optional
                                 && matches!(
-                                    self.ctx.type_ctx.get_type(field_info.type_id),
+                                    self.ctx.type_ctx.type_shape(field_info.type_id),
                                     Some(TypeShape::Array { .. })
                                 );
                             if is_required_list {
@@ -628,7 +628,7 @@ impl Compiler<'_> {
                 let branch_capture = capture.clone().with_pre_values(null_effects);
 
                 let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
-                let branch_entry = self.compile_expr_inner(
+                let branch_entry = self.dispatch_pattern(
                     &body,
                     ExprCtx {
                         exit: branch_exit,

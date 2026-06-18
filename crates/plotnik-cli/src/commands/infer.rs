@@ -7,7 +7,7 @@ use plotnik_lib::bytecode::Module;
 use plotnik_lib::typegen::typescript;
 
 use super::lang_resolver::require_lang;
-use super::query_loader::load_query_source;
+use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
 
 pub struct InferArgs {
@@ -29,7 +29,7 @@ pub fn run(args: InferArgs) -> CliResult {
         return Err(CliError::fatal("--format must be 'typescript' or 'ts'"));
     }
 
-    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
+    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
 
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));
@@ -66,13 +66,13 @@ pub fn run(args: InferArgs) -> CliResult {
     };
     // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
-    let config = typescript::Config::new()
+    let config = typescript::Config::builder()
         .export(args.export)
-        .emit_node_type(!args.no_node_type)
+        .emit_node_interface(!args.no_node_type)
         .verbose_nodes(args.verbose_nodes)
         .void_type(void_type)
         .colored(use_colors);
-    let output = typescript::emit_with_config(&module, config);
+    let output = typescript::emit(&module, config);
 
     if let Some(ref path) = args.output {
         fs::write(path, &output)

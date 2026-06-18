@@ -19,6 +19,8 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 
 # Query Syntax Quick Reference
 
+**Pattern.** A *pattern* is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+
 ## Core Constructs
 
 | Syntax              | Meaning                            |
@@ -52,17 +54,14 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 
 ## Alternations
 
-Unlabeled (merge style):
+An alternation `[...]` matches one of several branches; its form determines its type:
 
-```
-[(identifier) @x (number) @y]  → { x?: Node, y?: Node }
-```
+- **Union** (unlabeled) — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields. This is an *untagged union* in the C/Rust sense: fields overlap, with no discriminant for which branch matched.
+- **Enum** (labeled) — `[A: (id) @x  B: (num) @y]` → `{ $tag: "A", $data: { x } } | { $tag: "B", $data: { y } }`. Each branch label becomes a discriminant tag — a *tagged union*, i.e. a Rust-style `enum`.
 
-Labeled (tagged union):
+Mixing labeled and unlabeled branches in one `[...]` is an error.
 
-```
-[A: (id) @x  B: (num) @y]  → { $tag: "A", $data: { x: ... } } | { $tag: "B", $data: { y: ... } }
-```
+Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`).
 
 ## Common Patterns
 
@@ -173,7 +172,7 @@ crates/
       parser/          # Syntactic parsing (lexer, grammar, AST)
       query/           # Query facade (Query, QueryBuilder, SourceMap)
       typegen/         # Type declaration extraction (bytecode → .d.ts)
-  plotnik-core/        # Grammar metadata, node type database, and string interning (Interner, Symbol)
+  plotnik-core/        # Grammar metadata, node kind database, and string interning (Interner, Symbol)
   plotnik-lib/         # Facade crate re-exporting bytecode, compiler, vm
   plotnik-vm/          # Runtime VM
     src/engine/        # Execution, backtracking, effects

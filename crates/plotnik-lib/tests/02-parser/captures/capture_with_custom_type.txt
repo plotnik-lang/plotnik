@@ -18,5 +18,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @fn :: FunctionDecl
+    CapturedPattern @fn :: FunctionDecl
       NamedNode function_declaration

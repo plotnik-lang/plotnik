@@ -41,25 +41,25 @@ Q = 06 :: T4
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
-  08  -ε-  [Arr]                            29, 14
+  08  -ε-  [ArrayOpen]                      29, 14
   10  -ε-                                   11
-  11  ─‣┘  [EndArr Set(M2)] _               13
+  11  ─‣┘  [ArrayClose Set(M2)] _           13
   13                                        ▶
-  14  -ε-  [EndArr Set(M2)]                 13
-  16  -ε-  [EndEnum Push]                   34, 10
+  14  -ε-  [ArrayClose Set(M2)]             13
+  16  -ε-  [EnumClose Push]                 34, 10
   18   !   (comment)                        16
   19  ─‣─  _                                18, 19
   21  ─‣─  _                                18, 19
   23  ...  
-  24   !   [Enum(M1)] (expression_statement) [Node Set(M0)]  21, 16
+  24   !   [EnumOpen(M1)] (expression_statement) [Node Set(M0)]  21, 16
   27  ─‣─  _                                24, 27
   29  └‣─  _                                24, 27
   31  ...  
@@ -78,17 +78,17 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [Arr]                            29, 14
+  08  -ε-  [ArrayOpen]                      29, 14
   29       _                                24, 27
        ●   expression_statement
-  24       [Enum(M1)] (expression_statement) [Node Set(M0)]  21, 16
+  24       [EnumOpen(M1)] (expression_statement) [Node Set(M0)]  21, 16
        ●   expression_statement
   21       _                                18, 19
        ●   expression_statement
@@ -97,23 +97,23 @@ Q:
   21  ❮❮❮ 
   19       _                                18, 19
   24  ❮❮❮ 
-  16  -ε-  [EndEnum Push]                   34, 10
+  16  -ε-  [EnumClose Push]                 34, 10
   34       _                                24, 32
        ●   expression_statement
-  24       [Enum(M1)] (expression_statement) [Node Set(M0)]  21, 16
+  24       [EnumOpen(M1)] (expression_statement) [Node Set(M0)]  21, 16
        ●   expression_statement
   21       _                                18, 19
   24  ❮❮❮ 
-  16  -ε-  [EndEnum Push]                   34, 10
+  16  -ε-  [EnumClose Push]                 34, 10
   34       _                                24, 32
   16  ❮❮❮ 
   10  -ε-                                   11
-  11       [EndArr Set(M2)] _               13
+  11       [ArrayClose Set(M2)] _           13
        ●   program
   13   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"items":[{"$tag":"Tag","$data":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}},{"$tag":"Tag","$data":{"a":{"kind":"expression_statement","text":"b;","span":[3, 5]}}}]}

@@ -44,14 +44,14 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @expr
+    CapturedPattern @expr
       NamedNode binary_expression
-        CapturedExpr @left
-          FieldExpr left:
+        CapturedPattern @left
+          FieldPattern left:
             NamedNode (any)
-        CapturedExpr @op
-          FieldExpr operator:
+        CapturedPattern @op
+          FieldPattern operator:
             AnonymousNode (any)
-        CapturedExpr @right
-          FieldExpr right:
+        CapturedPattern @right
+          FieldPattern right:
             NamedNode (any)

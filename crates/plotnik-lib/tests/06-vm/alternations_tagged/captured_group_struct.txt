@@ -38,17 +38,17 @@ Q = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
   08  └‣─  _                                10, 16
-  10   !   [Enum(M2) Obj] (expression_statement) [Node Set(M0)]  13
-  13  ─‣┘  [EndObj Set(M1) EndEnum] _       15
+  10   !   [EnumOpen(M2) ObjectOpen] (expression_statement) [Node Set(M0)]  13
+  13  ─‣┘  [ObjectClose Set(M1) EnumClose] _  15
   15                                        ▶
   16  ─‣─  _                                10, 16
 ==== types ====
@@ -64,7 +64,7 @@ export interface Struct {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -73,14 +73,14 @@ Q:
        ●   program
   08       _                                10, 16
        ●   expression_statement
-  10       [Enum(M2) Obj] (expression_statement) [Node Set(M0)]  13
+  10       [EnumOpen(M2) ObjectOpen] (expression_statement) [Node Set(M0)]  13
        ●   expression_statement
-  13       [EndObj Set(M1) EndEnum] _       15
+  13       [ObjectClose Set(M1) EnumClose] _  15
        ●   program
   15   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"$tag":"Tag","$data":{"x":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}

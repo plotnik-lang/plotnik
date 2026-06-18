@@ -25,41 +25,41 @@ impl Slice {
 /// Maps tree-sitter NodeTypeId to its string name.
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub struct NodeSymbol {
-    /// Tree-sitter node type ID
-    pub id: u16,
+pub struct NodeKindEntry {
+    /// Tree-sitter node kind ID
+    pub symbol: u16,
     /// StringId for the node kind name
     pub name: StringId,
 }
 
-impl NodeSymbol {
+impl NodeKindEntry {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    pub fn new(id: u16, name: StringId) -> Self {
-        Self { id, name }
+    pub fn new(symbol: u16, name: StringId) -> Self {
+        Self { symbol, name }
     }
 }
 
-const _: () = assert!(std::mem::size_of::<NodeSymbol>() == NodeSymbol::SIZE);
+const _: () = assert!(std::mem::size_of::<NodeKindEntry>() == NodeKindEntry::SIZE);
 
 /// Maps tree-sitter NodeFieldId to its string name.
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub struct FieldSymbol {
+pub struct FieldEntry {
     /// Tree-sitter field ID
-    pub id: u16,
+    pub symbol: u16,
     /// StringId for the field name
     pub name: StringId,
 }
 
-impl FieldSymbol {
+impl FieldEntry {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    pub fn new(id: u16, name: StringId) -> Self {
-        Self { id, name }
+    pub fn new(symbol: u16, name: StringId) -> Self {
+        Self { symbol, name }
     }
 }
 
-const _: () = assert!(std::mem::size_of::<FieldSymbol>() == FieldSymbol::SIZE);
+const _: () = assert!(std::mem::size_of::<FieldEntry>() == FieldEntry::SIZE);

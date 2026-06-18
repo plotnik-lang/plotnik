@@ -6,21 +6,21 @@
 mod capture_shape;
 mod context;
 mod infer;
-mod symbol;
+mod def_id;
 pub(crate) mod types;
 mod unify;
 
 #[cfg(test)]
 mod context_tests;
 #[cfg(test)]
-mod symbol_tests;
+mod def_id_tests;
 #[cfg(test)]
 mod unify_tests;
 
 pub(crate) use capture_shape::is_repeating_quantifier;
-pub use capture_shape::{CaptureMechanism, capture_mechanism, produces_output};
+pub use capture_shape::{CaptureKind, capture_kind, produces_output};
 pub use context::TypeContext;
-pub use symbol::{DefId, Interner, Symbol};
+pub use def_id::{DefId, Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, TermInfo, TypeFlow, TypeId, TypeShape,
 };
@@ -45,7 +45,7 @@ pub fn infer_types(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeContext {
-    let analysis = infer::AnalysisCtx {
+    let analysis = infer::InferPassInput {
         interner,
         ast_map,
         symbol_table,

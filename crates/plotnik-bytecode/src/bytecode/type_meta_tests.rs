@@ -12,7 +12,7 @@ fn type_member_size() {
 
 #[test]
 fn type_name_size() {
-    assert_eq!(std::mem::size_of::<TypeName>(), 4);
+    assert_eq!(std::mem::size_of::<TypeNameEntry>(), 4);
 }
 
 #[test]

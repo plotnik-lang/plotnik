@@ -61,8 +61,8 @@ pub enum Value {
     Array(Vec<Value>),
     /// Object with ordered fields.
     Object(Vec<(String, Value)>),
-    /// Tagged union. `data` is None for Void payloads.
-    Tagged {
+    /// Enum variant. `data` is None for Void payloads.
+    Enum {
         tag: String,
         data: Option<Box<Value>>,
     },
@@ -90,7 +90,7 @@ impl Serialize for Value {
                 }
                 map.end()
             }
-            Value::Tagged { tag, data } => {
+            Value::Enum { tag, data } => {
                 let len = if data.is_some() { 2 } else { 1 };
                 let mut map = serializer.serialize_map(Some(len))?;
                 map.serialize_entry("$tag", tag)?;
@@ -148,8 +148,8 @@ fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
         Value::Object(fields) => {
             format_object(ctx, fields, indent);
         }
-        Value::Tagged { tag, data } => {
-            format_tagged(ctx, tag, data, indent);
+        Value::Enum { tag, data } => {
+            format_enum(ctx, tag, data, indent);
         }
     }
 }
@@ -339,7 +339,7 @@ fn format_object(ctx: &mut FormatCtx<'_>, fields: &[(String, Value)], indent: us
     ctx.out.push_str(c.reset);
 }
 
-fn format_tagged(ctx: &mut FormatCtx<'_>, tag: &str, data: &Option<Box<Value>>, indent: usize) {
+fn format_enum(ctx: &mut FormatCtx<'_>, tag: &str, data: &Option<Box<Value>>, indent: usize) {
     let c = ctx.colors;
     let pretty = ctx.pretty;
     ctx.out.push_str(c.dim);

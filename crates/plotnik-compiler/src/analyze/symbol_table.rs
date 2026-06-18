@@ -1,7 +1,7 @@
 //! Symbol table: name resolution and reference checking.
 //!
 //! Two-pass approach:
-//! 1. Collect all `Name = expr` definitions from all sources
+//! 1. Collect all `Name = pattern` definitions from all sources
 //! 2. Check that all `(UpperIdent)` references are defined
 
 use indexmap::IndexMap;
@@ -20,7 +20,7 @@ pub const UNNAMED_DEF: &str = "_";
 
 #[derive(Clone, Debug, Default)]
 pub struct SymbolTable {
-    table: IndexMap<String, ast::Expr>,
+    table: IndexMap<String, ast::Pattern>,
     files: IndexMap<String, SourceId>,
 }
 
@@ -33,24 +33,24 @@ impl SymbolTable {
     ///
     /// Returns `true` if the symbol was newly inserted, `false` if it already existed
     /// (in which case the old value is replaced).
-    pub fn insert(&mut self, name: &str, source_id: SourceId, expr: ast::Expr) -> bool {
+    pub fn insert(&mut self, name: &str, source_id: SourceId, pattern: ast::Pattern) -> bool {
         let is_new = !self.table.contains_key(name);
-        self.table.insert(name.to_owned(), expr);
+        self.table.insert(name.to_owned(), pattern);
         self.files.insert(name.to_owned(), source_id);
         is_new
     }
 
-    pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Expr)> {
-        let expr = self.table.shift_remove(name)?;
+    pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Pattern)> {
+        let pattern = self.table.shift_remove(name)?;
         let source_id = self.files.shift_remove(name)?;
-        Some((source_id, expr))
+        Some((source_id, pattern))
     }
 
     pub fn contains(&self, name: &str) -> bool {
         self.table.contains_key(name)
     }
 
-    pub fn get(&self, name: &str) -> Option<&ast::Expr> {
+    pub fn body(&self, name: &str) -> Option<&ast::Pattern> {
         self.table.get(name)
     }
 
@@ -58,10 +58,10 @@ impl SymbolTable {
         self.files.get(name).copied()
     }
 
-    pub fn get_full(&self, name: &str) -> Option<(SourceId, &ast::Expr)> {
-        let expr = self.table.get(name)?;
+    pub fn definition(&self, name: &str) -> Option<(SourceId, &ast::Pattern)> {
+        let pattern = self.table.get(name)?;
         let source_id = self.files.get(name).copied()?;
-        Some((source_id, expr))
+        Some((source_id, pattern))
     }
 
     /// Number of symbols in the symbol table.
@@ -85,13 +85,13 @@ impl SymbolTable {
         self.table.get_key_value(name).map(|(k, _)| k.as_str())
     }
 
-    /// Iterate over (name, expr) pairs in insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &ast::Expr)> {
+    /// Iterate over (name, pattern) pairs in insertion order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &ast::Pattern)> {
         self.table.iter().map(|(k, v)| (k.as_str(), v))
     }
 
-    /// Iterate over (name, source_id, expr) tuples in insertion order.
-    pub fn iter_full(&self) -> impl Iterator<Item = (&str, SourceId, &ast::Expr)> {
+    /// Iterate over (name, source_id, pattern) tuples in insertion order.
+    pub fn definitions(&self) -> impl Iterator<Item = (&str, SourceId, &ast::Pattern)> {
         self.table.iter().map(|(k, v)| {
             let source_id = self.files[k];
             (k.as_str(), source_id, v)
@@ -142,7 +142,7 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
             if self.symbol_table.contains(name) {
                 self.reporter
                     .report(DiagnosticKind::DuplicateDefinition, token.text_range())
-                    .message(name)
+                    .detail(name)
                     .emit();
             } else {
                 let source_id = self.reporter.source();
@@ -175,7 +175,7 @@ impl Visitor for ReferenceValidator<'_, '_> {
 
         self.reporter
             .report(DiagnosticKind::UndefinedReference, name_token.text_range())
-            .message(name)
+            .detail(name)
             .emit();
     }
 }

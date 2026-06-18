@@ -15,10 +15,6 @@ pub use emitter::Emitter;
 
 use plotnik_bytecode::Module;
 
-pub fn emit(module: &Module) -> String {
-    Emitter::new(module, Config::default()).emit()
-}
-
-pub fn emit_with_config(module: &Module, config: Config) -> String {
+pub fn emit(module: &Module, config: Config) -> String {
     Emitter::new(module, config).emit()
 }

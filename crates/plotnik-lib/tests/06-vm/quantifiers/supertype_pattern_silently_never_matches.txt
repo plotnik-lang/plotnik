@@ -25,38 +25,38 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ...  
-  08  -ε-  [Arr]                            18, 11
+  08  -ε-  [ArrayOpen]                      18, 11
   10                                        ▶
-  11  -ε-  [EndArr Set(M0)]                 10
+  11  -ε-  [ArrayClose Set(M0)]             10
   13   !   (statement) [Node Push]          22, 24
   15  ...  
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
   20  ─‣─  _                                13, 20
   22  ─‣─  _                                13, 20
-  24  ─‣┘  [EndArr Set(M0)] _               10
+  24  ─‣┘  [ArrayClose Set(M0)] _           10
 ==== types ====
 export interface Q {
   s: Node[];
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [Arr]                            18, 11
+  08  -ε-  [ArrayOpen]                      18, 11
   18       _                                13, 16
        ●   lexical_declaration
   13       (statement) [Node Push]          22, 24
@@ -64,11 +64,11 @@ Q:
   18  ❮❮❮ 
   16       _                                13, 16
   08  ❮❮❮ 
-  11  -ε-  [EndArr Set(M0)]                 10
+  11  -ε-  [ArrayClose Set(M0)]             10
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"s":[]}

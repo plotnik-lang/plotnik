@@ -10,7 +10,7 @@ pub struct Frame {
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
     /// Tree depth at Call time (for level restoration on Return).
-    pub saved_depth: u32,
+    pub cursor_depth: u32,
 }
 
 /// Append-only arena for frames (cactus stack implementation).
@@ -34,25 +34,25 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, return_addr: u16, saved_depth: u32) -> u32 {
+    pub fn push(&mut self, return_addr: u16, cursor_depth: u32) -> u32 {
         let idx = self.frames.len() as u32;
         self.frames.push(Frame {
             return_addr,
             parent: self.current,
-            saved_depth,
+            cursor_depth,
         });
         self.current = Some(idx);
         idx
     }
 
-    /// Pop the current frame, returning its return address and saved depth.
+    /// Pop the current frame, returning its return address and cursor depth.
     ///
     /// Panics if the stack is empty.
     pub fn pop(&mut self) -> (u16, u32) {
         let current_idx = self.current.expect("pop on empty frame stack");
         let frame = self.frames[current_idx as usize];
         self.current = frame.parent;
-        (frame.return_addr, frame.saved_depth)
+        (frame.return_addr, frame.cursor_depth)
     }
 
     /// Restore frame state for backtracking.
@@ -86,10 +86,10 @@ impl FrameArena {
     /// Prune frames above high-water mark.
     ///
     /// Frames are only pruned after Return, when we know no checkpoint
-    /// references them. The `max_referenced` is the highest frame index
+    /// references them. The `max_frame_idx` is the highest frame index
     /// still referenced by any active checkpoint.
-    pub fn prune(&mut self, max_referenced: Option<u32>) {
-        let keep = match (self.current, max_referenced) {
+    pub fn prune(&mut self, max_frame_idx: Option<u32>) {
+        let keep = match (self.current, max_frame_idx) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };

@@ -26,14 +26,14 @@ Fetch step at `ip` → dispatch by `type_id` → execute → update `ip`.
 
 ### Match8 — Fast Path
 
-1. Execute `nav` → check `node_type` → check `node_field`
+1. Execute `nav` → check `node_kind` → check `node_field`
 2. Fail → backtrack
 3. Success: if `next == 0` → accept; else `ip = next`
 
 ### Match16–64 — Extended Path
 
 1. Execute `pre_effects`, clear `matched_node`
-2. Execute `nav`, check `node_type`/`node_field` (see Epsilon Transitions below)
+2. Execute `nav`, check `node_kind`/`node_field` (see Epsilon Transitions below)
 3. Success: `matched_node = cursor.node()`, verify negated fields absent
 4. Execute `post_effects`
 5. Continuation:
@@ -43,7 +43,7 @@ Fetch step at `ip` → dispatch by `type_id` → execute → update `ip`.
 
 ### Epsilon Transitions
 
-A `Match8` or `Match16–64` with `node_type: None`, `node_field: None`, and `nav: Stay` is an **epsilon transition** — it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
+A `Match8` or `Match16–64` with `node_kind: Any`, `node_field: None`, and `nav: Stay` is an **epsilon transition** — it succeeds unconditionally without cursor interaction. This enables pure control-flow decisions (branching for quantifiers) even when the cursor is exhausted (EOF).
 
 Common patterns:
 
@@ -153,14 +153,14 @@ Operations logged instead of inline output. Backtracking: `truncate(watermark)`.
 ```rust
 pub enum RuntimeEffect<'t> {
     Node(tree_sitter::Node<'t>),
-    Arr,
+    ArrayOpen,
     Push,
-    EndArr,
-    Obj,
-    Set(u16),       // member index
-    EndObj,
-    Enum(u16),      // variant index
-    EndEnum,
+    ArrayClose,
+    ObjectOpen,
+    Set(u16),         // member index
+    ObjectClose,
+    EnumOpen(u16),    // variant index
+    EnumClose,
     Clear,
     Null,
 }
@@ -170,16 +170,16 @@ struct EffectLog<'t>(Vec<RuntimeEffect<'t>>);
 
 Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 
-| Effect       | Action                                     |
-| ------------ | ------------------------------------------ |
-| Node(n)      | Capture node `n`                           |
-| Obj/EndObj   | Object boundaries                          |
-| Set(idx)     | Assign to field at member index            |
-| Arr/EndArr   | Array boundaries                           |
-| Push         | Append to array                            |
-| Enum/EndEnum | Tagged union boundaries (variant at index) |
-| Clear        | Reset current value                        |
-| Null         | Null placeholder (optional/alternation)    |
+| Effect                  | Action                                    |
+| ----------------------- | ----------------------------------------- |
+| Node(n)                 | Capture node `n`                          |
+| ObjectOpen/ObjectClose  | Object boundaries                         |
+| Set(idx)                | Assign to field at member index           |
+| ArrayOpen/ArrayClose    | Array boundaries                          |
+| Push                    | Append to array                           |
+| EnumOpen/EnumClose      | Enum boundaries (variant at index)        |
+| Clear                   | Reset current value                       |
+| Null                    | Null placeholder (optional/alternation)   |
 
 The `Node` variant carries the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.
 

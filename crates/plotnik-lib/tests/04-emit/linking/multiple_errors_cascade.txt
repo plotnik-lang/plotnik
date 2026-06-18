@@ -2,7 +2,7 @@ Q = (function_declaraton
   nme: (identifer) @name
 ) @fn
 ==== diagnostics ====
-error: `function_declaraton` is not a valid node type
+error: `function_declaraton` is not a valid node kind
  --> query.ptk:1:6
   |
 1 | Q = (function_declaraton
@@ -24,7 +24,7 @@ help: did you mean `name`?
 2 |   name: (identifer) @name
   |    +
 
-error: `identifer` is not a valid node type
+error: `identifer` is not a valid node kind
  --> query.ptk:2:9
   |
 2 |   nme: (identifer) @name

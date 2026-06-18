@@ -6,6 +6,6 @@ mod ir;
 mod ir_tests;
 
 pub use ir::{
-    CallIR, EffectIR, EmitContext, InstructionIR, Label, LayoutResult, MatchIR, MemberRef,
-    NodeTypeIR, PredicateIR, PredicateValueIR, ReturnIR, TrampolineIR,
+    CallIR, EffectIR, EmitResolvers, InstructionIR, Label, LayoutMap, MatchIR, MemberRef,
+    NodeKindConstraint, PredicateIR, PredicateValueIR, ReturnIR, TrampolineIR,
 };

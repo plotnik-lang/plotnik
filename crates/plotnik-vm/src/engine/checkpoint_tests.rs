@@ -1,7 +1,7 @@
-//! Tests for `CheckpointStack`'s `max_frame_ref` invariant.
+//! Tests for `CheckpointStack`'s `max_frame_idx` invariant.
 //!
-//! `max_frame_ref` must always equal the maximum `frame_index` over the live
-//! checkpoints. The prefix-max (`running_max`) maintenance must preserve this
+//! `max_frame_idx` must always equal the maximum `frame_index` over the live
+//! checkpoints. The prefix-max (`max_frame_idx_below`) maintenance must preserve this
 //! exactly — including the cases that previously forced an O(n) rescan:
 //! duplicate max-holders and the all-`None` stack.
 
@@ -25,7 +25,7 @@ fn brute_force_max(frames: &[Option<u32>]) -> Option<u32> {
 }
 
 /// Push every frame index, then pop them all, asserting after every operation
-/// that `max_frame_ref()` matches a brute-force recomputation over the live set.
+/// that `max_frame_idx()` matches a brute-force recomputation over the live set.
 fn check_sequence(frames: &[Option<u32>]) {
     let mut stack = CheckpointStack::new();
     let mut live: Vec<Option<u32>> = Vec::new();
@@ -34,9 +34,9 @@ fn check_sequence(frames: &[Option<u32>]) {
         stack.push(cp(f));
         live.push(f);
         assert_eq!(
-            stack.max_frame_ref(),
+            stack.max_frame_idx(),
             brute_force_max(&live),
-            "max_frame_ref diverged after push of {f:?} (live={live:?})"
+            "max_frame_idx diverged after push of {f:?} (live={live:?})"
         );
     }
 
@@ -45,13 +45,13 @@ fn check_sequence(frames: &[Option<u32>]) {
         let expected = live.pop().unwrap();
         assert_eq!(popped, expected, "pop returned the wrong checkpoint");
         assert_eq!(
-            stack.max_frame_ref(),
+            stack.max_frame_idx(),
             brute_force_max(&live),
-            "max_frame_ref diverged after pop (live={live:?})"
+            "max_frame_idx diverged after pop (live={live:?})"
         );
     }
 
-    assert_eq!(stack.max_frame_ref(), None, "empty stack must have no max");
+    assert_eq!(stack.max_frame_idx(), None, "empty stack must have no max");
 }
 
 #[test]
@@ -102,6 +102,6 @@ fn interleaved_push_pop() {
             stack.pop();
             live.pop();
         }
-        assert_eq!(stack.max_frame_ref(), brute_force_max(&live));
+        assert_eq!(stack.max_frame_idx(), brute_force_max(&live));
     }
 }

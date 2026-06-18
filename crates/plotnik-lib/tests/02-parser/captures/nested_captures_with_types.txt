@@ -51,13 +51,13 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @func :: Function
+    CapturedPattern @func :: Function
       NamedNode function
-        CapturedExpr @name :: Foo
-          FieldExpr name:
+        CapturedPattern @name :: Foo
+          FieldPattern name:
             NamedNode identifier
-        FieldExpr body:
+        FieldPattern body:
           NamedNode block
-            CapturedExpr @body_stmts :: Statement
-              QuantifiedExpr *
+            CapturedPattern @body_stmts :: Statement
+              QuantifiedPattern *
                 NamedNode statement

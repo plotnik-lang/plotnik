@@ -20,7 +20,7 @@ They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Set`) are
 placed directly on match instructions rather than in separate epsilon steps. Structural
-effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) may appear in epsilons or
+effects (`ObjectOpen`, `ObjectClose`, `ArrayOpen`, `ArrayClose`, `EnumOpen`, `EnumClose`) may appear in epsilons or
 consolidated into match instructions.
 
 ```
@@ -55,9 +55,9 @@ Value = 06 :: T3
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Value:
@@ -65,16 +65,16 @@ Value:
   07  ...
   08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11   !   [Enum(M2)] (number) [Node Set(M0) EndEnum]  14
+  11   !   [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
   14  ─‣┘  _                                10
   15  ...
-  16   !   [Enum(M3)] (string) [Node Set(M1) EndEnum]  14
+  16   !   [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
   19  ─‣─  _                                11, 16, 19
 ```
 
 ### Sections Explained
 
-- **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `Obj`/`EndObj` and dispatches via `Trampoline`.
+- **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `ObjectOpen`/`ObjectClose` and dispatches via `Trampoline`.
 - **`Value`**: The compiled query definition. Step 08 searches the document children, tries `Num` (step 11) or `Str` (step 16), and uses step 19 to advance to the next candidate on backtracking.
 - **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
@@ -187,19 +187,19 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Effects
 
-| Effect    | Description            |
-| --------- | ---------------------- |
-| Obj       | Start struct           |
-| EndObj    | End struct             |
-| Arr       | Start array            |
-| EndArr    | End array              |
-| Push      | Push to array          |
-| Enum(Mxx) | Start enum variant Mxx |
-| EndEnum   | End enum variant       |
-| Node      | Capture matched node   |
-| Set(Mxx)  | Set field/member Mxx   |
-| Null      | Null value             |
-| Clear     | Clear current          |
+| Effect         | Description            |
+| -------------- | ---------------------- |
+| ObjectOpen     | Start struct           |
+| ObjectClose    | End struct             |
+| ArrayOpen      | Start array            |
+| ArrayClose     | End array              |
+| Push           | Push to array          |
+| EnumOpen(Mxx)  | Start enum variant Mxx |
+| EnumClose      | End enum variant       |
+| Node           | Capture matched node   |
+| Set(Mxx)       | Set field/member Mxx   |
+| Null           | Null value             |
+| Clear          | Clear current          |
 
 ## Index Prefixes
 

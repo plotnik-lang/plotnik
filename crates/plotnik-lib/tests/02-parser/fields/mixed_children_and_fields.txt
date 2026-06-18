@@ -36,8 +36,8 @@ Root
 Root
   Def Q
     NamedNode if
-      FieldExpr condition:
+      FieldPattern condition:
         NamedNode expr
       NamedNode then_block
-      FieldExpr else:
+      FieldPattern else:
         NamedNode else_block

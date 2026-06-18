@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use plotnik_lib::Colors;
 use plotnik_lib::engine::{PrintTracer, RuntimeError, VM, Verbosity, materialize_verified};
 
-use super::run_common::{self, PreparedQuery, QueryInput};
+use super::run_common::{self, ExecPlan, ExecRequest};
 use crate::error::{CliError, CliResult};
 
 pub struct TraceArgs {
@@ -22,12 +22,12 @@ pub struct TraceArgs {
 }
 
 pub fn run(args: TraceArgs) -> CliResult {
-    let PreparedQuery {
+    let ExecPlan {
         module,
         entrypoint,
         tree,
         source_code,
-    } = run_common::prepare_query(QueryInput {
+    } = run_common::plan_exec(ExecRequest {
         query_path: args.query_path.as_deref(),
         query_text: args.query_text.as_deref(),
         source_path: args.source_path.as_deref(),
@@ -38,7 +38,7 @@ pub fn run(args: TraceArgs) -> CliResult {
     })?;
 
     let vm = VM::builder(&source_code, &tree)
-        .exec_fuel(args.fuel)
+        .step_budget(args.fuel)
         .build();
     let colors = Colors::new(args.color);
     let mut tracer = PrintTracer::builder(&source_code, &module)

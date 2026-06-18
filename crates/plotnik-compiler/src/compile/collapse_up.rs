@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 use plotnik_bytecode::Nav;
 
-use crate::bytecode::{InstructionIR, Label, MatchIR, NodeTypeIR};
+use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint};
 use crate::compile::CompileResult;
 
 pub fn collapse_up(result: &mut CompileResult) {
@@ -122,7 +122,7 @@ pub fn collapse_up(result: &mut CompileResult) {
 
 /// Check if a MatchIR has no effects or constraints (pure navigation).
 fn is_effectless(m: &MatchIR) -> bool {
-    m.node_type == NodeTypeIR::Any
+    m.node_kind == NodeKindConstraint::Any
         && m.node_field.is_none()
         && m.pre_effects.is_empty()
         && m.neg_fields.is_empty()

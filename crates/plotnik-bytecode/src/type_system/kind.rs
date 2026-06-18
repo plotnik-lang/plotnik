@@ -19,7 +19,7 @@ pub enum TypeKind {
     ArrayOneOrMore = 4,
     /// Record with named fields.
     Struct = 5,
-    /// Discriminated union with tagged variants.
+    /// Discriminated union with named variants.
     Enum = 6,
     /// Named reference to another type (e.g., `type Foo = Bar`).
     Alias = 7,
@@ -67,7 +67,7 @@ impl TypeKind {
     }
 
     /// For array types, whether the array is non-empty.
-    pub fn array_is_non_empty(self) -> bool {
+    pub fn is_non_empty_array(self) -> bool {
         matches!(self, Self::ArrayOneOrMore)
     }
 

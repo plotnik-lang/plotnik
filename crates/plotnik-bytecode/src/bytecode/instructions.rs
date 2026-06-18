@@ -9,9 +9,9 @@ use super::constants::{
     MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
     SECTION_ALIGN, STEP_SIZE,
 };
-use super::effects::{EFFECT_PAYLOAD_MAX, EffectOp};
+use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::nav::Nav;
-use super::node_type_ir::NodeTypeIR;
+use super::node_kind_constraint::NodeKindConstraint;
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// step. Effects, negated fields, an optional predicate, and successors follow,
@@ -27,7 +27,7 @@ pub(crate) const PREDICATE_SLOTS: usize = 2;
 /// A predicate's size in bytes within the payload.
 pub(crate) const PREDICATE_SIZE: usize = PREDICATE_SLOTS * PAYLOAD_SLOT_SIZE;
 
-/// The first byte of every instruction: `segment(2) | node_kind(2) | opcode(4)`.
+/// The first byte of every instruction: `segment(2) | node_class(2) | opcode(4)`.
 ///
 /// One source of truth for the header-byte field positions, shared by every
 /// instruction decoder/encoder and the load-time validator.
@@ -36,7 +36,7 @@ pub(crate) mod header_byte {
 
     const OPCODE_MASK: u8 = 0x0F;
     const FIELD2_MASK: u8 = 0b11;
-    const NODE_KIND_SHIFT: u32 = 4;
+    const NODE_CLASS_SHIFT: u32 = 4;
     const SEGMENT_SHIFT: u32 = 6;
 
     /// The raw opcode nibble (low 4 bits), without validating it.
@@ -54,14 +54,14 @@ pub(crate) mod header_byte {
         (b >> SEGMENT_SHIFT) & FIELD2_MASK
     }
 
-    /// The 2-bit node-kind field (bits 5-4); meaningful only for Match.
-    pub(crate) fn node_kind(b: u8) -> u8 {
-        (b >> NODE_KIND_SHIFT) & FIELD2_MASK
+    /// The 2-bit node-class field (bits 5-4); meaningful only for Match.
+    pub(crate) fn node_class_bits(b: u8) -> u8 {
+        (b >> NODE_CLASS_SHIFT) & FIELD2_MASK
     }
 
     /// Assemble a header byte from its fields.
-    pub(crate) fn pack(segment: u8, node_kind: u8, opcode: Opcode) -> u8 {
-        (segment << SEGMENT_SHIFT) | (node_kind << NODE_KIND_SHIFT) | (opcode as u8)
+    pub(crate) fn pack(segment: u8, node_class: u8, opcode: Opcode) -> u8 {
+        (segment << SEGMENT_SHIFT) | (node_class << NODE_CLASS_SHIFT) | (opcode as u8)
     }
 }
 
@@ -71,7 +71,7 @@ pub(crate) mod header_byte {
 /// Decoded once here so the Match decoder, the encoder, and the load-time
 /// validator share one definition of the field positions.
 #[derive(Clone, Copy)]
-pub(crate) struct Counts {
+pub(crate) struct MatchCounts {
     pub(crate) pre: u8,
     pub(crate) neg: u8,
     pub(crate) post: u8,
@@ -79,7 +79,7 @@ pub(crate) struct Counts {
     pub(crate) has_predicate: bool,
 }
 
-impl Counts {
+impl MatchCounts {
     const PRE_SHIFT: u32 = 13;
     const NEG_SHIFT: u32 = 10;
     const POST_SHIFT: u32 = 7;
@@ -138,9 +138,8 @@ impl StepId {
         Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
     }
 
-    /// Get the raw u16 value.
     #[inline]
-    pub fn get(self) -> u16 {
+    pub fn as_u16(self) -> u16 {
         self.0.get()
     }
 }
@@ -237,8 +236,8 @@ pub struct Match<'a> {
     pub segment: u8,
     /// Navigation command. `Epsilon` means no cursor movement or node check.
     pub nav: Nav,
-    /// Node type constraint (Any = wildcard, Named/Anonymous for specific checks).
-    pub node_type: NodeTypeIR,
+    /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
+    pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NonZeroU16>,
     layout: MatchLayout,
@@ -267,28 +266,28 @@ impl<'a> Match<'a> {
     /// The slice must start at the instruction and contain at least
     /// the full instruction size (determined by opcode).
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
         debug_assert!(bytes.len() >= STEP_SIZE, "Match instruction too short");
 
-        let type_id_byte = bytes[0];
-        let segment = header_byte::segment(type_id_byte);
-        let node_kind = header_byte::node_kind(type_id_byte);
-        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let node_class = header_byte::node_class_bits(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
         debug_assert!(segment == 0, "non-zero segment not yet supported");
         debug_assert!(opcode.is_match(), "expected Match opcode");
 
         let nav = Nav::from_byte(bytes[1]);
-        let node_type_val = u16::from_le_bytes([bytes[2], bytes[3]]);
-        let node_type = NodeTypeIR::from_bytes(node_kind, node_type_val);
+        let node_val = u16::from_le_bytes([bytes[2], bytes[3]]);
+        let node_kind = NodeKindConstraint::from_bytes(node_class, node_val);
         let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
 
         let layout = if opcode == Opcode::Match8 {
             let next = u16::from_le_bytes([bytes[6], bytes[7]]);
             MatchLayout::Match8 { next }
         } else {
-            let c = Counts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
+            let c = MatchCounts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
             MatchLayout::Extended {
                 pre_count: c.pre,
                 neg_count: c.neg,
@@ -302,7 +301,7 @@ impl<'a> Match<'a> {
             bytes,
             segment,
             nav,
-            node_type,
+            node_kind,
             node_field,
             layout,
         }
@@ -362,11 +361,11 @@ impl<'a> Match<'a> {
 
     /// Iterate over pre-effects (executed after transition acceptance, before post-effects).
     #[inline]
-    pub fn pre_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
+    pub fn pre_effects(&self) -> impl Iterator<Item = Effect> + '_ {
         let start = MATCH_PAYLOAD_START;
         (0..self.pre_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
-            EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
+            Effect::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
 
@@ -382,11 +381,11 @@ impl<'a> Match<'a> {
 
     /// Iterate over post-effects (executed after successful match).
     #[inline]
-    pub fn post_effects(&self) -> impl Iterator<Item = EffectOp> + '_ {
+    pub fn post_effects(&self) -> impl Iterator<Item = Effect> + '_ {
         let start = MATCH_PAYLOAD_START + (self.pre_count() + self.neg_count()) * PAYLOAD_SLOT_SIZE;
         (0..self.post_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
-            EffectOp::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
+            Effect::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
 
@@ -475,7 +474,7 @@ impl<'a> Match<'a> {
     pub fn to_instr(&self) -> MatchInstr {
         MatchInstr {
             nav: self.nav,
-            node_type: self.node_type,
+            node_kind: self.node_kind,
             node_field: self.node_field,
             pre_effects: self.pre_effects().collect(),
             neg_fields: self.neg_fields().collect(),
@@ -541,11 +540,11 @@ impl MatchPredicate {
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct MatchInstr {
     pub nav: Nav,
-    pub node_type: NodeTypeIR,
+    pub node_kind: NodeKindConstraint,
     pub node_field: Option<NonZeroU16>,
-    pub pre_effects: Vec<EffectOp>,
+    pub pre_effects: Vec<Effect>,
     pub neg_fields: Vec<u16>,
-    pub post_effects: Vec<EffectOp>,
+    pub post_effects: Vec<Effect>,
     pub predicate: Option<MatchPredicate>,
     pub successors: Vec<StepId>,
 }
@@ -583,7 +582,7 @@ impl MatchInstr {
             }
         }
 
-        let (node_kind, node_type_val) = self.node_type.to_bytes();
+        let (node_class, node_val) = self.node_kind.to_bytes();
         let node_field_val = self.node_field.map_or(0, |n| n.get());
 
         let can_use_match8 = self.pre_effects.is_empty()
@@ -594,11 +593,11 @@ impl MatchInstr {
 
         if can_use_match8 {
             let mut bytes = vec![0u8; Opcode::Match8.size()];
-            bytes[0] = header_byte::pack(0, node_kind, Opcode::Match8);
+            bytes[0] = header_byte::pack(0, node_class, Opcode::Match8);
             bytes[1] = self.nav.to_byte();
-            bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
+            bytes[2..4].copy_from_slice(&node_val.to_le_bytes());
             bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
-            let next = self.successors.first().map_or(0, |s| s.get());
+            let next = self.successors.first().map_or(0, |s| s.as_u16());
             bytes[6..8].copy_from_slice(&next.to_le_bytes());
             return Ok(bytes);
         }
@@ -629,12 +628,12 @@ impl MatchInstr {
         let opcode = select_match_opcode(slots).ok_or(EncodeError::PayloadTooLarge(slots))?;
 
         let mut bytes = vec![0u8; opcode.size()];
-        bytes[0] = header_byte::pack(0, node_kind, opcode);
+        bytes[0] = header_byte::pack(0, node_class, opcode);
         bytes[1] = self.nav.to_byte();
-        bytes[2..4].copy_from_slice(&node_type_val.to_le_bytes());
+        bytes[2..4].copy_from_slice(&node_val.to_le_bytes());
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
 
-        let counts = Counts {
+        let counts = MatchCounts {
             pre: pre as u8,
             neg: neg as u8,
             post: post as u8,
@@ -662,7 +661,7 @@ impl MatchInstr {
             put(&mut bytes, pred.value_ref.to_le_bytes());
         }
         for succ in &self.successors {
-            put(&mut bytes, succ.get().to_le_bytes());
+            put(&mut bytes, succ.as_u16().to_le_bytes());
         }
 
         Ok(bytes)
@@ -697,12 +696,12 @@ impl Call {
 
     /// Decode from 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
-    /// For Call, node_kind bits are ignored (always 0).
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
+    /// For Call, node_class bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let type_id_byte = bytes[0];
-        let segment = header_byte::segment(type_id_byte);
-        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -720,14 +719,14 @@ impl Call {
 
     /// Encode to 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Call);
         bytes[1] = self.nav.to_byte();
         bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
-        bytes[4..6].copy_from_slice(&self.next.get().to_le_bytes());
-        bytes[6..8].copy_from_slice(&self.target.get().to_le_bytes());
+        bytes[4..6].copy_from_slice(&self.next.as_u16().to_le_bytes());
+        bytes[6..8].copy_from_slice(&self.target.as_u16().to_le_bytes());
         bytes
     }
 
@@ -759,12 +758,12 @@ impl Return {
 
     /// Decode from 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
-    /// For Return, node_kind bits are ignored (always 0).
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
+    /// For Return, node_class bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let type_id_byte = bytes[0];
-        let segment = header_byte::segment(type_id_byte);
-        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -776,7 +775,7 @@ impl Return {
 
     /// Encode to 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Return);
@@ -795,7 +794,7 @@ impl Default for Return {
 ///
 /// Like Call, but the target comes from VM context (external parameter)
 /// rather than being encoded in the instruction. Used at address 0 for
-/// the entry preamble: `Obj → Trampoline → EndObj → Accept`.
+/// the entry preamble: `ObjectOpen → Trampoline → ObjectClose → Accept`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Trampoline {
     /// Segment index (0-3).
@@ -811,12 +810,12 @@ impl Trampoline {
 
     /// Decode from 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
-    /// For Trampoline, node_kind bits are ignored (always 0).
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
+    /// For Trampoline, node_class bits are ignored (always 0).
     pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let type_id_byte = bytes[0];
-        let segment = header_byte::segment(type_id_byte);
-        let opcode = header_byte::opcode(type_id_byte).expect("invalid opcode");
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
         assert!(
             segment == 0,
             "non-zero segment not yet supported: {segment}"
@@ -831,12 +830,12 @@ impl Trampoline {
 
     /// Encode to 8-byte bytecode.
     ///
-    /// Header byte layout: `segment(2) | node_kind(2) | opcode(4)`
+    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Trampoline);
         // bytes[1] is padding
-        bytes[2..4].copy_from_slice(&self.next.get().to_le_bytes());
+        bytes[2..4].copy_from_slice(&self.next.as_u16().to_le_bytes());
         // bytes[4..8] are reserved/padding
         bytes
     }

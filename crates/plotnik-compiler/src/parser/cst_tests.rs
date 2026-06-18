@@ -1,4 +1,4 @@
-use super::cst::{QLang, SyntaxKind::*, TokenSet};
+use super::cst::{QueryLang, SyntaxKind::*, TokenSet};
 use rowan::Language;
 
 #[test]
@@ -52,8 +52,8 @@ fn test_token_set_debug() {
 #[test]
 fn test_qlang_roundtrip() {
     for kind in [ParenOpen, ParenClose, Star, Plus, Id, Error, Whitespace] {
-        let raw = QLang::kind_to_raw(kind);
-        let back = QLang::kind_from_raw(raw);
+        let raw = QueryLang::kind_to_raw(kind);
+        let back = QueryLang::kind_from_raw(raw);
         assert_eq!(kind, back);
     }
 }

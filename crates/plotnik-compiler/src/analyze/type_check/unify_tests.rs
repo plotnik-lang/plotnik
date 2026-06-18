@@ -18,14 +18,14 @@ fn unify_void_bubble() {
     let x = interner.intern("x");
     let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 
-    let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Bubble(struct_id)).unwrap();
+    let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Fields(struct_id)).unwrap();
 
     match result {
-        TypeFlow::Bubble(id) => {
-            let fields = ctx.get_struct_fields(id).unwrap();
+        TypeFlow::Fields(id) => {
+            let fields = ctx.struct_fields(id).unwrap();
             assert!(fields.get(&x).unwrap().optional);
         }
-        _ => panic!("expected Bubble"),
+        _ => panic!("expected Fields"),
     }
 }
 
@@ -43,17 +43,17 @@ fn unify_bubble_merge() {
     b_fields.insert(y, FieldInfo::required(TYPE_NODE));
     let b_id = ctx.intern_struct(b_fields);
 
-    let result = unify_flow(&mut ctx, TypeFlow::Bubble(a_id), TypeFlow::Bubble(b_id)).unwrap();
+    let result = unify_flow(&mut ctx, TypeFlow::Fields(a_id), TypeFlow::Fields(b_id)).unwrap();
 
     match result {
-        TypeFlow::Bubble(id) => {
-            let fields = ctx.get_struct_fields(id).unwrap();
+        TypeFlow::Fields(id) => {
+            let fields = ctx.struct_fields(id).unwrap();
             // x is in both, so required
             assert!(!fields.get(&x).unwrap().optional);
             // y only in b, so optional
             assert!(fields.get(&y).unwrap().optional);
         }
-        _ => panic!("expected Bubble"),
+        _ => panic!("expected Fields"),
     }
 }
 
@@ -61,5 +61,5 @@ fn unify_bubble_merge() {
 fn unify_scalar_error() {
     let mut ctx = TypeContext::new();
     let result = unify_flow(&mut ctx, TypeFlow::Scalar(TYPE_NODE), TypeFlow::Void);
-    assert!(matches!(result, Err(UnifyError::ScalarInUntagged)));
+    assert!(matches!(result, Err(UnifyError::ScalarInUnion)));
 }

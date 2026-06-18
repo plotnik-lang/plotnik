@@ -18,5 +18,5 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @kw :: Foo
+    CapturedPattern @kw :: Foo
       AnonymousNode "return"

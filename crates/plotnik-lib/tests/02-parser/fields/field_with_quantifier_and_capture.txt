@@ -25,7 +25,7 @@ Root
 Root
   Def Q
     NamedNode node
-      CapturedExpr @baz
-        QuantifiedExpr *
-          FieldExpr foo:
+      CapturedPattern @baz
+        QuantifiedPattern *
+          FieldPattern foo:
             NamedNode bar

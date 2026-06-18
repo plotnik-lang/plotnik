@@ -30,8 +30,8 @@ Root
 Root
   Def Q
     Seq
-      CapturedExpr @comments
-        QuantifiedExpr *
+      CapturedPattern @comments
+        QuantifiedPattern *
           NamedNode comment
-      CapturedExpr @fn
+      CapturedPattern @fn
         NamedNode function

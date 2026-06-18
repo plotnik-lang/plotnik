@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstParams, CheckParams, DumpParams, InferParams, LangDumpParams, RunParams, TraceParams,
+    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts,
     build_cli, route_default_subcommand,
 };
 use error::CliResult;
@@ -33,33 +33,33 @@ fn main() -> ExitCode {
 fn dispatch(matches: &ArgMatches) -> CliResult {
     match matches.subcommand() {
         Some(("ast", m)) => {
-            let params = AstParams::from_matches(m);
+            let params = AstOpts::from_matches(m);
             commands::ast::run(params.into())
         }
         Some(("check", m)) => {
-            let params = CheckParams::from_matches(m);
+            let params = CheckOpts::from_matches(m);
             commands::check::run(params.into())
         }
         Some(("dump", m)) => {
-            let params = DumpParams::from_matches(m);
+            let params = DumpOpts::from_matches(m);
             commands::dump::run(params.into())
         }
         Some(("infer", m)) => {
-            let params = InferParams::from_matches(m);
+            let params = InferOpts::from_matches(m);
             commands::infer::run(params.into())
         }
         Some(("run", m)) => {
-            let params = RunParams::from_matches(m);
+            let params = RunOpts::from_matches(m);
             commands::run::run(params.into())
         }
         Some(("trace", m)) => {
-            let params = TraceParams::from_matches(m);
+            let params = TraceOpts::from_matches(m);
             commands::trace::run(params.into())
         }
         Some(("lang", m)) => match m.subcommand() {
             Some(("list", _)) => commands::lang::run_list(),
             Some(("dump", sub_m)) => {
-                let params = LangDumpParams::from_matches(sub_m);
+                let params = LangDumpOpts::from_matches(sub_m);
                 commands::lang::run_dump(&params.lang)
             }
             _ => unreachable!("clap should have caught this"),

@@ -27,4 +27,4 @@ pub use materializer::{Materializer, ValueMaterializer, materialize_verified};
 pub use trace::{PrintTracer, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
 pub use verify::debug_verify_type;
-pub use vm::{FuelLimits, VM};
+pub use vm::{ExecLimits, VM};

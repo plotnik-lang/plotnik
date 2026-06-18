@@ -20,5 +20,5 @@ Root
 Root
   Def Q
     NamedNode binary_expression
-      CapturedExpr @op
+      CapturedPattern @op
         AnonymousNode "+"

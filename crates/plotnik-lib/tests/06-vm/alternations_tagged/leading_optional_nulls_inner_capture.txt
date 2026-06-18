@@ -41,9 +41,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -61,10 +61,10 @@ Q:
   24   !   (expression_statement)           10
   25  ─‣─  _                                24, 25
   27   !   _                                24, 25
-  29  -ε-  [Enum(M3)]                       27, 23
+  29  -ε-  [EnumOpen(M3)]                   27, 23
   31  ...  
   32  ─‣─  _                                29, 32
-  34  ─‣┘  [EndEnum] _                      13
+  34  ─‣┘  [EnumClose] _                    13
 ==== types ====
 export interface QTag {
   $tag: "Tag";
@@ -74,7 +74,7 @@ export interface QTag {
 export type Q = QTag;
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -83,7 +83,7 @@ Q:
        ●   program
   08       _                                29, 32
        ●   expression_statement
-  29  -ε-  [Enum(M3)]                       27, 23
+  29  -ε-  [EnumOpen(M3)]                   27, 23
   27       _                                24, 25
        ●   expression_statement
   24       (expression_statement)           10
@@ -107,12 +107,12 @@ Q:
        ●   expression_statement
   14       (expression_statement) [Node Set(M2)]  34
        ●   expression_statement
-  34       [EndEnum] _                      13
+  34       [EnumClose] _                    13
        ●   program
   13   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"$tag":"Tag","$data":{"c":null,"a":{"kind":"expression_statement","text":"a;","span":[0, 2]},"b":{"kind":"expression_statement","text":"b;","span":[3, 5]}}}

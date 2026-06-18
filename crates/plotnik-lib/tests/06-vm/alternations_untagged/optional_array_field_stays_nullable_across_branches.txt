@@ -39,9 +39,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -53,10 +53,10 @@ Q:
   13   !   (identifier) [Node Push]         22, 24
   15  ─‣┘² _                                10
   16  ─‣─  _                                13, 16
-  18  └‣─  [Arr] _                          13, 16
+  18  └‣─  [ArrayOpen] _                    13, 16
   20  ─‣─  _                                13, 20
   22  ─‣─  _                                13, 20
-  24  ─‣┘² [EndArr Set(M0)] _               15
+  24  ─‣┘² [ArrayClose Set(M0)] _           15
   26   !   (arguments)                      18
   27  ─‣─  _                                26, 27
   29  └‣─  _                                26, 27
@@ -71,7 +71,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -93,7 +93,7 @@ Q:
        ●   arguments
   26       (arguments)                      18
        ●   arguments
-  18       [Arr] _                          13, 16
+  18       [ArrayOpen] _                    13, 16
        ●   (
   13       (identifier) [Node Push]         22, 24
        ○   (
@@ -113,7 +113,7 @@ Q:
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"id":null,"args":null}

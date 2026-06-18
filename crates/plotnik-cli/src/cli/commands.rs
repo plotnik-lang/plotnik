@@ -145,7 +145,7 @@ pub fn dump_command() -> Command {
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik dump query.ptk -l ts       # resolved node types
+  plotnik dump query.ptk -l ts       # resolved node kinds
   plotnik dump -q 'Q = ...' -l ts    # inline query"#,
         )
         .arg(query_path_arg())

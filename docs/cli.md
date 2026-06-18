@@ -403,11 +403,11 @@ Respects the `NO_COLOR`, `CLICOLOR_FORCE`, and `TERM=dumb` conventions.
 Plotnik provides detailed diagnostics with source context:
 
 ```
-error: unknown node type 'function_decl'
+error: unknown node kind 'function_decl'
  --> query.ptk:3:5
   |
 3 |     (function_decl name: (identifier) @name)
-  |      ^^^^^^^^^^^^^ not a valid TypeScript node type
+  |      ^^^^^^^^^^^^^ not a valid node kind
   |
 help: did you mean 'function_declaration'?
 ```
@@ -416,7 +416,7 @@ Common errors:
 
 | Error                             | Cause                                | Fix                                      |
 | --------------------------------- | ------------------------------------ | ---------------------------------------- |
-| `unknown node type`               | Typo in node kind                    | Check `plotnik ast file` for valid types |
+| `unknown node kind`               | Typo in node kind                    | Check `plotnik ast file` for valid kinds |
 | `missing closing )`               | Unclosed tree pattern                | Match parentheses                        |
 | `expected expression`             | Invalid syntax                       | Check query syntax                       |
 | `strict dimensionality violation` | Quantified captures need row wrapper | Use `{...}* @rows` pattern               |

@@ -1,6 +1,6 @@
 (identifier) @foo. bar
 ==== diagnostics ====
-error: node types must be parenthesized
+error: node kinds must be parenthesized
  --> query.ptk:1:20
   |
 1 | (identifier) @foo. bar

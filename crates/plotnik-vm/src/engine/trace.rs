@@ -24,7 +24,7 @@ use std::num::NonZeroU16;
 use arborium_tree_sitter::Node;
 
 use plotnik_bytecode::{
-    EffectOpcode, Instruction, LineBuilder, Match, Module, Nav, NodeTypeIR, PREAMBLE_NAME,
+    EffectKind, Instruction, LineBuilder, Match, Module, Nav, NodeKindConstraint, PREAMBLE_NAME,
     PredicateOp, SECTION_ALIGN, STEP_SIZE, Symbol, cols, format_effect, nav_symbol, trace,
     truncate_text, width_for_count,
 };
@@ -88,11 +88,11 @@ pub trait Tracer {
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>);
 
     /// Called when an effect is suppressed (inside @_ capture).
-    fn trace_effect_suppressed(&mut self, opcode: EffectOpcode, payload: usize);
+    fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize);
 
     /// Called for SuppressBegin/SuppressEnd control effects.
     /// `suppressed` is true if already inside another suppress scope.
-    fn trace_suppress_control(&mut self, opcode: EffectOpcode, suppressed: bool);
+    fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool);
 
     /// Called when entering a definition via Call.
     fn trace_call(&mut self, target_ip: u16);
@@ -142,10 +142,10 @@ impl Tracer for NoopTracer {
     fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {}
 
     #[inline(always)]
-    fn trace_effect_suppressed(&mut self, _opcode: EffectOpcode, _payload: usize) {}
+    fn trace_effect_suppressed(&mut self, _opcode: EffectKind, _payload: usize) {}
 
     #[inline(always)]
-    fn trace_suppress_control(&mut self, _opcode: EffectOpcode, _suppressed: bool) {}
+    fn trace_suppress_control(&mut self, _opcode: EffectKind, _suppressed: bool) {}
 
     #[inline(always)]
     fn trace_call(&mut self, _target_ip: u16) {}
@@ -173,16 +173,16 @@ pub struct PrintTracer<'s> {
     pub(crate) verbosity: Verbosity,
     pub(crate) lines: Vec<String>,
     pub(crate) builder: LineBuilder,
-    pub(crate) node_type_names: BTreeMap<u16, String>,
+    pub(crate) node_kind_names: BTreeMap<u16, String>,
     pub(crate) node_field_names: BTreeMap<u16, String>,
     pub(crate) member_names: Vec<String>,
     pub(crate) all_strings: Vec<String>,
     pub(crate) regex_patterns: Vec<String>,
     pub(crate) entrypoint_by_ip: BTreeMap<u16, String>,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
-    pub(crate) checkpoint_ips: Vec<u16>,
-    pub(crate) definition_stack: Vec<String>,
-    pub(crate) pending_return_ip: Option<u16>,
+    pub(crate) checkpoint_creation_ips: Vec<u16>,
+    pub(crate) call_stack: Vec<String>,
+    pub(crate) deferred_return_ip: Option<u16>,
     pub(crate) step_width: usize,
     pub(crate) colors: Colors,
     pub(crate) prev_ip: Option<u16>,
@@ -227,31 +227,31 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         let node_fields = self.module.node_fields();
         let entrypoints = self.module.entrypoints();
 
-        let mut node_type_names = BTreeMap::new();
+        let mut node_kind_names = BTreeMap::new();
         for i in 0..node_types.len() {
             let t = node_types.get(i);
-            node_type_names.insert(t.id, strings.get(t.name).to_string());
+            node_kind_names.insert(t.symbol, strings.get(t.name).to_string());
         }
 
         let mut node_field_names = BTreeMap::new();
         for i in 0..node_fields.len() {
             let f = node_fields.get(i);
-            node_field_names.insert(f.id, strings.get(f.name).to_string());
+            node_field_names.insert(f.symbol, strings.get(f.name).to_string());
         }
 
         let member_names: Vec<String> = (0..types.members_count())
-            .map(|i| strings.get(types.get_member(i).name).to_string())
+            .map(|i| strings.get(types.get_member(i).name_id).to_string())
             .collect();
 
         // Same index space as dump.rs — must stay aligned with StringTable layout.
         let all_strings: Vec<String> = (0..header.str_table_count as usize)
-            .map(|i| strings.get_by_index(i).to_string())
+            .map(|i| strings.at(i).to_string())
             .collect();
 
         // Index 0 is reserved in RegexTable, so seed with a placeholder.
         let mut regex_patterns = vec![String::new()];
         for i in 1..header.regex_table_count as usize {
-            let string_id = regexes.get_string_id(i);
+            let string_id = regexes.pattern_string_id(i);
             regex_patterns.push(strings.get(string_id).to_string());
         }
 
@@ -268,15 +268,15 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             verbosity: self.verbosity,
             lines: Vec::new(),
             builder: LineBuilder::new(step_width),
-            node_type_names,
+            node_kind_names,
             node_field_names,
             member_names,
             all_strings,
             regex_patterns,
             entrypoint_by_ip,
-            checkpoint_ips: Vec::new(),
-            definition_stack: Vec::new(),
-            pending_return_ip: None,
+            checkpoint_creation_ips: Vec::new(),
+            call_stack: Vec::new(),
+            deferred_return_ip: None,
             step_width,
             colors: self.colors,
             prev_ip: None,
@@ -290,8 +290,8 @@ impl<'s> PrintTracer<'s> {
         PrintTracerBuilder::new(source, module)
     }
 
-    fn node_type_name(&self, id: u16) -> &str {
-        self.node_type_names.get(&id).map_or("?", |s| s.as_str())
+    fn node_kind_name(&self, id: u16) -> &str {
+        self.node_kind_names.get(&id).map_or("?", |s| s.as_str())
     }
 
     fn node_field_name(&self, id: u16) -> &str {
@@ -349,31 +349,31 @@ impl<'s> PrintTracer<'s> {
         use RuntimeEffect::*;
         match effect {
             Node(_) => "Node".to_string(),
-            Arr => "Arr".to_string(),
+            ArrayOpen => "ArrayOpen".to_string(),
             Push => "Push".to_string(),
-            EndArr => "EndArr".to_string(),
-            Obj => "Obj".to_string(),
-            EndObj => "EndObj".to_string(),
+            ArrayClose => "ArrayClose".to_string(),
+            ObjectOpen => "ObjectOpen".to_string(),
+            ObjectClose => "ObjectClose".to_string(),
             Set(idx) => format!("Set \"{}\"", self.member_name(*idx)),
-            Enum(idx) => format!("Enum \"{}\"", self.member_name(*idx)),
-            EndEnum => "EndEnum".to_string(),
+            EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(*idx)),
+            EnumClose => "EnumClose".to_string(),
             Clear => "Clear".to_string(),
             Null => "Null".to_string(),
         }
     }
 
-    fn format_effect_from_opcode(&self, opcode: EffectOpcode, payload: usize) -> String {
-        use EffectOpcode::*;
+    fn format_effect_from_opcode(&self, opcode: EffectKind, payload: usize) -> String {
+        use EffectKind::*;
         match opcode {
             Node => "Node".to_string(),
-            Arr => "Arr".to_string(),
+            ArrayOpen => "ArrayOpen".to_string(),
             Push => "Push".to_string(),
-            EndArr => "EndArr".to_string(),
-            Obj => "Obj".to_string(),
-            EndObj => "EndObj".to_string(),
+            ArrayClose => "ArrayClose".to_string(),
+            ObjectOpen => "ObjectOpen".to_string(),
+            ObjectClose => "ObjectClose".to_string(),
             Set => format!("Set \"{}\"", self.member_name(payload as u16)),
-            Enum => format!("Enum \"{}\"", self.member_name(payload as u16)),
-            EndEnum => "EndEnum".to_string(),
+            EnumOpen => format!("EnumOpen \"{}\"", self.member_name(payload as u16)),
+            EnumClose => "EnumClose".to_string(),
             Clear => "Clear".to_string(),
             Null => "Null".to_string(),
             SuppressBegin | SuppressEnd => unreachable!(),
@@ -433,24 +433,24 @@ impl<'s> PrintTracer<'s> {
             result.push_str(": ");
         }
 
-        match m.node_type {
-            NodeTypeIR::Any => {
+        match m.node_kind {
+            NodeKindConstraint::Any => {
                 result.push('_');
             }
-            NodeTypeIR::Named(None) => {
+            NodeKindConstraint::Named(None) => {
                 result.push_str("(_)");
             }
-            NodeTypeIR::Named(Some(t)) => {
+            NodeKindConstraint::Named(Some(t)) => {
                 result.push('(');
-                result.push_str(self.node_type_name(t.get()));
+                result.push_str(self.node_kind_name(t.get()));
                 result.push(')');
             }
-            NodeTypeIR::Anonymous(None) => {
+            NodeKindConstraint::Anonymous(None) => {
                 result.push_str("\"_\"");
             }
-            NodeTypeIR::Anonymous(Some(t)) => {
+            NodeKindConstraint::Anonymous(Some(t)) => {
                 result.push('"');
-                result.push_str(self.node_type_name(t.get()));
+                result.push_str(self.node_kind_name(t.get()));
                 result.push('"');
             }
         }
@@ -486,7 +486,7 @@ impl<'s> PrintTracer<'s> {
     }
 
     /// Format definition name (blue). User definitions get parentheses, preamble doesn't.
-    fn format_def_name(&self, name: &str) -> String {
+    fn format_def_ref(&self, name: &str) -> String {
         let c = self.colors;
         if name.starts_with('_') {
             // Preamble/internal names: no parentheses
@@ -497,17 +497,17 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    fn format_def_label(&self, name: &str) -> String {
+    fn format_def_header(&self, name: &str) -> String {
         let c = self.colors;
         format!("{}{}{}:", c.blue, name, c.reset)
     }
 
-    /// Push a definition label, with empty line separator (except for first label).
-    fn push_def_label(&mut self, name: &str) {
+    /// Push a definition header, with empty line separator (except for first header).
+    fn push_def_header(&mut self, name: &str) {
         if !self.lines.is_empty() {
             self.lines.push(String::new());
         }
-        self.lines.push(self.format_def_label(name));
+        self.lines.push(self.format_def_header(name));
     }
 
     fn format_cache_line_separator(&self) -> String {
@@ -560,17 +560,17 @@ impl Tracer for PrintTracer<'_> {
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             Instruction::Call(c) => {
-                let name = self.entrypoint_name(c.target.get());
-                let content = self.format_def_name(name);
-                let successors = format!("{:02} : {:02}", c.target.get(), c.next.get());
+                let name = self.entrypoint_name(c.target.as_u16());
+                let content = self.format_def_ref(name);
+                let successors = format!("{:02} : {:02}", c.target.as_u16(), c.next.as_u16());
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             Instruction::Return(_) => {
-                self.pending_return_ip = Some(ip);
+                self.deferred_return_ip = Some(ip);
             }
             Instruction::Trampoline(t) => {
                 let content = "Trampoline";
-                let successors = format!("{:02}", t.next.get());
+                let successors = format!("{:02}", t.next.as_u16());
                 self.add_instruction(ip, Symbol::EMPTY, content, &successors);
             }
         }
@@ -655,7 +655,7 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(trace::EFFECT, &effect_str);
     }
 
-    fn trace_effect_suppressed(&mut self, opcode: EffectOpcode, payload: usize) {
+    fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize) {
         if self.verbosity == Verbosity::Default {
             return;
         }
@@ -664,14 +664,14 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(trace::EFFECT_SUPPRESSED, &effect_str);
     }
 
-    fn trace_suppress_control(&mut self, opcode: EffectOpcode, suppressed: bool) {
+    fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
         if self.verbosity == Verbosity::Default {
             return;
         }
 
         let name = match opcode {
-            EffectOpcode::SuppressBegin => "SuppressBegin",
-            EffectOpcode::SuppressEnd => "SuppressEnd",
+            EffectKind::SuppressBegin => "SuppressBegin",
+            EffectKind::SuppressEnd => "SuppressEnd",
             _ => unreachable!(),
         };
         let symbol = if suppressed {
@@ -684,37 +684,37 @@ impl Tracer for PrintTracer<'_> {
 
     fn trace_call(&mut self, target_ip: u16) {
         let name = self.entrypoint_name(target_ip).to_string();
-        self.add_subline(trace::CALL, &self.format_def_name(&name));
-        self.push_def_label(&name);
-        self.definition_stack.push(name);
+        self.add_subline(trace::CALL, &self.format_def_ref(&name));
+        self.push_def_header(&name);
+        self.call_stack.push(name);
     }
 
     fn trace_return(&mut self) {
         let ip = self
-            .pending_return_ip
+            .deferred_return_ip
             .take()
             .expect("trace_return without trace_instruction");
         let name = self
-            .definition_stack
+            .call_stack
             .pop()
             .expect("trace_return requires balanced call stack");
-        let content = self.format_def_name(&name);
+        let content = self.format_def_ref(&name);
         // Show ◼ when returning from top-level (stack now empty)
-        let is_top_level = self.definition_stack.is_empty();
+        let is_top_level = self.call_stack.is_empty();
         let successor = if is_top_level { "◼" } else { "" };
         self.add_instruction(ip, trace::RETURN, &content, successor);
-        if let Some(caller) = self.definition_stack.last().cloned() {
-            self.push_def_label(&caller);
+        if let Some(caller) = self.call_stack.last().cloned() {
+            self.push_def_header(&caller);
         }
     }
 
     fn trace_checkpoint_created(&mut self, ip: u16) {
-        self.checkpoint_ips.push(ip);
+        self.checkpoint_creation_ips.push(ip);
     }
 
     fn trace_backtrack(&mut self) {
         let created_at = self
-            .checkpoint_ips
+            .checkpoint_creation_ips
             .pop()
             .expect("backtrack without checkpoint");
         let line = format!(
@@ -728,13 +728,13 @@ impl Tracer for PrintTracer<'_> {
 
     fn trace_enter_entrypoint(&mut self, target_ip: u16) {
         let name = self.entrypoint_name(target_ip).to_string();
-        self.push_def_label(&name);
-        self.definition_stack.push(name);
+        self.push_def_header(&name);
+        self.call_stack.push(name);
     }
 
     fn trace_enter_preamble(&mut self) {
-        self.push_def_label(PREAMBLE_NAME);
-        self.definition_stack.push(PREAMBLE_NAME.to_string());
+        self.push_def_header(PREAMBLE_NAME);
+        self.call_stack.push(PREAMBLE_NAME.to_string());
     }
 }
 
@@ -742,9 +742,9 @@ fn format_match_successors(m: &Match<'_>) -> String {
     if m.is_terminal() {
         "◼".to_string()
     } else if m.succ_count() == 1 {
-        format!("{:02}", m.successor(0).get())
+        format!("{:02}", m.successor(0).as_u16())
     } else {
-        let succs: Vec<_> = m.successors().map(|s| format!("{:02}", s.get())).collect();
+        let succs: Vec<_> = m.successors().map(|s| format!("{:02}", s.as_u16())).collect();
         succs.join(", ")
     }
 }

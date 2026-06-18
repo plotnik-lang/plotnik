@@ -6,8 +6,8 @@ use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeId;
 use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, MemberRef};
-use crate::parser::Expr;
-use plotnik_bytecode::{EffectOpcode, Nav};
+use crate::parser::Pattern;
+use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -62,7 +62,7 @@ pub(super) struct SplitExits {
 /// `SetAfter`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
 pub(super) struct CaptureRequest<'a> {
-    pub inner: &'a Expr,
+    pub inner: &'a Pattern,
     pub nav: Option<Nav>,
     pub capture_effects: Vec<EffectIR>,
     pub outer_capture: CaptureEffects,
@@ -118,7 +118,7 @@ impl Compiler<'_> {
 
     /// Returns a `MemberRef` keyed by (struct_type, relative_index).
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.ctx.type_ctx.get_struct_fields(type_id)?;
+        let fields = self.ctx.type_ctx.struct_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
             if self.ctx.interner.resolve(field_sym) == capture_name {
                 return Some(MemberRef::new(type_id, relative_index as u16));
@@ -142,7 +142,7 @@ impl Compiler<'_> {
     /// consistent with the same pattern at the query root (#470).
     ///
     /// `outer_capture.pre` runs in the enclosing scope before the struct opens
-    /// (e.g. an alternation branch's null-injected defaults, or a tagged variant's
+    /// (e.g. an alternation branch's null-injected defaults, or an enum variant's
     /// `Enum`); dropping it would lose those and close a scope that never opened.
     /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_struct_capture(
@@ -160,7 +160,7 @@ impl Compiler<'_> {
         let scope_type_id = self
             .ctx
             .type_ctx
-            .get_term_info(inner)
+            .term_info(inner)
             .and_then(|info| info.flow.type_id());
 
         let end_effects = EndScopeEffects {
@@ -171,7 +171,7 @@ impl Compiler<'_> {
             CaptureExits::Single(exit) => {
                 let endobj = self.emit_endobj_step_with_effects(end_effects, exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
-                    this.compile_expr_with_nav(inner, endobj, nav)
+                    this.compile_pattern(inner, endobj, nav)
                 })
             }
             CaptureExits::Split {
@@ -205,7 +205,7 @@ impl Compiler<'_> {
     /// `Some`, Obj/EndObj wraps the inner to open a fresh struct scope.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
-        inner: &Expr,
+        inner: &Pattern,
         exit: Label,
         nav_override: Option<Nav>,
         scope_type_id: Option<TypeId>,
@@ -226,7 +226,7 @@ impl Compiler<'_> {
             };
 
             let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
-            return self.compile_expr_inner(
+            return self.dispatch_pattern(
                 inner,
                 ExprCtx {
                     exit: actual_exit,
@@ -251,7 +251,7 @@ impl Compiler<'_> {
         let inner_entry = self.with_scope(
             scope_type_id.expect("scope_type_id is Some after the early return on None above"),
             |this| {
-                this.compile_expr_inner(
+                this.dispatch_pattern(
                     inner,
                     ExprCtx {
                         exit: endobj_step,
@@ -278,7 +278,7 @@ impl Compiler<'_> {
     /// internal captures. Each iteration produces: Obj → inner → EndObj Push
     pub(super) fn compile_struct_for_array(
         &mut self,
-        inner: &Expr,
+        inner: &Pattern,
         exit: Label,
         nav_override: Option<Nav>,
         row_type_id: Option<TypeId>,
@@ -293,7 +293,7 @@ impl Compiler<'_> {
 
         // row_type_id drives Set effects inside the struct scope.
         let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
-            this.compile_expr_with_nav(inner, endobj_step, nav_override)
+            this.compile_pattern(inner, endobj_step, nav_override)
         });
 
         let obj_step = self.fresh_label();
@@ -365,7 +365,7 @@ impl Compiler<'_> {
     ///
     /// The struct-scope counterpart of [`emit_arr_step`](Self::emit_arr_step),
     /// used by split-exit struct captures to open the object after the enclosing
-    /// scope's pre-effects (e.g. a tagged variant's `Enum`).
+    /// scope's pre-effects (e.g. an enum variant's `Enum`).
     pub(super) fn emit_obj_step_with_pre(
         &mut self,
         successor: Label,
@@ -426,8 +426,8 @@ impl Compiler<'_> {
     /// Scope-opening captures (`compile_struct_capture`, `compile_array_capture`)
     /// fold `outer_capture.pre` onto their own `Obj`/`Arr` step. Captures that
     /// own no such step — `SetAfter` and suppressive — have nowhere to fold it,
-    /// so they call this. Dropping it loses a tagged variant's `Enum`-open (or an
-    /// untagged branch's null-injected defaults), and the path then closes a
+    /// so they call this. Dropping it loses an enum variant's `Enum`-open (or an
+    /// union branch's null-injected defaults), and the path then closes a
     /// scope it never opened.
     pub(super) fn wrap_entry_pre(&mut self, entry: Label, pre: Vec<EffectIR>) -> Label {
         if pre.is_empty() {
@@ -450,7 +450,7 @@ impl Compiler<'_> {
         let null_effects: Vec<_> = capture
             .post
             .iter()
-            .filter(|eff| eff.opcode() == EffectOpcode::Set)
+            .filter(|eff| eff.kind() == EffectKind::Set)
             .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
             .collect();
 
@@ -472,7 +472,7 @@ impl Compiler<'_> {
     /// Unlike `emit_null_for_skip_path` which handles captures passed as effects,
     /// this function handles captures defined INSIDE the expression (e.g., `{(x) @cap}?`).
     /// It collects all capture names from the expression and emits Null Set for each.
-    pub(super) fn emit_null_for_internal_captures(&mut self, exit: Label, inner: &Expr) -> Label {
+    pub(super) fn emit_null_for_internal_captures(&mut self, exit: Label, inner: &Pattern) -> Label {
         let captures = Self::collect_captures(inner);
         if captures.is_empty() {
             return exit;
@@ -482,7 +482,7 @@ impl Compiler<'_> {
         for name in captures {
             if let Some(member_ref) = self.lookup_member_in_scope(&name) {
                 null_effects.push(EffectIR::null());
-                null_effects.push(EffectIR::with_member(EffectOpcode::Set, member_ref));
+                null_effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
             }
         }
 
@@ -496,7 +496,7 @@ impl Compiler<'_> {
     /// Cascading for bytecode limits is handled by the lowering pass.
     pub(super) fn emit_epsilon(&mut self, label: Label, successors: Vec<Label>) {
         self.instructions
-            .push(MatchIR::at(label).next_many(successors).into());
+            .push(MatchIR::terminal(label).successors(successors).into());
     }
 
     /// Cascading for bytecode limits is handled by the lowering pass.

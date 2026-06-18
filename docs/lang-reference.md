@@ -2,6 +2,8 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
+**Pattern.** A *pattern* is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
 ---
@@ -471,7 +473,7 @@ Output type:
 
 - `(ERROR)` — matches parser error nodes
 - `(MISSING)` — matches nodes inserted by error recovery
-- `(MISSING identifier)` — matches a specific missing node type
+- `(MISSING identifier)` — matches a specific missing node kind
 - `(MISSING ";")` — matches a missing anonymous node
 
 ```
@@ -492,7 +494,7 @@ Output type:
 
 ### Supertypes
 
-Query abstract node types directly. A `#subtype` refinement is accepted syntactically but
+Query abstract node kinds directly. A `#subtype` refinement is accepted syntactically but
 not yet enforced — the node currently matches on its supertype alone, so `(expression)` and
 `(expression#binary_expression)` behave identically for now:
 
@@ -532,7 +534,7 @@ decorator: (decorator)* @decorators   ; repeats the whole field
 value: [A: (x) B: (y)] @kind          ; captures the field (containing the alternation)
 ```
 
-This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type — for alternations, you get the tagged union, not a raw node.
+This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type — for alternations, you get the enum, not a raw node.
 
 ### Negated Fields
 
@@ -652,8 +654,8 @@ interface Section {
 
 Match alternatives with `[...]`:
 
-- **Untagged**: Fields merge across branches
-- **Tagged** (with labels): Discriminated union
+- **Union** (unlabeled): Fields merge across branches
+- **Enum** (with labels): Discriminated union
 
 ```
 [
@@ -662,7 +664,7 @@ Match alternatives with `[...]`:
 ] @value
 ```
 
-### Merge Style (Unlabeled)
+### Union Style (Unlabeled)
 
 Captures merge: present in all branches → required; some branches → nullable (`T | null`, always present). Same-name captures must have compatible types.
 
@@ -741,7 +743,7 @@ Output type:
 }
 ```
 
-### Tagged Style (Labeled)
+### Enum Style (Labeled)
 
 Labels create a discriminated union (`$tag` + `$data`):
 
@@ -936,7 +938,7 @@ BinaryOp =
     right: (_) @right)
 ```
 
-Use as node types:
+Use as node kinds:
 
 ```
 (return_statement (BinaryOp) @expr)
@@ -1062,7 +1064,7 @@ interface Root {
 | Non-greedy           |                    | `??` `*?` `+?`            |
 | Sequence             | `((a) (b))`        | `{(a) (b)}`               |
 | Alternation          | `[a b]`            | `[a b]`                   |
-| Tagged alternation   |                    | `[A: (a) B: (b)]`         |
+| Enum alternation     |                    | `[A: (a) B: (b)]`         |
 | Anchor               | `.`                | `.` soft, `.!` exact      |
 | Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`         |
 | Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`           |

@@ -19,20 +19,20 @@ pub fn run_list() -> CliResult {
 }
 
 pub fn run_dump(lang_name: &str) -> CliResult {
-    let lang = super::lang_resolver::resolve_named_lang(lang_name)?;
+    let lang = super::lang_resolver::resolve_lang_name(lang_name)?;
 
-    let renderer = GrammarRenderer::new(lang.raw());
-    print!("{}", renderer.render());
+    let printer = GrammarPrinter::new(lang.raw());
+    print!("{}", printer.render());
 
     Ok(())
 }
 
-pub struct GrammarRenderer<'a> {
+pub struct GrammarPrinter<'a> {
     grammar: &'a RawGrammar,
     hidden_rules: HashSet<&'a str>,
 }
 
-impl<'a> GrammarRenderer<'a> {
+impl<'a> GrammarPrinter<'a> {
     pub fn new(grammar: &'a RawGrammar) -> Self {
         let hidden_rules: HashSet<_> = grammar
             .rules

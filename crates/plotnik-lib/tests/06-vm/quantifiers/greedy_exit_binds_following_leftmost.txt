@@ -32,19 +32,19 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (program)                        08
   07  ─‣┘  _                                10
-  08  -ε-  [Arr]                            24, 19
+  08  -ε-  [ArrayOpen]                      24, 19
   10                                        ▶
-  11  └‣─  [EndArr Set(M0)] (_) [Node Set(M1)]  07
+  11  └‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
   14  ─‣─  _                                20, 26
-  16  ─‣─  [EndArr Set(M0)] (_) [Node Set(M1)]  07
+  16  ─‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
   19  -ε-                                   11
   20   !   (lexical_declaration) [Node Push]  14, 16
   22  ─‣─  _                                20, 22
@@ -57,14 +57,14 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [Arr]                            24, 19
+  08  -ε-  [ArrayOpen]                      24, 19
   24       _                                20, 22
        ●   lexical_declaration
   20       (lexical_declaration) [Node Push]  14, 16
@@ -81,14 +81,14 @@ Q:
   26  ❮❮❮ 
   26       _                                20, 26
   20  ❮❮❮ 
-  16       [EndArr Set(M0)] (_) [Node Set(M1)]  07
+  16       [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
        ●   expression_statement
   07       _                                10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"decls":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]}],"x":{"kind":"expression_statement","text":"foo;","span":[7, 11]}}

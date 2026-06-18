@@ -11,38 +11,38 @@ use std::num::NonZeroU16;
 use crate::analyze::type_check::TypeId;
 use crate::emit::EmitError;
 use plotnik_bytecode::{
-    Call, EffectOp, EffectOpcode, MatchInstr, MatchPredicate, Nav, PredicateOp, Return, StepAddr,
+    Call, Effect, EffectKind, MatchInstr, MatchPredicate, Nav, PredicateOp, Return, StepAddr,
     StepId, Trampoline, select_match_opcode,
 };
 
 /// Resolver bundle for bytecode emission.
 ///
-/// Bundles the deferred-reference resolvers (`get_member_base` for struct/enum
+/// Bundles the deferred-reference resolvers (`member_base` for struct/enum
 /// member bases, `lookup_regex` for predicate patterns) into one value so
 /// `resolve` signatures stay flat. The resolvers borrow the emission tables;
-/// build via [`EmitContext::new`].
-pub struct EmitContext<'a> {
-    get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
+/// build via [`EmitResolvers::new`].
+pub struct EmitResolvers<'a> {
+    member_base: &'a dyn Fn(TypeId) -> Option<u16>,
     lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
 }
 
-impl<'a> EmitContext<'a> {
+impl<'a> EmitResolvers<'a> {
     pub fn new(
-        get_member_base: &'a dyn Fn(TypeId) -> Option<u16>,
+        member_base: &'a dyn Fn(TypeId) -> Option<u16>,
         lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
     ) -> Self {
         Self {
-            get_member_base,
+            member_base,
             lookup_regex,
         }
     }
 }
 
-/// Node type constraint for Match instructions.
+/// Node kind constraint for Match instructions.
 ///
 /// The bytecode crate owns this type; re-exported here so existing
-/// `crate::bytecode::NodeTypeIR` references resolve unchanged.
-pub use plotnik_bytecode::NodeTypeIR;
+/// `crate::bytecode::NodeKindConstraint` references resolve unchanged.
+pub use plotnik_bytecode::NodeKindConstraint;
 
 /// Symbolic reference, resolved to step address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -77,111 +77,111 @@ impl MemberRef {
         }
     }
 
-    pub fn resolve(self, ctx: &EmitContext) -> u16 {
-        (ctx.get_member_base)(self.parent_type).expect("member base must resolve")
+    pub fn resolve(self, ctx: &EmitResolvers) -> u16 {
+        (ctx.member_base)(self.parent_type).expect("member base must resolve")
             + self.relative_index
     }
 }
 
 /// Effect operation with symbolic member references.
-/// Used during compilation; resolved to EffectOp during emission.
+/// Used during compilation; resolved to Effect during emission.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectIR {
-    opcode: EffectOpcode,
-    payload: EffectPayload,
+    kind: EffectKind,
+    payload: EffectArg,
 }
 
-/// An effect's payload: a raw value, or a symbolic member reference — used by
+/// An effect's argument: a literal value, or a symbolic member reference — used by
 /// Set/Enum effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum EffectPayload {
-    Raw(usize),
+enum EffectArg {
+    Literal(usize),
     Member(MemberRef),
 }
 
 impl EffectIR {
-    /// The effect's opcode.
+    /// The effect's kind.
     #[inline]
-    pub fn opcode(&self) -> EffectOpcode {
-        self.opcode
+    pub fn kind(&self) -> EffectKind {
+        self.kind
     }
 
-    /// Create a simple effect without member reference.
-    pub fn simple(opcode: EffectOpcode, payload: usize) -> Self {
+    /// Create a literal effect without member reference.
+    pub fn literal(kind: EffectKind, payload: usize) -> Self {
         Self {
-            opcode,
-            payload: EffectPayload::Raw(payload),
+            kind,
+            payload: EffectArg::Literal(payload),
         }
     }
 
-    pub fn with_member(opcode: EffectOpcode, member_ref: MemberRef) -> Self {
+    pub fn with_member(kind: EffectKind, member_ref: MemberRef) -> Self {
         Self {
-            opcode,
-            payload: EffectPayload::Member(member_ref),
+            kind,
+            payload: EffectArg::Member(member_ref),
         }
     }
 
     /// Capture current node value.
     pub fn node() -> Self {
-        Self::simple(EffectOpcode::Node, 0)
+        Self::literal(EffectKind::Node, 0)
     }
 
     /// Push null value.
     pub fn null() -> Self {
-        Self::simple(EffectOpcode::Null, 0)
+        Self::literal(EffectKind::Null, 0)
     }
 
     /// Push accumulated value to array.
     pub fn push() -> Self {
-        Self::simple(EffectOpcode::Push, 0)
+        Self::literal(EffectKind::Push, 0)
     }
 
     /// Begin array scope.
     pub fn start_arr() -> Self {
-        Self::simple(EffectOpcode::Arr, 0)
+        Self::literal(EffectKind::ArrayOpen, 0)
     }
 
     /// End array scope.
     pub fn end_arr() -> Self {
-        Self::simple(EffectOpcode::EndArr, 0)
+        Self::literal(EffectKind::ArrayClose, 0)
     }
 
     /// Begin object scope.
     pub fn start_obj() -> Self {
-        Self::simple(EffectOpcode::Obj, 0)
+        Self::literal(EffectKind::ObjectOpen, 0)
     }
 
     /// End object scope.
     pub fn end_obj() -> Self {
-        Self::simple(EffectOpcode::EndObj, 0)
+        Self::literal(EffectKind::ObjectClose, 0)
     }
 
     /// Begin enum scope.
     pub fn start_enum() -> Self {
-        Self::simple(EffectOpcode::Enum, 0)
+        Self::literal(EffectKind::EnumOpen, 0)
     }
 
     /// End enum scope.
     pub fn end_enum() -> Self {
-        Self::simple(EffectOpcode::EndEnum, 0)
+        Self::literal(EffectKind::EnumClose, 0)
     }
 
     /// Begin suppression (suppress effects within).
     pub fn suppress_begin() -> Self {
-        Self::simple(EffectOpcode::SuppressBegin, 0)
+        Self::literal(EffectKind::SuppressBegin, 0)
     }
 
     /// End suppression.
     pub fn suppress_end() -> Self {
-        Self::simple(EffectOpcode::SuppressEnd, 0)
+        Self::literal(EffectKind::SuppressEnd, 0)
     }
 
-    pub fn resolve(&self, ctx: &EmitContext) -> EffectOp {
+    pub fn resolve(&self, ctx: &EmitResolvers) -> Effect {
         let payload = match &self.payload {
-            EffectPayload::Member(member_ref) => member_ref.resolve(ctx) as usize,
-            EffectPayload::Raw(payload) => *payload,
+            EffectArg::Member(member_ref) => member_ref.resolve(ctx) as usize,
+            EffectArg::Literal(payload) => *payload,
         };
-        EffectOp::new(self.opcode, payload)
+        Effect::new(self.kind, payload)
     }
 }
 
@@ -199,7 +199,7 @@ pub enum PredicateValueIR {
 
 /// Predicate IR for node text filtering.
 ///
-/// Applied after node type/field matching. Compares node text against
+/// Applied after node kind/field matching. Compares node text against
 /// a string literal or regex pattern.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PredicateIR {
@@ -270,7 +270,7 @@ impl InstructionIR {
     pub fn resolve(
         &self,
         map: &BTreeMap<Label, StepAddr>,
-        ctx: &EmitContext,
+        ctx: &EmitResolvers,
     ) -> Result<Vec<u8>, EmitError> {
         match self {
             Self::Match(m) => m.resolve(map, ctx),
@@ -288,8 +288,8 @@ pub struct MatchIR {
     pub(crate) label: Label,
     /// Navigation command. `Epsilon` means pure control flow (no node check).
     pub(crate) nav: Nav,
-    /// Node type constraint (Any = wildcard, Named/Anonymous for specific checks).
-    pub(crate) node_type: NodeTypeIR,
+    /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
+    pub(crate) node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
     pub(crate) node_field: Option<NonZeroU16>,
     /// Effects to execute before match attempt.
@@ -310,7 +310,7 @@ impl MatchIR {
         Self {
             label,
             nav: Nav::Epsilon,
-            node_type: NodeTypeIR::Any,
+            node_kind: NodeKindConstraint::Any,
             node_field: None,
             pre_effects: vec![],
             neg_fields: vec![],
@@ -320,13 +320,9 @@ impl MatchIR {
         }
     }
 
-    pub fn at(label: Label) -> Self {
-        Self::terminal(label)
-    }
-
     /// Create an epsilon transition (no node interaction) to a single successor.
     pub fn epsilon(label: Label, next: Label) -> Self {
-        Self::at(label).next(next)
+        Self::terminal(label).next(next)
     }
 
     pub fn nav(mut self, nav: Nav) -> Self {
@@ -334,8 +330,8 @@ impl MatchIR {
         self
     }
 
-    pub fn node_type(mut self, t: NodeTypeIR) -> Self {
-        self.node_type = t;
+    pub fn node_kind(mut self, t: NodeKindConstraint) -> Self {
+        self.node_kind = t;
         self
     }
 
@@ -384,7 +380,7 @@ impl MatchIR {
         self
     }
 
-    pub fn next_many(mut self, s: Vec<Label>) -> Self {
+    pub fn successors(mut self, s: Vec<Label>) -> Self {
         self.successors = s;
         self
     }
@@ -420,14 +416,14 @@ impl MatchIR {
     pub fn resolve(
         &self,
         map: &BTreeMap<Label, StepAddr>,
-        ctx: &EmitContext,
+        ctx: &EmitResolvers,
     ) -> Result<Vec<u8>, EmitError> {
         let pre_effects = self.pre_effects.iter().map(|e| e.resolve(ctx)).collect();
         let post_effects = self.post_effects.iter().map(|e| e.resolve(ctx)).collect();
         let predicate = self.predicate.as_ref().map(|pred| {
             let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
             let value_ref = match &pred.value {
-                PredicateValueIR::String(string_id) => string_id.get(),
+                PredicateValueIR::String(string_id) => string_id.as_u16(),
                 PredicateValueIR::Regex(string_id) => {
                     (ctx.lookup_regex)(*string_id).expect("regex predicate must be interned")
                 }
@@ -446,7 +442,7 @@ impl MatchIR {
 
         let instr = MatchInstr {
             nav: self.nav,
-            node_type: self.node_type,
+            node_kind: self.node_kind,
             node_field: self.node_field,
             pre_effects,
             neg_fields: self.neg_fields.clone(),
@@ -577,7 +573,7 @@ impl From<TrampolineIR> for InstructionIR {
 
 /// Result of layout: maps labels to step addresses.
 #[derive(Clone, Debug)]
-pub struct LayoutResult {
+pub struct LayoutMap {
     /// Mapping from symbolic labels to concrete step addresses (raw u16).
     label_to_step: BTreeMap<Label, StepAddr>,
     /// Total number of steps. Held as `u32` so a query whose layout overflows
@@ -586,7 +582,7 @@ pub struct LayoutResult {
     total_steps: u32,
 }
 
-impl LayoutResult {
+impl LayoutMap {
     pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u32) -> Self {
         Self {
             label_to_step,
@@ -601,7 +597,7 @@ impl LayoutResult {
         }
     }
 
-    pub fn label_to_step(&self) -> &BTreeMap<Label, StepAddr> {
+    pub fn step_addrs(&self) -> &BTreeMap<Label, StepAddr> {
         &self.label_to_step
     }
     pub fn total_steps(&self) -> u32 {

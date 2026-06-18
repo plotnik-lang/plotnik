@@ -30,7 +30,7 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @value :: Value
+    CapturedPattern @value :: Value
       Alt
         Branch
           NamedNode identifier

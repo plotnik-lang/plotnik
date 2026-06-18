@@ -9,16 +9,16 @@ impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {
         self.start_node(SyntaxKind::Root);
 
-        while !self.should_stop() && !self.currently_is(SyntaxKind::Error) {
+        while !self.is_done() && !self.at(SyntaxKind::Error) {
             // LL(2): Id followed by Equals → named definition (if PascalCase)
-            if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
+            if self.at(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
                 self.parse_def();
                 continue;
             }
 
             let start = self.current_span().start();
             self.start_node(SyntaxKind::Def);
-            let success = self.parse_expr_or_error();
+            let success = self.parse_pattern_or_error();
             if !success {
                 self.error_until_next_def();
             }
@@ -28,7 +28,7 @@ impl Parser<'_, '_> {
                 let span = TextRange::new(start, end);
                 let def_text = &self.source[usize::from(start)..usize::from(end)];
                 self.diagnostics
-                    .report(self.source_id, DiagnosticKind::UnnamedDef, span)
+                    .report(self.source_id, DiagnosticKind::MissingDefName, span)
                     .hint(format!("give it a name like `Name = {}`", def_text.trim()))
                     .emit();
             }
@@ -39,7 +39,7 @@ impl Parser<'_, '_> {
     }
 
     pub(crate) fn error_until_next_def(&mut self) {
-        if self.should_stop() {
+        if self.is_done() {
             return;
         }
 
@@ -48,7 +48,7 @@ impl Parser<'_, '_> {
         }
 
         self.start_node(SyntaxKind::Error);
-        while !self.should_stop() && !self.currently_at_def_start() {
+        while !self.is_done() && !self.currently_at_def_start() {
             self.bump();
             self.skip_trivia_to_buffer();
         }
@@ -56,13 +56,13 @@ impl Parser<'_, '_> {
     }
 
     pub(crate) fn currently_at_def_start(&mut self) -> bool {
-        if self.currently_is(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
+        if self.at(SyntaxKind::Id) && self.next_is(SyntaxKind::Equals) {
             return true;
         }
-        self.currently_is_one_of(ROOT_EXPR_FIRST_TOKENS)
+        self.at_ts(ROOT_EXPR_FIRST_TOKENS)
     }
 
-    /// Named expression definition: `Name = expr`
+    /// Named expression definition: `Name = pattern`
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
 
@@ -78,7 +78,7 @@ impl Parser<'_, '_> {
             self.current()
         );
 
-        self.parse_required_expr();
+        self.parse_required_pattern();
 
         self.finish_node();
     }

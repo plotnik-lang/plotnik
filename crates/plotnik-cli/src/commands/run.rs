@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use plotnik_lib::Colors;
 use plotnik_lib::engine::{RuntimeError, VM, materialize_verified};
 
-use super::run_common::{self, PreparedQuery, QueryInput};
+use super::run_common::{self, ExecPlan, ExecRequest};
 use crate::error::{CliError, CliResult};
 
 pub struct RunArgs {
@@ -20,12 +20,12 @@ pub struct RunArgs {
 }
 
 pub fn run(args: RunArgs) -> CliResult {
-    let PreparedQuery {
+    let ExecPlan {
         module,
         entrypoint,
         tree,
         source_code,
-    } = run_common::prepare_query(QueryInput {
+    } = run_common::plan_exec(ExecRequest {
         query_path: args.query_path.as_deref(),
         query_text: args.query_text.as_deref(),
         source_path: args.source_path.as_deref(),

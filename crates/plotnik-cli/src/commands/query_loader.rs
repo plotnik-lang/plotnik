@@ -4,25 +4,25 @@ use std::path::Path;
 
 use plotnik_lib::SourceMap;
 
-use crate::cli::shebang::{ShebangOptions, parse_shebang};
+use crate::cli::shebang::{ShebangDecl, parse_shebang};
 use crate::error::CliError;
 
 /// Query sources plus the semantic options declared in their shebang lines.
-pub struct LoadedQuery {
+pub struct QuerySources {
     pub sources: SourceMap,
-    pub shebang: ShebangOptions,
+    pub shebang: ShebangDecl,
 }
 
-pub fn load_query_source(
+pub fn load_query(
     query_path: Option<&Path>,
     query_text: Option<&str>,
-) -> Result<LoadedQuery, CliError> {
+) -> Result<QuerySources, CliError> {
     if let Some(text) = query_text {
         // Inline text can carry a shebang too (e.g. `-q "$(cat q.ptk)"`)
         let shebang = extract_shebang(text, "<query>")?;
         let mut sources = SourceMap::new();
-        sources.add_one_liner(text);
-        return Ok(LoadedQuery { sources, shebang });
+        sources.add_inline(text);
+        return Ok(QuerySources { sources, shebang });
     }
 
     if let Some(path) = query_path {
@@ -40,7 +40,7 @@ pub fn load_query_source(
     ))
 }
 
-fn load_stdin() -> Result<LoadedQuery, CliError> {
+fn load_stdin() -> Result<QuerySources, CliError> {
     let mut buf = String::new();
     io::stdin()
         .read_to_string(&mut buf)
@@ -48,20 +48,20 @@ fn load_stdin() -> Result<LoadedQuery, CliError> {
     let shebang = extract_shebang(&buf, "<stdin>")?;
     let mut sources = SourceMap::new();
     sources.add_stdin(&buf);
-    Ok(LoadedQuery { sources, shebang })
+    Ok(QuerySources { sources, shebang })
 }
 
-fn load_file(path: &Path) -> Result<LoadedQuery, CliError> {
+fn load_file(path: &Path) -> Result<QuerySources, CliError> {
     let content = read_file(path)?;
     let shebang = extract_shebang(&content, &path.display().to_string())?;
     let mut sources = SourceMap::new();
     sources.add_file(&path.to_string_lossy(), &content);
-    Ok(LoadedQuery { sources, shebang })
+    Ok(QuerySources { sources, shebang })
 }
 
 /// Terraform-style workspace: all `.ptk` files in the directory are merged
 /// into one namespace. Shebang declarations across files must agree.
-fn load_workspace(dir: &Path) -> Result<LoadedQuery, CliError> {
+fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
     let entries = fs::read_dir(dir).map_err(|e| {
         CliError::fatal(format!(
             "failed to read directory '{}': {}",
@@ -86,7 +86,7 @@ fn load_workspace(dir: &Path) -> Result<LoadedQuery, CliError> {
     paths.sort();
 
     let mut sources = SourceMap::new();
-    let mut shebang = ShebangOptions::default();
+    let mut shebang = ShebangDecl::default();
     let mut lang_origin: Option<String> = None;
     let mut entry_origin: Option<String> = None;
 
@@ -99,7 +99,7 @@ fn load_workspace(dir: &Path) -> Result<LoadedQuery, CliError> {
             "language",
             &mut shebang.lang,
             &mut lang_origin,
-            declared.lang.map(|raw| canonical_lang_name(&raw)),
+            declared.lang.map(|raw| normalize_lang_alias(&raw)),
             &display,
         )?;
         merge_declaration(
@@ -113,12 +113,12 @@ fn load_workspace(dir: &Path) -> Result<LoadedQuery, CliError> {
         sources.add_file(&path.to_string_lossy(), &content);
     }
 
-    Ok(LoadedQuery { sources, shebang })
+    Ok(QuerySources { sources, shebang })
 }
 
 /// Normalize aliases (`ts` → `typescript`) so workspace agreement isn't
 /// fooled by spelling. Unknown names stay raw; resolution errors surface later.
-fn canonical_lang_name(raw: &str) -> String {
+fn normalize_lang_alias(raw: &str) -> String {
     plotnik::language_registry::from_name(raw)
         .map(|l| l.name().to_string())
         .unwrap_or_else(|| raw.to_string())
@@ -129,7 +129,7 @@ fn read_file(path: &Path) -> Result<String, CliError> {
         .map_err(|e| CliError::fatal(format!("failed to read '{}': {}", path.display(), e)))
 }
 
-fn extract_shebang(content: &str, origin: &str) -> Result<ShebangOptions, CliError> {
+fn extract_shebang(content: &str, origin: &str) -> Result<ShebangDecl, CliError> {
     match parse_shebang(content) {
         Ok(options) => Ok(options.unwrap_or_default()),
         Err(msg) => Err(CliError::fatal(format!(

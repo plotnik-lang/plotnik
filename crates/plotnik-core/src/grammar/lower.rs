@@ -4,18 +4,15 @@ use std::collections::BTreeSet;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use super::raw::{
-    RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
-    RawRule as PlotnikRule,
-};
+use super::raw::{RawGrammar, RawPrecedence, RawPrecedenceEntry, RawRule};
 use super::{
     node_shapes::{self, GrammarContext},
     prepared::{
-        InlinedProductionMap, LexicalGrammar, PrecedenceEntry, Production, ReservedWordContext,
+        InlinedProductionMap, LexicalGrammar, PrecedenceEntry, Production, ReservedWordSet,
         SyntaxGrammar, Variable, VariableType,
     },
     rules::{Alias, AliasMap, Precedence, Rule, Symbol, SymbolType},
-    types::{FieldSymbol, NodeSymbol},
+    types::{FieldEntry, NodeKindEntry},
 };
 
 const TREE_SITTER_PUBLIC_NAME_SEPARATOR: char = '\0';
@@ -30,11 +27,11 @@ pub(super) struct LoweredGrammar {
     pub variables_to_inline: Vec<String>,
     pub supertype_symbols: Vec<String>,
     pub word_token: Option<String>,
-    pub reserved_words: Vec<ReservedWordContext<Rule>>,
+    pub reserved_words: Vec<ReservedWordSet<Rule>>,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct PreResolveGrammar<'a> {
+pub(super) struct UninternedGrammar<'a> {
     pub variables: &'a [Variable],
     pub extra_symbols: &'a [Rule],
     pub expected_conflicts: &'a [Vec<String>],
@@ -42,7 +39,7 @@ pub(super) struct PreResolveGrammar<'a> {
     pub variables_to_inline: &'a [String],
     pub supertype_symbols: &'a [String],
     pub word_token: Option<&'a str>,
-    pub reserved_words: &'a [ReservedWordContext<Rule>],
+    pub reserved_words: &'a [ReservedWordSet<Rule>],
 }
 
 impl LoweredGrammar {
@@ -71,7 +68,7 @@ impl LoweredGrammar {
             reserved_words: raw
                 .reserved
                 .iter()
-                .map(|(name, rules)| ReservedWordContext {
+                .map(|(name, rules)| ReservedWordSet {
                     name: name.clone(),
                     reserved_words: rules.iter().map(convert_rule).collect(),
                 })
@@ -79,8 +76,8 @@ impl LoweredGrammar {
         }
     }
 
-    pub fn pre_resolve(&self) -> PreResolveGrammar<'_> {
-        PreResolveGrammar {
+    pub fn as_uninterned(&self) -> UninternedGrammar<'_> {
+        UninternedGrammar {
             variables: &self.variables,
             extra_symbols: &self.extra_symbols,
             expected_conflicts: &self.expected_conflicts,
@@ -143,7 +140,7 @@ fn reachable_rule_names<'a>(
     word_token: Option<&'a str>,
     extra_symbols: &'a [Rule],
     external_tokens: &'a [Rule],
-    reserved_words: &'a [ReservedWordContext<Rule>],
+    reserved_words: &'a [ReservedWordSet<Rule>],
 ) -> FxHashSet<String> {
     let by_name = variables
         .iter()
@@ -217,42 +214,42 @@ where
     }
 }
 
-pub(super) fn convert_rule(rule: &PlotnikRule) -> Rule {
+pub(super) fn convert_rule(rule: &RawRule) -> Rule {
     match rule {
-        PlotnikRule::BLANK => Rule::Blank,
-        PlotnikRule::STRING { value } => Rule::String(value.clone()),
-        PlotnikRule::PATTERN { value, flags } => Rule::Pattern(
+        RawRule::BLANK => Rule::Blank,
+        RawRule::STRING { value } => Rule::String(value.clone()),
+        RawRule::PATTERN { value, flags } => Rule::Pattern(
             value.clone(),
             flags.as_deref().map(filter_flags).unwrap_or_default(),
         ),
-        PlotnikRule::SYMBOL { name } => Rule::NamedSymbol(name.clone()),
-        PlotnikRule::SEQ { members } => Rule::seq(members.iter().map(convert_rule).collect()),
-        PlotnikRule::CHOICE { members } => Rule::choice(members.iter().map(convert_rule).collect()),
-        PlotnikRule::REPEAT { content } => {
+        RawRule::SYMBOL { name } => Rule::NamedSymbol(name.clone()),
+        RawRule::SEQ { members } => Rule::seq(members.iter().map(convert_rule).collect()),
+        RawRule::CHOICE { members } => Rule::choice(members.iter().map(convert_rule).collect()),
+        RawRule::REPEAT { content } => {
             Rule::choice(vec![Rule::repeat(convert_rule(content)), Rule::Blank])
         }
-        PlotnikRule::REPEAT1 { content } => Rule::repeat(convert_rule(content)),
-        PlotnikRule::FIELD { name, content } => Rule::field(name.clone(), convert_rule(content)),
-        PlotnikRule::ALIAS {
+        RawRule::REPEAT1 { content } => Rule::repeat(convert_rule(content)),
+        RawRule::FIELD { name, content } => Rule::field(name.clone(), convert_rule(content)),
+        RawRule::ALIAS {
             content,
             value,
             named,
         } => Rule::alias(convert_rule(content), value.clone(), *named),
-        PlotnikRule::TOKEN { content } => Rule::token(convert_rule(content)),
-        PlotnikRule::IMMEDIATE_TOKEN { content } => Rule::immediate_token(convert_rule(content)),
-        PlotnikRule::PREC { value, content } => {
+        RawRule::TOKEN { content } => Rule::token(convert_rule(content)),
+        RawRule::IMMEDIATE_TOKEN { content } => Rule::immediate_token(convert_rule(content)),
+        RawRule::PREC { value, content } => {
             Rule::prec(convert_precedence(value), convert_rule(content))
         }
-        PlotnikRule::PREC_LEFT { value, content } => {
+        RawRule::PREC_LEFT { value, content } => {
             Rule::prec_left(convert_precedence(value), convert_rule(content))
         }
-        PlotnikRule::PREC_RIGHT { value, content } => {
+        RawRule::PREC_RIGHT { value, content } => {
             Rule::prec_right(convert_precedence(value), convert_rule(content))
         }
-        PlotnikRule::PREC_DYNAMIC { value, content } => {
+        RawRule::PREC_DYNAMIC { value, content } => {
             Rule::prec_dynamic(*value, convert_rule(content))
         }
-        PlotnikRule::RESERVED {
+        RawRule::RESERVED {
             context_name,
             content,
         } => Rule::Reserved {
@@ -267,25 +264,25 @@ fn filter_flags(flags: &str) -> String {
     flags.chars().filter(|flag| *flag == 'i').collect()
 }
 
-fn convert_precedence(precedence: &PlotnikPrecedence) -> Precedence {
+fn convert_precedence(precedence: &RawPrecedence) -> Precedence {
     match precedence {
-        PlotnikPrecedence::Integer(value) => Precedence::Integer(*value),
-        PlotnikPrecedence::Name(name) => Precedence::Name(name.clone()),
+        RawPrecedence::Integer(value) => Precedence::Integer(*value),
+        RawPrecedence::Name(name) => Precedence::Name(name.clone()),
     }
 }
 
-pub(super) fn convert_precedence_entry(entry: &PlotnikPrecedenceEntry) -> PrecedenceEntry {
+pub(super) fn convert_precedence_entry(entry: &RawPrecedenceEntry) -> PrecedenceEntry {
     match entry {
-        PlotnikPrecedenceEntry::STRING { value } => PrecedenceEntry::Name(value.clone()),
-        PlotnikPrecedenceEntry::SYMBOL { name } => PrecedenceEntry::Symbol(name.clone()),
+        RawPrecedenceEntry::STRING { value } => PrecedenceEntry::Name(value.clone()),
+        RawPrecedenceEntry::SYMBOL { name } => PrecedenceEntry::Symbol(name.clone()),
     }
 }
 
 pub(super) fn derive_fields(
     syntax_grammar: &SyntaxGrammar,
     inlines: &InlinedProductionMap,
-    variable_info: &[node_shapes::VariableInfo],
-) -> Vec<FieldSymbol> {
+    variable_info: &[node_shapes::VariableSummary],
+) -> Vec<FieldEntry> {
     let mut field_names = BTreeSet::<String>::new();
     for_each_metadata_production(syntax_grammar, inlines, |production| {
         collect_field_names(production, syntax_grammar, variable_info, &mut field_names);
@@ -294,7 +291,7 @@ pub(super) fn derive_fields(
     field_names
         .into_iter()
         .enumerate()
-        .map(|(index, name)| FieldSymbol {
+        .map(|(index, name)| FieldEntry {
             id: u16::try_from(index + 1).expect("tree-sitter field IDs fit in u16"),
             name,
         })
@@ -304,7 +301,7 @@ pub(super) fn derive_fields(
 fn collect_field_names(
     production: &Production,
     syntax_grammar: &SyntaxGrammar,
-    variable_info: &[node_shapes::VariableInfo],
+    variable_info: &[node_shapes::VariableSummary],
     field_names: &mut BTreeSet<String>,
 ) {
     for step in &production.steps {
@@ -327,7 +324,7 @@ pub(super) fn derive_symbols(
     lexical_grammar: &LexicalGrammar,
     inlines: &InlinedProductionMap,
     default_aliases: &AliasMap,
-) -> Vec<NodeSymbol> {
+) -> Vec<NodeKindEntry> {
     let ctx = GrammarContext {
         syntax: syntax_grammar,
         lexical: lexical_grammar,
@@ -360,9 +357,9 @@ pub(super) fn derive_symbols(
             continue;
         }
 
-        symbols.push(NodeSymbol {
+        symbols.push(NodeKindEntry {
             id: public_id,
-            type_name: public_node_type_name(type_name),
+            type_name: public_node_kind(type_name),
             named: visibility.named,
             visible: visibility.visible,
             supertype: visibility.supertype,
@@ -377,9 +374,9 @@ pub(super) fn derive_symbols(
         .expect("tree-sitter symbol order includes end symbol")
         + 1;
     for (index, alias) in unique_aliases.iter().enumerate() {
-        symbols.push(NodeSymbol {
+        symbols.push(NodeKindEntry {
             id: first_alias_id + u16::try_from(index).expect("tree-sitter alias IDs fit in u16"),
-            type_name: public_node_type_name(&alias.value),
+            type_name: public_node_kind(&alias.value),
             named: alias.is_named,
             visible: true,
             supertype: false,
@@ -394,7 +391,7 @@ pub(super) fn derive_symbols(
     symbols
 }
 
-pub(super) fn public_node_type_name(name: &str) -> String {
+pub(super) fn public_node_kind(name: &str) -> String {
     // Tree-sitter appends private disambiguators after NUL; public node names stop before it.
     name.split(TREE_SITTER_PUBLIC_NAME_SEPARATOR)
         .next()

@@ -26,7 +26,7 @@
 //!   fusing them loses information — that is exactly how aliased non-terminals lost
 //!   their descent link before.
 //! - **Public names are NUL-truncated.** Resolution maps are keyed on
-//!   `public_node_type_name`, so every name is normalized through that exact
+//!   `public_node_kind`, so every name is normalized through that exact
 //!   function before lookup; resolving raw names would drop disambiguated kinds.
 //! - **Classification mirrors `node_shapes`.** Alias folding, visibility, and symbol
 //!   naming reuse the `node_shapes` helpers verbatim, so a step is classified here
@@ -47,9 +47,9 @@
 //!   is built for every grammar even with no consumer yet, and `Grammar` clones
 //!   deep-copy it; both are provisional, to revisit when a consumer lands.
 
-use crate::{NodeFieldId, NodeTypeId};
+use crate::{NodeFieldId, NodeKindId};
 
-use super::lower::public_node_type_name;
+use super::lower::public_node_kind;
 use super::node_shapes::{
     ChildType, GrammarContext, effective_step_alias, symbol_node_metadata,
     variable_type_for_child_type,
@@ -85,13 +85,13 @@ impl VarId {
 /// step the grammar classifies as visible always has at least one set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StepTarget {
-    pub id: Option<NodeTypeId>,
+    pub id: Option<NodeKindId>,
     pub body: Option<VarId>,
 }
 
 /// One production step: the node it matches, and the field it binds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StructStep {
+pub struct SkeletonStep {
     pub target: StepTarget,
     /// Field this step binds to, if any.
     pub field: Option<NodeFieldId>,
@@ -99,7 +99,7 @@ pub struct StructStep {
 
 /// A grammar variable reduced to its productions.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StructVariable {
+pub struct SkeletonVariable {
     /// Public name, kept for diagnostics. Hidden variables have no public id, so
     /// the name is the only stable handle on them.
     pub name: String,
@@ -107,10 +107,10 @@ pub struct StructVariable {
     /// named or anonymous rule, a non-inlined supertype, or a rule tree-sitter
     /// publishes via a named alias (e.g. swift `_expression`). `None` for variables
     /// spliced away without an id of their own.
-    pub id: Option<NodeTypeId>,
+    pub id: Option<NodeKindId>,
     pub kind: VariableType,
     /// One inner `Vec` per production, each an ordered list of steps.
-    pub productions: Vec<Vec<StructStep>>,
+    pub productions: Vec<Vec<SkeletonStep>>,
 }
 
 /// Ordered structural skeleton of every syntax variable in the grammar.
@@ -121,7 +121,7 @@ pub struct StructVariable {
 /// `body` indexes [`StructureTable::variables`].
 #[derive(Clone, Debug, Default)]
 pub struct StructureTable {
-    variables: Vec<StructVariable>,
+    variables: Vec<SkeletonVariable>,
 }
 
 impl StructureTable {
@@ -131,8 +131,8 @@ impl StructureTable {
             .variables
             .iter()
             .map(|variable| {
-                let name = public_node_type_name(&variable.name);
-                StructVariable {
+                let name = public_node_kind(&variable.name);
+                SkeletonVariable {
                     id: resolve_visible_id(&name, variable.kind, grammar),
                     name,
                     kind: variable.kind,
@@ -155,11 +155,11 @@ impl StructureTable {
 
     /// Distilled productions, positionally aligned with the grammar's syntax
     /// variables (non-terminal symbol index).
-    pub fn variables(&self) -> &[StructVariable] {
+    pub fn variables(&self) -> &[SkeletonVariable] {
         &self.variables
     }
 
-    pub fn variable(&self, id: VarId) -> Option<&StructVariable> {
+    pub fn variable(&self, id: VarId) -> Option<&SkeletonVariable> {
         self.variables.get(id.index())
     }
 }
@@ -168,7 +168,7 @@ fn resolve_visible_id(
     public_name: &str,
     kind: VariableType,
     grammar: &Grammar,
-) -> Option<NodeTypeId> {
+) -> Option<NodeKindId> {
     match kind {
         VariableType::Named => grammar.resolve_named_node(public_name),
         VariableType::Anonymous => grammar.resolve_anonymous_node(public_name),
@@ -181,7 +181,7 @@ fn resolve_visible_id(
     }
 }
 
-fn classify_step(step: &ProductionStep, ctx: GrammarContext<'_>, grammar: &Grammar) -> StructStep {
+fn classify_step(step: &ProductionStep, ctx: GrammarContext<'_>, grammar: &Grammar) -> SkeletonStep {
     // Fold the step's own alias and the grammar's default alias into one effective
     // child type, exactly as node-shape derivation does, so a default-aliased step
     // resolves to the same public kind here and there.
@@ -202,7 +202,7 @@ fn classify_step(step: &ProductionStep, ctx: GrammarContext<'_>, grammar: &Gramm
                 variable_type == VariableType::Named,
             ),
         };
-        let public = public_node_type_name(name);
+        let public = public_node_kind(name);
         if named {
             grammar.resolve_named_node(&public)
         } else {
@@ -230,7 +230,7 @@ fn classify_step(step: &ProductionStep, ctx: GrammarContext<'_>, grammar: &Gramm
         step.symbol.index
     );
 
-    StructStep {
+    SkeletonStep {
         target: StepTarget { id, body },
         field: step
             .field_name

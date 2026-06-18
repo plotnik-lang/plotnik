@@ -92,7 +92,7 @@ impl RegexTableBuilder {
         Ok(())
     }
 
-    pub fn get(&self, string_id: StringId) -> Option<u16> {
+    pub fn lookup(&self, string_id: StringId) -> Option<u16> {
         self.lookup.get(&string_id).copied()
     }
 
@@ -112,7 +112,7 @@ impl RegexTableBuilder {
 
             let (string_id, offset) = if let Some(e) = entry {
                 blob.extend_from_slice(&e.dfa_bytes);
-                (e.string_id.get(), (blob.len() - e.dfa_bytes.len()) as u32)
+                (e.string_id.as_u16(), (blob.len() - e.dfa_bytes.len()) as u32)
             } else {
                 (0, 0)
             };

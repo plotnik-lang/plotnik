@@ -8,7 +8,7 @@ error: unexpected token
   |
 help: expected a child node, or `)` to close
 
-error: node types must be parenthesized
+error: node kinds must be parenthesized
  --> query.ptk:1:19
   |
 1 | Q = (expression / binary_expression)

@@ -11,4 +11,4 @@ help: use `First`
 1 - [first: (a) Second: (b)]
 1 + [First: (a) Second: (b)]
   |
-help: branch labels become variants of a tagged union in the output
+help: branch labels become variants of an enum in the output

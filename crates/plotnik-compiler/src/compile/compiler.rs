@@ -3,13 +3,13 @@
 use std::cell::RefCell;
 
 use indexmap::IndexMap;
-use plotnik_core::{Interner, NodeFieldId, NodeType, NodeTypeId, Symbol};
+use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
 use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::emit::StringTableBuilder;
-use crate::parser::Expr;
+use crate::parser::Pattern;
 use plotnik_bytecode::Nav;
 
 use super::capture::ExprCtx;
@@ -30,8 +30,8 @@ pub struct CompileCtx<'a> {
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
     pub strings: &'a RefCell<StringTableBuilder>,
-    pub node_types: &'a IndexMap<NodeType<Symbol>, NodeTypeId>,
-    pub node_fields: &'a IndexMap<Symbol, NodeFieldId>,
+    pub target_node_kinds: &'a IndexMap<NodeKind<Symbol>, NodeKindId>,
+    pub target_node_fields: &'a IndexMap<Symbol, NodeFieldId>,
 }
 
 /// Compiler state for Thompson construction.
@@ -56,7 +56,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
+    pub fn build_ir(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
         let mut compiler = Compiler::new(ctx);
 
         // Emit universal preamble first: Obj -> Trampoline -> EndObj -> Return
@@ -119,7 +119,7 @@ impl<'a> Compiler<'a> {
         let name_sym = self.ctx.type_ctx.def_name_sym(def_id);
         let name = self.ctx.interner.resolve(name_sym);
 
-        let Some(body) = self.ctx.symbol_table.get(name) else {
+        let Some(body) = self.ctx.symbol_table.body(name) else {
             return Err(CompileError::DefinitionNotFound(name.to_string()));
         };
 
@@ -138,12 +138,12 @@ impl<'a> Compiler<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Obj/EndObj wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
-        let body_entry = if let Some(type_id) = self.ctx.type_ctx.get_def_type(def_id) {
+        let body_entry = if let Some(type_id) = self.ctx.type_ctx.def_type(def_id) {
             self.with_scope(type_id, |this| {
-                this.compile_expr_with_nav(body, return_label, body_nav)
+                this.compile_pattern(body, return_label, body_nav)
             })
         } else {
-            self.compile_expr_with_nav(body, return_label, body_nav)
+            self.compile_pattern(body, return_label, body_nav)
         };
 
         if body_entry != entry_label {
@@ -153,13 +153,13 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    pub(super) fn compile_expr_with_nav(
+    pub(super) fn compile_pattern(
         &mut self,
-        expr: &Expr,
+        pattern: &Pattern,
         exit: Label,
         nav_override: Option<Nav>,
     ) -> Label {
-        self.compile_expr_inner(expr, ExprCtx::with_nav(exit, nav_override))
+        self.dispatch_pattern(pattern, ExprCtx::with_nav(exit, nav_override))
     }
 
     /// Compile an expression with navigation override and capture effects.
@@ -169,19 +169,19 @@ impl<'a> Compiler<'a> {
     /// - Sequences: effects go on last item
     /// - Alternations: effects go on each branch
     /// - Other wrappers: effects propagate through
-    pub(super) fn compile_expr_inner(&mut self, expr: &Expr, ctx: ExprCtx) -> Label {
-        match expr {
-            Expr::NamedNode(n) => self.compile_named_node_inner(n, ctx),
-            Expr::AnonymousNode(n) => self.compile_anonymous_node_inner(n, ctx),
-            Expr::SeqExpr(s) => self.compile_seq_inner(s, ctx),
-            Expr::AltExpr(a) => self.compile_alt_inner(a, ctx),
-            Expr::CapturedExpr(c) => {
+    pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: ExprCtx) -> Label {
+        match pattern {
+            Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
+            Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
+            Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
+            Pattern::AltPattern(a) => self.compile_alt(a, ctx),
+            Pattern::CapturedPattern(c) => {
                 let ExprCtx { exit, nav, capture } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
             }
-            Expr::QuantifiedExpr(q) => self.compile_quantified_inner(q, ctx),
-            Expr::FieldExpr(f) => self.compile_field_inner(f, ctx),
-            Expr::Ref(r) => self.compile_ref_inner(r, ctx, None),
+            Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),
+            Pattern::FieldPattern(f) => self.compile_field(f, ctx),
+            Pattern::Ref(r) => self.compile_ref(r, ctx, None),
         }
     }
 }

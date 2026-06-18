@@ -6,13 +6,13 @@ use crate::parser::Branch;
 
 #[inline]
 pub fn ensure_both_branch_kinds<'a>(
-    first_tagged: Option<&'a Branch>,
-    first_untagged: Option<&'a Branch>,
+    first_enum: Option<&'a Branch>,
+    first_union: Option<&'a Branch>,
 ) -> (&'a Branch, &'a Branch) {
-    match (first_tagged, first_untagged) {
+    match (first_enum, first_union) {
         (Some(t), Some(u)) => (t, u),
         _ => panic!(
-            "alt_kind: Mixed alternation without both tagged and untagged branches \
+            "alt_kind: Mixed alternation without both enum and union branches \
              (should be caught by AltKind::compute_kind)"
         ),
     }

@@ -1,18 +1,19 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use plotnik_bytecode::{EffectOpcode, Nav};
+use plotnik_bytecode::{EffectKind, Nav};
 
 use super::ir::{
-    CallIR, EffectIR, EmitContext, InstructionIR, Label, MatchIR, MemberRef, NodeTypeIR, ReturnIR,
+    CallIR, EffectIR, EmitResolvers, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
+    ReturnIR,
 };
 use crate::analyze::type_check::TypeId;
 
 #[test]
 fn match_ir_size_match8() {
-    let m = MatchIR::at(Label(0))
+    let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
+        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10)))
         .next(Label(1));
 
     assert_eq!(m.size(), 8);
@@ -20,9 +21,9 @@ fn match_ir_size_match8() {
 
 #[test]
 fn match_ir_size_extended() {
-    let m = MatchIR::at(Label(0))
+    let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_type(NodeTypeIR::Named(NonZeroU16::new(10)))
+        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10)))
         .pre_effect(EffectIR::start_obj())
         .post_effect(EffectIR::node())
         .next(Label(1));
@@ -33,8 +34,8 @@ fn match_ir_size_extended() {
 
 #[test]
 fn instruction_successors() {
-    let m: InstructionIR = MatchIR::at(Label(0))
-        .next_many(vec![Label(1), Label(2)])
+    let m: InstructionIR = MatchIR::terminal(Label(0))
+        .successors(vec![Label(1), Label(2)])
         .into();
 
     assert_eq!(m.successors(), vec![Label(1), Label(2)]);
@@ -58,7 +59,7 @@ fn resolve_match_terminal() {
     let mut map = BTreeMap::new();
     map.insert(Label(0), 1u16);
 
-    let ctx = EmitContext::new(&|_| None, &|_| None);
+    let ctx = EmitResolvers::new(&|_| None, &|_| None);
     let bytes = m.resolve(&map, &ctx).expect("terminal match encodes");
     assert_eq!(bytes.len(), 8);
 
@@ -72,7 +73,7 @@ fn member_ref_resolution() {
 
     let member = MemberRef::new(parent_type, 3);
     let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
-    let ctx = EmitContext::new(&get_member_base, &|_| None);
+    let ctx = EmitResolvers::new(&get_member_base, &|_| None);
     assert_eq!(member.resolve(&ctx), 53); // base 50 + relative 3
 }
 
@@ -80,16 +81,16 @@ fn member_ref_resolution() {
 fn effect_ir_resolution() {
     let parent_type = TypeId(10);
 
-    let simple = EffectIR::simple(EffectOpcode::Node, 5);
-    let simple_ctx = EmitContext::new(&|_| None, &|_| None);
+    let simple = EffectIR::literal(EffectKind::Node, 5);
+    let simple_ctx = EmitResolvers::new(&|_| None, &|_| None);
     let resolved = simple.resolve(&simple_ctx);
-    assert_eq!(resolved.opcode, EffectOpcode::Node);
+    assert_eq!(resolved.kind, EffectKind::Node);
     assert_eq!(resolved.payload, 5);
 
-    let set_effect = EffectIR::with_member(EffectOpcode::Set, MemberRef::new(parent_type, 1));
+    let set_effect = EffectIR::with_member(EffectKind::Set, MemberRef::new(parent_type, 1));
     let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
-    let set_ctx = EmitContext::new(&get_member_base, &|_| None);
+    let set_ctx = EmitResolvers::new(&get_member_base, &|_| None);
     let resolved = set_effect.resolve(&set_ctx);
-    assert_eq!(resolved.opcode, EffectOpcode::Set);
+    assert_eq!(resolved.kind, EffectKind::Set);
     assert_eq!(resolved.payload, 51); // base 50 + relative 1
 }

@@ -12,7 +12,7 @@ help: remove the `|`
 1 + (a  b)
   |
 
-error: node types must be parenthesized
+error: node kinds must be parenthesized
  --> query.ptk:1:6
   |
 1 | (a | b)

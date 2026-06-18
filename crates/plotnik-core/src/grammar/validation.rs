@@ -14,8 +14,6 @@ use super::{
     rules::{Precedence, Rule},
 };
 
-pub type ValidatePrecedenceResult<T> = Result<T, ValidatePrecedenceError>;
-
 #[derive(Debug, Error, Serialize, Deserialize)]
 #[error(transparent)]
 pub enum ValidatePrecedenceError {
@@ -81,7 +79,7 @@ pub(super) fn validate_indirect_recursion(
     let mut epsilon_transitions: IndexMap<&str, BTreeSet<String>> = IndexMap::new();
 
     for variable in variables {
-        let productions = get_single_symbol_productions(&variable.rule);
+        let productions = single_symbol_productions(&variable.rule);
         // Filter out rules that *directly* reference themselves, as this doesn't
         // cause a parsing loop.
         let filtered: BTreeSet<String> = productions
@@ -95,7 +93,7 @@ pub(super) fn validate_indirect_recursion(
         let mut visited = BTreeSet::new();
         let mut path = Vec::new();
         if let Some((start_idx, end_idx)) =
-            get_cycle(start_symbol, &epsilon_transitions, &mut visited, &mut path)
+            find_cycle(start_symbol, &epsilon_transitions, &mut visited, &mut path)
         {
             let cycle_symbols = path[start_idx..=end_idx]
                 .iter()
@@ -108,19 +106,19 @@ pub(super) fn validate_indirect_recursion(
     Ok(())
 }
 
-fn get_single_symbol_productions(rule: &Rule) -> BTreeSet<String> {
+fn single_symbol_productions(rule: &Rule) -> BTreeSet<String> {
     match rule {
         Rule::NamedSymbol(name) => BTreeSet::from([name.clone()]),
         Rule::Choice(choices) => choices
             .iter()
-            .flat_map(get_single_symbol_productions)
+            .flat_map(single_symbol_productions)
             .collect(),
-        Rule::Metadata { rule, .. } => get_single_symbol_productions(rule),
+        Rule::Metadata { rule, .. } => single_symbol_productions(rule),
         _ => BTreeSet::new(),
     }
 }
 
-fn get_cycle<'a>(
+fn find_cycle<'a>(
     current: &'a str,
     transitions: &'a IndexMap<&'a str, BTreeSet<String>>,
     visited: &mut BTreeSet<&'a str>,
@@ -140,7 +138,7 @@ fn get_cycle<'a>(
 
     if let Some(next_symbols) = transitions.get(current) {
         for next in next_symbols {
-            if let Some(cycle) = get_cycle(next, transitions, visited, path) {
+            if let Some(cycle) = find_cycle(next, transitions, visited, path) {
                 return Some(cycle);
             }
         }
@@ -153,7 +151,7 @@ fn get_cycle<'a>(
 pub(super) fn validate_precedences(
     variables: &[Variable],
     precedence_orderings: &[Vec<PrecedenceEntry>],
-) -> ValidatePrecedenceResult<()> {
+) -> Result<(), ValidatePrecedenceError> {
     validate_conflicting_precedence_orderings(precedence_orderings)?;
     validate_declared_precedences(variables, precedence_orderings)?;
     Ok(())
@@ -163,7 +161,7 @@ pub(super) fn validate_precedences(
 // in some list, then it cannot come *after* `b` in any list.
 fn validate_conflicting_precedence_orderings(
     precedence_orderings: &[Vec<PrecedenceEntry>],
-) -> ValidatePrecedenceResult<()> {
+) -> Result<(), ValidatePrecedenceError> {
     let mut pairs = FxHashMap::default();
     for list in precedence_orderings {
         for (i, mut entry1) in list.iter().enumerate() {
@@ -202,7 +200,7 @@ fn validate_conflicting_precedence_orderings(
 fn validate_declared_precedences(
     variables: &[Variable],
     precedence_orderings: &[Vec<PrecedenceEntry>],
-) -> ValidatePrecedenceResult<()> {
+) -> Result<(), ValidatePrecedenceError> {
     let precedence_names = precedence_orderings
         .iter()
         .flat_map(|l| l.iter())
@@ -226,7 +224,7 @@ fn validate_declared_precedences_in_rule(
     rule_name: &str,
     rule: &Rule,
     names: &FxHashSet<&String>,
-) -> ValidatePrecedenceResult<()> {
+) -> Result<(), ValidatePrecedenceError> {
     match rule {
         Rule::Repeat(rule) => validate_declared_precedences_in_rule(rule_name, rule, names),
         Rule::Seq(elements) | Rule::Choice(elements) => elements

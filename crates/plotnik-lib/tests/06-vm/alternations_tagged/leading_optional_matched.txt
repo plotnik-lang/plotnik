@@ -38,9 +38,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -57,9 +57,9 @@ Q:
   21  ─‣─  _                                20, 21
   23  ...  
   24   !   _                                20, 21
-  26  -ε-  [Enum(M2)]                       24, 13
+  26  -ε-  [EnumOpen(M2)]                   24, 13
   28  ─‣─  _                                26, 28
-  30  ─‣┘  [EndEnum] _                      10
+  30  ─‣┘  [EnumClose] _                    10
 ==== types ====
 export interface QTag {
   $tag: "Tag";
@@ -69,7 +69,7 @@ export interface QTag {
 export type Q = QTag;
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -78,7 +78,7 @@ Q:
        ●   program
   08       _                                26, 28
        ●   comment
-  26  -ε-  [Enum(M2)]                       24, 13
+  26  -ε-  [EnumOpen(M2)]                   24, 13
   24       _                                20, 21
        ●   comment
   20       (comment)                        18
@@ -87,12 +87,12 @@ Q:
        ●   expression_statement
   16       (expression_statement) [Node Set(M1)]  30
        ●   expression_statement
-  30       [EndEnum] _                      10
+  30       [EnumClose] _                    10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"$tag":"Tag","$data":{"a":{"kind":"expression_statement","text":"a;","span":[8, 10]},"b":{"kind":"expression_statement","text":"b;","span":[11, 13]}}}

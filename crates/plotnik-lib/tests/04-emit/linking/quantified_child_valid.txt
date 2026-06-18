@@ -27,18 +27,18 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
   06   !   (statement_block) [Node Set(M0)]  08
-  08  └‣─  [Arr] _                          11, 13
+  08  └‣─  [ArrayOpen] _                    11, 13
   10                                        ▶
   11   !   (function_declaration) [Node Push]  18, 20
   13  ─‣─  _                                11, 13
   15  ...  
   16  ─‣─  _                                11, 16
   18  ─‣─  _                                11, 16
-  20  ─‣┘  [EndArr Set(M1)] _               10
+  20  ─‣┘  [ArrayClose Set(M1)] _           10

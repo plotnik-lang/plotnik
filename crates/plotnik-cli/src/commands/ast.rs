@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::QueryBuilder;
 
-use super::lang_resolver::merge_lang;
-use super::query_loader::load_query_source;
+use super::lang_resolver::reconcile_lang;
+use super::query_loader::load_query;
 use super::run_common;
 use crate::error::{CliError, CliResult};
 
@@ -51,14 +51,14 @@ pub fn run(args: AstArgs) -> CliResult {
 
 /// Prints the query AST; returns the shebang-declared language, if any.
 fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
-    let loaded = load_query_source(args.query_path.as_deref(), args.query_text.as_deref())?;
+    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
 
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
     // Enforce -l/shebang agreement even when no source AST follows
-    merge_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
+    reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
 
     let query = QueryBuilder::new(loaded.sources)
         .parse()
@@ -74,7 +74,7 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
         );
     }
 
-    let output = query.printer().raw(args.raw).with_trivia(args.raw).dump();
+    let output = query.printer().cst(args.raw).with_trivia(args.raw).dump();
     print!("{}", output);
 
     Ok(loaded.shebang.lang)
@@ -86,12 +86,12 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
         args.source_path.as_deref(),
         args.query_path.as_deref(),
     )?;
-    let lang = run_common::resolve_lang(
+    let lang = run_common::resolve_run_lang(
         args.lang.as_deref(),
         declared_lang,
         args.source_path.as_deref(),
     )?;
-    let tree = lang.parse(&source);
+    let tree = lang.parse_source(&source);
     print!("{}", dump_tree(&tree, &source, args.raw));
 
     Ok(())

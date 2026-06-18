@@ -6,8 +6,8 @@
 //! Transitions
 
 use super::entrypoint::Entrypoint;
-use super::sections::{FieldSymbol, NodeSymbol};
-use super::type_meta::{TypeDef, TypeMember, TypeName};
+use super::sections::{FieldEntry, NodeKindEntry};
+use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
     HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
     VERSION,
@@ -183,11 +183,11 @@ impl Header {
         bytes
     }
 
-    pub fn validate_magic(&self) -> bool {
+    pub fn has_valid_magic(&self) -> bool {
         self.magic == MAGIC
     }
 
-    pub fn validate_version(&self) -> bool {
+    pub fn is_supported_version(&self) -> bool {
         self.version == VERSION
     }
 
@@ -207,11 +207,11 @@ impl Header {
             self.regex_blob_size as u64,
             (self.str_table_count as u64 + 1) * STRING_TABLE_ENTRY_SIZE as u64,
             (self.regex_table_count as u64 + 1) * REGEX_TABLE_ENTRY_SIZE as u64,
-            self.node_types_count as u64 * NodeSymbol::SIZE as u64,
-            self.node_fields_count as u64 * FieldSymbol::SIZE as u64,
+            self.node_types_count as u64 * NodeKindEntry::SIZE as u64,
+            self.node_fields_count as u64 * FieldEntry::SIZE as u64,
             self.type_defs_count as u64 * TypeDef::SIZE as u64,
             self.type_members_count as u64 * TypeMember::SIZE as u64,
-            self.type_names_count as u64 * TypeName::SIZE as u64,
+            self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
             self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
             self.transitions_count as u64 * STEP_SIZE as u64,
         ]

@@ -14,7 +14,7 @@ help: use `Left`
 2 -   left: (a)
 2 +   Left: (a)
   |
-help: branch labels become variants of a tagged union in the output
+help: branch labels become variants of an enum in the output
 
 error: branch labels must be PascalCase
  --> query.ptk:3:3
@@ -27,4 +27,4 @@ help: use `Right`
 3 -   right: (b)
 3 +   Right: (b)
   |
-help: branch labels become variants of a tagged union in the output
+help: branch labels become variants of an enum in the output

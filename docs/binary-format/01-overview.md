@@ -16,7 +16,7 @@
 | `StepId` (u16)      | 8-byte step index in Transitions |
 | `StringId` (u16)    | String Table index               |
 | `TypeId` (u16)      | Type Definition index            |
-| `NodeTypeId` (u16)  | Tree-sitter node type ID         |
+| `NodeKindId` (u16)  | Tree-sitter node kind ID         |
 | `NodeFieldId` (u16) | Tree-sitter field ID             |
 | `RegexId` (u16)     | Regex Table index                |
 
@@ -125,7 +125,7 @@ Validation, in order:
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
 9. **Transitions** — the instruction stream is walked twice. Pass 1 decodes each
    instruction's fixed-size slot, validating opcode, segment, nav, node kind,
-   effect opcodes, `Set`/`Enum` member operands, and predicate operands, and
+   effect opcodes, `Set`/`EnumOpen` member operands, and predicate operands, and
    rejecting any zero successor; it records each instruction start and must tile
    the section exactly. Pass 2 requires every jump target (successor, call
    next/target, trampoline next) to land on a recorded instruction start. This
@@ -136,7 +136,7 @@ Validation, in order:
     address a real TypeDef.
 11. **Effect stack** — an interprocedural walk of the committed-effect order
     (across `Call`/`Return`/`Trampoline`, under the suppression filter) proves no
-    path can drive the materializer's builder stack (`Push`/`Set`/`EndArr`/
-    `EndObj`/`EndEnum`) or the VM's suppression counter into a panic. This closes
+    path can drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
+    `ObjectClose`/`EnumClose`) or the VM's suppression counter into a panic. This closes
     the last forged-module panic class — the materializer's builder-stack panics
     and the VM's `SuppressEnd` underflow — that decode-level checks cannot see.

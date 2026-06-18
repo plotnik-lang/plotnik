@@ -35,9 +35,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -48,12 +48,12 @@ Q:
   11   !   (variable_declarator) [Node Push]  20, 22
   13  ─‣─  _                                11, 13
   15  ─‣┘  _                                10
-  16  └‣─  [Arr] _                          11, 13
+  16  └‣─  [ArrayOpen] _                    11, 13
   18  ─‣─  _                                11, 18
   20  ─‣─  _                                11, 18
-  22  ─‣┘  [EndArr Set(M0)] _               15
+  22  ─‣┘  [ArrayClose Set(M0)] _           15
   24   !   [Null Set(M1)] (lexical_declaration)  16
-  26   !   [Arr EndArr Set(M0)] (expression_statement) [Node Set(M1)]  15
+  26   !   [ArrayOpen ArrayClose Set(M0)] (expression_statement) [Node Set(M1)]  15
   29  ─‣─  _                                24, 26, 29
 ==== types ====
 export interface Q {
@@ -62,7 +62,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -74,14 +74,14 @@ Q:
   24       [Null Set(M1)] (lexical_declaration)  16
        ○   expression_statement
   08  ❮❮❮ 
-  26       [Arr EndArr Set(M0)] (expression_statement) [Node Set(M1)]  15
+  26       [ArrayOpen ArrayClose Set(M0)] (expression_statement) [Node Set(M1)]  15
        ●   expression_statement
   15       _                                10
        ●   program
   10   ◀   (Q)                              
 
 _ObjWrap:
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05   ◀   _ObjWrap                         ◼
 ==== output ====
 {"vs":[],"s":{"kind":"expression_statement","text":"foo;","span":[0, 4]}}

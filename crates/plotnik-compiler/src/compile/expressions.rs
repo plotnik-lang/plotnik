@@ -3,19 +3,19 @@
 //! Handles compilation of:
 //! - Named nodes: `(identifier)`, `(call_expression ...)`
 //! - Anonymous nodes: `"+"`, `_`
-//! - References: `(Expr)` (calls to other definitions)
+//! - References: `(Pattern)` (calls to other definitions)
 //! - Field constraints: `name: pattern`
 //! - Captured expressions: `@name`, `pattern @name`
 
 use std::num::NonZeroU16;
 
 use crate::analyze::type_check::TypeShape;
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeTypeIR, PredicateIR};
-use crate::parser::ast::{self, Expr};
+use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR};
+use crate::parser::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
-use plotnik_core::NodeType;
+use plotnik_core::NodeKind;
 
-use crate::analyze::type_check::{CaptureMechanism, capture_mechanism};
+use crate::analyze::type_check::{CaptureKind, capture_kind};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -24,9 +24,9 @@ use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 impl Compiler<'_> {
-    pub(super) fn compile_named_node_inner(
+    pub(super) fn compile_node_pattern(
         &mut self,
-        node: &ast::NamedNode,
+        node: &ast::NodePattern,
         ctx: ExprCtx,
     ) -> Label {
         let ExprCtx {
@@ -35,7 +35,7 @@ impl Compiler<'_> {
             capture,
         } = ctx;
         let entry = self.fresh_label();
-        let node_type = self.resolve_node_type(node);
+        let node_kind = self.resolve_node_kind(node);
         let nav = nav_override.unwrap_or(Nav::Stay);
 
         let items: Vec<_> = node.items().collect();
@@ -45,7 +45,7 @@ impl Compiler<'_> {
         if items.is_empty() {
             let mut m = MatchIR::epsilon(entry, exit)
                 .nav(nav)
-                .node_type(node_type)
+                .node_kind(node_kind)
                 .neg_fields(neg_fields)
                 .pre_effects(capture.pre)
                 .post_effects(capture.post);
@@ -60,7 +60,7 @@ impl Compiler<'_> {
 
         // Emit Up instruction with appropriate strictness. A trailing anchor only
         // changes this ascent into a lastness check (`Up*`); the body itself
-        // compiles like any node body, with `compile_seq_items_inner` keeping the
+        // compiles like any node body, with `compile_seq_items` keeping the
         // last item's child search resumable so a lastness failure can retry.
         let up_nav = if has_trailing_anchor {
             trailing_nav.unwrap_or(Nav::UpSkipTrivia(1))
@@ -72,16 +72,16 @@ impl Compiler<'_> {
         // right after match), other effects go on final_exit (after children processing).
         // Node capture effects use matched_node which is only valid immediately after the match,
         // before descending into children (which may clobber matched_node via backtracking).
-        use plotnik_bytecode::EffectOpcode;
+        use plotnik_bytecode::EffectKind;
 
         let mut entry_effects = Vec::new();
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
-            if eff.opcode() == EffectOpcode::Node {
+            if eff.kind() == EffectKind::Node {
                 entry_effects.push(eff);
                 // Node is always paired with a following Set
-                if iter.peek().is_some_and(|e| e.opcode() == EffectOpcode::Set) {
+                if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
                     entry_effects.push(
                         iter.next()
                             .expect("peek confirmed the iterator has a next element"),
@@ -96,7 +96,7 @@ impl Compiler<'_> {
         let final_exit = self.emit_post_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
-        let items_entry = self.compile_seq_items_inner(SeqItemsCtx {
+        let items_entry = self.compile_seq_items(SeqItemsCtx {
             items: &items,
             exit: up_label,
             is_inside_node: true,
@@ -110,7 +110,7 @@ impl Compiler<'_> {
 
         let mut entry_match = MatchIR::epsilon(entry, items_entry)
             .nav(nav)
-            .node_type(node_type)
+            .node_kind(node_kind)
             .neg_fields(neg_fields)
             .pre_effects(capture.pre)
             .post_effects(entry_effects);
@@ -132,9 +132,9 @@ impl Compiler<'_> {
         }
     }
 
-    pub(super) fn compile_anonymous_node_inner(
+    pub(super) fn compile_token_pattern(
         &mut self,
-        node: &ast::AnonymousNode,
+        node: &ast::TokenPattern,
         ctx: ExprCtx,
     ) -> Label {
         let ExprCtx {
@@ -145,15 +145,15 @@ impl Compiler<'_> {
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
 
-        let node_type = match node.value() {
-            Some(token) => self.resolve_anonymous_node_type(token.text()),
-            None => NodeTypeIR::Any, // `_` wildcard matches any node
+        let node_kind = match node.value() {
+            Some(token) => self.resolve_anonymous_node_kind(token.text()),
+            None => NodeKindConstraint::Any, // `_` wildcard matches any node
         };
 
         self.emit_match(
             MatchIR::epsilon(entry, exit)
                 .nav(nav)
-                .node_type(node_type)
+                .node_kind(node_kind)
                 .pre_effects(capture.pre)
                 .post_effects(capture.post),
         );
@@ -169,7 +169,7 @@ impl Compiler<'_> {
     /// - Captured ref returning struct: `Obj → Call → EndObj → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
     /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
-    pub(super) fn compile_ref_inner(
+    pub(super) fn compile_ref(
         &mut self,
         r: &ast::Ref,
         ctx: ExprCtx,
@@ -185,7 +185,7 @@ impl Compiler<'_> {
         };
         let name = name_token.text();
 
-        let Some(def_id) = self.ctx.type_ctx.get_def_id(self.ctx.interner, name) else {
+        let Some(def_id) = self.ctx.type_ctx.def_id_for_name(self.ctx.interner, name) else {
             return exit;
         };
 
@@ -193,20 +193,20 @@ impl Compiler<'_> {
             return exit;
         };
 
-        let def_type_id = self.ctx.type_ctx.get_def_type(def_id);
+        let def_type_id = self.ctx.type_ctx.def_type(def_id);
         let ref_returns_struct = def_type_id
-            .and_then(|tid| self.ctx.type_ctx.get_type(tid))
+            .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
 
         let is_captured = !capture.post.is_empty();
         let needs_scope = is_captured && ref_returns_struct;
 
         // An uncaptured recursive reference is opaque: inference types it Void, so
-        // its captures must not bubble into the parent scope. Tagged-union recursion
+        // its captures must not bubble into the parent scope. Enum recursion
         // is the exception — inference forwards its enum value — so only the rest is
         // suppressed.
         let ref_returns_enum = def_type_id
-            .and_then(|tid| self.ctx.type_ctx.get_type(tid))
+            .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
         let suppress_opaque_recursion =
             !is_captured && self.ctx.type_ctx.is_recursive(def_id) && !ref_returns_enum;
@@ -247,11 +247,11 @@ impl Compiler<'_> {
             return call_entry;
         }
 
-        // Wrap with pre-effects epsilon (e.g., Enum for tagged alternations)
+        // Wrap with pre-effects epsilon (e.g., Enum for enum alternations)
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    pub(super) fn compile_field_inner(&mut self, field: &ast::FieldExpr, ctx: ExprCtx) -> Label {
+    pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
             exit,
             nav: nav_override,
@@ -263,8 +263,8 @@ impl Compiler<'_> {
 
         let node_field = self.resolve_field(field);
 
-        if let Expr::Ref(r) = &value {
-            return self.compile_ref_inner(
+        if let Pattern::Ref(r) = &value {
+            return self.compile_ref(
                 r,
                 ExprCtx {
                     exit,
@@ -281,11 +281,11 @@ impl Compiler<'_> {
         let needs_wrapper = node_field.is_some()
             && matches!(
                 &value,
-                Expr::AltExpr(_) | Expr::SeqExpr(_) | Expr::QuantifiedExpr(_)
+                Pattern::AltPattern(_) | Pattern::SeqPattern(_) | Pattern::QuantifiedPattern(_)
             );
 
         if needs_wrapper {
-            let value_entry = self.compile_expr_inner(
+            let value_entry = self.dispatch_pattern(
                 &value,
                 ExprCtx {
                     exit,
@@ -304,7 +304,7 @@ impl Compiler<'_> {
             return entry;
         }
 
-        let value_entry = self.compile_expr_inner(
+        let value_entry = self.dispatch_pattern(
             &value,
             ExprCtx {
                 exit,
@@ -344,7 +344,7 @@ impl Compiler<'_> {
     /// emit always match the declared type.
     ///
     /// `exits` selects single- or split-exit lowering (see [`CaptureExits`]). The
-    /// ordinary capture path ([`compile_expr_inner`](Self::compile_expr_inner)) and
+    /// ordinary capture path ([`dispatch_pattern`](Self::dispatch_pattern)) and
     /// the navigating-first-child skippable path
     /// ([`compile_skippable_with_exits`](Self::compile_skippable_with_exits)) both
     /// route here, so a mechanism can never be handled by one and dropped by the
@@ -358,8 +358,8 @@ impl Compiler<'_> {
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
         &mut self,
-        cap: &ast::CapturedExpr,
-        inner_opt: Option<Expr>,
+        cap: &ast::CapturedPattern,
+        inner_opt: Option<Pattern>,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
         exits: CaptureExits,
@@ -380,7 +380,7 @@ impl Compiler<'_> {
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt
             .as_ref()
-            .map(|inner| capture_mechanism(inner, self.ctx.type_ctx, self.ctx.interner));
+            .map(|inner| capture_kind(inner, self.ctx.type_ctx, self.ctx.interner));
 
         let capture_effects = self.build_capture_effects(cap, mechanism);
 
@@ -390,7 +390,7 @@ impl Compiler<'_> {
 
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureMechanism::Array => self.compile_array_capture(
+            CaptureKind::Array => self.compile_array_capture(
                 CaptureRequest {
                     inner: &inner,
                     nav: nav_override,
@@ -403,7 +403,7 @@ impl Compiler<'_> {
             // Struct scope: Obj → inner → EndObj+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureMechanism::StructScope => self.compile_struct_capture(
+            CaptureKind::StructScope => self.compile_struct_capture(
                 CaptureRequest {
                     inner: &inner,
                     nav: nav_override,
@@ -419,9 +419,9 @@ impl Compiler<'_> {
             // split; that context always enters with empty `pre`, so the per-mechanism
             // single-exit handling (SetAfter's trailing Set, Node's bubble) is
             // unnecessary there.
-            mechanism @ (CaptureMechanism::Node
-            | CaptureMechanism::Ref
-            | CaptureMechanism::SetAfter) => match exits {
+            mechanism @ (CaptureKind::Node
+            | CaptureKind::Ref
+            | CaptureKind::SetAfter) => match exits {
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -445,10 +445,10 @@ impl Compiler<'_> {
                         outer_capture,
                     };
                     match mechanism {
-                        CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
-                        CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
-                        CaptureMechanism::Node => self.compile_node_capture(req, exit),
-                        CaptureMechanism::Array | CaptureMechanism::StructScope => {
+                        CaptureKind::SetAfter => self.compile_setafter_capture(req, exit),
+                        CaptureKind::Ref => self.compile_ref_capture(req, exit),
+                        CaptureKind::Node => self.compile_node_capture(req, exit),
+                        CaptureKind::Array | CaptureKind::StructScope => {
                             unreachable!("scope mechanisms are handled above in compile_captured")
                         }
                     }
@@ -458,7 +458,7 @@ impl Compiler<'_> {
     }
 
     /// Single-exit lowering for a `SetAfter` capture: the inner leaves the value
-    /// pending (tagged alternation or a named node forwarding a structured child).
+    /// pending (enum alternation or a named node forwarding a structured child).
     fn compile_setafter_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
         let CaptureRequest {
             inner,
@@ -470,7 +470,7 @@ impl Compiler<'_> {
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
         let inner_entry =
-            self.compile_expr_inner(inner, ExprCtx::with_nav(set_step, nav_override));
+            self.dispatch_pattern(inner, ExprCtx::with_nav(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
@@ -488,7 +488,7 @@ impl Compiler<'_> {
             outer_capture,
         } = req;
         let combined = outer_capture.with_post_values(capture_effects);
-        self.compile_expr_inner(
+        self.dispatch_pattern(
             inner,
             ExprCtx {
                 exit,
@@ -510,8 +510,8 @@ impl Compiler<'_> {
         let inner_is_bubble = self
             .ctx
             .type_ctx
-            .get_term_info(inner)
-            .is_some_and(|info| info.flow.is_bubble());
+            .term_info(inner)
+            .is_some_and(|info| info.flow.has_fields());
         if inner_is_bubble {
             return self.compile_bubble_with_node_capture(
                 inner,
@@ -523,7 +523,7 @@ impl Compiler<'_> {
             );
         }
         let combined = outer_capture.with_post_values(capture_effects);
-        self.compile_expr_inner(
+        self.dispatch_pattern(
             inner,
             ExprCtx {
                 exit,
@@ -539,12 +539,12 @@ impl Compiler<'_> {
     /// discards it at runtime, matching the `void` the type system infers.
     ///
     /// With `Split` exits the inner's match/skip paths route to two SuppressEnd
-    /// steps. `outer.pre` (e.g. a tagged variant's `Enum`-open) runs before
+    /// steps. `outer.pre` (e.g. an enum variant's `Enum`-open) runs before
     /// SuppressBegin in the enclosing scope, so the tag is produced and the later
     /// `EndEnum` matches.
     fn compile_suppressive(
         &mut self,
-        inner: Option<&Expr>,
+        inner: Option<&Pattern>,
         nav_override: Option<Nav>,
         outer_capture: CaptureEffects,
         exits: CaptureExits,
@@ -561,7 +561,7 @@ impl Compiler<'_> {
             return self.wrap_entry_pre(entry, pre);
         };
 
-        // SuppressEnd + outer post (e.g. a tagged variant's EndEnum) closes each exit;
+        // SuppressEnd + outer post (e.g. an enum variant's EndEnum) closes each exit;
         // the inner is compiled with NO capture effects.
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
@@ -570,7 +570,7 @@ impl Compiler<'_> {
                     vec![EffectIR::suppress_end()],
                     CaptureEffects::new_post(post),
                 );
-                self.compile_expr_inner(inner, ExprCtx::with_nav(end_label, nav_override))
+                self.dispatch_pattern(inner, ExprCtx::with_nav(end_label, nav_override))
             }
             CaptureExits::Split {
                 match_exit,
@@ -606,46 +606,48 @@ impl Compiler<'_> {
         self.wrap_entry_pre(begin_entry, pre)
     }
 
-    pub(super) fn resolve_anonymous_node_type(&mut self, text: &str) -> NodeTypeIR {
+    pub(super) fn resolve_anonymous_node_kind(&mut self, text: &str) -> NodeKindConstraint {
         let Some(sym) = self.ctx.interner.get(text) else {
-            return NodeTypeIR::Anonymous(None);
+            return NodeKindConstraint::Anonymous(None);
         };
         self.ctx
-            .node_types
-            .get(&NodeType::Anonymous(sym))
+            .target_node_kinds
+            .get(&NodeKind::Anonymous(sym))
             .and_then(|id| NonZeroU16::new(id.get()))
-            .map_or(NodeTypeIR::Anonymous(None), |id| {
-                NodeTypeIR::Anonymous(Some(id))
+            .map_or(NodeKindConstraint::Anonymous(None), |id| {
+                NodeKindConstraint::Anonymous(Some(id))
             })
     }
 
-    /// Resolve a NamedNode to its node type constraint.
+    /// Resolve a NodePattern to its node kind constraint.
     ///
-    /// Returns `NodeTypeIR::Named` with:
+    /// Returns `NodeKindConstraint::Named` with:
     /// - `None` for wildcard `(_)` (any named node)
     /// - `Some(id)` for specific types like `(identifier)`
-    pub(super) fn resolve_node_type(&mut self, node: &ast::NamedNode) -> NodeTypeIR {
+    pub(super) fn resolve_node_kind(&mut self, node: &ast::NodePattern) -> NodeKindConstraint {
         if node.is_any() {
-            return NodeTypeIR::Named(None);
+            return NodeKindConstraint::Named(None);
         }
 
-        let Some(type_token) = node.node_type() else {
-            return NodeTypeIR::Named(None);
+        let Some(type_token) = node.kind_token() else {
+            return NodeKindConstraint::Named(None);
         };
         let type_name = type_token.text();
 
         let Some(sym) = self.ctx.interner.get(type_name) else {
-            return NodeTypeIR::Named(None);
+            return NodeKindConstraint::Named(None);
         };
         self.ctx
-            .node_types
-            .get(&NodeType::Named(sym))
+            .target_node_kinds
+            .get(&NodeKind::Named(sym))
             .and_then(|id| NonZeroU16::new(id.get()))
-            .map_or(NodeTypeIR::Named(None), |id| NodeTypeIR::Named(Some(id)))
+            .map_or(NodeKindConstraint::Named(None), |id| {
+                NodeKindConstraint::Named(Some(id))
+            })
     }
 
     /// Resolve a field expression to its grammar `NodeFieldId`.
-    pub(super) fn resolve_field(&mut self, field: &ast::FieldExpr) -> Option<NonZeroU16> {
+    pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NonZeroU16> {
         let name_token = field.name()?;
         let field_name = name_token.text();
         self.resolve_field_by_name(field_name)
@@ -658,12 +660,12 @@ impl Compiler<'_> {
         self.ctx
             .interner
             .get(field_name)
-            .and_then(|sym| self.ctx.node_fields.get(&sym))
+            .and_then(|sym| self.ctx.target_node_fields.get(&sym))
             .and_then(|id| NonZeroU16::new(id.get()))
     }
 
-    pub(super) fn collect_neg_fields(&mut self, node: &ast::NamedNode) -> Vec<u16> {
-        node.as_cst()
+    pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<u16> {
+        node.syntax()
             .children()
             .filter_map(ast::NegatedField::cast)
             .filter_map(|nf| {
@@ -677,21 +679,21 @@ impl Compiler<'_> {
     /// Compile a predicate from AST to IR.
     ///
     /// Returns `Some(PredicateIR)` if the node has a valid predicate, `None` otherwise.
-    pub(super) fn compile_predicate(&mut self, node: &ast::NamedNode) -> Option<PredicateIR> {
+    pub(super) fn compile_predicate(&mut self, node: &ast::NodePattern) -> Option<PredicateIR> {
         let pred = node.predicate()?;
         let op = pred.operator()?;
 
         if let Some(str_token) = pred.string_value() {
-            let string_id = self.ctx.strings.borrow_mut().intern_str(str_token.text());
+            let string_id = self.ctx.strings.borrow_mut().get_or_intern_str(str_token.text());
             return Some(PredicateIR::string(op, string_id));
         }
 
         if let Some(regex) = pred.regex() {
             // Get pattern text by stripping `/` delimiters from CST text
-            let text: String = regex.as_cst().text().into();
+            let text: String = regex.syntax().text().into();
             let without_prefix = text.strip_prefix('/').unwrap_or(&text);
             let pattern = without_prefix.strip_suffix('/').unwrap_or(without_prefix);
-            let string_id = self.ctx.strings.borrow_mut().intern_str(pattern);
+            let string_id = self.ctx.strings.borrow_mut().get_or_intern_str(pattern);
             return Some(PredicateIR::regex(op, string_id));
         }
 

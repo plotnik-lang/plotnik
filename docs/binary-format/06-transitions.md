@@ -30,14 +30,14 @@ type_id (u8)
 ```
 
 - **Bits 7-6 (Segment)**: Reserved for future multi-segment addressing. Must be 0.
-- **Bits 5-4 (NodeKind)**: Node type constraint category for Match instructions. Unused for Call/Return/Trampoline, where they must be zero; loaders reject a non-zero value.
+- **Bits 5-4 (NodeKind)**: Node kind constraint category for Match instructions. Unused for Call/Return/Trampoline, where they must be zero; loaders reject a non-zero value.
 - **Bits 3-0 (Opcode)**: Step type and size.
 
 **NodeKind values** (for Match instructions):
 
 | Value | Name      | Meaning                                    |
 | :---- | :-------- | :----------------------------------------- |
-| `00`  | Any       | No type check (`_` pattern)                |
+| `00`  | Any       | No kind check (`_` pattern)                |
 | `01`  | Named     | Named node check (`(_)` or `(identifier)`) |
 | `10`  | Anonymous | Anonymous node check (`"text"` literals)   |
 | `11`  | Reserved  | Reserved for future use                    |
@@ -114,14 +114,14 @@ EffectOp (u16)
 | Opcode | Name            | Payload                |
 | :----- | :-------------- | :--------------------- |
 | 0      | `Node`          | -                      |
-| 1      | `Arr`           | -                      |
+| 1      | `ArrayOpen`     | -                      |
 | 2      | `Push`          | -                      |
-| 3      | `EndArr`        | -                      |
-| 4      | `Obj`           | -                      |
-| 5      | `EndObj`        | -                      |
+| 3      | `ArrayClose`    | -                      |
+| 4      | `ObjectOpen`    | -                      |
+| 5      | `ObjectClose`   | -                      |
 | 6      | `Set`           | Member index (0-1023)  |
-| 7      | `Enum`          | Variant index (0-1023) |
-| 8      | `EndEnum`       | -                      |
+| 7      | `EnumOpen`      | Variant index (0-1023) |
+| 8      | `EnumClose`     | -                      |
 | 9      | `Clear`         | -                      |
 | 10     | `Null`          | -                      |
 | 11     | `SuppressBegin` | -                      |
@@ -149,23 +149,23 @@ Optimized fast-path transition. Used when there are no side effects, no negated 
 struct Match8 {
     type_id: u8,                     // segment(2) | node_kind(2) | 0x0
     nav: u8,                         // Nav
-    node_type: u16,                  // Type ID (interpretation depends on node_kind)
+    node_kind: u16,                  // Kind ID (interpretation depends on node_kind class)
     node_field: Option<NonZeroU16>,  // None (0) means "any field"
     next: u16,                       // Next StepId. 0 = Accept.
 }
 ```
 
-**NodeKind + node_type interpretation**:
+**NodeKind class + node_kind interpretation**:
 
-| `node_kind`  | `node_type=0`       | `node_type>0`              |
-| :----------- | :------------------ | :------------------------- |
-| `00` (Any)   | No check (any node) | Invalid                    |
-| `01` (Named) | Check `is_named()`  | Check `kind_id() == value` |
-| `10` (Anon)  | Check `!is_named()` | Check `kind_id() == value` |
+| `node_kind` class | `node_kind=0`       | `node_kind>0`              |
+| :---------------- | :------------------ | :------------------------- |
+| `00` (Any)        | No check (any node) | Invalid                    |
+| `01` (Named)      | Check `is_named()`  | Check `kind_id() == value` |
+| `10` (Anon)       | Check `!is_named()` | Check `kind_id() == value` |
 
-**node_type / node_field**:
+**node_kind / node_field**:
 
-Bytes 2-3 (`node_type`) hold a tree-sitter `NodeTypeId`; bytes 4-5 (`node_field`) hold a `NodeFieldId`. The runtime compares these directly against the tree-sitter node.
+Bytes 2-3 (`node_kind`) hold a tree-sitter `NodeKindId`; bytes 4-5 (`node_field`) hold a `NodeFieldId`. The runtime compares these directly against the tree-sitter node.
 
 ### 4.2. Match16–Match64
 
@@ -178,7 +178,7 @@ Extended transitions with inline payload. Used for side effects, negated fields,
 struct MatchHeader {
     type_id: u8,                     // segment(2) | node_kind(2) | opcode(1-5)
     nav: u8,                         // Nav
-    node_type: u16,                  // Type ID (interpretation depends on node_kind)
+    node_kind: u16,                  // Kind ID (interpretation depends on node_kind class)
     node_field: Option<NodeFieldId>, // None (0) means "any field"
     counts: u16,                     // Bit-packed element counts
 }
@@ -266,13 +266,13 @@ A Match instruction with `nav == Epsilon` is an **epsilon transition** — it su
 
 - **Branching at EOF**: `(a)?` must succeed when no node exists to match.
 - **Pure control flow**: Decision points for quantifiers.
-- **Effect-only steps**: Scope openers/closers (`Obj`, `EndObj`) without node interaction.
+- **Effect-only steps**: Scope openers/closers (`ObjectOpen`, `ObjectClose`) without node interaction.
 
 When `nav == Epsilon`:
 
 - No cursor movement occurs
-- No node type or field checks are performed
-- `node_kind`, `node_type`, and `node_field` are ignored
+- No node kind or field checks are performed
+- `node_kind` and `node_field` are ignored
 - Only `pre_effects`, `post_effects`, and successors are meaningful
 
 ### 4.4. Call
@@ -290,7 +290,7 @@ struct Call {
 }
 ```
 
-- **Nav + Field**: Call handles navigation and field constraint. The callee's first Match checks node type. This allows `field: (Ref)` patterns to check field and type on the same node.
+- **Nav + Field**: Call handles navigation and field constraint. The callee's first Match checks node kind. This allows `field: (Ref)` patterns to check field and kind on the same node.
 - **Target Segment**: Defined by `(type_id >> 6) & 0x3`.
 - **Return Segment**: Implicitly the current segment.
 
@@ -320,7 +320,7 @@ struct Trampoline {
 }
 ```
 
-The preamble at step 0 typically looks like: `Obj → Trampoline → EndObj → Accept`. When executed:
+The preamble at step 0 typically looks like: `ObjectOpen → Trampoline → ObjectClose → Accept`. When executed:
 
 1. VM pushes `next` (return address) onto call stack
 2. VM jumps to `entrypoint_target` (set from entrypoint before execution)
@@ -334,7 +334,7 @@ This allows a single compiled preamble to dispatch to any entrypoint without rec
 
 1. If `nav == Epsilon`: skip steps 2-4, go directly to step 5.
 2. Execute `nav` movement.
-3. Check `node_type` according to `node_kind`:
+3. Check `node_kind` according to the node_kind class:
    - `Any`: no check
    - `Named(0)`: check `is_named()`
    - `Named(id)`: check `kind_id() == id`
@@ -350,7 +350,7 @@ This allows a single compiled preamble to dispatch to any entrypoint without rec
 2. If `nav == Epsilon`: skip steps 3-6, go to step 7.
 3. Clear `matched_node`.
 4. Execute `nav` movement.
-5. Check `node_type` according to `node_kind` (see Match8 Execution).
+5. Check `node_kind` according to the node_kind class (see Match8 Execution).
 6. Check `node_field` (if not 0).
 7. On success: `matched_node = cursor.node()`.
 8. Verify all `negated_fields` are absent on current node.
@@ -420,7 +420,7 @@ Branch.successors = [skip_path, match_path]  // try skip first
 
 ## 7. Alternation Compilation
 
-Untagged alternations `[ A  B ]` compile to branching with null injection for type consistency.
+Union alternations `[ A  B ]` compile to branching with null injection for type consistency.
 
 When a capture appears in some branches but not others, the compiler injects `Null` into branches missing that capture:
 

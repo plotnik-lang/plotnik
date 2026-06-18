@@ -1,6 +1,6 @@
 //! Materializer transforms effect logs into output values.
 
-use plotnik_bytecode::{Entrypoint, Module, StringsView, TypeData, TypeId, TypeKind, TypesView};
+use plotnik_bytecode::{Entrypoint, Module, StringsView, TypeDefKind, TypeId, TypeKind, TypesView};
 use plotnik_core::Colors;
 
 use super::effect::RuntimeEffect;
@@ -30,7 +30,7 @@ impl<'a> ValueMaterializer<'a> {
 
     fn resolve_member_name(&self, idx: u16) -> String {
         let member = self.types.get_member(idx as usize);
-        self.strings.get(member.name).to_owned()
+        self.strings.get(member.name_id).to_owned()
     }
 
     fn resolve_member_type(&self, idx: u16) -> TypeId {
@@ -40,30 +40,30 @@ impl<'a> ValueMaterializer<'a> {
     fn is_void_type(&self, type_id: TypeId) -> bool {
         self.types
             .get(type_id)
-            .is_some_and(|def| matches!(def.classify(), TypeData::Primitive(TypeKind::Void)))
+            .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
     }
 
-    fn builder_for_type(&self, type_id: TypeId) -> Builder {
+    fn accumulator_for_type(&self, type_id: TypeId) -> ValueAccumulator {
         let def = self
             .types
             .get(type_id)
             .unwrap_or_else(|| panic!("unknown type_id {}", type_id.0));
 
-        match def.classify() {
-            TypeData::Composite {
+        match def.decode() {
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 member_count,
                 ..
-            } => Builder::Object(Vec::with_capacity(member_count as usize)),
-            TypeData::Composite {
+            } => ValueAccumulator::Object(Vec::with_capacity(member_count as usize)),
+            TypeDefKind::Composite {
                 kind: TypeKind::Enum,
                 ..
-            } => Builder::Scalar(None),
-            TypeData::Wrapper {
+            } => ValueAccumulator::Scalar(None),
+            TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
                 ..
-            } => Builder::Array(vec![]),
-            _ => Builder::Scalar(None),
+            } => ValueAccumulator::Array(vec![]),
+            _ => ValueAccumulator::Scalar(None),
         }
     }
 }
@@ -88,25 +88,25 @@ pub fn materialize_verified<'t>(
     value
 }
 
-/// Value builder for stack-based materialization.
-enum Builder {
+/// Value accumulator for stack-based materialization.
+enum ValueAccumulator {
     Scalar(Option<Value>),
     Array(Vec<Value>),
     Object(Vec<(String, Value)>),
-    Tagged {
+    Enum {
         tag: String,
         payload_type: TypeId,
         fields: Vec<(String, Value)>,
     },
 }
 
-impl Builder {
-    fn build(self) -> Value {
+impl ValueAccumulator {
+    fn finish(self) -> Value {
         match self {
-            Builder::Scalar(v) => v.unwrap_or(Value::Null),
-            Builder::Array(arr) => Value::Array(arr),
-            Builder::Object(fields) => Value::Object(fields),
-            Builder::Tagged { tag, fields, .. } => Value::Tagged {
+            ValueAccumulator::Scalar(v) => v.unwrap_or(Value::Null),
+            ValueAccumulator::Array(arr) => Value::Array(arr),
+            ValueAccumulator::Object(fields) => Value::Object(fields),
+            ValueAccumulator::Enum { tag, fields, .. } => Value::Enum {
                 tag,
                 data: Some(Box::new(Value::Object(fields))),
             },
@@ -115,10 +115,10 @@ impl Builder {
 
     fn kind(&self) -> &'static str {
         match self {
-            Builder::Scalar(_) => "Scalar",
-            Builder::Array(_) => "Array",
-            Builder::Object(_) => "Object",
-            Builder::Tagged { .. } => "Tagged",
+            ValueAccumulator::Scalar(_) => "Scalar",
+            ValueAccumulator::Array(_) => "Array",
+            ValueAccumulator::Object(_) => "Object",
+            ValueAccumulator::Enum { .. } => "Enum",
         }
     }
 }
@@ -127,9 +127,9 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
     type Output = Value;
 
     fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
-        let mut stack: Vec<Builder> = vec![];
+        let mut stack: Vec<ValueAccumulator> = vec![];
 
-        let result_builder = self.builder_for_type(result_type);
+        let result_builder = self.accumulator_for_type(result_type);
         stack.push(result_builder);
 
         // Pending value from Node/Null (consumed by Set/Push)
@@ -143,12 +143,12 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                 RuntimeEffect::Null => {
                     pending = Some(Value::Null);
                 }
-                RuntimeEffect::Arr => {
-                    stack.push(Builder::Array(vec![]));
+                RuntimeEffect::ArrayOpen => {
+                    stack.push(ValueAccumulator::Array(vec![]));
                 }
                 RuntimeEffect::Push => {
                     let val = pending.take().unwrap_or(Value::Null);
-                    let Some(Builder::Array(arr)) = stack.last_mut() else {
+                    let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
                         panic!(
                             "effect {effect_idx}: Push expects Array on stack, found {:?}",
                             stack.last().map(|b| b.kind())
@@ -156,36 +156,38 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     };
                     arr.push(val);
                 }
-                RuntimeEffect::EndArr => {
+                RuntimeEffect::ArrayClose => {
                     let top = stack.pop();
-                    let Some(Builder::Array(arr)) = top else {
+                    let Some(ValueAccumulator::Array(arr)) = top else {
                         panic!(
-                            "effect {effect_idx}: EndArr expects Array on stack, found {:?}",
+                            "effect {effect_idx}: ArrayClose expects Array on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
                     pending = Some(Value::Array(arr));
                 }
-                RuntimeEffect::Obj => {
-                    stack.push(Builder::Object(vec![]));
+                RuntimeEffect::ObjectOpen => {
+                    stack.push(ValueAccumulator::Object(vec![]));
                 }
                 RuntimeEffect::Set(idx) => {
                     let field_name = self.resolve_member_name(*idx);
                     let val = pending.take().unwrap_or(Value::Null);
                     match stack.last_mut() {
-                        Some(Builder::Object(obj)) => obj.push((field_name, val)),
-                        Some(Builder::Tagged { fields, .. }) => fields.push((field_name, val)),
+                        Some(ValueAccumulator::Object(obj)) => obj.push((field_name, val)),
+                        Some(ValueAccumulator::Enum { fields, .. }) => {
+                            fields.push((field_name, val))
+                        }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Object/Tagged on stack, found {:?}",
+                            "effect {effect_idx}: Set expects Object/Enum on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
                 }
-                RuntimeEffect::EndObj => {
+                RuntimeEffect::ObjectClose => {
                     let top = stack.pop();
-                    let Some(Builder::Object(fields)) = top else {
+                    let Some(ValueAccumulator::Object(fields)) = top else {
                         panic!(
-                            "effect {effect_idx}: EndObj expects Object on stack, found {:?}",
+                            "effect {effect_idx}: ObjectClose expects Object on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
@@ -204,25 +206,25 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     }
                     // else: pending has a value, keep it (passthrough for enums, suppressive, etc.)
                 }
-                RuntimeEffect::Enum(idx) => {
+                RuntimeEffect::EnumOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
                     let payload_type = self.resolve_member_type(*idx);
-                    stack.push(Builder::Tagged {
+                    stack.push(ValueAccumulator::Enum {
                         tag,
                         payload_type,
                         fields: vec![],
                     });
                 }
-                RuntimeEffect::EndEnum => {
+                RuntimeEffect::EnumClose => {
                     let top = stack.pop();
-                    let Some(Builder::Tagged {
+                    let Some(ValueAccumulator::Enum {
                         tag,
                         payload_type,
                         fields,
                     }) = top
                     else {
                         panic!(
-                            "effect {effect_idx}: EndEnum expects Tagged on stack, found {:?}",
+                            "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
@@ -230,11 +232,11 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     let data = if self.is_void_type(payload_type) {
                         None
                     } else {
-                        // If inner returned a structured value (via Obj/EndObj), use it as data
+                        // If inner returned a structured value (via ObjectOpen/ObjectClose), use it as data
                         // Otherwise use fields collected from direct Set effects
                         Some(Box::new(pending.take().unwrap_or(Value::Object(fields))))
                     };
-                    pending = Some(Value::Tagged { tag, data });
+                    pending = Some(Value::Enum { tag, data });
                 }
                 RuntimeEffect::Clear => {
                     pending = None;
@@ -243,7 +245,7 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
         }
 
         pending
-            .or_else(|| stack.pop().map(Builder::build))
+            .or_else(|| stack.pop().map(ValueAccumulator::finish))
             .unwrap_or(Value::Null)
     }
 }

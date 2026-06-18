@@ -1,10 +1,10 @@
 use plotnik_core::grammar::raw::{RawGrammar, RawRule};
 
-use super::lang::GrammarRenderer;
+use super::lang::GrammarPrinter;
 use plotnik::language_registry::{self, Lang};
 
 fn smoke_test(lang: &Lang, source: &str, expected_root: &str) {
-    let tree = lang.parse(source);
+    let tree = lang.parse_source(source);
     let root = tree.root_node();
     assert_eq!(root.kind(), expected_root);
     assert!(!root.has_error());
@@ -63,7 +63,7 @@ fn grammar_dump_renders_synthetic_raw_grammar() {
         inherits: None,
     };
 
-    let output = GrammarRenderer::new(&grammar).render();
+    let output = GrammarPrinter::new(&grammar).render();
 
     assert!(output.contains("extras = [\n  (comment)\n]\n\n"));
     assert!(output.contains("program = {\n  body: (statement)?\n}\n\n"));

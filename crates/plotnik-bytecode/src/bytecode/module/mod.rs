@@ -11,8 +11,8 @@ use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline, header_byte};
-use super::sections::{FieldSymbol, NodeSymbol};
-use super::type_meta::{TypeData, TypeDef, TypeKind, TypeMember, TypeName};
+use super::sections::{FieldEntry, NodeKindEntry};
+use super::type_meta::{TypeDefKind, TypeDef, TypeKind, TypeMember, TypeNameEntry};
 use super::{
     Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
 };
@@ -153,7 +153,7 @@ pub struct Module {
     /// debug builds to back the VM's pre-`decode_step` IP assertion. It does not
     /// exist in release, so the steady-state module carries no extra memory.
     #[cfg(debug_assertions)]
-    is_start: Vec<bool>,
+    instr_start_bitmap: Vec<bool>,
 }
 
 impl Module {
@@ -188,15 +188,6 @@ impl Module {
         Self::from_storage(ByteStorage::copy_from_slice(bytes))
     }
 
-    /// Load a module from owned bytes (copies into aligned storage).
-    #[deprecated(
-        since = "0.1.0",
-        note = "use `Module::from_aligned` for AlignedVec or `Module::load` for copying"
-    )]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, ModuleError> {
-        Self::load(&bytes)
-    }
-
     pub fn header(&self) -> &Header {
         &self.header
     }
@@ -223,7 +214,7 @@ impl Module {
     /// under `debug_assertions` and does not exist in release.
     #[cfg(debug_assertions)]
     pub fn is_validated_step_start(&self, step: u16) -> bool {
-        self.is_start.get(step as usize).copied().unwrap_or(false)
+        self.instr_start_bitmap.get(step as usize).copied().unwrap_or(false)
     }
 
     pub fn strings(&self) -> StringsView<'_> {
@@ -233,21 +224,21 @@ impl Module {
         }
     }
 
-    pub fn node_types(&self) -> SymbolsView<'_, NodeSymbol> {
+    pub fn node_types(&self) -> GrammarTableView<'_, NodeKindEntry> {
         let offset = self.offsets.node_types as usize;
         let count = self.header.node_types_count as usize;
-        SymbolsView {
-            bytes: &self.storage[offset..offset + count * NodeSymbol::SIZE],
+        GrammarTableView {
+            bytes: &self.storage[offset..offset + count * NodeKindEntry::SIZE],
             count,
             _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn node_fields(&self) -> SymbolsView<'_, FieldSymbol> {
+    pub fn node_fields(&self) -> GrammarTableView<'_, FieldEntry> {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
-        SymbolsView {
-            bytes: &self.storage[offset..offset + count * FieldSymbol::SIZE],
+        GrammarTableView {
+            bytes: &self.storage[offset..offset + count * FieldEntry::SIZE],
             count,
             _marker: std::marker::PhantomData,
         }
@@ -280,7 +271,7 @@ impl Module {
             defs_bytes: &self.storage[defs_offset..defs_offset + defs_count * TypeDef::SIZE],
             members_bytes: &self.storage
                 [members_offset..members_offset + members_count * TypeMember::SIZE],
-            names_bytes: &self.storage[names_offset..names_offset + names_count * TypeName::SIZE],
+            names_bytes: &self.storage[names_offset..names_offset + names_count * TypeNameEntry::SIZE],
             defs_count,
             members_count,
             names_count,
@@ -319,31 +310,31 @@ pub struct StringsView<'a> {
 
 impl<'a> StringsView<'a> {
     pub fn get(&self, id: StringId) -> &'a str {
-        self.get_by_index(id.get() as usize)
+        self.at(id.as_u16() as usize)
     }
 
     /// Get a string by raw index (for iteration/dumps, including easter egg at 0).
     ///
     /// The string table contains sequential u32 offsets. To get string i:
     /// `start = table[i]`, `end = table[i+1]`, `length = end - start`.
-    pub fn get_by_index(&self, idx: usize) -> &'a str {
+    pub fn at(&self, idx: usize) -> &'a str {
         let start = read_u32_le(self.table, idx * STRING_TABLE_ENTRY_SIZE) as usize;
         let end = read_u32_le(self.table, (idx + 1) * STRING_TABLE_ENTRY_SIZE) as usize;
         std::str::from_utf8(&self.blob[start..end]).expect("invalid UTF-8 in string table")
     }
 }
 
-pub struct SymbolsView<'a, T> {
+pub struct GrammarTableView<'a, T> {
     bytes: &'a [u8],
     count: usize,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<'a> SymbolsView<'a, NodeSymbol> {
-    pub fn get(&self, idx: usize) -> NodeSymbol {
+impl<'a> GrammarTableView<'a, NodeKindEntry> {
+    pub fn get(&self, idx: usize) -> NodeKindEntry {
         assert!(idx < self.count, "node symbol index out of bounds");
-        let offset = idx * NodeSymbol::SIZE;
-        NodeSymbol::new(
+        let offset = idx * NodeKindEntry::SIZE;
+        NodeKindEntry::new(
             read_u16_le(self.bytes, offset),
             StringId::new(read_u16_le(self.bytes, offset + 2)),
         )
@@ -360,11 +351,11 @@ impl<'a> SymbolsView<'a, NodeSymbol> {
     }
 }
 
-impl<'a> SymbolsView<'a, FieldSymbol> {
-    pub fn get(&self, idx: usize) -> FieldSymbol {
+impl<'a> GrammarTableView<'a, FieldEntry> {
+    pub fn get(&self, idx: usize) -> FieldEntry {
         assert!(idx < self.count, "field symbol index out of bounds");
-        let offset = idx * FieldSymbol::SIZE;
-        FieldSymbol::new(
+        let offset = idx * FieldEntry::SIZE;
+        FieldEntry::new(
             read_u16_le(self.bytes, offset),
             StringId::new(read_u16_le(self.bytes, offset + 2)),
         )
@@ -393,7 +384,7 @@ impl<'a> RegexView<'a> {
     const ENTRY_SIZE: usize = REGEX_TABLE_ENTRY_SIZE;
 
     /// Raw serialized DFA bytes; use `regex-automata` to deserialize: `DFA::from_bytes(&bytes)`.
-    pub fn get_by_index(&self, idx: usize) -> &'a [u8] {
+    pub fn at(&self, idx: usize) -> &'a [u8] {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let next_entry_offset = (idx + 1) * Self::ENTRY_SIZE;
 
@@ -403,7 +394,7 @@ impl<'a> RegexView<'a> {
     }
 
     /// Pattern `StringId` for display (e.g. `dump`/`trace`).
-    pub fn get_string_id(&self, idx: usize) -> super::StringId {
+    pub fn pattern_string_id(&self, idx: usize) -> super::StringId {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let string_id = read_u16_le(self.table, entry_offset);
         super::StringId::new(string_id)
@@ -426,7 +417,7 @@ pub struct TypesView<'a> {
 }
 
 impl<'a> TypesView<'a> {
-    pub fn get_def(&self, idx: usize) -> TypeDef {
+    pub fn def(&self, idx: usize) -> TypeDef {
         assert!(idx < self.defs_count, "type def index out of bounds");
         let offset = idx * TypeDef::SIZE;
         TypeDef::from_bytes(&self.defs_bytes[offset..])
@@ -435,7 +426,7 @@ impl<'a> TypesView<'a> {
     pub fn get(&self, id: TypeId) -> Option<TypeDef> {
         let idx = id.0 as usize;
         if idx < self.defs_count {
-            Some(self.get_def(idx))
+            Some(self.def(idx))
         } else {
             None
         }
@@ -458,10 +449,10 @@ impl<'a> TypesView<'a> {
         TypeId(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
     }
 
-    pub fn get_name(&self, idx: usize) -> TypeName {
+    pub fn get_name(&self, idx: usize) -> TypeNameEntry {
         assert!(idx < self.names_count, "type name index out of bounds");
-        let offset = idx * TypeName::SIZE;
-        TypeName::new(
+        let offset = idx * TypeNameEntry::SIZE;
+        TypeNameEntry::new(
             StringId::new(read_u16_le(self.names_bytes, offset)),
             TypeId(read_u16_le(self.names_bytes, offset + 2)),
         )
@@ -471,7 +462,7 @@ impl<'a> TypesView<'a> {
     /// `StringId` — same boundary reason as [`member_type_id`](Self::member_type_id).
     pub(crate) fn name_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.names_count, "type name index out of bounds");
-        TypeId(read_u16_le(self.names_bytes, idx * TypeName::SIZE + 2))
+        TypeId(read_u16_le(self.names_bytes, idx * TypeNameEntry::SIZE + 2))
     }
 
     /// Number of type definitions.
@@ -491,8 +482,8 @@ impl<'a> TypesView<'a> {
 
     /// Iterate over members of a struct or enum type.
     pub fn members_of(&self, def: &TypeDef) -> impl Iterator<Item = TypeMember> + '_ {
-        let (start, count) = match def.classify() {
-            TypeData::Composite {
+        let (start, count) = match def.decode() {
+            TypeDefKind::Composite {
                 member_start,
                 member_count,
                 ..
@@ -508,8 +499,8 @@ impl<'a> TypesView<'a> {
         let Some(type_def) = self.get(type_id) else {
             return (type_id, false);
         };
-        match type_def.classify() {
-            TypeData::Wrapper {
+        match type_def.decode() {
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Optional,
                 inner,
             } => (inner, true),

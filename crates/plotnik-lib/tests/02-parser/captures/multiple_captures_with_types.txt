@@ -45,11 +45,11 @@ Root
 # query.ptk
 Root
   Def Q
-    CapturedExpr @expr :: BinaryExpr
+    CapturedPattern @expr :: BinaryExpr
       NamedNode binary
-        CapturedExpr @left :: Node
-          FieldExpr left:
+        CapturedPattern @left :: Node
+          FieldPattern left:
             NamedNode (any)
-        CapturedExpr @right :: Foo
-          FieldExpr right:
+        CapturedPattern @right :: Foo
+          FieldPattern right:
             NamedNode (any)

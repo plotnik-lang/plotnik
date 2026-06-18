@@ -42,9 +42,9 @@ Q = 06 :: T2
 
 [transitions]
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [EndObj]                         05
+  03  -ε-  [ObjectClose]                    05
   05                                        ▶
 
 Q:
@@ -55,12 +55,12 @@ Q:
   13  ─‣┘  _                                15
   14                                        ▶
   15  ─‣┘  _                                14
-  16  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  08
-  19  └•─  [Arr] (debugger_statement) [Node Push]  22, 16
+  16  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  19  └•─  [ArrayOpen] (debugger_statement) [Node Push]  22, 16
   22  ─•─  (debugger_statement) [Node Push]  22, 16
   24  -ε-                                   19
-  25  ─•─  [EndArr Set(M1)] (expression_statement) [Node Set(M2)]  11
-  28  ─•─  [Arr] (debugger_statement) [Node Push]  32, 25
+  25  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  11
+  28  ─•─  [ArrayOpen] (debugger_statement) [Node Push]  32, 25
   31  ...  
   32  ─•─  (debugger_statement) [Node Push]  32, 25
   34  -ε-  [Null Set(M0)]                   24
@@ -75,7 +75,7 @@ export interface Q {
 }
 ==== trace ====
 _ObjWrap:
-  00  -ε-  [Obj]                            02
+  00  -ε-  [ObjectOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -101,7 +101,7 @@ Q:
   06  ❮❮❮ 
   34  -ε-  [Null Set(M0)]                   24
   24  -ε-                                   19
-  19       [Arr] (debugger_statement) [Node Push]  22, 16
+  19       [ArrayOpen] (debugger_statement) [Node Push]  22, 16
        ○   expression_statement
 ==== output ====
 <no match>

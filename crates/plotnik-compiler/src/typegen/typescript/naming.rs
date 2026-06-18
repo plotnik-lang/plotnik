@@ -4,28 +4,28 @@ use std::collections::HashMap;
 
 use plotnik_core::utils::to_pascal_case;
 
-use plotnik_bytecode::{TypeData, TypeId, TypeKind};
+use plotnik_bytecode::{TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 
 #[derive(Clone, Debug)]
-pub(super) struct NamingContext {
-    pub def_name: String,
-    pub field_name: Option<String>,
+pub(super) struct NameHint {
+    pub entry_name: String,
+    pub member_name: Option<String>,
 }
 
 impl Emitter<'_> {
     pub(super) fn assign_generated_names(&mut self) {
-        let mut contexts: HashMap<TypeId, NamingContext> = HashMap::new();
+        let mut contexts: HashMap<TypeId, NameHint> = HashMap::new();
 
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
-            let def_name = self.strings.get(ep.name());
+            let entry_name = self.strings.get(ep.name());
             self.collect_naming_contexts(
                 ep.result_type(),
-                &NamingContext {
-                    def_name: def_name.to_string(),
-                    field_name: None,
+                &NameHint {
+                    entry_name: entry_name.to_string(),
+                    member_name: None,
                 },
                 &mut contexts,
             );
@@ -37,15 +37,15 @@ impl Emitter<'_> {
                 continue;
             }
 
-            let type_def = self.types.get_def(i);
-            if !self.needs_generated_name(&type_def) {
+            let type_def = self.types.def(i);
+            if !self.is_named_composite(&type_def) {
                 continue;
             }
 
             let name = if let Some(ctx) = contexts.get(&type_id) {
-                self.generate_contextual_name(ctx)
+                self.contextual_name(ctx)
             } else {
-                self.generate_fallback_name(&type_def)
+                self.fallback_name(&type_def)
             };
             self.type_names.insert(type_id, name);
         }
@@ -54,8 +54,8 @@ impl Emitter<'_> {
     fn collect_naming_contexts(
         &self,
         type_id: TypeId,
-        ctx: &NamingContext,
-        contexts: &mut HashMap<TypeId, NamingContext>,
+        ctx: &NameHint,
+        contexts: &mut HashMap<TypeId, NameHint>,
     ) {
         if contexts.contains_key(&type_id) {
             return;
@@ -65,69 +65,69 @@ impl Emitter<'_> {
             return;
         };
 
-        match type_def.classify() {
-            TypeData::Primitive(_) => {}
-            TypeData::Wrapper {
+        match type_def.decode() {
+            TypeDefKind::Primitive(_) => {}
+            TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => {}
-            TypeData::Wrapper { inner, .. } => {
+            TypeDefKind::Wrapper { inner, .. } => {
                 self.collect_naming_contexts(inner, ctx, contexts);
             }
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 ..
             } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 for member in self.types.members_of(&type_def) {
-                    let field_name = self.strings.get(member.name);
+                    let member_name = self.strings.get(member.name_id);
                     let (inner_type, _) = self.types.unwrap_optional(member.type_id);
-                    let field_ctx = NamingContext {
-                        def_name: ctx.def_name.clone(),
-                        field_name: Some(field_name.to_string()),
+                    let field_ctx = NameHint {
+                        entry_name: ctx.entry_name.clone(),
+                        member_name: Some(member_name.to_string()),
                     };
                     self.collect_naming_contexts(inner_type, &field_ctx, contexts);
                 }
             }
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind: TypeKind::Enum,
                 ..
             } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
             }
-            TypeData::Composite { .. } => {}
+            TypeDefKind::Composite { .. } => {}
         }
     }
 
-    pub(super) fn needs_generated_name(&self, type_def: &plotnik_bytecode::TypeDef) -> bool {
+    pub(super) fn is_named_composite(&self, type_def: &plotnik_bytecode::TypeDef) -> bool {
         matches!(
-            type_def.classify(),
-            TypeData::Composite {
+            type_def.decode(),
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct | TypeKind::Enum,
                 ..
             }
         )
     }
 
-    pub(super) fn generate_contextual_name(&mut self, ctx: &NamingContext) -> String {
-        let base = if let Some(field) = &ctx.field_name {
-            format!("{}{}", to_pascal_case(&ctx.def_name), to_pascal_case(field))
+    pub(super) fn contextual_name(&mut self, ctx: &NameHint) -> String {
+        let base = if let Some(field) = &ctx.member_name {
+            format!("{}{}", to_pascal_case(&ctx.entry_name), to_pascal_case(field))
         } else {
-            to_pascal_case(&ctx.def_name)
+            to_pascal_case(&ctx.entry_name)
         };
         self.unique_name(&base)
     }
 
-    pub(super) fn generate_fallback_name(
+    pub(super) fn fallback_name(
         &mut self,
         type_def: &plotnik_bytecode::TypeDef,
     ) -> String {
-        let base = match type_def.classify() {
-            TypeData::Composite {
+        let base = match type_def.decode() {
+            TypeDefKind::Composite {
                 kind: TypeKind::Struct,
                 ..
             } => "Struct",
-            TypeData::Composite {
+            TypeDefKind::Composite {
                 kind: TypeKind::Enum,
                 ..
             } => "Enum",
