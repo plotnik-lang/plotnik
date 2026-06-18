@@ -40,5 +40,5 @@ jobs:
       READY_OPTION: 61e4505c
       CLOSED_ISSUE: ${{ github.event.issue.number || github.event.inputs.issue_number }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: python3 .github/scripts/auto_ready.py
