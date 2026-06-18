@@ -214,35 +214,28 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 };
                 (formatted, comment)
             }
-            TypeDefKind::Composite {
-                kind,
+            TypeDefKind::Struct {
                 member_start,
                 member_count,
             } => {
-                let formatted = match kind {
-                    TypeKind::Struct => {
-                        format!("Struct  M{:0mw$}:{}", member_start, member_count)
-                    }
-                    TypeKind::Enum => format!("Enum    M{:0mw$}:{}", member_start, member_count),
-                    _ => unreachable!(),
-                };
-                let comment = match kind {
-                    TypeKind::Struct => {
-                        let fields: Vec<_> = types
-                            .members_of(&def)
-                            .map(|m| strings.get(m.name_id).to_string())
-                            .collect();
-                        format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset)
-                    }
-                    TypeKind::Enum => {
-                        let variants: Vec<_> = types
-                            .members_of(&def)
-                            .map(|m| strings.get(m.name_id).to_string())
-                            .collect();
-                        format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset)
-                    }
-                    _ => unreachable!(),
-                };
+                let formatted = format!("Struct  M{:0mw$}:{}", member_start, member_count);
+                let fields: Vec<_> = types
+                    .members_of(&def)
+                    .map(|m| strings.get(m.name_id).to_string())
+                    .collect();
+                let comment = format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset);
+                (formatted, comment)
+            }
+            TypeDefKind::Enum {
+                member_start,
+                member_count,
+            } => {
+                let formatted = format!("Enum    M{:0mw$}:{}", member_start, member_count);
+                let variants: Vec<_> = types
+                    .members_of(&def)
+                    .map(|m| strings.get(m.name_id).to_string())
+                    .collect();
+                let comment = format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset);
                 (formatted, comment)
             }
         };

@@ -81,7 +81,7 @@ Root
 # query.ptk
 Root
   Def Expression
-    Alt
+    Enum
       Branch Ident:
         CapturedPattern @name :: Foo
           NamedNode identifier

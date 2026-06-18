@@ -261,10 +261,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // at root or inside a seq without a named-node parent.
                 self.validate_field_pattern(f, ctx.as_ref(), mode, walk);
             }
-            Pattern::AltPattern(alt) => {
+            Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
-                for branch in alt.branches() {
-                    let Some(body) = branch.body() else { continue };
+                for body in pattern.children() {
                     self.check_pattern_grammar(&body, ctx, GrammarCheckMode::Deferred, walk);
                 }
             }
@@ -547,7 +546,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             // Anonymous children are untracked (grammar children arrays never list anonymous
             // tokens). Alternations, quantifiers, and references are not checked here.
             Pattern::TokenPattern(_)
-            | Pattern::AltPattern(_)
+            | Pattern::Union(_)
+            | Pattern::Enum(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::Ref(_)
             | Pattern::FieldPattern(_) => {}
@@ -605,7 +605,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
-            Pattern::AltPattern(_)
+            Pattern::Union(_)
+            | Pattern::Enum(_)
             | Pattern::QuantifiedPattern(_)
             | Pattern::Ref(_)
             | Pattern::SeqPattern(_)

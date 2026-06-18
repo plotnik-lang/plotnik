@@ -33,7 +33,7 @@ Root
 Root
   Def Q
     Seq
-      Alt
+      Union
         Branch
           NamedNode a
         Branch

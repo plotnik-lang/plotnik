@@ -24,7 +24,7 @@ fn match_ir_size_extended() {
     let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
         .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10)))
-        .pre_effect(EffectIR::start_obj())
+        .pre_effect(EffectIR::start_struct())
         .post_effect(EffectIR::node())
         .next(Label(1));
 

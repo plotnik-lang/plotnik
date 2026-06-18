@@ -24,10 +24,10 @@ N0: S2 → T2  ; Q
 Q = 06 :: T2
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Q:
@@ -46,8 +46,8 @@ export interface Q {
   d: [Node, ...Node[]];
 }
 ==== trace ====
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -62,8 +62,8 @@ Q:
        ●   program
   10   ◀   (Q)                              
 
-_ObjWrap:
-  03  -ε-  [ObjectClose]                    05
-  05   ◀   _ObjWrap                         ◼
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
 ==== output ====
 {"d":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]}]}

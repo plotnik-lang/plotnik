@@ -29,21 +29,21 @@ N0: S3 → T2  ; Test
 Test = 06 :: T2
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Test:
   06   !   (program)                        08
   07  ...  
-  08  -ε-  [ObjectOpen]                     22, 18
+  08  -ε-  [StructOpen]                     22, 18
   10   !   (identifier) [Node Set(M0)]      12
-  12  ─‣┘  [ObjectClose Set(M1)] _          14
+  12  ─‣┘  [StructClose Set(M1)] _          14
   14                                        ▶
   15  ...  
-  16  -ε-  [ObjectClose Set(M1)]            14
+  16  -ε-  [StructClose Set(M1)]            14
   18  -ε-  [Null Set(M0)]                   16
   20  ─‣─  _                                10, 20
   22  └‣─  _                                10, 20

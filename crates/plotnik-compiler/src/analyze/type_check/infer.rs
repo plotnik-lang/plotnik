@@ -21,10 +21,12 @@ use super::unify::{UnifyError, unify_flows};
 use crate::analyze::Reporter;
 use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::visitor::{Visitor, walk_alt_pattern, walk_def, walk_node_pattern, walk_seq_pattern};
+use crate::analyze::visitor::{
+    Visitor, walk_def, walk_enum_pattern, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
+};
 use crate::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::parser::{
-    AltPattern, AltKind, TokenPattern, CapturedPattern, Def, Pattern, FieldPattern, NodePattern, QuantifiedPattern,
+    TokenPattern, CapturedPattern, Def, EnumPattern, Pattern, FieldPattern, NodePattern, QuantifiedPattern, UnionPattern,
     Ref, Root, SeqPattern, is_empty_group,
 };
 use crate::query::SourceId;
@@ -78,7 +80,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
             Pattern::Ref(r) => self.infer_ref(r),
             Pattern::SeqPattern(s) => self.infer_seq_pattern(s),
-            Pattern::AltPattern(a) => self.infer_alt_pattern(a),
+            Pattern::Union(u) => self.infer_union(u),
+            Pattern::Enum(e) => self.infer_enum(e),
             Pattern::CapturedPattern(c) => self.infer_captured_pattern(c),
             Pattern::QuantifiedPattern(q) => self.infer_quantified_pattern(q),
             Pattern::FieldPattern(f) => self.infer_field_pattern(f),
@@ -134,7 +137,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if let Some(def_id) = self.ctx.type_ctx.def_id_for_sym(name_sym)
             && self.ctx.type_ctx.is_recursive(def_id)
         {
-            if self.body_produces_enum(body) {
+            if self.body_is_enum(body) {
                 let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
                 return TermInfo::new(Arity::One, TypeFlow::Scalar(ref_type));
             }
@@ -148,17 +151,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.with_source(ref_source, |this| this.infer_pattern(body))
     }
 
-    /// Check if an expression body will produce an Enum type (Scalar flow).
-    ///
-    /// This is a syntactic check for enum alternations at the root of a definition.
-    /// Enum alternations always produce Enum types, making them safe to reference
-    /// as Scalar(Ref) in uncaptured contexts.
-    fn body_produces_enum(&self, body: &Pattern) -> bool {
-        if let Pattern::AltPattern(alt) = body {
-            matches!(alt.kind(), AltKind::Enum | AltKind::Mixed)
-        } else {
-            false
-        }
+    /// An enum body always produces an Enum type (Scalar flow), so a recursive
+    /// `Ref` to such a definition is safe to treat as `Scalar(Ref)` in uncaptured
+    /// contexts rather than `Void`.
+    fn body_is_enum(&self, body: &Pattern) -> bool {
+        matches!(body, Pattern::Enum(_))
     }
 
     /// Sequence: Arity aggregation, strict field merging, and output propagation.
@@ -222,22 +219,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    /// Alternation: arity is Many if ANY branch is Many.
-    fn infer_alt_pattern(&mut self, alt: &AltPattern) -> TermInfo {
-        match alt.kind() {
-            AltKind::Enum => self.infer_enum_alt(alt),
-            AltKind::Union | AltKind::Mixed => self.infer_union_alt(alt),
-        }
-    }
-
-    fn infer_enum_alt(&mut self, alt: &AltPattern) -> TermInfo {
+    fn infer_enum(&mut self, e: &EnumPattern) -> TermInfo {
         let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
-        for branch in alt.branches() {
-            let Some(label) = branch.label() else {
-                continue;
-            };
+        for branch in e.branches() {
+            let label = branch.label().expect("enum branch must have a label");
             let label_sym = self.ctx.interner.intern(label.text());
 
             // A BTreeMap would silently collapse duplicate labels, leaving the enum
@@ -273,11 +260,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         TermInfo::new(combined_arity, TypeFlow::Scalar(enum_type))
     }
 
-    fn infer_union_alt(&mut self, alt: &AltPattern) -> TermInfo {
+    fn infer_union(&mut self, union: &UnionPattern) -> TermInfo {
         let mut flows: Vec<TypeFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
-        for branch in alt.branches() {
+        for branch in union.branches() {
             if let Some(body) = branch.body() {
                 let info = self.infer_pattern(&body);
                 combined_arity = combined_arity.combine(info.arity);
@@ -285,7 +272,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
         }
 
-        for pattern in alt.patterns() {
+        for pattern in union.patterns() {
             let info = self.infer_pattern(&pattern);
             combined_arity = combined_arity.combine(info.arity);
             flows.push(info.flow);
@@ -294,7 +281,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let unified_flow = match unify_flows(self.ctx.type_ctx, flows) {
             Ok(flow) => flow,
             Err(err) => {
-                self.report_unify_error(alt.text_range(), &err);
+                self.report_unify_error(union.text_range(), &err);
                 TypeFlow::Void
             }
         };
@@ -830,8 +817,12 @@ impl Visitor for InferVisitor<'_, '_> {
         walk_seq_pattern(self, seq);
     }
 
-    fn visit_alt_pattern(&mut self, alt: &AltPattern) {
-        walk_alt_pattern(self, alt);
+    fn visit_union_pattern(&mut self, union: &UnionPattern) {
+        walk_union_pattern(self, union);
+    }
+
+    fn visit_enum_pattern(&mut self, e: &EnumPattern) {
+        walk_enum_pattern(self, e);
     }
 }
 

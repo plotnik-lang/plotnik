@@ -46,7 +46,7 @@ Root
 Root
   Def Q
     CapturedPattern @chain :: MemberChain
-      Alt
+      Enum
         Branch Base:
           CapturedPattern @name
             NamedNode identifier

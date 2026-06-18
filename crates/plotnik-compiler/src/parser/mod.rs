@@ -39,10 +39,11 @@ mod tests;
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub use ast::{
-    AltPattern, AltKind, Anchor, Branch, CapturedPattern, Def, Pattern, FieldPattern, TokenPattern,
+    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, Pattern, FieldPattern, TokenPattern,
     NegatedField, NodePattern, NodePredicate, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
-    RegexLiteral, Root, SeqPattern, SeqItem, Type, is_empty_group, token_src,
+    RegexLiteral, Root, SeqPattern, SeqItem, Type, UnionPattern, is_empty_group, token_src,
 };
+pub(crate) use ast::classify_alt;
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};
 

@@ -330,7 +330,9 @@ impl TypeTableBuilder {
         let bc_type_id = self.mapping.get(&type_id)?;
         let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
         match type_def.decode() {
-            TypeDefKind::Composite { member_start, .. } => Some(member_start),
+            TypeDefKind::Struct { member_start, .. } | TypeDefKind::Enum { member_start, .. } => {
+                Some(member_start)
+            }
             _ => None,
         }
     }

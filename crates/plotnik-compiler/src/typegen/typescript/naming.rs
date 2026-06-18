@@ -38,7 +38,7 @@ impl Emitter<'_> {
             }
 
             let type_def = self.types.def(i);
-            if !self.is_named_composite(&type_def) {
+            if !self.is_named_struct_or_enum(&type_def) {
                 continue;
             }
 
@@ -74,10 +74,7 @@ impl Emitter<'_> {
             TypeDefKind::Wrapper { inner, .. } => {
                 self.collect_naming_contexts(inner, ctx, contexts);
             }
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => {
+            TypeDefKind::Struct { .. } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
                 for member in self.types.members_of(&type_def) {
                     let member_name = self.strings.get(member.name_id);
@@ -89,23 +86,16 @@ impl Emitter<'_> {
                     self.collect_naming_contexts(inner_type, &field_ctx, contexts);
                 }
             }
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => {
+            TypeDefKind::Enum { .. } => {
                 contexts.entry(type_id).or_insert_with(|| ctx.clone());
             }
-            TypeDefKind::Composite { .. } => {}
         }
     }
 
-    pub(super) fn is_named_composite(&self, type_def: &plotnik_bytecode::TypeDef) -> bool {
+    pub(super) fn is_named_struct_or_enum(&self, type_def: &plotnik_bytecode::TypeDef) -> bool {
         matches!(
             type_def.decode(),
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct | TypeKind::Enum,
-                ..
-            }
+            TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. }
         )
     }
 
@@ -123,14 +113,8 @@ impl Emitter<'_> {
         type_def: &plotnik_bytecode::TypeDef,
     ) -> String {
         let base = match type_def.decode() {
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => "Struct",
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => "Enum",
+            TypeDefKind::Struct { .. } => "Struct",
+            TypeDefKind::Enum { .. } => "Enum",
             _ => "Type",
         };
         self.unique_name(base)

@@ -139,104 +139,100 @@ impl<'a> TypeVerifier<'a> {
                 _ => unreachable!(),
             },
 
-            TypeDefKind::Composite { kind, .. } => match kind {
-                TypeKind::Struct => match value {
-                    Value::Object(fields) => {
-                        // Collect first: `members_of` borrows `self.types`, which would
-                        // clash with the `&mut self` recursion inside the loop.
-                        let members: Vec<_> = self.types.members_of(&type_def).collect();
-                        for member in members {
-                            let field_name = self.strings.get(member.name_id);
-                            let (inner_type, is_optional) =
-                                self.types.unwrap_optional(member.type_id);
+            TypeDefKind::Struct { .. } => match value {
+                Value::Struct(fields) => {
+                    // Collect first: `members_of` borrows `self.types`, which would
+                    // clash with the `&mut self` recursion inside the loop.
+                    let members: Vec<_> = self.types.members_of(&type_def).collect();
+                    for member in members {
+                        let field_name = self.strings.get(member.name_id);
+                        let (inner_type, is_optional) = self.types.unwrap_optional(member.type_id);
 
-                            let field_value = fields.iter().find(|(k, _)| k == field_name);
-                            match field_value {
-                                Some((_, v)) => {
-                                    if is_optional && matches!(v, Value::Null) {
-                                        continue;
-                                    }
-                                    let prev_len = self.path.len();
-                                    self.path.push('.');
-                                    self.path.push_str(field_name);
-                                    self.verify(v, inner_type);
-                                    self.path.truncate(prev_len);
+                        let field_value = fields.iter().find(|(k, _)| k == field_name);
+                        match field_value {
+                            Some((_, v)) => {
+                                if is_optional && matches!(v, Value::Null) {
+                                    continue;
                                 }
-                                None => {
-                                    // Policy: every declared field is always present in
-                                    // the output — optional fields materialize as null,
-                                    // never as an absent key. A missing key is always a bug.
-                                    self.errors.push(format!(
+                                let prev_len = self.path.len();
+                                self.path.push('.');
+                                self.path.push_str(field_name);
+                                self.verify(v, inner_type);
+                                self.path.truncate(prev_len);
+                            }
+                            None => {
+                                // Policy: every declared field is always present in
+                                // the output — optional fields materialize as null,
+                                // never as an absent key. A missing key is always a bug.
+                                self.errors.push(format!(
                                         "{}: field missing (declared fields are always present; optionals as null)",
                                         append_path(&self.path, field_name)
                                     ));
-                                }
                             }
                         }
                     }
-                    _ => {
-                        self.errors.push(format_error(
-                            &self.path,
-                            &format!("type: object, value: {}", value_kind_name(value)),
-                        ));
-                    }
-                },
-                TypeKind::Enum => match value {
-                    Value::Enum { tag, data } => {
-                        let variant = self
-                            .types
-                            .members_of(&type_def)
-                            .find(|m| self.strings.get(m.name_id) == tag);
+                }
+                _ => {
+                    self.errors.push(format_error(
+                        &self.path,
+                        &format!("type: struct, value: {}", value_kind_name(value)),
+                    ));
+                }
+            },
+            TypeDefKind::Enum { .. } => match value {
+                Value::Enum { tag, data } => {
+                    let variant = self
+                        .types
+                        .members_of(&type_def)
+                        .find(|m| self.strings.get(m.name_id) == tag);
 
-                        match variant {
-                            Some(member) => {
-                                let is_void = self.types.get(member.type_id).is_some_and(|d| {
-                                    matches!(d.decode(), TypeDefKind::Primitive(TypeKind::Void))
-                                });
+                    match variant {
+                        Some(member) => {
+                            let is_void = self.types.get(member.type_id).is_some_and(|d| {
+                                matches!(d.decode(), TypeDefKind::Primitive(TypeKind::Void))
+                            });
 
-                                if is_void {
-                                    if data.is_some() {
+                            if is_void {
+                                if data.is_some() {
+                                    self.errors.push(format!(
+                                        "{}: void variant '{}' should have no $data",
+                                        append_path(&self.path, "$data"),
+                                        tag
+                                    ));
+                                }
+                            } else {
+                                match data {
+                                    Some(d) => {
+                                        let prev_len = self.path.len();
+                                        self.path.push_str(".$data");
+                                        self.verify(d, member.type_id);
+                                        self.path.truncate(prev_len);
+                                    }
+                                    None => {
                                         self.errors.push(format!(
-                                            "{}: void variant '{}' should have no $data",
+                                            "{}: non-void variant '{}' should have $data",
                                             append_path(&self.path, "$data"),
                                             tag
                                         ));
                                     }
-                                } else {
-                                    match data {
-                                        Some(d) => {
-                                            let prev_len = self.path.len();
-                                            self.path.push_str(".$data");
-                                            self.verify(d, member.type_id);
-                                            self.path.truncate(prev_len);
-                                        }
-                                        None => {
-                                            self.errors.push(format!(
-                                                "{}: non-void variant '{}' should have $data",
-                                                append_path(&self.path, "$data"),
-                                                tag
-                                            ));
-                                        }
-                                    }
                                 }
                             }
-                            None => {
-                                self.errors.push(format!(
-                                    "{}: unknown variant '{}'",
-                                    append_path(&self.path, "$tag"),
-                                    tag
-                                ));
-                            }
+                        }
+                        None => {
+                            self.errors.push(format!(
+                                "{}: unknown variant '{}'",
+                                append_path(&self.path, "$tag"),
+                                tag
+                            ));
                         }
                     }
-                    _ => {
-                        self.errors.push(format_error(
-                            &self.path,
-                            &format!("type: enum, value: {}", value_kind_name(value)),
-                        ));
-                    }
-                },
-                _ => unreachable!(),
+                }
+                _ => {
+                    self.errors.push(format_error(
+                        &self.path,
+                        &format!("type: enum, value: {}", value_kind_name(value)),
+                    ));
+                }
             },
         }
     }
@@ -248,7 +244,7 @@ fn value_kind_name(value: &Value) -> &'static str {
         Value::Null => "null",
         Value::Node(_) => "Node",
         Value::Array(_) => "array",
-        Value::Object(_) => "object",
+        Value::Struct(_) => "struct",
         Value::Enum { .. } => "enum",
     }
 }

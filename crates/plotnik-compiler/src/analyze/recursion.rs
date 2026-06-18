@@ -275,7 +275,7 @@ fn expr_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
             let children: Vec<_> = node.children().collect();
             children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc_names))
         }
-        Pattern::AltPattern(_) => pattern
+        Pattern::Union(_) | Pattern::Enum(_) => pattern
             .children()
             .iter()
             .any(|c| expr_has_escape(c, scc_names)),
@@ -303,7 +303,9 @@ fn expr_guarantees_consumption(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
         Pattern::Ref(_) => false,
-        Pattern::AltPattern(_) => pattern.children().iter().all(expr_guarantees_consumption),
+        Pattern::Union(_) | Pattern::Enum(_) => {
+            pattern.children().iter().all(expr_guarantees_consumption)
+        }
         Pattern::SeqPattern(_) => pattern.children().iter().any(expr_guarantees_consumption),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()

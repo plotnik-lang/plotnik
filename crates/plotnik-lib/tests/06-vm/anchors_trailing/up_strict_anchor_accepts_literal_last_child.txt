@@ -22,10 +22,10 @@ N0: S2 → T0  ; Q
 Q = 06 :: T0
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Q:
@@ -41,8 +41,8 @@ Q:
 ==== types ====
 export type Q = undefined;
 ==== trace ====
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -61,8 +61,8 @@ Q:
        ●   program
   14   ◀   (Q)                              
 
-_ObjWrap:
-  03  -ε-  [ObjectClose]                    05
-  05   ◀   _ObjWrap                         ◼
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
 ==== output ====
 null

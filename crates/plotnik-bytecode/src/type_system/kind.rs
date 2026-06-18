@@ -49,17 +49,12 @@ impl TypeKind {
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
     ///
     /// Wrapper types contain a single inner type.
-    /// Composite types (Struct, Enum) have named members.
+    /// Struct and Enum types carry named members instead.
     pub fn is_wrapper(self) -> bool {
         matches!(
             self,
             Self::Optional | Self::ArrayZeroOrMore | Self::ArrayOneOrMore
         )
-    }
-
-    /// Whether this is a composite type (Struct, Enum).
-    pub fn is_composite(self) -> bool {
-        matches!(self, Self::Struct | Self::Enum)
     }
 
     pub fn is_array(self) -> bool {

@@ -358,12 +358,15 @@ impl Module {
                         return Err(invalid());
                     }
                 }
-                TypeDefKind::Composite {
+                TypeDefKind::Struct {
                     member_start,
                     member_count,
-                    ..
+                }
+                | TypeDefKind::Enum {
+                    member_start,
+                    member_count,
                 } => {
-                    // Both fields carry meaning here; only the run bound applies.
+                    // Member-run bounds are identical for struct and enum.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }

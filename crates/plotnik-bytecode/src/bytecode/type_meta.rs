@@ -39,12 +39,10 @@ pub enum TypeDefKind {
     Primitive(TypeKind),
     /// Wrapper types: Optional, ArrayZeroOrMore, ArrayOneOrMore, Alias.
     Wrapper { kind: TypeKind, inner: TypeId },
-    /// Composite types: Struct, Enum.
-    Composite {
-        kind: TypeKind,
-        member_start: u16,
-        member_count: u8,
-    },
+    /// A fixed set of named fields.
+    Struct { member_start: u16, member_count: u8 },
+    /// A tagged set of variants.
+    Enum { member_start: u16, member_count: u8 },
 }
 
 impl TypeDef {
@@ -78,8 +76,10 @@ impl TypeDef {
         }
     }
 
-    /// Create a composite type (Struct, Enum).
-    pub fn composite(kind: TypeKind, member_start: u16, member_count: u8) -> Self {
+    /// Shared byte-writer for the two member-run kinds (Struct, Enum). The
+    /// `kind as u8` write here is the on-wire discriminant — `for_struct` and
+    /// `for_enum` are the only callers.
+    fn composite(kind: TypeKind, member_start: u16, member_count: u8) -> Self {
         Self {
             payload: member_start,
             count: member_count,
@@ -168,8 +168,11 @@ impl TypeDef {
                 kind,
                 inner: TypeId(self.payload),
             },
-            TypeKind::Struct | TypeKind::Enum => TypeDefKind::Composite {
-                kind,
+            TypeKind::Struct => TypeDefKind::Struct {
+                member_start: self.payload,
+                member_count: self.count,
+            },
+            TypeKind::Enum => TypeDefKind::Enum {
                 member_start: self.payload,
                 member_count: self.count,
             },

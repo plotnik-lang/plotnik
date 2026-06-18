@@ -34,10 +34,10 @@ N0: S3 → T1  ; Q
 Q = 06 :: T1
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Q:
@@ -55,8 +55,8 @@ export interface Q {
   b: Node;
 }
 ==== trace ====
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -73,8 +73,8 @@ Q:
        ●   program
   08   ◀   (Q)                              
 
-_ObjWrap:
-  03  -ε-  [ObjectClose]                    05
-  05   ◀   _ObjWrap                         ◼
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
 ==== output ====
 {"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]},"b":{"kind":"debugger_statement","text":"debugger;","span":[7, 16]}}

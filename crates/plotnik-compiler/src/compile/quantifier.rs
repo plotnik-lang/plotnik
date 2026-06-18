@@ -220,7 +220,7 @@ impl Compiler<'_> {
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
         // #470 and the suppressive `@_` panic. It emits the scope that matches the
-        // declared type (`Obj`/`Arr`/`Suppress`), closing it on both exits.
+        // declared type (`Struct`/`Arr`/`Suppress`), closing it on both exits.
         if let Pattern::CapturedPattern(cap) = pattern
             && let Some(inner) = cap.inner()
         {

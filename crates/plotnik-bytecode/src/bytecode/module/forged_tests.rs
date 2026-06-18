@@ -587,7 +587,7 @@ fn forged_entrypoint_into_instruction_interior_is_rejected() {
 fn forged_effect_set_to_push_is_rejected() {
     // Swap an executed `Set` (opcode 6) for `Push` (opcode 2). A loaded module
     // would accept it, then the materializer would panic because the builder on
-    // top is an Object, not an Array. The effect-stack verifier rejects it at
+    // top is a Struct, not an Array. The effect-stack verifier rejects it at
     // load instead.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = first_effect_op(&bytes, |op| op == 6);
@@ -604,8 +604,8 @@ fn forged_effect_set_to_push_is_rejected() {
 #[test]
 fn forged_scalar_capture_set_to_push_is_rejected() {
     // The minimal case: a scalar struct whose only effect is a `Set` into the
-    // preamble's root object. Forged to `Push`, the body now demands an Array
-    // top while the preamble hands it an Object — caught when the entrypoint
+    // preamble's root struct. Forged to `Push`, the body now demands an Array
+    // top while the preamble hands it a Struct — caught when the entrypoint
     // summary is checked against the preamble.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
     let slot = first_effect_op(&bytes, |op| op == 6);
@@ -621,8 +621,8 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn an `ObjectClose` (opcode 5) into a no-op `Node` (opcode 0): the struct's
-    // `ObjectOpen` is never closed, so the body returns with an open frame — the
+    // Turn a `StructClose` (opcode 5) into a no-op `Node` (opcode 0): the struct's
+    // `StructOpen` is never closed, so the body returns with an open frame — the
     // materializer would leave the builder stack unbalanced. Rejected as a
     // non-neutral body.
     let mut bytes = emit_bytes(STRUCT_QUERY);
@@ -630,7 +630,7 @@ fn forged_dropped_scope_close_is_rejected() {
     bytes[slot..slot + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load(&bytes).expect_err("forged dropped ObjectClose must be rejected");
+    let err = Module::load(&bytes).expect_err("forged dropped StructClose must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -655,10 +655,10 @@ fn forged_suppress_underflow_is_rejected() {
 }
 
 #[test]
-fn forged_preamble_without_root_object_is_rejected() {
-    // The shared preamble opens a root `ObjectOpen` before trampolining into the entry
-    // body, so the body always has an Object to `Set` into. Neutralize that `ObjectOpen`
-    // and its matching `ObjectClose` (turn both into no-op `Clear`s) and lie that the
+fn forged_preamble_without_root_struct_is_rejected() {
+    // The shared preamble opens a root `StructOpen` before trampolining into the entry
+    // body, so the body always has a Struct to `Set` into. Neutralize that `StructOpen`
+    // and its matching `StructClose` (turn both into no-op `Clear`s) and lie that the
     // result type is scalar: the entry's `Set` would then hit the materializer's
     // scalar root frame and panic. The preamble has no caller, so a requirement
     // bubbling out of it must be rejected, not silently dropped.
@@ -667,11 +667,11 @@ fn forged_preamble_without_root_object_is_rejected() {
         .expect("module loads before tampering")
         .offsets()
         .entrypoints as usize;
-    let obj_slot = first_effect_op(&bytes, |op| op == 4); // preamble ObjectOpen
-    let endobj_slot = first_effect_op(&bytes, |op| op == 5); // preamble ObjectClose
+    let struct_open_slot = first_effect_op(&bytes, |op| op == 4); // preamble StructOpen
+    let struct_close_slot = first_effect_op(&bytes, |op| op == 5); // preamble StructClose
 
-    bytes[obj_slot..obj_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
-    bytes[endobj_slot..endobj_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
+    bytes[struct_open_slot..struct_open_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
+    bytes[struct_close_slot..struct_close_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
     // Result type T1 (struct) -> T0 (scalar <Node>): the root frame is now a Scalar.
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);

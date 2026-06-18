@@ -50,7 +50,7 @@ Root
 Root
   Def Q
     CapturedPattern @stmt
-      Alt
+      Enum
         Branch Assign:
           NamedNode assignment_expression
             CapturedPattern @left

@@ -156,9 +156,9 @@ pub enum RuntimeEffect<'t> {
     ArrayOpen,
     Push,
     ArrayClose,
-    ObjectOpen,
+    StructOpen,
     Set(u16),         // member index
-    ObjectClose,
+    StructClose,
     EnumOpen(u16),    // variant index
     EnumClose,
     Clear,
@@ -173,7 +173,7 @@ Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 | Effect                  | Action                                    |
 | ----------------------- | ----------------------------------------- |
 | Node(n)                 | Capture node `n`                          |
-| ObjectOpen/ObjectClose  | Object boundaries                         |
+| StructOpen/StructClose  | Struct boundaries                         |
 | Set(idx)                | Assign to field at member index           |
 | ArrayOpen/ArrayClose    | Array boundaries                          |
 | Push                    | Append to array                           |

@@ -13,7 +13,7 @@ pub fn ensure_both_branch_kinds<'a>(
         (Some(t), Some(u)) => (t, u),
         _ => panic!(
             "alt_kind: Mixed alternation without both enum and union branches \
-             (should be caught by AltKind::compute_kind)"
+             (classify_alt returns Mixed only when both are present)"
         ),
     }
 }

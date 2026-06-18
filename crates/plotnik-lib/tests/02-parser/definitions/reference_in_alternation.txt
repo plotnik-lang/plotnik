@@ -46,13 +46,13 @@ Root
 # query.ptk
 Root
   Def Literal
-    Alt
+    Union
       Branch
         NamedNode number
       Branch
         NamedNode string
   Def Expr
-    Alt
+    Union
       Branch
         NamedNode identifier
       Branch
