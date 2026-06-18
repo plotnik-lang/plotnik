@@ -6,9 +6,9 @@
 use std::collections::HashSet;
 
 use crate::analyze::type_check::{CaptureMechanism, TypeContext, TypeId, TypeShape};
-use crate::bytecode::EffectIR;
+use crate::bytecode::{EffectIR, Label};
 use crate::parser::ast::{self, Expr};
-use plotnik_bytecode::EffectOpcode;
+use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
 
@@ -101,6 +101,29 @@ impl CaptureEffects {
     pub fn with_post_values(mut self, effects: Vec<EffectIR>) -> Self {
         self.post.splice(0..0, effects);
         self
+    }
+}
+
+/// The backbone calling convention threaded through the `compile_*_inner` family.
+///
+/// Bundles the three values every expression compiler needs: where the compiled
+/// fragment continues (`exit`), the navigation it should apply to reach its first
+/// candidate (`nav`, `None` meaning "use the form's default"), and the capture
+/// effects that land on its innermost match/scope-close instruction (`capture`).
+#[derive(Clone)]
+pub(super) struct ExprCtx {
+    pub exit: Label,
+    pub nav: Option<Nav>,
+    pub capture: CaptureEffects,
+}
+
+impl ExprCtx {
+    pub(super) fn with_nav(exit: Label, nav: Option<Nav>) -> Self {
+        Self {
+            exit,
+            nav,
+            capture: CaptureEffects::default(),
+        }
     }
 }
 

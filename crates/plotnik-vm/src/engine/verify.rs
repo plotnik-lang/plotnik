@@ -15,20 +15,10 @@ use super::Value;
 /// No-op in release builds.
 #[cfg(debug_assertions)]
 pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, colors: Colors) {
-    let types = module.types();
-    let strings = module.strings();
-
-    let mut errors = Vec::new();
-    verify_type(
-        value,
-        declared_type,
-        &types,
-        &strings,
-        &mut String::new(),
-        &mut errors,
-    );
-    if !errors.is_empty() {
-        panic_with_mismatch(value, declared_type, &errors, module, colors);
+    let mut verifier = TypeVerifier::new(module);
+    verifier.verify(value, declared_type);
+    if !verifier.errors.is_empty() {
+        panic_with_mismatch(value, declared_type, &verifier.errors, module, colors);
     }
 }
 
@@ -42,200 +32,213 @@ pub fn debug_verify_type(
 ) {
 }
 
+/// Walks a materialized `Value` against its declared type, accumulating
+/// mismatches. Bundles the always-paired `(TypesView, StringsView)` and owns the
+/// recursion's `path` cursor and `errors` sink so the walker needs no out-params.
 #[cfg(debug_assertions)]
-fn verify_type(
-    value: &Value,
-    declared: TypeId,
-    types: &TypesView<'_>,
-    strings: &StringsView<'_>,
-    path: &mut String,
-    errors: &mut Vec<String>,
-) {
-    let Some(type_def) = types.get(declared) else {
-        errors.push(format_error(
-            path,
-            &format!("unknown type id {}", declared.0),
-        ));
-        return;
-    };
+struct TypeVerifier<'a> {
+    types: TypesView<'a>,
+    strings: StringsView<'a>,
+    path: String,
+    errors: Vec<String>,
+}
 
-    match type_def.classify() {
-        TypeData::Primitive(kind) => match kind {
-            TypeKind::Void => {
-                if !matches!(value, Value::Null) {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: void, value: {}", value_kind_name(value)),
-                    ));
-                }
-            }
-            TypeKind::Node => {
-                if !matches!(value, Value::Node(_)) {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: Node, value: {}", value_kind_name(value)),
-                    ));
-                }
-            }
-            _ => unreachable!(),
-        },
+#[cfg(debug_assertions)]
+impl<'a> TypeVerifier<'a> {
+    fn new(module: &'a Module) -> Self {
+        Self {
+            types: module.types(),
+            strings: module.strings(),
+            path: String::new(),
+            errors: Vec::new(),
+        }
+    }
 
-        TypeData::Wrapper { kind, inner } => match kind {
-            TypeKind::Alias => {
-                if !matches!(value, Value::Node(_)) {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: Node (alias), value: {}", value_kind_name(value)),
-                    ));
-                }
-            }
-            TypeKind::Optional => {
-                if !matches!(value, Value::Null) {
-                    verify_type(value, inner, types, strings, path, errors);
-                }
-            }
-            TypeKind::ArrayZeroOrMore => match value {
-                Value::Array(items) => {
-                    for (i, item) in items.iter().enumerate() {
-                        let prev_len = path.len();
-                        path.push_str(&format!("[{}]", i));
-                        verify_type(item, inner, types, strings, path, errors);
-                        path.truncate(prev_len);
-                    }
-                }
-                _ => {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: array, value: {}", value_kind_name(value)),
-                    ));
-                }
-            },
-            TypeKind::ArrayOneOrMore => match value {
-                Value::Array(items) => {
-                    if items.is_empty() {
-                        errors.push(format_error(
-                            path,
-                            "type: non-empty array, value: empty array",
+    fn verify(&mut self, value: &Value, declared: TypeId) {
+        let Some(type_def) = self.types.get(declared) else {
+            self.errors.push(format_error(
+                &self.path,
+                &format!("unknown type id {}", declared.0),
+            ));
+            return;
+        };
+
+        match type_def.classify() {
+            TypeData::Primitive(kind) => match kind {
+                TypeKind::Void => {
+                    if !matches!(value, Value::Null) {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: void, value: {}", value_kind_name(value)),
                         ));
                     }
-                    for (i, item) in items.iter().enumerate() {
-                        let prev_len = path.len();
-                        path.push_str(&format!("[{}]", i));
-                        verify_type(item, inner, types, strings, path, errors);
-                        path.truncate(prev_len);
+                }
+                TypeKind::Node => {
+                    if !matches!(value, Value::Node(_)) {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: Node, value: {}", value_kind_name(value)),
+                        ));
                     }
                 }
-                _ => {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: array, value: {}", value_kind_name(value)),
-                    ));
-                }
+                _ => unreachable!(),
             },
-            _ => unreachable!(),
-        },
 
-        TypeData::Composite { kind, .. } => match kind {
-            TypeKind::Struct => match value {
-                Value::Object(fields) => {
-                    for member in types.members_of(&type_def) {
-                        let field_name = strings.get(member.name);
-                        let (inner_type, is_optional) = types.unwrap_optional(member.type_id);
+            TypeData::Wrapper { kind, inner } => match kind {
+                TypeKind::Alias => {
+                    if !matches!(value, Value::Node(_)) {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: Node (alias), value: {}", value_kind_name(value)),
+                        ));
+                    }
+                }
+                TypeKind::Optional => {
+                    if !matches!(value, Value::Null) {
+                        self.verify(value, inner);
+                    }
+                }
+                TypeKind::ArrayZeroOrMore => match value {
+                    Value::Array(items) => {
+                        for (i, item) in items.iter().enumerate() {
+                            let prev_len = self.path.len();
+                            self.path.push_str(&format!("[{}]", i));
+                            self.verify(item, inner);
+                            self.path.truncate(prev_len);
+                        }
+                    }
+                    _ => {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: array, value: {}", value_kind_name(value)),
+                        ));
+                    }
+                },
+                TypeKind::ArrayOneOrMore => match value {
+                    Value::Array(items) => {
+                        if items.is_empty() {
+                            self.errors.push(format_error(
+                                &self.path,
+                                "type: non-empty array, value: empty array",
+                            ));
+                        }
+                        for (i, item) in items.iter().enumerate() {
+                            let prev_len = self.path.len();
+                            self.path.push_str(&format!("[{}]", i));
+                            self.verify(item, inner);
+                            self.path.truncate(prev_len);
+                        }
+                    }
+                    _ => {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: array, value: {}", value_kind_name(value)),
+                        ));
+                    }
+                },
+                _ => unreachable!(),
+            },
 
-                        let field_value = fields.iter().find(|(k, _)| k == field_name);
-                        match field_value {
-                            Some((_, v)) => {
-                                if is_optional && matches!(v, Value::Null) {
-                                    continue;
+            TypeData::Composite { kind, .. } => match kind {
+                TypeKind::Struct => match value {
+                    Value::Object(fields) => {
+                        // Collect first: `members_of` borrows `self.types`, which would
+                        // clash with the `&mut self` recursion inside the loop.
+                        let members: Vec<_> = self.types.members_of(&type_def).collect();
+                        for member in members {
+                            let field_name = self.strings.get(member.name);
+                            let (inner_type, is_optional) =
+                                self.types.unwrap_optional(member.type_id);
+
+                            let field_value = fields.iter().find(|(k, _)| k == field_name);
+                            match field_value {
+                                Some((_, v)) => {
+                                    if is_optional && matches!(v, Value::Null) {
+                                        continue;
+                                    }
+                                    let prev_len = self.path.len();
+                                    self.path.push('.');
+                                    self.path.push_str(field_name);
+                                    self.verify(v, inner_type);
+                                    self.path.truncate(prev_len);
                                 }
-                                let prev_len = path.len();
-                                path.push('.');
-                                path.push_str(field_name);
-                                verify_type(v, inner_type, types, strings, path, errors);
-                                path.truncate(prev_len);
+                                None => {
+                                    // Policy: every declared field is always present in
+                                    // the output — optional fields materialize as null,
+                                    // never as an absent key. A missing key is always a bug.
+                                    self.errors.push(format!(
+                                        "{}: field missing (declared fields are always present; optionals as null)",
+                                        append_path(&self.path, field_name)
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: object, value: {}", value_kind_name(value)),
+                        ));
+                    }
+                },
+                TypeKind::Enum => match value {
+                    Value::Tagged { tag, data } => {
+                        let variant = self
+                            .types
+                            .members_of(&type_def)
+                            .find(|m| self.strings.get(m.name) == tag);
+
+                        match variant {
+                            Some(member) => {
+                                let is_void = self.types.get(member.type_id).is_some_and(|d| {
+                                    matches!(d.classify(), TypeData::Primitive(TypeKind::Void))
+                                });
+
+                                if is_void {
+                                    if data.is_some() {
+                                        self.errors.push(format!(
+                                            "{}: void variant '{}' should have no $data",
+                                            append_path(&self.path, "$data"),
+                                            tag
+                                        ));
+                                    }
+                                } else {
+                                    match data {
+                                        Some(d) => {
+                                            let prev_len = self.path.len();
+                                            self.path.push_str(".$data");
+                                            self.verify(d, member.type_id);
+                                            self.path.truncate(prev_len);
+                                        }
+                                        None => {
+                                            self.errors.push(format!(
+                                                "{}: non-void variant '{}' should have $data",
+                                                append_path(&self.path, "$data"),
+                                                tag
+                                            ));
+                                        }
+                                    }
+                                }
                             }
                             None => {
-                                // Policy: every declared field is always present in
-                                // the output — optional fields materialize as null,
-                                // never as an absent key. A missing key is always a bug.
-                                errors.push(format!(
-                                    "{}: field missing (declared fields are always present; optionals as null)",
-                                    append_path(path, field_name)
+                                self.errors.push(format!(
+                                    "{}: unknown variant '{}'",
+                                    append_path(&self.path, "$tag"),
+                                    tag
                                 ));
                             }
                         }
                     }
-                }
-                _ => {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: object, value: {}", value_kind_name(value)),
-                    ));
-                }
-            },
-            TypeKind::Enum => match value {
-                Value::Tagged { tag, data } => {
-                    let variant = types
-                        .members_of(&type_def)
-                        .find(|m| strings.get(m.name) == tag);
-
-                    match variant {
-                        Some(member) => {
-                            let is_void = types.get(member.type_id).is_some_and(|d| {
-                                matches!(d.classify(), TypeData::Primitive(TypeKind::Void))
-                            });
-
-                            if is_void {
-                                if data.is_some() {
-                                    errors.push(format!(
-                                        "{}: void variant '{}' should have no $data",
-                                        append_path(path, "$data"),
-                                        tag
-                                    ));
-                                }
-                            } else {
-                                match data {
-                                    Some(d) => {
-                                        let prev_len = path.len();
-                                        path.push_str(".$data");
-                                        verify_type(
-                                            d,
-                                            member.type_id,
-                                            types,
-                                            strings,
-                                            path,
-                                            errors,
-                                        );
-                                        path.truncate(prev_len);
-                                    }
-                                    None => {
-                                        errors.push(format!(
-                                            "{}: non-void variant '{}' should have $data",
-                                            append_path(path, "$data"),
-                                            tag
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                        None => {
-                            errors.push(format!(
-                                "{}: unknown variant '{}'",
-                                append_path(path, "$tag"),
-                                tag
-                            ));
-                        }
+                    _ => {
+                        self.errors.push(format_error(
+                            &self.path,
+                            &format!("type: tagged union, value: {}", value_kind_name(value)),
+                        ));
                     }
-                }
-                _ => {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: tagged union, value: {}", value_kind_name(value)),
-                    ));
-                }
+                },
+                _ => unreachable!(),
             },
-            _ => unreachable!(),
-        },
+        }
     }
 }
 

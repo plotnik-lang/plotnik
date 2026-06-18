@@ -14,11 +14,12 @@ use crate::parser::ast::{self, Expr, SeqItem};
 use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
-use super::capture::CaptureEffects;
+use super::capture::{CaptureEffects, ExprCtx};
 use super::navigation::{
     AnonymousClassifier, compute_nav_modes, expr_owns_iteration, is_down_nav,
     is_skippable_quantifier, resumable_search_nav,
 };
+use super::scope::SplitExits;
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last expression as anchor-followed.
@@ -37,8 +38,16 @@ fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
     }
 }
 
-fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: Option<Nav>) -> Option<Nav> {
-    if search_nav.is_some() {
+/// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
+/// distinct from a branch's `first_nav` so the two adjacent `Option<Nav>` inputs
+/// to [`nav_for_alt_branch`] cannot be transposed. `Some` means the alternation
+/// owns the retry wrapper and each branch matches exactly at the candidate
+/// (`StayExact`).
+#[derive(Clone, Copy)]
+struct SearchNav(Option<Nav>);
+
+fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: SearchNav) -> Option<Nav> {
+    if search_nav.0.is_some() {
         return Some(Nav::StayExact);
     }
 
@@ -59,7 +68,7 @@ fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: Option<Nav>) -> 
 
 fn nav_for_alt_branch(
     first_nav: Option<Nav>,
-    search_nav: Option<Nav>,
+    search_nav: SearchNav,
     body: &Expr,
     classifier: &AnonymousClassifier<'_>,
 ) -> Option<Nav> {
@@ -111,13 +120,12 @@ pub(super) struct SeqItemsCtx<'a> {
 }
 
 impl Compiler<'_> {
-    pub(super) fn compile_seq_inner(
-        &mut self,
-        seq: &ast::SeqExpr,
-        exit: Label,
-        first_nav: Option<Nav>,
-        capture: CaptureEffects,
-    ) -> Label {
+    pub(super) fn compile_seq_inner(&mut self, seq: &ast::SeqExpr, ctx: ExprCtx) -> Label {
+        let ExprCtx {
+            exit,
+            nav: first_nav,
+            capture,
+        } = ctx;
         let items: Vec<_> = seq.items().collect();
         if items.is_empty() {
             return exit;
@@ -190,13 +198,15 @@ impl Compiler<'_> {
 
         if needs_skip_exit {
             return self.compile_seq_items_with_skip_exit(
-                items,
                 &nav_modes,
-                exit,
-                is_inside_node,
-                first_expr_nav,
-                capture,
-                skip_exit,
+                SeqItemsCtx {
+                    items,
+                    exit,
+                    is_inside_node,
+                    first_nav: first_expr_nav,
+                    capture,
+                    skip_exit,
+                },
             );
         }
 
@@ -266,11 +276,24 @@ impl Compiler<'_> {
                 .filter(|_| followed_by_anchor && !expr_owns_iteration(expr));
 
             current_exit = if let Some(nav) = search_nav {
-                let body =
-                    self.compile_expr_inner(expr, current_exit, Some(Nav::StayExact), item_capture);
+                let body = self.compile_expr_inner(
+                    expr,
+                    ExprCtx {
+                        exit: current_exit,
+                        nav: Some(Nav::StayExact),
+                        capture: item_capture,
+                    },
+                );
                 self.emit_position_search(nav, body)
             } else {
-                self.compile_expr_inner(expr, current_exit, nav_override, item_capture)
+                self.compile_expr_inner(
+                    expr,
+                    ExprCtx {
+                        exit: current_exit,
+                        nav: nav_override,
+                        capture: item_capture,
+                    },
+                )
             };
             following_nav = nav_override;
         }
@@ -293,19 +316,21 @@ impl Compiler<'_> {
     /// both the skip and match paths. Merging them onto items instead would drop the
     /// open on the skip path (skippable first item) and leave the path unbalanced.
     ///
-    /// When `caller_skip_exit` is provided and there are no remaining items, the skip
+    /// When `ctx.skip_exit` is provided and there are no remaining items, the skip
     /// path uses this exit (to bypass Up in parent node) while match path uses `exit`.
-    #[allow(clippy::too_many_arguments)]
     fn compile_seq_items_with_skip_exit(
         &mut self,
-        items: &[SeqItem],
         nav_modes: &[(usize, Option<Nav>)],
-        exit: Label,
-        is_inside_node: bool,
-        first_nav: Option<Nav>,
-        capture: CaptureEffects,
-        caller_skip_exit: Option<Label>,
+        ctx: SeqItemsCtx<'_>,
     ) -> Label {
+        let SeqItemsCtx {
+            items,
+            exit,
+            is_inside_node,
+            first_nav,
+            capture,
+            skip_exit: caller_skip_exit,
+        } = ctx;
         let first_expr_idx = nav_modes[0].0;
         let first_expr = items[first_expr_idx]
             .as_expr()
@@ -378,8 +403,15 @@ impl Compiler<'_> {
             (skip, mtch, CaptureEffects::default())
         };
 
-        let entry = self
-            .compile_skippable_with_exits(first_expr, match_exit, skip_exit, first_nav, first_post);
+        let entry = self.compile_skippable_with_exits(
+            first_expr,
+            SplitExits {
+                match_exit,
+                skip_exit,
+            },
+            first_nav,
+            first_post,
+        );
 
         // Open the scope on a single entry epsilon every path crosses first.
         self.wrap_entry_pre(entry, capture.pre.clone())
@@ -421,13 +453,12 @@ impl Compiler<'_> {
     }
 
     /// Compile an alternation with capture effects (passed to each branch).
-    pub(super) fn compile_alt_inner(
-        &mut self,
-        alt: &ast::AltExpr,
-        exit: Label,
-        first_nav: Option<Nav>,
-        capture: CaptureEffects,
-    ) -> Label {
+    pub(super) fn compile_alt_inner(&mut self, alt: &ast::AltExpr, ctx: ExprCtx) -> Label {
+        let ExprCtx {
+            exit,
+            nav: first_nav,
+            capture,
+        } = ctx;
         let branches: Vec<_> = alt.branches().collect();
         if branches.is_empty() {
             return exit;
@@ -464,6 +495,7 @@ impl Compiler<'_> {
         // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
         // wrapper below; otherwise the branch performs the exact navigation.
         let search_nav = resumable_search_nav(first_nav);
+        let branch_search = SearchNav(search_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
 
         // A branch is "named" (eligible for the soft-skip follower twin) when it
@@ -508,7 +540,7 @@ impl Compiler<'_> {
             };
 
             if is_enum {
-                let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
+                let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
 
                 // Look up variant info by branch label (using BTreeMap order, not AST order)
                 let label = branch.label().expect("tagged branch must have label");
@@ -530,7 +562,14 @@ impl Compiler<'_> {
                 let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
 
                 let body_entry = self.with_scope(payload_type_id, |this| {
-                    this.compile_expr_inner(&body, branch_exit, branch_nav, branch_capture)
+                    this.compile_expr_inner(
+                        &body,
+                        ExprCtx {
+                            exit: branch_exit,
+                            nav: branch_nav,
+                            capture: branch_capture,
+                        },
+                    )
                 });
 
                 successors.push(body_entry);
@@ -588,9 +627,15 @@ impl Compiler<'_> {
 
                 let branch_capture = capture.clone().with_pre_values(null_effects);
 
-                let branch_nav = nav_for_alt_branch(first_nav, search_nav, &body, &classifier);
-                let branch_entry =
-                    self.compile_expr_inner(&body, branch_exit, branch_nav, branch_capture);
+                let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
+                let branch_entry = self.compile_expr_inner(
+                    &body,
+                    ExprCtx {
+                        exit: branch_exit,
+                        nav: branch_nav,
+                        capture: branch_capture,
+                    },
+                );
                 successors.push(branch_entry);
             }
         }

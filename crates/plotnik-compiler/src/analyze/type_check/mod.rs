@@ -45,7 +45,14 @@ pub fn infer_types(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeContext {
-    infer::InferencePass::new(interner, ast_map, symbol_table, dependency_analysis, diag).run()
+    let analysis = infer::AnalysisCtx {
+        interner,
+        ast_map,
+        symbol_table,
+        dependency_analysis,
+        diag,
+    };
+    infer::InferencePass::new(analysis).run()
 }
 
 /// Get the primary definition name (first non-underscore, or underscore if none).

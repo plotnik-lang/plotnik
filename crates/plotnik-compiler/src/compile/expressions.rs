@@ -18,19 +18,22 @@ use plotnik_core::NodeType;
 use crate::analyze::type_check::{CaptureMechanism, capture_mechanism};
 
 use super::Compiler;
-use super::capture::CaptureEffects;
+use super::capture::{CaptureEffects, ExprCtx};
 use super::navigation::check_trailing_anchor;
-use super::scope::CaptureExits;
+use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 impl Compiler<'_> {
     pub(super) fn compile_named_node_inner(
         &mut self,
         node: &ast::NamedNode,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
+        ctx: ExprCtx,
     ) -> Label {
+        let ExprCtx {
+            exit,
+            nav: nav_override,
+            capture,
+        } = ctx;
         let entry = self.fresh_label();
         let node_type = self.resolve_node_type(node);
         let nav = nav_override.unwrap_or(Nav::Stay);
@@ -132,10 +135,13 @@ impl Compiler<'_> {
     pub(super) fn compile_anonymous_node_inner(
         &mut self,
         node: &ast::AnonymousNode,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
+        ctx: ExprCtx,
     ) -> Label {
+        let ExprCtx {
+            exit,
+            nav: nav_override,
+            capture,
+        } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
 
@@ -166,11 +172,14 @@ impl Compiler<'_> {
     pub(super) fn compile_ref_inner(
         &mut self,
         r: &ast::Ref,
-        exit: Label,
-        nav_override: Option<Nav>,
+        ctx: ExprCtx,
         field_override: Option<NonZeroU16>,
-        capture: CaptureEffects,
     ) -> Label {
+        let ExprCtx {
+            exit,
+            nav: nav_override,
+            capture,
+        } = ctx;
         let Some(name_token) = r.name() else {
             return exit;
         };
@@ -242,13 +251,12 @@ impl Compiler<'_> {
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    pub(super) fn compile_field_inner(
-        &mut self,
-        field: &ast::FieldExpr,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
-    ) -> Label {
+    pub(super) fn compile_field_inner(&mut self, field: &ast::FieldExpr, ctx: ExprCtx) -> Label {
+        let ExprCtx {
+            exit,
+            nav: nav_override,
+            capture,
+        } = ctx;
         let Some(value) = field.value() else {
             return exit;
         };
@@ -256,7 +264,15 @@ impl Compiler<'_> {
         let node_field = self.resolve_field(field);
 
         if let Expr::Ref(r) = &value {
-            return self.compile_ref_inner(r, exit, nav_override, node_field, capture);
+            return self.compile_ref_inner(
+                r,
+                ExprCtx {
+                    exit,
+                    nav: nav_override,
+                    capture,
+                },
+                node_field,
+            );
         }
 
         // Alternations, sequences, and quantified patterns emit an epsilon entry and
@@ -269,7 +285,14 @@ impl Compiler<'_> {
             );
 
         if needs_wrapper {
-            let value_entry = self.compile_expr_inner(&value, exit, None, capture);
+            let value_entry = self.compile_expr_inner(
+                &value,
+                ExprCtx {
+                    exit,
+                    nav: None,
+                    capture,
+                },
+            );
 
             let entry = self.fresh_label();
             self.instructions.push(
@@ -281,7 +304,14 @@ impl Compiler<'_> {
             return entry;
         }
 
-        let value_entry = self.compile_expr_inner(&value, exit, nav_override, capture);
+        let value_entry = self.compile_expr_inner(
+            &value,
+            ExprCtx {
+                exit,
+                nav: nav_override,
+                capture,
+            },
+        );
 
         if let Some(field_id) = node_field {
             if let Some(instr) = self
@@ -361,31 +391,27 @@ impl Compiler<'_> {
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
             CaptureMechanism::Array => self.compile_array_capture(
-                &inner,
-                nav_override,
-                capture_effects,
-                outer_capture,
+                CaptureRequest {
+                    inner: &inner,
+                    nav: nav_override,
+                    capture_effects,
+                    outer_capture,
+                },
                 exits,
             ),
 
             // Struct scope: Obj → inner → EndObj+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureMechanism::StructScope => {
-                let scope_type_id = self
-                    .ctx
-                    .type_ctx
-                    .get_term_info(&inner)
-                    .and_then(|info| info.flow.type_id());
-                self.compile_struct_capture(
-                    &inner,
-                    nav_override,
-                    scope_type_id,
+            CaptureMechanism::StructScope => self.compile_struct_capture(
+                CaptureRequest {
+                    inner: &inner,
+                    nav: nav_override,
                     capture_effects,
                     outer_capture,
-                    exits,
-                )
-            }
+                },
+                exits,
+            ),
 
             // Node/Ref/SetAfter own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
@@ -403,93 +429,108 @@ impl Compiler<'_> {
                     let combined = outer_capture.with_post_values(capture_effects);
                     self.compile_skippable_with_exits(
                         &inner,
-                        match_exit,
-                        skip_exit,
+                        SplitExits {
+                            match_exit,
+                            skip_exit,
+                        },
                         nav_override,
                         combined,
                     )
                 }
-                CaptureExits::Single(exit) => self.compile_passthrough_capture(
-                    mechanism,
-                    &inner,
-                    exit,
-                    nav_override,
-                    capture_effects,
-                    outer_capture,
-                ),
+                CaptureExits::Single(exit) => {
+                    let req = CaptureRequest {
+                        inner: &inner,
+                        nav: nav_override,
+                        capture_effects,
+                        outer_capture,
+                    };
+                    match mechanism {
+                        CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
+                        CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
+                        CaptureMechanism::Node => self.compile_node_capture(req, exit),
+                        CaptureMechanism::Array | CaptureMechanism::StructScope => {
+                            unreachable!("scope mechanisms are handled above in compile_captured")
+                        }
+                    }
+                }
             },
         }
     }
 
-    /// Single-exit lowering for the pass-through mechanisms (Node/Ref/SetAfter):
-    /// the captured value is produced by the inner itself, so the capture emits no
-    /// scope — only a trailing `Set` (plus `Node` for a plain node).
-    fn compile_passthrough_capture(
-        &mut self,
-        mechanism: CaptureMechanism,
-        inner: &Expr,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
-    ) -> Label {
-        match mechanism {
-            // Set-after: the inner leaves the value pending (tagged alternation or a
-            // named node forwarding a structured child). Emit the inner, then a
-            // trailing Set; no Node, no wrapper.
-            CaptureMechanism::SetAfter => {
-                let CaptureEffects { pre, post } = outer_capture;
-                let set_step = self.emit_effects_epsilon(
-                    exit,
-                    capture_effects,
-                    CaptureEffects::new_post(post),
-                );
-                let inner_entry = self.compile_expr_inner(
-                    inner,
-                    set_step,
-                    nav_override,
-                    CaptureEffects::default(),
-                );
-                // The enclosing variant's `Enum`-open (in `pre`) must run before the
-                // inner produces its pending value; routing it through the trailing
-                // `Set` step would drop it and unbalance the scope.
-                self.wrap_entry_pre(inner_entry, pre)
-            }
+    /// Single-exit lowering for a `SetAfter` capture: the inner leaves the value
+    /// pending (tagged alternation or a named node forwarding a structured child).
+    fn compile_setafter_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
+        let CaptureRequest {
+            inner,
+            nav: nav_override,
+            capture_effects,
+            outer_capture,
+        } = req;
+        let CaptureEffects { pre, post } = outer_capture;
+        let set_step =
+            self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
+        let inner_entry =
+            self.compile_expr_inner(inner, ExprCtx::with_nav(set_step, nav_override));
+        // The enclosing variant's `Enum`-open (in `pre`) must run before the
+        // inner produces its pending value; routing it through the trailing
+        // `Set` step would drop it and unbalance the scope.
+        self.wrap_entry_pre(inner_entry, pre)
+    }
 
-            // Ref: hand the capture to the call site, which wraps Call/Return (and
-            // Obj/EndObj for struct-returning definitions) to isolate the
-            // definition's internal captures before the Set.
-            CaptureMechanism::Ref => {
-                let combined = outer_capture.with_post_values(capture_effects);
-                self.compile_expr_inner(inner, exit, nav_override, combined)
-            }
+    /// Single-exit lowering for a `Ref` capture: hand the capture to the call
+    /// site, which wraps Call/Return (and Obj/EndObj for struct-returning
+    /// definitions) to isolate the definition's internal captures before the Set.
+    fn compile_ref_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
+        let CaptureRequest {
+            inner,
+            nav: nav_override,
+            capture_effects,
+            outer_capture,
+        } = req;
+        let combined = outer_capture.with_post_values(capture_effects);
+        self.compile_expr_inner(
+            inner,
+            ExprCtx {
+                exit,
+                nav: nav_override,
+                capture: combined,
+            },
+        )
+    }
 
-            // Bubbling children, if any, set into the current scope alongside the capture.
-            CaptureMechanism::Node => {
-                let inner_is_bubble = self
-                    .ctx
-                    .type_ctx
-                    .get_term_info(inner)
-                    .is_some_and(|info| info.flow.is_bubble());
-                if inner_is_bubble {
-                    self.compile_bubble_with_node_capture(
-                        inner,
-                        exit,
-                        nav_override,
-                        None,
-                        capture_effects,
-                        outer_capture,
-                    )
-                } else {
-                    let combined = outer_capture.with_post_values(capture_effects);
-                    self.compile_expr_inner(inner, exit, nav_override, combined)
-                }
-            }
-
-            CaptureMechanism::Array | CaptureMechanism::StructScope => {
-                unreachable!("scope mechanisms are handled by compile_captured")
-            }
+    /// Single-exit lowering for a `Node` capture. Bubbling children, if any, set
+    /// into the current scope alongside the capture.
+    fn compile_node_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
+        let CaptureRequest {
+            inner,
+            nav: nav_override,
+            capture_effects,
+            outer_capture,
+        } = req;
+        let inner_is_bubble = self
+            .ctx
+            .type_ctx
+            .get_term_info(inner)
+            .is_some_and(|info| info.flow.is_bubble());
+        if inner_is_bubble {
+            return self.compile_bubble_with_node_capture(
+                inner,
+                exit,
+                nav_override,
+                None,
+                capture_effects,
+                outer_capture,
+            );
         }
+        let combined = outer_capture.with_post_values(capture_effects);
+        self.compile_expr_inner(
+            inner,
+            ExprCtx {
+                exit,
+                nav: nav_override,
+                capture: combined,
+            },
+        )
     }
 
     /// Compile a suppressive capture (`@_`/`@_name`): wrap the inner in
@@ -529,7 +570,7 @@ impl Compiler<'_> {
                     vec![EffectIR::suppress_end()],
                     CaptureEffects::new_post(post),
                 );
-                self.compile_expr_inner(inner, end_label, nav_override, CaptureEffects::default())
+                self.compile_expr_inner(inner, ExprCtx::with_nav(end_label, nav_override))
             }
             CaptureExits::Split {
                 match_exit,
@@ -547,8 +588,10 @@ impl Compiler<'_> {
                 );
                 self.compile_skippable_with_exits(
                     inner,
-                    end_match,
-                    end_skip,
+                    SplitExits {
+                        match_exit: end_match,
+                        skip_exit: end_skip,
+                    },
                     nav_override,
                     CaptureEffects::default(),
                 )

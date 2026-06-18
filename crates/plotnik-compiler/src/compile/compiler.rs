@@ -12,7 +12,7 @@ use crate::emit::StringTableBuilder;
 use crate::parser::Expr;
 use plotnik_bytecode::Nav;
 
-use super::capture::CaptureEffects;
+use super::capture::ExprCtx;
 use super::collapse_up::collapse_up;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
@@ -159,7 +159,7 @@ impl<'a> Compiler<'a> {
         exit: Label,
         nav_override: Option<Nav>,
     ) -> Label {
-        self.compile_expr_inner(expr, exit, nav_override, CaptureEffects::default())
+        self.compile_expr_inner(expr, ExprCtx::with_nav(exit, nav_override))
     }
 
     /// Compile an expression with navigation override and capture effects.
@@ -169,32 +169,19 @@ impl<'a> Compiler<'a> {
     /// - Sequences: effects go on last item
     /// - Alternations: effects go on each branch
     /// - Other wrappers: effects propagate through
-    pub(super) fn compile_expr_inner(
-        &mut self,
-        expr: &Expr,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
-    ) -> Label {
+    pub(super) fn compile_expr_inner(&mut self, expr: &Expr, ctx: ExprCtx) -> Label {
         match expr {
-            Expr::NamedNode(n) => self.compile_named_node_inner(n, exit, nav_override, capture),
-            Expr::AnonymousNode(n) => {
-                self.compile_anonymous_node_inner(n, exit, nav_override, capture)
+            Expr::NamedNode(n) => self.compile_named_node_inner(n, ctx),
+            Expr::AnonymousNode(n) => self.compile_anonymous_node_inner(n, ctx),
+            Expr::SeqExpr(s) => self.compile_seq_inner(s, ctx),
+            Expr::AltExpr(a) => self.compile_alt_inner(a, ctx),
+            Expr::CapturedExpr(c) => {
+                let ExprCtx { exit, nav, capture } = ctx;
+                self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
             }
-            Expr::SeqExpr(s) => self.compile_seq_inner(s, exit, nav_override, capture),
-            Expr::AltExpr(a) => self.compile_alt_inner(a, exit, nav_override, capture),
-            Expr::CapturedExpr(c) => self.compile_captured(
-                c,
-                c.inner(),
-                nav_override,
-                capture,
-                CaptureExits::Single(exit),
-            ),
-            Expr::QuantifiedExpr(q) => {
-                self.compile_quantified_inner(q, exit, nav_override, capture)
-            }
-            Expr::FieldExpr(f) => self.compile_field_inner(f, exit, nav_override, capture),
-            Expr::Ref(r) => self.compile_ref_inner(r, exit, nav_override, None, capture),
+            Expr::QuantifiedExpr(q) => self.compile_quantified_inner(q, ctx),
+            Expr::FieldExpr(f) => self.compile_field_inner(f, ctx),
+            Expr::Ref(r) => self.compile_ref_inner(r, ctx, None),
         }
     }
 }

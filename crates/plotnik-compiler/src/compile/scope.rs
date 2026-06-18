@@ -10,7 +10,7 @@ use crate::parser::Expr;
 use plotnik_bytecode::{EffectOpcode, Nav};
 
 use super::Compiler;
-use super::capture::CaptureEffects;
+use super::capture::{CaptureEffects, ExprCtx};
 
 #[derive(Clone, Copy, Debug)]
 pub struct StructScope(pub TypeId);
@@ -41,6 +41,56 @@ impl CaptureExits {
         match self {
             CaptureExits::Single(exit) => exit,
             CaptureExits::Split { match_exit, .. } => match_exit,
+        }
+    }
+}
+
+/// The two distinct continuations a skippable expression (`?`/`*`) routes to:
+/// the matched path and the zero-match skip path. Bundling them keeps the two
+/// adjacent `Label`s from being transposed at a call site.
+#[derive(Clone, Copy)]
+pub(super) struct SplitExits {
+    pub match_exit: Label,
+    pub skip_exit: Label,
+}
+
+/// The per-capture inputs shared by every capture lowering. The continuation is
+/// not among them: it is a sibling argument whose type encodes the capability —
+/// the scope-emitting helpers ([`Compiler::compile_struct_capture`] /
+/// [`Compiler::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
+/// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
+/// `SetAfter`) take a plain [`Label`] — they own no skip path, so a `Split` is
+/// unrepresentable for them rather than silently collapsed via `match_exit`.
+pub(super) struct CaptureRequest<'a> {
+    pub inner: &'a Expr,
+    pub nav: Option<Nav>,
+    pub capture_effects: Vec<EffectIR>,
+    pub outer_capture: CaptureEffects,
+}
+
+/// `prefer` is tried first when greedy, `other` first when non-greedy. Bundled
+/// so the two same-type `Label`s can't be transposed — a swap would silently
+/// flip greediness.
+#[derive(Clone, Copy)]
+pub(super) struct BranchTargets {
+    pub prefer: Label,
+    pub other: Label,
+}
+
+/// Emitted in order after a scope-closing epsilon (`EndArr`/`EndObj`): the
+/// capture's own value effects first, then the enclosing scope's. Bundled so the
+/// two same-type slices can't be transposed at a call site.
+#[derive(Clone, Copy)]
+pub(super) struct EndScopeEffects<'a> {
+    pub capture: &'a [EffectIR],
+    pub outer: &'a [EffectIR],
+}
+
+impl EndScopeEffects<'_> {
+    pub(super) fn none() -> Self {
+        Self {
+            capture: &[],
+            outer: &[],
         }
     }
 }
@@ -97,41 +147,47 @@ impl Compiler<'_> {
     /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_struct_capture(
         &mut self,
-        inner: &Expr,
-        nav_override: Option<Nav>,
-        scope_type_id: Option<TypeId>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
+        req: CaptureRequest<'_>,
         exits: CaptureExits,
     ) -> Label {
+        let CaptureRequest {
+            inner,
+            nav,
+            capture_effects,
+            outer_capture,
+        } = req;
+        // The struct scope's type drives the inner captures' Set member resolution.
+        let scope_type_id = self
+            .ctx
+            .type_ctx
+            .get_term_info(inner)
+            .and_then(|info| info.flow.type_id());
+
+        let end_effects = EndScopeEffects {
+            capture: &capture_effects,
+            outer: &outer_capture.post,
+        };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let endobj =
-                    self.emit_endobj_step_with_effects(&capture_effects, &outer_capture.post, exit);
+                let endobj = self.emit_endobj_step_with_effects(end_effects, exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
-                    this.compile_expr_with_nav(inner, endobj, nav_override)
+                    this.compile_expr_with_nav(inner, endobj, nav)
                 })
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let match_endobj = self.emit_endobj_step_with_effects(
-                    &capture_effects,
-                    &outer_capture.post,
-                    match_exit,
-                );
-                let skip_endobj = self.emit_endobj_step_with_effects(
-                    &capture_effects,
-                    &outer_capture.post,
-                    skip_exit,
-                );
+                let match_endobj = self.emit_endobj_step_with_effects(end_effects, match_exit);
+                let skip_endobj = self.emit_endobj_step_with_effects(end_effects, skip_exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
                     this.compile_skippable_with_exits(
                         inner,
-                        match_endobj,
-                        skip_endobj,
-                        nav_override,
+                        SplitExits {
+                            match_exit: match_endobj,
+                            skip_exit: skip_endobj,
+                        },
+                        nav,
                         CaptureEffects::default(),
                     )
                 })
@@ -170,7 +226,14 @@ impl Compiler<'_> {
             };
 
             let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
-            return self.compile_expr_inner(inner, actual_exit, nav_override, inner_capture);
+            return self.compile_expr_inner(
+                inner,
+                ExprCtx {
+                    exit: actual_exit,
+                    nav: nav_override,
+                    capture: inner_capture,
+                },
+            );
         }
 
         // EndObj carries ONLY outer_capture effects (e.g. Push), not capture_effects,
@@ -187,7 +250,16 @@ impl Compiler<'_> {
         let inner_capture = CaptureEffects::new_post(capture_effects);
         let inner_entry = self.with_scope(
             scope_type_id.expect("scope_type_id is Some after the early return on None above"),
-            |this| this.compile_expr_inner(inner, endobj_step, nav_override, inner_capture),
+            |this| {
+                this.compile_expr_inner(
+                    inner,
+                    ExprCtx {
+                        exit: endobj_step,
+                        nav: nav_override,
+                        capture: inner_capture,
+                    },
+                )
+            },
         );
 
         let obj_step = self.fresh_label();
@@ -234,18 +306,13 @@ impl Compiler<'_> {
         obj_step
     }
 
-    pub(super) fn emit_endarr_step(
-        &mut self,
-        capture_effects: &[EffectIR],
-        outer_effects: &[EffectIR],
-        exit: Label,
-    ) -> Label {
+    pub(super) fn emit_endarr_step(&mut self, effects: EndScopeEffects<'_>, exit: Label) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
                 .post_effect(EffectIR::end_arr())
-                .post_effects(capture_effects.iter().cloned())
-                .post_effects(outer_effects.iter().cloned())
+                .post_effects(effects.capture.iter().cloned())
+                .post_effects(effects.outer.iter().cloned())
                 .into(),
         );
         label
@@ -258,7 +325,7 @@ impl Compiler<'_> {
 
     /// Emit an EndObj epsilon step (no capture or outer effects).
     pub(super) fn emit_endobj_step(&mut self, successor: Label) -> Label {
-        self.emit_endobj_step_with_effects(&[], &[], successor)
+        self.emit_endobj_step_with_effects(EndScopeEffects::none(), successor)
     }
 
     /// Emit an EndObj epsilon step carrying capture + outer effects.
@@ -268,16 +335,15 @@ impl Compiler<'_> {
     /// on each exit.
     pub(super) fn emit_endobj_step_with_effects(
         &mut self,
-        capture_effects: &[EffectIR],
-        outer_effects: &[EffectIR],
+        effects: EndScopeEffects<'_>,
         exit: Label,
     ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
                 .post_effect(EffectIR::end_obj())
-                .post_effects(capture_effects.iter().cloned())
-                .post_effects(outer_effects.iter().cloned())
+                .post_effects(effects.capture.iter().cloned())
+                .post_effects(effects.outer.iter().cloned())
                 .into(),
         );
         label
@@ -451,25 +517,21 @@ impl Compiler<'_> {
             .push(MatchIR::epsilon(label, successor).nav(nav).into());
     }
 
-    /// Emit an epsilon branch preferring `prefer` when greedy, `other` when non-greedy.
-    pub(super) fn emit_branch_epsilon(
-        &mut self,
-        prefer: Label,
-        other: Label,
-        is_greedy: bool,
-    ) -> Label {
+    /// Emit an epsilon branch preferring `targets.prefer` when greedy,
+    /// `targets.other` when non-greedy.
+    pub(super) fn emit_branch_epsilon(&mut self, targets: BranchTargets, is_greedy: bool) -> Label {
         let entry = self.fresh_label();
-        self.emit_branch_epsilon_at(entry, prefer, other, is_greedy);
+        self.emit_branch_epsilon_at(entry, targets, is_greedy);
         entry
     }
 
     pub(super) fn emit_branch_epsilon_at(
         &mut self,
         label: Label,
-        prefer: Label,
-        other: Label,
+        targets: BranchTargets,
         is_greedy: bool,
     ) {
+        let BranchTargets { prefer, other } = targets;
         let successors = if is_greedy {
             vec![prefer, other]
         } else {
@@ -507,7 +569,14 @@ impl Compiler<'_> {
         let retry = self.fresh_label();
         self.emit_wildcard_nav(retry, Nav::Next, try_label);
 
-        self.emit_branch_epsilon_at(try_label, body, retry, true);
+        self.emit_branch_epsilon_at(
+            try_label,
+            BranchTargets {
+                prefer: body,
+                other: retry,
+            },
+            true,
+        );
 
         let navigate = self.fresh_label();
         self.emit_wildcard_nav(navigate, nav, try_label);

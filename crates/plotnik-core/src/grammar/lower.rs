@@ -5,11 +5,11 @@ use std::collections::BTreeSet;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::raw::{
-    RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
+    RawGrammar, RawPrecedence as PlotnikPrecedence, RawPrecedenceEntry as PlotnikPrecedenceEntry,
     RawRule as PlotnikRule,
 };
 use super::{
-    node_shapes,
+    node_shapes::{self, GrammarContext},
     prepared::{
         InlinedProductionMap, LexicalGrammar, PrecedenceEntry, Production, ReservedWordContext,
         SyntaxGrammar, Variable, VariableType,
@@ -21,44 +21,120 @@ use super::{
 const TREE_SITTER_PUBLIC_NAME_SEPARATOR: char = '\0';
 const FIRST_SYMBOL_POSITION_AFTER_END: usize = 1;
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn retain_reachable_rules(
-    variables: &mut Vec<Variable>,
-    extra_symbols: &mut Vec<Rule>,
-    expected_conflicts: &mut Vec<Vec<String>>,
-    precedence_orderings: &mut Vec<Vec<PrecedenceEntry>>,
-    external_tokens: &mut Vec<Rule>,
-    variables_to_inline: &mut Vec<String>,
-    supertype_symbols: &mut Vec<String>,
-    word_token: Option<&str>,
-    reserved_words: &mut [ReservedWordContext<Rule>],
-) {
-    let used = reachable_rule_names(
-        variables,
-        word_token,
-        extra_symbols,
-        external_tokens,
-        reserved_words,
-    );
-    let dropped = variables
-        .iter()
-        .filter(|variable| !used.contains(variable.name.as_str()))
-        .map(|variable| variable.name.clone())
-        .collect::<Vec<_>>();
+pub(super) struct LoweredGrammar {
+    pub variables: Vec<Variable>,
+    pub extra_symbols: Vec<Rule>,
+    pub expected_conflicts: Vec<Vec<String>>,
+    pub precedence_orderings: Vec<Vec<PrecedenceEntry>>,
+    pub external_tokens: Vec<Rule>,
+    pub variables_to_inline: Vec<String>,
+    pub supertype_symbols: Vec<String>,
+    pub word_token: Option<String>,
+    pub reserved_words: Vec<ReservedWordContext<Rule>>,
+}
 
-    variables.retain(|variable| used.contains(variable.name.as_str()));
+#[derive(Clone, Copy)]
+pub(super) struct PreResolveGrammar<'a> {
+    pub variables: &'a [Variable],
+    pub extra_symbols: &'a [Rule],
+    pub expected_conflicts: &'a [Vec<String>],
+    pub external_tokens: &'a [Rule],
+    pub variables_to_inline: &'a [String],
+    pub supertype_symbols: &'a [String],
+    pub word_token: Option<&'a str>,
+    pub reserved_words: &'a [ReservedWordContext<Rule>],
+}
 
-    for name in &dropped {
-        remove_dropped_rule_references(
-            name,
-            extra_symbols,
-            expected_conflicts,
-            precedence_orderings,
-            external_tokens,
-            variables_to_inline,
-            supertype_symbols,
-            reserved_words,
+impl LoweredGrammar {
+    pub fn from_raw(raw: &RawGrammar) -> Self {
+        Self {
+            variables: raw
+                .rules
+                .iter()
+                .map(|(name, rule)| Variable {
+                    name: name.clone(),
+                    kind: VariableType::Named,
+                    rule: convert_rule(rule),
+                })
+                .collect(),
+            extra_symbols: raw.extras.iter().map(convert_rule).collect(),
+            expected_conflicts: raw.conflicts.clone(),
+            precedence_orderings: raw
+                .precedences
+                .iter()
+                .map(|entries| entries.iter().map(convert_precedence_entry).collect())
+                .collect(),
+            external_tokens: raw.externals.iter().map(convert_rule).collect(),
+            variables_to_inline: raw.inline.clone(),
+            supertype_symbols: raw.supertypes.clone(),
+            word_token: raw.word.clone(),
+            reserved_words: raw
+                .reserved
+                .iter()
+                .map(|(name, rules)| ReservedWordContext {
+                    name: name.clone(),
+                    reserved_words: rules.iter().map(convert_rule).collect(),
+                })
+                .collect(),
+        }
+    }
+
+    pub fn pre_resolve(&self) -> PreResolveGrammar<'_> {
+        PreResolveGrammar {
+            variables: &self.variables,
+            extra_symbols: &self.extra_symbols,
+            expected_conflicts: &self.expected_conflicts,
+            external_tokens: &self.external_tokens,
+            variables_to_inline: &self.variables_to_inline,
+            supertype_symbols: &self.supertype_symbols,
+            word_token: self.word_token.as_deref(),
+            reserved_words: &self.reserved_words,
+        }
+    }
+
+    pub fn retain_reachable_rules(&mut self) {
+        let used = reachable_rule_names(
+            &self.variables,
+            self.word_token.as_deref(),
+            &self.extra_symbols,
+            &self.external_tokens,
+            &self.reserved_words,
         );
+        let dropped = self
+            .variables
+            .iter()
+            .filter(|variable| !used.contains(variable.name.as_str()))
+            .map(|variable| variable.name.clone())
+            .collect::<Vec<_>>();
+
+        self.variables
+            .retain(|variable| used.contains(variable.name.as_str()));
+
+        let dropped: FxHashSet<&str> = dropped.iter().map(String::as_str).collect();
+        self.remove_dropped_rule_references(&dropped);
+    }
+
+    fn remove_dropped_rule_references(&mut self, dropped: &FxHashSet<&str>) {
+        self.expected_conflicts
+            .retain(|conflict| !conflict.iter().any(|symbol| dropped.contains(symbol.as_str())));
+        self.supertype_symbols
+            .retain(|symbol| !dropped.contains(symbol.as_str()));
+        self.variables_to_inline
+            .retain(|symbol| !dropped.contains(symbol.as_str()));
+        self.extra_symbols
+            .retain(|rule| !rule_references_any(rule, dropped, true));
+        self.external_tokens
+            .retain(|rule| !rule_references_any(rule, dropped, true));
+        self.precedence_orderings.retain(|ordering| {
+            !ordering.iter().any(|entry| {
+                matches!(entry, PrecedenceEntry::Symbol(symbol) if dropped.contains(symbol.as_str()))
+            })
+        });
+        for context in &mut self.reserved_words {
+            context
+                .reserved_words
+                .retain(|rule| !rule_references_any(rule, dropped, false));
+        }
     }
 }
 
@@ -106,42 +182,14 @@ fn reachable_rule_names<'a>(
     visited.into_iter().map(String::from).collect()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn remove_dropped_rule_references(
-    name: &str,
-    extra_symbols: &mut Vec<Rule>,
-    expected_conflicts: &mut Vec<Vec<String>>,
-    precedence_orderings: &mut Vec<Vec<PrecedenceEntry>>,
-    external_tokens: &mut Vec<Rule>,
-    variables_to_inline: &mut Vec<String>,
-    supertype_symbols: &mut Vec<String>,
-    reserved_words: &mut [ReservedWordContext<Rule>],
-) {
-    expected_conflicts.retain(|conflict| !conflict.iter().any(|symbol| symbol == name));
-    supertype_symbols.retain(|symbol| symbol != name);
-    variables_to_inline.retain(|symbol| symbol != name);
-    extra_symbols.retain(|rule| !rule_is_referenced(rule, name, true));
-    external_tokens.retain(|rule| !rule_is_referenced(rule, name, true));
-    precedence_orderings.retain(|ordering| {
-        !ordering
-            .iter()
-            .any(|entry| matches!(entry, PrecedenceEntry::Symbol(symbol) if symbol == name))
-    });
-    for context in reserved_words {
-        context
-            .reserved_words
-            .retain(|rule| !rule_is_referenced(rule, name, false));
-    }
-}
-
 fn collect_referenced_names<'a>(rule: &'a Rule, skip_top_level: bool, out: &mut Vec<&'a str>) {
     for_each_referenced_name(rule, skip_top_level, &mut |name| out.push(name));
 }
 
-fn rule_is_referenced(rule: &Rule, target: &str, skip_top_level: bool) -> bool {
+fn rule_references_any(rule: &Rule, targets: &FxHashSet<&str>, skip_top_level: bool) -> bool {
     let mut found = false;
     for_each_referenced_name(rule, skip_top_level, &mut |name| {
-        found |= name == target;
+        found |= targets.contains(name);
     });
     found
 }
@@ -280,6 +328,11 @@ pub(super) fn derive_symbols(
     inlines: &InlinedProductionMap,
     default_aliases: &AliasMap,
 ) -> Vec<NodeSymbol> {
+    let ctx = GrammarContext {
+        syntax: syntax_grammar,
+        lexical: lexical_grammar,
+        aliases: default_aliases,
+    };
     let symbol_order = derive_symbol_order(syntax_grammar, lexical_grammar);
     let symbol_ids = symbol_ids(&symbol_order);
     let symbol_map = public_symbol_map(
@@ -288,15 +341,11 @@ pub(super) fn derive_symbols(
         &symbol_order,
         default_aliases,
     );
-    let unique_aliases = unique_aliases(
-        syntax_grammar,
-        lexical_grammar,
-        inlines,
-        &symbol_order,
-        default_aliases,
-        &symbol_ids,
-        &symbol_map,
-    );
+    let resolution = SymbolResolution {
+        ids: &symbol_ids,
+        map: &symbol_map,
+    };
+    let unique_aliases = unique_aliases(ctx, inlines, &symbol_order, resolution);
 
     let mut symbols = Vec::new();
     for symbol in &symbol_order {
@@ -305,8 +354,7 @@ pub(super) fn derive_symbols(
             || metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol),
             |alias| (alias.value.as_str(), alias.kind()),
         );
-        let (visible, named, supertype) =
-            symbol_visibility(syntax_grammar, *symbol, kind, default_aliases);
+        let visibility = symbol_visibility(syntax_grammar, *symbol, kind, default_aliases);
 
         if public_id == 0 {
             continue;
@@ -315,9 +363,9 @@ pub(super) fn derive_symbols(
         symbols.push(NodeSymbol {
             id: public_id,
             type_name: public_node_type_name(type_name),
-            named,
-            visible,
-            supertype,
+            named: visibility.named,
+            visible: visibility.visible,
+            supertype: visibility.supertype,
             terminal: symbol.is_terminal() || symbol.is_external(),
         });
     }
@@ -456,33 +504,31 @@ fn public_symbol_map(
     symbol_map
 }
 
+/// The public symbol id assignment paired with the canonical-symbol map that
+/// `unique_aliases` consults to decide whether an alias already names an existing symbol.
+#[derive(Clone, Copy)]
+struct SymbolResolution<'a> {
+    ids: &'a rustc_hash::FxHashMap<Symbol, u16>,
+    map: &'a rustc_hash::FxHashMap<Symbol, Symbol>,
+}
+
 fn unique_aliases(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
+    ctx: GrammarContext<'_>,
     inlines: &InlinedProductionMap,
     symbols: &[Symbol],
-    default_aliases: &AliasMap,
-    symbol_ids: &rustc_hash::FxHashMap<Symbol, u16>,
-    symbol_map: &rustc_hash::FxHashMap<Symbol, Symbol>,
+    resolution: SymbolResolution<'_>,
 ) -> Vec<Alias> {
     let mut aliases = Vec::new();
 
-    for_each_metadata_production(syntax_grammar, inlines, |production| {
+    for_each_metadata_production(ctx.syntax, inlines, |production| {
         for alias in production
             .steps
             .iter()
             .filter_map(|step| step.alias.as_ref())
         {
-            let has_existing_symbol = symbols_for_alias(
-                syntax_grammar,
-                lexical_grammar,
-                symbols,
-                default_aliases,
-                alias,
-            )
-            .first()
-            .and_then(|symbol| symbol_map.get(symbol))
-            .is_some_and(|symbol| symbol_ids.contains_key(symbol));
+            let has_existing_symbol = symbol_for_alias(ctx, symbols, alias)
+                .and_then(|symbol| resolution.map.get(&symbol))
+                .is_some_and(|symbol| resolution.ids.contains_key(symbol));
 
             if has_existing_symbol {
                 continue;
@@ -513,27 +559,16 @@ fn for_each_metadata_production(
     }
 }
 
-fn symbols_for_alias(
-    syntax_grammar: &SyntaxGrammar,
-    lexical_grammar: &LexicalGrammar,
-    symbols: &[Symbol],
-    default_aliases: &AliasMap,
-    alias: &Alias,
-) -> Vec<Symbol> {
-    symbols
-        .iter()
-        .copied()
-        .filter(|symbol| {
-            default_aliases.get(symbol).map_or_else(
-                || {
-                    let (name, kind) =
-                        metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol);
-                    name == alias.value && kind == alias.kind()
-                },
-                |default_alias| default_alias == alias,
-            )
-        })
-        .collect()
+fn symbol_for_alias(ctx: GrammarContext<'_>, symbols: &[Symbol], alias: &Alias) -> Option<Symbol> {
+    symbols.iter().copied().find(|symbol| {
+        ctx.aliases.get(symbol).map_or_else(
+            || {
+                let (name, kind) = metadata_for_symbol(ctx.syntax, ctx.lexical, *symbol);
+                name == alias.value && kind == alias.kind()
+            },
+            |default_alias| default_alias == alias,
+        )
+    })
 }
 
 fn metadata_for_symbol<'a>(
@@ -558,24 +593,46 @@ fn metadata_for_symbol<'a>(
     }
 }
 
+struct SymbolVisibility {
+    visible: bool,
+    named: bool,
+    supertype: bool,
+}
+
 fn symbol_visibility(
     syntax_grammar: &SyntaxGrammar,
     symbol: Symbol,
     kind: VariableType,
     default_aliases: &AliasMap,
-) -> (bool, bool, bool) {
+) -> SymbolVisibility {
     if let Some(alias) = default_aliases.get(&symbol) {
-        return (true, alias.is_named, false);
+        return SymbolVisibility {
+            visible: true,
+            named: alias.is_named,
+            supertype: false,
+        };
     }
 
     match kind {
-        VariableType::Named => (true, true, false),
-        VariableType::Anonymous => (true, false, false),
-        VariableType::Hidden => (
-            false,
-            true,
-            syntax_grammar.supertype_symbols.contains(&symbol),
-        ),
-        VariableType::Auxiliary => (false, false, false),
+        VariableType::Named => SymbolVisibility {
+            visible: true,
+            named: true,
+            supertype: false,
+        },
+        VariableType::Anonymous => SymbolVisibility {
+            visible: true,
+            named: false,
+            supertype: false,
+        },
+        VariableType::Hidden => SymbolVisibility {
+            visible: false,
+            named: true,
+            supertype: syntax_grammar.supertype_symbols.contains(&symbol),
+        },
+        VariableType::Auxiliary => SymbolVisibility {
+            visible: false,
+            named: false,
+            supertype: false,
+        },
     }
 }

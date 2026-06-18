@@ -197,8 +197,8 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         TermInfo::new(arity, flow)
     }
 
-    /// Merge `source` fields into `target`, reporting a diagnostic on any name
-    /// collision. Shared by sequences and named nodes so both paths reject
+    /// Fold `source` fields into `target` in place, reporting a diagnostic on any
+    /// name collision. Shared by sequences and named nodes so both paths reject
     /// duplicate captures identically.
     fn merge_fields(
         &mut self,
@@ -478,18 +478,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
     }
 
     fn infer_quantified_expr(&mut self, quant: &QuantifiedExpr) -> TermInfo {
-        self.infer_quantified_expr_impl(quant, false)
-    }
-
-    fn infer_quantified_expr_as_row(&mut self, quant: &QuantifiedExpr) -> TermInfo {
-        self.infer_quantified_expr_impl(quant, true)
-    }
-
-    fn infer_quantified_expr_impl(
-        &mut self,
-        quant: &QuantifiedExpr,
-        is_row_capture: bool,
-    ) -> TermInfo {
         let Some(inner) = quant.inner() else {
             return TermInfo::void();
         };
@@ -500,9 +488,34 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                // Always check multi-element sequences (row capture doesn't help)
-                // Only skip internal capture check when is_row_capture
-                self.check_strict_dimensionality(quant, &inner_info, is_row_capture);
+                // A bare quantifier must satisfy both strict-dimensionality checks:
+                // multi-element scalars short-circuit, otherwise internal captures
+                // require a row capture this expression doesn't have.
+                if !self.check_multi_element_scalar(quant, &inner_info) {
+                    self.check_internal_capture_dimensionality(quant, &inner_info);
+                }
+                self.make_flow_array(inner_info.flow, &inner, quantifier.is_non_empty())
+            }
+        };
+
+        TermInfo::new(inner_info.arity, flow)
+    }
+
+    fn infer_quantified_expr_as_row(&mut self, quant: &QuantifiedExpr) -> TermInfo {
+        let Some(inner) = quant.inner() else {
+            return TermInfo::void();
+        };
+
+        let inner_info = self.infer_expr(&inner);
+        let quantifier = self.parse_quantifier(quant);
+
+        let flow = match quantifier {
+            QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                // The surrounding row capture supplies the missing dimension, so only
+                // the multi-element scalar check still applies; internal captures are
+                // legal here.
+                self.check_multi_element_scalar(quant, &inner_info);
                 self.make_flow_array(inner_info.flow, &inner, quantifier.is_non_empty())
             }
         };
@@ -546,9 +559,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 TypeFlow::Scalar(array_type)
             }
             TypeFlow::Bubble(struct_type) => {
-                // `check_strict_dimensionality` already emitted an error for this case
-                // (Bubble under * or + without a row capture). We still produce a
-                // plausible array type so downstream inference isn't poisoned by void.
+                // `check_internal_capture_dimensionality` already emitted an error for
+                // this case (Bubble under * or + without a row capture). We still
+                // produce a plausible array type so downstream inference isn't poisoned
+                // by void.
                 let array_type = self.ctx.type_ctx.intern_type(TypeShape::Array {
                     element: struct_type,
                     non_empty,
@@ -598,47 +612,43 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         builder.emit();
     }
 
-    /// Check strict dimensionality rule for * and + quantifiers.
-    ///
-    /// Two checks:
-    /// 1. Multi-element patterns (Arity::Many) without captures can't be scalar arrays
-    ///    (applies regardless of is_row_capture - row capture doesn't help here)
-    /// 2. Internal captures require a row capture on the quantifier
-    ///    (skipped when is_row_capture=true)
-    fn check_strict_dimensionality(
+    /// Strict-dimensionality check 1: a multi-element pattern (`Arity::Many`)
+    /// without captures can't become a scalar array. Applies even under a row
+    /// capture — you can't meaningfully capture multiple nodes per iteration as
+    /// a scalar. Returns `true` when it reports, signalling the caller to skip
+    /// the internal-capture check (the original short-circuit).
+    fn check_multi_element_scalar(
         &mut self,
         quant: &QuantifiedExpr,
         inner_info: &TermInfo,
-        is_row_capture: bool,
+    ) -> bool {
+        if !(inner_info.arity == Arity::Many && inner_info.flow.is_void()) {
+            return false;
+        }
+
+        let op = self.quantifier_operator(quant);
+        self.ctx
+            .reporter
+            .report(
+                DiagnosticKind::MultiElementScalarCapture,
+                quant.text_range(),
+            )
+            .message(format!(
+                "sequence with `{}` matches multiple nodes but has no internal captures",
+                op
+            ))
+            .emit();
+        true
+    }
+
+    /// Strict-dimensionality check 2: internal captures require a row capture on
+    /// the quantifier. Skipped when the quantifier already sits under a row
+    /// capture (see `infer_quantified_expr_as_row`).
+    fn check_internal_capture_dimensionality(
+        &mut self,
+        quant: &QuantifiedExpr,
+        inner_info: &TermInfo,
     ) {
-        let op = quant
-            .operator()
-            .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "*".to_string());
-
-        // Check 1: Multi-element patterns without captures can't be scalar arrays
-        // This check applies even with row capture - you can't meaningfully capture
-        // multiple nodes per iteration as a scalar
-        if inner_info.arity == Arity::Many && inner_info.flow.is_void() {
-            self.ctx
-                .reporter
-                .report(
-                    DiagnosticKind::MultiElementScalarCapture,
-                    quant.text_range(),
-                )
-                .message(format!(
-                    "sequence with `{}` matches multiple nodes but has no internal captures",
-                    op
-                ))
-                .emit();
-            return;
-        }
-
-        // Check 2: Internal captures require row capture (skip if already a row capture)
-        if is_row_capture {
-            return;
-        }
-
         let TypeFlow::Bubble(type_id) = &inner_info.flow else {
             return;
         };
@@ -654,6 +664,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             .collect();
         let captures_str = capture_names.join(", ");
 
+        let op = self.quantifier_operator(quant);
         self.ctx
             .reporter
             .report(
@@ -666,6 +677,13 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
             ))
             .hint(format!("add a struct capture: `{{...}}{} @name`", op))
             .emit();
+    }
+
+    fn quantifier_operator(&self, quant: &QuantifiedExpr) -> String {
+        quant
+            .operator()
+            .map(|t| t.text().to_string())
+            .unwrap_or_else(|| "*".to_string())
     }
 
     fn parse_quantifier(&self, quant: &QuantifiedExpr) -> QuantifierKind {
@@ -823,39 +841,33 @@ fn infer_root(ctx: InferenceContext, root: &Root) {
     visitor.visit(root);
 }
 
-/// Orchestrates type inference across all definitions in dependency order.
-pub(super) struct InferencePass<'a> {
-    ctx: TypeContext,
-    interner: &'a mut Interner,
-    ast_map: &'a IndexMap<SourceId, Root>,
-    symbol_table: &'a SymbolTable,
-    dependency_analysis: &'a DependencyAnalysis,
-    diag: &'a mut Diagnostics,
+pub(super) struct AnalysisCtx<'a, 'd> {
+    pub interner: &'a mut Interner,
+    pub ast_map: &'a IndexMap<SourceId, Root>,
+    pub symbol_table: &'a SymbolTable,
+    pub dependency_analysis: &'a DependencyAnalysis,
+    pub diag: &'d mut Diagnostics,
 }
 
-impl<'a> InferencePass<'a> {
-    pub fn new(
-        interner: &'a mut Interner,
-        ast_map: &'a IndexMap<SourceId, Root>,
-        symbol_table: &'a SymbolTable,
-        dependency_analysis: &'a DependencyAnalysis,
-        diag: &'a mut Diagnostics,
-    ) -> Self {
+/// Orchestrates type inference across all definitions in dependency order.
+pub(super) struct InferencePass<'a, 'd> {
+    ctx: TypeContext,
+    analysis: AnalysisCtx<'a, 'd>,
+}
+
+impl<'a, 'd> InferencePass<'a, 'd> {
+    pub fn new(analysis: AnalysisCtx<'a, 'd>) -> Self {
         Self {
             ctx: TypeContext::new(),
-            interner,
-            ast_map,
-            symbol_table,
-            dependency_analysis,
-            diag,
+            analysis,
         }
     }
 
     pub fn run(mut self) -> TypeContext {
         // Avoid re-registration of definitions
         self.ctx.seed_defs(
-            self.dependency_analysis.def_names(),
-            self.dependency_analysis.name_to_def(),
+            self.analysis.dependency_analysis.def_names(),
+            self.analysis.dependency_analysis.name_to_def(),
         );
 
         self.mark_recursion();
@@ -867,12 +879,12 @@ impl<'a> InferencePass<'a> {
 
     /// Identify and mark recursive definitions.
     fn mark_recursion(&mut self) {
-        for scc in self.dependency_analysis.sccs() {
+        for scc in self.analysis.dependency_analysis.sccs() {
             for def_name in scc {
-                if !self.dependency_analysis.is_recursive(def_name) {
+                if !self.analysis.dependency_analysis.is_recursive(def_name) {
                     continue;
                 }
-                let sym = self.interner.intern(def_name);
+                let sym = self.analysis.interner.intern(def_name);
                 let Some(def_id) = self.ctx.get_def_id_sym(sym) else {
                     continue;
                 };
@@ -883,9 +895,9 @@ impl<'a> InferencePass<'a> {
 
     /// Process definitions in SCC order (leaves first).
     fn process_sccs(&mut self) {
-        for scc in self.dependency_analysis.sccs() {
+        for scc in self.analysis.dependency_analysis.sccs() {
             for def_name in scc {
-                if let Some(source_id) = self.symbol_table.source_id(def_name) {
+                if let Some(source_id) = self.analysis.symbol_table.source_id(def_name) {
                     self.infer_and_register(def_name, source_id);
                 }
             }
@@ -894,9 +906,12 @@ impl<'a> InferencePass<'a> {
 
     /// Handle any definitions not in an SCC (safety net).
     fn process_orphans(&mut self) {
-        for (name, source_id, _body) in self.symbol_table.iter_full() {
-            // Skip if already processed
-            if self.ctx.get_def_type_by_name(self.interner, name).is_some() {
+        for (name, source_id, _body) in self.analysis.symbol_table.iter_full() {
+            if self
+                .ctx
+                .get_def_type_by_name(self.analysis.interner, name)
+                .is_some()
+            {
                 continue;
             }
             self.infer_and_register(name, source_id);
@@ -904,26 +919,26 @@ impl<'a> InferencePass<'a> {
     }
 
     fn infer_and_register(&mut self, def_name: &str, source_id: SourceId) {
-        let Some(root) = self.ast_map.get(&source_id) else {
+        let Some(root) = self.analysis.ast_map.get(&source_id) else {
             return;
         };
 
         infer_root(
             InferenceContext {
                 type_ctx: &mut self.ctx,
-                interner: self.interner,
-                symbol_table: self.symbol_table,
-                reporter: Reporter::new(source_id, self.diag),
+                interner: self.analysis.interner,
+                symbol_table: self.analysis.symbol_table,
+                reporter: Reporter::new(source_id, self.analysis.diag),
             },
             root,
         );
 
-        if let Some(body) = self.symbol_table.get(def_name)
+        if let Some(body) = self.analysis.symbol_table.get(def_name)
             && let Some(info) = self.ctx.get_term_info(body).cloned()
         {
             let type_id = self.flow_to_type_id(&info.flow);
             self.ctx
-                .set_def_type_by_name(self.interner, def_name, type_id);
+                .set_def_type_by_name(self.analysis.interner, def_name, type_id);
         }
     }
 
